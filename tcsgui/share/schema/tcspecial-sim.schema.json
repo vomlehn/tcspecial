@@ -420,7 +420,9 @@
         "type can",
         "type iio",
         "type rpmsg",
-        "type gpio",
+        "type gpio_in",
+        "type gpio_out",
+        "type gpio_inout",
         "type hdlc"
       ]
     },

@@ -247,10 +247,14 @@ pub enum DHType {
     ///
     /// Experimental; see [`crate::node::payload::rpmsg`].
     Rpmsg,
-    /// A handler whose payload is a set of discrete lines.
+    /// A handler whose payload is a set of discrete lines, watched.
     ///
     /// See [`crate::node::payload::gpio`].
-    Gpio,
+    GpioIn,
+    /// The same, driven.
+    GpioOut,
+    /// The same, some watched and some driven.
+    GpioInout,
     /// A handler whose payload is on a synchronous serial line, which Linux
     /// drives as a network interface.
     ///
@@ -406,7 +410,7 @@ impl DHType {
     /// Every kind, in the order [`DHType::spellings`] lists them: the
     /// interfaces a payload node may be reached over, and the kinds a simulator
     /// file may simulate.
-    pub const ALL: [DHType; 12] = [
+    pub const ALL: [DHType; 14] = [
         DHType::Network,
         DHType::Device,
         DHType::Serial,
@@ -417,7 +421,9 @@ impl DHType {
         DHType::Can,
         DHType::Iio,
         DHType::Rpmsg,
-        DHType::Gpio,
+        DHType::GpioIn,
+        DHType::GpioOut,
+        DHType::GpioInout,
         DHType::Hdlc,
     ];
 
@@ -443,7 +449,9 @@ impl DHType {
             DHType::Can => "can",
             DHType::Iio => "iio",
             DHType::Rpmsg => "rpmsg",
-            DHType::Gpio => "gpio",
+            DHType::GpioIn => "gpio_in",
+            DHType::GpioOut => "gpio_out",
+            DHType::GpioInout => "gpio_inout",
             DHType::Hdlc => "hdlc",
         }
     }
@@ -1144,13 +1152,15 @@ pub struct SpiConfig {
 /// See [`crate::node::payload::gpio`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GpioConfig {
+    /// Which of the three types it is.
+    pub kind: crate::node::payload::gpio::Kind,
     /// The chip's character device: `/dev/gpiochip0`.
     pub path: String,
-    /// The offsets of the lines, lowest first: see
-    /// [`crate::node::payload::gpio::lines_of`].
-    pub lines: Vec<u32>,
-    /// Whether they are watched or driven.
-    pub direction: crate::node::payload::gpio::Direction,
+    /// The offsets of the lines watched, lowest first: see
+    /// [`crate::node::payload::gpio::lines_of`]. None but for a `gpio_in`.
+    pub inputs: Vec<u32>,
+    /// And of the lines driven. None for a `gpio_in`.
+    pub outputs: Vec<u32>,
     /// Which changes of a line are events. Only meaningful on lines that are
     /// watched, and refused on lines that are driven.
     pub edge: crate::LineEdge,
@@ -1169,6 +1179,22 @@ pub struct GpioConfig {
     /// report every so often closes both: after one interval at most, what
     /// the ground has is the truth.
     pub state_interval: Option<Duration>,
+}
+
+impl GpioConfig {
+    /// Every line of the request, watched and driven, lowest first: the
+    /// order the kernel is asked for them in, and so the order it counts
+    /// them by.
+    ///
+    /// # Returns
+    ///
+    /// The offsets.
+    pub fn lines(&self) -> Vec<u32> {
+        let mut lines: Vec<u32> =
+            self.inputs.iter().chain(&self.outputs).copied().collect();
+        lines.sort_unstable();
+        lines
+    }
 }
 
 /// Configuration for an endpoint that is an rpmsg channel
@@ -1329,7 +1355,11 @@ impl EndpointConfig {
             EndpointConfig::Can(_) => DHType::Can,
             EndpointConfig::Iio(_) => DHType::Iio,
             EndpointConfig::Rpmsg(_) => DHType::Rpmsg,
-            EndpointConfig::Gpio(_) => DHType::Gpio,
+            EndpointConfig::Gpio(gpio) => match gpio.kind {
+                crate::node::payload::gpio::Kind::In => DHType::GpioIn,
+                crate::node::payload::gpio::Kind::Out => DHType::GpioOut,
+                crate::node::payload::gpio::Kind::Inout => DHType::GpioInout,
+            },
             EndpointConfig::Hdlc(_) => DHType::Hdlc,
         }
     }
@@ -1518,7 +1548,11 @@ pub(crate) fn kind_of_terms(
         DHType::Can => crate::node::payload::can::group_kind_of(name, wire),
         DHType::Iio => crate::node::payload::iio::group_kind_of(name, wire),
         DHType::Rpmsg => crate::node::payload::rpmsg::group_kind_of(name, wire),
-        DHType::Gpio => crate::node::payload::gpio::group_kind_of(name, wire),
+        DHType::GpioIn | DHType::GpioOut | DHType::GpioInout => {
+            let kind = crate::node::payload::gpio::Kind::of(kind.spelling())
+                .expect("a GPIO kind's spelling is a GPIO type");
+            crate::node::payload::gpio::group_kind_of(name, kind, wire)
+        }
         DHType::Hdlc => crate::node::payload::hdlc::group_kind_of(name, wire),
         other => {
             return Err(format!(

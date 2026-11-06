@@ -296,8 +296,8 @@ impl Simulator {
     /// joins a simulated payload to its payload by that name alone, as
     /// tcssim does, and the reader allows no two nodes one name across every
     /// file of a configuration. So a payload in an included file is
-    /// `gpio-in-tmass` here, never `../thermostat-common/thermostat/
-    /// gpio-in-tmass`, and the settings are held exactly as the file keys
+    /// `gpio-out-tmass1` here, never `../thermostat-common/thermostat/
+    /// gpio-out-tmass1`, and the settings are held exactly as the file keys
     /// them.
     ///
     /// # Arguments
@@ -1349,7 +1349,7 @@ mod tests {
             "  - type i2c:\n",
             "      - payload: temp_1\n        simulate: true\n",
             "        connects: zone.temperature\n",
-            "  - type gpio:\n",
+            "  - type gpio_out:\n",
             "      - payload: heat_1\n        simulate: true\n",
             "        connects: heater_1.on\n",
         );
@@ -1367,7 +1367,7 @@ mod tests {
         // Saved, as every other edit saves the whole file, and read again.
         let payloads = [
             ("temp_1".to_string(), "i2c".to_string()),
-            ("heat_1".to_string(), "gpio".to_string()),
+            ("heat_1".to_string(), "gpio_out".to_string()),
         ];
         let written = to_yaml(&read_in, &payloads);
         let at = |what: &str| written.find(what).expect(what);

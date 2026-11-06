@@ -806,7 +806,9 @@ mod tests {
                 "app_pl",
                 "can",
                 "device-file",
-                "gpio",
+                "gpio_in",
+                "gpio_inout",
+                "gpio_out",
                 "hdlc",
                 "i2c",
                 "i2c_tmass",
@@ -1097,8 +1099,17 @@ mod tests {
             }
             // The same path, with the extension taken off:
             // `vehicle/compute/mean.yaml` is `vehicle/compute/mean.rs`, or
-            // the directory `vehicle/compute/mean/`.
-            let stem = one.path.with_extension("");
+            // the directory `vehicle/compute/mean/` -- but for the three
+            // kinds of discrete lines, which are one module, `payload/gpio/`.
+            let stem = if tcslibgs::node::payload::gpio::Kind::of(
+                &one.path.file_stem().unwrap_or_default().to_string_lossy(),
+            )
+            .is_some()
+            {
+                Path::new("payload/gpio").to_path_buf()
+            } else {
+                one.path.with_extension("")
+            };
             let file = code.join(&stem).with_extension("rs");
             let directory = code.join(&stem);
             assert!(

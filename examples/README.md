@@ -407,7 +407,7 @@ Nothing either does survives a reboot.
 | Directory | Description |
 |---|---|
 | `can` | A motor controller on the CAN bus `vcan0`, as two payloads: its status frames, identifier 0x123, go to the ground, and each command the ground sends goes to it as one frame with identifier 0x124. |
-| `gpio` | Two lines of a GPIO chip: each edge of a switch on line 0 goes to the ground as a sixteen-byte record, and a 1 or 0 from the ground drives a lamp on line 1. |
+| `gpio` | Two lines of a GPIO chip: each edge of a switch on line 0, a `gpio_in`, goes to the ground as a sixteen-byte record, and a 1 or 0 from the ground drives a lamp on line 1, a `gpio_out`. |
 | `iio` | Experimental. A sensor's sample buffer, read through the kernel's IIO subsystem, its whole sample sets going to the ground. Nothing goes up: a buffer is read and never written. |
 
 ### can
@@ -424,7 +424,9 @@ make run-can
 
 ### gpio
 
-The chip is one of the kernel's `gpio-sim`, whose lines exist in memory: a
+The switch is a `gpio_in`, whose line is watched, and the lamp a `gpio_out`,
+whose line is driven: see "A GPIO Payload" in the manual. The chip is one of
+the kernel's `gpio-sim`, whose lines exist in memory: a
 line's `pull` file sets what an input is pulled to, which the kernel reports
 to tcspecial as an edge, and its `value` file says what an output is driven
 to. tcssim pulls the switch's line the other way every second and counts the
@@ -482,20 +484,17 @@ reading goes through a conversion of its own to kelvin -- `temp1`, `temp2`,
 the zone's temperature with it. `thermostat` holds that to a setpoint,
 293.15 K with a half band of 2 K, and drives two heaters, each through a GPIO
 line of its own, `gpio-out-tmass1` and `gpio-out-tmass2`, which go on and off
-together. Its decision is logged and not sent down: what the ground hears is
-`gpio-in-tmass`, two lines on the thermal mass sensing the heaters, read for
-their levels every second, so the ground sees what the heaters are doing
-rather than what they were told. The ground commands the setpoint, and
-`housekeeping` logs the readings, the decisions and the lines in
-`/tmp/telemetry`.
+together. Each switch is a `gpio_inout`: it drives its line, and every second
+sends the ground the last value it was told, so the ground follows the
+heaters on a beat. The ground commands the setpoint, and `housekeeping` logs
+the readings and the decisions in `/tmp/telemetry`.
 
 The sensors are temperature sensors on the zone: `temp_1` and `temp_2` on an
 I2C bus, of type `i2c_tmass`, and `temp_3` a SPI peripheral, of type
 `spi_tmass`. On a desk each is reached over UDP at its `sim_address` on this
 host, ports 5201 to 5203, where tcssim answers with the zone's temperature;
-flown, the buses are opened. The heaters' switches and the lines sensing them
-are lines 2 to 5 of the kernel's dummy GPIO chip, `/dev/gpiochip1`, which
-tcssim moves and watches: make it once with `sudo bin/mk-kernel-dummies gpio`
+flown, the buses are opened. The heaters' switches are lines 4 and 5 of the
+kernel's dummy GPIO chip, `/dev/gpiochip1`, which tcssim watches: make it once with `sudo bin/mk-kernel-dummies gpio`
 (see "Payloads on the kernel's dummy devices", below). The gpio example has
 lines 0 and 1 of it, so the two run at once. The buses themselves are flown
 against simulated devices by `make simulated-devices-test`, with
@@ -512,18 +511,16 @@ cools towards its surroundings, 288.15 K, just inside the
 plot's lower red, which swing half a kelvin over a ninety minute orbit; each
 heater's switch is joined to `heater_1.on` or `heater_2.on`, so the
 heaters warm it while the vehicle has them on: the loop closes through
-tcspecial. tcssim pulls `gpio-in-tmass`'s line 2 to `heater_1.heating`
-and its line 3 to `heater_2.heating`, which are on only while each heater is
-really heating.
+tcspecial.
 The heaters are four watts each, and either alone holds the band, the
 thermostat cycling whichever are working; a heater disabled in tcssim shows
-on its line's strip, and with both disabled the zone falls into the plot's
+in the temperature, and with both disabled the zone falls into the plot's
 lower red.
 
 A heater whose switch's panel in tcssim is not enabled is unpowered, or
 failed: it stays off whatever the thermostat decides, and enabled again it
-takes the latest decision at once. The ground sees it on its line of
-`gpio-in-tmass`, which stays low, and in the temperature.
+takes the latest decision at once. The ground sees it in the temperature: its
+switch goes on reporting what it was told.
 
 ```
 make run-thermostat
@@ -532,12 +529,11 @@ make run-thermostat
 That runs tcsmoc on the example, as `run-simple` does, and tcsmoc opens its
 plot window beside its own: each sensor's temperature and their vote over
 the last ten seconds, a dot at each reading, with the setpoint's rule and the
-thermostat's band, and under them a strip for each line of `gpio-in-tmass`,
-`gpio-in-tmass line 2` and `line 3`, on while its heater is heating. Press
+thermostat's band, and under them a strip for each heater's switch,
+`gpio-out-tmass1` and `gpio-out-tmass2`, on while it was told on. Press
 Connect in tcsmoc, and Enable on each payload in tcssim, to start the data and
 the heating; press Disable on a heater's switch in tcssim to take it away, and
-its strip stays off while the zone falls behind in the cold part of the
-orbit.
+the zone falls behind in the cold part of the orbit.
 
 Languages:
 
@@ -545,8 +541,8 @@ Languages:
 - Vehicle: Rust -- tcspecial, whose conversions, vote, thermostat and log are
   its own nodes.
 - Payload: Rust -- tcssim simulates the three sensors, with the zone
-  they read, and for the heaters' switches and the lines sensing them, on
-  the kernel's simulated GPIO chip.
+  they read, and the heaters' switches, on the kernel's simulated GPIO
+  chip.
 
 ### thermostat-yamcs
 
@@ -567,8 +563,8 @@ ground carries a CCSDS primary header:
 | CONNECT and its answer | up, down | `tcs_cmd.apid`, 0x111 |
 | what Yamcs sends the gateway node | up | its `apid_base`, 0x400 |
 | `ambient` | down | `apid_base` plus its device id, 0x400 |
-| `gpio-in-tmass` | down | 0x402 |
-| `temp1`, `temp2`, `temp3` | down | 0x406 to 0x408 |
+| `gpio-out-tmass1`, `gpio-out-tmass2` | down | 0x402 and 0x403 |
+| `temp1`, `temp2`, `temp3` | down | 0x405 to 0x407 |
 
 `thermostat_yamcs.py` writes Yamcs's configuration with
 `python/tcslib/yamcs_ground.py`, as `ping_yamcs.py` does, its mission
@@ -579,10 +575,10 @@ its data are, by `python/tcslibgs/form.py` -- the Python spelling of
 bridge go by, and nothing a configuration does not already state: a
 conversion's or a vote's value is a float in its unit, with the unit in a
 `UnitSet`, read from its four bytes of a signed count of the unit's steps
-through a calibrator, and lines read for their levels are a record for each
-line, its level a boolean. So Yamcs's web interface, at
-<http://localhost:17090>, shows `ambient` and `temp1` to `temp3` as
-temperatures in K and `gpio-in-tmass_line2` and `_line3` as true or false.
+through a calibrator, and a decision -- what a heater's switch was told -- is
+a boolean. So Yamcs's web interface, at <http://localhost:17090>, shows
+`ambient` and `temp1` to `temp3` as temperatures in K and `gpio-out-tmass1`
+and `gpio-out-tmass2` as true or false.
 
 It starts Yamcs, then tcssim -- every payload sending from the start, as
 though its panel's button had been pressed -- and, once tcssim says it is

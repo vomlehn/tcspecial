@@ -1254,7 +1254,11 @@ pub enum NodeType {
     Rpmsg,
     Network,
     DeviceFile,
-    Gpio,
+    /// Discrete lines watched, driven, and some of each: see
+    /// `tcslibgs::node::payload::gpio::Kind`.
+    GpioIn,
+    GpioOut,
+    GpioInout,
     Compute,
     /// A vehicle node that takes what the ground sends and drops it.
     NullGateway,
@@ -1299,7 +1303,7 @@ pub enum NodeType {
 
 impl NodeType {
     /// Every type, for the palette and for the tests.
-    pub const ALL: [NodeType; 29] = [
+    pub const ALL: [NodeType; 31] = [
         NodeType::I2c,
         NodeType::Spi,
         NodeType::I2cTmass,
@@ -1311,7 +1315,9 @@ impl NodeType {
         NodeType::Rpmsg,
         NodeType::Network,
         NodeType::DeviceFile,
-        NodeType::Gpio,
+        NodeType::GpioIn,
+        NodeType::GpioOut,
+        NodeType::GpioInout,
         NodeType::Compute,
         NodeType::TeeGateway,
         NodeType::TeePayload,
@@ -1351,7 +1357,9 @@ impl NodeType {
             NodeType::Rpmsg => "rpmsg",
             NodeType::Network => "network",
             NodeType::DeviceFile => "device-file",
-            NodeType::Gpio => "gpio",
+            NodeType::GpioIn => "gpio_in",
+            NodeType::GpioOut => "gpio_out",
+            NodeType::GpioInout => "gpio_inout",
             NodeType::Compute => "compute",
             NodeType::NullGateway => "null-gateway",
             NodeType::NullPayload => "null-payload",
@@ -1565,15 +1573,26 @@ impl NodeType {
             // `state_interval`. So none of the words that drive a payload
             // that is read -- a trigger, the rate it goes out at, the delay
             // before reading, the floor between reads -- is one of these.
-            NodeType::Gpio => &[
+            NodeType::GpioIn => &[
                 ("path", true),
                 ("lines", true),
-                ("direction", false),
                 ("edge", false),
                 ("bias", false),
                 ("debounce", false),
                 ("group", false),
                 ("state_interval", false),
+            ],
+            // Driven lines say which, and what they start at, and nothing
+            // about watching: an output has no edges.
+            NodeType::GpioOut => {
+                &[("path", true), ("lines", true), ("init", false)]
+            }
+            // And driven lines that report what they were told, on a beat
+            // they have to say.
+            NodeType::GpioInout => &[
+                ("path", true),
+                ("lines", true),
+                ("state_interval", true),
                 ("init", false),
             ],
             // Every term any computation takes, which is what this list is
@@ -1768,7 +1787,9 @@ impl NodeType {
             | NodeType::Rpmsg
             | NodeType::Network
             | NodeType::DeviceFile => "Devices",
-            NodeType::Gpio => "Driven",
+            NodeType::GpioIn | NodeType::GpioOut | NodeType::GpioInout => {
+                "Discrete lines"
+            }
             NodeType::Compute => "Computation",
             // Where a stream goes both ways, and where one stops.
             NodeType::TeeGateway | NodeType::TeePayload => "Pass-through",
@@ -1838,7 +1859,9 @@ impl NodeType {
             | NodeType::Rpmsg
             | NodeType::Network
             | NodeType::DeviceFile
-            | NodeType::Gpio
+            | NodeType::GpioIn
+            | NodeType::GpioOut
+            | NodeType::GpioInout
             // A payload need not be a device. These two are programs, and
             // what makes them payloads is that they are what the vehicle
             // carries this flight: they are written in the `payloads` section
@@ -2001,18 +2024,23 @@ impl NodeType {
                 weight: Wide,
                 size: (WIDTH, HEIGHT),
             },
-            // Driven rather than read: a payload, so a parallelogram, told from
-            // the others by a dotted line and a plain name.
-            NodeType::Gpio => Appearance {
-                face: Face::Plain,
-                label_size: 14,
-                label_weight: 400,
-                label_italic: false,
-                outline: Parallelogram,
-                edge: Dotted,
-                weight: Narrow,
-                size: (WIDTH, HEIGHT),
-            },
+            // Discrete lines: a payload, so a parallelogram, told from the
+            // others by a dotted line and a plain name. One look for the three
+            // kinds, told apart by their colours and by the type written along
+            // each one's top: see `look::came_later` and the test that holds
+            // every other pair of types to two channels that are not colour.
+            NodeType::GpioIn | NodeType::GpioOut | NodeType::GpioInout => {
+                Appearance {
+                    face: Face::Plain,
+                    label_size: 14,
+                    label_weight: 400,
+                    label_italic: false,
+                    outline: Parallelogram,
+                    edge: Dotted,
+                    weight: Narrow,
+                    size: (WIDTH, HEIGHT),
+                }
+            }
             // Software aboard.
             // The node that sends a payload's data on both ways and does
             // nothing else to it: rounded, because it is software aboard, and
@@ -2514,11 +2542,25 @@ mod tests {
     /// colour and a borrowed shape would satisfy every reviewer and nobody
     /// with deuteranopia. Two channels must differ, not one, so that losing a
     /// channel to a projector or a printer still leaves a distinction.
+    ///
+    /// But for the three kinds of discrete lines, which are drawn alike and
+    /// told apart by colour and by the type written along each one's top, a
+    /// name being a channel that is not colour: they are one device three
+    /// ways round, and drawn as one family.
     #[test]
     fn every_pair_of_types_differs_in_two_things_that_are_not_colour() {
+        let lines = |t: NodeType| {
+            matches!(
+                t,
+                NodeType::GpioIn | NodeType::GpioOut | NodeType::GpioInout
+            )
+        };
         for (a, b) in NodeType::ALL.iter().enumerate().flat_map(|(i, a)| {
             NodeType::ALL[i + 1..].iter().map(move |b| (*a, *b))
         }) {
+            if lines(a) && lines(b) {
+                continue;
+            }
             let one = a.appearance();
             let two = b.appearance();
             let differences = [
@@ -2562,8 +2604,8 @@ mod tests {
         for (i, a) in NodeType::ALL.iter().enumerate() {
             for b in &NodeType::ALL[i + 1..] {
                 assert_ne!(
-                    a.appearance(),
-                    b.appearance(),
+                    (a.appearance(), crate::look::tint_of(a.spelling())),
+                    (b.appearance(), crate::look::tint_of(b.spelling())),
                     "{} and {} are drawn identically",
                     a.spelling(),
                     b.spelling()
@@ -2735,9 +2777,22 @@ mod tests {
         // terminals are drawn on its right; the ground is the right-hand end,
         // and both of its are on its left. Spelled out here because it is
         // the thing a reader of the canvas sees first.
+        //
+        // But for discrete lines, which have terminals on their left as well,
+        // facing the physics pane: what a watched line senses arrives from
+        // the world it is wired to, and what a driven line drives leaves for
+        // it.
         for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {
             for terminal in t.terminals().each() {
-                assert!(!corner_of(terminal).unwrap().left, "{terminal}");
+                let lines =
+                    tcslibgs::node::payload::gpio::Kind::of(t.spelling());
+                let left = corner_of(terminal).unwrap().left;
+                match *terminal {
+                    "world-in" | "moc-out" if lines.is_some() => {
+                        assert!(left, "{} {terminal}", t.spelling());
+                    }
+                    _ => assert!(!left, "{} {terminal}", t.spelling()),
+                }
             }
         }
         for terminal in NodeType::GatewayRadio.terminals().each() {
@@ -2799,8 +2854,17 @@ mod tests {
             assert!(!t.must_name(true), "{}", t.spelling());
             assert!(t.must_name(false), "{}", t.spelling());
         }
-        // One data sink and one data source: nothing to say which.
-        for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {
+        // Driven lines that report what they were told have two sources,
+        // the report groundward and what goes on to what they drive, and
+        // their links say which; one sink, which needs no naming.
+        assert!(!NodeType::GpioInout.must_name(true));
+        assert!(NodeType::GpioInout.must_name(false));
+        // Every other payload, one data sink and one data source: nothing to
+        // say which.
+        for t in NodeType::ALL
+            .iter()
+            .filter(|t| t.is_payload() && **t != NodeType::GpioInout)
+        {
             assert!(!t.must_name(true), "{}", t.spelling());
             assert!(!t.must_name(false), "{}", t.spelling());
         }
@@ -2973,7 +3037,7 @@ mod tests {
         for t in NodeType::ALL {
             let by_family = matches!(
                 t.family(),
-                "Devices" | "Driven" | "Payloads of their own"
+                "Devices" | "Discrete lines" | "Payloads of their own"
             );
             assert_eq!(
                 t.is_payload(),

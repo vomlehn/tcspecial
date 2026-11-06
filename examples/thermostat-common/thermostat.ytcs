@@ -2,7 +2,7 @@
 
 # The vehicle the two thermostat examples share, which each includes:
 # the three conversions and the vote between them, the thermostat and
-# its log, the heaters and the lines that sense them, the group the
+# its log, the heaters' switches, the group the
 # sensors are read in, and the setpoint the ground may set. What
 # differs between the two is in each example's own file: the
 # tcspecial section, the gateway node, and the three sensors, whose
@@ -15,7 +15,7 @@
 # own file, and every reading that leaves for the gateway node there.
 exports:
   world-in: [temp1, temp2, temp3]
-  world-out: [ambient, gpio-in-tmass, temp1, temp2, temp3]
+  world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
 
 payload_groups:
   - name: "zone_temps"
@@ -77,9 +77,8 @@ vehicle:
         # one failing must not leave the mass with no way to be warmed: either
         # alone holds the band while the orbit is warm, and both together hold
         # it in the cold too, each switched through a line of its own. What it
-        # decides goes to the heaters and the log and not to the ground: the
-        # ground is told what the heaters are doing, by gpio-in-tmass, which a
-        # heater that has failed does not hide.
+        # decides goes to the heaters and the log, and the ground is told it by
+        # the heaters' switches, each reporting what it was last told.
         moc-out:
           - gpio-out-tmass1.thermostat
           - gpio-out-tmass2.thermostat
@@ -90,40 +89,32 @@ vehicle:
       - compute: housekeeping
         directory: "/tmp/telemetry"
         format: "variable_ts_rc"
-        world-in: [gpio-in-tmass, temp1, temp2, temp3, thermostat]
+        world-in: [temp1, temp2, temp3, thermostat]
 
 payloads:
-  # The heaters and the lines that sense them, on the thermal mass, through
-  # the kernel's simulated chip, which bin/mk-kernel-dummies makes: lines
-  # 2 to 5, which leaves 0 and 1 to the gpio example.
-  - type gpio:
-      # Two lines on the thermal mass, one sensing each heater: high while it
-      # is heating. Read every second for what they are, rather than for
-      # when they change, so the ground hears the heaters' state on a beat
-      # and a lost report is made good by the next; one bit a line, each a
-      # sixteen-byte record -- when, which line, what it is -- to the ground
-      # and the log. Disabled from the ground, it reports nothing at all.
-      - payload: gpio-in-tmass
-        edge: "none"
-        lines: "2,3"
-        path: "/dev/gpiochip1"
-        state_interval: "1 s"
-        world-out:
-          - gateway.gpio-in-tmass
-          - housekeeping.gpio-in-tmass
-      # The two heaters' switches, each a line the thermostat drives -- 1 for
-      # on, 0 for off. One payload each, so that one can be stopped from the
-      # ground while the other goes on warming the mass.
+  # The heaters' switches, on the thermal mass, through the kernel's
+  # simulated chip, which bin/mk-kernel-dummies makes: lines 4 and 5, which
+  # leaves 0 and 1 to the gpio example.
+  - type gpio_inout:
+      # Each a line the thermostat drives -- 1 for on, 0 for off -- and tells
+      # the heater it switches, and every second the ground what it was last
+      # told, so the ground follows the heaters on a beat and a lost report is
+      # made good by the next. One payload each, so that one can be stopped
+      # from the ground while the other goes on warming the mass.
       - payload: gpio-out-tmass1
-        direction: "output"
         lines: "4"
         path: "/dev/gpiochip1"
+        state_interval: "1 s"
         moc-in: [thermostat]
+        world-out:
+          - gateway.gpio-out-tmass1
       - payload: gpio-out-tmass2
-        direction: "output"
         lines: "5"
         path: "/dev/gpiochip1"
+        state_interval: "1 s"
         moc-in: [thermostat]
+        world-out:
+          - gateway.gpio-out-tmass2
 
 commands:
   # the zone temperature the heaters are held at, in kelvin
@@ -132,7 +123,6 @@ commands:
 tcsgui:
   nodes:
     - { node: ambient, x: 469, y: 166 }
-    - { node: gpio-in-tmass, x: 91, y: 544 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }
     - { node: gpio-out-tmass2, x: 34, y: 469 }
     - { node: housekeeping, x: 469, y: 450 }

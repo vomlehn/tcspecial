@@ -1564,8 +1564,8 @@ fn lined(
         why,
     };
     let watched = match endpoint {
-        EndpointConfig::Gpio(gpio) if !gpio.direction.is_output() => {
-            Some(gpio.lines.len())
+        EndpointConfig::Gpio(gpio) if !gpio.inputs.is_empty() => {
+            Some(gpio.inputs.len())
         }
         _ => None,
     };
@@ -4608,13 +4608,13 @@ physics:
     /// is a pull too.
     #[test]
     fn gpio_lines_are_pulled_one_terminal_a_line() {
-        use crate::node::payload::gpio::Direction;
         let at = |said: &str| At::parse("connects", said).expect("a terminal");
         let gpio = |lines: Vec<u32>| {
             EndpointConfig::Gpio(crate::GpioConfig {
+                kind: crate::node::payload::gpio::Kind::In,
                 path: "/dev/gpiochip1".to_string(),
-                lines,
-                direction: Direction::Input,
+                inputs: lines,
+                outputs: Vec::new(),
                 edge: crate::LineEdge::None,
                 bias: crate::Bias::None,
                 debounce: None,

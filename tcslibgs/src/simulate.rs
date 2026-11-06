@@ -764,8 +764,19 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
 ///
 /// Nothing at the path of one tcssim makes for itself is where it is about to
 /// go; nothing where the kernel's should be is a script that was not run.
+///
+/// # Arguments
+///
+/// * `node_type` - The payload's type.
+///
+/// # Returns
+///
+/// Whether tcssim makes what it simulates the payload at.
 pub fn tcssim_makes(node_type: &str) -> bool {
-    !matches!(node_type, "i2c" | "gpio" | "can" | "hdlc")
+    !matches!(
+        node_type,
+        "i2c" | "gpio_in" | "gpio_out" | "gpio_inout" | "can" | "hdlc"
+    )
 }
 
 /// Says what is wrong, if anything, with a payload's `simulate` against what
@@ -1036,9 +1047,9 @@ mod tests {
 
         // A dummy device the file leaves out is one tcssim would not
         // control.
-        let said = disagreement("a", "gpio", None, &s).expect("refused");
+        let said = disagreement("a", "gpio_in", None, &s).expect("refused");
         assert!(said.contains("does not name it"), "{said}");
-        assert_eq!(disagreement("a", "gpio", None, &h), None);
+        assert_eq!(disagreement("a", "gpio_in", None, &h), None);
     }
 
     /// What the mode counts: the payloads reached over an interface, and not
@@ -1052,7 +1063,9 @@ mod tests {
             group: None,
             attributes: Default::default(),
         };
-        for counted_type in ["i2c", "serial", "hdlc", "gpio"] {
+        for counted_type in
+            ["i2c", "serial", "hdlc", "gpio_in", "gpio_out", "gpio_inout"]
+        {
             assert!(counted(&node(counted_type)), "{counted_type}");
         }
         for not in [

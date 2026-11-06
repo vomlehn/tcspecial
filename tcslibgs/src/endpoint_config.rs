@@ -246,13 +246,14 @@ pub(crate) fn endpoint_of(
                 Ok(EndpointConfig::Iio(IioConfig { path: path.clone() }))
             }
             GroupKind::Gpio(gpio) => Ok(EndpointConfig::Gpio(GpioConfig {
+                kind: gpio.kind,
                 path: path.clone(),
-                lines: gpio.lines.clone(),
+                inputs: gpio.inputs.clone(),
+                outputs: gpio.outputs.clone(),
                 edge: gpio.edge,
                 bias: gpio.bias,
                 debounce: gpio.debounce,
                 state_interval: gpio.state_interval,
-                direction: gpio.direction,
             })),
             GroupKind::Rpmsg(rpmsg) => Ok(EndpointConfig::Rpmsg(RpmsgConfig {
                 path: path.clone(),
@@ -305,7 +306,7 @@ impl GroupKind {
             GroupKind::Can(_) => "can",
             GroupKind::Iio(_) => "iio",
             GroupKind::Rpmsg(_) => "rpmsg",
-            GroupKind::Gpio(_) => "gpio",
+            GroupKind::Gpio(gpio) => gpio.kind.type_name(),
             GroupKind::Hdlc(_) => "hdlc",
         }
     }
@@ -560,7 +561,7 @@ pub(crate) struct LinkTerms {
     /// see [`crate::node::payload::rpmsg`].
     pub(crate) service: Option<Scalar>,
     pub(crate) max_message_bytes: Option<Scalar>,
-    /// Which discrete lines a payload watches and how; see
+    /// Which discrete lines a node watches or drives, and how; see
     /// [`crate::node::payload::gpio`].
     pub(crate) lines: Option<Scalar>,
     pub(crate) edge: Option<Scalar>,
@@ -569,8 +570,9 @@ pub(crate) struct LinkTerms {
     /// How often the current level of every line is reported, where the file
     /// asks for it; see [`crate::node::payload::gpio`].
     pub(crate) state_interval: Option<Scalar>,
-    /// Whether a set of discrete lines is read or driven. See
-    /// `node::payload::gpio::Direction`.
+    /// Whether a set of discrete lines is read or driven, which its type
+    /// says now: kept so that a file still saying it is told so. See
+    /// `node::payload::gpio::Kind`.
     pub(crate) direction: Option<Scalar>,
 }
 

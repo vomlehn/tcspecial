@@ -925,7 +925,7 @@ refused, saying which list to add the node to:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">exports</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">world-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span><span class="whitespace">
-  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-in-tmass</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span>
+  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span>
 </pre>
 <p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-in&gt;temp1&lt;/world-in&gt;</span></tt>,
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
@@ -981,9 +981,10 @@ and no others: a device file stating a <tt class="docutils literal">port</tt>, o
 <tt class="docutils literal">path</tt>, is refused.</p>
 <div class="section" id="supported-and-experimental-interfaces">
 <h2><a class="toc-backref" href="#toc-entry-9">Supported and experimental interfaces</a></h2>
-<p>Seven types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
-<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt>.</p>
-<p>The last two were experimental until each was flown against the kernel's
+<p>Nine types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
+<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, and the three kinds of discrete
+lines, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_inout</tt>.</p>
+<p>CAN and the discrete lines were experimental until each was flown against the kernel's
 dummy device for it, which is what supported means for them: tcspecial's
 node code is run against a CAN bus of the kernel's <tt class="docutils literal">vcan</tt> and a chip of its
 <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, the far end of each played through the kernel and not by
@@ -1012,8 +1013,7 @@ short of the hardware: an rpmsg channel needs a remote processor and its
 firmware, a synchronous HDLC line needs a card, and RS-485's direction
 control is the driver of a real UART, which a pseudo-terminal refuses.</p>
 <p>Read them as a statement of what the configuration will be rather than as a
-feature to rely on. They may change in ways the seven supported types will
-not.</p>
+feature to rely on. They may change in ways the supported types will not.</p>
 </div>
 <div class="section" id="attributes-every-payload-has">
 <h2><a class="toc-backref" href="#toc-entry-10">Attributes Every Payload Has</a></h2>
@@ -1026,8 +1026,9 @@ group          the group it is read with, if any. Optional: a payload in
                see `How a Payload's Data Is Read`_
 type           not an attribute but the type it is written under, as
                - type network: or &lt;type name=&quot;network&quot;&gt;, one of
-               network | device-file | serial | i2c | spi | can | gpio,
-               or one of the experimental iio | rpmsg | hdlc
+               network | device-file | serial | i2c | spi | can |
+               gpio_in | gpio_out | gpio_inout, or one of the
+               experimental iio | rpmsg | hdlc
 </pre>
 <div class="section" id="how-a-payload-is-driven">
 <h3><a class="toc-backref" href="#toc-entry-11">How a payload is driven</a></h3>
@@ -1139,11 +1140,10 @@ came up on is warming the zone until then. <tt class="docutils literal">init</tt
 instead, written as the node is opened -- as the vehicle starts, and again
 whenever the ground starts the node after stopping it:</p>
 <pre class="code yaml literal-block">
-<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_out</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
       </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">/dev/gpiochip0</span><span class="whitespace">
       </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="whitespace">
-      </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">output</span><span class="whitespace">
       </span><span class="name tag">init</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;0&quot;'</span>
 </pre>
 <p>It is not only for what is driven. A sensor whose register has to be set
@@ -1367,10 +1367,21 @@ transaction on every pass. Give such a payload a group or a rate.</p>
 <td>Yes: bytes clocked out</td>
 <td><tt class="docutils literal">read_size</tt> bytes, one transfer</td>
 </tr>
-<tr><td><tt class="docutils literal">gpio</tt></td>
-<td>Yes: edges on input lines, and levels every <tt class="docutils literal">state_interval</tt></td>
+<tr><td><tt class="docutils literal">gpio_in</tt></td>
+<td>Yes: edges on watched lines, and levels every <tt class="docutils literal">state_interval</tt></td>
+<td>No: a datum at <tt class="docutils literal"><span class="pre">world-in</span></tt> asks for the levels now</td>
+<td>One event per edge, or a report of every watched line</td>
+</tr>
+<tr><td><tt class="docutils literal">gpio_out</tt></td>
+<td>Only what it was driven to, passed on when it changes</td>
 <td>No</td>
-<td>One event per edge</td>
+<td>The decision that changed the lines</td>
+</tr>
+<tr><td><tt class="docutils literal">gpio_inout</tt></td>
+<td>What it was driven to, passed on when it changes, and the last value
+it was told, every <tt class="docutils literal">state_interval</tt></td>
+<td>No</td>
+<td>One decision</td>
 </tr>
 <tr><td><tt class="docutils literal">app_pl</tt></td>
 <td>Yes: whatever the program writes</td>
@@ -1729,22 +1740,47 @@ makes the bus; see <a class="reference internal" href="#making-the-kernel-s-dumm
 </div>
 <div class="section" id="a-gpio-payload">
 <h2><a class="toc-backref" href="#toc-entry-19">A GPIO Payload</a></h2>
-<p>Keyword <tt class="docutils literal">type gpio</tt>. <strong>Supported</strong>, as flown against the kernel's simulated
-chip: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and experimental interfaces</a>. A set of discrete lines --
-a deployment switch, an arming line, a payload's own &quot;alive&quot; line -- watched
-for changes, or a set of circuits driven: a heater, a valve, a latch.</p>
+<p>Keywords <tt class="docutils literal">type gpio_in</tt>, <tt class="docutils literal">type gpio_out</tt> and <tt class="docutils literal">type gpio_inout</tt>.
+<strong>Supported</strong>, as flown against the kernel's simulated chip: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported
+and experimental interfaces</a>. A set of discrete lines -- a deployment switch,
+an arming line, a payload's own &quot;alive&quot; line -- watched for changes; a set of
+circuits driven -- a heater, a valve, a latch; or a set driven whose state
+the ground is told on a beat.</p>
+<p>The type says which, and so which terminals the node has:</p>
+<pre class="code text literal-block">
+gpio_in      lines watched. What they say is world data, out of
+             world-out to the ground; a datum arriving at world-in asks
+             for what the lines are now
+gpio_out     lines driven. What arrives at moc-in -- a thermostat's
+             decision, a command from the ground -- is what they are
+             driven to, and a value that changes them goes on out of
+             moc-out, to whatever they drive
+gpio_inout   lines driven as a gpio_out's are, and reported: every
+             state_interval the last value they were told goes out of
+             world-out, towards the ground. A heater a thermostat
+             switches, whose state the ground follows. Its links out
+             say which terminal they leave by
+</pre>
+<p>A file that still says <tt class="docutils literal">type gpio</tt>, or <tt class="docutils literal">direction</tt>, is refused and told
+the three types: one <tt class="docutils literal">gpio</tt> with a direction was what there was, and it
+drew driven lines with a payload's terminals, a sink for moc data and a
+source for world data, when what goes through them is moc data both ways.</p>
 <pre class="code text literal-block">
 path           the chip: /dev/gpiochip0
-lines          the offsets, separated by commas or spaces, decimal
-               or 0x. Required
-direction      input | output, default input
-edge           rising | falling | both | none, default both. Inputs only
-bias           none | pull_up | pull_down, default none. Inputs only
+lines          the offsets, separated by commas or spaces, decimal or 0x.
+               Required
+edge           rising | falling | both | none, default both. Watched
+               lines only
+bias           none | pull_up | pull_down, default none. Watched lines
+               only
 debounce       how long a line must be steady before a change counts,
                as a length of time: 50 us. Default none, applied by the
-               kernel, inputs only
-state_interval how often to report what the lines are. Default none,
-               inputs only
+               kernel, watched lines only
+state_interval how often to report what the watched lines are, or what
+               a gpio_inout's lines were last told. Default none;
+               required of a gpio_inout
+init           what driven lines start at, as a trigger is written:
+               '&quot;0&quot;'. gpio_out and gpio_inout only
 </pre>
 <p><strong>How lines are watched.</strong> Two different questions, and a set of lines may ask
 either or both:</p>
@@ -1768,18 +1804,16 @@ cannot do: a line that has not changed since the vehicle started tells the
 ground nothing about itself, and the kernel's queue of events is finite, so a
 burst can leave the ground holding a value that is wrong. A report every so
 often ends both: after one interval at most, what the ground has is what the
-lines are.</p>
+lines are. A datum arriving at <tt class="docutils literal"><span class="pre">world-in</span></tt> asks for one at once, whatever
+the datum says.</p>
 <p>Asking for neither takes saying <tt class="docutils literal">edge: none</tt> with no <tt class="docutils literal">state_interval</tt>, and
 that is refused -- lines watched for no changes and reported at no interval
 would send nothing at all.</p>
-<p>The direction is not something a set of lines can be both of: a line
-requested as an input is one the kernel will not write, and one requested as
-an output produces no edges to read. So it is stated, and stating it is what
-lets a file be refused for driving something it said it would watch. The
-watching terms are refused outright on an output rather than ignored: an
-edge, a debounce or a report of a line nothing reads is a file saying
-something it does not mean, and the usual cause is a set of lines whose
-direction was changed and whose other words were left as they were.</p>
+<p>The watching terms are refused outright on a <tt class="docutils literal">gpio_out</tt> rather than
+ignored: an edge, a debounce or a report of a line nothing reads is a file
+saying something it does not mean, and the usual cause is a set of lines
+turned into a <tt class="docutils literal">gpio_out</tt> with its other words left as they were. A
+<tt class="docutils literal">gpio_inout</tt> takes <tt class="docutils literal">state_interval</tt> alone of them, for its report.</p>
 <p>This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
 So each change becomes a record of sixteen bytes -- eight of time in
@@ -1788,9 +1822,9 @@ microseconds since the epoch, four of line offset, four of the value it became
 number of them. One that is not is refused where the file is read: room left
 unfilled on every read, or, smaller than a record, a node that would never
 deliver anything.</p>
-<p>A report makes the same record, one per line: this line, this value, this
-time. The ground reads the two alike, which is the point of their being the
-same record; the only difference is that a change carries the time of the
+<p>A report makes the same record, one per watched line: this line, this value,
+this time. The ground reads the two alike, which is the point of their being
+the same record; the only difference is that a change carries the time of the
 change and a report carries the time it was looked at.</p>
 <p>Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.</p>
@@ -1808,22 +1842,21 @@ named in that order are the low three bits of the call that drives them.</p>
 asserts its decision on every sample rather than only when it changes, so the
 lines are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample instead of standing until the
-temperature crosses the other threshold. Only the devices are told again: a
-log and a ground link are sent the transitions, so a reader still sees when
-the heaters actually switched.</p>
-<p>A GPIO payload cannot be triggered, and a read and a write are not both open
-to it: an input refuses a write, because driving one would be commanding a
-payload rather than reading it, and an output refuses a read, because
-reporting a line this node itself drove would be reporting its own voice.
-Each refusal says which direction does allow it.</p>
+temperature crosses the other threshold. What goes on out of <tt class="docutils literal"><span class="pre">moc-out</span></tt> is
+the transitions only, as a log and a ground link are sent them, so a reader
+still sees when the heaters actually switched.</p>
+<p>A GPIO payload cannot be triggered: watched lines report on their edges and
+their <tt class="docutils literal">state_interval</tt> and are asked by what arrives at <tt class="docutils literal"><span class="pre">world-in</span></tt>, and
+driven lines are set by what arrives at <tt class="docutils literal"><span class="pre">moc-in</span></tt>.</p>
 <p>The simulator moves lines through the kernel's <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, which it finds
 rather than makes: loading the module and making a chip need root, and tcssim
 says so if there is none. <tt class="docutils literal">bin/mkgpio</tt> makes one and prints the node it
 became, which is numbered as chips appear and so has to be read off the run
 rather than assumed; <tt class="docutils literal">bin/rmgpio</tt> takes it away again. The packet and segment sizes mean nothing to a
 simulated set of discretes, and neither do the faults -- there are no bytes to
-drop or corrupt; what it does is pull each of its lines the other way every
-packet interval.</p>
+drop or corrupt; what it does is pull each of its watched lines the other
+way every packet interval, and watch its driven lines for what the vehicle
+drives them to.</p>
 <p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies <a class="reference internal" href="#the-gpio-example">The gpio example</a> on such a
 chip, pulling and reading its lines itself rather than through tcssim: each
 pull of the switch's line reaches the ground as a record, and a <tt class="docutils literal">1</tt> or
@@ -2337,15 +2370,13 @@ which is what a panel in the MOC shows.</p>
     </span><span class="name tag">interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;100</span><span class="name variable"> </span><span class="literal string">ms&quot;</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_out</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-        </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
         </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="whitespace">
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
         </span><span class="name tag">moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">thermostat</span><span class="punctuation indicator">]</span><span class="whitespace">
 
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
-        </span><span class="name tag">direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;output&quot;</span><span class="whitespace">
         </span><span class="name tag">lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="whitespace">
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="whitespace">
         </span><span class="name tag">moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">thermostat</span><span class="punctuation indicator">]</span><span class="whitespace">
@@ -2554,10 +2585,10 @@ tcspecial is running.</p>
 <div class="figure">
 <object data="../examples/thermostat/thermostat.svg" style="width: 100%;" type="image/svg+xml">The thermostat example: three temperature sensors of one place,
 converted to kelvin, voted on, logged and sent to the ground, with a
-thermostat driving two heaters, each through a GPIO line,
-and two more lines sensing the heaters reported to the ground. Each
-sensor is the far end of a UDP socket and each line one of the
-kernel's dummy chip, which tcssim drives.</object>
+thermostat driving two heaters, each through a GPIO line whose
+switch reports what it was told to the ground. Each sensor is the
+far end of a UDP socket and each line one of the kernel's dummy
+chip, which tcssim watches.</object>
 <p class="caption"><tt class="docutils literal">examples/thermostat</tt>: a trio of sensors, a vote, a thermostat, its two
 heaters, and the lines that say what the heaters are doing.</p>
 </div>
@@ -2612,27 +2643,25 @@ and off together. Two of them, because one failing must not leave the zone
 with no way to be warmed: either alone holds the band while the orbit is
 warm, and both together hold it in the cold too. They are separate nodes so
 that the ground can stop one and leave the other warming the zone.</p>
-<p>The decision is not sent to the ground: what the thermostat decided is not
-what the heaters did, and a heater that has failed takes what it is told and
-does nothing. What goes down instead is <tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt>, two lines on the
-thermal mass, line 2 sensing the first heater and line 3 the second, each high
-while its heater is heating. It reads them for their levels every second --
-<tt class="docutils literal">edge: &quot;none&quot;</tt> and <tt class="docutils literal">state_interval: &quot;1 s&quot;</tt> -- and sends a sixteen-byte
-record of each, the time, the line and its level, to the ground on port 5102
-and to the log. So the ground hears every second what each heater is doing,
-and a report lost on the way is made good by the next. Disabled from the
-ground, like any node, it reports nothing at all.</p>
+<p>The decision is not sent to the ground by the thermostat. Each heater's switch
+is a <tt class="docutils literal">gpio_inout</tt>, which drives its line as a <tt class="docutils literal">gpio_out</tt> does and reports:
+every second -- <tt class="docutils literal">state_interval: &quot;1 s&quot;</tt> -- it sends the last value it was
+told, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, to the ground, <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> on port 5102 and
+<tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on 5103. So the ground hears every second what each
+heater was told, and a report lost on the way is made good by the next. What
+it hears is what the switch was told and not what the heater did: a heater
+that has failed takes what it is told and does nothing, and shows only in the
+temperature. Disabled from the ground, like any node, a switch neither drives
+nor reports.</p>
 <p>The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample. What is logged is the transitions
 alone.</p>
 <p>No payload here has a telemetry link of its own: the sensors' readings reach
-the ground through their conversions, the heaters' switches are driven and
-never read, and the lines sensing the heaters are drawn into the gateway node.
-Tcssim counts each decision the vehicle drives the switches to, and pulls
-each of <tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt>'s lines to its
-heater's <tt class="docutils literal">heating</tt> -- <tt class="docutils literal">connects: heater_1.heating, heater_2.heating</tt>, one
-terminal for each line, in the order of the node's lines.</p>
+the ground through their conversions, and the heaters' switches are drawn
+into the gateway node. Tcssim counts each decision the vehicle drives the
+switches to, and switches the heater each is joined to -- <tt class="docutils literal">connects:
+heater_1.on</tt> -- by it.</p>
 <p>The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a <tt class="docutils literal">SET_NODE</tt>
 naming that node and that attribute is taken on the node command link, the
@@ -2660,9 +2689,9 @@ the setpoint and inside the band, every run alike. Either
 heater alone settles the zone ten kelvin above its surroundings, above the
 band, so one heater holds it and the thermostat cycles whichever are
 working. So a heater disabled in tcssim's window -- an unpowered or failed
-heater, see <a class="reference internal" href="#starting-and-stopping-a-payload">Starting and stopping a payload</a> -- shows on its line of
-<tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt>, which stays low however the thermostat decides, while the
-other, on twice as long, holds the band; with both disabled, the zone falls
+heater, see <a class="reference internal" href="#starting-and-stopping-a-payload">Starting and stopping a payload</a> -- shows in the temperature:
+its switch goes on reporting what it is told, while the other heater, on
+twice as long, holds the band; with both disabled, the zone falls
 out of the band to its surroundings. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-thermostat</span></tt>
 starts every payload disabled, so press <tt class="docutils literal">Enable</tt> on each, and <tt class="docutils literal">Disable</tt> on a heater to take
 it away. A run of the model with its sensors' errors, three orbits from each
@@ -3073,10 +3102,10 @@ shares, as it shares the Yamcs templates beside it.</p>
 <h2><a class="toc-backref" href="#toc-entry-43">The thermostat-yamcs example</a></h2>
 <div class="figure">
 <object data="../examples/thermostat-yamcs/thermostat-yamcs.svg" style="width: 100%;" type="image/svg+xml">The thermostat-yamcs example: the thermostat example's sensors,
-conversions, vote, thermostat, heaters and the lines sensing them,
-with a gateway_yamcs node that sends each conversion's, the vote's
-and the lines' data down to Yamcs as CCSDS telemetry, one APID
-each, where each is a temperature in kelvin or a line on or off.</object>
+conversions, vote, thermostat and heaters, with a gateway_yamcs
+node that sends each conversion's, the vote's and each heater
+switch's data down to Yamcs as CCSDS telemetry, one APID each,
+where each is a temperature in kelvin or a switch on or off.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">examples/thermostat-yamcs</span></tt>: the thermostat example with Yamcs
 between the ground station and the vehicle, over CCSDS packets.</p>
 </div>
@@ -3088,7 +3117,7 @@ example's is a link to <tt class="docutils literal"><span class="pre">examples/t
 so that each is found beside its configuration by name. The vehicle is
 written once, in <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat.ytcs</span></tt> and its
 XML, which both configurations include: the conversions, the vote, the
-thermostat and its log, the heaters and the lines sensing them, the
+thermostat and its log, the heaters' switches, the
 <tt class="docutils literal">zone_temps</tt> group and the setpoint's binding. Each example's own file
 has its <tt class="docutils literal">tcspecial</tt> section, its gateway node, called <tt class="docutils literal">gateway</tt> in
 both, and the three sensors, whose ports differ. The two cannot run at
@@ -3097,14 +3126,13 @@ they answer whether tcssim is ready at one address. What differs is the
 gateway, <tt class="docutils literal">yamcs</tt>: the beacon is telemetry of APID <tt class="docutils literal">0x110</tt>, CONNECT and
 its answer are on <tt class="docutils literal">0x111</tt>, and each source drawn into the gateway node
 comes down as telemetry of its <tt class="docutils literal">apid_base</tt>, <tt class="docutils literal">0x400</tt>, plus the source's
-device id -- <tt class="docutils literal">ambient</tt> on <tt class="docutils literal">0x400</tt>, <tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt> on <tt class="docutils literal">0x402</tt>, and
-<tt class="docutils literal">temp1</tt> to <tt class="docutils literal">temp3</tt> on <tt class="docutils literal">0x406</tt> to <tt class="docutils literal">0x408</tt>.</p>
+device id -- <tt class="docutils literal">ambient</tt> on <tt class="docutils literal">0x400</tt>, <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> and
+<tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on <tt class="docutils literal">0x402</tt> and <tt class="docutils literal">0x403</tt>, and <tt class="docutils literal">temp1</tt> to <tt class="docutils literal">temp3</tt> on
+<tt class="docutils literal">0x405</tt> to <tt class="docutils literal">0x407</tt>.</p>
 <p>The mission database gives each of them a parameter of the type the
 configuration says its data are (see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>): the
-conversions and the vote are temperatures in kelvin, and <tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt>,
-lines read for their levels with no edges, is a record for each line in the
-order of its offsets -- <tt class="docutils literal"><span class="pre">gpio-in-tmass_line2_time</span></tt>, <tt class="docutils literal">_offset</tt> and
-<tt class="docutils literal"><span class="pre">gpio-in-tmass_line2</span></tt>, its level, on or off, then line 3's. Nothing is
+conversions and the vote are temperatures in kelvin, and each heater's
+switch, which reports what it was told, is a decision, on or off. Nothing is
 added to the configuration for it: the type is what tcsmoc's plot window and
 the F´ bridge already read there.
 Yamcs's web interface, at <tt class="docutils literal"><span class="pre">http://localhost:17090</span></tt>, shows them so.</p>
@@ -3119,14 +3147,14 @@ make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples
 tcspecial once tcssim is ready, each killed with it; has Yamcs send CONNECT
 until the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon above
-the zone's temperature, each reading, and each line sensing a heater, on or
-off. With <tt class="docutils literal"><span class="pre">--seconds</span></tt> there is no window, and it prints what arrives, and a
-line each time a heater's line changes, of these forms:</p>
+the zone's temperature, each reading, and each heater's switch, on or off.
+With <tt class="docutils literal"><span class="pre">--seconds</span></tt> there is no window, and it prints what arrives, and a line
+each time a heater's switch changes, of these forms:</p>
 <pre class="code text literal-block">
 connected: the vehicle is running this configuration
 read: ambient &lt;T&gt; K, temp1 &lt;T&gt; K, temp2 &lt;T&gt; K, temp3 &lt;T&gt; K,
-gpio-in-tmass line 2 off, gpio-in-tmass line 3 off
-switched: gpio-in-tmass line 2 off -&gt; on; ambient &lt;T&gt; K, ...
+gpio-out-tmass1 off, gpio-out-tmass2 off
+switched: gpio-out-tmass1 off -&gt; on; ambient &lt;T&gt; K, ...
 </pre>
 <p>tcssim draws a window of its own, so it wants a display. Its ports are in
 the seventeen thousands, apart from the thermostat example's, but its GPIO
@@ -5299,8 +5327,9 @@ test that starts tcspecial and tcssim and holds the same lock.</p>
 <p>A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
 <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">i2c_tmass</tt>, <tt class="docutils literal">spi_tmass</tt>,
-<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt>, and <tt class="docutils literal">raw</tt> for raw network
-sockets, a sensor's feature bringing its bus's with it -- and a build
+<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt>, <tt class="docutils literal">gpio_inout</tt> and
+<tt class="docutils literal">hdlc</tt>, and <tt class="docutils literal">raw</tt> for raw network sockets, a sensor's feature bringing its
+bus's with it -- and a build
 with the defaults has all of them, which is what <tt class="docutils literal">cargo build <span class="pre">--workspace</span></tt>
 and the tests make. A build for a vehicle names the types it flies:</p>
 <pre class="code console literal-block">
@@ -5313,8 +5342,8 @@ asks for.</p>
 <p>The network type over UDP, TCP and Unix-domain sockets is in every build,
 because the link to the ground is UDP, and so is every node that reaches no
 interface: computations, logs, tees, null nodes, the ping node and the app
-nodes. <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, their sensors, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>,
-<tt class="docutils literal">gpio</tt> and <tt class="docutils literal">hdlc</tt> are Linux interfaces, and asking for one when building for another operating
+nodes. <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, their sensors, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, the
+three kinds of discrete lines and <tt class="docutils literal">hdlc</tt> are Linux interfaces, and asking for one when building for another operating
 system stops the build, saying which.</p>
 <p>A build says what it contains:</p>
 <pre class="code console literal-block">
@@ -5576,9 +5605,10 @@ drawn, so that a spike is never thinned away.</p>
 <p>Under the panels, as wide as them so that a change lines up with the values
 above it, is a strip for each switch -- a <tt class="docutils literal">thermostat</tt> node drawn into a
 gateway node, named with what it drives, such as <tt class="docutils literal">thermostat →
-<span class="pre">gpio-out-tmass1,</span> <span class="pre">gpio-out-tmass2</span></tt>; and each line of a GPIO payload drawn into
-one that watches lines, named with its line, such as <tt class="docutils literal"><span class="pre">gpio-in-tmass</span> line 2</tt>
-in the thermostat example, whose lines sense its heaters -- green with
+<span class="pre">gpio-out-tmass1,</span> <span class="pre">gpio-out-tmass2</span></tt>; each line of a <tt class="docutils literal">gpio_in</tt> drawn into
+one, named with its line, such as <tt class="docutils literal">switch line 0</tt> in the gpio example; and
+each <tt class="docutils literal">gpio_inout</tt> drawn into one, by its name, such as <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt>
+in the thermostat example, what that heater's switch was told -- green with
 <tt class="docutils literal">on</tt> written in it while it is on or high, grey while it is off or low, and
 its last state said beside it. With two thermostats each
 driving a heater there are two strips, one under the other, so which heater

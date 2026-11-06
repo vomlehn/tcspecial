@@ -53,18 +53,10 @@
         </type>
     </gateways>
     <payloads>
-        <type name="gpio">
-            <!-- A lamp on line 1, driven by what the ground sends: the text
-                 1 to light it, 0 to put it out, and anything else refused. -->
-            <payload name="lamp">
-                <direction>output</direction>
-                <lines>1</lines>
-                <path>/dev/gpiochip1</path>
-                <moc-in>ground</moc-in>
-            </payload>
-            <!-- Two lines of one chip, each a payload of its own because
-                 one is read and the other driven, and a payload's lines go
-                 one way. The chip here is /dev/gpiochip1, which is what the
+        <type name="gpio_in">
+            <!-- Two lines of one chip: a lamp the ground drives, a
+                 gpio_out, and a switch the ground is told about, a
+                 gpio_in. The chip here is /dev/gpiochip1, which is what the
                  kernel's gpio-sim chip is numbered on a host with one chip
                  of its own; bin/mk-kernel-dummies makes that chip and
                  prints the number it was given, which is the path to write
@@ -78,6 +70,15 @@
                 <lines>0</lines>
                 <path>/dev/gpiochip1</path>
                 <world-out>ground.switch</world-out>
+            </payload>
+        </type>
+        <type name="gpio_out">
+            <!-- A lamp on line 1, driven by what the ground sends: the text
+                 1 to light it, 0 to put it out, and anything else refused. -->
+            <payload name="lamp">
+                <lines>1</lines>
+                <path>/dev/gpiochip1</path>
+                <moc-in>ground</moc-in>
             </payload>
         </type>
     </payloads>

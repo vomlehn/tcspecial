@@ -59,7 +59,9 @@ default = [
     "can",
     "iio",
     "rpmsg",
-    "gpio",
+    "gpio_in",
+    "gpio_out",
+    "gpio_inout",
     "hdlc",
     "raw",
 ]
@@ -79,7 +81,11 @@ spi_tmass = ["spi"]
 can = []
 iio = []
 rpmsg = []
-gpio = []
+# The three kinds of a set of discrete lines, which share one module: a
+# build with any of them has it.
+gpio_in = []
+gpio_out = []
+gpio_inout = []
 hdlc = []
 raw = []
 

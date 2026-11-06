@@ -274,11 +274,37 @@ pub fn terminals_of(node_type: &str) -> Option<Terminals> {
         merges: false,
     };
 
+    const GPIO_IN: Terminals = Terminals {
+        // Lines watched: what they say is world data, leaving groundward,
+        // and what arrives asks them for it -- world data too, which is why
+        // the way in is world-in and not a payload's moc-in.
+        sinks: &["world-in"],
+        sources: &["world-out"],
+        merges: false,
+    };
+    const GPIO_OUT: Terminals = Terminals {
+        // Lines driven: what drives them is moc data, and what they were
+        // driven to goes on the same way, to whatever they drive.
+        sinks: &["moc-in"],
+        sources: &["moc-out"],
+        merges: false,
+    };
+
+    const GPIO_INOUT: Terminals = Terminals {
+        // Lines driven as a gpio_out's are, and reported: the last value
+        // they were told goes out groundward on a beat as well. Nothing
+        // arrives as world data, there being nothing watched to ask.
+        sinks: &["moc-in"],
+        sources: &["world-out", "moc-out"],
+        merges: false,
+    };
+
     match node_type {
         "i2c" | "spi" | "i2c_tmass" | "spi_tmass" | "serial" | "hdlc"
-        | "can" | "iio" | "rpmsg" | "network" | "device-file" | "gpio" => {
-            Some(PAYLOAD)
-        }
+        | "can" | "iio" | "rpmsg" | "network" | "device-file" => Some(PAYLOAD),
+        "gpio_in" => Some(GPIO_IN),
+        "gpio_out" => Some(GPIO_OUT),
+        "gpio_inout" => Some(GPIO_INOUT),
         gateway if crate::gateway::is_gateway(gateway) => Some(GATEWAY),
         "null-gateway" => Some(NULL_GATEWAY),
         "null-payload" => Some(NULL_PAYLOAD),

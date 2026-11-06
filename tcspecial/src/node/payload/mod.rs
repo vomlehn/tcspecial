@@ -26,7 +26,7 @@
 pub mod can;
 #[cfg(feature = "device-file")]
 pub mod device_file;
-#[cfg(feature = "gpio")]
+#[cfg(any(feature = "gpio_in", feature = "gpio_out", feature = "gpio_inout"))]
 pub mod gpio;
 #[cfg(feature = "hdlc")]
 pub mod hdlc;
@@ -76,8 +76,12 @@ pub const BUILT: &[&str] = &[
     "iio",
     #[cfg(feature = "rpmsg")]
     "rpmsg",
-    #[cfg(feature = "gpio")]
-    "gpio",
+    #[cfg(feature = "gpio_in")]
+    "gpio_in",
+    #[cfg(feature = "gpio_out")]
+    "gpio_out",
+    #[cfg(feature = "gpio_inout")]
+    "gpio_inout",
     #[cfg(feature = "hdlc")]
     "hdlc",
     #[cfg(feature = "raw")]
@@ -113,10 +117,14 @@ compile_error!(
     "the rpmsg payload type needs Linux's rpmsg character devices, which this \
      platform does not have: build without the rpmsg feature"
 );
-#[cfg(all(feature = "gpio", not(target_os = "linux")))]
+#[cfg(all(
+    any(feature = "gpio_in", feature = "gpio_out", feature = "gpio_inout"),
+    not(target_os = "linux")
+))]
 compile_error!(
-    "the gpio payload type needs Linux's GPIO character devices, which this \
-     platform does not have: build without the gpio feature"
+    "the gpio_in, gpio_out and gpio_inout payload types need Linux's GPIO \
+     character devices, which this platform does not have: build without \
+     those features"
 );
 #[cfg(all(feature = "hdlc", not(target_os = "linux")))]
 compile_error!(
@@ -143,7 +151,9 @@ mod tests {
         feature = "can",
         feature = "iio",
         feature = "rpmsg",
-        feature = "gpio",
+        feature = "gpio_in",
+        feature = "gpio_out",
+        feature = "gpio_inout",
         feature = "hdlc",
         feature = "raw"
     ))]

@@ -662,8 +662,9 @@ the type decides what is needed to open it and what terms it is operated
 on.</dd>
 <dt>endpoint type</dt>
 <dd>What an endpoint is made of, and so what locates it and what else must be
-said about it. Seven are supported -- <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
-<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt> -- and three more are
+said about it. Nine are supported -- <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
+<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, and the discrete lines
+<tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_inout</tt> -- and three more are
 experimental: <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt>. A type is not a protocol --
 a network endpoint
 carries the protocol it runs over, and no other type is addressed that
@@ -784,8 +785,9 @@ runs, which is the reliability one.</p>
 <dd><p class="first">Anything the configuration names. A node has a name unique across the
 configuration, a type, and the attributes its type requires. Three families
 of type:</p>
-<p><em>devices</em> -- <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">hdlc</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">gpio</tt>,
-<tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt> -- which are the interfaces
+<p><em>devices</em> -- <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">hdlc</tt>, <tt class="docutils literal">can</tt>,
+<tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt>, <tt class="docutils literal">gpio_inout</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>,
+<tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt> -- which are the interfaces
 real
 hardware arrives on. Each is what used to be called a payload endpoint, and
 the attributes are unchanged: a bus and an address, a chip and a set of
@@ -1932,7 +1934,7 @@ four bytes made a number whatever they held would be a temperature nobody
 measured. A <tt class="docutils literal">thermostat</tt> node sends decisions, the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and
 its channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
 <tt class="docutils literal">from_decision</tt>, the one statement of what a decision is, by which a
-<tt class="docutils literal">gpio</tt> node aboard reads the state its lines are driven to -- and a datum
+<tt class="docutils literal">gpio_out</tt> node aboard reads the state its lines are driven to -- and a datum
 from it that is not one is written to no channel, counted in
 <tt class="docutils literal">DataNotDecisions</tt> and said in an event. Every other source's channel is
 <tt class="docutils literal">Tcs.Datum</tt>: its length, and its first 64 bytes. A longer one goes as its
@@ -2414,9 +2416,8 @@ arrives at its <tt class="docutils literal"><span class="pre">world-in</span></t
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="punctuation indicator">,</span><span class="name tag"> address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">127.0.0.1</span><span class="punctuation indicator">,</span><span class="name tag"> port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5000&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">          ground_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5100&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">echo</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
-</span><span class="name tag">          path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/dev/gpiochip0</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_out</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater</span><span class="punctuation indicator">,</span><span class="name tag"> lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">/dev/gpiochip0</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 </span><span class="name tag">vehicle</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type tee-gateway</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="comment single"># What the ground sends the heater, and back to the ground to be</span><span class="whitespace">
@@ -5043,8 +5044,8 @@ node's do.</p>
 <p>A payload is a <strong>parallelogram</strong>, every one of them, the flowchart symbol for
 input and output on an unspecified medium -- which is what a payload is: a
 bus, a socket, a channel, a sample buffer, a file, lines driven, a program.
-The outline alone then says which nodes are what the vehicle carries; <tt class="docutils literal">gpio</tt>
-was a keyed rectangle and the two payloads that are programs wore the bars of
+The outline alone then says which nodes are what the vehicle carries; <tt class="docutils literal">gpio</tt>,
+as the discrete lines were one type then, was a keyed rectangle and the two payloads that are programs wore the bars of
 a predefined process, and each of those said something about the node at the
 cost of saying it is a payload. It is the one symbol in the
 notation that means <em>data crossing a boundary</em> rather than a thing or a step,
@@ -6151,8 +6152,8 @@ addresses are its own. What is here is checked as it stands, with a
 </span><span class="name tag">          world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">gateway.ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">thermostat.ambient</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_out</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_1</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">          lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3,4,5&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">thermostat</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heaters_2</span><span class="punctuation indicator">,</span><span class="name tag"> direction</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">output</span><span class="punctuation indicator">,</span><span class="name tag"> path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/gpiochip0&quot;</span><span class="punctuation indicator">,</span><span class="whitespace">
 </span><span class="name tag">          lines</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;6,7,8&quot;</span><span class="punctuation indicator">,</span><span class="name tag"> moc-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">thermostat</span><span class="punctuation indicator">]</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
@@ -9129,8 +9130,8 @@ what was chosen.</p>
 <dd>Each payload type is a Cargo feature of the <tt class="docutils literal">tcspecial</tt> crate, declared
 in <tt class="docutils literal">tcspecial/Cargo.toml</tt> and named as the type is written in a
 configuration: <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>,
-<tt class="docutils literal">i2c_tmass</tt>, <tt class="docutils literal">spi_tmass</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> and
-<tt class="docutils literal">hdlc</tt>, with <tt class="docutils literal">raw</tt> for the raw protocol of the network type. A
+<tt class="docutils literal">i2c_tmass</tt>, <tt class="docutils literal">spi_tmass</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio_in</tt>,
+<tt class="docutils literal">gpio_out</tt>, <tt class="docutils literal">gpio_inout</tt> and <tt class="docutils literal">hdlc</tt>, with <tt class="docutils literal">raw</tt> for the raw protocol of the network type. A
 sensor's feature brings in its bus's, the sensor being opened as a device
 on that bus is. One word for a type in the configuration,
 the build and the refusal means none of them has to be translated into
@@ -9293,8 +9294,8 @@ Corporation, Alta Data Technologies</td>
 <td>Chang'e</td>
 </tr>
 <tr><td>Time at the tone (a timing signal and the time it marks)</td>
-<td>not supported: the edge can be watched as <tt class="docutils literal">gpio</tt>, but nothing sets a
-clock or stamps data by it</td>
+<td>not supported: the edge can be watched as <tt class="docutils literal">gpio_in</tt>, but nothing
+sets a clock or stamps data by it</td>
 <td>built in: the PPS subsystem, <tt class="docutils literal"><span class="pre">pps-gpio</span></tt></td>
 <td>Astrobotic</td>
 </tr>
@@ -9304,7 +9305,7 @@ clock or stamps data by it</td>
 <td>Apollo, Luna, Surveyor</td>
 </tr>
 <tr><td>Discrete commands and status lines</td>
-<td>supported: <tt class="docutils literal">gpio</tt></td>
+<td>supported: <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt>, <tt class="docutils literal">gpio_inout</tt></td>
 <td>built in: the GPIO character device</td>
 <td>Apollo, Luna, Surveyor</td>
 </tr>
@@ -9392,7 +9393,7 @@ where each row comes from.</p>
 <td>Apollo, Luna, Surveyor</td>
 </tr>
 <tr><td>Discrete commands and status lines</td>
-<td><tt class="docutils literal">gpio</tt></td>
+<td><tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_in</tt></td>
 <td>Apollo, Luna, Surveyor</td>
 </tr>
 <tr><td>Serial data clocked out by the lander</td>
@@ -9986,10 +9987,11 @@ mean both.</dd>
 </dl>
 <div class="section" id="what-is-supported-and-what-is-experimental">
 <h3><a class="toc-backref" href="#toc-entry-107">What Is Supported and What Is Experimental</a></h3>
-<p>Seven types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
-<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt>. The last two were
-experimental, and became supported when each was flown against the kernel's
-own dummy device: a CAN bus of <tt class="docutils literal">vcan</tt> and a chip of
+<p>Nine types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
+<tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, and the three kinds of discrete
+lines, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_inout</tt>. CAN and the discrete
+lines were experimental, and became supported when each was flown against
+the kernel's own dummy device: a CAN bus of <tt class="docutils literal">vcan</tt> and a chip of
 <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
@@ -9998,7 +10000,8 @@ has been run, by a test in the tree, against the device it describes or
 against the kernel's dummy device for it, with the device's far end
 played through the kernel and not by tcssim. The test shows the device's
 data reaching the ground and, where the type has an output, the ground's
-commands reaching the device. For <tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt> that test is
+commands reaching the device. For <tt class="docutils literal">can</tt> and the discrete lines that
+test is
 <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>, and it flies <tt class="docutils literal">examples/can</tt>
 and <tt class="docutils literal">examples/gpio</tt>. Why: a type
 whose rules are tested and whose code has never met a device is a type
@@ -10058,7 +10061,7 @@ carry the bytes, and do not reach the code that differs.</dd>
 <p>The requirements for the experimental ones are written the way every other
 requirement here is, because that is what they are for: a statement of what
 the configuration will be, settled before there is equipment to try it
-against. They may change, where the seven supported types will not.</p>
+against. They may change, where the supported types will not.</p>
 </div>
 <div class="section" id="gpio-payloads-discrete-lines">
 <h3><a class="toc-backref" href="#toc-entry-108">GPIO Payloads: Discrete Lines</a></h3>
@@ -10070,15 +10073,52 @@ thermostat's output: each is one wire that is high or low, and what the ground
 wants to know is when it changed. Linux offers those through a chip's
 character device, where a program asks for a set of lines with edge detection
 and then reads events.</p>
-<p>The rules are in <tt class="docutils literal"><span class="pre">tcslibgs::endpoint_config_gpio</span></tt>, the endpoint in
-<tt class="docutils literal"><span class="pre">tcspecial::endpoint_gpio</span></tt> and the simulation in <tt class="docutils literal"><span class="pre">tcssim::payload_gpio</span></tt>.</p>
+<p>The rules are in <tt class="docutils literal"><span class="pre">tcslibgs::node::payload::gpio</span></tt>, the endpoint in
+<tt class="docutils literal"><span class="pre">tcspecial::node::payload::gpio</span></tt> and the simulation in
+<tt class="docutils literal"><span class="pre">tcssim::node::payload::gpio</span></tt>: one module in each for three node types.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A GPIO payload states a <tt class="docutils literal">path</tt> and the <tt class="docutils literal">lines</tt> it watches, and may
-state the <tt class="docutils literal">edge</tt>, the <tt class="docutils literal">bias</tt>, a <tt class="docutils literal">debounce</tt> and a
-<tt class="docutils literal">state_interval</tt>. Offsets are separated by commas or spaces and written
-in decimal or hexadecimal, because a file written for a board copies them
-out of a schematic in whichever form the schematic used.</dd>
+<dd>A set of lines is one of three node types, and the type says whether its
+lines are watched or driven and so which terminals it has: <tt class="docutils literal">gpio_in</tt>,
+watched, a sink at <tt class="docutils literal"><span class="pre">world-in</span></tt> and a source at <tt class="docutils literal"><span class="pre">world-out</span></tt>;
+<tt class="docutils literal">gpio_out</tt>, driven, a sink at <tt class="docutils literal"><span class="pre">moc-in</span></tt> and a source at <tt class="docutils literal"><span class="pre">moc-out</span></tt>;
+and <tt class="docutils literal">gpio_inout</tt>, driven and reported, a <tt class="docutils literal">gpio_out</tt>'s terminals and a
+source at <tt class="docutils literal"><span class="pre">world-out</span></tt> besides. What a watched line says
+is world data on its way to the ground, and what drives a line is moc
+data -- a thermostat's decision, a command -- which goes on to what the
+line drives, so each stream has the terminals that carry it. Why: one
+<tt class="docutils literal">gpio</tt> type with a <tt class="docutils literal">direction</tt> drew every set of lines with a
+payload's terminals, a sink for moc data and a source for world data,
+which for driven lines is moc data arriving and nothing to leave by; and
+a heater that forgot to say <tt class="docutils literal">output</tt> read as a file that was right.</dd>
+<dt>Requirement</dt>
+<dd>A file that says <tt class="docutils literal">gpio</tt> or <tt class="docutils literal">direction</tt> is refused, told the three
+types and to take <tt class="docutils literal">direction</tt> out (<cite>tcslibgs::graph::renamed</cite>), as a
+file in the other old words is.</dd>
+<dt>Requirement</dt>
+<dd>Each states a <tt class="docutils literal">path</tt> and its <tt class="docutils literal">lines</tt>. A <tt class="docutils literal">gpio_in</tt> may state the
+<tt class="docutils literal">edge</tt>, the <tt class="docutils literal">bias</tt>, a <tt class="docutils literal">debounce</tt> and a <tt class="docutils literal">state_interval</tt>, and a
+<tt class="docutils literal">gpio_inout</tt> must state the <tt class="docutils literal">state_interval</tt> it reports on. Offsets
+are separated by commas or spaces and written in decimal or hexadecimal,
+because a file written for a board copies them out of a schematic in
+whichever form the schematic used.</dd>
+<dt>Requirement</dt>
+<dd>A <tt class="docutils literal">gpio_inout</tt> sends the last value its lines were told out of
+<tt class="docutils literal"><span class="pre">world-out</span></tt> every <tt class="docutils literal">state_interval</tt>, as the decision it was, and
+nothing until it has been told one: the ground follows a heater's switch
+on a beat, and a report lost on the way is made good by the next. It is
+what the switch was told and not what the heater did, which only a line
+sensing the heater, a <tt class="docutils literal">gpio_in</tt>, can say.</dd>
+<dt>Requirement</dt>
+<dd>A datum arriving at a watched set's <tt class="docutils literal"><span class="pre">world-in</span></tt> asks for a report of
+what its lines are, now, whatever the datum says; the report's clock is
+left as it was. A driven value that changes the lines goes on out of
+<tt class="docutils literal"><span class="pre">moc-out</span></tt> as the decision it was, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>; one that says again
+what they are does not, so what the lines drive is told when they
+switch. The two halves of the node's request -- the reader and the
+writer, each on a duplicate of its descriptor -- tell each other these
+through three numbers made as the node opens, so that nothing is
+allocated as data passes.</dd>
 </dl>
 </div>
 <div class="section" id="two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both">
@@ -10158,27 +10198,19 @@ of one chip, as several devices sit on one bus, and the kernel gives a
 line to one request at a time -- so two payloads naming one line are two
 handlers of which the second could not start.</dd>
 <dt>Requirement</dt>
-<dd>A set of lines states its direction, and the default is <tt class="docutils literal">input</tt>. A set
-of discretes is more often something read -- a deployment switch, an
-arming line -- than something driven, and a line requested as an input is
-one the kernel will not write, so the direction decides the request and
-cannot be deduced from anything else the file says.</dd>
+<dd><tt class="docutils literal">edge</tt>, <tt class="docutils literal">bias</tt>, <tt class="docutils literal">debounce</tt> and <tt class="docutils literal">state_interval</tt> are refused on a
+<tt class="docutils literal">gpio_out</tt>, and all but <tt class="docutils literal">state_interval</tt> on a <tt class="docutils literal">gpio_inout</tt>, rather
+than ignored. They are about watching a line, an
+output has no edges to report and nothing to debounce, and a file that
+states one of them for driven lines is saying something it does not mean
+-- commonly a set of lines turned into a <tt class="docutils literal">gpio_out</tt> with its other
+terms left as they were. The refusal names the term that was missed.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">edge</tt>, <tt class="docutils literal">bias</tt> and <tt class="docutils literal">debounce</tt> are refused on an output rather
-than ignored. They are about watching a line, an output has no edges to
-report and nothing to debounce, and a file that states one of them for a
-driven line is saying something it does not mean -- commonly a set of
-lines whose direction was changed and whose other terms were left as they
-were. The refusal names the term that was missed.</dd>
-<dt>Requirement</dt>
-<dd>A GPIO payload cannot be triggered, and only one of a read and a write is
-open to it. An input refuses a write -- there is nothing to write a
-request to, and driving one would be commanding a payload rather than
-reading it, as the IIO endpoint says of its own. An output refuses a read:
-a driven line reports nothing, so reading one would be reporting what this
-node itself asked for, and a configuration that said <tt class="docutils literal">output</tt> where it
-meant <tt class="docutils literal">input</tt> is told so rather than left waiting for events that never
-come. Each refusal names the direction that would allow what was tried.</dd>
+<dd>A GPIO payload cannot be triggered. Watched lines report on their edges
+and their <tt class="docutils literal">state_interval</tt> and are asked by what arrives at
+<tt class="docutils literal"><span class="pre">world-in</span></tt>; driven lines are set by what arrives at <tt class="docutils literal"><span class="pre">moc-in</span></tt>. A
+trigger would be one of those arriving on a clock, and a heater driven
+because a timer went off is the worst of them.</dd>
 <dt>Requirement</dt>
 <dd>Driven lines are driven together, to the one state, by a decision on a
 link -- the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and nothing else, a decision being the
@@ -10191,8 +10223,9 @@ is on the other end of an output is a heater or a valve.</dd>
 <dt>Requirement</dt>
 <dd>The bits and the mask of a set-values call are indexed by a line's place
 in the request and not by its offset on the chip, which is how the v2
-interface counts. Every line of the request appears in the mask whichever
-way they are going: a mask of zero is a call that says nothing.</dd>
+interface counts. Every driven line of the request appears in the mask
+whichever way they are going, and no watched line does: a mask of zero is
+a call that says nothing.</dd>
 <dt>Requirement</dt>
 <dd>The request names the handler as its consumer. A line held by something
 unnamed is the hardest type of conflict to find, and <tt class="docutils literal">gpioinfo</tt> shows
@@ -11083,7 +11116,7 @@ character device and <tt class="docutils literal">ioctl</tt>, a socket family, o
 <tr><td>GPIO character device</td>
 <td><tt class="docutils literal">/dev/gpiochipN</tt> and the version 2 line <tt class="docutils literal">ioctl</tt>s: requesting
 lines, edges, bias and debounce, getting and setting values</td>
-<td>The <tt class="docutils literal">gpio</tt> node</td>
+<td>The <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_inout</tt> nodes</td>
 </tr>
 <tr><td><tt class="docutils literal"><span class="pre">i2c-dev</span></tt></td>
 <td><tt class="docutils literal"><span class="pre">/dev/i2c-N</span></tt> with <tt class="docutils literal">I2C_SLAVE</tt>, <tt class="docutils literal">I2C_TENBIT</tt>, <tt class="docutils literal">I2C_PEC</tt>,
@@ -11405,7 +11438,8 @@ that the two files can be checked against each other.</p>
 payload configuration's own word:
 <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>,
 <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>,
-<tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio</tt> or <tt class="docutils literal">hdlc</tt>. Not a
+<tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt>,
+<tt class="docutils literal">gpio_inout</tt> or <tt class="docutils literal">hdlc</tt>. Not a
 setting of the entry: the type it is
 written under</td>
 </tr>
@@ -12660,7 +12694,7 @@ and part simulation.</dd>
 <h3><a class="toc-backref" href="#toc-entry-140">Which Types Can Be Simulated</a></h3>
 <p>A simulated payload has to be whatever is at the far end of its handler's
 payload endpoint, and the types of endpoint are not equally easy to be. The
-<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">gpio</tt> types are covered where each of them
+<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and GPIO types are covered where each of them
 is: a CAN bus of peers, a sensor's buffer, a channel to another core and a set
 of discrete lines.</p>
 <dl class="docutils">
@@ -14043,8 +14077,8 @@ but never run against the hardware it describes and in no configuration
 this tree ships.
 Four things are in that state, all of them types of payload interface:
 RS-485 on a serial line, and the <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt> types. The
-<tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt> types were once, and are supported now that each has
-been flown against the kernel's dummy device for it.</p>
+<tt class="docutils literal">can</tt> type and the discrete lines were once, and are supported now that
+each has been flown against the kernel's dummy device for it.</p>
 </div>
 <div class="section" id="the-name-of-the-project-is-tcspecial">
 <h2><a class="toc-backref" href="#toc-entry-150">The name of the project is TCSpecial</a></h2>

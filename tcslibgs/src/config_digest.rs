@@ -457,7 +457,9 @@ pub fn unordered(
         // As `node::vehicle::compute` reads a vote's inputs.
         ("compute", "inputs") => value.split([',', ' ']).collect(),
         // As `node::payload::gpio::lines_of` reads them.
-        ("gpio", "lines") => value.split([',', ' ', '\t']).collect(),
+        ("gpio_in" | "gpio_out" | "gpio_inout", "lines") => {
+            value.split([',', ' ', '\t']).collect()
+        }
         // A listed attribute, held with its entries joined: see
         // `graph::LISTED`.
         (_, listed) if crate::graph::LISTED.contains(&listed) => {
@@ -754,7 +756,7 @@ mod tests {
              world-out:\n          - x.v\n          - y.v\n  \
              - type log:\n      - { compute: x, world-in: [v] }\n      \
              - { compute: y, world-in: [v] }\n\
-             payloads:\n  - type gpio:\n      - payload: p\n        \
+             payloads:\n  - type gpio_in:\n      - payload: p\n        \
              lines: \"0, 1\"\n        chip: c\n  \
              - type serial:\n      - payload: s\n        \
              terminators:\n          - '[0A]'\n          - '[0D]'\n\
@@ -768,7 +770,7 @@ mod tests {
              - { from: x, sets: v.a }\n\
              payloads:\n  - type serial:\n      - payload: s\n        \
              terminators:\n          - '[0D]'\n          - '[0A]'\n  \
-             - type gpio:\n      - payload: p\n        chip: c\n        \
+             - type gpio_in:\n      - payload: p\n        chip: c\n        \
              lines: \"1 0\"\n\
              vehicle:\n  - type log:\n      \
              - { compute: y, world-in: [v] }\n      \

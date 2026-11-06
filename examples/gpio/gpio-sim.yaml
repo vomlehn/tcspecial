@@ -13,14 +13,15 @@ tcssim:
 # does not make: bin/mk-kernel-dummies makes it, and gives its lines to the
 # user who ran that.
 simulated_payloads:
-  - type gpio:
-      # Driven and never read: tcssim watches the dummy chip's line and
-      # counts each change the vehicle drives it to, so that its panel shows
-      # each command reaching it.
-      - payload: lamp
-        simulate: true
+  - type gpio_in:
       # The switch is pulled the other way every second, so that its line has an
       # edge, and the ground a record, a second.
       - payload: switch
         packet_interval: 1 s
+        simulate: true
+  - type gpio_out:
+      # Driven and never read: tcssim watches the dummy chip's line and
+      # counts each change the vehicle drives it to, so that its panel shows
+      # each command reaching it.
+      - payload: lamp
         simulate: true

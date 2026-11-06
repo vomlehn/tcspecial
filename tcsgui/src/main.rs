@@ -5913,7 +5913,7 @@ fn physics_joins(
             .unwrap_or_default();
         let joined: Vec<&str> =
             tcslibgs::sim_config::terminals_of(said).collect();
-        let watches = watches_lines(&node.node_type, &node.attributes);
+        let watches = watches_lines(&node.node_type);
         for terminal in terminals {
             let named = format!("{}.{}", end.component, terminal.name);
             if terminal.direction == way
@@ -5933,29 +5933,21 @@ fn physics_joins(
     Some(meant)
 }
 
-/// Whether a payload is a GPIO node watching its lines, rather than one
+/// Whether a payload is a GPIO node watching lines, rather than only
 /// driving them: whose simulated payload is pulled to a decision for each
-/// line.
+/// line it watches.
 ///
 /// # Arguments
 ///
-/// * `node_type`  - The payload's type.
-/// * `attributes` - What it states.
+/// * `node_type` - The payload's type, which says: see
+///                 `tcslibgs::node::payload::gpio::Kind`.
 ///
 /// # Returns
 ///
-/// Whether it watches lines; `false` for a direction that is neither,
-/// which the checking reports.
-fn watches_lines(
-    node_type: &str,
-    attributes: &BTreeMap<String, String>,
-) -> bool {
-    use tcslibgs::node::payload::gpio::Direction;
-    node_type == "gpio"
-        && attributes
-            .get("direction")
-            .map_or(Ok(Direction::default()), |said| Direction::of(said.trim()))
-            .is_ok_and(|direction| !direction.is_output())
+/// Whether it watches lines.
+fn watches_lines(node_type: &str) -> bool {
+    tcslibgs::node::payload::gpio::Kind::of(node_type)
+        .is_some_and(|kind| kind.watches())
 }
 
 /// The edit that makes a join.
@@ -5994,9 +5986,7 @@ fn physics_edit(editor: &Editor, join: &PhysicsJoin) -> Option<Edit> {
                 .find(|node| {
                     crate::sim::Simulator::key_of(&node.name) == *payload
                 })
-                .is_some_and(|node| {
-                    watches_lines(&node.node_type, &node.attributes)
-                });
+                .is_some_and(|node| watches_lines(&node.node_type));
             let now = match (&was, watches) {
                 (Some(was), true) => format!("{was}, {terminal}"),
                 _ => terminal.clone(),
@@ -8804,8 +8794,8 @@ mod tests {
         let mut editor = Editor::open(&path, dividers()).expect("it opens");
         editor.open_simulator(&sim).expect("it opens");
         for (name, kind, at) in [
-            ("lines-in", "gpio", (34, 34)),
-            ("lines-out", "gpio", (34, 166)),
+            ("lines-in", "gpio_in", (34, 34)),
+            ("lines-out", "gpio_out", (34, 166)),
             ("temp_1", "network", (34, 280)),
         ] {
             editor.edit(Edit::AddNode {
@@ -8819,12 +8809,6 @@ mod tests {
                 now: at,
             });
         }
-        editor.edit(Edit::SetAttribute {
-            node: "lines-out".into(),
-            attribute: "direction".into(),
-            was: None,
-            now: Some("output".into()),
-        });
         editor.edit(Edit::SetSimPayload {
             payload: "lines-in".into(),
             setting: "connects".into(),
@@ -9328,7 +9312,7 @@ mod tests {
         let devices = [
             "can",
             "device-file",
-            "gpio",
+            "gpio_in",
             "hdlc",
             "i2c",
             "iio",
@@ -9342,6 +9326,11 @@ mod tests {
         }
         assert_eq!(tint_of("app_all_pl"), PAYLOAD_RUNGS[0]);
         assert_eq!(tint_of("app_pl"), PAYLOAD_RUNGS[1]);
+        // And the two kinds of discrete lines that came when the one was
+        // split, after the sensors on a thermal mass: colours in use, and
+        // gpio_in keeping the one gpio had.
+        assert_eq!(tint_of("gpio_inout"), PAYLOAD_RUNGS[4]);
+        assert_eq!(tint_of("gpio_out"), PAYLOAD_RUNGS[5]);
     }
 
     /// Every tint is a colour, and no two types share one closely enough to

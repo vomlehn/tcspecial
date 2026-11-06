@@ -509,14 +509,6 @@
             "null"
           ]
         },
-        "direction": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
         "edge": {
           "type": [
             "string",
@@ -1115,14 +1107,6 @@
           ]
         },
         "lines": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        "direction": {
           "type": [
             "string",
             "number",
@@ -1759,14 +1743,6 @@
             "null"
           ]
         },
-        "direction": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
         "edge": {
           "type": [
             "string",
@@ -1953,7 +1929,9 @@
         "type can",
         "type iio",
         "type rpmsg",
-        "type gpio",
+        "type gpio_in",
+        "type gpio_out",
+        "type gpio_inout",
         "type hdlc",
         "type app_pl",
         "type app_all_pl"

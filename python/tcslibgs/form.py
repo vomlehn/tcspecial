@@ -140,7 +140,10 @@ def form_of(config, source):
     if source not in names:
         return DATUM
     node = config.node(source)
-    if node.node_type == "gpio":
+    if node.node_type == "gpio_inout":
+        # What it reports is what its lines were told: a decision.
+        return DECISION
+    if node.node_type in ("gpio_in", "gpio_out"):
         return _lines_form(node)
     function = _function(config, source)
     if function in DECISION_FUNCTIONS:
@@ -157,10 +160,10 @@ LINE_RECORD_BYTES = 16
 def _lines_form(node):
     """The form of a GPIO payload's data: ``Form::of``'s rule for one.
 
-    Its lines' levels where it reads them on an interval and watches them
-    for no edge, every datum then holding a record of every line; its bytes
-    where it watches for edges, a datum of which may hold the one line that
-    changed, or drives them.
+    Its watched lines' levels where it reads them on an interval and
+    watches them for no edge, every datum then holding a record of every
+    watched line; its bytes where it watches for edges, a datum of which may
+    hold the one line that changed, or where it watches none.
 
     Args:
         node: The node.
@@ -170,7 +173,7 @@ def _lines_form(node):
     """
     said = {name: str(value).strip()
             for name, value in node.attributes.items()}
-    levels = (said.get("direction", "input") != "output"
+    levels = (node.node_type == "gpio_in"
               and said.get("edge") == "none"
               and bool(said.get("state_interval")))
     if not levels:

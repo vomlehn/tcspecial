@@ -25,7 +25,7 @@ use crate::types::{DHType, RAW};
 /// every build, because the link to the ground is UDP; and so is every node
 /// that reaches no interface. These words are the Cargo features' names too,
 /// which a test of tcspecial's holds them to.
-pub const OPTIONAL_TYPES: [&str; 12] = [
+pub const OPTIONAL_TYPES: [&str; 14] = [
     "device-file",
     "serial",
     "i2c",
@@ -35,7 +35,9 @@ pub const OPTIONAL_TYPES: [&str; 12] = [
     "can",
     "iio",
     "rpmsg",
-    "gpio",
+    "gpio_in",
+    "gpio_out",
+    "gpio_inout",
     "hdlc",
     RAW,
 ];

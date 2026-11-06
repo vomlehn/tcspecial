@@ -1,0 +1,51 @@
+# Discrete lines, watched.
+#
+# A payload: what the vehicle carries this flight. What its lines say --
+# each edge, and their levels on an interval -- is world data, leaving by
+# world-out on its way to the ground; what arrives at world-in asks for
+# their levels now. Its Rust is tcspecial/src/node/payload/gpio/, which it
+# shares with gpio_out and gpio_inout.
+node: gpio_in
+type: gpio_in
+about: Discrete lines, watched; their changes go to the ground.
+payload-sink: true
+payload-source: true
+gateway-sink: false
+gateway-source: false
+attributes:
+  - name: path
+    required: true
+    kind: path
+    about: >
+      The GPIO chip the lines are on: /dev/gpiochip0.
+  - name: lines
+    required: true
+    about: Which lines of that chip it watches, comma separated.
+  - name: edge
+    required: false
+    about: >
+      Which edge of a watched line is an event: rising, falling, both or
+      none.
+  - name: bias
+    required: false
+    about: >
+      Which way a watched line is biased when nothing drives it: pull_up,
+      pull_down or none.
+  - name: debounce
+    required: false
+    kind: interval
+    about: >
+      How long a watched line must hold its level to count as an event, as a
+      length of time: 50 us, 2 ms.
+  - name: group
+    required: false
+    about: >
+      The payload group it belongs to, where it is in one.
+  - name: state_interval
+    required: false
+    kind: interval
+    about: >
+      How often to report what the watched lines are: 5 s. Edges say when a
+      line changed and this says what it is now, so a set of lines may ask
+      for either or both -- and a line that has not changed since the vehicle
+      started tells the ground nothing until this is stated.

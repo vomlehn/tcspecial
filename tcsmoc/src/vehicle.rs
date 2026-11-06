@@ -3264,21 +3264,23 @@ payloads:
             named,
             vec![
                 ("ambient".to_string(), 0),
-                // The lines sensing the heaters, which the ground sees in
-                // place of the thermostat's decision.
-                ("gpio-in-tmass".to_string(), 2),
-                ("temp1".to_string(), 6),
-                ("temp2".to_string(), 7),
-                ("temp3".to_string(), 8),
+                // The heaters' switches, each reporting what it was last
+                // told, which the ground sees in place of the thermostat's
+                // decision.
+                ("gpio-out-tmass1".to_string(), 2),
+                ("gpio-out-tmass2".to_string(), 3),
+                ("temp1".to_string(), 5),
+                ("temp2".to_string(), 6),
+                ("temp3".to_string(), 7),
             ]
         );
-        // temp3, device id 8, at ground_base plus that.
+        // temp3, device id 7, at ground_base plus that.
         assert!(
-            panels[4].config.contains("to gateway"),
+            panels[5].config.contains("to gateway"),
             "{}",
-            panels[4].config
+            panels[5].config
         );
-        assert!(panels[4].config.contains("5108"), "{}", panels[4].config);
+        assert!(panels[5].config.contains("5107"), "{}", panels[5].config);
     }
 
     /// The minimal example's sensor reports over payload_telemetry.

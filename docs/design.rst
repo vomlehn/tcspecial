@@ -77,8 +77,9 @@ endpoint
 
 endpoint type
     What an endpoint is made of, and so what locates it and what else must be
-    said about it. Seven are supported -- ``network``, ``device-file``,
-    ``serial``, ``i2c``, ``spi``, ``can`` and ``gpio`` -- and three more are
+    said about it. Nine are supported -- ``network``, ``device-file``,
+    ``serial``, ``i2c``, ``spi``, ``can``, and the discrete lines
+    ``gpio_in``, ``gpio_out`` and ``gpio_inout`` -- and three more are
     experimental: ``iio``, ``rpmsg`` and ``hdlc``. A type is not a protocol --
     a network endpoint
     carries the protocol it runs over, and no other type is addressed that
@@ -221,8 +222,9 @@ node
     configuration, a type, and the attributes its type requires. Three families
     of type:
 
-    *devices* -- ``i2c``, ``spi``, ``serial``, ``hdlc``, ``can``, ``gpio``,
-    ``iio``, ``rpmsg``, ``network``, ``device-file`` -- which are the interfaces
+    *devices* -- ``i2c``, ``spi``, ``serial``, ``hdlc``, ``can``,
+    ``gpio_in``, ``gpio_out``, ``gpio_inout``, ``iio``, ``rpmsg``,
+    ``network``, ``device-file`` -- which are the interfaces
     real
     hardware arrives on. Each is what used to be called a payload endpoint, and
     the attributes are unchanged: a bus and an address, a chip and a set of
@@ -1449,7 +1451,7 @@ four bytes made a number whatever they held would be a temperature nobody
 measured. A ``thermostat`` node sends decisions, the text ``1`` or ``0``, and
 its channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
 ``from_decision``, the one statement of what a decision is, by which a
-``gpio`` node aboard reads the state its lines are driven to -- and a datum
+``gpio_out`` node aboard reads the state its lines are driven to -- and a datum
 from it that is not one is written to no channel, counted in
 ``DataNotDecisions`` and said in an event. Every other source's channel is
 ``Tcs.Datum``: its length, and its first 64 bytes. A longer one goes as its
@@ -1958,9 +1960,8 @@ in the file showed.
          - { gateway: ground, address: 127.0.0.1, port: "5000",
              ground_base: "127.0.0.1:5100", moc-out: echo }
    payloads:
-     - type gpio:
-         - { payload: heater, direction: output, lines: "4",
-             path: /dev/gpiochip0 }
+     - type gpio_out:
+         - { payload: heater, lines: "4", path: /dev/gpiochip0 }
    vehicle:
      - type tee-gateway:
          # What the ground sends the heater, and back to the ground to be
@@ -4829,8 +4830,8 @@ node's do.
 A payload is a **parallelogram**, every one of them, the flowchart symbol for
 input and output on an unspecified medium -- which is what a payload is: a
 bus, a socket, a channel, a sample buffer, a file, lines driven, a program.
-The outline alone then says which nodes are what the vehicle carries; ``gpio``
-was a keyed rectangle and the two payloads that are programs wore the bars of
+The outline alone then says which nodes are what the vehicle carries; ``gpio``,
+as the discrete lines were one type then, was a keyed rectangle and the two payloads that are programs wore the bars of
 a predefined process, and each of those said something about the node at the
 cost of saying it is a payload. It is the one symbol in the
 notation that means *data crossing a boundary* rather than a thing or a step,
@@ -6061,8 +6062,8 @@ addresses are its own. What is here is checked as it stands, with a
              world-out: [gateway.ambient, thermostat.ambient] }
 
    payloads:
-     - type gpio:
-         - { payload: heaters_1, direction: output, path: "/dev/gpiochip0",
+     - type gpio_out:
+         - { payload: heaters_1, path: "/dev/gpiochip0",
              lines: "3,4,5", moc-in: [thermostat] }
          - { payload: heaters_2, direction: output, path: "/dev/gpiochip0",
              lines: "6,7,8", moc-in: [thermostat] }
@@ -8966,8 +8967,8 @@ Requirement
     Each payload type is a Cargo feature of the ``tcspecial`` crate, declared
     in ``tcspecial/Cargo.toml`` and named as the type is written in a
     configuration: ``device-file``, ``serial``, ``i2c``, ``spi``,
-    ``i2c_tmass``, ``spi_tmass``, ``can``, ``iio``, ``rpmsg``, ``gpio`` and
-    ``hdlc``, with ``raw`` for the raw protocol of the network type. A
+    ``i2c_tmass``, ``spi_tmass``, ``can``, ``iio``, ``rpmsg``, ``gpio_in``,
+    ``gpio_out``, ``gpio_inout`` and ``hdlc``, with ``raw`` for the raw protocol of the network type. A
     sensor's feature brings in its bus's, the sensor being opened as a device
     on that bus is. One word for a type in the configuration,
     the build and the refusal means none of them has to be translated into
@@ -9124,8 +9125,8 @@ Griffin are "Astrobotic".
        Corporation, Alta Data Technologies
      - Chang'e
    * - Time at the tone (a timing signal and the time it marks)
-     - not supported: the edge can be watched as ``gpio``, but nothing sets a
-       clock or stamps data by it
+     - not supported: the edge can be watched as ``gpio_in``, but nothing
+       sets a clock or stamps data by it
      - built in: the PPS subsystem, ``pps-gpio``
      - Astrobotic
    * - Analog telemetry channels
@@ -9133,7 +9134,7 @@ Griffin are "Astrobotic".
      - built in: IIO, for the converters it has drivers for
      - Apollo, Luna, Surveyor
    * - Discrete commands and status lines
-     - supported: ``gpio``
+     - supported: ``gpio_in``, ``gpio_out``, ``gpio_inout``
      - built in: the GPIO character device
      - Apollo, Luna, Surveyor
    * - Serial data clocked out by the lander
@@ -9209,7 +9210,7 @@ where each row comes from.
      - ``iio``, where the converter is an IIO device
      - Apollo, Luna, Surveyor
    * - Discrete commands and status lines
-     - ``gpio``
+     - ``gpio_out`` and ``gpio_in``
      - Apollo, Luna, Surveyor
    * - Serial data clocked out by the lander
      - ``spi``, which clocks the same way and is a different protocol
@@ -9864,10 +9865,11 @@ Requirement
 
 What Is Supported and What Is Experimental
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Seven types of payload are supported: ``network``, ``device-file``,
-``serial``, ``i2c``, ``spi``, ``can`` and ``gpio``. The last two were
-experimental, and became supported when each was flown against the kernel's
-own dummy device: a CAN bus of ``vcan`` and a chip of
+Nine types of payload are supported: ``network``, ``device-file``,
+``serial``, ``i2c``, ``spi``, ``can``, and the three kinds of discrete
+lines, ``gpio_in``, ``gpio_out`` and ``gpio_inout``. CAN and the discrete
+lines were experimental, and became supported when each was flown against
+the kernel's own dummy device: a CAN bus of ``vcan`` and a chip of
 ``gpio-sim``.
 
 Requirement
@@ -9876,7 +9878,8 @@ Requirement
     against the kernel's dummy device for it, with the device's far end
     played through the kernel and not by tcssim. The test shows the device's
     data reaching the ground and, where the type has an output, the ground's
-    commands reaching the device. For ``can`` and ``gpio`` that test is
+    commands reaching the device. For ``can`` and the discrete lines that
+    test is
     ``tcspecial/tests/kernel-dummies.rs``, and it flies ``examples/can``
     and ``examples/gpio``. Why: a type
     whose rules are tested and whose code has never met a device is a type
@@ -9940,7 +9943,7 @@ Requirement
 The requirements for the experimental ones are written the way every other
 requirement here is, because that is what they are for: a statement of what
 the configuration will be, settled before there is equipment to try it
-against. They may change, where the seven supported types will not.
+against. They may change, where the supported types will not.
 
 GPIO Payloads: Discrete Lines
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -9954,15 +9957,56 @@ wants to know is when it changed. Linux offers those through a chip's
 character device, where a program asks for a set of lines with edge detection
 and then reads events.
 
-The rules are in ``tcslibgs::endpoint_config_gpio``, the endpoint in
-``tcspecial::endpoint_gpio`` and the simulation in ``tcssim::payload_gpio``.
+The rules are in ``tcslibgs::node::payload::gpio``, the endpoint in
+``tcspecial::node::payload::gpio`` and the simulation in
+``tcssim::node::payload::gpio``: one module in each for three node types.
 
 Requirement
-    A GPIO payload states a ``path`` and the ``lines`` it watches, and may
-    state the ``edge``, the ``bias``, a ``debounce`` and a
-    ``state_interval``. Offsets are separated by commas or spaces and written
-    in decimal or hexadecimal, because a file written for a board copies them
-    out of a schematic in whichever form the schematic used.
+    A set of lines is one of three node types, and the type says whether its
+    lines are watched or driven and so which terminals it has: ``gpio_in``,
+    watched, a sink at ``world-in`` and a source at ``world-out``;
+    ``gpio_out``, driven, a sink at ``moc-in`` and a source at ``moc-out``;
+    and ``gpio_inout``, driven and reported, a ``gpio_out``'s terminals and a
+    source at ``world-out`` besides. What a watched line says
+    is world data on its way to the ground, and what drives a line is moc
+    data -- a thermostat's decision, a command -- which goes on to what the
+    line drives, so each stream has the terminals that carry it. Why: one
+    ``gpio`` type with a ``direction`` drew every set of lines with a
+    payload's terminals, a sink for moc data and a source for world data,
+    which for driven lines is moc data arriving and nothing to leave by; and
+    a heater that forgot to say ``output`` read as a file that was right.
+
+Requirement
+    A file that says ``gpio`` or ``direction`` is refused, told the three
+    types and to take ``direction`` out (`tcslibgs::graph::renamed`), as a
+    file in the other old words is.
+
+Requirement
+    Each states a ``path`` and its ``lines``. A ``gpio_in`` may state the
+    ``edge``, the ``bias``, a ``debounce`` and a ``state_interval``, and a
+    ``gpio_inout`` must state the ``state_interval`` it reports on. Offsets
+    are separated by commas or spaces and written in decimal or hexadecimal,
+    because a file written for a board copies them out of a schematic in
+    whichever form the schematic used.
+
+Requirement
+    A ``gpio_inout`` sends the last value its lines were told out of
+    ``world-out`` every ``state_interval``, as the decision it was, and
+    nothing until it has been told one: the ground follows a heater's switch
+    on a beat, and a report lost on the way is made good by the next. It is
+    what the switch was told and not what the heater did, which only a line
+    sensing the heater, a ``gpio_in``, can say.
+
+Requirement
+    A datum arriving at a watched set's ``world-in`` asks for a report of
+    what its lines are, now, whatever the datum says; the report's clock is
+    left as it was. A driven value that changes the lines goes on out of
+    ``moc-out`` as the decision it was, ``1`` or ``0``; one that says again
+    what they are does not, so what the lines drive is told when they
+    switch. The two halves of the node's request -- the reader and the
+    writer, each on a duplicate of its descriptor -- tell each other these
+    through three numbers made as the node opens, so that nothing is
+    allocated as data passes.
 
 Two ways of watching, and a set of lines may ask for either or both
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10054,29 +10098,20 @@ Requirement
     handlers of which the second could not start.
 
 Requirement
-    A set of lines states its direction, and the default is ``input``. A set
-    of discretes is more often something read -- a deployment switch, an
-    arming line -- than something driven, and a line requested as an input is
-    one the kernel will not write, so the direction decides the request and
-    cannot be deduced from anything else the file says.
+    ``edge``, ``bias``, ``debounce`` and ``state_interval`` are refused on a
+    ``gpio_out``, and all but ``state_interval`` on a ``gpio_inout``, rather
+    than ignored. They are about watching a line, an
+    output has no edges to report and nothing to debounce, and a file that
+    states one of them for driven lines is saying something it does not mean
+    -- commonly a set of lines turned into a ``gpio_out`` with its other
+    terms left as they were. The refusal names the term that was missed.
 
 Requirement
-    ``edge``, ``bias`` and ``debounce`` are refused on an output rather
-    than ignored. They are about watching a line, an output has no edges to
-    report and nothing to debounce, and a file that states one of them for a
-    driven line is saying something it does not mean -- commonly a set of
-    lines whose direction was changed and whose other terms were left as they
-    were. The refusal names the term that was missed.
-
-Requirement
-    A GPIO payload cannot be triggered, and only one of a read and a write is
-    open to it. An input refuses a write -- there is nothing to write a
-    request to, and driving one would be commanding a payload rather than
-    reading it, as the IIO endpoint says of its own. An output refuses a read:
-    a driven line reports nothing, so reading one would be reporting what this
-    node itself asked for, and a configuration that said ``output`` where it
-    meant ``input`` is told so rather than left waiting for events that never
-    come. Each refusal names the direction that would allow what was tried.
+    A GPIO payload cannot be triggered. Watched lines report on their edges
+    and their ``state_interval`` and are asked by what arrives at
+    ``world-in``; driven lines are set by what arrives at ``moc-in``. A
+    trigger would be one of those arriving on a clock, and a heater driven
+    because a timer went off is the worst of them.
 
 Requirement
     Driven lines are driven together, to the one state, by a decision on a
@@ -10091,8 +10126,9 @@ Requirement
 Requirement
     The bits and the mask of a set-values call are indexed by a line's place
     in the request and not by its offset on the chip, which is how the v2
-    interface counts. Every line of the request appears in the mask whichever
-    way they are going: a mask of zero is a call that says nothing.
+    interface counts. Every driven line of the request appears in the mask
+    whichever way they are going, and no watched line does: a mask of zero is
+    a call that says nothing.
 
 Requirement
     The request names the handler as its consumer. A line held by something
@@ -10927,7 +10963,7 @@ character device and ``ioctl``, a socket family, or a Linux file system.
    * - GPIO character device
      - ``/dev/gpiochipN`` and the version 2 line ``ioctl``\ s: requesting
        lines, edges, bias and debounce, getting and setting values
-     - The ``gpio`` node
+     - The ``gpio_in``, ``gpio_out`` and ``gpio_inout`` nodes
    * - ``i2c-dev``
      - ``/dev/i2c-N`` with ``I2C_SLAVE``, ``I2C_TENBIT``, ``I2C_PEC``,
        ``I2C_FUNCS`` and ``I2C_SMBUS``
@@ -11223,7 +11259,8 @@ that the two files can be checked against each other.
 |                     |        | payload configuration's own word:           |
 |                     |        | ``network``, ``device-file``, ``serial``,   |
 |                     |        | ``i2c``, ``spi``, ``can``, ``iio``,         |
-|                     |        | ``rpmsg``, ``gpio`` or ``hdlc``. Not a      |
+|                     |        | ``rpmsg``, ``gpio_in``, ``gpio_out``,       |
+|                     |        | ``gpio_inout`` or ``hdlc``. Not a           |
 |                     |        | setting of the entry: the type it is        |
 |                     |        | written under                               |
 +---------------------+--------+---------------------------------------------+
@@ -12539,7 +12576,7 @@ Which Types Can Be Simulated
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A simulated payload has to be whatever is at the far end of its handler's
 payload endpoint, and the types of endpoint are not equally easy to be. The
-``can``, ``iio``, ``rpmsg`` and ``gpio`` types are covered where each of them
+``can``, ``iio``, ``rpmsg`` and GPIO types are covered where each of them
 is: a CAN bus of peers, a sensor's buffer, a channel to another core and a set
 of discrete lines.
 
@@ -14079,8 +14116,8 @@ but never run against the hardware it describes and in no configuration
 this tree ships.
 Four things are in that state, all of them types of payload interface:
 RS-485 on a serial line, and the ``iio``, ``rpmsg`` and ``hdlc`` types. The
-``can`` and ``gpio`` types were once, and are supported now that each has
-been flown against the kernel's dummy device for it.
+``can`` type and the discrete lines were once, and are supported now that
+each has been flown against the kernel's dummy device for it.
 
 The name of the project is TCSpecial
 ------------------------------------

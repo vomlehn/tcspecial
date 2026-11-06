@@ -494,7 +494,7 @@ refused, saying which list to add the node to:
 
    exports:
      world-in: [temp1, temp2, temp3]
-     world-out: [ambient, gpio-in-tmass, temp1, temp2, temp3]
+     world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
 
 In XML each name is an element of its own, ``<world-in>temp1</world-in>``,
 inside ``<exports>``. A top file has nothing around it and may not have the
@@ -555,10 +555,11 @@ and no others: a device file stating a ``port``, or a network payload stating a
 
 Supported and experimental interfaces
 -------------------------------------
-Seven types of payload are supported: ``network``, ``device-file``,
-``serial``, ``i2c``, ``spi``, ``can`` and ``gpio``.
+Nine types of payload are supported: ``network``, ``device-file``,
+``serial``, ``i2c``, ``spi``, ``can``, and the three kinds of discrete
+lines, ``gpio_in``, ``gpio_out`` and ``gpio_inout``.
 
-The last two were experimental until each was flown against the kernel's
+CAN and the discrete lines were experimental until each was flown against the kernel's
 dummy device for it, which is what supported means for them: tcspecial's
 node code is run against a CAN bus of the kernel's ``vcan`` and a chip of its
 ``gpio-sim``, the far end of each played through the kernel and not by
@@ -589,8 +590,7 @@ firmware, a synchronous HDLC line needs a card, and RS-485's direction
 control is the driver of a real UART, which a pseudo-terminal refuses.
 
 Read them as a statement of what the configuration will be rather than as a
-feature to rely on. They may change in ways the seven supported types will
-not.
+feature to rely on. They may change in ways the supported types will not.
 
 Attributes Every Payload Has
 ----------------------------
@@ -604,8 +604,9 @@ Attributes Every Payload Has
                   see `How a Payload's Data Is Read`_
    type           not an attribute but the type it is written under, as
                   - type network: or <type name="network">, one of
-                  network | device-file | serial | i2c | spi | can | gpio,
-                  or one of the experimental iio | rpmsg | hdlc
+                  network | device-file | serial | i2c | spi | can |
+                  gpio_in | gpio_out | gpio_inout, or one of the
+                  experimental iio | rpmsg | hdlc
 
 How a payload is driven
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -735,11 +736,10 @@ whenever the ground starts the node after stopping it:
 
 .. code-block:: yaml
 
-   - type gpio:
+   - type gpio_out:
        - payload: heaters_1
          path: /dev/gpiochip0
          lines: "4"
-         direction: output
          init: '"0"'
 
 It is not only for what is driven. A sensor whose register has to be set
@@ -945,10 +945,19 @@ transaction on every pass. Give such a payload a group or a rate.
      - No: the bus is clocked by tcspecial
      - Yes: bytes clocked out
      - ``read_size`` bytes, one transfer
-   * - ``gpio``
-     - Yes: edges on input lines, and levels every ``state_interval``
+   * - ``gpio_in``
+     - Yes: edges on watched lines, and levels every ``state_interval``
+     - No: a datum at ``world-in`` asks for the levels now
+     - One event per edge, or a report of every watched line
+   * - ``gpio_out``
+     - Only what it was driven to, passed on when it changes
      - No
-     - One event per edge
+     - The decision that changed the lines
+   * - ``gpio_inout``
+     - What it was driven to, passed on when it changes, and the last value
+       it was told, every ``state_interval``
+     - No
+     - One decision
    * - ``app_pl``
      - Yes: whatever the program writes
      - No
@@ -1299,24 +1308,52 @@ makes the bus; see `Making the Kernel's Dummy Devices`_.
 
 A GPIO Payload
 --------------
-Keyword ``type gpio``. **Supported**, as flown against the kernel's simulated
-chip: see `Supported and experimental interfaces`_. A set of discrete lines --
-a deployment switch, an arming line, a payload's own "alive" line -- watched
-for changes, or a set of circuits driven: a heater, a valve, a latch.
+Keywords ``type gpio_in``, ``type gpio_out`` and ``type gpio_inout``.
+**Supported**, as flown against the kernel's simulated chip: see `Supported
+and experimental interfaces`_. A set of discrete lines -- a deployment switch,
+an arming line, a payload's own "alive" line -- watched for changes; a set of
+circuits driven -- a heater, a valve, a latch; or a set driven whose state
+the ground is told on a beat.
+
+The type says which, and so which terminals the node has:
+
+.. code-block:: text
+
+   gpio_in      lines watched. What they say is world data, out of
+                world-out to the ground; a datum arriving at world-in asks
+                for what the lines are now
+   gpio_out     lines driven. What arrives at moc-in -- a thermostat's
+                decision, a command from the ground -- is what they are
+                driven to, and a value that changes them goes on out of
+                moc-out, to whatever they drive
+   gpio_inout   lines driven as a gpio_out's are, and reported: every
+                state_interval the last value they were told goes out of
+                world-out, towards the ground. A heater a thermostat
+                switches, whose state the ground follows. Its links out
+                say which terminal they leave by
+
+A file that still says ``type gpio``, or ``direction``, is refused and told
+the three types: one ``gpio`` with a direction was what there was, and it
+drew driven lines with a payload's terminals, a sink for moc data and a
+source for world data, when what goes through them is moc data both ways.
 
 .. code-block:: text
 
    path           the chip: /dev/gpiochip0
-   lines          the offsets, separated by commas or spaces, decimal
-                  or 0x. Required
-   direction      input | output, default input
-   edge           rising | falling | both | none, default both. Inputs only
-   bias           none | pull_up | pull_down, default none. Inputs only
+   lines          the offsets, separated by commas or spaces, decimal or 0x.
+                  Required
+   edge           rising | falling | both | none, default both. Watched
+                  lines only
+   bias           none | pull_up | pull_down, default none. Watched lines
+                  only
    debounce       how long a line must be steady before a change counts,
                   as a length of time: 50 us. Default none, applied by the
-                  kernel, inputs only
-   state_interval how often to report what the lines are. Default none,
-                  inputs only
+                  kernel, watched lines only
+   state_interval how often to report what the watched lines are, or what
+                  a gpio_inout's lines were last told. Default none;
+                  required of a gpio_inout
+   init           what driven lines start at, as a trigger is written:
+                  '"0"'. gpio_out and gpio_inout only
 
 **How lines are watched.** Two different questions, and a set of lines may ask
 either or both:
@@ -1344,20 +1381,18 @@ cannot do: a line that has not changed since the vehicle started tells the
 ground nothing about itself, and the kernel's queue of events is finite, so a
 burst can leave the ground holding a value that is wrong. A report every so
 often ends both: after one interval at most, what the ground has is what the
-lines are.
+lines are. A datum arriving at ``world-in`` asks for one at once, whatever
+the datum says.
 
 Asking for neither takes saying ``edge: none`` with no ``state_interval``, and
 that is refused -- lines watched for no changes and reported at no interval
 would send nothing at all.
 
-The direction is not something a set of lines can be both of: a line
-requested as an input is one the kernel will not write, and one requested as
-an output produces no edges to read. So it is stated, and stating it is what
-lets a file be refused for driving something it said it would watch. The
-watching terms are refused outright on an output rather than ignored: an
-edge, a debounce or a report of a line nothing reads is a file saying
-something it does not mean, and the usual cause is a set of lines whose
-direction was changed and whose other words were left as they were.
+The watching terms are refused outright on a ``gpio_out`` rather than
+ignored: an edge, a debounce or a report of a line nothing reads is a file
+saying something it does not mean, and the usual cause is a set of lines
+turned into a ``gpio_out`` with its other words left as they were. A
+``gpio_inout`` takes ``state_interval`` alone of them, for its report.
 
 This is the one type whose payload data is made rather than carried. A line
 has no bytes: it is high or low, and what the ground wants is when it changed.
@@ -1368,9 +1403,9 @@ number of them. One that is not is refused where the file is read: room left
 unfilled on every read, or, smaller than a record, a node that would never
 deliver anything.
 
-A report makes the same record, one per line: this line, this value, this
-time. The ground reads the two alike, which is the point of their being the
-same record; the only difference is that a change carries the time of the
+A report makes the same record, one per watched line: this line, this value,
+this time. The ground reads the two alike, which is the point of their being
+the same record; the only difference is that a change carries the time of the
 change and a report carries the time it was looked at.
 
 Two payloads may watch one chip and may not watch one line: the kernel gives a
@@ -1391,15 +1426,13 @@ The same value arrives over and over, and that is deliberate. A thermostat
 asserts its decision on every sample rather than only when it changes, so the
 lines are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample instead of standing until the
-temperature crosses the other threshold. Only the devices are told again: a
-log and a ground link are sent the transitions, so a reader still sees when
-the heaters actually switched.
+temperature crosses the other threshold. What goes on out of ``moc-out`` is
+the transitions only, as a log and a ground link are sent them, so a reader
+still sees when the heaters actually switched.
 
-A GPIO payload cannot be triggered, and a read and a write are not both open
-to it: an input refuses a write, because driving one would be commanding a
-payload rather than reading it, and an output refuses a read, because
-reporting a line this node itself drove would be reporting its own voice.
-Each refusal says which direction does allow it.
+A GPIO payload cannot be triggered: watched lines report on their edges and
+their ``state_interval`` and are asked by what arrives at ``world-in``, and
+driven lines are set by what arrives at ``moc-in``.
 
 The simulator moves lines through the kernel's ``gpio-sim``, which it finds
 rather than makes: loading the module and making a chip need root, and tcssim
@@ -1407,8 +1440,9 @@ says so if there is none. ``bin/mkgpio`` makes one and prints the node it
 became, which is numbered as chips appear and so has to be read off the run
 rather than assumed; ``bin/rmgpio`` takes it away again. The packet and segment sizes mean nothing to a
 simulated set of discretes, and neither do the faults -- there are no bytes to
-drop or corrupt; what it does is pull each of its lines the other way every
-packet interval.
+drop or corrupt; what it does is pull each of its watched lines the other
+way every packet interval, and watch its driven lines for what the vehicle
+drives them to.
 
 ``tcspecial/tests/kernel-dummies.rs`` flies `The gpio example`_ on such a
 chip, pulling and reading its lines itself rather than through tcssim: each
@@ -1991,15 +2025,13 @@ which is what a panel in the MOC shows.
        interval: "100 ms"
 
    payloads:
-     - type gpio:
+     - type gpio_out:
          - payload: heaters_1
-           direction: "output"
            lines: "3,4,5"
            path: "/dev/gpiochip0"
            moc-in: [thermostat]
 
          - payload: heaters_2
-           direction: "output"
            lines: "6,7,8"
            path: "/dev/gpiochip0"
            moc-in: [thermostat]
@@ -2229,10 +2261,10 @@ The thermostat example
 .. figure:: ../examples/thermostat/thermostat.svg
    :alt: The thermostat example: three temperature sensors of one place,
          converted to kelvin, voted on, logged and sent to the ground, with a
-         thermostat driving two heaters, each through a GPIO line,
-         and two more lines sensing the heaters reported to the ground. Each
-         sensor is the far end of a UDP socket and each line one of the
-         kernel's dummy chip, which tcssim drives.
+         thermostat driving two heaters, each through a GPIO line whose
+         switch reports what it was told to the ground. Each sensor is the
+         far end of a UDP socket and each line one of the kernel's dummy
+         chip, which tcssim watches.
    :width: 100%
 
    ``examples/thermostat``: a trio of sensors, a vote, a thermostat, its two
@@ -2295,16 +2327,16 @@ with no way to be warmed: either alone holds the band while the orbit is
 warm, and both together hold it in the cold too. They are separate nodes so
 that the ground can stop one and leave the other warming the zone.
 
-The decision is not sent to the ground: what the thermostat decided is not
-what the heaters did, and a heater that has failed takes what it is told and
-does nothing. What goes down instead is ``gpio-in-tmass``, two lines on the
-thermal mass, line 2 sensing the first heater and line 3 the second, each high
-while its heater is heating. It reads them for their levels every second --
-``edge: "none"`` and ``state_interval: "1 s"`` -- and sends a sixteen-byte
-record of each, the time, the line and its level, to the ground on port 5102
-and to the log. So the ground hears every second what each heater is doing,
-and a report lost on the way is made good by the next. Disabled from the
-ground, like any node, it reports nothing at all.
+The decision is not sent to the ground by the thermostat. Each heater's switch
+is a ``gpio_inout``, which drives its line as a ``gpio_out`` does and reports:
+every second -- ``state_interval: "1 s"`` -- it sends the last value it was
+told, ``1`` or ``0``, to the ground, ``gpio-out-tmass1`` on port 5102 and
+``gpio-out-tmass2`` on 5103. So the ground hears every second what each
+heater was told, and a report lost on the way is made good by the next. What
+it hears is what the switch was told and not what the heater did: a heater
+that has failed takes what it is told and does nothing, and shows only in the
+temperature. Disabled from the ground, like any node, a switch neither drives
+nor reports.
 
 The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
@@ -2312,12 +2344,10 @@ missing is corrected on the next sample. What is logged is the transitions
 alone.
 
 No payload here has a telemetry link of its own: the sensors' readings reach
-the ground through their conversions, the heaters' switches are driven and
-never read, and the lines sensing the heaters are drawn into the gateway node.
-Tcssim counts each decision the vehicle drives the switches to, and pulls
-each of ``gpio-in-tmass``'s lines to its
-heater's ``heating`` -- ``connects: heater_1.heating, heater_2.heating``, one
-terminal for each line, in the order of the node's lines.
+the ground through their conversions, and the heaters' switches are drawn
+into the gateway node. Tcssim counts each decision the vehicle drives the
+switches to, and switches the heater each is joined to -- ``connects:
+heater_1.on`` -- by it.
 
 The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
@@ -2348,9 +2378,9 @@ the setpoint and inside the band, every run alike. Either
 heater alone settles the zone ten kelvin above its surroundings, above the
 band, so one heater holds it and the thermostat cycles whichever are
 working. So a heater disabled in tcssim's window -- an unpowered or failed
-heater, see `Starting and stopping a payload`_ -- shows on its line of
-``gpio-in-tmass``, which stays low however the thermostat decides, while the
-other, on twice as long, holds the band; with both disabled, the zone falls
+heater, see `Starting and stopping a payload`_ -- shows in the temperature:
+its switch goes on reporting what it is told, while the other heater, on
+twice as long, holds the band; with both disabled, the zone falls
 out of the band to its surroundings. ``make -C examples run-thermostat``
 starts every payload disabled, so press ``Enable`` on each, and ``Disable`` on a heater to take
 it away. A run of the model with its sensors' errors, three orbits from each
@@ -2810,10 +2840,10 @@ The thermostat-yamcs example
 ----------------------------
 .. figure:: ../examples/thermostat-yamcs/thermostat-yamcs.svg
    :alt: The thermostat-yamcs example: the thermostat example's sensors,
-         conversions, vote, thermostat, heaters and the lines sensing them,
-         with a gateway_yamcs node that sends each conversion's, the vote's
-         and the lines' data down to Yamcs as CCSDS telemetry, one APID
-         each, where each is a temperature in kelvin or a line on or off.
+         conversions, vote, thermostat and heaters, with a gateway_yamcs
+         node that sends each conversion's, the vote's and each heater
+         switch's data down to Yamcs as CCSDS telemetry, one APID each,
+         where each is a temperature in kelvin or a switch on or off.
    :width: 100%
 
    ``examples/thermostat-yamcs``: the thermostat example with Yamcs
@@ -2827,7 +2857,7 @@ example's is a link to ``examples/thermostat-common/thermostat-sim.yaml``,
 so that each is found beside its configuration by name. The vehicle is
 written once, in ``examples/thermostat-common/thermostat.ytcs`` and its
 XML, which both configurations include: the conversions, the vote, the
-thermostat and its log, the heaters and the lines sensing them, the
+thermostat and its log, the heaters' switches, the
 ``zone_temps`` group and the setpoint's binding. Each example's own file
 has its ``tcspecial`` section, its gateway node, called ``gateway`` in
 both, and the three sensors, whose ports differ. The two cannot run at
@@ -2836,15 +2866,14 @@ they answer whether tcssim is ready at one address. What differs is the
 gateway, ``yamcs``: the beacon is telemetry of APID ``0x110``, CONNECT and
 its answer are on ``0x111``, and each source drawn into the gateway node
 comes down as telemetry of its ``apid_base``, ``0x400``, plus the source's
-device id -- ``ambient`` on ``0x400``, ``gpio-in-tmass`` on ``0x402``, and
-``temp1`` to ``temp3`` on ``0x406`` to ``0x408``.
+device id -- ``ambient`` on ``0x400``, ``gpio-out-tmass1`` and
+``gpio-out-tmass2`` on ``0x402`` and ``0x403``, and ``temp1`` to ``temp3`` on
+``0x405`` to ``0x407``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
-conversions and the vote are temperatures in kelvin, and ``gpio-in-tmass``,
-lines read for their levels with no edges, is a record for each line in the
-order of its offsets -- ``gpio-in-tmass_line2_time``, ``_offset`` and
-``gpio-in-tmass_line2``, its level, on or off, then line 3's. Nothing is
+conversions and the vote are temperatures in kelvin, and each heater's
+switch, which reports what it was told, is a decision, on or off. Nothing is
 added to the configuration for it: the type is what tcsmoc's plot window and
 the F´ bridge already read there.
 Yamcs's web interface, at ``http://localhost:17090``, shows them so.
@@ -2862,16 +2891,16 @@ It starts Yamcs, tcssim, with every payload sending from the start, and
 tcspecial once tcssim is ready, each killed with it; has Yamcs send CONNECT
 until the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon above
-the zone's temperature, each reading, and each line sensing a heater, on or
-off. With ``--seconds`` there is no window, and it prints what arrives, and a
-line each time a heater's line changes, of these forms:
+the zone's temperature, each reading, and each heater's switch, on or off.
+With ``--seconds`` there is no window, and it prints what arrives, and a line
+each time a heater's switch changes, of these forms:
 
 .. code-block:: text
 
    connected: the vehicle is running this configuration
    read: ambient <T> K, temp1 <T> K, temp2 <T> K, temp3 <T> K,
-   gpio-in-tmass line 2 off, gpio-in-tmass line 3 off
-   switched: gpio-in-tmass line 2 off -> on; ambient <T> K, ...
+   gpio-out-tmass1 off, gpio-out-tmass2 off
+   switched: gpio-out-tmass1 off -> on; ambient <T> K, ...
 
 tcssim draws a window of its own, so it wants a display. Its ports are in
 the seventeen thousands, apart from the thermostat example's, but its GPIO
@@ -5313,8 +5342,9 @@ Building tcspecial for a vehicle
 A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
 ``device-file``, ``serial``, ``i2c``, ``spi``, ``i2c_tmass``, ``spi_tmass``,
-``can``, ``iio``, ``rpmsg``, ``gpio`` and ``hdlc``, and ``raw`` for raw network
-sockets, a sensor's feature bringing its bus's with it -- and a build
+``can``, ``iio``, ``rpmsg``, ``gpio_in``, ``gpio_out``, ``gpio_inout`` and
+``hdlc``, and ``raw`` for raw network sockets, a sensor's feature bringing its
+bus's with it -- and a build
 with the defaults has all of them, which is what ``cargo build --workspace``
 and the tests make. A build for a vehicle names the types it flies:
 
@@ -5330,8 +5360,8 @@ asks for.
 The network type over UDP, TCP and Unix-domain sockets is in every build,
 because the link to the ground is UDP, and so is every node that reaches no
 interface: computations, logs, tees, null nodes, the ping node and the app
-nodes. ``i2c``, ``spi``, their sensors, ``can``, ``iio``, ``rpmsg``,
-``gpio`` and ``hdlc`` are Linux interfaces, and asking for one when building for another operating
+nodes. ``i2c``, ``spi``, their sensors, ``can``, ``iio``, ``rpmsg``, the
+three kinds of discrete lines and ``hdlc`` are Linux interfaces, and asking for one when building for another operating
 system stops the build, saying which.
 
 A build says what it contains:
@@ -5631,9 +5661,10 @@ drawn, so that a spike is never thinned away.
 Under the panels, as wide as them so that a change lines up with the values
 above it, is a strip for each switch -- a ``thermostat`` node drawn into a
 gateway node, named with what it drives, such as ``thermostat →
-gpio-out-tmass1, gpio-out-tmass2``; and each line of a GPIO payload drawn into
-one that watches lines, named with its line, such as ``gpio-in-tmass line 2``
-in the thermostat example, whose lines sense its heaters -- green with
+gpio-out-tmass1, gpio-out-tmass2``; each line of a ``gpio_in`` drawn into
+one, named with its line, such as ``switch line 0`` in the gpio example; and
+each ``gpio_inout`` drawn into one, by its name, such as ``gpio-out-tmass1``
+in the thermostat example, what that heater's switch was told -- green with
 ``on`` written in it while it is on or high, grey while it is off or low, and
 its last state said beside it. With two thermostats each
 driving a heater there are two strips, one under the other, so which heater

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1000" viewBox="0 0 1300 1000" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat example</title>
-  <desc id="desc">Three temperature sensors of one place on the thermal mass, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Each sensor is the far end of a UDP socket on this host, ports 5201 to 5203, which tcssim plays. Each reading is converted to kelvin by temp1, temp2 and temp3, and each converted reading goes to the gateway node on the ground, to ambient as input in0, in1 or in2, and to the log housekeeping. ambient votes over the three, by the median, and produces one temperature on every arrival. Its value goes to the gateway node and to thermostat, a thermostat holding 293.15 K within a half-band of 2.0, whose decision is logged and drives the two heaters, each through a GPIO line of its own, gpio-out-tmass1 on line 4 and gpio-out-tmass2 on line 5. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. The thermostat&#8217;s decision does not go to the ground: what does is gpio-in-tmass, lines 2 and 3 on the thermal mass, each sensing one heater, read every second and sent to the gateway node and the log, so the ground sees what the heaters are doing rather than what they were told. The lines are on the kernel&#8217;s simulated chip, /dev/gpiochip1. tcspecial sends what each of ambient, gpio-in-tmass, temp1, temp2 and temp3 produces as UDP datagrams to the gateway node&#8217;s ground_base, 127.0.0.1:5100, plus the source&#8217;s device id: port 5100 for ambient, 5102 for gpio-in-tmass, and 5106 to 5108 for the conversions. Ground software gets that data from the gateway node with a function call, tcslib&#8217;s GatewayReceiver::receive. The ground sets the thermostat&#8217;s setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">Three temperature sensors of one place on the thermal mass, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Each sensor is the far end of a UDP socket on this host, ports 5201 to 5203, which tcssim plays. Each reading is converted to kelvin by temp1, temp2 and temp3, and each converted reading goes to the gateway node on the ground, to ambient as input in0, in1 or in2, and to the log housekeeping. ambient votes over the three, by the median, and produces one temperature on every arrival. Its value goes to the gateway node and to thermostat, a thermostat holding 293.15 K within a half-band of 2.0, whose decision is logged and drives the two heaters, each through a GPIO line of its own, gpio-out-tmass1 on line 4 and gpio-out-tmass2 on line 5. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. The thermostat&#8217;s decision does not go to the ground: each heater&#8217;s switch is a gpio_inout node, which drives its line and every second sends the gateway node the last value it was told, so the ground follows the heaters on a beat. The lines are on the kernel&#8217;s simulated chip, /dev/gpiochip1. tcspecial sends what each of ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2 and temp3 produces as UDP datagrams to the gateway node&#8217;s ground_base, 127.0.0.1:5100, plus the source&#8217;s device id: port 5100 for ambient, 5102 and 5103 for the heaters&#8217; switches, and 5105 to 5107 for the conversions. Ground software gets that data from the gateway node with a function call, tcslib&#8217;s GatewayReceiver::receive. The ground sets the thermostat&#8217;s setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -60,18 +60,14 @@
   <text class="detail" x="74" y="402">127.0.0.1:5203</text>
   <rect class="payload" x="60" y="580" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="604">gpio-out-tmass1</text>
-  <text class="kind" x="74" y="624">gpio, output</text>
+  <text class="kind" x="74" y="624">gpio_inout, every 1 s</text>
   <text class="detail" x="74" y="642">line 4: heater_1</text>
   <rect class="payload" x="60" y="680" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="704">gpio-out-tmass2</text>
-  <text class="kind" x="74" y="724">gpio, output</text>
+  <text class="kind" x="74" y="724">gpio_inout, every 1 s</text>
   <text class="detail" x="74" y="742">line 5: heater_2</text>
-  <rect class="payload" x="60" y="780" width="170" height="74" rx="10"/>
-  <text class="name" x="74" y="804">gpio-in-tmass</text>
-  <text class="kind" x="74" y="824">gpio, read every 1 s</text>
-  <text class="detail" x="74" y="842">lines 2, 3: heaters</text>
-  <text class="note" x="58" y="874">on /dev/gpiochip1, the</text>
-  <text class="note" x="58" y="890">kernel&#8217;s simulated chip</text>
+  <text class="note" x="58" y="774">on /dev/gpiochip1, the</text>
+  <text class="note" x="58" y="790">kernel&#8217;s simulated chip</text>
   <!-- Conversions -->
   <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
   <text class="name" x="314" y="124">temp1</text>
@@ -141,18 +137,21 @@
        one decision, two circuits -->
   <path class="vehicleward" d="M865,414 L865,717 L234,717" marker-end="url(#arrow-orange)"/>
   <path class="vehicleward" d="M865,617 L234,617" marker-end="url(#arrow-orange)"/>
-  <text class="label" x="600" y="609">gateway-out: on below the band</text>
+  <text class="label" x="600" y="609">moc-out: on below the band</text>
   <text class="label" x="600" y="709">and to the second heater</text>
-  <!-- The lines sensing the heaters, to the ground and to the log -->
-  <path class="groundward" d="M230,812 L1020,812 L1020,215 L1050,215 L1050,196" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M230,830 L500,830 C520,830 520,538 536,538" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="600" y="804">what the heaters are doing</text>
+  <!-- Each heater's switch, what it was last told, to the ground every
+       second -->
+  <path class="groundward" d="M230,640 L996,640 L996,206 L1050,206 L1050,196" marker-end="url(#arrow-blue)"/>
+  <path class="groundward" d="M230,740 L1006,740 L1006,214 L1072,214 L1072,196" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="600" y="656">what the first heater was told</text>
+  <text class="label" x="600" y="756">and the second</text>
   <!-- Each source's port on the ground: ground_base plus its device id -->
-  <text class="portno" x="985" y="113">5106</text>
-  <text class="portno" x="985" y="128">5107</text>
-  <text class="portno" x="985" y="143">5108</text>
+  <text class="portno" x="985" y="113">5105</text>
+  <text class="portno" x="985" y="128">5106</text>
+  <text class="portno" x="985" y="143">5107</text>
   <text class="portno" x="985" y="158">5100</text>
-  <text class="portno" x="1056" y="212">5102</text>
+  <text class="portno" x="1020" y="236">5102</text>
+  <text class="portno" x="1078" y="236">5103</text>
   <!-- The ground sets the setpoint -->
   <path class="command" d="M1030,180 L900,180 L900,336" marker-end="url(#arrow-orange)"/>
   <text class="label" x="910" y="252">command:</text>

@@ -125,7 +125,7 @@ simulated_payload_groups:
     simulate: true
 
 simulated_payloads:
-  - type gpio:
+  - type gpio_out:
       # Driven and never read: tcssim sends nothing for them, counts each time
       # the vehicle moves their lines, and switch the heater each is joined to.
       - payload: heaters_1

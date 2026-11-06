@@ -126,19 +126,17 @@
         </type>
     </vehicle>
     <payloads>
-        <type name="gpio">
+        <type name="gpio_out">
             <!-- Two heaters, each three circuits driven together, both near
                  the sensors on the same thermal mass. Separate nodes rather
                  than six lines on one, so that one can be stopped from the
                  ground while the other goes on warming the mass. -->
             <payload name="heaters_1">
-                <direction>output</direction>
                 <lines>3,4,5</lines>
                 <path>/dev/gpiochip0</path>
                 <moc-in>thermostat</moc-in>
             </payload>
             <payload name="heaters_2">
-                <direction>output</direction>
                 <lines>6,7,8</lines>
                 <path>/dev/gpiochip0</path>
                 <moc-in>thermostat</moc-in>

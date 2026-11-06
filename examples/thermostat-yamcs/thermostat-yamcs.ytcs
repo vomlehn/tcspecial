@@ -53,16 +53,16 @@ gateways:
   - type gateway_yamcs:
       # Yamcs's end of the link. Each reading drawn into this node comes
       # down to Yamcs at ground_base plus its source's device id -- temp3 is
-      # the ninth of the thirteen names, here and in the file this one
-      # includes, device id 8, so 17708 -- as telemetry of APID apid_base
-      # plus that device id, 0x408. What Yamcs sends up to address:port goes
+      # the eighth of the twelve names, here and in the file this one
+      # includes, device id 7, so 17707 -- as telemetry of APID apid_base
+      # plus that device id, 0x407. What Yamcs sends up to address:port goes
       # as a telecommand of APID apid_base.
       - gateway: gateway
         address: "127.0.0.1"
         apid_base: "0x400"
         ground_base: "127.0.0.1:17700"
         port: "17600"
-        world-in: [ambient, gpio-in-tmass, temp1, temp2, temp3]
+        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
 
 payloads:
   # The three sensors of the zone, two on an I2C bus and one on a SPI bus,

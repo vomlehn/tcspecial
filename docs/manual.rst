@@ -2895,6 +2895,17 @@ added to the configuration for it: the type is what tcsmoc's plot window and
 the F´ bridge already read there.
 Yamcs's web interface, at ``http://localhost:17090``, shows them so.
 
+Beside them is one parameter the vehicle does not send:
+``world_ambient_temp``, the simulated world's ambient temperature, the
+``ambient_temp`` under ``world:`` in the simulator file. It is a local
+parameter, in kelvin, with no packet to read it from; ``thermostat_yamcs.py``
+reads the figure with ``tcsverify --ambient``, which finds the simulator file
+beside the configuration as tcssim does, and sets it in Yamcs once the vehicle
+has answered CONNECT. So Yamcs has the zone's surroundings beside the zone,
+and the configuration's diagram has nothing called ambient. A simulator file
+whose world states no ambient temperature gives the run none, and the
+program says so.
+
 ``examples/thermostat-yamcs/thermostat_yamcs.py`` runs it, given a Yamcs
 release unpacked somewhere:
 
@@ -2916,7 +2927,7 @@ each time a heater's switch changes, of these forms:
 
    connected: the vehicle is running this configuration
    read: consensus_temp <T> K, to_k1 <T> K, to_k2 <T> K, to_k3 <T> K,
-   gpio-out-tmass1 off, gpio-out-tmass2 off
+   world ambient 288.150 K, gpio-out-tmass1 off, gpio-out-tmass2 off
    switched: gpio-out-tmass1 off -> on; consensus_temp <T> K, ...
 
 tcssim draws a window of its own, so it wants a display. Its ports are in

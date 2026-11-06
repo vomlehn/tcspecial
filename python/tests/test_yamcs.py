@@ -371,6 +371,30 @@ class MdbTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "already has"):
             generated.mdb(config)
 
+    def test_the_worlds_ambient_is_a_local_temperature_when_asked(self):
+        config = yamcs(self.directory.name)
+        root = generated.mdb(config).getroot()
+        self.assertEqual(self.find(root, ".//x:Parameter[@name='"
+                                         f"{generated.WORLD_AMBIENT}']"), [])
+        root = generated.mdb(config, world=True).getroot()
+        parameter, = self.find(root, ".//x:Parameter[@name='"
+                                     f"{generated.WORLD_AMBIENT}']")
+        self.assertEqual(parameter.get("parameterTypeRef"),
+                         generated.WORLD_TEMPERATURE_TYPE)
+        properties, = self.find(parameter, "./x:ParameterProperties")
+        self.assertEqual(properties.get("dataSource"), "local")
+        kind, = self.find(root, ".//x:FloatParameterType[@name='"
+                                f"{generated.WORLD_TEMPERATURE_TYPE}']")
+        self.assertEqual([unit.text for unit in self.find(kind, ".//x:Unit")],
+                         ["K"])
+        # No packet carries it, so it has no encoding to read one by.
+        self.assertEqual(self.find(kind, "./x:IntegerDataEncoding"), [])
+        # And a node of that name is refused, told why.
+        config = yamcs(self.directory.name,
+                       renamed={"n": generated.WORLD_AMBIENT})
+        with self.assertRaisesRegex(ValueError, "simulated world"):
+            generated.mdb(config, world=True)
+
     def test_an_apid_used_twice_is_refused(self):
         with self.assertRaisesRegex(ValueError, "both APID"):
             generated.mdb(yamcs(self.directory.name, base="0x100"))

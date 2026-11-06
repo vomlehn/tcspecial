@@ -7,6 +7,8 @@
 //!     tests/manual/tcspecial2sim.yaml
 //! tcsverify --digest tests/manual/tcspecial2.ytcs
 //! tcsverify --interface-digest
+//! tcsverify --ambient examples/thermostat/thermostat-sim.yaml
+//! tcsverify --ambient examples/thermostat/thermostat.ytcs
 //! tcsverify --set-interface examples/*/*.ytcs examples/*/*.xtcs
 //! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 //! tcsverify --fprime-model=fprime/Tcs/TcsBridge/model fprime.ytcs
@@ -21,7 +23,7 @@
 //! file, and then the two are compared, every section, attribute and value.
 
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 /// What is said when the command line is not one of the two shapes.
@@ -35,6 +37,7 @@ usage: tcsverify [options] <tcspecial configuration file> \
        tcsverify [options] <configuration> <configuration> \
 <payload simulator file>
        tcsverify --interface-digest
+       tcsverify --ambient <payload simulator file | configuration>
        tcsverify --set-interface <configuration>...
        tcsverify -h | --help
 
@@ -106,6 +109,17 @@ configuration.
                      build was made from, which every beacon carries, and
                      a configuration naming another is refused by this
                      build's tcsverify, tcspecial and ground programs
+  --ambient          with one payload simulator file and nothing else:
+                     print its world's ambient_temp in kelvin, a number
+                     alone, as 288.15, and exit. Given a configuration
+                     instead, a .ytcs or .xtcs, the simulator file is the
+                     one beside it that tcssim would read. For a ground
+                     station that shows the simulated world's temperature
+                     beside the vehicle's readings, the vehicle sending
+                     nothing of it: read here, by the rule tcssim reads it
+                     by. A file whose world states none, or one that does
+                     not read, or a configuration with no simulator file
+                     beside it, is said on stderr, with status 1
   --set-interface    with one or more configurations and nothing else:
                      write this build's interface digest into each, as
                      its tcspecial section's interface, in place, every
@@ -141,6 +155,11 @@ const TYPES_FLAG: &str = "--types=";
 /// Takes no value, where the other two do: there is one digest of a
 /// configuration and nothing to choose about it.
 const DIGEST_FLAG: &str = "--digest";
+
+/// Asks for a simulator file's world's ambient temperature, in kelvin, with
+/// the file and nothing else: a shape of its own, as the interface digest's
+/// is, being a question about one file and no check of it.
+const AMBIENT_FLAG: &str = "--ambient";
 
 /// Writes this build's interface digest into each configuration named: see
 /// `tcsverify::set_interface`. A shape of its own.
@@ -191,6 +210,18 @@ fn main() -> ExitCode {
     }
     if args.first().is_some_and(|arg| arg == SET_INTERFACE_FLAG) {
         return set_interfaces(&args[1..]);
+    }
+    if args.iter().any(|arg| arg == AMBIENT_FLAG) {
+        return match args.as_slice() {
+            [flag, file] if flag == AMBIENT_FLAG => ambient(Path::new(file)),
+            _ => {
+                eprintln!(
+                    "tcsverify: {AMBIENT_FLAG} is given with one payload \
+                     simulator file and nothing else\n\n{USAGE}"
+                );
+                ExitCode::from(2)
+            }
+        };
     }
     for arg in args {
         let said = arg.to_string_lossy();
@@ -431,6 +462,74 @@ fn main() -> ExitCode {
     }
 
     ExitCode::from(u8::try_from(report.status()).unwrap_or(1))
+}
+/// Prints a simulator file's world's ambient temperature in kelvin.
+///
+/// # Arguments
+///
+/// * `file` - The payload simulator file, or a configuration beside one.
+///
+/// # Returns
+///
+/// 0 with the temperature printed; 1 where there is no simulator file, it
+/// does not read, has no world, or its world states no ambient_temp that
+/// reads, said on stderr; 2 where stdout cannot be written.
+fn ambient(file: &Path) -> ExitCode {
+    let said = file.to_string_lossy();
+    let configuration = said.ends_with(".ytcs") || said.ends_with(".xtcs");
+    let beside = configuration
+        .then(|| tcslibgs::config::sim_path_beside(&said))
+        .flatten();
+    let sim = match (configuration, &beside) {
+        (false, _) => file,
+        (true, Some(beside)) => Path::new(beside),
+        (true, None) => {
+            eprintln!(
+                "tcsverify: {said}: no payload simulator file beside it, \
+                 so no simulated world: name the simulator file instead"
+            );
+            return ExitCode::from(1);
+        }
+    };
+    let file = match tcslibgs::sim_config::SimConfigFile::load(sim) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!("tcsverify: {}: {e}", sim.display());
+            return ExitCode::from(1);
+        }
+    };
+    let Some(world) = file.world.as_ref() else {
+        eprintln!(
+            "tcsverify: {}: there is no world: section, so no ambient \
+             temperature; state one under world:, as ambient_temp: \
+             \"288.15 K\"",
+            sim.display()
+        );
+        return ExitCode::from(1);
+    };
+    let Some(kelvin) = world.ambient() else {
+        // What is wrong is what tcssim would say, from the one reading of
+        // ambient_temp; or, where it reads, that it is not stated.
+        let why = world
+            .problems()
+            .into_iter()
+            .find(|problem| problem.ambient)
+            .map_or_else(
+                || {
+                    "world ambient_temp: it is not stated: state it under \
+                     world:, as ambient_temp: \"288.15 K\""
+                        .to_string()
+                },
+                |problem| problem.to_string(),
+            );
+        eprintln!("tcsverify: {}: {why}", sim.display());
+        return ExitCode::from(1);
+    };
+    if let Err(e) = writeln!(std::io::stdout(), "{kelvin}") {
+        eprintln!("tcsverify: cannot write the temperature: {e}");
+        return ExitCode::from(2);
+    }
+    ExitCode::SUCCESS
 }
 
 /// Sets the interface of every configuration named to this build's, and

@@ -108,6 +108,13 @@ LINE_TIME_TYPE = "U64Type"
 LINE_OFFSET_TYPE = "U32Type"
 LINE_LEVEL_TYPE = "LineLevelType"
 
+#: The simulated world's ambient temperature, which nothing on the link
+#: carries: a local parameter, which the ground station sets from the
+#: simulator file, so that Yamcs has the surroundings beside the vehicle's
+#: readings. See :func:`mdb`'s ``world``.
+WORLD_AMBIENT = "world_ambient_temp"
+WORLD_TEMPERATURE_TYPE = "WorldTemperatureType"
+
 #: The binary argument type a gateway node's command carries its data as,
 #: and the argument that says its length in bits.
 DATA_TYPE = "DataArg"
@@ -1060,13 +1067,16 @@ def _uplink_command(root, names, copier, uplink):
            containerRef=f"{BASE_COMMAND}Container")
 
 
-def mdb(config, template=TEMPLATE):
+def mdb(config, template=TEMPLATE, world=False):
     """The mission database's wrapper for a configuration: the template,
     with every APID the configuration counts added.
 
     Args:
         config:   The :class:`tcslibgs.configuration.Configuration`.
         template: The XTCE that does not depend on the configuration.
+        world:    Whether to add :data:`WORLD_AMBIENT`, for a run whose
+                  payloads are simulated in a world with an ambient
+                  temperature.
 
     Returns:
         The :class:`xml.etree.ElementTree.ElementTree` of the wrapper.
@@ -1109,10 +1119,44 @@ def mdb(config, template=TEMPLATE):
         _downlink(root, names, copier, link)
     for uplink in uplinks(config):
         _uplink_command(root, names, copier, uplink)
+    if world:
+        _world_ambient(root, names)
     return tree
 
 
-def write_mdb(config, path, template=TEMPLATE):
+def _world_ambient(root, names):
+    """Adds :data:`WORLD_AMBIENT`: a temperature in kelvin, local, with no
+    encoding, because no packet carries it.
+
+    Args:
+        root:  The wrapper's root.
+        names: The :class:`_Names` it holds.
+
+    Raises:
+        ValueError: As :meth:`_Names.take`, where a node has the name.
+    """
+    fix = (f"rename the node: {WORLD_AMBIENT} is the simulated world's "
+           "ambient temperature")
+    names.take("parameter type", WORLD_TEMPERATURE_TYPE, WORLD_AMBIENT, fix)
+    names.take("parameter", WORLD_AMBIENT, WORLD_AMBIENT, fix)
+    types = _one(root, "./x:TelemetryMetaData/x:ParameterTypeSet",
+                 "parameter type sets")
+    _comment(types, "The simulated world's temperature, set by the ground "
+                    "station.")
+    kind = _child(types, "FloatParameterType", name=WORLD_TEMPERATURE_TYPE,
+                  sizeInBits="64")
+    _child(_child(kind, "UnitSet"), "Unit",
+           description="kelvin").text = "K"
+    parameters = _one(root, "./x:TelemetryMetaData/x:ParameterSet",
+                      "parameter sets")
+    _comment(parameters, "The simulated world's ambient temperature, from "
+                         "the simulator file and not from the vehicle.")
+    parameter = _child(parameters, "Parameter", name=WORLD_AMBIENT,
+                       parameterTypeRef=WORLD_TEMPERATURE_TYPE)
+    _child(parameter, "ParameterProperties", dataSource="local")
+
+
+def write_mdb(config, path, template=TEMPLATE, world=False):
     """Writes the mission database's wrapper for a configuration, no line
     of it wider than :data:`WIDTH`, but a comment's that the template or a
     file's name makes so.
@@ -1121,13 +1165,14 @@ def write_mdb(config, path, template=TEMPLATE):
         config:   The :class:`tcslibgs.configuration.Configuration`.
         path:     Where to write it.
         template: The XTCE that does not depend on the configuration.
+        world:    As :func:`mdb`.
 
     Raises:
         ValueError: As :func:`mdb`.
         OSError: The template or a node's document cannot be read, or the
                  wrapper written.
     """
-    tree = mdb(config, template)
+    tree = mdb(config, template, world)
     documents = sorted({link.document.name for link in telemetry(config)
                         if link.document}
                        | {uplink.document.name for uplink in uplinks(config)

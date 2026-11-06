@@ -115,6 +115,38 @@ fn the_interface_digest_is_printed_alone() {
     assert_eq!(status, 2, "given alone");
 }
 
+/// `--ambient` prints a simulator file's world's ambient temperature in
+/// kelvin, a number alone, given the file or a configuration it is beside;
+/// a file with no world, one whose figure does not read, or a configuration
+/// with none beside it prints nothing and fails; and anything beside the
+/// one file is none of the shapes.
+#[test]
+fn the_worlds_ambient_is_printed_in_kelvin() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let write = |name: &str, text: &str| {
+        let path = dir.path().join(name);
+        std::fs::write(&path, text).expect("written");
+        path.to_str().expect("a path").to_string()
+    };
+    let good = write("good-sim.yaml", "world:\n  ambient_temp: \"288.15 K\"\n");
+    assert_eq!(run(&["--ambient", &good]), (vec!["288.15".to_string()], 0));
+    // A configuration is answered for by the simulator file beside it.
+    let beside = write("good.ytcs", "description: unread\n");
+    assert_eq!(
+        run(&["--ambient", &beside]),
+        (vec!["288.15".to_string()], 0)
+    );
+    let alone = write("alone.ytcs", "description: unread\n");
+    assert_eq!(run(&["--ambient", &alone]), (Vec::new(), 1));
+    let none = write("none-sim.yaml", "groups: []\n");
+    assert_eq!(run(&["--ambient", &none]), (Vec::new(), 1));
+    let wrong = write("wrong-sim.yaml", "world:\n  ambient_temp: \"20 C\"\n");
+    assert_eq!(run(&["--ambient", &wrong]), (Vec::new(), 1));
+    assert_eq!(run(&["--ambient"]).1, 2, "no file");
+    assert_eq!(run(&["--ambient", &good, &none]).1, 2, "two files");
+    assert_eq!(run(&[&good, "--ambient"]).1, 2, "the flag second");
+}
+
 /// `--keep=<directory>` keeps a configuration with nothing wrong with it
 /// under its checksum, read-only, and says where; again, it writes nothing
 /// and says it is kept already. One with errors is not kept, and the store

@@ -113,7 +113,8 @@ def yamcs_home(said):
     return Path(said)
 
 
-def write_yamcs(config, run_dir, http_port, home, instance, writer):
+def write_yamcs(config, run_dir, http_port, home, instance, writer,
+                world=False):
     """Writes Yamcs's configuration for a tcspecial configuration.
 
     The server's and the instance's from :data:`TEMPLATES`, with the
@@ -130,6 +131,8 @@ def write_yamcs(config, run_dir, http_port, home, instance, writer):
                    instance's streams.
         instance:  The instance's name.
         writer:    The program writing it, which each file says.
+        world:     Whether the mission database has the simulated world's
+                   ambient temperature: see :func:`tcslibgs.yamcs.mdb`.
 
     Raises:
         ValueError: The configuration does not give Yamcs what it needs: an
@@ -176,7 +179,7 @@ def write_yamcs(config, run_dir, http_port, home, instance, writer):
         f"# {config.path}, its links and command streams\n"
         "# by tcslibgs/yamcs.py: edit those, not this.\n"
         + yaml.safe_dump(said, sort_keys=False))
-    generated.write_mdb(config, run_dir / "tcs-ccsds.xtce")
+    generated.write_mdb(config, run_dir / "tcs-ccsds.xtce", world=world)
     sample = (Path(home) / "etc" / "processor.yaml.sample").read_text()
     if sample.count(ONE_STREAM) != 1:
         raise OSError(f"{home}/etc/processor.yaml.sample does not release "
@@ -285,6 +288,29 @@ class Yamcs:
         except urllib.error.HTTPError as why:
             raise RuntimeError(f"Yamcs refused {command}: "
                                f"{why.read().decode(errors='replace')}")
+
+    def set_value(self, name, value):
+        """Sets a local parameter, one no packet carries, to a number.
+
+        Args:
+            name:  The parameter's qualified name.
+            value: The number.
+
+        Raises:
+            RuntimeError: Yamcs refuses it, or does not answer.
+        """
+        body = json.dumps({"type": "DOUBLE", "doubleValue": value}).encode()
+        request = urllib.request.Request(
+            f"{self.base}/processors/{self.instance}/realtime/parameters"
+            f"{name}", data=body, method="PUT",
+            headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(request, timeout=5).read()
+        except urllib.error.HTTPError as why:
+            raise RuntimeError(f"Yamcs refused {name} = {value}: "
+                               f"{why.read().decode(errors='replace')}")
+        except OSError as why:
+            raise RuntimeError(f"Yamcs did not take {name} = {value}: {why}")
 
     def parameters(self, names):
         """Several parameters' latest values, each from one packet, and when

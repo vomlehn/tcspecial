@@ -7707,6 +7707,13 @@ sent. The vehicle sends nothing of it, the surroundings being no
 payload, so it is not on the configuration's diagram. A flight run
 draws none: a figure from a file beside real readings would be read as a
 measurement. <tt class="docutils literal"><span class="pre">WorldSection::ambient</span></tt> is where it is read.</dd>
+<dt>Requirement</dt>
+<dd>The Yamcs example's mission database has the simulated world's ambient
+temperature as <tt class="docutils literal">world_ambient_temp</tt>, a local parameter in kelvin with
+no encoding, no packet carrying it; <tt class="docutils literal">thermostat_yamcs.py</tt> sets it from
+<tt class="docutils literal">tcsverify <span class="pre">--ambient</span></tt> once the vehicle has answered CONNECT and shows
+it after the readings. A node named <tt class="docutils literal">world_ambient_temp</tt> is refused,
+told why. See <tt class="docutils literal">python/tcslibgs/yamcs.py</tt>.</dd>
 </dl>
 </div>
 <div class="section" id="holes-in-the-checksum-scheme-and-what-closes-them">
@@ -13940,6 +13947,16 @@ configuration's <tt class="docutils literal">tcspecial</tt> section gives as its
 the last field of every beacon this build's tcspecial sends. It is how
 a person writing a configuration finds the value: see <a class="reference internal" href="#the-configuration-names-its-interface">The
 configuration names its interface</a>.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal"><span class="pre">--ambient</span> &lt;file&gt;</tt>, given alone, prints the simulated world's
+<tt class="docutils literal">ambient_temp</tt> in kelvin and nothing else, from a simulator file, or
+from the one beside a configuration that tcssim would read. It is read
+by <tt class="docutils literal"><span class="pre">WorldSection::ambient</span></tt>, the one reading of it, so that a ground
+program in another language -- the Yamcs example's Python -- shows the
+world's temperature without stating the rule for reading a quantity a
+second time. A file with no world, a figure that does not read, or a
+configuration with no simulator file beside it is said on stderr, with
+status 1.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--types=&lt;types&gt;</span></tt> checks a configuration as a tcspecial built with only
 those payload types would; see <a class="reference internal" href="#which-node-types-are-built">Which Node Types Are Built</a>.</dd>

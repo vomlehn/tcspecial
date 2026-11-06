@@ -238,7 +238,7 @@ mod judged_tests {
     ///
     /// # Arguments
     ///
-    /// * `sys` - The tree made to look like `/sys`.
+    /// * `sys`   - The tree made to look like `/sys`.
     /// * `name`  - The interface's name.
     /// * `under` - The directory under `sys` its device is kept in.
     /// * `kind`  - What its `type` file says.

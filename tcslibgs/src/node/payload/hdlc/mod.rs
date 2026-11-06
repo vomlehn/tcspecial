@@ -492,9 +492,7 @@ pub(crate) fn group_kind_of(
 /// A judgement of hardware, always.
 pub fn judged(interface: &str) -> crate::simulate::Judged {
     crate::simulate::Judged::hardware(
-        format!(
-            "{interface} is a synchronous line, which has no dummy device"
-        ),
+        format!("{interface} is a synchronous line, which has no dummy device"),
         "interface",
         "leave the hdlc node out of a run that must exercise no hardware",
     )

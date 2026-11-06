@@ -249,12 +249,12 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     found.sort();
     match found.first() {
         Some((_, adapter)) => Ok(format!("/dev/{adapter}")),
-        None => Err(
-            "no I2C stub bus is loaded, so there is no dummy device to \
+        None => {
+            Err("no I2C stub bus is loaded, so there is no dummy device to \
              simulate a device on: sudo modprobe i2c-stub chip_addr=0x48, with \
              the address the tcspecial configuration gives"
-                .to_string(),
-        ),
+                .to_string())
+        }
     }
 }
 

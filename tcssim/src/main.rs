@@ -1183,10 +1183,7 @@ fn main() {
     {
         Ok(cfs) => {
             if let Some(cfs) = &cfs {
-                eprintln!(
-                    "simulating the cFS end at {}",
-                    cfs.local_addr()
-                );
+                eprintln!("simulating the cFS end at {}", cfs.local_addr());
             }
             cfs
         }

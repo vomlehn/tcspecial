@@ -368,7 +368,8 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         CommandStatus::Success
     );
 
-    stub.join().expect("the simulated spacecraft answered every command");
+    stub.join()
+        .expect("the simulated spacecraft answered every command");
 }
 
 #[test]

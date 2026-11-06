@@ -573,6 +573,65 @@ pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
     out.trim_end().to_string()
 }
 
+/// How far a point is from a line drawn as a route, which is how a click is
+/// found to be on a line: the window has the line only as path data, and a
+/// press on a `Path` is not reported by the toolkit.
+///
+/// The path is read as the polyline through every point it names. A rounded
+/// corner's control point is the corner itself, so the polyline is the
+/// route's own points and strays from the drawn curve by less than the
+/// corner's radius, which is closer than a click is aimed.
+///
+/// # Arguments
+///
+/// * `route` - The line as SVG path data, as [`drawn_route`] writes it.
+/// * `at`    - The point, in the same coordinates.
+///
+/// # Returns
+///
+/// The shortest distance from `at` to the line, in pixels, or `None` for
+/// path data naming fewer than two points or that cannot be read.
+pub fn distance_to(route: &str, at: (f32, f32)) -> Option<f32> {
+    let numbers: Vec<f32> = route
+        .split_whitespace()
+        .filter(|word| !word.chars().all(|c| c.is_ascii_alphabetic()))
+        .map(|word| word.parse::<f32>().ok())
+        .collect::<Option<Vec<f32>>>()?;
+    if !numbers.len().is_multiple_of(2) || numbers.len() < 4 {
+        return None;
+    }
+    let points: Vec<(f32, f32)> =
+        numbers.chunks(2).map(|pair| (pair[0], pair[1])).collect();
+    points
+        .windows(2)
+        .map(|run| from_segment(run[0], run[1], at))
+        .reduce(f32::min)
+}
+
+/// How far a point is from a straight segment.
+///
+/// # Arguments
+///
+/// * `from` - One end of the segment.
+/// * `to`   - The other end.
+/// * `at`   - The point.
+///
+/// # Returns
+///
+/// The shortest distance from `at` to any point of the segment.
+fn from_segment(from: (f32, f32), to: (f32, f32), at: (f32, f32)) -> f32 {
+    let (dx, dy) = (to.0 - from.0, to.1 - from.1);
+    let squared = dx * dx + dy * dy;
+    let t = if squared == 0.0 {
+        0.0
+    } else {
+        (((at.0 - from.0) * dx + (at.1 - from.1) * dy) / squared)
+            .clamp(0.0, 1.0)
+    };
+    let near = (from.0 + t * dx, from.1 + t * dy);
+    ((at.0 - near.0).powi(2) + (at.1 - near.1).powi(2)).sqrt()
+}
+
 /// How many nodes other than its own ends a link's line runs through.
 ///
 /// The nodes it is joined to do not count, which is the same distinction
@@ -2075,5 +2134,23 @@ mod tests {
         // And nothing at all where the pointer has not moved, which is the
         // first moment of every gesture.
         assert_eq!(drawing((20.0, 20.0), (20.0, 20.5)), "");
+    }
+
+    /// A point is measured to the nearest run of a route, corners and all,
+    /// and path data that is not a line has no distance.
+    #[test]
+    fn a_point_is_measured_to_the_nearest_run() {
+        let points = [(0.0, 0.0), (100.0, 0.0), (100.0, 50.0)];
+        let route = drawn_route(&points);
+        let near = |at| distance_to(&route, at).expect("a line");
+        // Beside the first run, beside the second, and past the far end.
+        assert!((near((50.0, 3.0)) - 3.0).abs() < 0.01);
+        assert!((near((104.0, 30.0)) - 4.0).abs() < 0.01);
+        assert!((near((100.0, 60.0)) - 10.0).abs() < 0.01);
+        // At the corner the rounding is crossed, not missed.
+        assert!(near((100.0, 0.0)) < 1.0);
+        assert_eq!(distance_to("", (0.0, 0.0)), None);
+        assert_eq!(distance_to("M 1 2", (0.0, 0.0)), None);
+        assert_eq!(distance_to("M 1 2 L x 3", (0.0, 0.0)), None);
     }
 }

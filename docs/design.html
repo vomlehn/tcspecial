@@ -4725,16 +4725,29 @@ anything goes. A node is not in the menu bar -- that is for the configuration
 as a whole -- and it has nowhere else to put its own commands, so the node
 itself is where they are asked for. Edit is first because it is what nearly
 every click wants, and because it is what a click used to do on its own.</p>
-<p>A right click opens it, as a right click opens a menu anywhere else, and so
-does a left click that moved nothing: a press is how a drag starts, so a
+<p>A left click that moved nothing opens it: a press is how a drag starts, so a
 gesture that moved the node is a move and one that stayed put is this.
 Choosing a node is still the left press -- a node somebody has started to move
 is the node they are interested in -- so the node the menu is about is the node
-drawn as chosen while it is open.</p>
-<p>The right click had to be handled by hand rather than left to Slint's
-<tt class="docutils literal">ContextMenuArea</tt>. The grip that takes a drag covers the whole node and is
-above everything, so it takes every press on it and the menu area underneath
-never sees one; the grip shows the menu by name instead.</p>
+drawn as chosen while it is open. The grip that takes a drag covers the whole
+node and is above everything, so it takes every press on it and Slint's
+<tt class="docutils literal">ContextMenuArea</tt> underneath never sees one; the grip shows the menu by name.</p>
+<p>A right click selects, and does nothing else: a node, a physics component or
+a line, outlined in the dark grey a selected node always was, a line by a
+wider line under it so that it still says which stream it carries. One thing
+is selected on a page at a time, and the Delete key, or Backspace, takes it --
+a line at once, a node after asking, as its menu's Delete does. A left click on
+a line opens a menu of its own, whose one item is Delete, and leaves the
+selection as it was. A click of either button anywhere else on the page
+selects nothing, and closes whatever menu was open. A line is a <tt class="docutils literal">Path</tt>, and a
+press on a path is not reported, so the press goes to the page underneath,
+which asks which line runs within a few pixels of the point, by the line's
+points rather than its drawing: see <tt class="docutils literal"><span class="pre">tcsdiagram::route::distance_to</span></tt>. Only
+the document's lines are found, not the ones an edge draws to a node nothing
+joins outside yet, there being no line to take out. A selected line is kept
+by what it joins rather than where it is in the page's list, so an edit
+elsewhere that redraws the page keeps it selected, and one that takes it away
+selects nothing.</p>
 <p>&quot;Stayed put&quot; is within three pixels, not exactly nowhere. The test was that
 the release landed on the very pixel of the press, which a hand on a mouse does
 not manage: every click carried a fraction of a pixel, every click was read as

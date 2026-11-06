@@ -833,14 +833,17 @@ vehicle: <code>temp_1</code> and <code>temp_2</code> on an I2C bus, of
 type <code>i2c</code>, and <code>temp_3</code> a SPI peripheral, of type
 <code>spi</code>. On a desk the two on I2C are chips of the kernel’s
 dummy bus, <code>i2c-stub</code>, whose registers tcssim fills with the
-zone’s temperature (<code>sudo bin/mki2c</code> makes it), and
-<code>temp_3</code> is reached over UDP at its <code>sim_address</code>,
-127.0.0.1:5203, where tcssim answers the same; flown, the buses are
-opened. The heaters’ switches are lines 4 and 5 of the kernel’s dummy
-GPIO chip, <code>/dev/gpiochip1</code>, which tcssim watches: make it
-once with <code>sudo bin/mk-kernel-dummies gpio</code> (see “Payloads on
-the kernel’s dummy devices”, below). The gpio example has lines 0 and 1
-of it, so the two run at once. The buses themselves are flown against
+zone’s temperature: <code>sudo bin/mki2c</code> makes it, with chips at
+their addresses, 0x48 and 0x49. The kernel numbers the stub as it finds
+it, so their <code>path</code>, <code>/tmp/tcs-thermostat-i2c</code>, is
+a link tcssim makes to the stub wherever it is. <code>temp_3</code> is
+reached over UDP at its <code>sim_address</code>, 127.0.0.1:5203, where
+tcssim answers the same. Flown, the paths are the vehicle’s buses. The
+heaters’ switches are lines 4 and 5 of the kernel’s dummy GPIO chip,
+<code>/dev/gpiochip1</code>, which tcssim watches: make it once with
+<code>sudo bin/mk-kernel-dummies gpio</code> (see “Payloads on the
+kernel’s dummy devices”, below). The gpio example has lines 0 and 1 of
+it, so the two run at once. The buses themselves are flown against
 simulated devices by <code>make simulated-devices-test</code>, with
 <code>tests/manual/thermostat.ytcs</code>.</p>
 <p>tcssim joins the simulated payloads to the vehicle’s physics model,

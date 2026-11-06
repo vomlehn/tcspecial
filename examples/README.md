@@ -493,9 +493,12 @@ The sensors are temperature sensors on the zone, in
 `thermostat-common/thermostat.ytcs` with the rest of the vehicle: `temp_1` and
 `temp_2` on an I2C bus, of type `i2c`, and `temp_3` a SPI peripheral, of type
 `spi`. On a desk the two on I2C are chips of the kernel's dummy bus,
-`i2c-stub`, whose registers tcssim fills with the zone's temperature (`sudo
-bin/mki2c` makes it), and `temp_3` is reached over UDP at its `sim_address`,
-127.0.0.1:5203, where tcssim answers the same; flown, the buses are opened.
+`i2c-stub`, whose registers tcssim fills with the zone's temperature: `sudo
+bin/mki2c` makes it, with chips at their addresses, 0x48 and 0x49. The
+kernel numbers the stub as it finds it, so their `path`,
+`/tmp/tcs-thermostat-i2c`, is a link tcssim makes to the stub wherever it is.
+`temp_3` is reached over UDP at its `sim_address`, 127.0.0.1:5203, where
+tcssim answers the same. Flown, the paths are the vehicle's buses.
 The heaters' switches are lines 4 and 5 of the kernel's dummy GPIO chip,
 `/dev/gpiochip1`, which tcssim watches: make it once with `sudo
 bin/mk-kernel-dummies gpio` (see "Payloads on the kernel's dummy devices",

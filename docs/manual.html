@@ -2615,9 +2615,13 @@ them: <tt class="docutils literal">temp_1</tt> and <tt class="docutils literal">
 <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat.ytcs</span></tt>, which the example includes,
 with the rest of the vehicle. On a desk the two on I<sup>2</sup>C
 are chips of the kernel's dummy bus, <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, whose registers tcssim
-fills with the zone's temperature -- <tt class="docutils literal">sudo bin/mki2c</tt> makes it -- and
-<tt class="docutils literal">temp_3</tt> is reached over UDP at its <tt class="docutils literal">sim_address</tt>, <tt class="docutils literal">127.0.0.1:5203</tt>,
-where tcssim answers the same; flown, the buses are opened. The heaters'
+fills with the zone's temperature: <tt class="docutils literal">sudo bin/mki2c</tt> makes it, with chips at
+their addresses, <tt class="docutils literal">0x48</tt> and <tt class="docutils literal">0x49</tt>. The kernel numbers the stub as it
+finds it, <tt class="docutils literal"><span class="pre">/dev/i2c-1</span></tt> on one host and <tt class="docutils literal"><span class="pre">/dev/i2c-22</span></tt> on the next, so
+their <tt class="docutils literal">path</tt>, <tt class="docutils literal"><span class="pre">/tmp/tcs-thermostat-i2c</span></tt>, is a link tcssim makes to the
+stub wherever it is. <tt class="docutils literal">temp_3</tt> is reached over UDP at its <tt class="docutils literal">sim_address</tt>,
+<tt class="docutils literal">127.0.0.1:5203</tt>, where tcssim answers the same. Flown, the paths are the
+vehicle's buses. The heaters'
 switches are GPIO lines 4 and 5 of the kernel's dummy chip, <tt class="docutils literal">/dev/gpiochip1</tt>, which tcssim moves and watches: <tt class="docutils literal">sudo
 <span class="pre">bin/mk-kernel-dummies</span> gpio</tt> makes it, once, before the example is run --
 see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>. The gpio example has lines 0 and 1, so

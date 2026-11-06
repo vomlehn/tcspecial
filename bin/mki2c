@@ -123,10 +123,23 @@ if [ -z "$stub" ]; then
 	exit 1
 fi
 
+# Give the stub's node to whoever asked for it, where that was someone running
+# this under sudo, for the reason bin/mkgpio gives its chip: the kernel makes
+# the node root's, and tcssim and tcspecial are run as the user. udev is let
+# finish first, so that it does not set the owner back afterwards.
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+	if command -v udevadm > /dev/null; then
+		udevadm settle
+	fi
+	chown "$SUDO_USER" "/dev/i2c-$stub"
+	echo "mki2c: /dev/i2c-$stub is now $SUDO_USER's"
+fi
+
 echo "mki2c: done"
 echo
 echo "  an I2C payload:   path: /dev/i2c-$stub"
 echo "                    address: one of ${addresses[*]}"
 echo
 echo "The bus number is assigned as adapters appear, so it can differ from one"
-echo "run of this to the next; a payload set that names it has to name this."
+echo "run of this to the next; a payload set that names it has to name this,"
+echo "or name a path tcssim may make, which it links to the stub."

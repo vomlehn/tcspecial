@@ -5044,67 +5044,62 @@ operating -- so placing it is work the editor can do rather than work it can
 wait for. It is placed through the history like any other edit, so it can be
 taken back by somebody drawing a page of a larger configuration.
 
-A configuration the editor can read and the vehicle could not fly is asked
-about when it is opened, in a window of its own: **one row per problem with a
-node**, each said in the words of the rule it breaks, each offering what can
-be done about that kind of problem. A node named twice, a node with no name, a
-type this build does not know, attributes that do not hold together, a node in
-a group nobody declared, a payload that is written to and states no trigger.
+A configuration the editor can read and the vehicle could not fly is **warned
+of when it is opened**, briefly: the warning says whether some nodes have
+attribute values that are not valid, whether some links are not valid, and
+whether there are other errors -- a group, the ``tcspecial`` parameters, the
+simulator file -- and **not each error**. Each is in the errors button's menu,
+and a list read once at startup is a list nobody has to hand when they come to
+put the errors right. The warning has two buttons: **Ignore**, which takes it
+away and leaves the errors as they stand, and **Quit**, which leaves the
+editor. The errors are the editor's own faults and everything ``tcsverify``
+finds in the files, warnings included, in its words.
 
-What is offered depends on what is wrong. Where a *name* is the fix -- two
-nodes sharing one, or a node without one -- the row carries a field and a
-**Suggest** button, which offers the name the editor would have placed the node
-with; that is the one kind of problem the editor can mend by itself. Every row
-whose node is in the document also offers **Edit**, which opens that node's own
-window, and **Delete**, which goes through the same confirmation any other
-deletion does. **Rename** waits until the names all differ, none is blank and
-none belongs to a third node, since a repair that left the same question
-standing would be no answer; what is wrong with the names is said under the
-list rather than beside a row, so the list does not shift as somebody types.
+**One button finds every error.** While the configuration has any, the bar has
+a button saying how many -- *3 errors* -- whose menu lists them, one line each,
+attribute values and links alike. Choosing one goes to it:
 
-**Every fault gets a row.** A problem with no row went to the alert on its
-own, which says what is wrong and offers nothing -- and an alert with nothing
-to press is a complaint rather than a question. So a line that goes nowhere
-offers *delete the line*, a group with nothing in it offers *delete the
-group*, and a ``tcspecial`` parameter that does not hold together offers *edit
-the parameters*, which opens that window. The line whose removal is offered is
-the one the document holds, origin and input included, because that is what a
-removal is matched by.
+* a node's -- a value a rule refuses, a type this build does not know, a group
+  nobody declared -- is shown in the middle of its page, chosen, with its own
+  window open, so the value can be put right where it is;
+* a line's -- one that goes nowhere, one that goes back where it came from, one
+  of two into a single input -- is shown in the middle of the page it is drawn
+  on and **lit**, drawn over a wide pale line as tcspecial's visual window
+  lights a line data crosses, so it is told from the others by its width and
+  not by colour alone;
+* a name two nodes share, or a node with no name, is first given a name
+  nothing has -- the one repair the editor makes by itself -- and then shown as
+  a node's is, so its window can be opened and the name made a better one;
+* a group's opens the groups window on that group, and the parameters' the
+  parameters window.
 
-**Doing nothing is one of the offers, and there are two of them.** *Leave this
-one* closes the window on that problem. *Ignore them all* answers every
-remaining problem at once, which is what somebody opening a file to look at it
-wants: **the nodes are added as they stand**, the faults stay faults -- drawn
-in red on their own nodes, refused by ``tcsverify`` -- and nothing says any of
-it again for the rest of the session.
+**An error put right leaves the menu.** The errors are worked out again after
+every edit and when a node's window is closed, so a value mended in the window
+is gone from the menu as the window closes, and a lit line is put out, and
+leaves the menu, once what was wrong with it is put right. The button goes
+when the last error does.
 
-That last part is a decision about the session and not about the file, which is
-worth stating. A judgement about a *concern* is written into the file, since
-somebody else reading the drawing should see what was decided; nobody should
-inherit somebody else's decision to ignore an error, so this one is forgotten
-when the editor closes. A fault that goes away and comes back is raised again,
-the set being kept by what each one says.
+Ignoring the warning is a decision about the session and not about the file,
+which is worth stating. A judgement about a *concern* is written into the
+file, since somebody else reading the drawing should see what was decided;
+nobody should inherit somebody else's decision to ignore an error, so this one
+is forgotten when the editor closes. A fault that goes away and comes back is
+raised again, the set being kept by what each one says.
 
 Either way **the node is on the canvas in its own working pane**, which is what
-lets somebody look at the drawing before choosing. A type nothing knows goes in
-the vehicle pane, the two others meaning something about what a node *is* where
-that type says nothing. An editor that would not show a configuration until it
-was correct could not be used to correct one.
+lets somebody look at the drawing before putting it right. A type nothing knows
+goes in the vehicle pane, the two others meaning something about what a node
+*is* where that type says nothing. An editor that would not show a
+configuration until it was correct could not be used to correct one.
 
-Answering one problem leaves the window on the rest rather than closing it: a
-file with four problems should not need opening four times, and one that has
-been mended should leave the list rather than sit there answered.
-
-And the alert says nothing about the state the file arrived in. Both windows
-used to open on a file with problems -- one that offered something and one that
-offered nothing -- so what the file came with is counted as said before either
-is shown. What the alert is for afterwards is what goes wrong *while somebody
-works*, which is news.
+And the alert says nothing about the state the file arrived in: what the file
+came with is counted as said before the warning is shown. What the alert is
+for afterwards is what goes wrong *while somebody works*, which is news.
 
 **Whatever comes up as the editor starts is in front of the main window, and
-the main window takes nothing until it has been answered.** The question about
-the file's problems, and an alert about a file that could not be read, are
-asked *inside* the main window, as a dialog in front of its drawing, rather
+the main window takes nothing until it has been answered.** The warning about
+the file's errors, and an alert about a file that could not be read, are
+given *inside* the main window, as a dialog in front of its drawing, rather
 than in windows of their own. A window of its own cannot be kept in front: the
 order of windows is the window manager's, and on Wayland no program can ask
 for its window to stay on top, so a question shown in a window of its own could

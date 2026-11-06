@@ -2319,6 +2319,37 @@ def find_tcsverify():
     return find_built("tcsverify")
 
 
+def ambient(path, tcsverify=None):
+    """The simulated world's ambient temperature, in kelvin, from the
+    simulator file beside a configuration, as tcsverify reads it: by the
+    rule tcssim reads it by, which is not restated here.
+
+    ``None`` is not a failure. A run whose world states none shows none.
+
+    Args:
+        path:      The configuration file.
+        tcsverify: The tcsverify program to run, or ``None`` to find one with
+                   :func:`find_tcsverify`.
+
+    Returns:
+        A pair: the temperature and ``None``; or ``None`` and the reason it
+        cannot be had.
+    """
+    program = tcsverify or find_tcsverify()
+    if program is None:
+        return None, "tcsverify is not built or on the PATH"
+    try:
+        done = subprocess.run([program, "--ambient", str(path)],
+                              capture_output=True, text=True, timeout=30)
+    except OSError as why:
+        return None, f"{program} cannot be run: {why}"
+    try:
+        return float(done.stdout.strip()), None
+    except ValueError:
+        return None, (done.stderr.strip()
+                      or f"{program} gave no temperature")
+
+
 def digest(path, tcsverify=None):
     """The configuration's digest, as tcsverify works it out.
 

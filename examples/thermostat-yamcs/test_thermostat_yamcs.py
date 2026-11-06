@@ -286,6 +286,30 @@ class ReadingsTest(unittest.TestCase):
                           "consensus_temp 295.200 K, to_k1 --, to_k2 --, "
                           "to_k3 --, gpio-out-tmass1 off, gpio-out-tmass2 --"])
 
+    def test_the_worlds_ambient_is_shown_after_the_readings(self):
+        setup = thermostat_yamcs.Setup(options())
+        if setup.world is None:
+            self.skipTest(f"no world's temperature: {setup.why_no_ambient}")
+        self.assertEqual(setup.ambient, 288.15)
+        self.assertEqual((setup.world.node, setup.world.parameter,
+                          setup.world.form),
+                         ("world ambient", "/TcsYamcs/world_ambient_temp",
+                          KELVIN))
+        yamcs = FakeYamcs({f"/TcsYamcs/{name}": ["K"]
+                           for name in ("to_k1", "to_k2", "to_k3",
+                                        "consensus_temp",
+                                        "world_ambient_temp")})
+        sources = setup.sources + [setup.world]
+        readings = thermostat_yamcs.Readings(
+            yamcs, sources, thermostat_yamcs.feeding_of(setup.config,
+                                                        sources))
+        yamcs.values["/TcsYamcs/world_ambient_temp"] = 288.15
+        readings.read()
+        self.assertEqual(readings.line(),
+                         "consensus_temp --, to_k1 --, to_k2 --, to_k3 --, "
+                         "world ambient 288.150 K, gpio-out-tmass1 --, "
+                         "gpio-out-tmass2 --")
+
     def test_bytes_are_shown_as_hex(self):
         self.assertEqual(thermostat_yamcs.shown(
             thermostat_yamcs.Source("x", "/TcsYamcs/x", DATUM), b"\x01\xff",

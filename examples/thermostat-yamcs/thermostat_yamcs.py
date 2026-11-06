@@ -26,7 +26,10 @@ This program puts the pieces together:
   the vehicle answers with it -- the vehicle sends nothing down until it
   has -- and then reads what arrives back from Yamcs, over its REST API:
   the zone's temperature, the three readings, the thermostat's decision and
-  the heaters it drives, and the beacon;
+  the heaters it drives, and the beacon; and the simulated world's ambient
+  temperature, which the vehicle does not send: it is read from the
+  simulator file by ``tcsverify --ambient`` and set in Yamcs as a local
+  parameter, ``world_ambient_temp``;
 * it shows them in a window, the beacon panel above the thermostat's, or
   with ``--seconds`` prints them for that long with no window, a line each
   ``--every`` seconds and a line whenever the heaters are switched.
@@ -69,7 +72,7 @@ from tcslib.yamcs_ground import (  # noqa: E402
     write_yamcs, yamcs_home)
 from tcslibgs import configuration  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
-from tcslibgs.form import DECISION  # noqa: E402
+from tcslibgs.form import DECISION, UNITS, Form  # noqa: E402
 
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
 HTTP_PORT = 17090
@@ -83,6 +86,10 @@ SIMULATE = "all"
 
 #: How long tcssim is given to say it is ready, in seconds.
 SIMULATOR_PATIENCE = 60
+
+#: What the simulated world's ambient temperature is shown as: a source of
+#: its own, though nothing on the vehicle sends it.
+WORLD = "world ambient"
 
 #: What a value is shown as before one has arrived.
 NOTHING_YET = "--"
@@ -222,6 +229,16 @@ class Setup:
                              "program shows a thermostat's temperatures")
         self.digest, self.why_no_digest = configuration.digest(
             self.path, options.tcsverify)
+        # The simulated world's ambient temperature, which the vehicle does
+        # not send, read from the simulator file and set in Yamcs as a local
+        # parameter, so that Yamcs shows the surroundings beside the zone.
+        self.ambient, self.why_no_ambient = configuration.ambient(
+            self.path, options.tcsverify)
+        self.world = None
+        if self.ambient is not None:
+            kelvin = next(unit for unit in UNITS if unit.symbol == "K")
+            self.world = Source(WORLD, generated.qualified(
+                generated.WORLD_AMBIENT), Form("Value", kelvin))
 
     def _drives(self, link):
         """The nodes a source's decisions drive.
@@ -598,7 +615,8 @@ def main(argv):
         if not options.no_yamcs:
             home = yamcs_home(options.yamcs)
             write_yamcs(setup.config, run_dir, options.http_port, home,
-                        INSTANCE, "thermostat_yamcs.py")
+                        INSTANCE, "thermostat_yamcs.py",
+                        world=setup.world is not None)
             status(f"starting Yamcs on {run_dir}")
             yamcs.start()
             status(f"Yamcs is at http://localhost:{options.http_port}")
@@ -629,8 +647,14 @@ def main(argv):
         beacons = YamcsBeacons(yamcs, setup.beacon,
                                Schedule.for_interval(setup.beacon_interval),
                                setup.digest, setup.beacon_interval)
-        readings = Readings(yamcs, setup.sources,
-                            feeding_of(setup.config, setup.sources))
+        sources = setup.sources + [setup.world] * (setup.world is not None)
+        if setup.world is None:
+            status("no simulated world's temperature: "
+                   f"{setup.why_no_ambient}")
+        else:
+            yamcs.set_value(setup.world.parameter, setup.ambient)
+        readings = Readings(yamcs, sources,
+                            feeding_of(setup.config, sources))
         for source in readings.ordered():
             units = " ".join(readings.units[source.parameter]) or "none"
             print(f"parameter: {source.parameter}, {source.form}, units "

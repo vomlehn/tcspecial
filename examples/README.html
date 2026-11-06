@@ -955,7 +955,12 @@ interface, at <a href="http://localhost:17090"
 class="uri">http://localhost:17090</a>, shows
 <code>consensus_temp</code> and <code>to_k1</code> to <code>to_k3</code>
 as temperatures in K and <code>gpio-out-tmass1</code> and
-<code>gpio-out-tmass2</code> as true or false.</p>
+<code>gpio-out-tmass2</code> as true or false. Beside them is
+<code>world_ambient_temp</code>, the simulated world’s ambient
+temperature, which the vehicle does not send: a local parameter in K,
+which <code>thermostat_yamcs.py</code> sets from the simulator file’s
+<code>ambient_temp</code>, read by <code>tcsverify --ambient</code>,
+once the vehicle has answered CONNECT.</p>
 <p>It starts Yamcs, then tcssim – every payload sending from the start,
 as though its panel’s button had been pressed – and, once tcssim says it
 is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs

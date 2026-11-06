@@ -7604,6 +7604,14 @@ Requirement
     draws none: a figure from a file beside real readings would be read as a
     measurement. ``WorldSection::ambient`` is where it is read.
 
+Requirement
+    The Yamcs example's mission database has the simulated world's ambient
+    temperature as ``world_ambient_temp``, a local parameter in kelvin with
+    no encoding, no packet carrying it; ``thermostat_yamcs.py`` sets it from
+    ``tcsverify --ambient`` once the vehicle has answered CONNECT and shows
+    it after the readings. A node named ``world_ambient_temp`` is refused,
+    told why. See ``python/tcslibgs/yamcs.py``.
+
 Holes in the checksum scheme, and what closes them
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -13954,6 +13962,17 @@ Requirement
     the last field of every beacon this build's tcspecial sends. It is how
     a person writing a configuration finds the value: see `The
     configuration names its interface`_.
+
+Requirement
+    ``--ambient <file>``, given alone, prints the simulated world's
+    ``ambient_temp`` in kelvin and nothing else, from a simulator file, or
+    from the one beside a configuration that tcssim would read. It is read
+    by ``WorldSection::ambient``, the one reading of it, so that a ground
+    program in another language -- the Yamcs example's Python -- shows the
+    world's temperature without stating the rule for reading a quantity a
+    second time. A file with no world, a figure that does not read, or a
+    configuration with no simulator file beside it is said on stderr, with
+    status 1.
 
 Requirement
     ``--types=<types>`` checks a configuration as a tcspecial built with only

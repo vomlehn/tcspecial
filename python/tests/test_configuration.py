@@ -326,3 +326,27 @@ class ConfigurationTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AmbientTest(unittest.TestCase):
+    """The simulated world's ambient temperature, as tcsverify reads it."""
+
+    def test_the_worlds_ambient_is_read_beside_the_configuration(self):
+        program = configuration.find_tcsverify()
+        if program is None:
+            self.skipTest("tcsverify is not built")
+        kelvin, why = configuration.ambient(
+            ROOT / "examples" / "thermostat" / "thermostat.xtcs", program)
+        self.assertEqual((kelvin, why), (288.15, None))
+        # A world with no ambient temperature is said, not guessed.
+        kelvin, why = configuration.ambient(
+            ROOT / "examples" / "minimal" / "minimal.ytcs", program)
+        self.assertIsNone(kelvin)
+        self.assertIn("no world", why)
+
+    def test_no_tcsverify_is_said(self):
+        kelvin, why = configuration.ambient(
+            ROOT / "examples" / "thermostat" / "thermostat.xtcs",
+            "/nonexistent/tcsverify")
+        self.assertIsNone(kelvin)
+        self.assertIn("cannot be run", why)

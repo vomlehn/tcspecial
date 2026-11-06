@@ -586,7 +586,11 @@ conversion's or a vote's value is a float in its unit, with the unit in a
 through a calibrator, and a decision -- what a heater's switch was told -- is
 a boolean. So Yamcs's web interface, at <http://localhost:17090>, shows
 `consensus_temp` and `to_k1` to `to_k3` as temperatures in K and
-`gpio-out-tmass1` and `gpio-out-tmass2` as true or false.
+`gpio-out-tmass1` and `gpio-out-tmass2` as true or false. Beside them is
+`world_ambient_temp`, the simulated world's ambient temperature, which the
+vehicle does not send: a local parameter in K, which `thermostat_yamcs.py`
+sets from the simulator file's `ambient_temp`, read by
+`tcsverify --ambient`, once the vehicle has answered CONNECT.
 
 It starts Yamcs, then tcssim -- every payload sending from the start, as
 though its panel's button had been pressed -- and, once tcssim says it is

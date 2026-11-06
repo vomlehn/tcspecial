@@ -1366,6 +1366,10 @@ source for world data, when what goes through them is moc data both ways.
                   required of a gpio_inout
    init           what driven lines start at, as a trigger is written:
                   '"0"'. gpio_out and gpio_inout only
+   sim_address    where tcssim answers for the lines over UDP when they
+                  are simulated, a loopback address and port:
+                  127.0.0.1:5204. Optional; used under --simulate=some or
+                  all instead of the chip, and not under none
 
 **How lines are watched.** Two different questions, and a set of lines may ask
 either or both:
@@ -1455,6 +1459,18 @@ simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its watched lines the other
 way every packet interval, and watch its driven lines for what the vehicle
 drives them to.
+
+A node that gives ``sim_address`` needs no chip in a simulated run: tcspecial
+drives and watches its lines over UDP at that address, and tcssim answers
+there, by the same rules. One datagram is one state of the lines, an ASCII
+``1`` or ``0`` for each in the order of ``lines``, lowest first -- ``10`` for
+lines 4 and 5 with 4 asserted -- both ways: what the vehicle drives its lines
+to, and what watched lines are, which tcssim sends whenever they change.
+tcspecial says hello with an empty datagram, so that tcssim knows where to
+answer, and makes of each change the record an edge on a chip would be,
+keeping to the node's ``edge``. Everything else -- reports, ``state_interval``,
+what is passed on by ``moc-out`` -- is as it is on a chip. Under ``none``, the
+flight setting, the chip is opened.
 
 ``tcspecial/tests/kernel-dummies.rs`` flies `The gpio example`_ on such a
 chip, pulling and reading its lines itself rather than through tcssim: each
@@ -2291,22 +2307,18 @@ the hardware allows.
 
 The sensors are temperature sensors on the zone, as a vehicle would carry
 them: ``temp_1`` and ``temp_2`` on an I\ :superscript:`2`\ C bus, of type
-``i2c``, and ``temp_3`` a SPI peripheral, of type ``spi``. They are in
+``i2c_tmass``, and ``temp_3`` a SPI peripheral, of type ``spi_tmass`` -- see
+`Temperature Sensors on a Thermal Mass`_. They are in
 ``examples/thermostat-common/thermostat.ytcs``, which the example includes,
-with the rest of the vehicle. On a desk the two on I\ :superscript:`2`\ C
-are chips of the kernel's dummy bus, ``i2c-stub``, whose registers tcssim
-fills with the zone's temperature: ``sudo bin/mki2c`` makes it, with chips at
-their addresses, ``0x48`` and ``0x49``. The kernel numbers the stub as it
-finds it, ``/dev/i2c-1`` on one host and ``/dev/i2c-22`` on the next, so
-their ``path``, ``/tmp/tcs-thermostat-i2c``, is a link tcssim makes to the
-stub wherever it is. ``temp_3`` is reached over UDP at its ``sim_address``,
-``127.0.0.1:5203``, where tcssim answers the same. Flown, the paths are the
-vehicle's buses. The heaters'
-switches are GPIO lines 4 and 5 of the kernel's dummy chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
-bin/mk-kernel-dummies gpio`` makes it, once, before the example is run --
-see `Making the Kernel's Dummy Devices`_. The gpio example has lines 0 and 1, so
-the two run at once; the thermostat-yamcs example has the same lines as this,
-so it and this do not.
+with the rest of the vehicle. The heaters' switches are GPIO lines 4 and 5 of
+``/dev/gpiochip1``. On a desk every one of them is a simulated device, reached
+over UDP at its ``sim_address``: the sensors at ``127.0.0.1:5201`` to
+``5203``, where tcssim answers with the zone's temperature, and the switches
+at ``5204`` and ``5205``, where tcssim takes what the vehicle drives them to
+-- see `A GPIO Payload`_. So the example needs no dummy device, no root and no
+hardware. Flown, the buses and the chip are opened. The thermostat-yamcs
+example has the same sensors and switches as this, at the same addresses, so
+it and this are not run at once.
 
 The three are sensors of *one place*, separated only because two parts cannot
 occupy one point. ``temp_3`` is a different part, reporting three unsigned
@@ -4097,7 +4109,7 @@ example shares with thermostat-yamcs, its world shortened here:
            connects: zone.heater_2
            simulate: true
 
-     - type i2c:
+     - type i2c_tmass:
          - payload: temp_1
            accuracy: 0.5 K
            group: zone_temps
@@ -4111,7 +4123,7 @@ example shares with thermostat-yamcs, its world shortened here:
            noise: 0.03 K
            offset: +0.2 K
 
-     - type spi:
+     - type spi_tmass:
          - payload: temp_3
            accuracy: 0.25 K
            group: zone_temps
@@ -5267,7 +5279,9 @@ faithfully: an HDLC line has no virtual interface at all, and a
 pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
 sensor's bytes without its clock, its channel or its sysfs. Two more, the
 temperature sensors ``i2c_tmass`` and ``spi_tmass``, are simulated as the
-thermal mass they are fixed to. A node of one of those types may give
+thermal mass they are fixed to. And the three GPIO types, whose dummy chip
+needs root to make, may be simulated without it: tcssim answers for their
+lines over UDP, see `A GPIO Payload`_. A node of one of those types may give
 ``sim_address``, a loopback address and port. Under ``--simulate=some`` or
 ``all`` tcspecial reaches it there over UDP instead of opening the device,
 and tcssim answers there, a simulated device; under ``none`` the device is

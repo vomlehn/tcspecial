@@ -41,7 +41,7 @@ simulated_payloads:
         connects: zone.heater_2
         simulate: true
 
-  - type i2c:
+  - type i2c_tmass:
       - payload: temp_1
         accuracy: 0.5 K
         group: zone_temps
@@ -55,7 +55,7 @@ simulated_payloads:
         noise: 0.03 K
         offset: +0.2 K
 
-  - type spi:
+  - type spi_tmass:
       - payload: temp_3
         accuracy: 0.25 K
         group: zone_temps

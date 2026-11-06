@@ -85,6 +85,12 @@ pub fn payload_config_attached(
             // tcssim takes part in, so the simulator is a UDP payload there, by
             // the same rule of which end speaks first. See
             // `tcslibgs::graph::reach::Reach::opened`.
+            // Discrete lines whose node gives a sim_address: tcssim answers
+            // for them there, in the lines' own datagrams rather than as a
+            // stream of bytes. See payload_gpio.
+            (EndpointConfig::Gpio(_), Some(at)) => {
+                (PayloadProtocol::GpioUdp, at.ip().to_string(), at.port(), 0)
+            }
             (_, Some(at)) => {
                 (PayloadProtocol::Udp, at.ip().to_string(), at.port(), 0)
             }
@@ -454,6 +460,24 @@ mod tests {
         assert!(payload_config_from(&line, &sim(250, 100, 2)).is_ok());
         line.sim_address = None;
         assert!(payload_config_from(&line, &sim(250, 100, 2)).is_err());
+
+        // Discrete lines are answered for there in their own datagrams, as
+        // lines and not as a stream of bytes.
+        let lines = on(EndpointConfig::Gpio(tcslibgs::GpioConfig {
+            kind: tcslibgs::node::payload::gpio::Kind::Inout,
+            path: "/dev/gpiochip1".to_string(),
+            inputs: Vec::new(),
+            outputs: vec![4],
+            edge: tcslibgs::LineEdge::None,
+            bias: tcslibgs::Bias::None,
+            debounce: None,
+            state_interval: Some(std::time::Duration::from_secs(1)),
+            sim_address: None,
+        }));
+        let config = payload_config_from(&lines, &sim(250, 100, 2)).unwrap();
+        assert!(config.protocol == PayloadProtocol::GpioUdp);
+        assert_eq!((config.address.as_str(), config.port), ("127.0.0.1", 7950));
+        assert_eq!(config.gpio_lines, vec![4]);
     }
 
     /// A triggered payload the simulator cannot be the asked end of is

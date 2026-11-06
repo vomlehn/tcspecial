@@ -193,8 +193,9 @@
       <!-- Where a udp or unix_dgram payload that speaks first sends from:
            host:port, or a path. -->
       <xs:element name="sends_from" type="xs:string"/>
-      <!-- Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload
-           is reached over UDP when simulated: a loopback host:port. -->
+      <!-- Where an hdlc, spi, rpmsg, iio, i2c_tmass, spi_tmass, gpio_in,
+           gpio_out or gpio_inout payload is reached over UDP when
+           simulated: a loopback host:port. -->
       <xs:element name="sim_address" type="xs:string"/>
       <xs:element name="interface" type="xs:string"/>
       <xs:element name="can_id" type="xs:string"/>

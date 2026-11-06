@@ -254,6 +254,7 @@ pub(crate) fn endpoint_of(
                 bias: gpio.bias,
                 debounce: gpio.debounce,
                 state_interval: gpio.state_interval,
+                sim_address: None,
             })),
             GroupKind::Rpmsg(rpmsg) => Ok(EndpointConfig::Rpmsg(RpmsgConfig {
                 path: path.clone(),

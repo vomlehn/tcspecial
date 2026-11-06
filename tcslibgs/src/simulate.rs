@@ -636,9 +636,37 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
             ))
         }
     };
-    let judged = match &reach.opened(mode) {
-        // A node reached at its sim_address, the only network endpoint a
-        // counted node opens.
+    // A node reached at its sim_address, the only network endpoint a counted
+    // node opens -- a GPIO node too, whose lines are then tcssim's.
+    let judged = match reach.simulated_at(mode) {
+        Some(at) => payload::network::judged(&at),
+        None => judged_at(host, &reach.endpoint),
+    };
+    // Reached at its sim_address, which is what to change, where it is.
+    if reach.sim_address.is_some() && !mode.is_flight() {
+        return Some(Judged {
+            attribute: "sim_address",
+            to_simulate: "give sim_address as a loopback address, such as \
+                 127.0.0.1:7950",
+            ..judged
+        });
+    }
+    Some(judged)
+}
+
+/// Judges the endpoint a node opens where it is not reached at its
+/// sim_address, by its type's own rule.
+///
+/// # Arguments
+///
+/// * `host`     - The host, whose `/sys` is read.
+/// * `endpoint` - The node's own endpoint.
+///
+/// # Returns
+///
+/// The judgement.
+fn judged_at(host: &Host, endpoint: &EndpointConfig) -> Judged {
+    match endpoint {
         EndpointConfig::Network(at) => payload::network::judged(at),
         // Never opened by a counted node: see `counted`.
         EndpointConfig::Device(at) => Judged::hardware(
@@ -658,17 +686,7 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
         EndpointConfig::Rpmsg(at) => payload::rpmsg::judged(&at.path),
         EndpointConfig::Gpio(at) => payload::gpio::judged(host, &at.path),
         EndpointConfig::Hdlc(at) => payload::hdlc::judged(&at.interface),
-    };
-    // Reached at its sim_address, which is what to change, where it is.
-    if reach.sim_address.is_some() && !mode.is_flight() {
-        return Some(Judged {
-            attribute: "sim_address",
-            to_simulate: "give sim_address as a loopback address, such as \
-                 127.0.0.1:7950",
-            ..judged
-        });
     }
-    Some(judged)
 }
 
 /// Lists everything about a run's payloads that a mode forbids.

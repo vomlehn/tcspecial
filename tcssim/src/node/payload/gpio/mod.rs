@@ -27,8 +27,18 @@
 //! quietly ignored: a file that asks a set of discretes to drop a tenth of
 //! its packets has asked for something this kind cannot do.
 //!
+//! A node that gives a `sim_address` needs no chip: in a run that simulates
+//! it, tcspecial reaches its lines over UDP there, and this answers for them
+//! -- see [`run_gpio_udp_node`]. One datagram is one state of the lines, an
+//! ASCII `1` or `0` for each in the node's order, as
+//! [`tcslibgs::node::payload::gpio::state_said`] says it, both ways: what
+//! the vehicle drives its lines to, and what watched lines are. The lines are
+//! moved and watched as a chip's are, by the same rules; only where a level
+//! goes differs.
+//!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
+use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -193,6 +203,188 @@ pub fn run_gpio_node(
         }
 
         wait_out_packet(&pacing, started, &running);
+    }
+}
+
+/// Answers for discrete lines over UDP, at their node's `sim_address`, with no
+/// chip.
+///
+/// Lines the vehicle drives are taken from what it sends, as a chip's are
+/// read from its values: where they all agree it is a decision, and the part
+/// they are joined to in the world is driven by it; a change is counted as a
+/// datum received. Lines the vehicle watches are said whenever they change --
+/// to what the world says they sense, or every packet interval the other way
+/// where they are joined to nothing -- and again to a vehicle that has just
+/// said where it is, by an empty datagram.
+///
+/// # Arguments
+///
+/// * `config`  - The payload's configuration: its address and port are the
+///               `sim_address`.
+/// * `running` - Cleared to stop it; the function returns soon after.
+/// * `stats`   - Where it counts what it sends and receives.
+pub fn run_gpio_udp_node(
+    config: PayloadConfig,
+    running: Arc<AtomicBool>,
+    stats: Arc<std::sync::Mutex<PayloadStats>>,
+) {
+    let at = format!("{}:{}", config.address, config.port);
+    let socket = match UdpSocket::bind(&at).and_then(|socket| {
+        socket.set_read_timeout(Some(WATCH_EVERY))?;
+        Ok(socket)
+    }) {
+        Ok(socket) => socket,
+        Err(e) => {
+            could_not_simulate(
+                &config,
+                format!("cannot answer for its lines at {at}: {e}"),
+            );
+            return;
+        }
+    };
+    config.standing.made();
+
+    let count = config.gpio_lines.len();
+    let mut vehicle: Option<SocketAddr> = None;
+    let mut datagram = [0u8; tcslibgs::node::payload::gpio::MOST_LINES + 1];
+    // What the vehicle last drove the lines to, and what watched lines were
+    // last said to be: nothing yet, so the first of each counts.
+    let mut driven: Option<u64> = None;
+    let mut said: Option<u64> = None;
+    // What watched lines are to be: from the world, or the pattern.
+    let mut levels = vec![false; count];
+    let mut high = false;
+    let mut moved = Instant::now();
+
+    while running.load(Ordering::SeqCst) {
+        match socket.recv_from(&mut datagram) {
+            Ok((0, from)) => {
+                // A hello: say the lines again, to where it came from.
+                vehicle = Some(from);
+                said = None;
+            }
+            Ok((n, from)) => {
+                vehicle = Some(from);
+                if config.driven {
+                    took_a_drive(
+                        &config,
+                        &stats,
+                        count,
+                        &datagram[..n],
+                        &mut driven,
+                    );
+                }
+            }
+            Err(ref e)
+                if matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::ConnectionRefused
+                ) => {}
+            Err(e) => {
+                eprintln!(
+                    "{}: cannot hear the vehicle at {at}: {e}",
+                    config.name
+                );
+                crate::payload::wait_while_running(WATCH_EVERY, &running);
+            }
+        }
+        if config.driven {
+            continue;
+        }
+
+        let pacing = Pacing::read(&config);
+        let now = match &config.attachment {
+            Some(world @ crate::node::physics::Attachment::Pulls { .. }) => {
+                if pacing.sending && world.levels(&mut levels) {
+                    Some(
+                        levels.iter().enumerate().fold(0u64, |bits, (n, l)| {
+                            bits | (u64::from(*l) << n)
+                        }),
+                    )
+                } else {
+                    said
+                }
+            }
+            _ => {
+                if pacing.sending
+                    && pacing.produces()
+                    && moved.elapsed() >= pacing.packet_interval
+                {
+                    high = !high;
+                    moved = Instant::now();
+                }
+                Some(if high { (1u64 << count) - 1 } else { 0 })
+            }
+        };
+        if let (Some(to), Some(now)) = (vehicle, now) {
+            if said != Some(now) {
+                let state =
+                    tcslibgs::node::payload::gpio::state_said(count, now);
+                match socket.send_to(&state, to) {
+                    Ok(_) => {
+                        let changed = said.map_or(count as u64, |was| {
+                            u64::from((was ^ now).count_ones())
+                        });
+                        said = Some(now);
+                        let mut guard = stats.lock().unwrap();
+                        guard.bytes_sent += changed * EVENT_BYTES;
+                        guard.a_packet_has_gone(&state);
+                    }
+                    Err(e) => eprintln!(
+                        "{}: cannot tell the vehicle at {to} what its lines \
+                         are: {e}",
+                        config.name
+                    ),
+                }
+            }
+        }
+    }
+}
+
+/// Takes what the vehicle drove its lines to, from a datagram.
+///
+/// Where every line agrees it is a decision, and the part the lines are
+/// joined to in the world is driven by it, each time -- the part keeps the
+/// latest, and an unpowered one stays off -- and a change is counted as a
+/// datum received. A datagram that is not a state of the lines is said, and
+/// taken for nothing.
+///
+/// # Arguments
+///
+/// * `config`   - The payload's configuration.
+/// * `stats`    - Where a change is counted.
+/// * `count`    - How many lines the node has.
+/// * `datagram` - What arrived.
+/// * `driven`   - What the lines were last driven to, which this updates.
+fn took_a_drive(
+    config: &PayloadConfig,
+    stats: &std::sync::Mutex<PayloadStats>,
+    count: usize,
+    datagram: &[u8],
+    driven: &mut Option<u64>,
+) {
+    let now = match tcslibgs::node::payload::gpio::state_read(count, datagram) {
+        Ok(now) => now,
+        Err(why) => {
+            eprintln!("{}: the vehicle sent {why}", config.name);
+            return;
+        }
+    };
+    let all = (1u64 << count) - 1;
+    if now == 0 || now == all {
+        crate::node::physics::driven(
+            &config.attachment,
+            &config.name,
+            &datagram[..1],
+        );
+    }
+    if *driven != Some(now) {
+        *driven = Some(now);
+        let mut guard = stats.lock().unwrap();
+        guard.a_packet_has_come(datagram);
+        guard.bytes_recv += count as u64 * EVENT_BYTES;
     }
 }
 
@@ -431,6 +623,136 @@ mod tests {
 
         running.store(false, std::sync::atomic::Ordering::SeqCst);
         watching.join().unwrap();
+    }
+
+    /// A payload of discrete lines answered for over UDP, for the tests
+    /// below: no world, sending, at a port of its own on the loopback
+    /// interface.
+    ///
+    /// # Arguments
+    ///
+    /// * `driven`   - Whether the vehicle drives the lines.
+    /// * `lines`    - Their offsets.
+    /// * `interval` - Its packet interval, in milliseconds.
+    ///
+    /// # Returns
+    ///
+    /// The configuration, and its address.
+    fn over_udp(
+        driven: bool,
+        lines: Vec<u32>,
+        interval: u32,
+    ) -> (PayloadConfig, SocketAddr) {
+        use std::sync::atomic::AtomicU32;
+
+        // A port nothing has, found by asking for one and letting it go.
+        let at = UdpSocket::bind("127.0.0.1:0")
+            .and_then(|s| s.local_addr())
+            .expect("a free port");
+        let config = PayloadConfig {
+            attachment: None,
+            thermostats: Vec::new(),
+            name: "lines".to_string(),
+            protocol: crate::payload::PayloadProtocol::GpioUdp,
+            address: at.ip().to_string(),
+            port: at.port(),
+            bus_address: 0,
+            can_id: 0,
+            can_fd: false,
+            gpio_lines: lines,
+            triggered: false,
+            faults: Default::default(),
+            own_address: None,
+            own_port: None,
+            packet_size: Arc::new(AtomicU32::new(0)),
+            segment_size: Arc::new(AtomicU32::new(0)),
+            packet_interval_ms: Arc::new(AtomicU32::new(interval)),
+            segment_interval_ms: Arc::new(AtomicU32::new(0)),
+            sending: Arc::new(AtomicBool::new(true)),
+            standing: Default::default(),
+            driven,
+        };
+        (config, at)
+    }
+
+    /// Starts a payload of lines answered for over UDP.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Its configuration.
+    ///
+    /// # Returns
+    ///
+    /// The flag that stops it, its counts, and its thread.
+    fn started(
+        config: PayloadConfig,
+    ) -> (
+        Arc<AtomicBool>,
+        Arc<std::sync::Mutex<PayloadStats>>,
+        std::thread::JoinHandle<()>,
+    ) {
+        let running = Arc::new(AtomicBool::new(true));
+        let stats = Arc::new(std::sync::Mutex::new(PayloadStats::default()));
+        let thread = {
+            let (running, stats) = (running.clone(), stats.clone());
+            std::thread::spawn(move || {
+                run_gpio_udp_node(config, running, stats)
+            })
+        };
+        std::thread::sleep(WATCH_EVERY * 5);
+        (running, stats, thread)
+    }
+
+    /// Lines the vehicle drives over UDP are taken from what it sends, a
+    /// change counted as a datum received and a repeat not.
+    #[test]
+    fn lines_driven_over_udp_count_each_change() {
+        let (config, at) = over_udp(true, vec![4, 5], 0);
+        let (running, stats, thread) = started(config);
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        let received = || stats.lock().unwrap().packets_recv;
+
+        for (state, count) in [(b"11", 1), (b"11", 1), (b"00", 2)] {
+            vehicle.send_to(state, at).expect("sent");
+            std::thread::sleep(WATCH_EVERY * 5);
+            assert_eq!(received(), count, "after {state:?}");
+        }
+        // Not a state of the two lines: said, and taken for nothing.
+        vehicle.send_to(b"1", at).expect("sent");
+        std::thread::sleep(WATCH_EVERY * 5);
+        assert_eq!(received(), 2);
+
+        running.store(false, Ordering::SeqCst);
+        thread.join().unwrap();
+    }
+
+    /// Lines the vehicle watches over UDP, joined to nothing, are said to the
+    /// vehicle once it says where it is, and every packet interval the other
+    /// way, every line together.
+    #[test]
+    fn lines_watched_over_udp_are_said_as_they_move() {
+        let (config, at) = over_udp(false, vec![3, 7], 50);
+        let (running, _stats, thread) = started(config);
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        vehicle
+            .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+            .expect("a timeout");
+
+        vehicle.send_to(&[], at).expect("the hello");
+        let mut said = [0u8; 8];
+        let mut states = Vec::new();
+        for _ in 0..3 {
+            let n = vehicle.recv(&mut said).expect("a state");
+            states.push(said[..n].to_vec());
+        }
+        assert!(
+            states.iter().all(|s| s == b"11" || s == b"00"),
+            "{states:?}"
+        );
+        assert!(states.windows(2).all(|w| w[0] != w[1]), "{states:?}");
+
+        running.store(false, Ordering::SeqCst);
+        thread.join().unwrap();
     }
 
     /// With no simulated chip at all, nothing is found.

@@ -59,6 +59,66 @@ use crate::endpoint_config::{
 /// something moved.
 pub const EVENT_BYTES: usize = 16;
 
+/// Says a state of a node's lines as a datagram, as tcspecial and tcssim
+/// send one another simulated lines' states over UDP: an ASCII `1` or `0` for
+/// each line, in the order of the node's lines, lowest offset first -- `10`
+/// for lines 4 and 5 with 4 asserted.
+///
+/// # Arguments
+///
+/// * `count` - How many lines the node has.
+/// * `bits`  - A bit per line by its place, set where it is asserted.
+///
+/// # Returns
+///
+/// The datagram.
+pub fn state_said(count: usize, bits: u64) -> Vec<u8> {
+    (0..count)
+        .map(|place| {
+            if bits & (1u64 << place) != 0 {
+                b'1'
+            } else {
+                b'0'
+            }
+        })
+        .collect()
+}
+
+/// Reads a state of a node's lines from a datagram: see [`state_said`].
+///
+/// # Arguments
+///
+/// * `count`    - How many lines the node has.
+/// * `datagram` - What arrived.
+///
+/// # Returns
+///
+/// A bit per line by its place, set where it is asserted.
+///
+/// # Errors
+///
+/// What is wrong, if the datagram is not one `1` or `0` for each line: a
+/// state that cannot be read is not guessed at.
+pub fn state_read(count: usize, datagram: &[u8]) -> Result<u64, String> {
+    let refused = || {
+        format!(
+            "{:?} is not a 1 or a 0 for each of the {count} lines",
+            String::from_utf8_lossy(datagram)
+        )
+    };
+    if datagram.len() != count {
+        return Err(refused());
+    }
+    datagram
+        .iter()
+        .enumerate()
+        .try_fold(0u64, |bits, (place, said)| match said {
+            b'1' => Ok(bits | (1u64 << place)),
+            b'0' => Ok(bits),
+            _ => Err(refused()),
+        })
+}
+
 /// The greatest number of lines one request may name, which is the kernel's
 /// own limit on a line request.
 pub const MOST_LINES: usize = 64;

@@ -1581,12 +1581,16 @@ impl NodeType {
                 ("debounce", false),
                 ("group", false),
                 ("state_interval", false),
+                ("sim_address", false),
             ],
             // Driven lines say which, and what they start at, and nothing
             // about watching: an output has no edges.
-            NodeType::GpioOut => {
-                &[("path", true), ("lines", true), ("init", false)]
-            }
+            NodeType::GpioOut => &[
+                ("path", true),
+                ("lines", true),
+                ("init", false),
+                ("sim_address", false),
+            ],
             // And driven lines that report what they were told, on a beat
             // they have to say.
             NodeType::GpioInout => &[
@@ -1594,6 +1598,7 @@ impl NodeType {
                 ("lines", true),
                 ("state_interval", true),
                 ("init", false),
+                ("sim_address", false),
             ],
             // Every term any computation takes, which is what this list is
             // for: the function itself is required of all of them, and each of

@@ -33,6 +33,12 @@
 //! is made once, when the node is opened, and is three numbers -- see
 //! [`Shared`] -- so that nothing is allocated as data passes.
 //!
+//! In a run that simulates them, a node that gives a `sim_address` has its
+//! lines answered for by tcssim over UDP rather than by a chip: see
+//! [`UdpLines`]. Everything above is the same either way -- the records, the
+//! reports, what is passed on -- and only where a level comes from and where
+//! a drive goes differ.
+//!
 //! The kernel's structures are declared here, unlike the CAN endpoint's:
 //! `libc` has no GPIO character-device definitions. Their sizes are asserted
 //! against the kernel's own in the tests below, because a structure of the
@@ -40,18 +46,20 @@
 //! would notice.
 
 use std::fs::{File, OpenOptions};
-use std::io::Read;
+use std::io::{ErrorKind, Read};
 use std::mem;
+use std::net::{SocketAddr, UdpSocket};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use nix::poll::PollFlags;
 use tcslibgs::{
-    graph::terminals::Stream, node::payload::gpio::EVENT_BYTES,
-    node::vehicle::compute::from_decision, Bias, GpioConfig, LineEdge,
-    TcsError, TcsResult, Timestamp,
+    graph::terminals::Stream,
+    node::payload::gpio::{state_read, state_said, EVENT_BYTES},
+    node::vehicle::compute::from_decision,
+    Bias, GpioConfig, LineEdge, TcsError, TcsResult, Timestamp,
 };
 
 use crate::endpoint::{
@@ -208,17 +216,64 @@ const LOW: u8 = 1;
 /// Driven high.
 const HIGH: u8 = 2;
 
+/// Where the lines are: a chip's, or tcssim's over UDP.
+enum Lines {
+    /// A chip's.
+    Chip {
+        /// The chip's character device, kept open: the line request belongs
+        /// to it for as long as it lives.
+        _chip: File,
+        /// The request's own descriptor, which the events are read from and
+        /// the line states driven through.
+        request: File,
+    },
+    /// tcssim's, at the node's `sim_address`.
+    Udp(UdpLines),
+}
+
+/// Lines tcssim answers for over UDP, in a run that simulates them.
+///
+/// One datagram is one state of the lines: an ASCII `1` or `0` for each line
+/// of the node, in the order of the request, lowest offset first -- `10` for
+/// lines 4 and 5 with 4 asserted. The vehicle sends what it drives its lines
+/// to; tcssim sends what watched lines are, whenever that changes. An empty
+/// datagram from the vehicle, sent when it opens and again while it has heard
+/// nothing, says where to answer.
+///
+/// What the kernel does for a chip is done here from the levels tcssim sends,
+/// so that what goes out is what a chip's would be: an event for each edge the
+/// node asks for, as the same record, and the levels when a report is due. The
+/// first state tcssim sends is what the lines are, not a change, as a chip's
+/// lines have no event for being what they were when asked for.
+struct UdpLines {
+    /// Connected to the `sim_address`, so that nothing else's datagrams are
+    /// taken for the lines'.
+    socket: UdpSocket,
+    /// Where tcssim answers, for what a complaint says.
+    at: SocketAddr,
+    /// Which changes of a watched line are events.
+    edge: LineEdge,
+    /// The levels tcssim last sent, which both halves of the node read.
+    seen: Arc<Seen>,
+}
+
+/// What tcssim last said the lines are.
+#[derive(Debug, Default)]
+struct Seen {
+    /// A bit for each line by its place in the request, set where it is
+    /// asserted.
+    levels: AtomicU64,
+    /// Whether tcssim has said anything yet.
+    known: AtomicBool,
+}
+
 /// A set of discrete lines: watched, or driven.
 pub struct GpioEndpoint {
     /// The handler this endpoint belongs to, as the device configuration
     /// names it.
     what: String,
-    /// The chip's character device, kept open: the line request belongs to it
-    /// for as long as it lives.
-    _chip: File,
-    /// The request's own descriptor, which the events are read from and the
-    /// line states driven through.
-    lines: File,
+    /// Where the lines are.
+    lines: Lines,
     /// Which of them are watched and which driven, a bit for each by its
     /// place in the request: the kernel counts lines by their place, and
     /// these are what a report and a drive ask it about.
@@ -334,9 +389,220 @@ fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
     record
 }
 
+impl UdpLines {
+    /// Reaches tcssim's lines at a node's `sim_address`, and says where to
+    /// answer.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - The handler, for what a complaint says.
+    /// * `at`   - The `sim_address`.
+    /// * `edge` - Which changes of a watched line are events.
+    ///
+    /// # Returns
+    ///
+    /// The lines, on a non-blocking socket connected to `at`.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the socket cannot be made, connected or made
+    /// non-blocking.
+    fn open(what: &str, at: SocketAddr, edge: LineEdge) -> TcsResult<Self> {
+        let failed = |e: std::io::Error| {
+            TcsError::Endpoint(format!(
+                "{what}: cannot reach the simulated lines at {at}: {e}"
+            ))
+        };
+        let socket = UdpSocket::bind((at.ip(), 0)).map_err(failed)?;
+        socket.connect(at).map_err(failed)?;
+        socket.set_nonblocking(true).map_err(failed)?;
+        let lines = Self {
+            socket,
+            at,
+            edge,
+            seen: Arc::new(Seen::default()),
+        };
+        lines.hello();
+        Ok(lines)
+    }
+
+    /// The same lines, on a duplicate of the socket, with what tcssim said
+    /// shared rather than copied.
+    ///
+    /// # Returns
+    ///
+    /// The second half.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if the socket cannot be duplicated.
+    fn try_clone(&self) -> TcsResult<Self> {
+        Ok(Self {
+            socket: self.socket.try_clone()?,
+            at: self.at,
+            edge: self.edge,
+            seen: Arc::clone(&self.seen),
+        })
+    }
+
+    /// Tells tcssim where to answer: an empty datagram. Lost if tcssim is
+    /// not there yet, which is why it is said again until tcssim answers.
+    fn hello(&self) {
+        let _ = self.socket.send(&[]);
+    }
+
+    /// What the lines are, as tcssim last said.
+    ///
+    /// # Arguments
+    ///
+    /// * `mask` - Which lines, by place.
+    ///
+    /// # Returns
+    ///
+    /// A bit per line, set where it is asserted; none, until tcssim has said.
+    fn levels(&self, mask: u64) -> u64 {
+        if !self.seen.known.load(Ordering::Acquire) {
+            self.hello();
+        }
+        self.seen.levels.load(Ordering::Acquire) & mask
+    }
+
+    /// Sends what the lines are driven to.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`    - The handler, for what a complaint says.
+    /// * `count`   - How many lines the request has.
+    /// * `values`  - What they are driven to.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` if the datagram cannot be sent.
+    fn drive(
+        &self,
+        what: &str,
+        count: usize,
+        values: &LineValues,
+    ) -> TcsResult<()> {
+        let datagram = state_said(count, values.bits & values.mask);
+        self.socket.send(&datagram).map_err(|e| {
+            TcsError::Endpoint(format!(
+                "{what}: cannot drive the simulated lines at {}: {e}",
+                self.at
+            ))
+        })?;
+        Ok(())
+    }
+
+    /// Takes what tcssim has sent, as records of the edges the node asks for,
+    /// while the buffer has room for every watched line's.
+    ///
+    /// # Arguments
+    ///
+    /// * `what`    - The handler, for what a complaint says.
+    /// * `offsets` - Every line of the request, in its order.
+    /// * `watched` - The watched lines, a bit for each by its place.
+    /// * `buffer`  - Where the records go.
+    /// * `filled`  - How much of `buffer` is already used.
+    ///
+    /// # Returns
+    ///
+    /// How much of `buffer` is used afterwards.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Endpoint` for a datagram that is not a state of the lines;
+    /// `TcsError::Io` for a socket that fails.
+    fn edges(
+        &self,
+        what: &str,
+        offsets: &[u32],
+        watched: u64,
+        buffer: &mut [u8],
+        mut filled: usize,
+    ) -> TcsResult<usize> {
+        let most = EVENT_BYTES * watched.count_ones() as usize;
+        let mut datagram = [0u8; GPIO_V2_LINES_MAX + 1];
+        while filled + most <= buffer.len() {
+            let n = match self.socket.recv(&mut datagram) {
+                Ok(n) => n,
+                // Nothing yet, or tcssim not there yet: the hello was
+                // refused, and is said again until it is answered.
+                Err(ref e)
+                    if matches!(
+                        e.kind(),
+                        ErrorKind::WouldBlock | ErrorKind::ConnectionRefused
+                    ) =>
+                {
+                    break
+                }
+                Err(e) => return Err(TcsError::Io(e)),
+            };
+            let now =
+                state_read(offsets.len(), &datagram[..n]).map_err(|why| {
+                    TcsError::Endpoint(format!(
+                        "{what}: {} sent {why}",
+                        self.at
+                    ))
+                })?;
+            let was = self.seen.levels.swap(now, Ordering::AcqRel);
+            if !self.seen.known.swap(true, Ordering::AcqRel) {
+                continue;
+            }
+            let at = SystemTime::now();
+            for (place, offset) in offsets.iter().enumerate() {
+                let bit = 1u64 << place;
+                if watched & bit == 0 || (was ^ now) & bit == 0 {
+                    continue;
+                }
+                let high = now & bit != 0;
+                let wanted = match self.edge {
+                    LineEdge::Both => true,
+                    LineEdge::Rising => high,
+                    LineEdge::Falling => !high,
+                    LineEdge::None => false,
+                };
+                if wanted {
+                    buffer[filled..filled + EVENT_BYTES]
+                        .copy_from_slice(&level_record(*offset, high, at));
+                    filled += EVENT_BYTES;
+                }
+            }
+        }
+        Ok(filled)
+    }
+}
+
+impl Lines {
+    /// The descriptor to wait on: the request's, or the socket's.
+    fn fd(&self) -> RawFd {
+        match self {
+            Lines::Chip { request, .. } => request.as_raw_fd(),
+            Lines::Udp(udp) => udp.socket.as_raw_fd(),
+        }
+    }
+
+    /// The same lines, for the other half of the node.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Io` if a descriptor cannot be duplicated.
+    fn try_clone(&self) -> TcsResult<Self> {
+        Ok(match self {
+            Lines::Chip { _chip, request } => Lines::Chip {
+                _chip: _chip.try_clone()?,
+                request: request.try_clone()?,
+            },
+            Lines::Udp(udp) => Lines::Udp(udp.try_clone()?),
+        })
+    }
+}
+
 impl GpioEndpoint {
     /// Asks the chip for the configured lines: the watched ones with edge
-    /// detection where it is asked for, and the driven ones as outputs.
+    /// detection where it is asked for, and the driven ones as outputs. Or,
+    /// where the run simulates them, reaches tcssim's at the node's
+    /// `sim_address`: see [`UdpLines`].
     ///
     /// # Arguments
     ///
@@ -356,23 +622,35 @@ impl GpioEndpoint {
     ///
     /// `TcsError::Config` if the number of lines is not one a request can
     /// hold; `TcsError::Endpoint` if the chip cannot be opened or will not
-    /// give up the lines.
+    /// give up the lines, or the simulated lines cannot be reached.
     pub fn new(what: &str, config: &GpioConfig) -> TcsResult<Self> {
-        let chip = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(&config.path)
-            .map_err(|e| {
-                TcsError::Endpoint(format!(
-                    "{what}: cannot open the GPIO chip {}: {e}",
-                    config.path
-                ))
-            })?;
-
         let offsets = config.lines();
         let request = request_for(what, config, &offsets)?;
-        let lines =
-            ask_for_lines(what, chip.as_raw_fd(), request, &config.path)?;
+        let lines = match config.sim_address {
+            Some(at) => Lines::Udp(UdpLines::open(what, at, config.edge)?),
+            None => {
+                let chip = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(&config.path)
+                    .map_err(|e| {
+                        TcsError::Endpoint(format!(
+                            "{what}: cannot open the GPIO chip {}: {e}",
+                            config.path
+                        ))
+                    })?;
+                let request = ask_for_lines(
+                    what,
+                    chip.as_raw_fd(),
+                    request,
+                    &config.path,
+                )?;
+                Lines::Chip {
+                    _chip: chip,
+                    request,
+                }
+            }
+        };
 
         // Watched lines are reported on, and the driven lines of a
         // gpio_inout; a gpio_out's say nothing groundward.
@@ -383,7 +661,6 @@ impl GpioEndpoint {
 
         Ok(Self {
             what: what.to_string(),
-            _chip: chip,
             lines,
             watched: mask_of(&offsets, &config.inputs),
             driven: mask_of(&offsets, &config.outputs),
@@ -417,7 +694,6 @@ impl GpioEndpoint {
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
-            _chip: self._chip.try_clone()?,
             lines: self.lines.try_clone()?,
             watched: self.watched,
             driven: self.driven,
@@ -723,7 +999,7 @@ fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
 
 impl EndpointWaitable for GpioEndpoint {
     fn io_fd(&self) -> RawFd {
-        self.lines.as_raw_fd()
+        self.lines.fd()
     }
 
     fn wait_for_event(
@@ -801,8 +1077,12 @@ impl EndpointReadable for GpioEndpoint {
         // it was.
         if self.report_due() {
             self.shared.asked.store(false, Ordering::Release);
-            let bits =
-                levels_of(&self.what, self.lines.as_raw_fd(), self.watched)?;
+            let bits = match &self.lines {
+                Lines::Chip { request, .. } => {
+                    levels_of(&self.what, request.as_raw_fd(), self.watched)?
+                }
+                Lines::Udp(udp) => udp.levels(self.watched),
+            };
             let at = SystemTime::now();
             for (n, offset) in self.offsets.iter().enumerate() {
                 if self.watched & (1u64 << n) == 0 {
@@ -819,6 +1099,18 @@ impl EndpointReadable for GpioEndpoint {
             self.wind();
         }
 
+        let request = match &mut self.lines {
+            Lines::Chip { request, .. } => request,
+            Lines::Udp(udp) => {
+                return udp.edges(
+                    &self.what,
+                    &self.offsets,
+                    self.watched,
+                    buffer,
+                    filled,
+                )
+            }
+        };
         while filled + EVENT_BYTES <= buffer.len() {
             let mut event = LineEvent::default();
             // SAFETY: a buffer of exactly the structure's size, which is what
@@ -830,7 +1122,7 @@ impl EndpointReadable for GpioEndpoint {
                 )
             };
 
-            match self.lines.read(slot) {
+            match request.read(slot) {
                 Ok(0) => break,
                 Ok(n) if n < mem::size_of::<LineEvent>() => {
                     // Part of an event is not an event. Nothing to report:
@@ -887,23 +1179,30 @@ impl EndpointWritable for GpioEndpoint {
         let wanted = state_of(&self.what, data)?;
         let values = values_for(self.driven, wanted);
 
-        // SAFETY: a structure laid out as the kernel's own -- the tests below
-        // hold it to the kernel's size -- living across a call on a descriptor
-        // this owns.
-        let result = unsafe {
-            libc::ioctl(
-                self.lines.as_raw_fd(),
-                GPIO_V2_LINE_SET_VALUES_IOCTL,
-                &values,
-            )
-        };
-        if result < 0 {
-            return Err(TcsError::Endpoint(format!(
-                "{}: cannot drive the lines of {}: {}",
-                self.what,
-                self.path,
-                std::io::Error::last_os_error()
-            )));
+        match &self.lines {
+            Lines::Chip { request, .. } => {
+                // SAFETY: a structure laid out as the kernel's own -- the
+                // tests below hold it to the kernel's size -- living across a
+                // call on a descriptor this owns.
+                let result = unsafe {
+                    libc::ioctl(
+                        request.as_raw_fd(),
+                        GPIO_V2_LINE_SET_VALUES_IOCTL,
+                        &values,
+                    )
+                };
+                if result < 0 {
+                    return Err(TcsError::Endpoint(format!(
+                        "{}: cannot drive the lines of {}: {}",
+                        self.what,
+                        self.path,
+                        std::io::Error::last_os_error()
+                    )));
+                }
+            }
+            Lines::Udp(udp) => {
+                udp.drive(&self.what, self.offsets.len(), &values)?
+            }
         }
 
         let now = if wanted { HIGH } else { LOW };
@@ -962,6 +1261,7 @@ mod tests {
             bias: Bias::None,
             debounce: None,
             state_interval: None,
+            sim_address: None,
         }
     }
 
@@ -1004,11 +1304,13 @@ mod tests {
         assert!(chip >= 0, "a copy of the pipe's end");
         let endpoint = GpioEndpoint {
             what: what.to_string(),
-            // SAFETY: the copy was just made and nothing else owns it.
-            _chip: unsafe { File::from_raw_fd(chip) },
-            // SAFETY: the pipe's read end, just made, owned by the endpoint
-            // from here and not used through `fds[0]` again.
-            lines: unsafe { File::from_raw_fd(fds[0]) },
+            lines: Lines::Chip {
+                // SAFETY: the copy was just made and nothing else owns it.
+                _chip: unsafe { File::from_raw_fd(chip) },
+                // SAFETY: the pipe's read end, just made, owned by the
+                // endpoint from here and not used through `fds[0]` again.
+                request: unsafe { File::from_raw_fd(fds[0]) },
+            },
             watched,
             driven,
             path: "/dev/gpiochip0".to_string(),
@@ -1231,6 +1533,7 @@ mod tests {
             bias: Bias::None,
             debounce: None,
             state_interval: None,
+            sim_address: None,
         };
         let request = request_for("heaters", &config, &config.lines())
             .expect("a request");
@@ -1364,5 +1667,152 @@ mod tests {
         );
         assert!(!endpoint.due(), "nothing to pass on from a failed drive");
         close(end);
+    }
+
+    /// tcssim's end of simulated lines: a socket on the loopback interface,
+    /// and the lines' configuration at it.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The lines, which are given the socket's address.
+    ///
+    /// # Returns
+    ///
+    /// The socket, waiting at most a second for what it is sent, and the
+    /// configuration.
+    fn simulated(mut config: GpioConfig) -> (UdpSocket, GpioConfig) {
+        let tcssim = UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        tcssim
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .expect("a timeout");
+        config.sim_address = Some(tcssim.local_addr().expect("an address"));
+        (tcssim, config)
+    }
+
+    /// Reads from an endpoint until something arrives, for at most a second:
+    /// a datagram on the loopback interface is quick, but not instant.
+    ///
+    /// # Arguments
+    ///
+    /// * `endpoint` - The endpoint.
+    ///
+    /// # Returns
+    ///
+    /// What was read.
+    fn read_some(endpoint: &mut GpioEndpoint) -> Vec<u8> {
+        let mut buffer = [0u8; 256];
+        let until = Instant::now() + Duration::from_secs(1);
+        while Instant::now() < until {
+            let n = endpoint.read(&mut buffer).expect("it reads");
+            if n > 0 {
+                return buffer[..n].to_vec();
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        Vec::new()
+    }
+
+    /// Simulated watched lines say hello, take tcssim's first state as what
+    /// they are rather than as a change, and make a record of each edge after
+    /// it, as a chip's would; a datagram that is not a state is refused.
+    #[test]
+    fn simulated_watched_lines_make_the_records_a_chip_would() {
+        let (tcssim, config) = simulated(watched(vec![3, 7], LineEdge::Both));
+        let mut endpoint = GpioEndpoint::new("switches", &config)
+            .expect("the lines are reached");
+        let mut hello = [0u8; 8];
+        let (n, vehicle) = tcssim.recv_from(&mut hello).expect("a hello");
+        assert_eq!(n, 0, "the hello is empty");
+
+        tcssim.send_to(b"00", vehicle).expect("sent");
+        tcssim.send_to(b"10", vehicle).expect("sent");
+        let read = read_some(&mut endpoint);
+        assert_eq!(read.len(), EVENT_BYTES, "one edge, not the first state");
+        assert_eq!(&read[8..12], &3u32.to_be_bytes());
+        assert_eq!(&read[12..], &1u32.to_be_bytes());
+
+        // Both lines change: line 3 falls and line 7 rises.
+        tcssim.send_to(b"01", vehicle).expect("sent");
+        let read = read_some(&mut endpoint);
+        assert_eq!(read.len(), 2 * EVENT_BYTES);
+        assert_eq!(&read[8..16], &[0, 0, 0, 3, 0, 0, 0, 0]);
+        assert_eq!(&read[24..32], &[0, 0, 0, 7, 0, 0, 0, 1]);
+
+        tcssim.send_to(b"2", vehicle).expect("sent");
+        std::thread::sleep(Duration::from_millis(50));
+        let mut buffer = [0u8; 256];
+        let refused = endpoint.read(&mut buffer).expect_err("not a state");
+        assert!(refused.to_string().contains("not a 1 or a 0"), "{refused}");
+    }
+
+    /// Simulated lines watched for rising edges make records of those alone,
+    /// and a report gives the levels tcssim last said.
+    #[test]
+    fn simulated_lines_keep_to_their_edges_and_report_their_levels() {
+        let (tcssim, config) = simulated(watched(vec![5], LineEdge::Rising));
+        let mut endpoint = GpioEndpoint::new("switch", &config)
+            .expect("the lines are reached");
+        let (_, vehicle) = tcssim.recv_from(&mut [0u8; 8]).expect("a hello");
+
+        for state in [b"0", b"1", b"0", b"1"] {
+            tcssim.send_to(state, vehicle).expect("sent");
+        }
+        let mut records = Vec::new();
+        let until = Instant::now() + Duration::from_millis(300);
+        while Instant::now() < until {
+            records.extend(read_some(&mut endpoint));
+        }
+        assert_eq!(records.len(), 2 * EVENT_BYTES, "the two rises alone");
+        assert!(records
+            .chunks(EVENT_BYTES)
+            .all(|r| r[12..] == 1u32.to_be_bytes()));
+
+        // Asked, as a datum at world-in asks: the level now.
+        endpoint.shared.asked.store(true, Ordering::Release);
+        let report = read_some(&mut endpoint);
+        assert_eq!(report.len(), EVENT_BYTES);
+        assert_eq!(&report[8..], &[0, 0, 0, 5, 0, 0, 0, 1]);
+    }
+
+    /// Simulated driven lines send tcssim what they are driven to, one
+    /// character for each line, and pass on and report it as a chip's do.
+    #[test]
+    fn simulated_driven_lines_send_what_they_are_driven_to() {
+        let config = GpioConfig {
+            kind: tcslibgs::node::payload::gpio::Kind::Inout,
+            path: "/dev/gpiochip1".to_string(),
+            inputs: Vec::new(),
+            outputs: vec![4, 5],
+            edge: LineEdge::None,
+            bias: Bias::None,
+            debounce: None,
+            state_interval: Some(Duration::from_secs(60)),
+            sim_address: None,
+        };
+        let (tcssim, config) = simulated(config);
+        let mut endpoint = GpioEndpoint::new("heaters", &config)
+            .expect("the lines are reached");
+        let mut said = [0u8; 8];
+        assert_eq!(tcssim.recv(&mut said).expect("a hello"), 0);
+
+        endpoint.write(b"1").expect("driven");
+        let n = tcssim.recv(&mut said).expect("the drive");
+        assert_eq!(&said[..n], b"11");
+
+        let mut buffer = [0u8; 16];
+        assert_eq!(endpoint.read(&mut buffer).expect("passed on"), 1);
+        assert_eq!(
+            (buffer[0], endpoint.stream()),
+            (b'1', Some(Stream::Vehicleward))
+        );
+        assert_eq!(endpoint.read(&mut buffer).expect("reported"), 1);
+        assert_eq!(
+            (buffer[0], endpoint.stream()),
+            (b'1', Some(Stream::Groundward))
+        );
+
+        endpoint.write(b"0").expect("driven");
+        let n = tcssim.recv(&mut said).expect("the drive");
+        assert_eq!(&said[..n], b"00");
     }
 }

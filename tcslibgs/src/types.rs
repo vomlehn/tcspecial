@@ -1179,6 +1179,12 @@ pub struct GpioConfig {
     /// report every so often closes both: after one interval at most, what
     /// the ground has is the truth.
     pub state_interval: Option<Duration>,
+    /// Where tcssim answers for the lines over UDP, in a run that simulates
+    /// them; `None` where the chip is opened, which is always under the
+    /// flight setting. Set by [`crate::graph::reach::Reach::opened`] and never
+    /// read from a file, so a node's lines are the same whichever it is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sim_address: Option<std::net::SocketAddr>,
 }
 
 impl GpioConfig {

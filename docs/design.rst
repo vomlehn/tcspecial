@@ -4495,7 +4495,9 @@ a drag, and the menu was unreachable by the gesture meant to open it. The same
 slack keeps a trembling click from recording a one-pixel move as an edit.
 
 Delete asks, with the node's name and what goes with it: "two lines are
-attached to it and go with it". Undo would put all of that back, a removal
+attached to it and go with it". Every line to it or from it goes, a node of a
+subdiagram's as well as one of the top file's: a line left naming a node that
+is not there would be a configuration refused when it is loaded. Undo would put all of that back, a removal
 being one edit, but an undo somebody has to discover is no answer to a node
 that has already gone and taken four lines with it -- and the press that
 deleted it is one key away from the press that opens its attributes. Cancel
@@ -4509,8 +4511,24 @@ drawn second is the only one anybody sees, and a link that is invisible reads
 as a link that is not there. So each route is laid against the routes already
 laid: every column and row is offered in lanes either side of itself, seven
 pixels apart (a line is five wide), and a shared run costs more than a bend.
-The order the router weighs things in is now: nodes crossed, then length shared
-with another line, then bends, then distance.
+Two lines a lane apart are two lines, and are not counted as sharing a run.
+
+Lines with the same two ends -- the same terminal of one node to the same
+terminal of another, as a subdiagram's readings all go to the gateway -- are
+a bundle, and run side by side as closely as they can without lying along each
+other. Each after the first is offered the first one's route moved over a lane,
+or two, up to four, either way, stepping across to it just past each end; and
+it takes the nearest of those that crosses no node and shares no run, before
+any route of its own however fewer bends that has. A bundle whose lines went
+each its own way read as so many unrelated lines, spread over the page. The
+order the router weighs things in is now: nodes crossed, then length shared
+with another line, then whether a line of a bundle keeps beside the rest, then
+bends, then distance.
+
+A line's label is written at the middle of its longest run, and the lines of a
+bundle have their longest runs side by side, so their labels would be written
+over each other. A label that would cover one already written moves along its
+own run instead, its length at a time, to the first place that is clear.
 
 Two overlaps are not the router's to fix, and both are short. Two links
 leaving one terminal leave from the same point, so their first segments run
@@ -5135,16 +5153,22 @@ drawn. The repair is written at once instead, so the document and the file
 never disagree about a name.
 
 Any node of a working pane, on any page, is renamed in its own window, whose
-name is a field at the top: renamed when the name is accepted rather than at
-each letter, a name being what every line to the node is drawn by. A name any
+name is a field at the top: renamed when the name is done with, as a value is
+taken -- on Enter, on leaving the field, on Close or when the window is closed
+-- rather than at each letter, a name being what every line to the node is
+drawn by. The node is drawn under its new name at once, and the window stays
+where it is, the renamed node's from then on. A name any
 other node has is refused, in any file of the configuration -- the reader
 allows no two nodes one name across the top file and its includes, and a line
 names a node by its name alone -- and so is a physics component's, the
 simulator file joining payloads to components by name, and so is no name, or
 one with a dot or a slash in it, which a line and a page read as separators.
-What is refused is said under the field and nothing changes. A rename is one
+What is refused is said under the field and nothing changes, and the window
+will not close on it until the name is put right or cleared, a name cleared
+being the one it had. A rename is one
 edit, taken back by one undo, and takes the node's lines, its simulator
-settings and its showing at its page's edge with it; a node of a subdiagram
+settings, the command bindings that name it -- as the gateway a command
+arrives on or the node it sets -- and its showing at its page's edge with it; a node of a subdiagram
 keeps its page. A subdiagram's box is renamed the same way, which renames the
 subdiagram -- its page, the lines to its nodes and its exports go with the
 name -- and leaves its file where its ``path`` says.
@@ -5500,8 +5524,9 @@ longest column. Tab goes down each column in turn. A window whose fields grow,
 a complaint appearing over them or a component with more settings shown in
 the physics window, grows with them.
 
-The name is a field like any other, renamed on Enter, with a small "x" beside
-it that clears the field to type a new name from nothing: the one control in
+The name is a field like any other, taken as a value is, with a small "x"
+beside it that clears the field to type a new name from nothing: the one
+control in
 a node's window and a physics component's alike. A physics component's window
 has nothing to choose another component by -- it is opened from the component
 -- and no button to remove it, a component being deleted from its menu on the

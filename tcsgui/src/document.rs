@@ -2078,12 +2078,14 @@ impl Document {
                     home: home.clone(),
                 });
             }
-            Edit::RemoveNode { name, .. } => {
-                self.nodes.retain(|n| &n.name != name);
+            Edit::RemoveNode { name, home, .. } => {
+                self.nodes.retain(|n| &n.name != name || &n.home != home);
                 // A link to a node that is gone would be a dangling link, so
                 // the links go with it. The removal carries them, which is how
-                // undo puts them back.
-                self.links.retain(|l| &l.from != name && &l.to != name);
+                // undo puts them back. A line names the node by its page as
+                // well as its own name, which is the name the removal holds.
+                let whole = Qualified::of(name, home).absolute();
+                self.links.retain(|l| l.from != whole && l.to != whole);
             }
             Edit::RestoreNode {
                 name,
@@ -2158,6 +2160,22 @@ impl Document {
                 }
                 // And its own file's exports, which list it by its own name.
                 let (was, now) = (Qualified::parse(was), Qualified::parse(now));
+                // And the command bindings, which name the gateway a command
+                // arrives on and the node it sets by their own names, as the
+                // files write them: a binding left naming the old one is a
+                // command from a gateway that is not there, which the
+                // configuration is refused for.
+                for command in &mut self.commands {
+                    if command.from == was.node {
+                        command.from.clone_from(&now.node);
+                    }
+                    let set = command.sets.split_once('.');
+                    if let Some((node, attribute)) = set {
+                        if node == was.node {
+                            command.sets = format!("{}.{attribute}", now.node);
+                        }
+                    }
+                }
                 if let Some(exports) =
                     was.in_.as_ref().and_then(|home| self.exports.get_mut(home))
                 {
@@ -5322,6 +5340,78 @@ mod tests {
         document.apply(&removal.inverse());
         assert!(document.node("a").is_some());
         assert_eq!(document.links, vec![link], "the links did not come back");
+    }
+
+    /// A node of a subdiagram, removed, takes every line to it as well, the
+    /// lines naming it by its page as well as its name, and leaves a node of
+    /// the same name elsewhere alone.
+    #[test]
+    fn a_removed_node_of_a_subdiagram_takes_its_links() {
+        let mut document = Document::new();
+        document.apply(&add("zone", "subdiagram"));
+        document.apply(&add("sensor", "i2c"));
+        document.apply(&Edit::AddNode {
+            name: "probe".into(),
+            node_type: "compute".into(),
+            home: Some("zone".into()),
+        });
+        document.apply(&Edit::AddNode {
+            name: "log".into(),
+            node_type: "log".into(),
+            home: Some("zone".into()),
+        });
+        let into = Link::new("sensor", "zone/probe", None);
+        let out = Link::new("zone/probe", "zone/log", None);
+        document.apply(&Edit::AddLink { link: into.clone() });
+        document.apply(&Edit::AddLink { link: out.clone() });
+
+        let removal = document.removal_of("zone/probe").expect("there");
+        document.apply(&removal);
+        assert!(document.node("zone/probe").is_none());
+        assert!(document.node("zone/log").is_some());
+        assert!(document.links.is_empty(), "a dangling link was left behind");
+
+        document.apply(&removal.inverse());
+        assert!(document.node("zone/probe").is_some());
+        assert_eq!(document.links.len(), 2, "the links did not come back");
+    }
+
+    /// Renaming a node renames the command bindings that name it, as the
+    /// gateway a command arrives on and as the node it sets, and undoing it
+    /// names the old one again.
+    #[test]
+    fn renaming_a_node_follows_through_its_command_bindings() {
+        let mut document = Document::new();
+        document.apply(&add("gateway", "gateway_radio"));
+        document.apply(&add("thermostat", "compute"));
+        document.commands.push(Command {
+            from: "gateway".into(),
+            sets: "thermostat.setpoint".into(),
+            comment: None,
+            home: None,
+        });
+
+        let renames = [
+            Edit::RenameNode {
+                was: "gateway".into(),
+                now: "ground".into(),
+            },
+            Edit::RenameNode {
+                was: "thermostat".into(),
+                now: "control".into(),
+            },
+        ];
+        for rename in &renames {
+            document.apply(rename);
+        }
+        assert_eq!(document.commands[0].from, "ground");
+        assert_eq!(document.commands[0].sets, "control.setpoint");
+
+        for rename in renames.iter().rev() {
+            document.apply(&rename.inverse());
+        }
+        assert_eq!(document.commands[0].from, "gateway");
+        assert_eq!(document.commands[0].sets, "thermostat.setpoint");
     }
 
     /// Renaming a node renames what points at it.

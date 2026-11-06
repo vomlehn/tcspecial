@@ -1944,9 +1944,9 @@ fn show_node(
 
 /// Wires one node's window to the one editor.
 ///
-/// `node` is the name a link would use, captured once: a window belongs to the
-/// node it was opened for, and goes on belonging to it however many others are
-/// opened afterwards.
+/// `node` is the name a link would use: a window belongs to the node it was
+/// opened for, and goes on belonging to it however many others are opened
+/// afterwards, and under its new name once it is renamed from here.
 ///
 /// # Arguments
 ///
@@ -1961,14 +1961,19 @@ fn wire_node(
     views: &Rc<RefCell<Views>>,
     node: &str,
 ) {
+    // Shared by the handlers below, so a rename made here is the name each
+    // of them edits from then on: the window stays where it was put, with
+    // whatever is in its other fields, rather than giving way to another.
+    let node = Rc::new(RefCell::new(node.to_string()));
     {
         // Typing into a field. The old value comes from the document, so the
         // edit carries what it replaced and undo is a lookup.
         let editor = editor.clone();
         let views = views.clone();
-        let node = node.to_string();
+        let node = node.clone();
         window.on_attribute_set(move |attribute, value| {
             {
+                let node = node.borrow().clone();
                 let mut editor = editor.borrow_mut();
                 let was = editor
                     .document()
@@ -1999,9 +2004,10 @@ fn wire_node(
         let views = views.clone();
         // By the node's own name, as the simulator's file keys it, which a
         // node in a subdiagram is not held under here.
-        let node = sim::Simulator::key_of(node);
+        let node = node.clone();
         window.on_sim_attribute_set(move |setting, value| {
             {
+                let node = sim::Simulator::key_of(&node.borrow());
                 let mut editor = editor.borrow_mut();
                 let setting = setting.to_string();
                 let was = editor
@@ -2027,9 +2033,10 @@ fn wire_node(
     {
         let editor = editor.clone();
         let views = views.clone();
-        let node = node.to_string();
+        let node = node.clone();
         window.on_comment_set(move |text| {
             {
+                let node = node.borrow().clone();
                 let mut editor = editor.borrow_mut();
                 let was = editor
                     .document()
@@ -2049,48 +2056,51 @@ fn wire_node(
         });
     }
     {
-        // A new name, accepted. Refused, with the reason under the field,
-        // where another node has it or it is no name: see
-        // `Document::rename_refused`. Made, as one edit that carries the
-        // node's lines, simulator settings and showing at its page's edge
-        // with it; and the window is the renamed node's from then on, a
-        // window belonging to the name it was opened for.
+        // A name typed and done with: see the name field. Refused, with the
+        // reason under the field, where another node has it or it is no
+        // name: see `Document::rename_refused`. Made, as one edit that
+        // carries the node's lines, simulator settings and showing at its
+        // page's edge with it; and the window, where it is, is the renamed
+        // node's from then on, so the name drawn on the canvas changes and
+        // nothing else seems to.
         let editor = editor.clone();
         let views = views.clone();
-        let node = node.to_string();
+        let node = node.clone();
         let weak = window.as_weak();
         window.on_renamed(move |now| {
             let now = now.trim().to_string();
-            let refused =
-                editor.borrow().document().rename_refused(&node, &now);
-            if let Some(why) = refused {
-                if let Some(window) = weak.upgrade() {
-                    window.set_name_trouble(why.into());
-                }
-                return;
-            }
+            let was = node.borrow().clone();
+            let refused = editor.borrow().document().rename_refused(&was, &now);
             if let Some(window) = weak.upgrade() {
-                window.set_name_trouble("".into());
+                window.set_name_trouble(
+                    refused.clone().unwrap_or_default().into(),
+                );
             }
-            let was = Qualified::parse(&node);
-            if was.node == now {
+            if refused.is_some() || Qualified::parse(&was).node == now {
                 return;
             }
             let renamed = Qualified {
-                in_: was.in_.clone(),
+                in_: Qualified::parse(&was).in_,
                 node: now,
             }
             .absolute();
             editor.borrow_mut().edit(Edit::RenameNode {
-                was: node.clone(),
+                was: was.clone(),
                 now: renamed.clone(),
             });
-            let window = views.borrow_mut().attributes.remove(&node);
-            if let Some(window) = window {
-                let _ = window.hide();
+            *node.borrow_mut() = renamed.clone();
+            let gone = {
+                let mut views = views.borrow_mut();
+                let window = views.attributes.remove(&was);
+                // A window still open on a node of that name since removed,
+                // which this one now speaks for.
+                window
+                    .and_then(|window| views.attributes.insert(renamed, window))
+            };
+            if let Some(gone) = gone {
+                let _ = gone.hide();
             }
             views.borrow().refresh(&editor.borrow());
-            show_node(&editor, &views, &renamed);
         });
     }
     {
@@ -2099,9 +2109,18 @@ fn wire_node(
         // would be the panel this replaced.
         let editor = editor.clone();
         let views = views.clone();
-        let node = node.to_string();
+        let node = node.clone();
+        let weak = window.as_weak();
         window.on_closed(move || {
-            let window = views.borrow_mut().attributes.remove(&node);
+            // Not while the name typed is refused, which would go unsaid:
+            // it is put right or cleared first.
+            if weak
+                .upgrade()
+                .is_some_and(|window| !window.get_name_trouble().is_empty())
+            {
+                return;
+            }
+            let window = views.borrow_mut().attributes.remove(&*node.borrow());
             if let Some(window) = window {
                 let _ = window.hide();
             }
@@ -2119,12 +2138,18 @@ fn wire_node(
         let editor = editor.clone();
         let views = views.clone();
         window.window().on_close_requested(move || {
-            if let Some(window) = weak.upgrade() {
+            let refused = weak.upgrade().is_some_and(|window| {
                 window.invoke_take();
-            }
+                !window.get_name_trouble().is_empty()
+            });
             // And checked again, as Close checks it.
             views.borrow().refresh(&editor.borrow());
-            slint::CloseRequestResponse::HideWindow
+            // Kept open while the name typed is refused, as Close keeps it.
+            if refused {
+                slint::CloseRequestResponse::KeepWindowShown
+            } else {
+                slint::CloseRequestResponse::HideWindow
+            }
         });
     }
 }
@@ -10727,10 +10752,18 @@ mod tests {
         let open = window("zone/temp1").expect("its window");
         assert_eq!(open.get_name(), "temp1");
 
-        // Refused: nothing changes, and the field says why.
+        // Refused: nothing changes, and the field says why. And the window
+        // will not close on it, which would drop the name unsaid.
         let depth = editor.borrow().undo_depth();
         open.invoke_renamed("sensor".into());
         assert!(open.get_name_trouble().contains("already the name"));
+        assert_eq!(editor.borrow().undo_depth(), depth);
+        open.invoke_closed();
+        assert!(window("zone/temp1").is_some(), "kept open");
+
+        // The name it had, taken again, clears the complaint.
+        open.invoke_renamed("temp1".into());
+        assert_eq!(open.get_name_trouble(), "");
         assert_eq!(editor.borrow().undo_depth(), depth);
 
         // Made: one edit, its own name kept on its page, its line and its
@@ -10746,11 +10779,23 @@ mod tests {
             assert!(document.links.iter().any(|l| l.to == "zone/probe"));
             assert!(document.exports["zone"].exports("probe", "world-in"));
         }
+        // The same window, where it was, under the new name, and what it
+        // edits from now on is the renamed node.
         assert!(window("zone/temp1").is_none());
+        let same = window("zone/probe").expect("its window");
+        assert_eq!(same.get_name(), "probe");
+        assert_eq!(same.get_node(), open.get_node());
+        open.invoke_comment_set("the probe".into());
         assert_eq!(
-            window("zone/probe").expect("its window").get_name(),
-            "probe"
+            editor
+                .borrow()
+                .document()
+                .node("zone/probe")
+                .unwrap()
+                .comment,
+            Some("the probe".into())
         );
+        assert!(editor.borrow_mut().undo(), "the comment");
 
         // And one undo puts the old name back.
         assert!(editor.borrow_mut().undo());

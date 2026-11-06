@@ -191,8 +191,8 @@ help:
 		"kernel's vcan, gpio-sim and iio_dummy"
 	@echo "                     (make them first with sudo" \
 		"bin/mk-kernel-dummies)"
-	@echo "  make check       - cargo check, clippy, a format check and" \
-		"an HTML check"
+	@echo "  make check       - cargo check, clippy, a format check," \
+		"the spellings compared and an HTML check"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
 		"behind its source"
 	@echo "  make format      - Reformat the source"
@@ -1143,6 +1143,10 @@ endif
 # is not written down a second time here; see "Which Node Types Are Built" in
 # docs/design.rst. And with the visual window, which no default build has
 # and so nothing else would ever build.
+#
+# And every configuration compared in its two spellings, which must say the
+# same thing: a change made to one and not the other leaves both files valid,
+# and an edit by hand is made to one file at a time.
 .PHONY: check
 check:
 	@echo "Running cargo check..."
@@ -1164,6 +1168,7 @@ check:
 	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
 		--test visual
 	cd $(RUST) && cargo fmt -- --check
+	$(MAKE) --no-print-directory comparespellings
 	$(MAKE) --no-print-directory html-check
 
 # The F´ bridge, which F´'s own tools build rather than cargo: see

@@ -25,6 +25,15 @@
 //! every column and row is offered in lanes either side of itself, and a
 //! shared run costs more than a bend: see [`shared`] and [`LANE`].
 //!
+//! And lines between the same two points kept together. Four links from one
+//! terminal to another -- a subdiagram's readings, all going to the gateway --
+//! are one bundle to a reader, and a reader follows a bundle as one thing if
+//! its lines run side by side. Laid each on its own they spread over the page,
+//! each taking whatever clear column it found first, and the bundle reads as
+//! four unrelated lines. So such a link is offered the route of the first one
+//! laid, moved over a lane or more, and takes it wherever that runs through
+//! no node and along no other line: see [`parallel`].
+//!
 //! The route is computed here rather than in the markup, for two reasons. It
 //! is arithmetic, and arithmetic in a layout language is hard to read and
 //! impossible to test; and this way the shape of every route is checkable --
@@ -279,8 +288,9 @@ impl Ends {
 type Box = (f32, f32, f32, f32);
 
 /// What a route costs, in the order the terms are weighed: how many nodes it
-/// runs through, how far it runs along a line already drawn, how many times it
-/// bends, and how far it goes. Compared in that order, which is what the
+/// runs through, how far it runs along a line already drawn, whether it keeps
+/// beside a line with the same two ends, how many times it bends, and how far
+/// it goes. Compared in that order, which is what the
 /// ordering of a tuple does: a route that runs through nothing beats one that
 /// runs through something however long it is.
 ///
@@ -289,7 +299,14 @@ type Box = (f32, f32, f32, f32);
 /// line with a corner in it, and the corner is what buys the lane. The shared
 /// run is counted in lane-widths rather than pixels so that a few pixels of
 /// coincidence cannot outweigh a bend.
-type Cost = (usize, u32, usize, u32);
+///
+/// Keeping beside a line with the same ends comes after both, because a
+/// bundle that runs through a node or hides one of its own lines is no
+/// bundle; and ahead of the bends, because a line beside its fellows has to
+/// step over to them at each end, which costs it two bends a route of its own
+/// would not have -- and that route is the one that wandered off. It is 0 for
+/// a route beside them, and for every route of a line that has no fellows.
+type Cost = (usize, u32, u32, usize, u32);
 
 /// A route and what it costs.
 type Weighed = (Cost, Vec<(f32, f32)>);
@@ -439,6 +456,60 @@ pub fn label_on(ends: Ends, points: &[(f32, f32)]) -> (f32, f32) {
     }
 }
 
+/// Where a label of this size may go on a route already laid, in the order it
+/// is preferred: the middle of the longest run first, as [`label_on`] puts
+/// it, and then along that run either way, a label's length at a time, as far
+/// as the run goes.
+///
+/// For lines that run side by side, whose longest runs are beside each other
+/// and whose middles are level: labelled each at its middle, the labels are
+/// written over each other and none can be read. Moved along the run, each
+/// is still on its own line.
+///
+/// # Arguments
+///
+/// * `ends`   - The link's ends, as [`label_on`] takes them.
+/// * `points` - The route's points, as [`lay`] gives them.
+/// * `size`   - How wide and how tall the label is, in pixels.
+///
+/// # Returns
+///
+/// The points the label may be put at, best first; never empty.
+pub fn label_places(
+    ends: Ends,
+    points: &[(f32, f32)],
+    size: (f32, f32),
+) -> Vec<(f32, f32)> {
+    let middle = label_on(ends, points);
+    let mut places = vec![middle];
+    let Some((from, to)) = longest(points) else {
+        return places;
+    };
+    // A label's length along the run, and a little: its height down an
+    // upright run, its width along a level one.
+    let upright = (from.0 - to.0).abs() < 0.5;
+    let step = if upright { size.1 } else { size.0 } + LANE / 2.0;
+    let half = length(from, to) / 2.0;
+    let (dx, dy) = if half > 0.0 {
+        (
+            (to.0 - from.0) / (2.0 * half),
+            (to.1 - from.1) / (2.0 * half),
+        )
+    } else {
+        (0.0, 0.0)
+    };
+    for n in 1.. {
+        let by = n as f32 * step;
+        if by > half {
+            break;
+        }
+        for by in [by, -by] {
+            places.push((middle.0 + dx * by, middle.1 + dy * by));
+        }
+    }
+    places
+}
+
 /// The line a gesture is drawing, from where it started to where the pointer
 /// is, as a dashed path.
 ///
@@ -570,10 +641,34 @@ fn way(
     let boxes = blocking(around, ends.from, ends.to);
     let mut best: Option<Weighed> = None;
 
-    for points in shapes(ends, around) {
+    // The first line laid between the same two points, which the rest of
+    // its bundle runs beside: one lane over each way, then two, and so on,
+    // as far as `laned` lets a line be moved.
+    let fellow = taken.iter().find(|route| {
+        let at = |p: Option<&(f32, f32)>, q: (f32, f32)| {
+            p.is_some_and(|p| length(*p, q) < 0.5)
+        };
+        at(route.first(), ends.from) && at(route.last(), ends.to)
+    });
+    let beside: Vec<Vec<(f32, f32)>> = fellow
+        .map(|fellow| {
+            (1..=4)
+                .flat_map(|n| [n as f32 * LANE, -(n as f32) * LANE])
+                .filter_map(|by| parallel(fellow, ends, by))
+                .collect()
+        })
+        .unwrap_or_default();
+    let apart = u32::from(fellow.is_some());
+
+    let offered = beside
+        .into_iter()
+        .map(|points| (0, points))
+        .chain(shapes(ends, around).into_iter().map(|p| (apart, p)));
+    for (apart, points) in offered {
         let cost: Cost = (
             crossings(&points, &boxes),
             shared(&points, taken),
+            apart,
             points.len() - 2,
             walked(&points),
         );
@@ -587,6 +682,103 @@ fn way(
 
     best.map(|(_, points)| points)
         .unwrap_or_else(|| vec![ends.from, ends.to])
+}
+
+/// Another line's route, moved over beside it, for a line with the same two
+/// ends.
+///
+/// Every run of `fellow` is moved `by` to its left as it goes -- the same
+/// side all the way, so the moved route keeps the same distance from it
+/// round every corner, inside or outside -- and the two ends are reached by
+/// a step across just past the stub at each. The step is where the two meet,
+/// and it is short: the lines leave one terminal together and part at once,
+/// which reads as a line dividing.
+///
+/// # Arguments
+///
+/// * `fellow` - The route laid first, from the same source point to the
+///              same target point.
+/// * `ends`   - This line's ends, which are `fellow`'s.
+/// * `by`     - How far over, in pixels: positive to the left of the way
+///              `fellow` goes, negative to its right.
+///
+/// # Returns
+///
+/// The moved route, or `None` where moving it turns a run back on itself,
+/// as the inside of a corner too tight for it does.
+fn parallel(
+    fellow: &[(f32, f32)],
+    ends: Ends,
+    by: f32,
+) -> Option<Vec<(f32, f32)>> {
+    // Each run, as the line it lies on once moved: `Some(y)` for a level
+    // run, `None` and its x for an upright one. To the left of the way it
+    // goes is up for a run going right, on a page whose y grows downwards.
+    let moved: Vec<(bool, f32)> = fellow
+        .windows(2)
+        .map(|run| {
+            let ((x1, y1), (x2, y2)) = (run[0], run[1]);
+            if (y1 - y2).abs() < 0.5 {
+                Some((true, y1 - by * (x2 - x1).signum()))
+            } else if (x1 - x2).abs() < 0.5 {
+                Some((false, x1 + by * (y2 - y1).signum()))
+            } else {
+                None
+            }
+        })
+        .collect::<Option<_>>()?;
+    // A route leaves and arrives level: its ends are terminals.
+    let (first, last) = (moved.first()?, moved.last()?);
+    if !first.0 || !last.0 {
+        return None;
+    }
+
+    // Stepped over just past each stub, on the grid as the stubs' lanes are.
+    let step_out =
+        mm_out(ends.out(), if ends.leaves_right { 1.0 } else { -1.0 });
+    let step_in =
+        mm_out(ends.in_(), if ends.arrives_right { -1.0 } else { 1.0 });
+    let mut points =
+        vec![ends.from, (step_out, ends.from.1), (step_out, first.1)];
+    // Each corner where a moved run meets the next, which is one's x and the
+    // other's y.
+    for pair in moved.windows(2) {
+        let (a, b) = (pair[0], pair[1]);
+        if a.0 == b.0 {
+            return None;
+        }
+        points.push(if a.0 { (b.1, a.1) } else { (a.1, b.1) });
+    }
+    points.push((step_in, last.1));
+    points.push((step_in, ends.to.1));
+    points.push(ends.to);
+
+    // Every moved run goes the way its own run went, and the steps go on
+    // the way the line set off and the way it arrives: one that runs back
+    // has been moved through a corner, or past the stub it steps from.
+    let way_of = |a: (f32, f32), b: (f32, f32)| {
+        ((b.0 - a.0).signum() as i32, (b.1 - a.1).signum() as i32)
+    };
+    let gone = |a: (f32, f32), b: (f32, f32)| length(a, b) >= 0.5;
+    for (n, run) in fellow.windows(2).enumerate() {
+        let (a, b) = (points[n + 2], points[n + 3]);
+        if !gone(a, b) || way_of(a, b) != way_of(run[0], run[1]) {
+            return None;
+        }
+    }
+    let ahead = |a: (f32, f32), b: (f32, f32), right: bool| {
+        (b.0 - a.0) * if right { 1.0 } else { -1.0 } > 0.0
+    };
+    if !ahead(points[0], points[1], ends.leaves_right)
+        || !ahead(
+            points[points.len() - 2],
+            points[points.len() - 1],
+            ends.arrives_right,
+        )
+    {
+        return None;
+    }
+    Some(tidied(&points))
 }
 
 /// Every route worth considering, in the order they are preferred.
@@ -946,8 +1138,8 @@ pub fn shared(points: &[(f32, f32)], taken: &[Vec<(f32, f32)>]) -> u32 {
 /// # Returns
 ///
 /// The length the two run along one another when both are horizontal or
-/// both vertical, no more than a lane apart, and share more than
-/// [`TOUCH`]; otherwise 0.
+/// both vertical, less than a lane apart, and share more than [`TOUCH`];
+/// otherwise 0. A lane apart is two lines, which is what a lane is.
 fn together(
     a1: (f32, f32),
     a2: (f32, f32),
@@ -965,7 +1157,10 @@ fn together(
         }
     };
 
-    if flat(a1, a2) && flat(b1, b2) && (a1.1 - b1.1).abs() <= LANE {
+    // Within half a pixel of a lane counts as a lane: the tracks are on the
+    // grid, and a lane is a whole number of millimetres of it.
+    let near = |a: f32, b: f32| (a - b).abs() < LANE - 0.5;
+    if flat(a1, a2) && flat(b1, b2) && near(a1.1, b1.1) {
         return run(
             a1.0.min(a2.0),
             a1.0.max(a2.0),
@@ -973,7 +1168,7 @@ fn together(
             b1.0.max(b2.0),
         );
     }
-    if upright(a1, a2) && upright(b1, b2) && (a1.0 - b1.0).abs() <= LANE {
+    if upright(a1, a2) && upright(b1, b2) && near(a1.0, b1.0) {
         return run(
             a1.1.min(a2.1),
             a1.1.max(a2.1),
@@ -1253,6 +1448,64 @@ mod tests {
             assert!(
                 (a.0 - b.0).abs() < 0.5 || (a.1 - b.1).abs() < 0.5,
                 "a diagonal crept in: {a:?} to {b:?}"
+            );
+        }
+    }
+
+    /// Lines between the same two points run side by side, a lane or so
+    /// apart, and none along another.
+    ///
+    /// A subdiagram's readings, all going from its one terminal to the
+    /// gateway's: a bundle, and a bundle a reader follows as one thing only
+    /// while its lines keep together. Laid each on its own, every line after
+    /// the first took whatever clear row it found, round the outside of the
+    /// page.
+    #[test]
+    fn lines_between_the_same_two_points_keep_together() {
+        let ends = Ends::forward(192.0, 68.0, 560.0, 240.0);
+        let around = [node(300.0, 300.0)];
+        let mut laid: Vec<Vec<(f32, f32)>> = Vec::new();
+        for _ in 0..4 {
+            laid.push(way(ends, &around, &laid));
+        }
+
+        // Within four lanes of the first, every point of every line: beside
+        // it, and not off round the page.
+        let first = &laid[0];
+        let (left, right) = first
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(l, r), p| (l.min(p.0), r.max(p.0)));
+        let (top, bottom) = first
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(t, b), p| (t.min(p.1), b.max(p.1)));
+        let slack = 4.0 * LANE + 0.5;
+        for line in &laid {
+            assert_eq!(line.first().copied(), Some(ends.from));
+            assert_eq!(line.last().copied(), Some(ends.to));
+            assert_eq!(runs_through(ends, &around), 0);
+            for p in line {
+                assert!(
+                    p.0 >= left - slack
+                        && p.0 <= right + slack
+                        && p.1 >= top - slack
+                        && p.1 <= bottom + slack,
+                    "a line wandered from its bundle, at {p:?}: {laid:?}"
+                );
+            }
+        }
+
+        // And each is to be seen: none lies along another.
+        for (n, line) in laid.iter().enumerate() {
+            let others: Vec<Vec<(f32, f32)>> = laid
+                .iter()
+                .enumerate()
+                .filter(|(m, _)| *m != n)
+                .map(|(_, other)| other.clone())
+                .collect();
+            assert_eq!(
+                shared(line, &others),
+                0,
+                "line {n} hides along another: {laid:?}"
             );
         }
     }

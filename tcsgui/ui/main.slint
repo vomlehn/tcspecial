@@ -343,18 +343,35 @@ component FieldRow inherits HorizontalLayout {
 }
 
 // A name, as every window with something named in it shows it: a field to
-// type a new one in, renamed on Enter, and beside it a small "x" that clears
-// the field to type the new one from nothing. One component, so that a node's
-// window and a physics component's offer the one control the one way.
+// type a new one in, and beside it a small "x" that clears the field to type
+// the new one from nothing. One component, so that a node's window and a
+// physics component's offer the one control the one way.
 //
-// Renamed on Enter and not on every keystroke: a name is what every line to
-// the thing is drawn by, so each letter typed would be a rename to undo. A
-// name cleared and left empty renames nothing; the field shows the name again
-// when the window is next drawn.
+// Renamed when somebody is done with the name, as a field's value is taken:
+// on Enter, on leaving the field, and, in a node's window, on Close or the
+// window closed. Not on every keystroke: a name is what every line to the
+// thing is drawn by, so each letter typed would be a rename to undo. A name
+// cleared and left empty renames nothing, and the field shows the name again.
 component NameField inherits HorizontalLayout {
     in property <string> name: "";
     callback renamed(string);
     spacing: Space.tight;
+
+    // Takes what is in the field. The name it already had is taken too,
+    // which renames nothing and clears a complaint about a name typed
+    // before it and since put back.
+    public function take() {
+        if (field.text == "") {
+            field.text = root.name;
+        }
+        root.renamed(field.text);
+    }
+
+    // The field follows the name it shows, so a rename made here, undone or
+    // redone, is what it says afterwards.
+    changed name => {
+        field.text = root.name;
+    }
 
     field := LineEdit {
         text: root.name;
@@ -362,7 +379,12 @@ component NameField inherits HorizontalLayout {
         font-size: Fonts.window;
         accessible-label: "name";
         horizontal-stretch: 1;
-        accepted => { root.renamed(self.text); }
+        accepted => { root.take(); }
+        changed has-focus => {
+            if (!self.has-focus && !Session.read-only) {
+                root.take();
+            }
+        }
     }
     // Small and plainly a clearing: the letter, not a word, and named for a
     // screen reader.
@@ -2655,8 +2677,11 @@ export component NodeWindow inherits Window {
             root.comment-drafted = false;
             root.comment-set(root.comment-draft);
         }
+        // The name last, so the values above go to the node they were typed
+        // for under the name they were typed under.
+        name-field.take();
     }
-    // A new name typed and accepted.
+    // A name typed and done with, which may be the one it had.
     callback renamed(string);
     callback closed();
 
@@ -2676,7 +2701,7 @@ export component NodeWindow inherits Window {
 
         // A name another node has is refused, and said why, and the old
         // name stays.
-        NameField {
+        name-field := NameField {
             name: root.name;
             renamed(said) => { root.renamed(said); }
         }

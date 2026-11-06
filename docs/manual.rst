@@ -2944,9 +2944,9 @@ each time a heater's switch changes, of these forms:
 
 tcssim draws a window of its own, so it wants a display. Its own ports are
 in the seventeen thousands, apart from the thermostat example's, but its
-sensors are thermostat-common's, at the thermostat example's ports 5201 to
-5203, and its GPIO lines are the same lines of the same chip, so the two are
-not run at once.
+sensors and its heaters' switches are thermostat-common's, simulated at the
+thermostat example's ports -- 5201 to 5203 for the sensors, 5204 and 5205
+for the switches -- so the two are not run at once.
 Because tcssim is given ``--sending``, both heaters start enabled; press
 ``Disable`` on a heater's switch in tcssim's window to take it away, and its
 line goes low and stays low, which Yamcs shows, while the zone falls behind

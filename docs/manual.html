@@ -5611,6 +5611,13 @@ stage and a second set lower that comes on only when the first cannot hold
 the zone -- the band drawn is that of the thermostat with the highest
 setpoint, the first stage, which is the one that states the comfort band;
 every thermostat's setpoint is still drawn as its rule.</p>
+<p>In a run that simulates, the panel in kelvin also has the simulated world's
+ambient temperature, the <tt class="docutils literal">ambient_temp</tt> under <tt class="docutils literal">world:</tt> in the simulator
+file, drawn as a dashed rule and labelled at its right end, as <tt class="docutils literal">ambient
+288.15 K (simulated world)</tt> in the thermostat example: what the zone drifts
+towards when nothing heats it. It is read from the file, not sent by the
+vehicle, and so is not drawn in tcsgui's diagram. A flight run, with
+<tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, has no simulated world and draws none.</p>
 <p>The buttons at the top choose the span: the last <tt class="docutils literal">10 s</tt>, <tt class="docutils literal">1 min</tt> or
 <tt class="docutils literal">10 min</tt>, which fill from the left and then scroll, the newest at the right
 edge; or the <tt class="docutils literal">Whole run</tt>, from the first reading at the left edge to now
@@ -5649,9 +5656,9 @@ value because a switch is a strip of its own under the panels. The
 band's yellow and red are their yellow and vermillion paled toward white,
 light enough that every line keeps its contrast against them. None is alone:
 the legend names each value beside its colour with its latest reading, the
-setpoint's rule is labelled, each region of the band is said in words and the
-legend names the band, and each switch's state is in words beside its strip
-and on it.</p>
+setpoint's and the ambient's rules are labelled, each region of the band is
+said in words and the legend names the band, and each switch's state is in
+words beside its strip and on it.</p>
 </div>
 <div class="section" id="a-triggered-payload-on-the-console">
 <h3><a class="toc-backref" href="#toc-entry-80">A triggered payload on the console</a></h3>

@@ -4857,7 +4857,7 @@ free one guessed at. Taken from an input, the line goes the other way, and the
 menu offers the node's output of that stream.</p>
 <p>What cannot be made is in the menu too, greyed, and saying why in words, so
 that the grey is never the only thing that says so: <tt class="docutils literal"><span class="pre">world-in</span> (fed by
-temp1)</tt>, an input something else feeds already; <tt class="docutils literal"><span class="pre">world-in</span> (joined
+to_k1)</tt>, an input something else feeds already; <tt class="docutils literal"><span class="pre">world-in</span> (joined
 already)</tt>, a line the configuration has. A menu that left out the input
 somebody was looking for would leave them wondering whether they had the right
 node; one that names what is in the way answers the question they were about
@@ -6142,8 +6142,10 @@ can take the whole trio out, and the vote leaves the odd reading out of the
 answer rather than averaging it in.</p>
 <p>This is the shape of the shipped <tt class="docutils literal">examples/thermostat</tt> as it would be
 aboard, on I<sup>2</sup>C, SPI and GPIO, which is
-<tt class="docutils literal">tests/manual/thermostat</tt>; the example itself puts each payload on a UDP
-socket, so that it runs on any desk and touches no hardware. Left out for room
+<tt class="docutils literal">tests/manual/thermostat</tt>, whose conversions are <tt class="docutils literal">temp1</tt> to <tt class="docutils literal">temp3</tt>
+where the example's are <tt class="docutils literal">to_k1</tt> to <tt class="docutils literal">to_k3</tt>; on a desk tcssim plays the
+example's sensors, the two on I<sup>2</sup>C on the kernel's dummy
+bus and <tt class="docutils literal">temp_3</tt> over UDP. Left out for room
 are its <tt class="docutils literal">tcspecial</tt> section, which every configuration must have and without
 which this would be refused, its log node, and the editor's layout; its
 addresses are its own. What is here is checked as it stands, with a
@@ -12152,71 +12154,60 @@ looks like. As there, the error is reported from the payload's end.</dd>
 <h2><a class="toc-backref" href="#toc-entry-132">Example</a></h2>
 <p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, a link to
 <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>, which thermostat-yamcs's
-simulator file is a link to too. It simulates the three sensors and two
-heaters of <tt class="docutils literal">thermostat.ytcs</tt>, joined to its world: two heaters warming one
-zone.</p>
+simulator file is a link to too. It simulates the three sensors and the
+two heaters' switches of <tt class="docutils literal">thermostat.ytcs</tt>, joined to its world: one zone
+with two heaters of its own.</p>
 <p>The three sensors are read together and so share a group, which carries
 their rate and the terminal they report; the zone is what makes three
 sensors agree about a temperature, each from a place of its own on it. Each
-heater's simulated payload switches its heater while the vehicle has it on.
-Every one of them is the far end of a UDP socket, which the simulator
-simulates with nothing more than a socket.</p>
+heater's switch drives the zone's <tt class="docutils literal">heater_1</tt> or <tt class="docutils literal">heater_2</tt>, which adds
+that heater's power to the zone's heat while the vehicle has it on. The
+switches are lines of the kernel's dummy GPIO chip, the two sensors on
+I<sup>2</sup>C are chips of its dummy bus, and <tt class="docutils literal">temp_3</tt> is reached
+over UDP. Shortened:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs and</span><span class="whitespace">
   </span><span class="literal scalar plain">thermostat-yamcs.ytcs</span><span class="whitespace">
 
 </span><span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+  </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;288.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
   </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type heater</span><span class="punctuation">:</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
-            </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-            </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
-            </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;60</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-            </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
             </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+            </span><span class="name tag">heater_1_power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+            </span><span class="name tag">heater_2_power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
             </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
-    </span><span class="name tag">connections</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.heat</span><span class="whitespace">
-        </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.heat</span><span class="whitespace">
-        </span><span class="name tag">to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heat</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
-    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_inout</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio-out-tmass1</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_1</span><span class="whitespace">
         </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
-        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.on</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio-out-tmass2</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_2</span><span class="whitespace">
         </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
 
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">+0.2 K</span><span class="whitespace">
 
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
-        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span>
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">-0.3 K</span>
 </pre>
 </div>
 </div>

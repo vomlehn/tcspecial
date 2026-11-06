@@ -4622,7 +4622,7 @@ menu offers the node's output of that stream.
 
 What cannot be made is in the menu too, greyed, and saying why in words, so
 that the grey is never the only thing that says so: ``world-in (fed by
-temp1)``, an input something else feeds already; ``world-in (joined
+to_k1)``, an input something else feeds already; ``world-in (joined
 already)``, a line the configuration has. A menu that left out the input
 somebody was looking for would leave them wondering whether they had the right
 node; one that names what is in the way answers the question they were about
@@ -6052,8 +6052,10 @@ answer rather than averaging it in.
 
 This is the shape of the shipped ``examples/thermostat`` as it would be
 aboard, on I\ :superscript:`2`\ C, SPI and GPIO, which is
-``tests/manual/thermostat``; the example itself puts each payload on a UDP
-socket, so that it runs on any desk and touches no hardware. Left out for room
+``tests/manual/thermostat``, whose conversions are ``temp1`` to ``temp3``
+where the example's are ``to_k1`` to ``to_k3``; on a desk tcssim plays the
+example's sensors, the two on I\ :superscript:`2`\ C on the kernel's dummy
+bus and ``temp_3`` over UDP. Left out for room
 are its ``tcspecial`` section, which every configuration must have and without
 which this would be refused, its log node, and the editor's layout; its
 addresses are its own. What is here is checked as it stands, with a
@@ -12008,16 +12010,18 @@ Example
 -------
 This is the shipped ``examples/thermostat/thermostat-sim.yaml``, a link to
 ``examples/thermostat-common/thermostat-sim.yaml``, which thermostat-yamcs's
-simulator file is a link to too. It simulates the three sensors and two
-heaters of ``thermostat.ytcs``, joined to its world: two heaters warming one
-zone.
+simulator file is a link to too. It simulates the three sensors and the
+two heaters' switches of ``thermostat.ytcs``, joined to its world: one zone
+with two heaters of its own.
 
 The three sensors are read together and so share a group, which carries
 their rate and the terminal they report; the zone is what makes three
 sensors agree about a temperature, each from a place of its own on it. Each
-heater's simulated payload switches its heater while the vehicle has it on.
-Every one of them is the far end of a UDP socket, which the simulator
-simulates with nothing more than a socket.
+heater's switch drives the zone's ``heater_1`` or ``heater_2``, which adds
+that heater's power to the zone's heat while the vehicle has it on. The
+switches are lines of the kernel's dummy GPIO chip, the two sensors on
+I\ :superscript:`2`\ C are chips of its dummy bus, and ``temp_3`` is reached
+over UDP. Shortened:
 
 .. code-block:: yaml
 
@@ -12025,57 +12029,44 @@ simulates with nothing more than a socket.
      thermostat-yamcs.ytcs
 
    world:
-     ambient_temp: "283.15 K"
+     ambient_temp: "288.15 K"
      physics:
        components:
-         - type heater:
-             - component: heater_1
-               power: "60 W"
-               voltage: "28 V"
-             - component: heater_2
-               power: "60 W"
-               voltage: "28 V"
          - type thermal_mass:
              - component: zone
                capacity: "20 J/K"
+               heater_1_power: "4 W"
+               heater_2_power: "4 W"
                time_constant: "50 s"
-       connections:
-         - from: heater_1.heat
-           to: zone.heat
-         - from: heater_2.heat
-           to: zone.heat
 
    simulated_payload_groups:
      - group: zone_temps
        connects: zone.temperature
-       packet_interval: 100 ms
+       packet_interval: 1 s
        simulate: true
 
    simulated_payloads:
-     - type network:
-         - payload: heaters_1
-           connects: heater_1.on
-           protocol: udp
+     - type gpio_inout:
+         - payload: gpio-out-tmass1
+           connects: zone.heater_1
            simulate: true
 
-         - payload: heaters_2
-           connects: heater_2.on
-           protocol: udp
+         - payload: gpio-out-tmass2
+           connects: zone.heater_2
            simulate: true
 
+     - type i2c:
          - payload: temp_1
            group: zone_temps
-           protocol: udp
 
          - payload: temp_2
            group: zone_temps
-           offset: "+0.2 K"
-           protocol: udp
+           offset: +0.2 K
 
+     - type spi:
          - payload: temp_3
            group: zone_temps
-           offset: "-0.3 K"
-           protocol: udp
+           offset: -0.3 K
 
 Testing
 =======

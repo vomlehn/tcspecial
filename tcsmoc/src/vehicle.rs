@@ -603,6 +603,35 @@ fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
         .is_some_and(|handlers| !handlers.is_empty())
 }
 
+/// The simulated world's ambient temperature, for the plot to draw the
+/// zones' readings against: from the simulator file, the vehicle sending
+/// nothing of it.
+///
+/// Only in a run that simulates something. Flown, the surroundings are
+/// whatever they are, and a figure from a file drawn beside real readings
+/// would be read as a measurement.
+///
+/// # Arguments
+///
+/// * `sim_path` - The simulator file's path, if the set has one.
+/// * `mode`     - The run's simulation mode.
+///
+/// # Returns
+///
+/// The temperature in kelvin, or `None` where the run simulates nothing,
+/// the set has no simulator file, or its world states none that reads: a
+/// world that does not read is said by tcssim, which refuses it.
+fn ambient_of(sim_path: Option<&str>, mode: Mode) -> Option<f64> {
+    if mode == Mode::None {
+        return None;
+    }
+    SimConfigFile::load(sim_path?)
+        .ok()?
+        .world
+        .as_ref()?
+        .ambient()
+}
+
 /// How long a simulator already running is given to answer before one is
 /// started: a simulator that is there answers at once.
 const ASK_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
@@ -2533,6 +2562,7 @@ pub fn run(
     // window runs. See plot.rs.
     let plot_window = PlotWindow::new().unwrap();
     let plot = Plot::of(&graph, |name| links.iter().any(|l| l.source == name))
+        .map(|plot| plot.with_ambient(ambient_of(sim_path, mode)))
         .map(|plot| Arc::new(Mutex::new(plot)));
     let _plotting = plot
         .as_ref()
@@ -3993,5 +4023,26 @@ vehicle:
         // used to be read against another set's file, which complained about
         // handlers it had never heard of.
         assert!(!anything_simulated(&example("minimal"), None));
+    }
+
+    /// The plot is given the simulated world's ambient temperature in a run
+    /// that simulates, and not in a flight run, nor from a simulator file
+    /// with no world or none stated.
+    #[test]
+    fn the_worlds_ambient_is_plotted_only_in_a_simulated_run() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let write = |name: &str, text: &str| {
+            let path = dir.path().join(name);
+            std::fs::write(&path, text).expect("written");
+            path.to_str().expect("a path").to_string()
+        };
+        let world =
+            write("world-sim.yaml", "world:\n  ambient_temp: \"288.15 K\"\n");
+        assert_eq!(ambient_of(Some(&world), Mode::All), Some(288.15));
+        assert_eq!(ambient_of(Some(&world), Mode::Some), Some(288.15));
+        assert_eq!(ambient_of(Some(&world), Mode::None), None);
+        let none = write("none-sim.yaml", "groups: []\n");
+        assert_eq!(ambient_of(Some(&none), Mode::All), None);
+        assert_eq!(ambient_of(None, Mode::All), None);
     }
 }

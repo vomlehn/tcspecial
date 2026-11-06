@@ -271,6 +271,9 @@ struct Panel {
     setpoints: Vec<f64>,
     /// The band drawn behind it: see [`Band::of`].
     band: Option<Band>,
+    /// The world's ambient temperature, on the panel in kelvin: see
+    /// [`Plot::with_ambient`].
+    ambient: Option<f64>,
 }
 
 /// A thermostat's band: the setpoint it holds a reading at, and how far
@@ -419,6 +422,7 @@ impl Plot {
                             traces: Vec::new(),
                             setpoints: Vec::new(),
                             band: None,
+                            ambient: None,
                         });
                         panels.len() - 1
                     }
@@ -516,6 +520,29 @@ impl Plot {
             started: None,
             span: Span::TenSeconds,
         })
+    }
+
+    /// The plot with the simulated world's ambient temperature drawn as a
+    /// rule on the panel in kelvin, which is where the zones' readings are:
+    /// what they drift towards when nothing heats them. The vehicle sends
+    /// nothing of it, the surroundings not being a payload, so it is read
+    /// from the simulator file and is not on the configuration's diagram.
+    /// Nothing is drawn where no reading in kelvin reaches the ground.
+    ///
+    /// # Arguments
+    ///
+    /// * `kelvin` - The world's ambient temperature, or `None` for none.
+    ///
+    /// # Returns
+    ///
+    /// The plot.
+    pub fn with_ambient(mut self, kelvin: Option<f64>) -> Plot {
+        if let Some(panel) =
+            self.panels.iter_mut().find(|p| p.unit == Unit::Kelvin)
+        {
+            panel.ambient = kelvin;
+        }
+        self
     }
 
     /// Says what a source is to the plot.
@@ -756,7 +783,7 @@ impl Plot {
                     }
                 });
             }
-            for &setpoint in &panel.setpoints {
+            for &setpoint in panel.setpoints.iter().chain(&panel.ambient) {
                 low = low.min(setpoint);
                 high = high.max(setpoint);
             }
@@ -785,6 +812,10 @@ impl Plot {
             }
             for &setpoint in &panel.setpoints {
                 shown.setpoints.push(y_of(setpoint));
+            }
+            if let Some(kelvin) = panel.ambient {
+                shown.ambient = Some(y_of(kelvin));
+                ambient_said(&mut shown.ambient_said, kelvin);
             }
             if let Some(band) = &panel.band {
                 shown.band = Some(band.edges().map(y_of));
@@ -1097,6 +1128,21 @@ fn band_said(out: &mut String, band: &Band, unit: Unit) {
     let _ = write!(out, " ({})", band.name);
 }
 
+/// Writes what is written on the world's ambient temperature's rule: that it
+/// is the simulator's, so that nobody reads it as a reading the vehicle
+/// sent.
+///
+/// # Arguments
+///
+/// * `out`    - Where it is written, emptied first.
+/// * `kelvin` - The temperature.
+fn ambient_said(out: &mut String, kelvin: f64) {
+    out.clear();
+    out.push_str("ambient ");
+    value_said(out, kelvin, Unit::Kelvin);
+    out.push_str(" (simulated world)");
+}
+
 /// Writes how long the run has been: seconds, or minutes and seconds, or
 /// hours and minutes.
 ///
@@ -1210,6 +1256,10 @@ pub struct PanelDrawn {
     pub band: Option<[f32; 4]>,
     /// What the legend says of the band; empty where there is none.
     pub band_said: String,
+    /// How far down the world's ambient temperature is, in pixels, or
+    /// `None` for a panel without it; and what is written on its rule.
+    pub ambient: Option<f32>,
+    pub ambient_said: String,
 }
 
 /// The plot, drawn: what its span is, each panel, and each switch's spans.
@@ -1248,6 +1298,8 @@ impl Drawn {
             drawn.setpoints.clear();
             drawn.band = None;
             drawn.band_said.clear();
+            drawn.ambient = None;
+            drawn.ambient_said.clear();
         }
         self.switches.clear();
     }
@@ -1389,6 +1441,9 @@ pub fn show(
                 setpoints: ModelRc::from(models.setpoints.clone()),
                 banded: false,
                 band_said: SharedString::new(),
+                ambiented: false,
+                ambient: 0.0,
+                ambient_said: SharedString::new(),
                 too_high: 0.0,
                 high: 0.0,
                 low: 0.0,
@@ -1444,6 +1499,12 @@ pub fn show(
                 if row.band_said.as_str() != panel.band_said {
                     row.band_said =
                         SharedString::from(panel.band_said.as_str());
+                }
+                row.ambiented = panel.ambient.is_some();
+                row.ambient = panel.ambient.unwrap_or_default();
+                if row.ambient_said.as_str() != panel.ambient_said {
+                    row.ambient_said =
+                        SharedString::from(panel.ambient_said.as_str());
                 }
                 panels.set_row_data(p, row);
             }
@@ -1950,6 +2011,45 @@ pub(crate) mod tests {
                 "thermostat_low \u{2192} gpio-out-tmass2",
             ]
         );
+    }
+
+    /// The simulated world's ambient temperature is drawn on the panel in
+    /// kelvin once it has a scale, which takes it in, its rule saying it is
+    /// the simulator's; a plot with no panel in kelvin has nowhere to draw
+    /// it.
+    #[test]
+    fn the_worlds_ambient_is_drawn_on_the_kelvin_panel() {
+        let mut plot = Plot::of(&example("thermostat"), |_| true)
+            .expect("a plot")
+            .with_ambient(Some(250.0));
+        let kelvin = plot
+            .panels
+            .iter()
+            .position(|p| p.unit == Unit::Kelvin)
+            .expect("a panel in kelvin");
+        let mut drawn = Drawn::default();
+        plot.draw(Instant::now(), 100.0, 600.0, &mut drawn);
+        assert_eq!(drawn.panels[kelvin].ambient, None, "no scale yet");
+
+        let t0 = Instant::now();
+        let trace = plot.panels[kelvin].traces[0];
+        plot.reading(trace, t0, 293.0);
+        plot.draw(t0, 100.0, 600.0, &mut drawn);
+        let y = drawn.panels[kelvin].ambient.expect("the rule");
+        assert_eq!(
+            drawn.panels[kelvin].ambient_said,
+            "ambient 250.00 K (simulated world)"
+        );
+        assert!((0.0..=600.0).contains(&y), "{y}");
+        let ticks = &drawn.panels[kelvin].ticks;
+        let bottom: f64 =
+            ticks[ticks.len() - 1].said.parse().expect("a number");
+        assert!(bottom <= 250.0, "{bottom}");
+
+        let descent = Plot::of(&example("descent"), |_| true)
+            .expect("a plot")
+            .with_ambient(Some(250.0));
+        assert!(descent.panels.iter().all(|p| p.ambient.is_none()));
     }
 
     /// A thermostat's band is drawn behind its panel, its edges in order

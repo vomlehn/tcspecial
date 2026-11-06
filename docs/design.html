@@ -7697,6 +7697,16 @@ only when the first cannot hold it. Every thermostat's setpoint is drawn
 as a rule. A switch is drawn only on its own strip, labelled with what it
 drives, never on a panel, so that a switch on is not taken for the band's
 red. See <tt class="docutils literal">tcsmoc/src/plot.rs</tt>.</dd>
+<dt>Requirement</dt>
+<dd>In a run that simulates, tcsmoc's plot draws the simulated world's
+<tt class="docutils literal">ambient_temp</tt>, read from the simulator file, as a dashed rule on the
+panel in kelvin, taken into its scale and labelled <tt class="docutils literal">ambient ...
+(simulated world)</tt>, so that it is told from a setpoint's solid rule by
+its dashes and its words and is never read as a reading the vehicle
+sent. The vehicle sends nothing of it, the surroundings being no
+payload, so it is not on the configuration's diagram. A flight run
+draws none: a figure from a file beside real readings would be read as a
+measurement. <tt class="docutils literal"><span class="pre">WorldSection::ambient</span></tt> is where it is read.</dd>
 </dl>
 </div>
 <div class="section" id="holes-in-the-checksum-scheme-and-what-closes-them">

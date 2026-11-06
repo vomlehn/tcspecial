@@ -1081,6 +1081,11 @@ export struct PanelShown {
     setpoints: [float],
     banded: bool,
     band-said: string,
+    // The simulated world's ambient temperature, where it is drawn: how far
+    // down, in pixels, and what is written on its rule.
+    ambiented: bool,
+    ambient: float,
+    ambient-said: string,
     too-high: float,
     high: float,
     low: float,
@@ -1364,6 +1369,31 @@ export component PlotWindow inherits Window {
                             color: #4B5563;
                             font-italic: true;
                         }
+                    }
+
+                    // The simulated world's ambient temperature: a dashed
+                    // rule, told from a setpoint's solid one by its dashes
+                    // and by its words, which say whose figure it is: at the
+                    // right end, clear of the band's words at the left, and
+                    // under the rule where the setpoint's are over theirs,
+                    // so the two are not written over each other where the
+                    // rules are close. On the rule and not in the legend,
+                    // which is full already.
+                    // A dash every ten pixels, six long.
+                    for dash in panel.ambiented ? floor(parent.width / 10px)
+                                                : 0: Rectangle {
+                        x: dash * 10px;
+                        y: panel.ambient * 1px - 1px;
+                        width: 6px;
+                        height: 2px;
+                        background: #4B5563;
+                    }
+                    if panel.ambiented: Text {
+                        x: parent.width - self.width - 4px;
+                        y: panel.ambient * 1px + 2px;
+                        text: panel.ambient-said;
+                        color: #4B5563;
+                        font-italic: true;
                     }
 
                     for trace in panel.traces: Path {

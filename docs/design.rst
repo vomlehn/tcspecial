@@ -7593,6 +7593,17 @@ Requirement
     drives, never on a panel, so that a switch on is not taken for the band's
     red. See ``tcsmoc/src/plot.rs``.
 
+Requirement
+    In a run that simulates, tcsmoc's plot draws the simulated world's
+    ``ambient_temp``, read from the simulator file, as a dashed rule on the
+    panel in kelvin, taken into its scale and labelled ``ambient ...
+    (simulated world)``, so that it is told from a setpoint's solid rule by
+    its dashes and its words and is never read as a reading the vehicle
+    sent. The vehicle sends nothing of it, the surroundings being no
+    payload, so it is not on the configuration's diagram. A flight run
+    draws none: a figure from a file beside real readings would be read as a
+    measurement. ``WorldSection::ambient`` is where it is read.
+
 Holes in the checksum scheme, and what closes them
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

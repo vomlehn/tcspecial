@@ -632,6 +632,30 @@ impl WorldSection {
         self.built().1
     }
 
+    /// The world's ambient temperature, in kelvin: what tcsmoc draws its
+    /// zones' readings against, the vehicle sending nothing of it.
+    ///
+    /// # Returns
+    ///
+    /// The temperature, or `None` where it is not stated or does not read;
+    /// [`WorldSection::problems`] says which.
+    pub fn ambient(&self) -> Option<f64> {
+        self.ambient_said().and_then(Result::ok)
+    }
+
+    /// The world's ambient temperature as it reads: the one place
+    /// `ambient_temp` is read.
+    ///
+    /// # Returns
+    ///
+    /// The temperature in kelvin, or why it does not read; `None` where it
+    /// is not stated.
+    fn ambient_said(&self) -> Option<Result<f64, String>> {
+        self.ambient_temp
+            .as_deref()
+            .map(|said| setting::quantity("ambient_temp", said, Some("K")))
+    }
+
     /// The model as far as it reads, and what is wrong with it.
     ///
     /// # Returns
@@ -646,15 +670,11 @@ impl WorldSection {
             .components
             .iter()
             .any(|c| matches!(c, Component::ThermalMass(_)));
-        let ambient = match &self.ambient_temp {
-            Some(said) => {
-                match setting::quantity("ambient_temp", said, Some("K")) {
-                    Ok(kelvin) => Some(kelvin),
-                    Err(why) => {
-                        problems.push(PhysicsProblem::of_ambient(why));
-                        None
-                    }
-                }
+        let ambient = match self.ambient_said() {
+            Some(Ok(kelvin)) => Some(kelvin),
+            Some(Err(why)) => {
+                problems.push(PhysicsProblem::of_ambient(why));
+                None
             }
             None if zones => {
                 problems.push(PhysicsProblem::of_ambient(
@@ -1198,5 +1218,17 @@ components:
         ))
         .expect("parses");
         assert_eq!(wrong.problems()[0].about(), About::Section(AMBIENT));
+    }
+
+    /// The world's ambient temperature is read in kelvin for the ground to
+    /// draw readings against, and is nothing where it is not stated or
+    /// does not read.
+    #[test]
+    fn the_worlds_ambient_temperature_is_read_in_kelvin() {
+        let world =
+            |said: &str| WorldSection::parse(said).expect("parses").ambient();
+        assert_eq!(world("ambient_temp: \"288.15 K\"\n"), Some(288.15));
+        assert_eq!(world("ambient_temp: \"20 C\"\n"), None);
+        assert_eq!(world("physics: {}\n"), None);
     }
 }

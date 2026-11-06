@@ -5667,6 +5667,14 @@ the zone -- the band drawn is that of the thermostat with the highest
 setpoint, the first stage, which is the one that states the comfort band;
 every thermostat's setpoint is still drawn as its rule.
 
+In a run that simulates, the panel in kelvin also has the simulated world's
+ambient temperature, the ``ambient_temp`` under ``world:`` in the simulator
+file, drawn as a dashed rule and labelled at its right end, as ``ambient
+288.15 K (simulated world)`` in the thermostat example: what the zone drifts
+towards when nothing heats it. It is read from the file, not sent by the
+vehicle, and so is not drawn in tcsgui's diagram. A flight run, with
+``--simulate=none``, has no simulated world and draws none.
+
 The buttons at the top choose the span: the last ``10 s``, ``1 min`` or
 ``10 min``, which fill from the left and then scroll, the newest at the right
 edge; or the ``Whole run``, from the first reading at the left edge to now
@@ -5707,9 +5715,9 @@ value because a switch is a strip of its own under the panels. The
 band's yellow and red are their yellow and vermillion paled toward white,
 light enough that every line keeps its contrast against them. None is alone:
 the legend names each value beside its colour with its latest reading, the
-setpoint's rule is labelled, each region of the band is said in words and the
-legend names the band, and each switch's state is in words beside its strip
-and on it.
+setpoint's and the ambient's rules are labelled, each region of the band is
+said in words and the legend names the band, and each switch's state is in
+words beside its strip and on it.
 
 A triggered payload on the console
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

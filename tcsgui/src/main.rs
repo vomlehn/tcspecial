@@ -238,9 +238,9 @@ struct Views {
     /// is about, and a second question about another node would leave a person
     /// answering whichever window happened to be on top.
     deleting: Option<DeleteWindow>,
-    /// The question about the problems the file opened with, while it is
-    /// being asked: the main window, which asks it in front of its own
-    /// drawing. See `settle_problems`.
+    /// The warning about the errors the file opened with, while it is up:
+    /// the main window, which gives it in front of its own drawing. See
+    /// `warn_of_errors`.
     names: Option<slint::Weak<MainWindow>>,
     /// The window that says what went wrong, and what it last said.
     ///
@@ -285,6 +285,13 @@ struct Views {
     /// from inside it: a handler that had captured the name the window was
     /// made with would go on editing a group that no longer exists.
     showing: Rc<RefCell<String>>,
+    /// The configuration's errors, as the errors button lists them: worked
+    /// out again at every refresh, so an error put right leaves the list as
+    /// it is put right. See [`errors_of`].
+    errors: Rc<RefCell<Vec<Trouble>>>,
+    /// The line chosen from the errors button, drawn lit until it is put
+    /// right or another error is chosen.
+    lit: Rc<RefCell<Option<Link>>>,
 }
 
 impl Views {
@@ -462,15 +469,26 @@ impl Views {
             .borrow()
             .as_ref()
             .and_then(|drawing| drawing.holding.clone());
+        let lit = self.lit.borrow();
         if let Some(top) = self.top.upgrade() {
-            let (_, links) =
-                views_of(editor, &None, self.divider.get(), held.as_ref());
+            let (_, links) = views_of(
+                editor,
+                &None,
+                self.divider.get(),
+                held.as_ref(),
+                lit.as_ref(),
+            );
             top.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
         }
         for (name, window) in &self.open {
             let home = Some(name.clone());
-            let (_, links) =
-                views_of(editor, &home, self.divider.get(), held.as_ref());
+            let (_, links) = views_of(
+                editor,
+                &home,
+                self.divider.get(),
+                held.as_ref(),
+                lit.as_ref(),
+            );
             window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
         }
     }
@@ -483,6 +501,27 @@ impl Views {
     /// * `editor` - The session whose document is drawn.
     fn refresh(&self, editor: &Editor) {
         self.alert(editor);
+        // The errors as they now are, for the button; and the line chosen
+        // from it is put out once it is put right.
+        let errors = errors_of(editor);
+        {
+            let mut lit = self.lit.borrow_mut();
+            let still = |line: &Link| {
+                errors.iter().any(|trouble| {
+                    matches!(&trouble.fix,
+                        Fix::Line(wrong) if wrong.same_connection(line))
+                })
+            };
+            if lit.as_ref().is_some_and(|line| !still(line)) {
+                *lit = None;
+            }
+        }
+        let error_rows: Vec<slint::SharedString> = errors
+            .iter()
+            .map(|trouble| trouble.label().into())
+            .collect();
+        *self.errors.borrow_mut() = errors;
+        let lit = self.lit.borrow();
         let chosen = self.chosen.borrow();
         let divider = self.divider.get();
         let lists = self.lists.get();
@@ -522,7 +561,7 @@ impl Views {
                 chosen.get("").map(|s| s.as_str()),
                 divider,
                 lists,
-                held.as_ref(),
+                (held.as_ref(), lit.as_ref()),
             );
         }
         for (name, window) in &self.open {
@@ -534,8 +573,13 @@ impl Views {
                 chosen.get(name).map(|s| s.as_str()),
                 divider,
                 lists,
-                held.as_ref(),
+                (held.as_ref(), lit.as_ref()),
             );
+        }
+        // The same list in every window, each of which has the button.
+        let error_rows = ModelRc::from(Rc::new(VecModel::from(error_rows)));
+        for window in self.top.upgrade().iter().chain(self.open.values()) {
+            window.set_error_rows(error_rows.clone());
         }
         // How the selection column is shared, in every window alike.
         let physics_list = self.physics_list.get();
@@ -800,6 +844,8 @@ fn main() -> Result<(), slint::PlatformError> {
             settings.list_physics_percent,
         )),
         showing: Rc::new(RefCell::new(String::new())),
+        errors: Rc::new(RefCell::new(Vec::new())),
+        lit: Rc::new(RefCell::new(None)),
     }));
     alerting(&views);
     // Which node the panel is showing, per window.
@@ -816,8 +862,8 @@ fn main() -> Result<(), slint::PlatformError> {
     let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
 
     // What the file arrived with is counted as said before anything is drawn,
-    // so that the alert leaves it to the window that asks about it: see
-    // `settle_problems`, below. Drawing is what raises the alert, and the
+    // so that the alert leaves it to the warning about it: see
+    // `warn_of_errors`, below. Drawing is what raises the alert, and the
     // first drawing is the next line.
     closing(&ui, &views);
 
@@ -843,16 +889,15 @@ fn main() -> Result<(), slint::PlatformError> {
     wire(&ui, &editor, &views, &drawing, &chosen, &None);
     wire_physics(&ui, &editor, &views, &None);
 
-    // And the question about whatever is wrong with the file as it arrived,
-    // in front of the window that is already up: see `settle_problems`.
+    // And the warning about whatever is wrong with the file as it arrived,
+    // in front of the window that is already up: see `warn_of_errors`.
     //
     // The alert is told to keep quiet about those first, so that a file with
-    // problems does not open with two windows about them -- one that offers
-    // something and one that offers nothing. What the alert is for after this
-    // is what goes wrong *while somebody works*: a fault they introduced,
-    // which is news, where the state the file arrived in is the question this
-    // window asks.
-    settle_problems(&editor, &views);
+    // errors does not open with two windows about them. What the alert is for
+    // after this is what goes wrong *while somebody works*: a fault they
+    // introduced, which is news, where the state the file arrived in is what
+    // the warning says.
+    warn_of_errors(&editor, &views);
 
     // And the main window takes no presses while any of that is still being
     // read: the question about the file's problems, the alert about a file
@@ -954,6 +999,16 @@ fn wire(
         let chosen = chosen.clone();
         window.on_open_subdiagram(move |name| {
             open_page(&editor, &views, &drawing, &chosen, &name);
+        });
+    }
+    {
+        // An error chosen from the errors button's menu.
+        let editor = editor.clone();
+        let views = views.clone();
+        let drawing = drawing.clone();
+        let chosen = chosen.clone();
+        window.on_error_chosen(move |which| {
+            go_to_error(&editor, &views, &drawing, &chosen, which as usize);
         });
     }
     {
@@ -1627,15 +1682,17 @@ fn open_page(
 ///
 /// # Arguments
 ///
-/// * `ui`       - The page's window.
-/// * `editor`   - The session drawn.
-/// * `home`     - The page drawn: `None` for the top of the configuration.
-/// * `chosen`   - The name of the node drawn as chosen, if any.
-/// * `dividers` - Where the working pane's dividers are.
-/// * `lists`    - The gateway and vehicle selection lists' shares of their
-///                column, in per cent.
-/// * `held`     - The link whose end is being dragged, which is drawn
-///                nowhere.
+/// * `ui`          - The page's window.
+/// * `editor`      - The session drawn.
+/// * `home`        - The page drawn: `None` for the top of the
+///                   configuration.
+/// * `chosen`      - The name of the node drawn as chosen, if any.
+/// * `dividers`    - Where the working pane's dividers are.
+/// * `lists`       - The gateway and vehicle selection lists' shares of
+///                   their column, in per cent.
+/// * `(held, lit)` - The link whose end is being dragged, which is drawn
+///                   nowhere; and the one chosen from the errors button,
+///                   which is drawn lit.
 fn put(
     ui: &MainWindow,
     editor: &Editor,
@@ -1643,7 +1700,7 @@ fn put(
     chosen: Option<&str>,
     dividers: Dividers,
     lists: (i32, i32),
-    held: Option<&Link>,
+    (held, lit): (Option<&Link>, Option<&Link>),
 ) {
     ui.set_payload_divider(dividers.payloads as f32);
     ui.set_vehicle_divider(dividers.vehicle as f32);
@@ -1674,7 +1731,7 @@ fn put(
             ui.set_edge_terminals(ModelRc::default());
         }
     }
-    let (nodes, links) = views_of(editor, home, dividers, held);
+    let (nodes, links) = views_of(editor, home, dividers, held, lit);
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     ui.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
@@ -2040,6 +2097,7 @@ fn wire_node(
         // Closing takes a press of its own, which is the point of a window
         // per node: one that closed itself when another node was pressed
         // would be the panel this replaced.
+        let editor = editor.clone();
         let views = views.clone();
         let node = node.to_string();
         window.on_closed(move || {
@@ -2047,6 +2105,9 @@ fn wire_node(
             if let Some(window) = window {
                 let _ = window.hide();
             }
+            // Checked again as it closes, so an error put right in it
+            // leaves the errors button's list.
+            views.borrow().refresh(&editor.borrow());
         });
     }
     {
@@ -2055,10 +2116,14 @@ fn wire_node(
         // value that vanished because the window was closed one way and not
         // the other would be a value nobody could trust to be there.
         let weak = window.as_weak();
+        let editor = editor.clone();
+        let views = views.clone();
         window.window().on_close_requested(move || {
             if let Some(window) = weak.upgrade() {
                 window.invoke_take();
             }
+            // And checked again, as Close checks it.
+            views.borrow().refresh(&editor.borrow());
             slint::CloseRequestResponse::HideWindow
         });
     }
@@ -2520,6 +2585,148 @@ fn go_to(editor: Rc<RefCell<Editor>>, views: Rc<RefCell<Views>>, node: &str) {
     show_node(&editor, &views, node);
 }
 
+/// Goes to one of the errors the errors button lists.
+///
+/// What choosing it from the button's menu does, by what kind of error it
+/// is: a node's is shown in the middle of its page with its window open, so
+/// its values can be put right, and checked again when that window closes;
+/// a line's is shown in the middle of the page it is drawn on, and lit; a
+/// group's opens the groups window on it, and the parameters' theirs. A name
+/// two nodes share, or a node without one, is given a name nothing has
+/// first, which is the one repair the editor makes by itself, so that its
+/// window can be opened at all. An error put right leaves the list at the
+/// next refresh: see `Views::refresh`.
+///
+/// # Arguments
+///
+/// * `editor`  - The session the error is in.
+/// * `views`   - The windows.
+/// * `drawing` - The gesture in hand, which a page opened is wired to.
+/// * `chosen`  - Which node each window shows as chosen.
+/// * `which`   - The error's place in the button's list.
+fn go_to_error(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    drawing: &Rc<RefCell<Option<Drawing>>>,
+    chosen: &Rc<RefCell<BTreeMap<String, String>>>,
+    which: usize,
+) {
+    let trouble = views.borrow().errors.borrow().get(which).cloned();
+    let Some(trouble) = trouble else { return };
+    let node_at = |at: usize| {
+        let editor = editor.borrow();
+        let node = editor.document().nodes.get(at)?;
+        Some(Qualified::of(&node.name, &node.home).absolute())
+    };
+    match trouble.fix {
+        Fix::Line(line) => {
+            // On the page both its ends are on; one between pages is drawn
+            // on the top page, to its subdiagram's box.
+            let from = Qualified::parse(&line.from).in_;
+            let page = if from == Qualified::parse(&line.to).in_ {
+                from
+            } else {
+                None
+            };
+            if let Some(name) = &page {
+                open_page(editor, views, drawing, chosen, name);
+            }
+            *views.borrow().lit.borrow_mut() = Some(line.clone());
+            views.borrow().refresh(&editor.borrow());
+            let dividers = views.borrow().divider.get();
+            let ends =
+                ends_of(editor.borrow().document(), &line, &page, dividers);
+            centre_on(&views.borrow(), &page, (ends.from.1 + ends.to.1) / 2.0);
+        }
+        Fix::Name => {
+            let Some(at) = trouble.at else { return };
+            let spare = editor.borrow().document().spare_name(at);
+            editor.borrow_mut().settle_name(at, &spare);
+            if let Some(node) = node_at(at) {
+                go_to_node(editor, views, drawing, chosen, &node);
+            }
+        }
+        Fix::Node => {
+            if let Some(node) = trouble.at.and_then(node_at) {
+                go_to_node(editor, views, drawing, chosen, &node);
+            }
+        }
+        Fix::Group(group) => {
+            *views.borrow().showing.borrow_mut() = group;
+            show_group(editor, views);
+        }
+        Fix::Parameters => show_parameters(editor, views),
+        // Nothing here to go to: the menu says what it is, which is all
+        // there is.
+        Fix::Nothing => {}
+    }
+}
+
+/// Shows a node with an error: on its page, in the middle of the window,
+/// chosen, and with its own window open.
+///
+/// # Arguments
+///
+/// * `editor`  - The session the node is in.
+/// * `views`   - The windows.
+/// * `drawing` - The gesture in hand, which a page opened is wired to.
+/// * `chosen`  - Which node each window shows as chosen.
+/// * `node`    - The node's qualified name.
+fn go_to_node(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    drawing: &Rc<RefCell<Option<Drawing>>>,
+    chosen: &Rc<RefCell<BTreeMap<String, String>>>,
+    node: &str,
+) {
+    let home = Qualified::parse(node).in_;
+    if let Some(name) = &home {
+        open_page(editor, views, drawing, chosen, name);
+    }
+    // A node and not a line, so no line is lit.
+    *views.borrow().lit.borrow_mut() = None;
+    chosen
+        .borrow_mut()
+        .insert(home.clone().unwrap_or_default(), node.to_string());
+    views.borrow().refresh(&editor.borrow());
+    let middle = editor.borrow().document().node(node).map(|found| {
+        let (_, tall) = pane::size_of(&found.node_type);
+        found.at.1 as f32 + tall as f32 / 2.0
+    });
+    if let Some(middle) = middle {
+        centre_on(&views.borrow(), &home, middle);
+    }
+    show_node(editor, views, node);
+}
+
+/// Scrolls a page's window so that a height on its sheet is in the middle of
+/// what it shows, or as near as the top of the sheet allows.
+///
+/// # Arguments
+///
+/// * `views`  - The windows.
+/// * `home`   - The page: `None` for the top.
+/// * `middle` - The height on the sheet, in the sheet's pixels.
+fn centre_on(views: &Views, home: &Home, middle: f32) {
+    let scroll = |window: &MainWindow| {
+        let half = window.get_canvas_view_height() / 2.0;
+        // Negative as the view goes down the sheet: see `canvas-offset`.
+        window.set_canvas_offset(-(middle - half).max(0.0));
+    };
+    match home {
+        None => {
+            if let Some(top) = views.top.upgrade() {
+                scroll(&top);
+            }
+        }
+        Some(name) => {
+            if let Some(window) = views.open.get(name) {
+                scroll(window);
+            }
+        }
+    }
+}
+
 /// Asks whether a node should go, and takes it away if the answer is yes.
 ///
 /// A node's Delete asks first. It is next to Edit in a menu a click opens, so
@@ -2608,27 +2815,27 @@ fn confirm_delete(
     }
 }
 
-/// What a row of the startup window offers to do, besides nothing.
+/// What choosing an error from the errors button does.
 ///
 /// One of these per problem, chosen by what kind of problem it is: there is no
-/// use offering to delete a group for a node whose address is malformed, and
-/// no use offering to open a node for a line that goes nowhere.
+/// use opening a node's window for a line that goes nowhere, and no use
+/// showing a line for a node whose address is malformed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Fix {
-    /// A name mends it: two nodes sharing one, or a node without one. The row
-    /// carries a field and a suggestion, this being the one kind of problem
-    /// the editor can mend by itself.
+    /// A name mends it: two nodes sharing one, or a node without one. The
+    /// one kind of problem the editor can mend by itself, so choosing it
+    /// gives the node a name nothing has and opens its window, where the
+    /// name can be made a better one.
     Name,
     /// The node has to be looked at or taken out, which is somebody's
     /// decision: an address that is not an address, a group that is not
     /// declared, a payload with no trigger, a type this build has not got.
     Node,
-    /// A group nothing is in. Deleting it is the whole of the fix, so the row
-    /// offers that -- the alternative is putting a node in it, which is
-    /// drawing and not repair.
+    /// A group nothing is in, which is shown in the groups window.
     Group(String),
     /// A line: one that goes nowhere, one that goes back where it came from,
-    /// one of two into a single input. Deleting it is the fix.
+    /// one of two into a single input. It is shown, lit, in the middle of
+    /// the window it is drawn in.
     Line(Link),
     /// The `tcspecial` section, which is edited in its own window.
     Parameters,
@@ -2657,25 +2864,53 @@ struct Trouble {
     fix: Fix,
 }
 
-impl Trouble {
-    /// Whether a name is the fix.
-    fn nameable(&self) -> bool {
-        self.fix == Fix::Name && self.at.is_some()
-    }
+/// Which of the startup alert's kinds of error a problem is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    /// A node's attributes: a value a rule refuses, a name, a type.
+    Attribute,
+    /// A line between two nodes.
+    Link,
+    /// Anything else: a group, the parameters, the simulator file.
+    Other,
+}
 
-    /// Names the one button this kind of problem offers, over and above
-    /// opening or deleting the node.
+impl Trouble {
+    /// Says which kind of error this is, which is what the startup alert
+    /// counts.
     ///
     /// # Returns
     ///
-    /// The button's label, empty where it offers none.
-    fn offer(&self) -> String {
-        match &self.fix {
-            Fix::Group(name) => format!("Delete the group \"{name}\""),
-            Fix::Line(_) => "Delete the line".to_string(),
-            Fix::Parameters => "Edit the parameters".to_string(),
-            Fix::Name | Fix::Node | Fix::Nothing => String::new(),
+    /// The kind, by what choosing the error does.
+    fn kind(&self) -> Kind {
+        match self.fix {
+            Fix::Name | Fix::Node => Kind::Attribute,
+            Fix::Line(_) => Kind::Link,
+            Fix::Group(_) | Fix::Parameters | Fix::Nothing => Kind::Other,
         }
+    }
+
+    /// Says what the errors button's menu calls this: the node it is about
+    /// and what is wrong, cut short where it is long, a menu being one line
+    /// to an item. The whole of it is in the node's own window, or on the
+    /// line itself.
+    ///
+    /// # Returns
+    ///
+    /// The menu's line for it.
+    fn label(&self) -> String {
+        const LONGEST: usize = 100;
+        let said = if self.node.is_empty() || self.said.contains(&self.node) {
+            self.said.clone()
+        } else {
+            format!("{}: {}", self.node, self.said)
+        };
+        if said.chars().count() <= LONGEST {
+            return said;
+        }
+        let mut short: String = said.chars().take(LONGEST - 1).collect();
+        short.push('…');
+        short
     }
 }
 
@@ -2824,9 +3059,9 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
     out
 }
 
-/// Every problem the configuration opened with: the editor's own, with what
-/// it can offer for each, and then whatever else `tcsverify` finds in the
-/// files.
+/// Every error the configuration has now: the editor's own, with what
+/// choosing each does, and then whatever else `tcsverify` finds in the
+/// files. What the startup alert counts and the errors button lists.
 ///
 /// The second half is what makes the editor say what every other program
 /// says. The editor's faults are its own checks of the drawing, made as it
@@ -2835,12 +3070,12 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
 /// files as they are on the disk. A file the editor opened quietly and the
 /// vehicle would refuse is the disagreement this is here to end, so what the
 /// rules find is listed too -- warnings included, the unfinished being worth
-/// knowing about as a session starts -- in tcsverify's own words.
+/// knowing about -- in tcsverify's own words.
 ///
 /// Of the files on the disk rather than the document, because the files are
 /// what those programs read. They are the same thing here: every edit is
 /// written as it is made.
-fn startup_troubles(editor: &Editor) -> Vec<Trouble> {
+fn errors_of(editor: &Editor) -> Vec<Trouble> {
     let mut troubles = troubles_of(editor.document());
     troubles.extend(verified(editor));
     troubles
@@ -2979,308 +3214,78 @@ fn said_already(problem: &Problem, faults: &[Fault]) -> bool {
     })
 }
 
-/// Tells whether a set of proposed names settles the duplicate, and what is
-/// wrong with it if not.
-///
-/// `proposed` is what the fields hold, by the position of the node each is
-/// for, and `document` is what else is in the configuration. Three things are
-/// asked: that no name is blank, that no two of the proposed names are the
-/// same, and that none of them is a name some *other* node already has --
-/// renaming one duplicate into a third node's name is a duplicate again, and
-/// pressing a button that made the same question come back would be no answer
-/// at all.
-///
-/// Here rather than in the markup for the usual reason: the markup can compare
-/// two strings, this is a rule about a document, and a rule is worth a test.
+/// Says what kinds of error a configuration has, as the startup alert says
+/// it: whether there are attribute errors, link errors, both, or others,
+/// and where to find them. Not each error: they are in the errors button's
+/// menu, and a list read once at startup is a list nobody has to hand when
+/// they come to put the errors right.
 ///
 /// # Arguments
 ///
-/// * `document` - The configuration the nodes are in.
-/// * `proposed` - The names the fields hold, by the position in the document
-///                of the node each is for.
+/// * `troubles` - The errors, from [`errors_of`].
 ///
 /// # Returns
 ///
-/// `Ok` if the names settle the duplicate.
-///
-/// # Errors
-///
-/// A sentence for the person renaming, when a proposed name is blank, two
-/// proposed names are the same, or one is a name another node already has.
-fn names_settle(
-    document: &Document,
-    proposed: &BTreeMap<usize, String>,
-) -> Result<(), String> {
-    let whole = |at: usize, name: &str| {
-        document
-            .nodes
-            .get(at)
-            .map(|node| Qualified::of(name, &node.home).absolute())
-            .unwrap_or_else(|| name.to_string())
-    };
-
-    let mut taken: BTreeMap<String, usize> = BTreeMap::new();
-    for (at, name) in proposed {
-        let said = name.trim();
-        if said.is_empty() {
-            return Err("A node has to have a name.".to_string());
-        }
-        if let Some(before) = taken.insert(whole(*at, said), *at) {
-            let _ = before;
-            return Err(format!("Two of these are called \"{said}\"."));
-        }
+/// The alert's words, empty for a configuration with no errors.
+fn errors_said(troubles: &[Trouble]) -> String {
+    let has = |kind| troubles.iter().any(|trouble| trouble.kind() == kind);
+    let mut said = Vec::new();
+    if has(Kind::Attribute) {
+        said.push("Some nodes have attribute values that are not valid.");
     }
-
-    // And against the nodes that are not being renamed, which is every node
-    // whose position is not in the list.
-    for (at, node) in document.nodes.iter().enumerate() {
-        if proposed.contains_key(&at) {
-            continue;
-        }
-        let held = Qualified::of(&node.name, &node.home).absolute();
-        if let Some(asked) = taken.get(&held) {
-            let _ = asked;
-            return Err(format!(
-                "Another node is already called \"{}\".",
-                node.name
-            ));
-        }
+    if has(Kind::Link) {
+        said.push("Some links are not valid.");
     }
-    Ok(())
+    if has(Kind::Other) {
+        said.push(if said.is_empty() {
+            "The configuration has errors."
+        } else {
+            "There are other errors as well."
+        });
+    }
+    if said.is_empty() {
+        return String::new();
+    }
+    said.push(
+        "Each is drawn in red. Choose one from the errors button on the bar \
+         to go to it.",
+    );
+    said.join("\n")
 }
 
-/// Asks about the problems a configuration opened with, and offers what can
-/// be done about each.
+/// Warns, once, at startup, that the configuration has errors.
 ///
-/// Shown once, at startup, when the editor has read a file the vehicle could
-/// not fly: a node named twice, a node with no name, a type this build does
-/// not know, attributes that do not hold together. See [`troubles_of`] for
-/// which faults reach this window and which are left to the alert.
+/// Inside the main window, in front of its drawing, rather than in a window
+/// of its own: a window of its own cannot be kept in front of the main one
+/// on every desktop, and a warning behind the window waiting for it is one
+/// nobody finds. See ProblemsPanel in the markup.
 ///
-/// Doing nothing is one of the offers, and the window closes with it. A
-/// problem left alone stays a problem -- red on its own node, counted in the
-/// alert, refused by `tcsverify` -- but the node is on the canvas in its own
-/// working pane whatever is decided here, which is what lets somebody look at
-/// the drawing before choosing. An editor that would not show a configuration
-/// until it was correct could not be used to correct one.
-///
-/// Where a name is the fix, the row carries a field and a suggestion: that is
-/// the one kind of problem the editor can mend by itself, and the renaming it
-/// does is not an edit -- see `Editor::settle_name`, which says why a repair
-/// is written at once and kept out of the history. Everything else is
-/// somebody's decision, so the row offers to open the node or to take it out.
+/// It says what kinds of error there are and nothing more: each one is in
+/// the errors button's menu, which goes to it. Ignore takes the warning
+/// away and leaves the errors as they are -- red on the canvas, listed by
+/// the button, refused by `tcsverify` -- and Quit leaves the editor.
 ///
 /// # Arguments
 ///
 /// * `editor` - The session just opened.
-/// * `views`  - The windows, the main one of which asks.
-fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
-    let troubles = startup_troubles(&editor.borrow());
-    if troubles.is_empty() {
+/// * `views`  - The windows, the main one of which warns.
+fn warn_of_errors(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let said = errors_said(&errors_of(&editor.borrow()));
+    if said.is_empty() {
         return;
     }
-
-    // Asked inside the main window, in front of its drawing, rather than in a
-    // window of its own: a window of its own cannot be kept in front of the
-    // main one on every desktop, and a question behind the window waiting for
-    // it is one nobody finds. See ProblemsPanel in the markup.
     let top = views.borrow().top.upgrade();
     let Some(window) = top else {
-        // Every one of these is still reported as a fault, so this failing is
-        // a quieter editor rather than a broken one.
-        eprintln!(
-            "tcsgui: the problems cannot be asked about: the main window \
-                   has gone"
-        );
+        // Every one of these is still drawn and listed, so this failing is a
+        // quieter editor rather than a broken one.
+        eprintln!("tcsgui: the errors cannot be warned of: no main window");
         return;
     };
-
-    // What the fields hold, by the position of the node each is for: its own
-    // name to begin with, so a window opened and closed again changes
-    // nothing.
-    let proposed: Rc<RefCell<BTreeMap<usize, String>>> = Rc::new(RefCell::new(
-        troubles
-            .iter()
-            .filter(|trouble| trouble.nameable())
-            .filter_map(|trouble| {
-                trouble.at.map(|at| (at, trouble.node.clone()))
-            })
-            .collect(),
-    ));
-    // And the rows the window is showing, so a press can say which one it was
-    // about after the document has changed under it.
-    let showing: Rc<RefCell<Vec<Trouble>>> = Rc::new(RefCell::new(troubles));
-
-    {
-        let editor = editor.clone();
-        let proposed = proposed.clone();
-        let showing = showing.clone();
-        let window = window.as_weak();
-        window
-            .upgrade()
-            .expect("the window exists")
-            .on_problems_typed(move |row, said| {
-                let Some(at) =
-                    showing.borrow().get(row as usize).and_then(|t| t.at)
-                else {
-                    return;
-                };
-                proposed.borrow_mut().insert(at, said.to_string());
-                if let Some(window) = window.upgrade() {
-                    // The rows are not rebuilt: a model replaced under a
-                    // LineEdit takes the focus with it, and somebody typing a
-                    // name would have to press the field again for every
-                    // letter. Only the answer changes.
-                    say_problems(
-                        &window,
-                        editor.borrow().document(),
-                        &showing.borrow(),
-                        &proposed.borrow(),
-                        false,
-                    );
-                }
-            });
-    }
-    {
-        let editor = editor.clone();
-        let proposed = proposed.clone();
-        let showing = showing.clone();
-        let window = window.as_weak();
-        window
-            .upgrade()
-            .expect("the window exists")
-            .on_problems_derive(move |row| {
-                let Some(at) =
-                    showing.borrow().get(row as usize).and_then(|t| t.at)
-                else {
-                    return;
-                };
-                let spare = editor.borrow().document().spare_name(at);
-                proposed.borrow_mut().insert(at, spare);
-                if let Some(window) = window.upgrade() {
-                    // Rebuilt here, because the field's own text is what
-                    // changed: a suggestion nobody can see is no suggestion.
-                    say_problems(
-                        &window,
-                        editor.borrow().document(),
-                        &showing.borrow(),
-                        &proposed.borrow(),
-                        true,
-                    );
-                }
-            });
-    }
     {
         let editor = editor.clone();
         let views = views.clone();
-        let proposed = proposed.clone();
-        let showing = showing.clone();
-        window.on_problems_confirmed(move || {
-            let asked = proposed.borrow().clone();
-            if names_settle(editor.borrow().document(), &asked).is_err() {
-                return;
-            }
-            {
-                let mut editor = editor.borrow_mut();
-                for (at, name) in &asked {
-                    editor.settle_name(*at, name.trim());
-                }
-            }
-            // What is left after that, which is the rest of the problems: the
-            // window stays on them rather than closing and leaving somebody
-            // to find them in the alert.
-            again(&editor, &views, &showing, &proposed);
-        });
-    }
-    {
-        let editor = editor.clone();
-        let views = views.clone();
-        let showing = showing.clone();
-        window.on_problems_edit(move |row| {
-            let node = showing
-                .borrow()
-                .get(row as usize)
-                .map(|trouble| trouble.node.clone());
-            if let Some(node) = node.filter(|node| !node.is_empty()) {
-                show_node(&editor, &views, &node);
-            }
-        });
-    }
-    {
-        let editor = editor.clone();
-        let views = views.clone();
-        let showing = showing.clone();
-        let proposed = proposed.clone();
-        window.on_problems_remove(move |row| {
-            let node = showing
-                .borrow()
-                .get(row as usize)
-                .map(|trouble| trouble.node.clone());
-            let Some(node) = node.filter(|node| !node.is_empty()) else {
-                return;
-            };
-            // Through the same question any other deletion goes through: a
-            // node and its lines are not taken out on one press, and the
-            // wording that says what goes with it is already written.
-            confirm_delete(&editor, &views, &node);
-            again(&editor, &views, &showing, &proposed);
-        });
-    }
-    {
-        let editor = editor.clone();
-        let views = views.clone();
-        let showing = showing.clone();
-        let proposed = proposed.clone();
-        window.on_problems_acted(move |row| {
-            let fix = showing.borrow().get(row as usize).map(|t| t.fix.clone());
-            match fix {
-                // A group nothing is in: taking it out is the whole of the
-                // fix, and it is an edit like any other -- somebody who meant
-                // to put a node in it can undo this.
-                Some(Fix::Group(name)) => {
-                    let interval = editor
-                        .borrow()
-                        .document()
-                        .groups
-                        .get(&name)
-                        .cloned()
-                        .unwrap_or_default();
-                    editor
-                        .borrow_mut()
-                        .edit(Edit::RemoveGroup { name, interval });
-                }
-                // A line that goes nowhere, goes back where it came from, or
-                // is the second into one input.
-                Some(Fix::Line(link)) => {
-                    editor.borrow_mut().edit(Edit::RemoveLink { link });
-                }
-                // And the configuration's own parameters, in their own
-                // window: what is wrong there is a value somebody has to
-                // choose, not something to delete.
-                Some(Fix::Parameters) => {
-                    show_parameters(&editor, &views);
-                }
-                Some(Fix::Name) | Some(Fix::Node) | Some(Fix::Nothing)
-                | None => return,
-            }
-            again(&editor, &views, &showing, &proposed);
-        });
-    }
-    {
-        let views = views.clone();
-        // Doing nothing about this one. The problem stays, drawn in red on
-        // its own node and counted in the alert, and every node is on the
-        // canvas.
-        window.on_problems_left(move || hide_problems(&views));
-    }
-    {
-        let editor = editor.clone();
-        let views = views.clone();
-        // And doing nothing about all of them, which is what somebody opening
-        // a file to look at it wants: every node is added as it stands, and
-        // nothing says any of this again for the rest of the session. The
-        // faults are still faults -- red on their nodes, refused by
-        // tcsverify -- but the editor stops asking.
+        // The errors stay, drawn in red and listed by the button, and none
+        // of them is alerted again this session.
         window.on_problems_ignored(move || {
             ignore_faults(&editor, &views);
             hide_problems(&views);
@@ -3289,129 +3294,13 @@ fn settle_problems(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     {
         let editor = editor.clone();
         let views = views.clone();
-        // A way out of the editor, which is the one answer here that is not
-        // about the configuration. Through the same path the menu's Exit
-        // takes: nothing has been edited yet, so it ends there and then, and
-        // a session that somehow has something unwritten is offered the same
-        // chance to write it.
+        // A way out of the editor, through the same path the menu's Exit
+        // takes: nothing has been edited yet, so it ends there and then.
         window.on_problems_quit(move || leave(&editor, &views));
     }
-    say_problems(
-        &window,
-        editor.borrow().document(),
-        &showing.borrow(),
-        &proposed.borrow(),
-        true,
-    );
+    window.set_problems_said(said.into());
     window.set_problems_up(true);
     views.borrow_mut().names = Some(window.as_weak());
-}
-
-/// Asks again about what is left after something was done about one of the
-/// problems, or takes the question away if nothing is.
-///
-/// The window stays open on the rest rather than closing: a file with four
-/// problems answered one at a time should not need opening four times, and a
-/// problem that has gone should leave the list rather than sit there answered.
-///
-/// # Arguments
-///
-/// * `editor`   - The session whose problems are asked about.
-/// * `views`    - The windows, the main one of which asks.
-/// * `showing`  - The rows the question shows, replaced with what is left.
-/// * `proposed` - The names the fields hold, by the position of the node
-///                each is for, reset to the nodes' own names.
-fn again(
-    editor: &Rc<RefCell<Editor>>,
-    views: &Rc<RefCell<Views>>,
-    showing: &Rc<RefCell<Vec<Trouble>>>,
-    proposed: &Rc<RefCell<BTreeMap<usize, String>>>,
-) {
-    let left = startup_troubles(&editor.borrow());
-    *showing.borrow_mut() = left.clone();
-    *proposed.borrow_mut() = left
-        .iter()
-        .filter(|trouble| trouble.nameable())
-        .filter_map(|trouble| trouble.at.map(|at| (at, trouble.node.clone())))
-        .collect();
-
-    let window = views.borrow().names.clone();
-    if left.is_empty() {
-        hide_problems(views);
-    } else if let Some(window) = window.and_then(|window| window.upgrade()) {
-        say_problems(
-            &window,
-            editor.borrow().document(),
-            &showing.borrow(),
-            &proposed.borrow(),
-            true,
-        );
-    }
-    views.borrow().refresh(&editor.borrow());
-}
-
-/// Puts the problems into the window, and says whether the names settle what
-/// they are offered for.
-///
-/// `rows` says whether the list itself is rebuilt. It is not, for a letter
-/// somebody typed: replacing the model under a LineEdit takes the focus with
-/// it, and a field that had to be pressed again for every letter is the bug
-/// this editor has already had once. See `refilled`.
-///
-/// # Arguments
-///
-/// * `window`   - The main window, which asks the question.
-/// * `document` - The configuration the problems are in.
-/// * `showing`  - The problems, one row each.
-/// * `proposed` - The names the fields hold, by the position of the node
-///                each is for.
-/// * `rows`     - Whether to rebuild the list's rows as well.
-fn say_problems(
-    window: &MainWindow,
-    document: &Document,
-    showing: &[Trouble],
-    proposed: &BTreeMap<usize, String>,
-    rows: bool,
-) {
-    if rows {
-        let rows: Vec<ProblemRow> = showing
-            .iter()
-            .map(|trouble| ProblemRow {
-                said: trouble.said.clone().into(),
-                node: trouble.node.clone().into(),
-                now: trouble
-                    .at
-                    .and_then(|at| proposed.get(&at))
-                    .cloned()
-                    .unwrap_or_else(|| trouble.node.clone())
-                    .into(),
-                nameable: trouble.nameable(),
-                there: trouble.at.is_some() && !trouble.node.is_empty(),
-                action: trouble.offer().into(),
-            })
-            .collect();
-        window.set_problems_any_nameable(rows.iter().any(|row| row.nameable));
-        // What the Copy button copies: the window's heading, then every
-        // problem, one to a line.
-        let mut everything = vec![
-            "This configuration has problems the vehicle would not fly with"
-                .to_string(),
-        ];
-        everything.extend(rows.iter().map(|row| row.said.to_string()));
-        window.set_problems_everything(everything.join("\n").into());
-        window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
-    }
-
-    match names_settle(document, proposed) {
-        Ok(()) => {
-            window.set_problems_ready(true);
-            window.set_problems_trouble(Default::default());
-        }
-        Err(why) => {
-            window.set_problems_ready(false);
-            window.set_problems_trouble(why.into());
-        }
-    }
 }
 
 /// Counts what the file arrived with as already said, so the alert leaves it
@@ -4946,6 +4835,7 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
 ///                configuration.
 /// * `dividers` - Where the panes are, which says where the page's edge is.
 /// * `held`     - The link whose end is being dragged, which is left out.
+/// * `lit`      - The link chosen from the errors button, which is drawn lit.
 ///
 /// # Returns
 ///
@@ -4955,6 +4845,7 @@ fn views_of(
     home: &Home,
     dividers: Dividers,
     held: Option<&Link>,
+    lit: Option<&Link>,
 ) -> (Vec<NodeView>, Vec<LinkView>) {
     let document = editor.document();
     let faults = editor.faults();
@@ -5020,7 +4911,7 @@ fn views_of(
             },
         });
     }
-    let lines: Vec<tcsdiagram::view::LineOnSheet> = document
+    let drawn: Vec<&Link> = document
         .links
         .iter()
         .filter(|link| here(&link.from) || here(&link.to) || between(link))
@@ -5029,11 +4920,19 @@ fn views_of(
         // started. It comes back where the hand put it down, or where it was.
         .filter(|link| !held.is_some_and(|held| held.same_connection(link)))
         .chain(&unjoined)
-        .map(line_on_sheet)
         .collect();
+    let lines: Vec<tcsdiagram::view::LineOnSheet> =
+        drawn.iter().map(|link| line_on_sheet(link)).collect();
+    // The line chosen from the errors button is lit, as tcspecial's visual
+    // window lights a line data crosses: a wide pale line under it, which
+    // says which one it is by its width as well as its colour.
     let links: Vec<LinkView> = tcsdiagram::view::link_looks(&sheet, &lines)
         .into_iter()
-        .map(link_view)
+        .zip(&drawn)
+        .map(|(look, link)| LinkView {
+            lit: lit.is_some_and(|lit| lit.same_connection(link)),
+            ..link_view(look)
+        })
         .collect();
 
     (nodes, links)
@@ -7881,8 +7780,9 @@ fn node_view(look: tcsdiagram::view::NodeLook, selected: bool) -> NodeView {
 
 /// Turns a line's look into what this window's markup takes.
 ///
-/// Never lit: a line is lit while data crosses it, which is something only a
-/// running vehicle has. See tcspecial's visual window.
+/// Not lit: here a line is lit only when it is chosen from the errors
+/// button, which `views_of` says. See tcspecial's visual window, which lights
+/// a line while data crosses it.
 ///
 /// # Arguments
 ///
@@ -8361,9 +8261,8 @@ mod tests {
         assert!(sheet * zoom <= width - 180.0, "drawn at {zoom} in {width}");
     }
 
-    /// In a read-only session the problems question's Edit and Delete are
-    /// greyed, and what would rename or act on a node is greyed with them;
-    /// the ways out of the question are not.
+    /// In a read-only session the startup warning's two ways out are not
+    /// greyed: quitting and ignoring change nothing in the files.
     #[test]
     fn a_read_only_session_greys_what_would_edit() {
         use i_slint_backend_testing::ElementQuery;
@@ -8371,23 +8270,10 @@ mod tests {
         i_slint_backend_testing::init_no_event_loop();
         let window = MainWindow::new().expect("a window");
         window.global::<Session>().set_read_only(true);
-        window.set_problems_rows(ModelRc::from(Rc::new(VecModel::from(vec![
-            ProblemRow {
-                said: "\"twice\" is the name of two nodes".into(),
-                node: "twice".into(),
-                now: "twice".into(),
-                nameable: true,
-                there: true,
-                action: "".into(),
-            },
-        ]))));
-        window.set_problems_any_nameable(true);
-        window.set_problems_ready(true);
+        window.set_problems_said("Some links are not valid.".into());
         window.set_problems_up(true);
         window.show().expect("the window shows");
 
-        // The buttons in the question, which is in the main window: the
-        // window has an Edit and a Delete of its own elsewhere.
         let enabled = |label: &str| {
             let wanted = label.to_string();
             ElementQuery::from_root(&window)
@@ -8400,16 +8286,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("there is no {label} button"))
                 .accessible_enabled()
         };
-        for label in ["Edit", "Delete", "Suggest", "Rename"] {
-            assert_eq!(enabled(label), Some(false), "{label} is not greyed");
-        }
-        for label in ["Quit", "Leave this one", "Ignore them all"] {
-            assert_eq!(enabled(label), Some(true), "{label} is greyed");
-        }
-
-        // And the same window in a session that may edit has them all.
-        window.global::<Session>().set_read_only(false);
-        for label in ["Edit", "Delete", "Suggest", "Rename"] {
+        for label in ["Quit", "Ignore"] {
             assert_eq!(enabled(label), Some(true), "{label} is greyed");
         }
     }
@@ -8574,7 +8451,10 @@ mod tests {
             troubles.iter().filter(|t| t.node == "i2c").collect();
         assert_eq!(shared.len(), 2, "{troubles:?}");
         assert_eq!((shared[0].at, shared[1].at), (Some(0), Some(1)));
-        assert!(shared.iter().all(|t| t.nameable()), "a name is the fix");
+        assert!(
+            shared.iter().all(|t| t.fix == Fix::Name),
+            "a name is the fix"
+        );
 
         // The unknown type: the node has to be looked at or taken out.
         assert_eq!(fix_for("contraption"), Some(Fix::Node));
@@ -8609,16 +8489,20 @@ mod tests {
              rows: {troubles:?} against {:?}",
             document.faults()
         );
-        // And every row says something and offers something.
+        // And every row says something, and is one of the kinds the
+        // startup warning counts.
         for trouble in &troubles {
             assert!(!trouble.said.is_empty(), "{trouble:?}");
-            assert!(
-                trouble.nameable()
-                    || trouble.at.is_some()
-                    || !trouble.offer().is_empty(),
-                "a row with nothing to press: {trouble:?}"
-            );
         }
+        let kind_of = |which: &str| {
+            troubles
+                .iter()
+                .find(|t| t.said.contains(which))
+                .map(Trouble::kind)
+        };
+        assert_eq!(kind_of("contraption"), Some(Kind::Attribute));
+        assert_eq!(kind_of("one of them is not here"), Some(Kind::Link));
+        assert_eq!(kind_of("has no nodes in it"), Some(Kind::Other));
     }
 
     /// A line from a physics component means what its terminals and the
@@ -8777,7 +8661,7 @@ mod tests {
         // On the canvas, in the vehicle pane -- which is where a type nothing
         // knows goes, because the two other panes mean something about what a
         // node is and this says nothing.
-        let (nodes, _) = views_of(&editor, &None, dividers(), None);
+        let (nodes, _) = views_of(&editor, &None, dividers(), None, None);
         let drawn = nodes
             .iter()
             .find(|view| view.name == "odd")
@@ -8815,7 +8699,7 @@ mod tests {
         .expect("a configuration with an empty group and an unfinished node");
 
         let editor = Editor::open(&path, dividers()).expect("it opens");
-        let troubles = startup_troubles(&editor);
+        let troubles = errors_of(&editor);
         let said: Vec<&str> =
             troubles.iter().map(|t| t.said.as_str()).collect();
 
@@ -8865,61 +8749,36 @@ mod tests {
         assert!(verified(&editor).is_empty());
     }
 
-    /// A set of names settles a duplicate only if all of them are different,
-    /// none is empty, and none belongs to a node that is not being renamed.
+    /// The startup warning says which kinds of error there are, and not
+    /// each error: attribute errors, link errors, both, or others alone.
     #[test]
-    fn the_names_offered_have_to_settle_the_duplicate() {
-        let mut document = Document::new();
-        for (name, node_type) in
-            [("i2c", "i2c"), ("i2c", "i2c"), ("gateway", "gateway_radio")]
-        {
-            document.apply(&Edit::AddNode {
-                name: name.to_string(),
-                node_type: node_type.to_string(),
-                home: None,
-            });
-        }
-
-        let asked = |pairs: &[(usize, &str)]| -> BTreeMap<usize, String> {
-            pairs
-                .iter()
-                .map(|(at, name)| (*at, (*name).to_string()))
-                .collect()
+    fn the_startup_warning_says_only_what_kinds_of_error_there_are() {
+        let trouble = |fix: Fix, said: &str| Trouble {
+            at: None,
+            node: String::new(),
+            said: said.to_string(),
+            fix,
         };
-
-        // As the file has them: still the same name, which is what the window
-        // opens on and what the button has to wait for.
-        assert!(
-            names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c")])).is_err()
+        let node = trouble(Fix::Node, "\"a\": address 0x999 is too big");
+        let line = trouble(
+            Fix::Line(Link::new("a", "nowhere", None)),
+            "a line to nowhere",
         );
+        let group = trouble(Fix::Group("idle".into()), "idle is empty");
 
-        // One of them changed is enough.
-        assert!(names_settle(&document, &asked(&[(0, "i2c"), (1, "i2c-1")]))
-            .is_ok());
-        // Both, to something else again.
-        assert!(
-            names_settle(&document, &asked(&[(0, "fore"), (1, "aft")])).is_ok()
-        );
-
-        // A blank is not a name.
-        assert!(
-            names_settle(&document, &asked(&[(0, "i2c"), (1, "  ")])).is_err()
-        );
-
-        // And a third node's name is a duplicate again: a button that made
-        // the same question come back would be no answer at all.
-        let said =
-            names_settle(&document, &asked(&[(0, "i2c"), (1, "gateway")]))
-                .expect_err(
-                    "renaming one of them to the ground station's name",
-                );
-        assert!(said.contains("gateway"), "{said}");
-
-        // What is said is about what is wrong, because it is said instead of
-        // the button being pressable.
-        let said = names_settle(&document, &asked(&[(0, "same"), (1, "same")]))
-            .expect_err("two the same");
-        assert!(said.contains("same"), "{said}");
+        assert_eq!(errors_said(&[]), "", "nothing to warn of");
+        let said = errors_said(std::slice::from_ref(&node));
+        assert!(said.contains("attribute values"), "{said}");
+        assert!(!said.contains("links"), "{said}");
+        assert!(!said.contains("0x999"), "not the error itself: {said}");
+        let said = errors_said(std::slice::from_ref(&line));
+        assert!(said.contains("links") && !said.contains("attribute"));
+        let said = errors_said(&[node, line, group.clone()]);
+        assert!(said.contains("attribute values") && said.contains("links"));
+        assert!(said.contains("other errors"), "{said}");
+        let said = errors_said(&[group]);
+        assert!(said.contains("has errors"), "{said}");
+        assert!(said.contains("errors button"), "where to find them: {said}");
     }
 
     /// Each heading of each selection panel is in alphabetical order.
@@ -9753,7 +9612,7 @@ mod tests {
                 });
             }
         }
-        let (nodes, _) = views_of(&editor, &None, dividers(), None);
+        let (nodes, _) = views_of(&editor, &None, dividers(), None, None);
         let said: BTreeMap<String, String> = nodes
             .iter()
             .map(|n| (n.name.to_string(), n.type_line.to_string()))
@@ -10078,13 +9937,13 @@ mod tests {
             home: Some("zone".into()),
         });
 
-        let (top, _) = views_of(&editor, &None, dividers(), None);
+        let (top, _) = views_of(&editor, &None, dividers(), None, None);
         let names: Vec<String> =
             top.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["zone".to_string(), "gateway".to_string()]);
 
         let (inside, _) =
-            views_of(&editor, &Some("zone".into()), dividers(), None);
+            views_of(&editor, &Some("zone".into()), dividers(), None, None);
         let names: Vec<String> =
             inside.iter().map(|n| n.name.to_string()).collect();
         assert_eq!(names, vec!["temp_1".to_string()]);
@@ -10130,14 +9989,14 @@ mod tests {
 
         // Seen from inside the subdiagram: one link, named for where it goes.
         let (_, inside) =
-            views_of(&editor, &Some("zone".into()), dividers(), None);
+            views_of(&editor, &Some("zone".into()), dividers(), None, None);
         assert_eq!(inside.len(), 1);
         assert_eq!(inside[0].label, "gateway");
 
         // And seen from the top diagram, where its source is behind the
         // box: drawn from the box's world-out, and named by its own name,
         // the box already saying which file it is in.
-        let (_, top) = views_of(&editor, &None, dividers(), None);
+        let (_, top) = views_of(&editor, &None, dividers(), None, None);
         assert_eq!(top.len(), 1);
         assert_eq!(top[0].label, "temp_1");
         let link = &editor.document().links[0];
@@ -10260,7 +10119,7 @@ mod tests {
             editor.edit(edit);
         }
 
-        let (_, links) = views_of(&editor, &None, dividers(), None);
+        let (_, links) = views_of(&editor, &None, dividers(), None, None);
         assert_eq!(links.len(), 1);
         let view = &links[0];
 
@@ -12345,8 +12204,9 @@ mod tests {
         the_line_being_drawn_follows_the_pointer();
         deleting_a_node_asks_first();
         the_main_window_is_inert_until_what_came_up_is_read();
-        ignoring_them_all_gives_the_presses_back();
-        the_question_offers_a_way_out_of_the_editor();
+        ignoring_the_warning_gives_the_presses_back();
+        the_warning_offers_a_way_out_of_the_editor();
+        an_error_chosen_from_the_button_is_gone_to_and_leaves_when_put_right();
         closing_the_main_window_closes_what_says_what_is_wrong();
         an_emptied_field_takes_the_attribute_off();
         a_type_carried_out_of_its_list_goes_where_it_is_let_go();
@@ -12354,6 +12214,129 @@ mod tests {
         a_typed_value_is_taken_when_it_is_done();
         a_component_placed_on_a_page_is_drawn_only_there();
         every_field_of_a_node_is_in_view_and_its_name_clears();
+    }
+
+    /// An error chosen from the errors button is gone to, and leaves the
+    /// button's list once it is put right: a node's value with the node
+    /// chosen and its window open, checked again as the window closes; a
+    /// line drawn lit, and put out when it is taken away.
+    fn an_error_chosen_from_the_button_is_gone_to_and_leaves_when_put_right() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("vehicle.ytcs"), dividers())
+                .expect("it opens"),
+        ));
+        for (name, node_type) in [
+            ("temp_1", "i2c"),
+            ("temp_2", "i2c"),
+            ("zone_temp", "compute"),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+        }
+        // Two lines into one input, which is a line's error, and an address
+        // that is not one, which is a value's.
+        let twice = |from: &str| {
+            journal::Link::joining(
+                from,
+                Some("world-out"),
+                "zone_temp",
+                Some("in0"),
+            )
+        };
+        for from in ["temp_1", "temp_2"] {
+            editor
+                .borrow_mut()
+                .edit(Edit::AddLink { link: twice(from) });
+        }
+        let address = |was: Option<&str>, now: &str| Edit::SetAttribute {
+            node: "temp_1".to_string(),
+            attribute: "address".to_string(),
+            was: was.map(str::to_string),
+            now: Some(now.to_string()),
+        };
+        // With its device said, which is checked first: a node missing an
+        // attribute it needs has its other values checked once it has it.
+        editor.borrow_mut().edit(Edit::SetAttribute {
+            node: "temp_1".to_string(),
+            attribute: "path".to_string(),
+            was: None,
+            now: Some("/dev/i2c-1".to_string()),
+        });
+        editor.borrow_mut().edit(address(None, "nonsense"));
+
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        ui.show().expect("the window shows");
+        let chosen = views.borrow().chosen.clone();
+        let drawing = views.borrow().drawing.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+
+        let errors = || views.borrow().errors.borrow().clone();
+        let row = |wanted: &dyn Fn(&Trouble) -> bool| {
+            errors().iter().position(wanted)
+        };
+        assert_eq!(
+            ui.get_error_rows().row_count(),
+            errors().len(),
+            "the button lists every error"
+        );
+
+        // The value: the node chosen, its window open.
+        let value = row(&|t| t.fix == Fix::Node && t.said.contains("nonsense"))
+            .unwrap_or_else(|| {
+                panic!("the address is an error: {:?}", errors())
+            });
+        ui.invoke_error_chosen(value as i32);
+        assert_eq!(
+            chosen.borrow().get("").map(String::as_str),
+            Some("temp_1"),
+            "the node is chosen"
+        );
+        let window = views
+            .borrow()
+            .attributes
+            .get("temp_1")
+            .map(|window| window.as_weak())
+            .and_then(|window| window.upgrade())
+            .expect("its window is open");
+
+        // Put right, and the window closed: the error has left the list.
+        editor.borrow_mut().edit(address(Some("nonsense"), "0x48"));
+        window.invoke_closed();
+        assert!(
+            !errors().iter().any(|t| t.said.contains("nonsense")),
+            "{:?}",
+            errors()
+        );
+
+        // The line: lit, and only that one.
+        let line = row(&|t| matches!(t.fix, Fix::Line(_)))
+            .unwrap_or_else(|| panic!("the line is an error: {:?}", errors()));
+        ui.invoke_error_chosen(line as i32);
+        assert!(views.borrow().lit.borrow().is_some(), "a line is lit");
+        let lit = || ui.get_links().iter().filter(|link| link.lit).count();
+        assert_eq!(lit(), 1, "the line is drawn lit");
+
+        // Taken away, and it is put out and leaves the list.
+        editor.borrow_mut().edit(Edit::RemoveLink {
+            link: twice("temp_2"),
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(views.borrow().lit.borrow().is_none(), "nothing is lit");
+        assert_eq!(lit(), 0);
+        assert!(
+            !errors().iter().any(|t| matches!(t.fix, Fix::Line(_))),
+            "{:?}",
+            errors()
+        );
+        let _ = ui.hide();
     }
 
     /// Every field a node's window offers is in view -- found by the
@@ -12907,16 +12890,17 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }))
     }
 
     /// The main window is there from the start and takes no presses until the
-    /// problems the file arrived with have been read.
+    /// warning about the errors the file arrived with has been read.
     ///
-    /// Shown beside the question rather than held back, because the drawing is
-    /// what the question is about -- and inert while it is up, so nothing is
-    /// edited behind a window asking about the state the file arrived in.
-    /// Answering it, however it is answered, gives the presses back.
+    /// Shown beside the warning rather than held back, because the drawing is
+    /// what the warning is about -- and inert while it is up, so nothing is
+    /// edited behind it. Ignoring it gives the presses back.
     fn the_main_window_is_inert_until_what_came_up_is_read() {
         use std::rc::Rc;
 
@@ -12939,12 +12923,12 @@ mod tests {
         alerting(&views);
         settled(&editor, &views);
         views.borrow().refresh(&editor.borrow());
-        settle_problems(&editor, &views);
+        warn_of_errors(&editor, &views);
         ui.set_inert(startup_waiting(&views, None));
 
         assert!(
             startup_waiting(&views, None),
-            "the question about the empty group should be up"
+            "the warning about the empty group should be up"
         );
         assert!(ui.window().is_visible(), "the main window is up beside it");
         assert!(ui.get_inert(), "and takes no presses while it is");
@@ -12954,28 +12938,32 @@ mod tests {
             .names
             .clone()
             .and_then(|window| window.upgrade())
-            .expect("the question");
+            .expect("the warning");
         assert!(
             question.get_problems_up(),
-            "the question is asked in front of the drawing"
+            "the warning is given in front of the drawing"
         );
-        question.invoke_problems_left();
+        assert!(
+            question.get_problems_said().contains("errors button"),
+            "and says where to find the errors: {}",
+            question.get_problems_said()
+        );
+        question.invoke_problems_ignored();
 
-        assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(views.borrow().names.is_none(), "the warning has gone");
         assert!(!ui.get_problems_up(), "and is no longer in front of it");
         assert!(ui.window().is_visible(), "the main window is still up");
         assert!(!ui.get_inert(), "and takes presses again");
         let _ = ui.hide();
     }
 
-    /// Ignoring them all takes the question away for good and gives the
-    /// presses back.
+    /// Ignore takes the warning away for good and gives the presses back.
     ///
-    /// The question is asked inside the main window, so it has no close box
-    /// of its own: "Ignore them all" is the way to answer every one of them
-    /// at once, and it leaves the faults counted as said, the question gone
-    /// and the drawing taking presses again.
-    fn ignoring_them_all_gives_the_presses_back() {
+    /// The warning is given inside the main window, so it has no close box of
+    /// its own: Ignore is the way past it, and it leaves the faults counted as
+    /// said, the warning gone and the drawing taking presses again. The
+    /// errors stay listed by the errors button.
+    fn ignoring_the_warning_gives_the_presses_back() {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
@@ -12995,7 +12983,7 @@ mod tests {
         alerting(&views);
         settled(&editor, &views);
         views.borrow().refresh(&editor.borrow());
-        settle_problems(&editor, &views);
+        warn_of_errors(&editor, &views);
         ui.set_inert(startup_waiting(&views, None));
 
         ui.invoke_problems_ignored();
@@ -13004,20 +12992,25 @@ mod tests {
             !views.borrow().faulted.borrow().is_empty(),
             "the faults are being ignored"
         );
-        assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(views.borrow().names.is_none(), "the warning has gone");
         assert!(!ui.get_problems_up(), "from in front of the drawing");
         assert!(!ui.get_inert(), "and the main window takes presses again");
+        assert!(
+            ui.get_error_rows().iter().any(|row| row.contains("idle")),
+            "the empty group is still listed by the errors button: {:?}",
+            ui.get_error_rows().iter().collect::<Vec<_>>()
+        );
         let _ = ui.hide();
     }
 
-    /// The question offers a way out of the editor.
+    /// The warning offers a way out of the editor.
     ///
     /// A file that arrived in a state somebody would rather put right
-    /// elsewhere is a reason to leave, and a question about it should not be
+    /// elsewhere is a reason to leave, and a warning about it should not be
     /// a reason to go looking for how. The same path the menu's Exit takes:
     /// with nothing unwritten it goes straight out, which is what this says
     /// by there being no offer to save.
-    fn the_question_offers_a_way_out_of_the_editor() {
+    fn the_warning_offers_a_way_out_of_the_editor() {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
@@ -13037,14 +13030,14 @@ mod tests {
         alerting(&views);
         settled(&editor, &views);
         views.borrow().refresh(&editor.borrow());
-        settle_problems(&editor, &views);
+        warn_of_errors(&editor, &views);
 
         let question = views
             .borrow()
             .names
             .clone()
             .and_then(|window| window.upgrade())
-            .expect("the question");
+            .expect("the warning");
         assert!(
             !editor.borrow().unsaved(),
             "every edit is written as it is made, so a file just opened has \
@@ -13062,7 +13055,7 @@ mod tests {
 
     /// Closing the main window closes the windows that say what is wrong.
     ///
-    /// All three of them: the question about the state the file arrived in,
+    /// All three of them: the warning about the state the file arrived in,
     /// the alert about something that failed, and the list of concerns. Each
     /// is about the drawing, so none of them has anything to say once the
     /// drawing has gone -- and the toolkit stops when its last window closes,
@@ -13088,9 +13081,9 @@ mod tests {
         alerting(&views);
         settled(&editor, &views);
         views.borrow().refresh(&editor.borrow());
-        settle_problems(&editor, &views);
+        warn_of_errors(&editor, &views);
 
-        // All three up: the question came up with the file, the alert is told
+        // All three up: the warning came up with the file, the alert is told
         // to say something of its own, and the list is opened as the bar's
         // count opens it.
         views.borrow().say(
@@ -13099,14 +13092,14 @@ mod tests {
             "",
         );
         show_concerns(&editor, &views, false);
-        assert!(views.borrow().names.is_some(), "the question is up");
+        assert!(views.borrow().names.is_some(), "the warning is up");
         assert!(views.borrow().alert.is_some(), "the alert is up");
         assert!(views.borrow().concerns.is_some(), "the list is up");
 
         ui.window()
             .dispatch_event(slint::platform::WindowEvent::CloseRequested);
 
-        assert!(views.borrow().names.is_none(), "the question has gone");
+        assert!(views.borrow().names.is_none(), "the warning has gone");
         assert!(!ui.get_problems_up(), "from in front of the drawing");
         assert!(views.borrow().alert.is_none(), "the alert has gone");
         assert!(views.borrow().concerns.is_none(), "the list has gone");
@@ -13176,6 +13169,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -13318,6 +13313,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -13475,6 +13472,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -13564,6 +13563,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         alerting(&views);
 
@@ -13708,6 +13709,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         alerting(&views);
 
@@ -13853,6 +13856,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -13976,6 +13981,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14181,6 +14188,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14364,7 +14373,7 @@ mod tests {
                 None,
                 dividers(),
                 lists(),
-                None,
+                (None, None),
             );
 
             let names: Vec<String> = (0..ui.get_nodes().row_count())
@@ -14411,7 +14420,7 @@ mod tests {
             .expect("it opens");
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui, descriptions());
-            put(&ui, &editor, &None, None, dividers(), lists(), None);
+            put(&ui, &editor, &None, None, dividers(), lists(), (None, None));
 
             assert_eq!(
                 ui.get_links().row_count(),
@@ -14513,6 +14522,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14662,6 +14673,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14764,6 +14777,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14930,6 +14945,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
 
         show_group(&editor, &views);
@@ -15012,6 +15029,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
 
         // Nothing owed: leaving asks nothing. (The loop is not running in a
@@ -15170,6 +15189,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15450,6 +15471,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
 
         show_node(&editor, &views, "temp_1");
@@ -15541,6 +15564,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15675,6 +15700,8 @@ mod tests {
                 settings::DEFAULT_LIST_PHYSICS,
             )),
             showing: Rc::new(RefCell::new(String::new())),
+            errors: Rc::new(RefCell::new(Vec::new())),
+            lit: Rc::new(RefCell::new(None)),
         }));
 
         // The only group there is, so the window opens on it.

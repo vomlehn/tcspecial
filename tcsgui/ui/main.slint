@@ -23,26 +23,6 @@ export struct ConcernRow {
 }
 
 // One problem a configuration opened with, and what is offered for it.
-export struct ProblemRow {
-    // What is wrong, in the words of the fault itself.
-    said: string,
-    // The node it is about, by name, or empty where not having one is the
-    // problem.
-    node: string,
-    // The name as it stands in the field, for the rows a name can mend.
-    now: string,
-    // Whether a name is the fix: two nodes sharing one, or a node without
-    // one. Those rows get a field and a suggestion; the rest get the buttons
-    // alone.
-    nameable: bool,
-    // Whether there is a node in the document to open or to delete.
-    there: bool,
-    // The one other thing this kind of problem offers, as the label on its
-    // button: deleting a group, deleting a line, opening the parameters.
-    // Empty where it offers none.
-    action: string,
-}
-
 // One thing a line in hand can be made into at the node it was taken to,
 // as the menu there offers it: what choosing it does, and whether it can be
 // chosen. One that cannot is shown greyed and says why in its words, so the
@@ -644,6 +624,10 @@ component Surface inherits Rectangle {
     changed canvas-offset => { sheet.content-y = root.canvas-offset * zoom; }
     changed zoom => { sheet.content-y = root.canvas-offset * zoom; }
 
+    // The configuration's errors, one line each, and which was chosen from
+    // the errors button's menu: see the bar.
+    in property <[string]> error-rows: [];
+    callback error-chosen(int);
     // How many concerns there are, and how many were set aside: see the two
     // buttons in the bar.
     in property <int> concern-count: 0;
@@ -900,6 +884,36 @@ component Surface inherits Rectangle {
             // there anything I have not looked at"; the second is "what did I
             // decide to leave", which is worth being able to ask again -- a
             // decision somebody cannot find is a decision they cannot change.
+            // The errors, attribute values and links alike, and the way to
+            // each: a menu of them, one line each, under the button, which is
+            // there only while there are some. Choosing one goes to it -- the
+            // node in the middle of its page with its window open, the line
+            // in the middle of its page and lit -- and one put right leaves
+            // the menu. Primary, so it is the first thing on the bar seen,
+            // and saying how many in words, so it is not colour alone.
+            if root.error-rows.length > 0: Rectangle {
+                min-width: errors-button.min-width;
+                preferred-width: errors-button.preferred-width;
+                min-height: errors-button.min-height;
+                errors-menu := ContextMenuArea {
+                    Menu {
+                        for row[i] in root.error-rows: MenuItem {
+                            title: row;
+                            activated => { root.error-chosen(i); }
+                        }
+                    }
+                }
+                errors-button := Button {
+                    width: 100%;
+                    height: 100%;
+                    text: root.error-rows.length
+                        + (root.error-rows.length == 1 ? " error" : " errors");
+                    primary: true;
+                    clicked => {
+                        errors-menu.show({ x: 0, y: self.height });
+                    }
+                }
+            }
             if concern-count > 0: Button {
                 text: concern-count
                     + (concern-count == 1 ? " concern" : " concerns");
@@ -1535,31 +1549,20 @@ component AlertPanel inherits Rectangle {
     }
 }
 
-/// What to do about the problems a configuration opened with.
+/// The warning a configuration with errors opens with.
 ///
-/// Shown when a file is opened that the editor can read and the vehicle could
-/// not fly: a node named twice, a node with no name, a type this build does
-/// not know, attributes that do not hold together. Each is said in the words
-/// of the rule it breaks, and each row offers what can be done about that
-/// kind of problem.
-///
-/// Doing nothing is one of the offers, and it is the one the window closes
-/// with. A problem left alone stays a problem -- it is drawn in red on the
-/// node it is about, counted in the alert, and `tcsverify` will refuse the
-/// file -- but the node is on the canvas in its own working pane either way,
-/// which is what lets somebody look at the drawing before deciding. An editor
-/// that would not show a configuration until it was correct would be an
-/// editor that cannot be used to correct one.
-///
-/// Where a name is the fix the row has a field and a suggestion, because that
-/// is the one kind of problem the editor can mend by itself. Everything else
-/// is somebody's decision: open the node and put it right, or take it out.
+/// It says what kinds of error there are -- attribute values, links, others
+/// -- and not each one: each is in the errors button's menu on the bar,
+/// which goes to it, and a list read once at startup is a list nobody has to
+/// hand when they come to put the errors right. Ignore takes the warning
+/// away and leaves the errors as they are, drawn in red; Quit leaves the
+/// editor. See warn_of_errors in main.rs.
 component ProblemsPanel inherits Rectangle {
     // A dialog drawn inside the main window, over the veil that greys the
     // rest of it: see MainWindow. Inside rather than a window of its own,
     // because a window of its own cannot be kept in front of the main one
     // on every desktop -- Wayland lets no program hold its windows on top --
-    // and a question behind the window waiting for it is one nobody finds.
+    // and a warning behind the window waiting for it is one nobody finds.
     background: Colors.window;
     border-width: 1px;
     border-color: #808080;
@@ -1567,159 +1570,56 @@ component ProblemsPanel inherits Rectangle {
     drop-shadow-blur: 16px;
     drop-shadow-color: #00000040;
     drop-shadow-offset-y: 4px;
-    min-width: 520px;
-    min-height: 260px;
-    preferred-width: 680px;
-    preferred-height: 380px;
+    min-width: 420px;
+    preferred-width: 520px;
+    preferred-height: whole.preferred-height;
 
-    in property <[ProblemRow]> rows;
-    // Every row as one text, for the Copy button. Set from Rust beside the
-    // rows.
-    in property <string> everything: "";
-    // Whether the names as they stand would settle what they are offered for:
-    // all different, none empty, none belonging to a third node. Worked out in
-    // Rust, where it can be tested: see tcsgui::names_settle.
-    in property <bool> ready: false;
-    // And why not, where they do not: said once, under the list, rather than
-    // beside whichever row is at fault -- a sentence between rows would shift
-    // the list as somebody types.
-    in property <string> trouble: "";
-    // Whether any row offers a name at all, which is what decides whether the
-    // renaming button is there to be pressed.
-    in property <bool> any-nameable: false;
+    // What kinds of error there are, a sentence a line. Set from Rust: see
+    // errors_said in main.rs.
+    in property <string> said: "";
 
-    callback typed(int, string);
-    callback derive(int);
-    callback confirmed();
-    callback edit(int);
-    callback remove(int);
-    // The one other thing a row offers: see ProblemRow::action.
-    callback acted(int);
-    callback left();
-    // And the way out that answers all of them at once: see `ignored` in
-    // tcsgui::settle_problems.
+    // Leaving the errors as they are, which is what somebody opening a file
+    // to look at it wants.
     callback ignored();
     // Out of the editor, which is the one answer that is not about the
     // configuration at all.
     callback quit();
 
-    VerticalLayout {
+    whole := VerticalLayout {
         padding: Space.wide;
         spacing: Space.step;
 
         Copyable {
-            text: "This configuration has problems "
-                + "the vehicle would not fly with";
+            text: "This configuration has errors the vehicle would not "
+                + "fly with";
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
         }
         Copyable {
-            text: "Each one is drawn in red on the node it is about. Put them "
-                + "right here, open a node to edit it, or leave them and look "
-                + "at the drawing first -- every node is on the canvas either "
-                + "way.";
-            font-size: Type.small;
-            color: #6b7280;
-            wrap: word-wrap;
-        }
-
-        ScrollView {
-            vertical-stretch: 1;
-            VerticalLayout {
-                spacing: Space.step;
-                for row[i] in root.rows: HorizontalLayout {
-                    spacing: Space.step;
-                    alignment: start;
-
-                    VerticalLayout {
-                        horizontal-stretch: 1;
-                        spacing: 1px;
-                        Copyable {
-                            text: row.said;
-                            font-size: Type.body;
-                            wrap: word-wrap;
-                        }
-                        if row.nameable: HorizontalLayout {
-                            spacing: Space.step;
-                            LineEdit {
-                                text: row.now;
-                                read-only: Session.read-only;
-                                font-size: Fonts.window;
-                                horizontal-stretch: 1;
-                                edited(said) => { root.typed(i, said); }
-                            }
-                            Button {
-                                text: "Suggest";
-                                enabled: !Session.read-only;
-                                clicked => { root.derive(i); }
-                            }
-                        }
-                    }
-                    if row.there: Button {
-                        text: "Edit";
-                        enabled: !Session.read-only;
-                        clicked => { root.edit(i); }
-                    }
-                    if row.there: Button {
-                        text: "Delete";
-                        enabled: !Session.read-only;
-                        clicked => { root.remove(i); }
-                    }
-                    if row.action != "": Button {
-                        text: row.action;
-                        enabled: !Session.read-only;
-                        clicked => { root.acted(i); }
-                    }
-                }
-                if root.rows.length == 0: Copyable {
-                    text: "Nothing is wrong.";
-                    font-size: Type.body;
-                    font-italic: true;
-                    color: #6b7280;
-                }
-            }
-        }
-
-        if root.trouble != "": Copyable {
-            text: root.trouble;
-            font-size: Type.small;
-            color: #c0392b;
+            text: root.said;
+            font-size: Type.body;
             wrap: word-wrap;
         }
 
         HorizontalLayout {
             spacing: Space.step;
-            CopyButton { said: root.everything; }
+            CopyButton {
+                said: "This configuration has errors the vehicle would not "
+                    + "fly with\n" + root.said;
+            }
             Rectangle { }
-            // Out of the editor altogether, for a file that arrived in a
-            // state somebody would rather put right elsewhere: a question
-            // about a configuration should not be a reason to go looking for
-            // a way to close the window it came up over. Leftmost, away from
-            // the button that acts, because it is the one press here that
-            // cannot be undone by pressing something else.
+            // Leftmost of the two, away from the one that is pressed most,
+            // because it is the one press here that cannot be undone by
+            // pressing something else.
             Button {
                 text: "Quit";
                 clicked => { root.quit(); }
             }
             Button {
-                text: "Leave this one";
-                clicked => { root.left(); }
-            }
-            // Doing nothing about every one of them, which is the other way
-            // out and the one somebody opening a file to look at it wants:
-            // the problems stay, the nodes are drawn as they are, and nothing
-            // says any of it again this session. The window's own close box
-            // does this, for the reason the comment on it in main.rs gives.
-            Button {
-                text: "Ignore them all";
-                clicked => { root.ignored(); }
-            }
-            if root.any-nameable: Button {
-                text: "Rename";
+                text: "Ignore";
                 primary: true;
-                enabled: root.ready && !Session.read-only;
-                clicked => { root.confirmed(); }
+                clicked => { root.ignored(); }
             }
         }
     }
@@ -1787,23 +1687,12 @@ export component MainWindow inherits Window {
     // disabled as well, the keyboard being another way to reach them.
     in property <bool> inert: false;
 
-    // The question about the problems the file opened with, asked in front
-    // of the drawing inside this window: see ProblemsPanel. Its properties
-    // and callbacks are the panel's, by the same names with "problems-" in
-    // front. Set and answered from Rust: see settle_problems in main.rs.
+    // The warning about the errors the file opened with, given in front of
+    // the drawing inside this window: see ProblemsPanel. Its properties and
+    // callbacks are the panel's, by the same names with "problems-" in
+    // front. Set and answered from Rust: see warn_of_errors in main.rs.
     in property <bool> problems-up: false;
-    in property <[ProblemRow]> problems-rows;
-    in property <string> problems-everything: "";
-    in property <bool> problems-ready: false;
-    in property <string> problems-trouble: "";
-    in property <bool> problems-any-nameable: false;
-    callback problems-typed(int, string);
-    callback problems-derive(int);
-    callback problems-confirmed();
-    callback problems-edit(int);
-    callback problems-remove(int);
-    callback problems-acted(int);
-    callback problems-left();
+    in property <string> problems-said: "";
     callback problems-ignored();
     callback problems-quit();
 
@@ -1883,6 +1772,9 @@ export component MainWindow inherits Window {
     in property <string> redo-label: "";
     // How many concerns there are, and how many were set aside: see the two
     // buttons in the bar.
+    // The errors, for the button on the bar: see Surface's.
+    in property <[string]> error-rows: [];
+    callback error-chosen(int);
     in property <int> concern-count: 0;
     in property <int> aside-count: 0;
     callback show-concerns();
@@ -2085,6 +1977,8 @@ export component MainWindow inherits Window {
         undo-label: root.undo-label;
         redo-label: root.redo-label;
         trouble: root.trouble;
+        error-rows: root.error-rows;
+        error-chosen(which) => { root.error-chosen(which); }
         concern-count: root.concern-count;
         aside-count: root.aside-count;
         outside-count: root.outside-count;
@@ -2148,18 +2042,7 @@ export component MainWindow inherits Window {
         height: min(self.preferred-height, root.height - 2 * Space.wide);
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
-        rows: root.problems-rows;
-        everything: root.problems-everything;
-        ready: root.problems-ready;
-        trouble: root.problems-trouble;
-        any-nameable: root.problems-any-nameable;
-        typed(row, said) => { root.problems-typed(row, said); }
-        derive(row) => { root.problems-derive(row); }
-        confirmed => { root.problems-confirmed(); }
-        edit(row) => { root.problems-edit(row); }
-        remove(row) => { root.problems-remove(row); }
-        acted(row) => { root.problems-acted(row); }
-        left => { root.problems-left(); }
+        said: root.problems-said;
         ignored => { root.problems-ignored(); }
         quit => { root.problems-quit(); }
     }

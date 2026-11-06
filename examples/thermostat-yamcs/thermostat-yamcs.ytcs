@@ -9,8 +9,10 @@ tcspecial:
   # reading and decision the gateway node sends down. Each link says its
   # APID; the gateway node's sources count theirs on from its apid_base.
   #
-  # Every port is in the seventeen thousands, which no other example uses,
-  # so this one can be left running beside the thermostat example itself.
+  # Every port of its own is in the seventeen thousands, which no other
+  # example uses. Its sensors are the ones in thermostat-common, at the
+  # thermostat example's simulated devices, and its heaters are the same
+  # lines of the same GPIO chip, so the two examples are not run at once.
   beacon:
     apid: "0x110"
     default_interval: "5 s"
@@ -52,63 +54,19 @@ include:
 gateways:
   - type gateway_yamcs:
       # Yamcs's end of the link. Each reading drawn into this node comes
-      # down to Yamcs at ground_base plus its source's device id -- temp3 is
-      # the eighth of the twelve names, here and in the file this one
-      # includes, device id 7, so 17707 -- as telemetry of APID apid_base
-      # plus that device id, 0x407. What Yamcs sends up to address:port goes
+      # down to Yamcs at ground_base plus its source's device id -- to_k3 is
+      # the last of the twelve names, here and in the file this one
+      # includes, device id 11, so 17711 -- as telemetry of APID apid_base
+      # plus that device id, 0x40b. What Yamcs sends up to address:port goes
       # as a telecommand of APID apid_base.
       - gateway: gateway
         address: "127.0.0.1"
         apid_base: "0x400"
         ground_base: "127.0.0.1:17700"
         port: "17600"
-        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
-
-payloads:
-  # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
-  # as a vehicle would carry them. On a desk each is reached over UDP at its
-  # sim_address, where tcssim answers with the zone's temperature, so that they
-  # touch no hardware; flown, with no simulated devices, the buses are
-  # opened.
-  - type i2c_tmass:
-      # One of three sensors of the same place, a trio, so that the
-      # temperature survives one of them going wrong. Two bytes, signed,
-      # big endian.
-      - payload: temp_1
-        address: "0x48"
-        group: "zone_temps"
-        path: "/dev/i2c-1"
-        read_size: "2"
-        sim_address: "127.0.0.1:17801"
-        world-out:
-          - temp1.temp_1
-      # The second of the trio; the same part as temp_1, on the same bus.
-      - payload: temp_2
-        address: "0x49"
-        group: "zone_temps"
-        path: "/dev/i2c-1"
-        read_size: "2"
-        sim_address: "127.0.0.1:17802"
-        world-out:
-          - temp2.temp_2
-  - type spi_tmass:
-      # The third. A different part on a different bus: three bytes,
-      # unsigned, its own scale and so its own conversion, so that no one
-      # bus and no one part number can take the whole trio out.
-      - payload: temp_3
-        group: "zone_temps"
-        max_speed: "1000000"
-        path: "/dev/spidev0.0"
-        read_size: "3"
-        spi_mode: "0"
-        sim_address: "127.0.0.1:17803"
-        world-out:
-          - temp3.temp_3
+        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
 tcsgui:
   nodes:
     - { node: thermostat-common, x: 242, y: 166 }
     - { node: gateway, x: 790, y: 34 }
-    - { node: temp_1, x: 34, y: 34 }
-    - { node: temp_2, x: 34, y: 166 }
-    - { node: temp_3, x: 34, y: 280 }

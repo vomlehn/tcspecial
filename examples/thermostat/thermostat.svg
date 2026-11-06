@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1000" viewBox="0 0 1300 1000" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat example</title>
-  <desc id="desc">Three temperature sensors of one place on the thermal mass, temp_1, temp_2 and temp_3, read together ten times a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. Each sensor is the far end of a UDP socket on this host, ports 5201 to 5203, which tcssim plays. Each reading is converted to kelvin by temp1, temp2 and temp3, and each converted reading goes to the gateway node on the ground, to ambient as input in0, in1 or in2, and to the log housekeeping. ambient votes over the three, by the median, and produces one temperature on every arrival. Its value goes to the gateway node and to thermostat, a thermostat holding 293.15 K within a half-band of 2.0, whose decision is logged and drives the two heaters, each through a GPIO line of its own, gpio-out-tmass1 on line 4 and gpio-out-tmass2 on line 5. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. The thermostat&#8217;s decision does not go to the ground: each heater&#8217;s switch is a gpio_inout node, which drives its line and every second sends the gateway node the last value it was told, so the ground follows the heaters on a beat. The lines are on the kernel&#8217;s simulated chip, /dev/gpiochip1. tcspecial sends what each of ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2 and temp3 produces as UDP datagrams to the gateway node&#8217;s ground_base, 127.0.0.1:5100, plus the source&#8217;s device id: port 5100 for ambient, 5102 and 5103 for the heaters&#8217; switches, and 5105 to 5107 for the conversions. Ground software gets that data from the gateway node with a function call, tcslib&#8217;s GatewayReceiver::receive. The ground sets the thermostat&#8217;s setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">Three temperature sensors of one place on the thermal mass, temp_1, temp_2 and temp_3, read together once a second as the group zone_temps. Three of them, so that the temperature survives one sensor going wrong. temp_1 and temp_2 are on the I2C bus /dev/i2c-1, at addresses 0x48 and 0x49, and temp_3 on the SPI bus /dev/spidev0.0; on a desk tcssim plays them, the two on I2C through the kernel&#8217;s dummy bus and temp_3 over UDP at 127.0.0.1:5203. Each reading is converted to kelvin by to_k1, to_k2 and to_k3, and each converted reading goes to the gateway node on the ground and to ambient as input in0, in1 or in2. ambient votes over the three, by the median, and produces one temperature on every arrival. Its value goes to the gateway node and to thermostat, a thermostat holding 293.15 K within a half-band of 2.0, whose decision is logged and drives the two heaters, each through a GPIO line of its own, gpio-out-tmass1 on line 4 and gpio-out-tmass2 on line 5. Two heaters, because one failing must not leave the thermal mass with no way to be warmed. The thermostat&#8217;s decision does not go to the ground: each heater&#8217;s switch is a gpio_inout node, which drives its line and every second sends the gateway node the last value it was told, so the ground follows the heaters on a beat. The lines are on the kernel&#8217;s simulated chip, /dev/gpiochip1. tcspecial sends what each of ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2 and to_k3 produces as UDP datagrams to the gateway node&#8217;s ground_base, 127.0.0.1:5100, plus the source&#8217;s device id: port 5100 for ambient, 5102 and 5103 for the heaters&#8217; switches, and 5109 to 5111 for the conversions. Ground software gets that data from the gateway node with a function call, tcslib&#8217;s GatewayReceiver::receive. The ground sets the thermostat&#8217;s setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -44,20 +44,20 @@
   <!-- The group the three sensors are read in -->
   <rect class="group" x="50" y="88" width="192" height="344" rx="12"/>
   <text class="note" x="58" y="448">group zone_temps,</text>
-  <text class="note" x="58" y="464">read every 100 ms</text>
+  <text class="note" x="58" y="464">read every 1 s</text>
   <!-- Payloads -->
   <rect class="payload" x="60" y="100" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="124">temp_1</text>
-  <text class="kind" x="74" y="144">network, udp</text>
-  <text class="detail" x="74" y="162">127.0.0.1:5201</text>
+  <text class="kind" x="74" y="144">i2c, address 0x48</text>
+  <text class="detail" x="74" y="162">/dev/i2c-1</text>
   <rect class="payload" x="60" y="220" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="244">temp_2</text>
-  <text class="kind" x="74" y="264">network, udp</text>
-  <text class="detail" x="74" y="282">127.0.0.1:5202</text>
+  <text class="kind" x="74" y="264">i2c, address 0x49</text>
+  <text class="detail" x="74" y="282">/dev/i2c-1</text>
   <rect class="payload" x="60" y="340" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="364">temp_3</text>
-  <text class="kind" x="74" y="384">network, udp</text>
-  <text class="detail" x="74" y="402">127.0.0.1:5203</text>
+  <text class="kind" x="74" y="384">spi, mode 0</text>
+  <text class="detail" x="74" y="402">/dev/spidev0.0</text>
   <rect class="payload" x="60" y="580" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="604">gpio-out-tmass1</text>
   <text class="kind" x="74" y="624">gpio_inout, every 1 s</text>
@@ -70,15 +70,15 @@
   <text class="note" x="58" y="790">kernel&#8217;s simulated chip</text>
   <!-- Conversions -->
   <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="124">temp1</text>
+  <text class="name" x="314" y="124">to_k1</text>
   <text class="kind" x="314" y="144">compute, to_kelvin</text>
   <text class="detail" x="314" y="162">i16_be</text>
   <rect class="vehicle" x="300" y="220" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="244">temp2</text>
+  <text class="name" x="314" y="244">to_k2</text>
   <text class="kind" x="314" y="264">compute, to_kelvin</text>
   <text class="detail" x="314" y="282">i16_be</text>
   <rect class="vehicle" x="300" y="340" width="170" height="74" rx="10"/>
-  <text class="name" x="314" y="364">temp3</text>
+  <text class="name" x="314" y="364">to_k3</text>
   <text class="kind" x="314" y="384">compute, to_kelvin</text>
   <text class="detail" x="314" y="402">u24_be</text>
   <!-- The vote over the three, with its named inputs -->
@@ -111,7 +111,7 @@
   <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>
   <text class="name" x="1044" y="456">MOC software</text>
   <text class="kind" x="1044" y="477">processing and display</text>
-  <text class="detail" x="1044" y="496">from ambient ... temp3</text>
+  <text class="detail" x="1044" y="496">from ambient ... to_k3</text>
   <!-- Sensors to their conversions -->
   <path class="groundward" d="M230,137 L296,137" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M230,257 L296,257" marker-end="url(#arrow-blue)"/>
@@ -124,10 +124,6 @@
   <path class="groundward" d="M470,137 C505,137 505,232 536,232" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M470,257 L536,257" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M470,377 C505,377 505,282 536,282" marker-end="url(#arrow-blue)"/>
-  <!-- Each conversion into the log -->
-  <path class="groundward" d="M470,158 C498,158 498,484 536,484" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M470,278 C494,278 494,500 536,500" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M470,398 C490,398 490,516 536,516" marker-end="url(#arrow-blue)"/>
   <!-- The mean to the ground link and to the thermostat -->
   <path class="groundward" d="M710,240 C745,240 745,161 780,161 L1026,161" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M710,280 C745,280 745,377 776,377" marker-end="url(#arrow-blue)"/>
@@ -146,9 +142,9 @@
   <text class="label" x="600" y="656">what the first heater was told</text>
   <text class="label" x="600" y="756">and the second</text>
   <!-- Each source's port on the ground: ground_base plus its device id -->
-  <text class="portno" x="985" y="113">5105</text>
-  <text class="portno" x="985" y="128">5106</text>
-  <text class="portno" x="985" y="143">5107</text>
+  <text class="portno" x="985" y="113">5109</text>
+  <text class="portno" x="985" y="128">5110</text>
+  <text class="portno" x="985" y="143">5111</text>
   <text class="portno" x="985" y="158">5100</text>
   <text class="portno" x="1020" y="236">5102</text>
   <text class="portno" x="1078" y="236">5103</text>

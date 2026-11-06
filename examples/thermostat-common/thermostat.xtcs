@@ -2,30 +2,25 @@
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
-    <!-- The vehicle the two thermostat examples share, which each includes: -->
-    <!-- the three conversions and the vote between them, the thermostat and -->
-    <!-- its log, the heaters' switches, the group the -->
-    <!-- sensors are read in, and the setpoint the ground may set. What -->
-    <!-- differs between the two is in each example's own file: the -->
-    <!-- tcspecial section, the gateway node, and the three sensors, whose -->
-    <!-- ports differ so that both examples can run at once. The gateway -->
-    <!-- node is called gateway in both, which is the name the links here -->
-    <!-- send to it by and the command binding takes the setpoint from. -->
+    <!-- The vehicle the two thermostat examples share, which each includes:
+         the three sensors, the three conversions and the vote between them,
+         the thermostat and its log, the heaters' switches, the group the
+         sensors are read in, and the setpoint the ground may set. What
+         differs between the two is in each example's own file: the tcspecial
+         section and the gateway node. The gateway node is called
+         gateway in both, which is the name the links here send to it by and
+         the command binding takes the setpoint from. -->
 
-    <!-- What the examples that include this file may join: the three -->
-    <!-- conversions, whose readings arrive from the sensors in each -->
-    <!-- example's own file, and every reading that leaves for the gateway -->
-    <!-- node there. -->
+    <!-- What the examples that include this file may join: every reading that
+         leaves for the gateway node there. Nothing arrives from outside, the
+         sensors being here. -->
     <exports>
-        <world-in>temp1</world-in>
-        <world-in>temp2</world-in>
-        <world-in>temp3</world-in>
         <world-out>ambient</world-out>
         <world-out>gpio-out-tmass1</world-out>
         <world-out>gpio-out-tmass2</world-out>
-        <world-out>temp1</world-out>
-        <world-out>temp2</world-out>
-        <world-out>temp3</world-out>
+        <world-out>to_k1</world-out>
+        <world-out>to_k2</world-out>
+        <world-out>to_k3</world-out>
     </exports>
     <payload_groups>
         <name>zone_temps</name>
@@ -33,13 +28,13 @@
     </payload_groups>
     <vehicle>
         <type name="compute">
-            <!-- One temperature out of the three, by the algorithm named: -->
-            <!-- median takes the middle reading, closest_mean the mean of -->
-            <!-- the two that agree best. Either leaves a sensor that has -->
-            <!-- gone wrong out of the answer, which a mean over all three -->
-            <!-- would not, and it produces a value on every arrival, so one -->
-            <!-- sensor that stops reporting is outvoted rather than -->
-            <!-- stopping the vehicle from deciding anything. -->
+            <!-- One temperature out of the three, by the algorithm named:
+                 median takes the middle reading, closest_mean the mean of
+                 the two that agree best. Either leaves a sensor that has
+                 gone wrong out of the answer, which a mean over all three
+                 would not, and it produces a value on every arrival, so one
+                 sensor that stops reporting is outvoted rather than
+                 stopping the vehicle from deciding anything. -->
             <compute name="ambient">
                 <algorithm>median</algorithm>
                 <function>vote</function>
@@ -49,80 +44,73 @@
                 <world-in>in1</world-in>
                 <world-in>in2</world-in>
             </compute>
-            <compute name="temp1">
+            <!-- setpoint is set from the ground; half_band is how far either side
+                 of it the heaters are switched at, the setpoint being in the middle
+                 of the band. -->
+            <compute name="thermostat">
+                <function>thermostat</function>
+                <half_band>2.0</half_band>
+                <setpoint>293.15</setpoint>
+                <!-- asserted below the setpoint, unasserted above it. Two heaters, because
+                     one failing must not leave the mass with no way to be warmed: either
+                     alone holds the band while the orbit is warm, and both together hold
+                     it in the cold too, each switched through a line of its own. What it
+                     decides goes to the heaters and the log, and the ground is told it by
+                     the heaters' switches, each reporting what it was last told. -->
+                <moc-out>gpio-out-tmass1.thermostat</moc-out>
+                <moc-out>gpio-out-tmass2.thermostat</moc-out>
+                <world-out>housekeeping.thermostat</world-out>
+                <world-in>ambient</world-in>
+            </compute>
+            <!-- Each sensor's reading, to kelvin, for the vote and the gateway
+                 node: the parts differ in format and scale, so each has a
+                 conversion of its own. -->
+            <compute name="to_k1">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
                 <world-out>ambient.in0</world-out>
-                <world-out>gateway.temp1</world-out>
-                <world-out>housekeeping.temp1</world-out>
+                <world-out>gateway.to_k1</world-out>
                 <world-in>temp_1</world-in>
             </compute>
-            <compute name="temp2">
+            <compute name="to_k2">
                 <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
                 <world-out>ambient.in1</world-out>
-                <world-out>gateway.temp2</world-out>
-                <world-out>housekeeping.temp2</world-out>
+                <world-out>gateway.to_k2</world-out>
                 <world-in>temp_2</world-in>
             </compute>
-            <compute name="temp3">
+            <compute name="to_k3">
                 <format>u24_be</format>
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
                 <world-out>ambient.in2</world-out>
-                <world-out>gateway.temp3</world-out>
-                <world-out>housekeeping.temp3</world-out>
+                <world-out>gateway.to_k3</world-out>
                 <world-in>temp_3</world-in>
-            </compute>
-            <!-- setpoint is set from the ground; half_band is how far -->
-            <!-- either side of it the heaters are switched at, the setpoint -->
-            <!-- being in the middle of the band. -->
-            <compute name="thermostat">
-                <function>thermostat</function>
-                <half_band>2.0</half_band>
-                <setpoint>293.15</setpoint>
-                <!-- asserted below the setpoint, unasserted above it. Two -->
-                <!-- heaters, because one failing must not leave the mass -->
-                <!-- with no way to be warmed: either alone holds the band -->
-                <!-- while the orbit is warm, and both together hold it in -->
-                <!-- the cold too, each switched through a line of its own. -->
-                <!-- What it decides goes to the heaters and the log, and the -->
-                <!-- ground is told it by the switches of the heaters, each -->
-                <!-- reporting what it was last told. -->
-                <moc-out>gpio-out-tmass1.thermostat</moc-out>
-                <moc-out>gpio-out-tmass2.thermostat</moc-out>
-                <world-out>housekeeping.thermostat</world-out>
-                <world-in>ambient</world-in>
             </compute>
         </type>
         <type name="log">
             <compute name="housekeeping">
                 <directory>/tmp/telemetry</directory>
                 <format>variable_ts_rc</format>
-                <world-in>temp1</world-in>
-                <world-in>temp2</world-in>
-                <world-in>temp3</world-in>
                 <world-in>thermostat</world-in>
             </compute>
         </type>
     </vehicle>
     <payloads>
-        <!-- The switches of the heaters, on the thermal mass, through -->
-        <!-- the simulated chip of the kernel, which -->
-        <!-- bin/mk-kernel-dummies makes: lines 4 and 5, which leaves 0 -->
-        <!-- and 1 to the gpio example. -->
+        <!-- The heaters' switches, on the thermal mass, through the kernel's
+             simulated chip, which bin/mk-kernel-dummies makes: lines 4 and 5, which
+             leaves 0 and 1 to the gpio example. -->
         <type name="gpio_inout">
-            <!-- Each a line the thermostat drives, 1 for on and 0 for -->
-            <!-- off, and tells the heater it switches, and every second the -->
-            <!-- ground what it was last told, so the ground follows the -->
-            <!-- heaters on a beat and a lost report is made good by the -->
-            <!-- next. One payload each, so that one can be stopped from -->
-            <!-- the ground while the other goes on warming the mass. -->
+            <!-- Each a line the thermostat drives, 1 for on and 0 for off, and tells
+                 the heater it switches, and every second the ground what it was last
+                 told, so the ground follows the heaters on a beat and a lost report is
+                 made good by the next. One payload each, so that one can be stopped
+                 from the ground while the other goes on warming the mass. -->
             <payload name="gpio-out-tmass1">
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
@@ -138,6 +126,47 @@
                 <world-out>gateway.gpio-out-tmass2</world-out>
             </payload>
         </type>
+        <!-- The three sensors of the zone, two on an I2C bus and one on a SPI bus,
+             as a vehicle would carry them, each converted to kelvin for the
+             vote. On a desk the two on I2C are on the kernel's dummy bus,
+             i2c-stub, whose registers tcssim fills with the zone's temperature, and
+             the one on SPI is reached over UDP at its sim_address, where tcssim
+             answers the same; flown, with no simulated devices, the buses are
+             opened. -->
+        <type name="i2c">
+            <!-- One of three sensors of the same place, a trio, so that the
+                 temperature survives one of them going wrong. Two bytes, signed,
+                 big endian. -->
+            <payload name="temp_1">
+                <address>0x48</address>
+                <group>zone_temps</group>
+                <path>/dev/i2c-1</path>
+                <read_size>2</read_size>
+                <world-out>to_k1.temp_1</world-out>
+            </payload>
+            <!-- The second of the trio; the same part as temp_1, on the same bus. -->
+            <payload name="temp_2">
+                <address>0x49</address>
+                <group>zone_temps</group>
+                <path>/dev/i2c-1</path>
+                <read_size>2</read_size>
+                <world-out>to_k2.temp_2</world-out>
+            </payload>
+        </type>
+        <type name="spi">
+            <!-- The third. A different part on a different bus: three bytes,
+                 unsigned, its own scale and so its own conversion, so that no one
+                 bus and no one part number can take the whole trio out. -->
+            <payload name="temp_3">
+                <group>zone_temps</group>
+                <max_speed>1000000</max_speed>
+                <path>/dev/spidev0.0</path>
+                <read_size>3</read_size>
+                <sim_address>127.0.0.1:5203</sim_address>
+                <spi_mode>0</spi_mode>
+                <world-out>to_k3.temp_3</world-out>
+            </payload>
+        </type>
     </payloads>
     <!-- the zone temperature the heaters are held at, in kelvin -->
     <commands>
@@ -146,14 +175,17 @@
     </commands>
     <tcsgui>
         <nodes>
-            <node name="ambient" x="469" y="166"/>
+            <node name="ambient" x="450" y="242"/>
             <node name="gpio-out-tmass1" x="34" y="393"/>
             <node name="gpio-out-tmass2" x="34" y="469"/>
             <node name="housekeeping" x="469" y="450"/>
-            <node name="temp1" x="261" y="34"/>
-            <node name="temp2" x="261" y="166"/>
-            <node name="temp3" x="261" y="280"/>
+            <node name="temp_1" x="53" y="72"/>
+            <node name="temp_2" x="34" y="166"/>
+            <node name="temp_3" x="53" y="280"/>
             <node name="thermostat" x="601" y="242"/>
+            <node name="to_k1" x="299" y="166"/>
+            <node name="to_k2" x="299" y="242"/>
+            <node name="to_k3" x="299" y="317"/>
         </nodes>
     </tcsgui>
 </configuration>

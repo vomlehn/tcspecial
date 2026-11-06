@@ -18,8 +18,8 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:6100"
     source_base: "0.0.0.0:6000"
-  # tcspecial counts its starts in this file, which must be on storage
-  # that survives a power cycle on a vehicle.
+  # tcspecial counts its starts in this file, which must be on
+  # storage that survives a power cycle on a vehicle.
   state_file: "/tmp/tcspecial-thermostat.state"
   tcs_cmd:
     recv: "0.0.0.0:4000"
@@ -35,53 +35,9 @@ gateways:
         address: "127.0.0.1"
         ground_base: "127.0.0.1:5100"
         port: "5000"
-        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
-
-payloads:
-  # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
-  # as a vehicle would carry them. On a desk each is reached over UDP at its
-  # sim_address, where tcssim answers with the zone's temperature, so that they
-  # touch no hardware; flown, with no simulated devices, the buses are
-  # opened.
-  - type i2c_tmass:
-      # One of three sensors of the same place, a trio, so that the
-      # temperature survives one of them going wrong. Two bytes, signed,
-      # big endian.
-      - payload: temp_1
-        address: "0x48"
-        group: "zone_temps"
-        path: "/dev/i2c-1"
-        read_size: "2"
-        sim_address: "127.0.0.1:5201"
-        world-out:
-          - temp1.temp_1
-      # The second of the trio; the same part as temp_1, on the same bus.
-      - payload: temp_2
-        address: "0x49"
-        group: "zone_temps"
-        path: "/dev/i2c-1"
-        read_size: "2"
-        sim_address: "127.0.0.1:5202"
-        world-out:
-          - temp2.temp_2
-  - type spi_tmass:
-      # The third. A different part on a different bus: three bytes,
-      # unsigned, its own scale and so its own conversion, so that no one
-      # bus and no one part number can take the whole trio out.
-      - payload: temp_3
-        group: "zone_temps"
-        max_speed: "1000000"
-        path: "/dev/spidev0.0"
-        read_size: "3"
-        spi_mode: "0"
-        sim_address: "127.0.0.1:5203"
-        world-out:
-          - temp3.temp_3
+        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
 tcsgui:
   nodes:
-    - { node: thermostat-common, x: 563, y: 374 }
     - { node: gateway, x: 790, y: 34 }
-    - { node: temp_1, x: 34, y: 34 }
-    - { node: temp_2, x: 34, y: 166 }
-    - { node: temp_3, x: 53, y: 299 }
+    - { node: thermostat-common, x: 299, y: 53 }

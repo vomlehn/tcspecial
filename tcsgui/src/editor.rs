@@ -2598,9 +2598,9 @@ tcsgui:
             root,
             &[(
                 common,
-                "temp_1\n        accuracy: \"0.5 K\"\n        \
+                "temp_1\n        accuracy: 0.5 K\n        \
                  group: zone_temps\n        lag: 4 s\n",
-                "temp_1\n        accuracy: \"0.5 K\"\n        \
+                "temp_1\n        accuracy: 0.5 K\n        \
                  group: zone_temps\n        lag: 5 s\n",
             )],
         );
@@ -2619,7 +2619,7 @@ tcsgui:
             )],
         );
 
-        // A value its author quoted, which keeps its quotes.
+        // A value its author left unquoted, which stays so.
         let before = every_file(root);
         set(&mut editor, "accuracy", Some("0.5 K"), Some("0.4 K"));
         only_changed(
@@ -2627,8 +2627,8 @@ tcsgui:
             root,
             &[(
                 common,
-                "- payload: temp_1\n        accuracy: \"0.5 K\"\n",
-                "- payload: temp_1\n        accuracy: \"0.4 K\"\n",
+                "- payload: temp_1\n        accuracy: 0.5 K\n",
+                "- payload: temp_1\n        accuracy: 0.4 K\n",
             )],
         );
 
@@ -2637,11 +2637,11 @@ tcsgui:
         set(&mut editor, "jitter", Some("10 ms"), None);
         only_changed(&before, root, &[(common, "        jitter: 10 ms\n", "")]);
 
-        // A physics figure, likewise.
+        // A physics figure its author quoted, which keeps its quotes.
         let before = every_file(root);
         editor.edit(Edit::SetPhysics {
-            component: "heater_2".to_string(),
-            setting: "power".to_string(),
+            component: "zone".to_string(),
+            setting: "heater_2_power".to_string(),
             was: Some("4 W".to_string()),
             now: Some("5 W".to_string()),
         });
@@ -2652,8 +2652,10 @@ tcsgui:
             root,
             &[(
                 common,
-                "- component: heater_2\n            power: \"4 W\"\n",
-                "- component: heater_2\n            power: \"5 W\"\n",
+                "heater_1_power: \"4 W\"\n            \
+                 heater_2_power: \"4 W\"\n",
+                "heater_1_power: \"4 W\"\n            \
+                 heater_2_power: \"5 W\"\n",
             )],
         );
     }

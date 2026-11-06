@@ -1035,7 +1035,7 @@ mod tests {
         let thermostat =
             Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
-        assert_eq!(Form::of(&thermostat, "temp1"), Form::Value(Unit::Kelvin));
+        assert_eq!(Form::of(&thermostat, "to_k1"), Form::Value(Unit::Kelvin));
         assert_eq!(Form::of(&thermostat, "ambient"), Form::Value(Unit::Kelvin));
         assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);

@@ -1727,24 +1727,11 @@ fn sheet_left(dividers: Dividers, home: &Home) -> i32 {
     dividers.physics + edge_of(home)
 }
 
-/// Where what is inside a page begins and ends, in the working panes' own
-/// coordinates: from the Physics pane's left edge to the Gateway pane's
-/// right one. A subdiagram's edge is the margin either side of it.
-///
-/// The Physics pane inside rather than outside the edge, though it holds
-/// nothing of the subdiagram's file, because it is drawn against the
-/// payloads it joins: put past the edge, a line from a sensor to the zone
-/// it reads would cross the edge without leaving the page.
-///
-/// # Arguments
-///
-/// * `dividers` - Where the panes are.
-///
-/// # Returns
-///
-/// The left and right of the page's inside, in pixels.
+/// Where what is inside a page begins and ends: see
+/// `tcsdiagram::pane::inside_of`, which tcspecial's visual window draws by
+/// too.
 fn inside_of(dividers: Dividers) -> (i32, i32) {
-    (-dividers.physics, pane::WORKING_WIDTH)
+    pane::inside_of(dividers)
 }
 
 /// [`inside_of`], as the drawing's arithmetic takes it.
@@ -1764,16 +1751,13 @@ fn inside_f(dividers: Dividers) -> (f32, f32) {
 ///
 /// Each terminal, where `tcsdiagram::style::edge_box` puts it.
 fn edge_views(dividers: Dividers) -> Vec<EdgeView> {
-    ["world-in", "moc-out", "world-out", "moc-in"]
+    style::edge_terminals(inside_f(dividers))
         .into_iter()
-        .filter_map(|terminal| {
-            let (x, y, _, _) = style::edge_box(terminal, inside_f(dividers))?;
-            Some(EdgeView {
-                terminal: terminal.into(),
-                x,
-                y,
-                rightward: style::corner_of(terminal)?.rightward,
-            })
+        .map(|edge| EdgeView {
+            terminal: edge.terminal.into(),
+            x: edge.x,
+            y: edge.y,
+            rightward: edge.rightward,
         })
         .collect()
 }
@@ -4985,18 +4969,12 @@ fn views_of(
                 .find(|f| f.node() == Some(absolute.as_str()))
                 .map(|f| f.describe());
 
-            // A subdiagram that is not open shows what is in it: how many
-            // nodes, and how many connections cross its edge. Those are the
-            // two things worth knowing about a diagram you are not looking
-            // at, and they are what "simplified" means here -- not a smaller
-            // drawing of the contents, which would be unreadable.
+            // A subdiagram that is not open shows what is in it: see
+            // tcsdiagram::view::box_summary.
             let summary = (node.node_type == "subdiagram").then(|| {
-                let inside = document.nodes_in(&Some(node.name.clone())).len();
-                let crossing = document.crossings(&node.name);
-                format!(
-                    "{inside} node{} · {crossing} crossing{}",
-                    if inside == 1 { "" } else { "s" },
-                    if crossing == 1 { "" } else { "s" }
+                tcsdiagram::view::box_summary(
+                    document.nodes_in(&Some(node.name.clone())).len(),
+                    document.crossings(&node.name),
                 )
             });
 

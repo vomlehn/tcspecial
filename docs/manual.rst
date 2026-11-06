@@ -5346,8 +5346,14 @@ a link each time data is sent over it: a wide line, a shade lighter than the
 link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.
 
-Nothing in the window can be pressed. Close it to stop tcspecial, which stops
-as it does on an interrupt; if tcspecial stops first, the window closes.
+A configuration that includes other files opens a window for each of them as
+well, drawn as tcsgui draws that subdiagram's page, with its edge in the
+margins and its own physics; on the top page, each is a box. A link that
+crosses a subdiagram's edge blinks on both pages.
+
+Nothing in the windows can be pressed. Close any of them to stop tcspecial,
+which stops as it does on an interrupt; if tcspecial stops first, the windows
+close.
 
 The window is for a run with stand-ins, so ``--visual`` wants
 ``--simulate=some`` or ``--simulate=all`` beside it. Under

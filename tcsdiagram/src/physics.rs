@@ -124,19 +124,23 @@ impl Drawn {
     }
 }
 
-/// What a simulator file's world draws on the top page: its components
-/// that the `tcsgui` section puts on no subdiagram's page, its connections,
-/// and every simulated payload's `connects`, its group's where it states
-/// none.
+/// What a simulator file's world draws on one page: its components that
+/// the `tcsgui` section puts on that page -- on the top page, those it puts
+/// on no subdiagram's -- its connections, and every simulated payload's
+/// `connects`, its group's where it states none.
 ///
 /// # Arguments
 ///
-/// * `sim` - The simulator file.
+/// * `sim`  - The simulator file.
+/// * `page` - The page drawn: a subdiagram's name, or `None` for the top.
 ///
 /// # Returns
 ///
 /// What is drawn, in the one order the model has.
-pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
+pub fn of_simulator(
+    sim: &tcslibgs::sim_config::SimConfigFile,
+    page: Option<&str>,
+) -> Drawn {
     let mut drawn = Drawn::default();
     if let Some(world) = &sim.world {
         drawn.components = world
@@ -160,13 +164,18 @@ pub fn of_simulator(sim: &tcslibgs::sim_config::SimConfigFile) -> Drawn {
             .iter()
             .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
             .collect();
-        // The top page's components only, which is the page drawn: one the
-        // editor put on a subdiagram's page is drawn there and not here.
-        let elsewhere: Vec<&String> = tcsgui.pages.values().flatten().collect();
-        drawn
-            .components
-            .retain(|(name, _)| !elsewhere.contains(&name));
     }
+    // The page's components only: one the editor put on a subdiagram's page
+    // is drawn there and nowhere else, and one it put on none is the top
+    // page's.
+    let pages = sim.tcsgui.as_ref().map(|tcsgui| &tcsgui.pages);
+    let page_of = |name: &String| {
+        pages?
+            .iter()
+            .find(|(_, components)| components.contains(name))
+            .map(|(page, _)| page.as_str())
+    };
+    drawn.components.retain(|(name, _)| page_of(name) == page);
     for payload in &sim.simulated_payloads {
         if let Some(said) = sim.settings_of(payload).connects {
             for terminal in tcslibgs::sim_config::terminals_of(&said) {
@@ -664,6 +673,32 @@ pub fn dashed(points: &[(f32, f32)]) -> String {
 mod tests {
     use super::*;
     use crate::pane::default_dividers;
+
+    /// Each page draws the components the `tcsgui` section puts on it, and
+    /// the top page those it puts on none.
+    #[test]
+    fn each_page_draws_its_own_components() {
+        let sim = tcslibgs::sim_config::SimConfigFile::parse(
+            "world:\n  physics:\n    components:\n      \
+             - type heater:\n          - component: heater_1\n            \
+             power: \"4 W\"\n            voltage: \"28 V\"\n          \
+             - component: heater_2\n            power: \"4 W\"\n            \
+             voltage: \"28 V\"\n\
+             tcsgui:\n  nodes: []\n  pages:\n    zone: [heater_2]\n",
+            tcslibgs::ConfigFormat::Yaml,
+        )
+        .expect("the file reads");
+        let names = |page| -> Vec<String> {
+            of_simulator(&sim, page)
+                .components
+                .into_iter()
+                .map(|(name, _)| name)
+                .collect()
+        };
+        assert_eq!(names(None), ["heater_1"]);
+        assert_eq!(names(Some("zone")), ["heater_2"]);
+        assert!(names(Some("elsewhere")).is_empty());
+    }
 
     /// The components go down the Physics pane in the order given, inside
     /// it, on the node grid, clear of its heading, and none on another.

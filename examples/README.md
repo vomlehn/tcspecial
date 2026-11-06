@@ -623,8 +623,9 @@ value as `value_bytes` makes it, in every unit there is, and each decision;
 `python.rs` runs `test_thermostat_yamcs.py`. None needs
 Yamcs or opens a window.
 
-Its ports are all in the seventeen thousands, which no other example uses,
-so it can run beside the thermostat example.
+Its own ports are all in the seventeen thousands, which no other example
+uses. Its sensors are thermostat-common's, at the thermostat example's ports,
+and its heaters are the same GPIO lines, so the two are not run at once.
 
 Languages:
 

@@ -1257,9 +1257,10 @@ fn main() {
     for (row, payload) in made.iter_mut().enumerate() {
         // A payload not yet running, so this cannot be refused.
         let _ = payload.start();
-        // As though its button had been pressed, where --sending asks: which
-        // for a heater is to power it.
-        if sending {
+        // As though its button had been pressed, where --sending asks, or
+        // the simulator file's enable says so of this payload: which for a
+        // heater is to power it.
+        if sending || sims.get(row).is_some_and(|sim| sim.enabled) {
             payload.send(true);
             update_row(&model, row, |info| {
                 info.status = SharedString::from(RUNNING_STATUS);
@@ -2510,6 +2511,7 @@ mod tests {
             faults: Default::default(),
             payload_address: None,
             payload_port: None,
+            enabled: false,
         }
     }
 

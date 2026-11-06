@@ -376,6 +376,7 @@ mod tests {
             faults: Default::default(),
             payload_address: None,
             payload_port: None,
+            enabled: false,
         }
     }
 

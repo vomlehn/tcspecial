@@ -12895,6 +12895,18 @@ Requirement
     the other would be worse than either button alone.
 
 Requirement
+    A payload starts disabled unless its simulator file's ``enable`` is
+    ``true``, its own or its group's, a payload's own overriding the group's:
+    ``enable: true`` in YAML and ``<enable value="true"/>`` in XML. Then it
+    starts as though its ``Enable`` had been pressed. Disabled is the
+    default, so that a simulator never starts sending what nobody asked for,
+    and a run that wants a payload sending from the start says which in the
+    file it is run with rather than in a flag for every payload at once.
+    ``--sending`` still starts every payload. ``enable`` is the simulator's
+    alone: tcspecial never reads the simulator file, and a configuration
+    that flies says nothing of what a simulator does.
+
+Requirement
     A payload that failed to start offers ``Enable`` again. It is not
     sending, which is what its status says, and the useful thing to offer is
     the start that failed rather than a stop of something that never began.

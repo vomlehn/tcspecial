@@ -1497,7 +1497,7 @@ mod tests {
                         "group" => "steady_1hz",
                         "protocol" => "udp",
                         "payload_address" => "127.0.0.1",
-                        "simulate" => "true",
+                        "simulate" | "enable" => "true",
                         _ => "1",
                     };
                     (name.to_string(), value.to_string())

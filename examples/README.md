@@ -478,8 +478,8 @@ with it aboard and on the ground.
 
 A control loop, aboard. Three temperature sensors are read together, once a
 second, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
-reading goes through a conversion of its own to kelvin -- `temp1`, `temp2`,
-`temp3`, the parts differing in format and scale -- and the three meet at
+reading goes through a conversion of its own to kelvin -- `to_k1`, `to_k2`,
+`to_k3`, the parts differing in format and scale -- and the three meet at
 `ambient`, which takes their median, so that one sensor failing cannot take
 the zone's temperature with it. `thermostat` holds that to a setpoint,
 293.15 K with a half band of 2 K, and drives two heaters, each through a GPIO
@@ -487,15 +487,19 @@ line of its own, `gpio-out-tmass1` and `gpio-out-tmass2`, which go on and off
 together. Each switch is a `gpio_inout`: it drives its line, and every second
 sends the ground the last value it was told, so the ground follows the
 heaters on a beat. The ground commands the setpoint, and `housekeeping` logs
-the readings and the decisions in `/tmp/telemetry`.
+the decisions in `/tmp/telemetry`.
 
-The sensors are temperature sensors on the zone: `temp_1` and `temp_2` on an
-I2C bus, of type `i2c_tmass`, and `temp_3` a SPI peripheral, of type
-`spi_tmass`. On a desk each is reached over UDP at its `sim_address` on this
-host, ports 5201 to 5203, where tcssim answers with the zone's temperature;
-flown, the buses are opened. The heaters' switches are lines 4 and 5 of the
-kernel's dummy GPIO chip, `/dev/gpiochip1`, which tcssim watches: make it once with `sudo bin/mk-kernel-dummies gpio`
-(see "Payloads on the kernel's dummy devices", below). The gpio example has
+The sensors are temperature sensors on the zone, in
+`thermostat-common/thermostat.ytcs` with the rest of the vehicle: `temp_1` and
+`temp_2` on an I2C bus, of type `i2c`, and `temp_3` a SPI peripheral, of type
+`spi`. On a desk the two on I2C are chips of the kernel's dummy bus,
+`i2c-stub`, whose registers tcssim fills with the zone's temperature (`sudo
+bin/mki2c` makes it), and `temp_3` is reached over UDP at its `sim_address`,
+127.0.0.1:5203, where tcssim answers the same; flown, the buses are opened.
+The heaters' switches are lines 4 and 5 of the kernel's dummy GPIO chip,
+`/dev/gpiochip1`, which tcssim watches: make it once with `sudo
+bin/mk-kernel-dummies gpio` (see "Payloads on the kernel's dummy devices",
+below). The gpio example has
 lines 0 and 1 of it, so the two run at once. The buses themselves are flown
 against simulated devices by `make simulated-devices-test`, with
 `tests/manual/thermostat.ytcs`.
@@ -503,13 +507,14 @@ against simulated devices by `make simulated-devices-test`, with
 tcssim joins the simulated payloads to the vehicle's physics model, in the world
 section of `thermostat-sim.yaml`, a link to
 `thermostat-common/thermostat-sim.yaml`, which thermostat-yamcs's simulator
-file is a link to too: a zone and two heaters, each a part simulated alone
-and joined to the zone under `connections`. All three sensors are joined to `zone.temperature`, each from
+file is a link to too: a zone with two heaters of its own, four watts each,
+`heater_1_power` and `heater_2_power`. All three sensors are joined to
+`zone.temperature`, each from
 a place of its own on the zone, so their readings agree and the vote
 produces a temperature. The zone starts at 292.15 K, inside the band, and
 cools towards its surroundings, 288.15 K, just inside the
 plot's lower red, which swing half a kelvin over a ninety minute orbit; each
-heater's switch is joined to `heater_1.on` or `heater_2.on`, so the
+heater's switch is joined to `zone.heater_1` or `zone.heater_2`, so the
 heaters warm it while the vehicle has them on: the loop closes through
 tcspecial.
 The heaters are four watts each, and either alone holds the band, the
@@ -549,8 +554,8 @@ Languages:
 The thermostat example with [Yamcs](https://yamcs.org) at the ground end,
 as ping-yamcs is the ping example with it. The vehicle is the thermostat's
 -- the same conversions, vote, thermostat, heaters, GPIO lines and log,
-from the file both include, `thermostat-common/thermostat.ytcs`, the same
-three sensors, at ports of its own, and the same simulator file,
+from the file both include, `thermostat-common/thermostat.ytcs`, with the same
+three sensors, and the same simulator file,
 `thermostat-common/thermostat-sim.yaml`, physics model and all, each
 example's being a link to it; the two cannot run at once, their heaters
 being the same lines of one GPIO chip -- and what differs is
@@ -564,7 +569,7 @@ ground carries a CCSDS primary header:
 | what Yamcs sends the gateway node | up | its `apid_base`, 0x400 |
 | `ambient` | down | `apid_base` plus its device id, 0x400 |
 | `gpio-out-tmass1`, `gpio-out-tmass2` | down | 0x402 and 0x403 |
-| `temp1`, `temp2`, `temp3` | down | 0x405 to 0x407 |
+| `to_k1`, `to_k2`, `to_k3` | down | 0x409 to 0x40b |
 
 `thermostat_yamcs.py` writes Yamcs's configuration with
 `python/tcslib/yamcs_ground.py`, as `ping_yamcs.py` does, its mission
@@ -577,7 +582,7 @@ conversion's or a vote's value is a float in its unit, with the unit in a
 `UnitSet`, read from its four bytes of a signed count of the unit's steps
 through a calibrator, and a decision -- what a heater's switch was told -- is
 a boolean. So Yamcs's web interface, at <http://localhost:17090>, shows
-`ambient` and `temp1` to `temp3` as temperatures in K and `gpio-out-tmass1`
+`ambient` and `to_k1` to `to_k3` as temperatures in K and `gpio-out-tmass1`
 and `gpio-out-tmass2` as true or false.
 
 It starts Yamcs, then tcssim -- every payload sending from the start, as

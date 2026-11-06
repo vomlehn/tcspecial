@@ -249,7 +249,7 @@ terminal
     one of them, which takes a line in hand; the node the line is to reach,
     anywhere on it; and, in the menu that node shows, the input the line is to
     arrive at. Inputs that cannot take the line are in the menu greyed, saying
-    why -- ``(fed by temp1)``, ``(joined already)``. Escape, a right click or a
+    why -- ``(fed by to_k1)``, ``(joined already)``. Escape, a right click or a
     click on bare sheet puts the line down. A line already drawn is picked up
     by clicking the terminal at either end of it: the next node clicked offers
     to move that end there, and the node it was picked up from, or the Delete
@@ -506,10 +506,9 @@ refused, saying which list to add the node to:
 .. code-block:: yaml
 
    exports:
-     world-in: [temp1, temp2, temp3]
-     world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
+     world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
-In XML each name is an element of its own, ``<world-in>temp1</world-in>``,
+In XML each name is an element of its own, ``<world-out>to_k1</world-out>``,
 inside ``<exports>``. A top file has nothing around it and may not have the
 section. tcsgui draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
@@ -1886,8 +1885,7 @@ read the same way; what the type adds is what it is, and one attribute:
                   sim_address
 
 In the simulator file each is listed under its own type and joined to the
-thermal mass's ``temperature`` by ``connects``, as the thermostat example's
-are:
+thermal mass's ``temperature`` by ``connects``:
 
 .. code-block:: yaml
 
@@ -2026,9 +2024,9 @@ This is the thermostat example as it would be aboard, without its
 ``tcspecial`` section: three sensors of one place, two on an I\ :superscript:`2`\ C
 bus and one on SPI, read together as a group, and two sets of heater lines
 driven by what the vehicle decides. It is ``tests/manual/thermostat.ytcs``;
-the shipped ``examples/thermostat`` puts each of these payloads on a UDP
-socket instead, so that it runs on any desk and touches no hardware (see `The
-thermostat example`_). Each payload is named for what it is,
+the shipped ``examples/thermostat`` has the same sensors, which on a desk
+tcssim plays on the kernel's dummy I\ :superscript:`2`\ C bus and, for
+``temp_3``, over UDP (see `The thermostat example`_). Each payload is named for what it is,
 which is what a panel in the MOC shows.
 
 .. code-block:: yaml
@@ -2273,11 +2271,11 @@ The thermostat example
 ----------------------
 .. figure:: ../examples/thermostat/thermostat.svg
    :alt: The thermostat example: three temperature sensors of one place,
-         converted to kelvin, voted on, logged and sent to the ground, with a
+         converted to kelvin, voted on and sent to the ground, with a
          thermostat driving two heaters, each through a GPIO line whose
-         switch reports what it was told to the ground. Each sensor is the
-         far end of a UDP socket and each line one of the kernel's dummy
-         chip, which tcssim watches.
+         switch reports what it was told to the ground. Two sensors are on
+         an I2C bus and one on SPI, and each line is one of the kernel's
+         dummy chip, which tcssim watches.
    :width: 100%
 
    ``examples/thermostat``: a trio of sensors, a vote, a thermostat, its two
@@ -2291,13 +2289,14 @@ the hardware allows.
 
 The sensors are temperature sensors on the zone, as a vehicle would carry
 them: ``temp_1`` and ``temp_2`` on an I\ :superscript:`2`\ C bus, of type
-``i2c_tmass``, and ``temp_3`` a SPI peripheral, of type ``spi_tmass`` --
-see `Temperature Sensors on a Thermal Mass`_. On a desk each is reached over
-UDP at its ``sim_address`` on this host, ports 5201 to 5203, where tcssim
-answers with the zone's temperature, so that the example touches no bus;
-flown, the buses are opened. The
-heaters, and the lines that sense them, are GPIO lines 2 to 5 of the kernel's
-dummy chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
+``i2c``, and ``temp_3`` a SPI peripheral, of type ``spi``. They are in
+``examples/thermostat-common/thermostat.ytcs``, which the example includes,
+with the rest of the vehicle. On a desk the two on I\ :superscript:`2`\ C
+are chips of the kernel's dummy bus, ``i2c-stub``, whose registers tcssim
+fills with the zone's temperature -- ``sudo bin/mki2c`` makes it -- and
+``temp_3`` is reached over UDP at its ``sim_address``, ``127.0.0.1:5203``,
+where tcssim answers the same; flown, the buses are opened. The heaters'
+switches are GPIO lines 4 and 5 of the kernel's dummy chip, ``/dev/gpiochip1``, which tcssim moves and watches: ``sudo
 bin/mk-kernel-dummies gpio`` makes it, once, before the example is run --
 see `Making the Kernel's Dummy Devices`_. The gpio example has lines 0 and 1, so
 the two run at once; the thermostat-yamcs example has the same lines as this,
@@ -2309,11 +2308,11 @@ bytes on a scale of its own where the first two report two signed bytes on
 theirs, so that no one part number can take the whole trio out.
 
 Each reading is converted to kelvin by its own ``to_kelvin`` node,
-``temp1``, ``temp2`` or ``temp3``, and each converted reading goes three ways:
+``to_k1``, ``to_k2`` or ``to_k3``, and each converted reading goes two ways:
 to the ground through the gateway node -- at its ``ground_base``,
-``127.0.0.1:5100``, plus each source's device id, so ``temp1``, ``temp2`` and
-``temp3``, ids 6 to 8, arrive on ports 5106 to 5108 -- into ``ambient`` as the
-input ``in0``, ``in1`` or ``in2``, and into the log ``housekeeping``.
+``127.0.0.1:5100``, plus each source's device id, so ``to_k1``, ``to_k2`` and
+``to_k3``, ids 9 to 11, arrive on ports 5109 to 5111 -- and into ``ambient``
+as the input ``in0``, ``in1`` or ``in2``.
 
 ``ambient`` is a ``vote``: one temperature out of the three by the algorithm
 it names, ``median``, which takes the middle reading. A mean would be the wrong
@@ -2360,7 +2359,7 @@ No payload here has a telemetry link of its own: the sensors' readings reach
 the ground through their conversions, and the heaters' switches are drawn
 into the gateway node. Tcssim counts each decision the vehicle drives the
 switches to, and switches the heater each is joined to -- ``connects:
-heater_1.on`` -- by it.
+zone.heater_1`` -- by it.
 
 The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
@@ -2374,7 +2373,7 @@ the reason the vehicle sends -- ``no command binding says the ground may set
 The simulator file beside it, ``thermostat-sim.yaml``, is a link to
 ``examples/thermostat-common/thermostat-sim.yaml``, which thermostat-yamcs,
 the same vehicle with Yamcs as its ground station, links to too. Its world
-holds the vehicle's physics model: a zone and two heaters joined to it.
+holds the vehicle's physics model: a zone with two heaters of its own.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; tcssim switches each heater while the
@@ -2869,19 +2868,18 @@ to: each
 example's is a link to ``examples/thermostat-common/thermostat-sim.yaml``,
 so that each is found beside its configuration by name. The vehicle is
 written once, in ``examples/thermostat-common/thermostat.ytcs`` and its
-XML, which both configurations include: the conversions, the vote, the
-thermostat and its log, the heaters' switches, the
-``zone_temps`` group and the setpoint's binding. Each example's own file
-has its ``tcspecial`` section, its gateway node, called ``gateway`` in
-both, and the three sensors, whose ports differ. The two cannot run at
-once all the same, their heaters being the same lines of one GPIO chip, so
-they answer whether tcssim is ready at one address. What differs is the
+XML, which both configurations include: the three sensors, the
+conversions, the vote, the thermostat and its log, the heaters' switches,
+the ``zone_temps`` group and the setpoint's binding. Each example's own file
+has its ``tcspecial`` section and its gateway node, called ``gateway`` in
+both. The two cannot run at once, their sensors and their heaters being
+the same, so they answer whether tcssim is ready at one address. What differs is the
 gateway, ``yamcs``: the beacon is telemetry of APID ``0x110``, CONNECT and
 its answer are on ``0x111``, and each source drawn into the gateway node
 comes down as telemetry of its ``apid_base``, ``0x400``, plus the source's
 device id -- ``ambient`` on ``0x400``, ``gpio-out-tmass1`` and
-``gpio-out-tmass2`` on ``0x402`` and ``0x403``, and ``temp1`` to ``temp3`` on
-``0x405`` to ``0x407``.
+``gpio-out-tmass2`` on ``0x402`` and ``0x403``, and ``to_k1`` to ``to_k3`` on
+``0x409`` to ``0x40b``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the
@@ -2911,7 +2909,7 @@ each time a heater's switch changes, of these forms:
 .. code-block:: text
 
    connected: the vehicle is running this configuration
-   read: ambient <T> K, temp1 <T> K, temp2 <T> K, temp3 <T> K,
+   read: ambient <T> K, to_k1 <T> K, to_k2 <T> K, to_k3 <T> K,
    gpio-out-tmass1 off, gpio-out-tmass2 off
    switched: gpio-out-tmass1 off -> on; ambient <T> K, ...
 
@@ -4056,64 +4054,53 @@ example shares with thermostat-yamcs, its world shortened here:
      ambient_temp: "288.15 K"
      physics:
        components:
-         - type heater:
-             - component: heater_1
-               power: "4 W"
-               voltage: "28 V"
-             - component: heater_2
-               power: "4 W"
-               voltage: "28 V"
          - type thermal_mass:
              - component: zone
                capacity: "20 J/K"
+               heater_1_power: "4 W"
+               heater_2_power: "4 W"
                start: "292.15 K"
                time_constant: "50 s"
-       connections:
-         - { from: heater_1.heat, to: zone.heat }
-         - { from: heater_2.heat, to: zone.heat }
 
    simulated_payload_groups:
      - group: zone_temps
        connects: zone.temperature
-       drift: "0.05 K"
-       drift_time: "30 min"
+       drift: 0.05 K
+       drift_time: 30 min
        packet_interval: 1 s
        simulate: true
 
    simulated_payloads:
-     - type network:
-         - payload: heaters_1
-           connects: heater_1.on
-           protocol: udp
+     - type gpio_inout:
+         - payload: gpio-out-tmass1
+           connects: zone.heater_1
            simulate: true
 
-         - payload: heaters_2
-           connects: heater_2.on
-           protocol: udp
+         - payload: gpio-out-tmass2
+           connects: zone.heater_2
            simulate: true
 
+     - type i2c:
          - payload: temp_1
-           accuracy: "0.5 K"
+           accuracy: 0.5 K
            group: zone_temps
            lag: 4 s
-           noise: "0.03 K"
-           protocol: udp
+           noise: 0.03 K
 
          - payload: temp_2
-           accuracy: "0.5 K"
+           accuracy: 0.5 K
            group: zone_temps
            lag: 4 s
-           noise: "0.03 K"
-           offset: "+0.2 K"
-           protocol: udp
+           noise: 0.03 K
+           offset: +0.2 K
 
+     - type spi:
          - payload: temp_3
-           accuracy: "0.25 K"
+           accuracy: 0.25 K
            group: zone_temps
            lag: 6 s
-           noise: "0.02 K"
-           offset: "-0.3 K"
-           protocol: udp
+           noise: 0.02 K
+           offset: -0.3 K
 
 Installing
 ==========

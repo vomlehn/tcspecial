@@ -700,7 +700,7 @@ the middle and the gateway on the right. A link is made in three clicks:
 one of them, which takes a line in hand; the node the line is to reach,
 anywhere on it; and, in the menu that node shows, the input the line is to
 arrive at. Inputs that cannot take the line are in the menu greyed, saying
-why -- <tt class="docutils literal">(fed by temp1)</tt>, <tt class="docutils literal">(joined already)</tt>. Escape, a right click or a
+why -- <tt class="docutils literal">(fed by to_k1)</tt>, <tt class="docutils literal">(joined already)</tt>. Escape, a right click or a
 click on bare sheet puts the line down. A line already drawn is picked up
 by clicking the terminal at either end of it: the next node clicked offers
 to move that end there, and the node it was picked up from, or the Delete
@@ -936,10 +936,9 @@ there, and a line that crosses into or out of the file anywhere else is
 refused, saying which list to add the node to:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">exports</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">world-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span><span class="whitespace">
-  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">temp3</span><span class="punctuation indicator">]</span>
+  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k3</span><span class="punctuation indicator">]</span>
 </pre>
-<p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-in&gt;temp1&lt;/world-in&gt;</span></tt>,
+<p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-out&gt;to_k1&lt;/world-out&gt;</span></tt>,
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
 section. tcsgui draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
@@ -2238,8 +2237,7 @@ sim_address    a loopback address and port: 127.0.0.1:5201. Under
                sim_address
 </pre>
 <p>In the simulator file each is listed under its own type and joined to the
-thermal mass's <tt class="docutils literal">temperature</tt> by <tt class="docutils literal">connects</tt>, as the thermostat example's
-are:</p>
+thermal mass's <tt class="docutils literal">temperature</tt> by <tt class="docutils literal">connects</tt>:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c_tmass</span><span class="punctuation">:</span><span class="whitespace">
@@ -2372,9 +2370,9 @@ produced them, so it applies to every type of payload alike.</p>
 <tt class="docutils literal">tcspecial</tt> section: three sensors of one place, two on an I<sup>2</sup>C
 bus and one on SPI, read together as a group, and two sets of heater lines
 driven by what the vehicle decides. It is <tt class="docutils literal">tests/manual/thermostat.ytcs</tt>;
-the shipped <tt class="docutils literal">examples/thermostat</tt> puts each of these payloads on a UDP
-socket instead, so that it runs on any desk and touches no hardware (see <a class="reference internal" href="#the-thermostat-example">The
-thermostat example</a>). Each payload is named for what it is,
+the shipped <tt class="docutils literal">examples/thermostat</tt> has the same sensors, which on a desk
+tcssim plays on the kernel's dummy I<sup>2</sup>C bus and, for
+<tt class="docutils literal">temp_3</tt>, over UDP (see <a class="reference internal" href="#the-thermostat-example">The thermostat example</a>). Each payload is named for what it is,
 which is what a panel in the MOC shows.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">payload_groups</span><span class="punctuation">:</span><span class="whitespace">
@@ -2596,11 +2594,11 @@ tcspecial is running.</p>
 <h2><a class="toc-backref" href="#toc-entry-36">The thermostat example</a></h2>
 <div class="figure">
 <object data="../examples/thermostat/thermostat.svg" style="width: 100%;" type="image/svg+xml">The thermostat example: three temperature sensors of one place,
-converted to kelvin, voted on, logged and sent to the ground, with a
+converted to kelvin, voted on and sent to the ground, with a
 thermostat driving two heaters, each through a GPIO line whose
-switch reports what it was told to the ground. Each sensor is the
-far end of a UDP socket and each line one of the kernel's dummy
-chip, which tcssim watches.</object>
+switch reports what it was told to the ground. Two sensors are on
+an I2C bus and one on SPI, and each line is one of the kernel's
+dummy chip, which tcssim watches.</object>
 <p class="caption"><tt class="docutils literal">examples/thermostat</tt>: a trio of sensors, a vote, a thermostat, its two
 heaters, and the lines that say what the heaters are doing.</p>
 </div>
@@ -2611,13 +2609,14 @@ group is for: readings that will be compared are taken as close together as
 the hardware allows.</p>
 <p>The sensors are temperature sensors on the zone, as a vehicle would carry
 them: <tt class="docutils literal">temp_1</tt> and <tt class="docutils literal">temp_2</tt> on an I<sup>2</sup>C bus, of type
-<tt class="docutils literal">i2c_tmass</tt>, and <tt class="docutils literal">temp_3</tt> a SPI peripheral, of type <tt class="docutils literal">spi_tmass</tt> --
-see <a class="reference internal" href="#temperature-sensors-on-a-thermal-mass">Temperature Sensors on a Thermal Mass</a>. On a desk each is reached over
-UDP at its <tt class="docutils literal">sim_address</tt> on this host, ports 5201 to 5203, where tcssim
-answers with the zone's temperature, so that the example touches no bus;
-flown, the buses are opened. The
-heaters, and the lines that sense them, are GPIO lines 2 to 5 of the kernel's
-dummy chip, <tt class="docutils literal">/dev/gpiochip1</tt>, which tcssim moves and watches: <tt class="docutils literal">sudo
+<tt class="docutils literal">i2c</tt>, and <tt class="docutils literal">temp_3</tt> a SPI peripheral, of type <tt class="docutils literal">spi</tt>. They are in
+<tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat.ytcs</span></tt>, which the example includes,
+with the rest of the vehicle. On a desk the two on I<sup>2</sup>C
+are chips of the kernel's dummy bus, <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, whose registers tcssim
+fills with the zone's temperature -- <tt class="docutils literal">sudo bin/mki2c</tt> makes it -- and
+<tt class="docutils literal">temp_3</tt> is reached over UDP at its <tt class="docutils literal">sim_address</tt>, <tt class="docutils literal">127.0.0.1:5203</tt>,
+where tcssim answers the same; flown, the buses are opened. The heaters'
+switches are GPIO lines 4 and 5 of the kernel's dummy chip, <tt class="docutils literal">/dev/gpiochip1</tt>, which tcssim moves and watches: <tt class="docutils literal">sudo
 <span class="pre">bin/mk-kernel-dummies</span> gpio</tt> makes it, once, before the example is run --
 see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>. The gpio example has lines 0 and 1, so
 the two run at once; the thermostat-yamcs example has the same lines as this,
@@ -2627,11 +2626,11 @@ occupy one point. <tt class="docutils literal">temp_3</tt> is a different part, 
 bytes on a scale of its own where the first two report two signed bytes on
 theirs, so that no one part number can take the whole trio out.</p>
 <p>Each reading is converted to kelvin by its own <tt class="docutils literal">to_kelvin</tt> node,
-<tt class="docutils literal">temp1</tt>, <tt class="docutils literal">temp2</tt> or <tt class="docutils literal">temp3</tt>, and each converted reading goes three ways:
+<tt class="docutils literal">to_k1</tt>, <tt class="docutils literal">to_k2</tt> or <tt class="docutils literal">to_k3</tt>, and each converted reading goes two ways:
 to the ground through the gateway node -- at its <tt class="docutils literal">ground_base</tt>,
-<tt class="docutils literal">127.0.0.1:5100</tt>, plus each source's device id, so <tt class="docutils literal">temp1</tt>, <tt class="docutils literal">temp2</tt> and
-<tt class="docutils literal">temp3</tt>, ids 6 to 8, arrive on ports 5106 to 5108 -- into <tt class="docutils literal">ambient</tt> as the
-input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or <tt class="docutils literal">in2</tt>, and into the log <tt class="docutils literal">housekeeping</tt>.</p>
+<tt class="docutils literal">127.0.0.1:5100</tt>, plus each source's device id, so <tt class="docutils literal">to_k1</tt>, <tt class="docutils literal">to_k2</tt> and
+<tt class="docutils literal">to_k3</tt>, ids 9 to 11, arrive on ports 5109 to 5111 -- and into <tt class="docutils literal">ambient</tt>
+as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or <tt class="docutils literal">in2</tt>.</p>
 <p><tt class="docutils literal">ambient</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
 it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
@@ -2673,7 +2672,7 @@ alone.</p>
 the ground through their conversions, and the heaters' switches are drawn
 into the gateway node. Tcssim counts each decision the vehicle drives the
 switches to, and switches the heater each is joined to -- <tt class="docutils literal">connects:
-heater_1.on</tt> -- by it.</p>
+zone.heater_1</tt> -- by it.</p>
 <p>The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a <tt class="docutils literal">SET_NODE</tt>
 naming that node and that attribute is taken on the node command link, the
@@ -2685,7 +2684,7 @@ the reason the vehicle sends -- <tt class="docutils literal">no command binding 
 <p>The simulator file beside it, <tt class="docutils literal"><span class="pre">thermostat-sim.yaml</span></tt>, is a link to
 <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>, which thermostat-yamcs,
 the same vehicle with Yamcs as its ground station, links to too. Its world
-holds the vehicle's physics model: a zone and two heaters joined to it.
+holds the vehicle's physics model: a zone with two heaters of its own.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; tcssim switches each heater while the
@@ -3128,19 +3127,18 @@ to: each
 example's is a link to <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>,
 so that each is found beside its configuration by name. The vehicle is
 written once, in <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat.ytcs</span></tt> and its
-XML, which both configurations include: the conversions, the vote, the
-thermostat and its log, the heaters' switches, the
-<tt class="docutils literal">zone_temps</tt> group and the setpoint's binding. Each example's own file
-has its <tt class="docutils literal">tcspecial</tt> section, its gateway node, called <tt class="docutils literal">gateway</tt> in
-both, and the three sensors, whose ports differ. The two cannot run at
-once all the same, their heaters being the same lines of one GPIO chip, so
-they answer whether tcssim is ready at one address. What differs is the
+XML, which both configurations include: the three sensors, the
+conversions, the vote, the thermostat and its log, the heaters' switches,
+the <tt class="docutils literal">zone_temps</tt> group and the setpoint's binding. Each example's own file
+has its <tt class="docutils literal">tcspecial</tt> section and its gateway node, called <tt class="docutils literal">gateway</tt> in
+both. The two cannot run at once, their sensors and their heaters being
+the same, so they answer whether tcssim is ready at one address. What differs is the
 gateway, <tt class="docutils literal">yamcs</tt>: the beacon is telemetry of APID <tt class="docutils literal">0x110</tt>, CONNECT and
 its answer are on <tt class="docutils literal">0x111</tt>, and each source drawn into the gateway node
 comes down as telemetry of its <tt class="docutils literal">apid_base</tt>, <tt class="docutils literal">0x400</tt>, plus the source's
 device id -- <tt class="docutils literal">ambient</tt> on <tt class="docutils literal">0x400</tt>, <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> and
-<tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on <tt class="docutils literal">0x402</tt> and <tt class="docutils literal">0x403</tt>, and <tt class="docutils literal">temp1</tt> to <tt class="docutils literal">temp3</tt> on
-<tt class="docutils literal">0x405</tt> to <tt class="docutils literal">0x407</tt>.</p>
+<tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on <tt class="docutils literal">0x402</tt> and <tt class="docutils literal">0x403</tt>, and <tt class="docutils literal">to_k1</tt> to <tt class="docutils literal">to_k3</tt> on
+<tt class="docutils literal">0x409</tt> to <tt class="docutils literal">0x40b</tt>.</p>
 <p>The mission database gives each of them a parameter of the type the
 configuration says its data are (see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>): the
 conversions and the vote are temperatures in kelvin, and each heater's
@@ -3164,7 +3162,7 @@ With <tt class="docutils literal"><span class="pre">--seconds</span></tt> there 
 each time a heater's switch changes, of these forms:</p>
 <pre class="code text literal-block">
 connected: the vehicle is running this configuration
-read: ambient &lt;T&gt; K, temp1 &lt;T&gt; K, temp2 &lt;T&gt; K, temp3 &lt;T&gt; K,
+read: ambient &lt;T&gt; K, to_k1 &lt;T&gt; K, to_k2 &lt;T&gt; K, to_k3 &lt;T&gt; K,
 gpio-out-tmass1 off, gpio-out-tmass2 off
 switched: gpio-out-tmass1 off -&gt; on; ambient &lt;T&gt; K, ...
 </pre>
@@ -4202,64 +4200,53 @@ example shares with thermostat-yamcs, its world shortened here:</p>
   </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;288.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
   </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type heater</span><span class="punctuation">:</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
-            </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-            </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
-          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2</span><span class="whitespace">
-            </span><span class="name tag">power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
-            </span><span class="name tag">voltage</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;28</span><span class="name variable"> </span><span class="literal string">V&quot;</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
             </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+            </span><span class="name tag">heater_1_power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+            </span><span class="name tag">heater_2_power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
             </span><span class="name tag">start</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;292.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
             </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
-    </span><span class="name tag">connections</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater_1.heat</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone.heat</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">heater_2.heat</span><span class="punctuation indicator">,</span><span class="name tag"> to</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone.heat</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
     </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
-    </span><span class="name tag">drift</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.05</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-    </span><span class="name tag">drift_time</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;30</span><span class="name variable"> </span><span class="literal string">min&quot;</span><span class="whitespace">
+    </span><span class="name tag">drift</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.05 K</span><span class="whitespace">
+    </span><span class="name tag">drift_time</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">30 min</span><span class="whitespace">
     </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span><span class="whitespace">
     </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
 </span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_1</span><span class="whitespace">
-        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1.on</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_inout</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio-out-tmass1</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_1</span><span class="whitespace">
         </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heaters_2</span><span class="whitespace">
-        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_2.on</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio-out-tmass2</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_2</span><span class="whitespace">
         </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
-        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.5</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.5 K</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
         </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">4 s</span><span class="whitespace">
-        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.03</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.03 K</span><span class="whitespace">
 
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
-        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.5</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.5 K</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
         </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">4 s</span><span class="whitespace">
-        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.03</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;+0.2</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.03 K</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">+0.2 K</span><span class="whitespace">
 
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
-        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.25</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.25 K</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
         </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">6 s</span><span class="whitespace">
-        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.02</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;-0.3</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span>
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.02 K</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">-0.3 K</span>
 </pre>
 </div>
 <div class="section" id="installing">

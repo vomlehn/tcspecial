@@ -828,20 +828,21 @@ component Surface inherits Rectangle {
     // whatever is selected is what the Delete key takes.
     in property <int> selected-link: -1;
     in property <string> selected-physics: "";
-    // A line selected by a right click on it, by its place in `links`; a
+    // A line selected by a click of either button on it, by its place in
+    // `links`; a
     // physics component selected by a press on it; and nothing selected, by
     // a click on neither a line nor a shape.
     callback link-picked(int);
     callback physics-picked(string);
     callback unpicked();
-    // A line deleted, by its place in `links`: from the menu a left click on
-    // it opens, or by the Delete key while it is selected.
+    // A line deleted, by its place in `links`: from the menu a right click
+    // on it opens, or by the Delete key while it is selected.
     callback link-delete(int);
     // Which line is under a point, in the working panes' coordinates, by its
     // place in `links`, or -1 for none: worked out in Rust, which has the
     // lines' routes as points. See tcsdiagram::route::distance_to.
     pure callback link-at(length, length) -> int;
-    // The line the menu a left click opened is about.
+    // The line the menu a right click opened is about.
     property <int> menu-link: -1;
 
     // A node chosen, by a press on it of either button, and the keys given
@@ -1187,7 +1188,7 @@ component Surface inherits Rectangle {
                         border-width: 1px;
                         border-color: #d8d8d4;
 
-                        // What a line offers on a left click: being taken
+                        // What a line offers on a right click: being taken
                         // out. Shown by the TouchArea below at the point
                         // pressed, which takes the presses its own
                         // right-click handling would otherwise see.
@@ -1206,8 +1207,8 @@ component Surface inherits Rectangle {
                         }
 
                         // A press on the page that no shape took: on a
-                        // line, a right click selects it and a left click
-                        // offers its menu; anywhere else, either button
+                        // line, either button selects it and a right click
+                        // offers its menu too; anywhere else, either button
                         // selects nothing, and any menu open is closed by
                         // the press itself. Under everything on the page,
                         // so that the shapes and terminals take their own
@@ -1229,16 +1230,17 @@ component Surface inherits Rectangle {
                                     self.mouse-x - root.left, self.mouse-y);
                                 if (line < 0) {
                                     root.unpicked();
-                                } else if (event.button
-                                           == PointerEventButton.right) {
+                                } else {
                                     root.link-picked(line);
                                     picks.focus();
-                                } else {
-                                    root.menu-link = line;
-                                    link-menu.show({
-                                        x: self.mouse-x,
-                                        y: self.mouse-y
-                                    });
+                                    if (event.button
+                                        == PointerEventButton.right) {
+                                        root.menu-link = line;
+                                        link-menu.show({
+                                            x: self.mouse-x,
+                                            y: self.mouse-y
+                                        });
+                                    }
                                 }
                             }
                         }

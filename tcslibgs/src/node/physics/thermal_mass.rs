@@ -2,7 +2,13 @@
 //! surroundings pull back.
 //!
 //! It takes `heat`, in watts, the sum of every heater's connected to it, and
-//! gives out its `temperature`, in kelvin. Newton's cooling with that heat:
+//! gives out its `temperature`, in kelvin. And it has two heaters of its own,
+//! `heater_1` and `heater_2`: inputs that take a decision -- a heater's switch,
+//! a `gpio_out` or a `gpio_inout`, joined straight to the zone -- each adding
+//! its `heater_1_power` or `heater_2_power` to the heat while it is on. Two,
+//! because two heaters on one zone is what a vehicle that must not lose its
+//! only way to warm a zone carries; and fixed, because a component's terminals
+//! are its type's. Newton's cooling with that heat:
 //!
 //! ```text
 //! dT/dt = -(T - environment) / time_constant + heat / capacity
@@ -30,6 +36,15 @@ use crate::unit::Unit;
 pub const TERMINALS: &[Terminal] = &[
     Terminal::input("heat", Kind::Value(Unit::Watt)).summing(),
     Terminal::output("temperature", Kind::Value(Unit::Kelvin)),
+    Terminal::input("heater_1", Kind::Decision),
+    Terminal::input("heater_2", Kind::Decision),
+];
+
+/// Its two heaters: each one's input, and the setting saying the watts it
+/// gives while on, in the order of [`Resolved::heater_power`].
+pub const HEATERS: [(&str, &str); 2] = [
+    ("heater_1", "heater_1_power"),
+    ("heater_2", "heater_2_power"),
 ];
 
 /// Everything it states, by the name a file writes, the
@@ -43,6 +58,8 @@ pub const SETTINGS: &[&str] = &[
     "wander",
     "wander_time",
     "start",
+    "heater_1_power",
+    "heater_2_power",
 ];
 
 /// A thermal mass, as a physics model states it.
@@ -95,6 +112,14 @@ pub struct ThermalMass {
     /// that every run of a model starts the same and two can be compared.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub start: Option<String>,
+    /// What its first heater gives while it is on, in watts: `"4 W"`.
+    /// Wanted where `heater_1` is joined, and meaning nothing where it is
+    /// not.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub heater_1_power: Option<String>,
+    /// And its second's.
+    #[serde(default, deserialize_with = "blank_is_unstated")]
+    pub heater_2_power: Option<String>,
 }
 
 /// What a zone that states its own `environment` is told.
@@ -120,6 +145,35 @@ pub struct Resolved {
     pub wander: Wander,
     /// Where it starts, in kelvin; `None` is at its surroundings.
     pub start: Option<f64>,
+    /// What each of its two heaters gives while on, in watts, in the order
+    /// of [`HEATERS`]; `None` for one it does not state.
+    pub heater_power: [Option<f64>; 2],
+}
+
+impl Resolved {
+    /// What is wrong with joining something to one of its terminals, if
+    /// anything: a heater of its own joined with no power stated for it,
+    /// which would be a heater that switched and warmed nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal` - The terminal joined.
+    ///
+    /// # Returns
+    ///
+    /// What to say, or `None` where the join is one it can take.
+    pub fn unpowered(&self, terminal: &str) -> Option<String> {
+        let (n, (_, setting)) = HEATERS
+            .iter()
+            .enumerate()
+            .find(|(_, (name, _))| *name == terminal)?;
+        self.heater_power[n].is_none().then(|| {
+            format!(
+                "{terminal} is joined and {setting} is not stated: say what \
+                 that heater gives while on, as {setting}: \"4 W\""
+            )
+        })
+    }
 }
 
 impl ThermalMass {
@@ -162,6 +216,14 @@ impl ThermalMass {
             Some(said) => Some(quantity("start", said, Some("K"))?),
             None => None,
         };
+        let power = |name: &str, said: &Option<String>| match said {
+            Some(said) => positive(name, said, Some("W")).map(Some),
+            None => Ok(None),
+        };
+        let heater_power = [
+            power("heater_1_power", &self.heater_1_power)?,
+            power("heater_2_power", &self.heater_2_power)?,
+        ];
         Ok(Resolved {
             environment: ambient,
             time_constant: time_of("time_constant", &self.time_constant)?,
@@ -176,6 +238,7 @@ impl ThermalMass {
                 Some("K"),
             )?,
             start,
+            heater_power,
         })
     }
 }
@@ -200,6 +263,8 @@ mod tests {
             wander: None,
             wander_time: None,
             start: None,
+            heater_1_power: None,
+            heater_2_power: None,
         }
     }
 
@@ -216,6 +281,34 @@ mod tests {
         .resolve(288.15)
         .unwrap();
         assert_eq!(started.start, Some(292.15));
+    }
+
+    /// Its heaters' powers are read in watts, and a heater joined with no
+    /// power stated is told what to write; one not joined says nothing.
+    #[test]
+    fn its_heaters_powers_are_read_in_watts() {
+        let both = ThermalMass {
+            heater_1_power: Some("4 W".to_string()),
+            heater_2_power: Some("6 W".to_string()),
+            ..zone()
+        }
+        .resolve(288.15)
+        .unwrap();
+        assert_eq!(both.heater_power, [Some(4.0), Some(6.0)]);
+        assert_eq!(both.unpowered("heater_1"), None);
+
+        let none = zone().resolve(288.15).unwrap();
+        let said = none.unpowered("heater_2").expect("unpowered");
+        assert!(said.contains("heater_2_power: \"4 W\""), "{said}");
+        assert_eq!(none.unpowered("heat"), None, "not a heater of its own");
+
+        let err = ThermalMass {
+            heater_1_power: Some("4 K".to_string()),
+            ..zone()
+        }
+        .resolve(288.15)
+        .unwrap_err();
+        assert!(err.contains("heater_1_power"), "{err}");
     }
 
     /// A start with no unit, or in another unit, is refused, told what to

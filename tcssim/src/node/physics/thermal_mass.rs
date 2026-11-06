@@ -3,7 +3,8 @@
 //!
 //! Its terminals are `tcslibgs::node::physics::thermal_mass`'s: `heat`, in watts,
 //! the sum of what every heater joined to it gives; `temperature`, in
-//! kelvin, what it is.
+//! kelvin, what it is; and `heater_1` and `heater_2`, decisions, each adding
+//! its stated power to the heat while it is on.
 //!
 //! # The arithmetic
 //!
@@ -76,6 +77,8 @@ use super::random::{seed_for, settled, wandered};
 /// order, which a test holds this to.
 const HEAT: usize = 0;
 const TEMPERATURE: usize = 1;
+const HEATER_1: usize = 2;
+const HEATER_2: usize = 3;
 
 /// A thermal mass of the world.
 #[derive(Debug)]
@@ -152,7 +155,13 @@ impl ThermalMass {
 
 impl Component for ThermalMass {
     fn hold(&mut self, inputs: &[f64]) {
-        self.heat = inputs[HEAT];
+        // A decision is one for on and nought for off, so each heater of its
+        // own adds its power while on; one with no power stated is not joined,
+        // the model's check having refused it.
+        let [one, two] = self.figures.heater_power;
+        self.heat = inputs[HEAT]
+            + inputs[HEATER_1] * one.unwrap_or(0.0)
+            + inputs[HEATER_2] * two.unwrap_or(0.0);
     }
 
     fn advance(&mut self, from: f64, to: f64) {
@@ -207,6 +216,8 @@ mod tests {
     fn the_terminals_are_the_types() {
         assert_eq!(TERMINALS[HEAT].name, "heat");
         assert_eq!(TERMINALS[TEMPERATURE].name, "temperature");
+        assert_eq!(TERMINALS[HEATER_1].name, "heater_1");
+        assert_eq!(TERMINALS[HEATER_2].name, "heater_2");
     }
 
     /// A zone with no heat on it settles at its environment, from either
@@ -259,10 +270,31 @@ mod tests {
     #[test]
     fn its_heat_decides_where_it_settles() {
         let mut zone = ThermalMass::new("zone", zone(), 0);
-        zone.hold(&[120.0, 0.0]);
+        zone.hold(&[120.0, 0.0, 0.0, 0.0]);
         zone.advance(0.0, 10_000.0);
         let settled = zone.output(TEMPERATURE);
         assert!((settled - (283.15 + 300.0)).abs() < 1e-6, "{settled}");
+    }
+
+    /// Each heater of its own adds its power while on: two of four watts
+    /// on, with a hundred and twelve more joined to its heat, is the hundred
+    /// and twenty that rests three hundred kelvin above the environment; off,
+    /// they add nothing.
+    #[test]
+    fn its_own_heaters_add_their_power_while_on() {
+        let powered = Resolved {
+            heater_power: [Some(4.0), Some(4.0)],
+            ..zone()
+        };
+        let mut zone = ThermalMass::new("zone", powered, 0);
+        zone.hold(&[112.0, 0.0, 1.0, 1.0]);
+        zone.advance(0.0, 10_000.0);
+        let settled = zone.output(TEMPERATURE);
+        assert!((settled - (283.15 + 300.0)).abs() < 1e-6, "{settled}");
+
+        zone.hold(&[0.0, 0.0, 0.0, 0.0]);
+        zone.advance(10_000.0, 20_000.0);
+        assert!((zone.output(TEMPERATURE) - 283.15).abs() < 1e-6);
     }
 
     /// The swing's closed form agrees with integrating the equation
@@ -276,7 +308,7 @@ mod tests {
         };
         let mut zone = ThermalMass::new("zone", swing, 0);
         // Two watts on twenty joules a kelvin: a tenth of a kelvin a second.
-        zone.hold(&[2.0, 0.0]);
+        zone.hold(&[2.0, 0.0, 0.0, 0.0]);
         zone.temperature = 290.0;
         let seconds = 300.0;
         zone.advance(0.0, seconds);
@@ -349,7 +381,7 @@ mod tests {
     #[test]
     fn an_interval_of_no_time_changes_nothing() {
         let mut zone = ThermalMass::new("zone", zone(), 0);
-        zone.hold(&[60.0, 0.0]);
+        zone.hold(&[60.0, 0.0, 0.0, 0.0]);
         zone.advance(0.0, 1.0);
         let first = zone.output(TEMPERATURE);
         zone.advance(1.0, 1.0);

@@ -253,11 +253,12 @@ terminal
     click on bare sheet puts the line down. A line already drawn is picked up
     by clicking the terminal at either end of it: the next node clicked offers
     to move that end there, and the node it was picked up from, or the Delete
-    key, offers to take it out. A line is also taken out from the menu a
-    click on it opens, or by a right click on it, which selects it, and the
-    Delete key. A right click selects a node or a physics component the same
-    way, and Delete then asks before the node goes; a click anywhere else on
-    the sheet selects nothing. A subdiagram's box offers the nodes its file
+    key, offers to take it out. A click of either button on a line selects
+    it, and the Delete key then takes it out; a right click also opens its
+    menu, whose Delete does the same. A node or a physics component is
+    selected by a click the same way, and a right click on a node opens its
+    menu, Edit and Delete; Delete asks before the node goes. A click anywhere
+    else on the sheet selects nothing. A subdiagram's box offers the nodes its file
     exports at that terminal; inside the subdiagram, its page has an edge in
     a margin either side, labelled *outside*, the left one left of the
     Physics pane, and clicking an edge terminal
@@ -3597,11 +3598,15 @@ is placed from the physics list
 as a node is from its own list: click its type, and it is put down the
 pane where the others are, or drag the type onto the Physics pane, and it
 is put where it is let go. In tcsgui a component is moved, edited, deleted
-and joined as a node is: drag it, press it for Edit and Delete, and draw a
-line from its output or input terminal to another component, for a
-connection, or to a payload, to set that payload's ``connects``. Where a line
-could mean more than one terminal -- a heater's heat, current and heating,
-to a sensor -- tcsgui asks which.
+and joined as a node is: drag it, right click it for Edit and Delete, and
+draw a line from its output or input terminal to another component, for a
+connection, or to a payload, to set that payload's ``connects``. A line
+drawn the other way, from a payload's terminal to a component, sets it too:
+from a ``moc`` terminal, what drives the payload, it offers the component's
+inputs -- a heater's ``on``, a zone's ``heater_1`` -- and from a ``world``
+terminal, what it reports, the component's outputs -- a zone's
+``temperature``. Where a line could mean more than one terminal -- a
+heater's heat, current and heating, to a sensor -- tcsgui asks which.
 
 Each component is one simple part, of one of these types:
 
@@ -3634,6 +3639,9 @@ Each component is one simple part, of one of these types:
                           wander and refused without it
      start                where it starts: "292.15 K". Optional; left out,
                           it starts at ambient_temp
+     heater_1_power       what its first heater of its own gives while on:
+                          "4 W". Wanted where heater_1 is joined
+     heater_2_power       and its second's, wanted where heater_2 is
 
    sun                    sunlight and shadow, through an orbit
      component            the name connections and payloads use
@@ -3694,6 +3702,10 @@ output, carrying a value in one unit or a decision:
                   current       out   A, nought while off
    thermal_mass   heat          in    W, the sum of everything joined to it
                   temperature   out   K
+                  heater_1      in    a decision: its first heater of its
+                                      own, adding heater_1_power while on
+                  heater_2      in    a decision: its second, adding
+                                      heater_2_power while on
    sun            light         out   a ratio: one lit, nought in shadow
    solar_array    light         in    a ratio
                   current       out   A, its full-sun current times light

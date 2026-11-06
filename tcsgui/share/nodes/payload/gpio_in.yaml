@@ -49,3 +49,11 @@ attributes:
       line changed and this says what it is now, so a set of lines may ask
       for either or both -- and a line that has not changed since the vehicle
       started tells the ground nothing until this is stated.
+  - name: sim_address
+    required: false
+    about: >
+      Where tcssim answers for the lines over UDP when they are simulated, as
+      a loopback address and port: 127.0.0.1:5204. Under --simulate=some or
+      all tcspecial drives and watches the lines there instead of on the
+      chip, so no dummy chip is needed; under --simulate=none, the flight
+      setting, it is not used and the chip is opened.

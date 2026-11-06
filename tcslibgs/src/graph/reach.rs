@@ -106,7 +106,10 @@ pub struct Reach {
 /// `spi_tmass`, whose simulated device is the thermal mass itself: tcssim
 /// answers at `sim_address` with the temperature of the one the sensor is
 /// joined to, which no register bank or pseudo-terminal at the device's path
-/// could follow.
+/// could follow. And the three GPIO types, whose lines tcssim answers for
+/// over UDP where the kernel's gpio-sim chip is not wanted -- a run that
+/// should need no root to set up -- with every line tcspecial drives or
+/// watches kept as it is: see [`crate::node::payload::gpio`].
 ///
 /// Every other type has a dummy device the kernel makes, or a simulated device
 /// tcssim makes, at the endpoint tcspecial opens, which is the better test: the
@@ -128,6 +131,9 @@ pub fn simulated_over_udp(kind: DHType) -> bool {
             | DHType::Iio
             | DHType::I2cTmass
             | DHType::SpiTmass
+            | DHType::GpioIn
+            | DHType::GpioOut
+            | DHType::GpioInout
     )
 }
 
@@ -149,17 +155,43 @@ impl Reach {
     ///
     /// The endpoint to open: a UDP socket to `sim_address` where `mode` is not
     /// the flight setting and the node gives one, and its own endpoint
-    /// otherwise.
+    /// otherwise. A GPIO node stays a GPIO node, carrying the address, so
+    /// that what it drives, watches and reports is unchanged and only the
+    /// lines are tcssim's.
     pub fn opened(&self, mode: crate::simulate::Mode) -> EndpointConfig {
-        match self.sim_address {
-            Some(at) if !mode.is_flight() => {
-                EndpointConfig::Network(NetworkConfig {
-                    protocol: NetworkProtocol::Udp,
-                    address: at.ip().to_string(),
-                    port: at.port(),
+        match (self.simulated_at(mode), &self.endpoint) {
+            (Some(_), EndpointConfig::Gpio(gpio)) => {
+                EndpointConfig::Gpio(crate::GpioConfig {
+                    sim_address: self.sim_address,
+                    ..gpio.clone()
                 })
             }
-            _ => self.endpoint.clone(),
+            (Some(at), _) => EndpointConfig::Network(at),
+            (None, _) => self.endpoint.clone(),
+        }
+    }
+
+    /// Where this node is reached over UDP under `mode`, if it is.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode` - What the run simulates: `none`, `some` or `all`.
+    ///
+    /// # Returns
+    ///
+    /// Its `sim_address`, as the UDP endpoint it is, where `mode` is not the
+    /// flight setting and the node gives one; `None` otherwise.
+    pub fn simulated_at(
+        &self,
+        mode: crate::simulate::Mode,
+    ) -> Option<NetworkConfig> {
+        match self.sim_address {
+            Some(at) if !mode.is_flight() => Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: at.ip().to_string(),
+                port: at.port(),
+            }),
+            _ => None,
         }
     }
 }
@@ -804,8 +836,8 @@ fn take(
             return Err(format!(
                 "\"{what}\" is {} {} node, which is simulated at its own \
                  endpoint, so sim_address does not apply to it: only hdlc, \
-                 spi, rpmsg, iio, i2c_tmass and spi_tmass nodes are reached \
-                 over UDP when simulated",
+                 spi, rpmsg, iio, i2c_tmass, spi_tmass, gpio_in, gpio_out \
+                 and gpio_inout nodes are reached over UDP when simulated",
                 kind.article(),
                 node.node_type
             ))
@@ -2649,6 +2681,47 @@ mod tests {
         }
         // Still what it is, for everything that asks what it is.
         assert_eq!(reach.endpoint.kind(), DHType::Rpmsg);
+    }
+
+    /// A GPIO node may give a sim_address, and in a simulated run stays a GPIO
+    /// node carrying it, so that what it drives, watches and reports is
+    /// unchanged; under the flight setting the chip is what is opened.
+    #[test]
+    fn a_gpio_node_carries_its_sim_address_only_when_the_run_simulates() {
+        use crate::simulate::Mode;
+        let switch = node(
+            "switch",
+            "gpio_inout",
+            &[
+                ("path", "/dev/gpiochip1"),
+                ("lines", "4"),
+                ("state_interval", "1 s"),
+                ("sim_address", "127.0.0.1:5204"),
+            ],
+        );
+        let reach = reach_of(&switch).expect("it opens");
+        assert_eq!(reach.opened(Mode::None), reach.endpoint);
+        for mode in [Mode::Some, Mode::All] {
+            match reach.opened(mode) {
+                EndpointConfig::Gpio(gpio) => {
+                    assert_eq!(
+                        gpio.sim_address,
+                        Some("127.0.0.1:5204".parse().expect("an address"))
+                    );
+                    assert_eq!(gpio.outputs, vec![4]);
+                }
+                other => panic!("expected a GPIO endpoint, got {other:?}"),
+            }
+        }
+        assert_eq!(
+            reach.simulated_at(Mode::All),
+            Some(NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "127.0.0.1".to_string(),
+                port: 5204,
+            })
+        );
+        assert_eq!(reach.simulated_at(Mode::None), None);
     }
 
     /// A temperature sensor on a thermal mass is reached as the device on its

@@ -4797,6 +4797,7 @@ physics:
                 bias: crate::Bias::None,
                 debounce: None,
                 state_interval: Some(Duration::from_secs(1)),
+                sim_address: None,
             })
         };
         let two = Attached::Pulls {

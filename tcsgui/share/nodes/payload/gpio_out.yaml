@@ -30,3 +30,11 @@ attributes:
       quotes, bytes in brackets, or both one after another. A heater that must
       start off. A write that fails stops the node from starting. Driven
       lines only: it is what they are driven to first.
+  - name: sim_address
+    required: false
+    about: >
+      Where tcssim answers for the lines over UDP when they are simulated, as
+      a loopback address and port: 127.0.0.1:5204. Under --simulate=some or
+      all tcspecial drives and watches the lines there instead of on the
+      chip, so no dummy chip is needed; under --simulate=none, the flight
+      setting, it is not used and the chip is opened.

@@ -183,6 +183,11 @@ fn run_kind(
         PayloadProtocol::Gpio => {
             crate::node::payload::gpio::run_gpio_node(config, running, stats)
         }
+        PayloadProtocol::GpioUdp => {
+            crate::node::payload::gpio::run_gpio_udp_node(
+                config, running, stats,
+            )
+        }
         PayloadProtocol::UnixStream => {
             crate::node::payload::network::unix::run_unix_stream_node(
                 config, running, stats,
@@ -208,6 +213,9 @@ pub(crate) fn could_not_simulate(config: &PayloadConfig, why: String) {
 /// Payload protocol type
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PayloadProtocol {
+    /// Discrete lines tcssim answers for over UDP, at their node's
+    /// `sim_address`, with no chip: see [`crate::node::payload::gpio`].
+    GpioUdp,
     Tcp,
     Udp,
     Device,

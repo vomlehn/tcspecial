@@ -6053,9 +6053,9 @@ answer rather than averaging it in.
 This is the shape of the shipped ``examples/thermostat`` as it would be
 aboard, on I\ :superscript:`2`\ C, SPI and GPIO, which is
 ``tests/manual/thermostat``, whose conversions are ``temp1`` to ``temp3``
-where the example's are ``to_k1`` to ``to_k3``; on a desk tcssim plays the
-example's sensors, the two on I\ :superscript:`2`\ C on the kernel's dummy
-bus, through a link tcssim makes at their ``path``, and ``temp_3`` over UDP. Left out for room
+where the example's are ``to_k1`` to ``to_k3``; on a desk the example's
+sensors and heaters' switches are reached over UDP at their ``sim_address``,
+where tcssim answers for them. Left out for room
 are its ``tcspecial`` section, which every configuration must have and without
 which this would be refused, its log node, and the editor's layout; its
 addresses are its own. What is here is checked as it stands, with a
@@ -12037,10 +12037,9 @@ The three sensors are read together and so share a group, which carries
 their rate and the terminal they report; the zone is what makes three
 sensors agree about a temperature, each from a place of its own on it. Each
 heater's switch drives the zone's ``heater_1`` or ``heater_2``, which adds
-that heater's power to the zone's heat while the vehicle has it on. The
-switches are lines of the kernel's dummy GPIO chip, the two sensors on
-I\ :superscript:`2`\ C are chips of its dummy bus, and ``temp_3`` is reached
-over UDP. Shortened:
+that heater's power to the zone's heat while the vehicle has it on. Every one
+of them is reached over UDP at its ``sim_address``, where tcssim answers, so
+no dummy device is needed. Shortened:
 
 .. code-block:: yaml
 
@@ -12074,7 +12073,7 @@ over UDP. Shortened:
            connects: zone.heater_2
            simulate: true
 
-     - type i2c:
+     - type i2c_tmass:
          - payload: temp_1
            group: zone_temps
 
@@ -12082,7 +12081,7 @@ over UDP. Shortened:
            group: zone_temps
            offset: +0.2 K
 
-     - type spi:
+     - type spi_tmass:
          - payload: temp_3
            group: zone_temps
            offset: -0.3 K
@@ -12239,7 +12238,10 @@ Requirement
        hdlc, spi,
        rpmsg, iio,
        i2c_tmass,
-       spi_tmass    simulated: reached at a sim_address, under some or all,
+       spi_tmass,
+       gpio_in,
+       gpio_out,
+       gpio_inout   simulated: reached at a sim_address, under some or all,
                     which is a loopback address, so the far end is on this
                     host
 
@@ -12356,7 +12358,18 @@ Requirement
     temperature of. Under ``--simulate=some`` or ``all``, tcspecial reaches such
     a node over UDP at its ``sim_address`` instead of opening the device, by the
     rule of which end speaks first that a UDP payload has, and tcssim answers
-    there as a UDP payload. Under ``none``, the flight setting, ``sim_address``
+    there as a UDP payload.
+
+    The three GPIO types, ``gpio_in``, ``gpio_out`` and ``gpio_inout``, may
+    state it too, so that a run needs no root to make a dummy chip. Such a node
+    stays a set of lines: tcspecial always sends to the ``sim_address`` and
+    tcssim always binds it, one datagram an ASCII ``1`` or ``0`` for each line
+    in the order of ``lines`` -- what the vehicle drives, and what watched
+    lines are, sent whenever they change -- and tcspecial makes of each change
+    the record an edge on a chip would be. Reports, ``state_interval`` and what
+    is passed on by ``moc-out`` are as on a chip.
+
+    Under ``none``, the flight setting, ``sim_address``
     is not used and the device is opened: the configuration that flies is the
     one that was tested, byte for byte.
 

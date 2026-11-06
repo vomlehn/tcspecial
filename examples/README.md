@@ -491,21 +491,15 @@ the decisions in `/tmp/telemetry`.
 
 The sensors are temperature sensors on the zone, in
 `thermostat-common/thermostat.ytcs` with the rest of the vehicle: `temp_1` and
-`temp_2` on an I2C bus, of type `i2c`, and `temp_3` a SPI peripheral, of type
-`spi`. On a desk the two on I2C are chips of the kernel's dummy bus,
-`i2c-stub`, whose registers tcssim fills with the zone's temperature: `sudo
-bin/mki2c` makes it, with chips at their addresses, 0x48 and 0x49. The
-kernel numbers the stub as it finds it, so their `path`,
-`/tmp/tcs-thermostat-i2c`, is a link tcssim makes to the stub wherever it is.
-`temp_3` is reached over UDP at its `sim_address`, 127.0.0.1:5203, where
-tcssim answers the same. Flown, the paths are the vehicle's buses.
-The heaters' switches are lines 4 and 5 of the kernel's dummy GPIO chip,
-`/dev/gpiochip1`, which tcssim watches: make it once with `sudo
-bin/mk-kernel-dummies gpio` (see "Payloads on the kernel's dummy devices",
-below). The gpio example has
-lines 0 and 1 of it, so the two run at once. The buses themselves are flown
-against simulated devices by `make simulated-devices-test`, with
-`tests/manual/thermostat.ytcs`.
+`temp_2` on an I2C bus, of type `i2c_tmass`, and `temp_3` a SPI peripheral,
+of type `spi_tmass`. The heaters' switches are lines 4 and 5 of
+`/dev/gpiochip1`. On a desk every one of them is a simulated device: each is
+reached over UDP at its `sim_address` -- the sensors at 127.0.0.1:5201 to
+5203, where tcssim answers with the zone's temperature, and the switches at
+5204 and 5205, where tcssim takes what the vehicle drives them to -- so the
+example needs no dummy device, no sudo and no hardware. Flown, the buses and
+the chip are opened. The buses themselves are flown against simulated devices
+by `make simulated-devices-test`, with `tests/manual/thermostat.ytcs`.
 
 tcssim joins the simulated payloads to the vehicle's physics model, in the world
 section of `thermostat-sim.yaml`, a link to

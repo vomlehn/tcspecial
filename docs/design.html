@@ -6143,9 +6143,9 @@ answer rather than averaging it in.</p>
 <p>This is the shape of the shipped <tt class="docutils literal">examples/thermostat</tt> as it would be
 aboard, on I<sup>2</sup>C, SPI and GPIO, which is
 <tt class="docutils literal">tests/manual/thermostat</tt>, whose conversions are <tt class="docutils literal">temp1</tt> to <tt class="docutils literal">temp3</tt>
-where the example's are <tt class="docutils literal">to_k1</tt> to <tt class="docutils literal">to_k3</tt>; on a desk tcssim plays the
-example's sensors, the two on I<sup>2</sup>C on the kernel's dummy
-bus, through a link tcssim makes at their <tt class="docutils literal">path</tt>, and <tt class="docutils literal">temp_3</tt> over UDP. Left out for room
+where the example's are <tt class="docutils literal">to_k1</tt> to <tt class="docutils literal">to_k3</tt>; on a desk the example's
+sensors and heaters' switches are reached over UDP at their <tt class="docutils literal">sim_address</tt>,
+where tcssim answers for them. Left out for room
 are its <tt class="docutils literal">tcspecial</tt> section, which every configuration must have and without
 which this would be refused, its log node, and the editor's layout; its
 addresses are its own. What is here is checked as it stands, with a
@@ -12178,10 +12178,9 @@ with two heaters of its own.</p>
 their rate and the terminal they report; the zone is what makes three
 sensors agree about a temperature, each from a place of its own on it. Each
 heater's switch drives the zone's <tt class="docutils literal">heater_1</tt> or <tt class="docutils literal">heater_2</tt>, which adds
-that heater's power to the zone's heat while the vehicle has it on. The
-switches are lines of the kernel's dummy GPIO chip, the two sensors on
-I<sup>2</sup>C are chips of its dummy bus, and <tt class="docutils literal">temp_3</tt> is reached
-over UDP. Shortened:</p>
+that heater's power to the zone's heat while the vehicle has it on. Every one
+of them is reached over UDP at its <tt class="docutils literal">sim_address</tt>, where tcssim answers, so
+no dummy device is needed. Shortened:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs and</span><span class="whitespace">
   </span><span class="literal scalar plain">thermostat-yamcs.ytcs</span><span class="whitespace">
@@ -12213,7 +12212,7 @@ over UDP. Shortened:</p>
         </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_2</span><span class="whitespace">
         </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c_tmass</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
 
@@ -12221,7 +12220,7 @@ over UDP. Shortened:</p>
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
         </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">+0.2 K</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi_tmass</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
         </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">-0.3 K</span>
@@ -12370,7 +12369,10 @@ hdlc         never at its interface: the kernel has no dummy device
 hdlc, spi,
 rpmsg, iio,
 i2c_tmass,
-spi_tmass    simulated: reached at a sim_address, under some or all,
+spi_tmass,
+gpio_in,
+gpio_out,
+gpio_inout   simulated: reached at a sim_address, under some or all,
              which is a loopback address, so the far end is on this
              host
 </pre>
@@ -12482,7 +12484,16 @@ device is the thermal mass they are fixed to, which tcssim answers with the
 temperature of. Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, tcspecial reaches such
 a node over UDP at its <tt class="docutils literal">sim_address</tt> instead of opening the device, by the
 rule of which end speaks first that a UDP payload has, and tcssim answers
-there as a UDP payload. Under <tt class="docutils literal">none</tt>, the flight setting, <tt class="docutils literal">sim_address</tt>
+there as a UDP payload.</p>
+<p>The three GPIO types, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_inout</tt>, may
+state it too, so that a run needs no root to make a dummy chip. Such a node
+stays a set of lines: tcspecial always sends to the <tt class="docutils literal">sim_address</tt> and
+tcssim always binds it, one datagram an ASCII <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> for each line
+in the order of <tt class="docutils literal">lines</tt> -- what the vehicle drives, and what watched
+lines are, sent whenever they change -- and tcspecial makes of each change
+the record an edge on a chip would be. Reports, <tt class="docutils literal">state_interval</tt> and what
+is passed on by <tt class="docutils literal"><span class="pre">moc-out</span></tt> are as on a chip.</p>
+<p>Under <tt class="docutils literal">none</tt>, the flight setting, <tt class="docutils literal">sim_address</tt>
 is not used and the device is opened: the configuration that flies is the
 one that was tested, byte for byte.</p>
 <p class="last"><tt class="docutils literal">sim_address</tt> is refused on every other type, whose simulated or dummy

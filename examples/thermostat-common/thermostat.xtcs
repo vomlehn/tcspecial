@@ -102,9 +102,10 @@
         </type>
     </vehicle>
     <payloads>
-        <!-- The heaters' switches, on the thermal mass, through the kernel's
-             simulated chip, which bin/mk-kernel-dummies makes: lines 4 and 5, which
-             leaves 0 and 1 to the gpio example. -->
+        <!-- The heaters' switches, on the thermal mass: lines 4 and 5 of
+             /dev/gpiochip1. On a desk tcssim answers for them over UDP at
+             their sim_address, so that no dummy chip is needed; flown, the
+             chip is opened. -->
         <type name="gpio_inout">
             <!-- Each a line the thermostat drives, 1 for on and 0 for off, and tells
                  the heater it switches, and every second the ground what it was last
@@ -114,6 +115,7 @@
             <payload name="gpio-out-tmass1">
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
+                <sim_address>127.0.0.1:5204</sim_address>
                 <state_interval>1 s</state_interval>
                 <moc-in>thermostat</moc-in>
                 <world-out>gateway.gpio-out-tmass1</world-out>
@@ -121,6 +123,7 @@
             <payload name="gpio-out-tmass2">
                 <lines>5</lines>
                 <path>/dev/gpiochip1</path>
+                <sim_address>127.0.0.1:5205</sim_address>
                 <state_interval>1 s</state_interval>
                 <moc-in>thermostat</moc-in>
                 <world-out>gateway.gpio-out-tmass2</world-out>
@@ -128,34 +131,32 @@
         </type>
         <!-- The three sensors of the zone, two on an I2C bus and one on a SPI bus,
              as a vehicle would carry them, each converted to kelvin for the
-             vote. On a desk the two on I2C are chips of the kernel's dummy
-             bus, i2c-stub, which bin/mki2c makes and whose registers tcssim
-             fills with the zone's temperature. The kernel numbers the stub as
-             it finds it, so their path is one tcssim makes, a link to the
-             stub wherever it is; flown, it is the vehicle's bus. The one on
-             SPI is reached over UDP at its sim_address, where tcssim answers
-             the same. -->
-        <type name="i2c">
+             vote. On a desk each is reached over UDP at its sim_address,
+             where tcssim answers with the zone's temperature, so that no bus
+             and no dummy device is needed; flown, the buses are opened. -->
+        <type name="i2c_tmass">
             <!-- One of three sensors of the same place, a trio, so that the
                  temperature survives one of them going wrong. Two bytes, signed,
                  big endian. -->
             <payload name="temp_1">
                 <address>0x48</address>
                 <group>zone_temps</group>
-                <path>/tmp/tcs-thermostat-i2c</path>
+                <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
+                <sim_address>127.0.0.1:5201</sim_address>
                 <world-out>to_k1.temp_1</world-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1, on the same bus. -->
             <payload name="temp_2">
                 <address>0x49</address>
                 <group>zone_temps</group>
-                <path>/tmp/tcs-thermostat-i2c</path>
+                <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
+                <sim_address>127.0.0.1:5202</sim_address>
                 <world-out>to_k2.temp_2</world-out>
             </payload>
         </type>
-        <type name="spi">
+        <type name="spi_tmass">
             <!-- The third. A different part on a different bus: three bytes,
                  unsigned, its own scale and so its own conversion, so that no one
                  bus and no one part number can take the whole trio out. -->

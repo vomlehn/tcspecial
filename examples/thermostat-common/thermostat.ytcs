@@ -90,9 +90,10 @@ vehicle:
         world-in: [thermostat]
 
 payloads:
-  # The heaters' switches, on the thermal mass, through the kernel's
-  # simulated chip, which bin/mk-kernel-dummies makes: lines 4 and 5, which
-  # leaves 0 and 1 to the gpio example.
+  # The heaters' switches, on the thermal mass: lines 4 and 5 of
+  # /dev/gpiochip1. On a desk tcssim answers for them over UDP at their
+  # sim_address, so that no dummy chip is needed; flown, the chip is
+  # opened.
   - type gpio_inout:
       # Each a line the thermostat drives -- 1 for on, 0 for off -- and tells
       # the heater it switches, and every second the ground what it was last
@@ -102,6 +103,7 @@ payloads:
       - payload: gpio-out-tmass1
         lines: "4"
         path: "/dev/gpiochip1"
+        sim_address: "127.0.0.1:5204"
         state_interval: "1 s"
         moc-in: [thermostat]
         world-out:
@@ -109,38 +111,38 @@ payloads:
       - payload: gpio-out-tmass2
         lines: "5"
         path: "/dev/gpiochip1"
+        sim_address: "127.0.0.1:5205"
         state_interval: "1 s"
         moc-in: [thermostat]
         world-out:
           - gateway.gpio-out-tmass2
   # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
   # as a vehicle would carry them, each converted to kelvin for the
-  # vote. On a desk the two on I2C are chips of the kernel's dummy bus,
-  # i2c-stub, which bin/mki2c makes and whose registers tcssim fills with
-  # the zone's temperature. The kernel numbers the stub as it finds it, so
-  # their path is one tcssim makes, a link to the stub wherever it is;
-  # flown, it is the vehicle's bus. The one on SPI is reached over UDP at
-  # its sim_address, where tcssim answers the same.
-  - type i2c:
+  # vote. On a desk each is reached over UDP at its sim_address, where
+  # tcssim answers with the zone's temperature, so that no bus and no dummy
+  # device is needed; flown, the buses are opened.
+  - type i2c_tmass:
       # One of three sensors of the same place, a trio, so that the
       # temperature survives one of them going wrong. Two bytes, signed,
       # big endian.
       - payload: temp_1
         address: "0x48"
         group: "zone_temps"
-        path: "/tmp/tcs-thermostat-i2c"
+        path: "/dev/i2c-1"
         read_size: "2"
+        sim_address: "127.0.0.1:5201"
         world-out:
           - to_k1.temp_1
       # The second of the trio; the same part as temp_1, on the same bus.
       - payload: temp_2
         address: "0x49"
         group: "zone_temps"
-        path: "/tmp/tcs-thermostat-i2c"
+        path: "/dev/i2c-1"
         read_size: "2"
+        sim_address: "127.0.0.1:5202"
         world-out:
           - to_k2.temp_2
-  - type spi:
+  - type spi_tmass:
       # The third. A different part on a different bus: three bytes,
       # unsigned, its own scale and so its own conversion, so that no one
       # bus and no one part number can take the whole trio out.

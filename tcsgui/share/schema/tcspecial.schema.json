@@ -186,7 +186,7 @@
           "type": "string"
         },
         "sim_address": {
-          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass, spi_tmass, gpio_in, gpio_out or gpio_inout payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
         "interface": {
@@ -791,7 +791,7 @@
           "type": "string"
         },
         "sim_address": {
-          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass, spi_tmass, gpio_in, gpio_out or gpio_inout payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
         "interface": {
@@ -1420,7 +1420,7 @@
           "type": "string"
         },
         "sim_address": {
-          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
+          "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass, spi_tmass, gpio_in, gpio_out or gpio_inout payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
         "interface": {

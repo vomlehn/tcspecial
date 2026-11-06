@@ -1792,6 +1792,10 @@ state_interval how often to report what the watched lines are, or what
                required of a gpio_inout
 init           what driven lines start at, as a trigger is written:
                '&quot;0&quot;'. gpio_out and gpio_inout only
+sim_address    where tcssim answers for the lines over UDP when they
+               are simulated, a loopback address and port:
+               127.0.0.1:5204. Optional; used under --simulate=some or
+               all instead of the chip, and not under none
 </pre>
 <p><strong>How lines are watched.</strong> Two different questions, and a set of lines may ask
 either or both:</p>
@@ -1868,6 +1872,17 @@ simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its watched lines the other
 way every packet interval, and watch its driven lines for what the vehicle
 drives them to.</p>
+<p>A node that gives <tt class="docutils literal">sim_address</tt> needs no chip in a simulated run: tcspecial
+drives and watches its lines over UDP at that address, and tcssim answers
+there, by the same rules. One datagram is one state of the lines, an ASCII
+<tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> for each in the order of <tt class="docutils literal">lines</tt>, lowest first -- <tt class="docutils literal">10</tt> for
+lines 4 and 5 with 4 asserted -- both ways: what the vehicle drives its lines
+to, and what watched lines are, which tcssim sends whenever they change.
+tcspecial says hello with an empty datagram, so that tcssim knows where to
+answer, and makes of each change the record an edge on a chip would be,
+keeping to the node's <tt class="docutils literal">edge</tt>. Everything else -- reports, <tt class="docutils literal">state_interval</tt>,
+what is passed on by <tt class="docutils literal"><span class="pre">moc-out</span></tt> -- is as it is on a chip. Under <tt class="docutils literal">none</tt>, the
+flight setting, the chip is opened.</p>
 <p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies <a class="reference internal" href="#the-gpio-example">The gpio example</a> on such a
 chip, pulling and reading its lines itself rather than through tcssim: each
 pull of the switch's line reaches the ground as a record, and a <tt class="docutils literal">1</tt> or
@@ -2611,22 +2626,18 @@ group is for: readings that will be compared are taken as close together as
 the hardware allows.</p>
 <p>The sensors are temperature sensors on the zone, as a vehicle would carry
 them: <tt class="docutils literal">temp_1</tt> and <tt class="docutils literal">temp_2</tt> on an I<sup>2</sup>C bus, of type
-<tt class="docutils literal">i2c</tt>, and <tt class="docutils literal">temp_3</tt> a SPI peripheral, of type <tt class="docutils literal">spi</tt>. They are in
+<tt class="docutils literal">i2c_tmass</tt>, and <tt class="docutils literal">temp_3</tt> a SPI peripheral, of type <tt class="docutils literal">spi_tmass</tt> -- see
+<a class="reference internal" href="#temperature-sensors-on-a-thermal-mass">Temperature Sensors on a Thermal Mass</a>. They are in
 <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat.ytcs</span></tt>, which the example includes,
-with the rest of the vehicle. On a desk the two on I<sup>2</sup>C
-are chips of the kernel's dummy bus, <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, whose registers tcssim
-fills with the zone's temperature: <tt class="docutils literal">sudo bin/mki2c</tt> makes it, with chips at
-their addresses, <tt class="docutils literal">0x48</tt> and <tt class="docutils literal">0x49</tt>. The kernel numbers the stub as it
-finds it, <tt class="docutils literal"><span class="pre">/dev/i2c-1</span></tt> on one host and <tt class="docutils literal"><span class="pre">/dev/i2c-22</span></tt> on the next, so
-their <tt class="docutils literal">path</tt>, <tt class="docutils literal"><span class="pre">/tmp/tcs-thermostat-i2c</span></tt>, is a link tcssim makes to the
-stub wherever it is. <tt class="docutils literal">temp_3</tt> is reached over UDP at its <tt class="docutils literal">sim_address</tt>,
-<tt class="docutils literal">127.0.0.1:5203</tt>, where tcssim answers the same. Flown, the paths are the
-vehicle's buses. The heaters'
-switches are GPIO lines 4 and 5 of the kernel's dummy chip, <tt class="docutils literal">/dev/gpiochip1</tt>, which tcssim moves and watches: <tt class="docutils literal">sudo
-<span class="pre">bin/mk-kernel-dummies</span> gpio</tt> makes it, once, before the example is run --
-see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>. The gpio example has lines 0 and 1, so
-the two run at once; the thermostat-yamcs example has the same lines as this,
-so it and this do not.</p>
+with the rest of the vehicle. The heaters' switches are GPIO lines 4 and 5 of
+<tt class="docutils literal">/dev/gpiochip1</tt>. On a desk every one of them is a simulated device, reached
+over UDP at its <tt class="docutils literal">sim_address</tt>: the sensors at <tt class="docutils literal">127.0.0.1:5201</tt> to
+<tt class="docutils literal">5203</tt>, where tcssim answers with the zone's temperature, and the switches
+at <tt class="docutils literal">5204</tt> and <tt class="docutils literal">5205</tt>, where tcssim takes what the vehicle drives them to
+-- see <a class="reference internal" href="#a-gpio-payload">A GPIO Payload</a>. So the example needs no dummy device, no root and no
+hardware. Flown, the buses and the chip are opened. The thermostat-yamcs
+example has the same sensors and switches as this, at the same addresses, so
+it and this are not run at once.</p>
 <p>The three are sensors of <em>one place</em>, separated only because two parts cannot
 occupy one point. <tt class="docutils literal">temp_3</tt> is a different part, reporting three unsigned
 bytes on a scale of its own where the first two report two signed bytes on
@@ -4242,7 +4253,7 @@ example shares with thermostat-yamcs, its world shortened here:</p>
         </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_2</span><span class="whitespace">
         </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c_tmass</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
         </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.5 K</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
@@ -4256,7 +4267,7 @@ example shares with thermostat-yamcs, its world shortened here:</p>
         </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.03 K</span><span class="whitespace">
         </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">+0.2 K</span><span class="whitespace">
 
-  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi_tmass</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
         </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.25 K</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
@@ -5264,7 +5275,9 @@ faithfully: an HDLC line has no virtual interface at all, and a
 pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
 sensor's bytes without its clock, its channel or its sysfs. Two more, the
 temperature sensors <tt class="docutils literal">i2c_tmass</tt> and <tt class="docutils literal">spi_tmass</tt>, are simulated as the
-thermal mass they are fixed to. A node of one of those types may give
+thermal mass they are fixed to. And the three GPIO types, whose dummy chip
+needs root to make, may be simulated without it: tcssim answers for their
+lines over UDP, see <a class="reference internal" href="#a-gpio-payload">A GPIO Payload</a>. A node of one of those types may give
 <tt class="docutils literal">sim_address</tt>, a loopback address and port. Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or
 <tt class="docutils literal">all</tt> tcspecial reaches it there over UDP instead of opening the device,
 and tcssim answers there, a simulated device; under <tt class="docutils literal">none</tt> the device is

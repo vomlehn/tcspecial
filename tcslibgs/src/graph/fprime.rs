@@ -1036,7 +1036,10 @@ mod tests {
             Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
                 .expect("the example reads");
         assert_eq!(Form::of(&thermostat, "to_k1"), Form::Value(Unit::Kelvin));
-        assert_eq!(Form::of(&thermostat, "ambient"), Form::Value(Unit::Kelvin));
+        assert_eq!(
+            Form::of(&thermostat, "consensus_temp"),
+            Form::Value(Unit::Kelvin)
+        );
         assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
         // Driven lines that report what they were told: decisions.

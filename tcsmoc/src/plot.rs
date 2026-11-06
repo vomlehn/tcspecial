@@ -1621,7 +1621,7 @@ pub(crate) mod tests {
         assert_eq!(switches, 2);
         assert_eq!(plot.panels[0].setpoints, vec![293.15]);
         assert_eq!(
-            plot.plotted("ambient"),
+            plot.plotted("consensus_temp"),
             Some(Plotted::Trace(0, Unit::Kelvin))
         );
         assert_eq!(
@@ -1986,7 +1986,7 @@ pub(crate) mod tests {
             .insert("setpoint".to_string(), Scalar::of("290.15"));
         graph.nodes.push(second);
         graph.links.push(Link {
-            from: "ambient".to_string(),
+            from: "consensus_temp".to_string(),
             to: Destinations::of(vec!["thermostat_low".to_string()]),
             comment: None,
         });

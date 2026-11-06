@@ -936,7 +936,7 @@ there, and a line that crosses into or out of the file anywhere else is
 refused, saying which list to add the node to:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">exports</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">ambient</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k3</span><span class="punctuation indicator">]</span>
+  </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">consensus_temp</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k3</span><span class="punctuation indicator">]</span>
 </pre>
 <p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-out&gt;to_k1&lt;/world-out&gt;</span></tt>,
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
@@ -2631,10 +2631,10 @@ theirs, so that no one part number can take the whole trio out.</p>
 <tt class="docutils literal">to_k1</tt>, <tt class="docutils literal">to_k2</tt> or <tt class="docutils literal">to_k3</tt>, and each converted reading goes two ways:
 to the ground through the gateway node -- at its <tt class="docutils literal">ground_base</tt>,
 <tt class="docutils literal">127.0.0.1:5100</tt>, plus each source's device id, so <tt class="docutils literal">to_k1</tt>, <tt class="docutils literal">to_k2</tt> and
-<tt class="docutils literal">to_k3</tt>, ids 9 to 11, arrive on ports 5109 to 5111 -- and into <tt class="docutils literal">ambient</tt>
-as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or <tt class="docutils literal">in2</tt>.</p>
-<p><tt class="docutils literal">ambient</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the algorithm
-it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
+<tt class="docutils literal">to_k3</tt>, ids 9 to 11, arrive on ports 5109 to 5111 -- and into
+<tt class="docutils literal">consensus_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or <tt class="docutils literal">in2</tt>.</p>
+<p><tt class="docutils literal">consensus_temp</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the
+algorithm it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
 answer at all. The vote keeps the last reading from each input and produces a
@@ -3138,7 +3138,7 @@ the same, so they answer whether tcssim is ready at one address. What differs is
 gateway, <tt class="docutils literal">yamcs</tt>: the beacon is telemetry of APID <tt class="docutils literal">0x110</tt>, CONNECT and
 its answer are on <tt class="docutils literal">0x111</tt>, and each source drawn into the gateway node
 comes down as telemetry of its <tt class="docutils literal">apid_base</tt>, <tt class="docutils literal">0x400</tt>, plus the source's
-device id -- <tt class="docutils literal">ambient</tt> on <tt class="docutils literal">0x400</tt>, <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> and
+device id -- <tt class="docutils literal">consensus_temp</tt> on <tt class="docutils literal">0x400</tt>, <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> and
 <tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on <tt class="docutils literal">0x402</tt> and <tt class="docutils literal">0x403</tt>, and <tt class="docutils literal">to_k1</tt> to <tt class="docutils literal">to_k3</tt> on
 <tt class="docutils literal">0x409</tt> to <tt class="docutils literal">0x40b</tt>.</p>
 <p>The mission database gives each of them a parameter of the type the
@@ -3164,9 +3164,9 @@ With <tt class="docutils literal"><span class="pre">--seconds</span></tt> there 
 each time a heater's switch changes, of these forms:</p>
 <pre class="code text literal-block">
 connected: the vehicle is running this configuration
-read: ambient &lt;T&gt; K, to_k1 &lt;T&gt; K, to_k2 &lt;T&gt; K, to_k3 &lt;T&gt; K,
+read: consensus_temp &lt;T&gt; K, to_k1 &lt;T&gt; K, to_k2 &lt;T&gt; K, to_k3 &lt;T&gt; K,
 gpio-out-tmass1 off, gpio-out-tmass2 off
-switched: gpio-out-tmass1 off -&gt; on; ambient &lt;T&gt; K, ...
+switched: gpio-out-tmass1 off -&gt; on; consensus_temp &lt;T&gt; K, ...
 </pre>
 <p>tcssim draws a window of its own, so it wants a display. Its ports are in
 the seventeen thousands, apart from the thermostat example's, but its GPIO

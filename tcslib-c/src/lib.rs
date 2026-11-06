@@ -2331,7 +2331,7 @@ mod tests {
         let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
         assert!(!configuration.is_null(), "the example opens");
         for (node, wanted) in [
-            (c"ambient", Some("K")),
+            (c"consensus_temp", Some("K")),
             (c"thermostat", None),
             (c"temp_1", None),
         ] {
@@ -2394,7 +2394,7 @@ mod tests {
         assert!(!configuration.is_null(), "the example opens");
         for (node, sends) in [
             (c"to_k1", 1),
-            (c"ambient", 1),
+            (c"consensus_temp", 1),
             (c"thermostat", 0),
             (c"temp_1", 0),
         ] {
@@ -2440,7 +2440,7 @@ mod tests {
         let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
         assert!(!configuration.is_null(), "the example opens");
         for (node, sends) in
-            [(c"thermostat", 1), (c"ambient", 0), (c"temp_1", 0)]
+            [(c"thermostat", 1), (c"consensus_temp", 0), (c"temp_1", 0)]
         {
             let mut decisions = -1;
             // SAFETY: a live configuration, a NUL-terminated name and a

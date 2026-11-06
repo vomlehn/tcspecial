@@ -38,7 +38,7 @@
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:5100</ground_base>
                 <port>5000</port>
-                <world-in>ambient</world-in>
+                <world-in>consensus_temp</world-in>
                 <world-in>gpio-out-tmass1</world-in>
                 <world-in>gpio-out-tmass2</world-in>
                 <world-in>to_k1</world-in>

@@ -480,8 +480,8 @@ A control loop, aboard. Three temperature sensors are read together, once a
 second, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
 reading goes through a conversion of its own to kelvin -- `to_k1`, `to_k2`,
 `to_k3`, the parts differing in format and scale -- and the three meet at
-`ambient`, which takes their median, so that one sensor failing cannot take
-the zone's temperature with it. `thermostat` holds that to a setpoint,
+`consensus_temp`, which takes their median, so that one sensor failing cannot
+take the zone's temperature with it. `thermostat` holds that to a setpoint,
 293.15 K with a half band of 2 K, and drives two heaters, each through a GPIO
 line of its own, `gpio-out-tmass1` and `gpio-out-tmass2`, which go on and off
 together. Each switch is a `gpio_inout`: it drives its line, and every second
@@ -567,7 +567,7 @@ ground carries a CCSDS primary header:
 | the beacon | down | `beacon.apid`, 0x110 |
 | CONNECT and its answer | up, down | `tcs_cmd.apid`, 0x111 |
 | what Yamcs sends the gateway node | up | its `apid_base`, 0x400 |
-| `ambient` | down | `apid_base` plus its device id, 0x400 |
+| `consensus_temp` | down | `apid_base` plus its device id, 0x400 |
 | `gpio-out-tmass1`, `gpio-out-tmass2` | down | 0x402 and 0x403 |
 | `to_k1`, `to_k2`, `to_k3` | down | 0x409 to 0x40b |
 
@@ -582,8 +582,8 @@ conversion's or a vote's value is a float in its unit, with the unit in a
 `UnitSet`, read from its four bytes of a signed count of the unit's steps
 through a calibrator, and a decision -- what a heater's switch was told -- is
 a boolean. So Yamcs's web interface, at <http://localhost:17090>, shows
-`ambient` and `to_k1` to `to_k3` as temperatures in K and `gpio-out-tmass1`
-and `gpio-out-tmass2` as true or false.
+`consensus_temp` and `to_k1` to `to_k3` as temperatures in K and
+`gpio-out-tmass1` and `gpio-out-tmass2` as true or false.
 
 It starts Yamcs, then tcssim -- every payload sending from the start, as
 though its panel's button had been pressed -- and, once tcssim says it is

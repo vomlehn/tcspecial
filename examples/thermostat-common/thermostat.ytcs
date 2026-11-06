@@ -13,7 +13,7 @@
 # leaves for the gateway node there. Nothing arrives from outside, the
 # sensors being here.
 exports:
-  world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
+  world-out: [consensus_temp, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
 payload_groups:
   - name: "zone_temps"
@@ -27,12 +27,12 @@ vehicle:
       # answer, which a mean over all three would not, and it produces a
       # value on every arrival, so one sensor that stops reporting is
       # outvoted rather than stopping the vehicle from deciding anything.
-      - compute: ambient
+      - compute: consensus_temp
         algorithm: "median"
         function: "vote"
         world-out:
-          - gateway.ambient
-          - thermostat.ambient
+          - gateway.consensus_temp
+          - thermostat.consensus_temp
         world-in: [in0, in1, in2]
       # setpoint is set from the ground; half_band is how far either side
       # of it the heaters are switched at, the setpoint being in the middle
@@ -52,7 +52,7 @@ vehicle:
           - gpio-out-tmass2.thermostat
         world-out:
           - housekeeping.thermostat
-        world-in: [ambient]
+        world-in: [consensus_temp]
       # Each sensor's reading, to kelvin, for the vote and the gateway node:
       # the parts differ in format and scale, so each has a conversion of
       # its own.
@@ -62,7 +62,7 @@ vehicle:
         offset: "273.15"
         scale: "0.0625"
         world-out:
-          - ambient.in0
+          - consensus_temp.in0
           - gateway.to_k1
         world-in: [temp_1]
       - compute: to_k2
@@ -71,7 +71,7 @@ vehicle:
         offset: "273.15"
         scale: "0.0625"
         world-out:
-          - ambient.in1
+          - consensus_temp.in1
           - gateway.to_k2
         world-in: [temp_2]
       - compute: to_k3
@@ -80,7 +80,7 @@ vehicle:
         offset: "255.37"
         scale: "0.0078"
         world-out:
-          - ambient.in2
+          - consensus_temp.in2
           - gateway.to_k3
         world-in: [temp_3]
   - type log:
@@ -159,7 +159,7 @@ commands:
 
 tcsgui:
   nodes:
-    - { node: ambient, x: 450, y: 242 }
+    - { node: consensus_temp, x: 450, y: 242 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }
     - { node: gpio-out-tmass2, x: 34, y: 469 }
     - { node: housekeeping, x: 469, y: 450 }

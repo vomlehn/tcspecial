@@ -15,7 +15,7 @@
          leaves for the gateway node there. Nothing arrives from outside, the
          sensors being here. -->
     <exports>
-        <world-out>ambient</world-out>
+        <world-out>consensus_temp</world-out>
         <world-out>gpio-out-tmass1</world-out>
         <world-out>gpio-out-tmass2</world-out>
         <world-out>to_k1</world-out>
@@ -35,11 +35,11 @@
                  would not, and it produces a value on every arrival, so one
                  sensor that stops reporting is outvoted rather than
                  stopping the vehicle from deciding anything. -->
-            <compute name="ambient">
+            <compute name="consensus_temp">
                 <algorithm>median</algorithm>
                 <function>vote</function>
-                <world-out>gateway.ambient</world-out>
-                <world-out>thermostat.ambient</world-out>
+                <world-out>gateway.consensus_temp</world-out>
+                <world-out>thermostat.consensus_temp</world-out>
                 <world-in>in0</world-in>
                 <world-in>in1</world-in>
                 <world-in>in2</world-in>
@@ -60,7 +60,7 @@
                 <moc-out>gpio-out-tmass1.thermostat</moc-out>
                 <moc-out>gpio-out-tmass2.thermostat</moc-out>
                 <world-out>housekeeping.thermostat</world-out>
-                <world-in>ambient</world-in>
+                <world-in>consensus_temp</world-in>
             </compute>
             <!-- Each sensor's reading, to kelvin, for the vote and the gateway
                  node: the parts differ in format and scale, so each has a
@@ -70,7 +70,7 @@
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
-                <world-out>ambient.in0</world-out>
+                <world-out>consensus_temp.in0</world-out>
                 <world-out>gateway.to_k1</world-out>
                 <world-in>temp_1</world-in>
             </compute>
@@ -79,7 +79,7 @@
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
-                <world-out>ambient.in1</world-out>
+                <world-out>consensus_temp.in1</world-out>
                 <world-out>gateway.to_k2</world-out>
                 <world-in>temp_2</world-in>
             </compute>
@@ -88,7 +88,7 @@
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
-                <world-out>ambient.in2</world-out>
+                <world-out>consensus_temp.in2</world-out>
                 <world-out>gateway.to_k3</world-out>
                 <world-in>temp_3</world-in>
             </compute>
@@ -175,7 +175,7 @@
     </commands>
     <tcsgui>
         <nodes>
-            <node name="ambient" x="450" y="242"/>
+            <node name="consensus_temp" x="450" y="242"/>
             <node name="gpio-out-tmass1" x="34" y="393"/>
             <node name="gpio-out-tmass2" x="34" y="469"/>
             <node name="housekeeping" x="469" y="450"/>

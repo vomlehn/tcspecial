@@ -506,7 +506,7 @@ refused, saying which list to add the node to:
 .. code-block:: yaml
 
    exports:
-     world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
+     world-out: [consensus_temp, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
 In XML each name is an element of its own, ``<world-out>to_k1</world-out>``,
 inside ``<exports>``. A top file has nothing around it and may not have the
@@ -2313,11 +2313,11 @@ Each reading is converted to kelvin by its own ``to_kelvin`` node,
 ``to_k1``, ``to_k2`` or ``to_k3``, and each converted reading goes two ways:
 to the ground through the gateway node -- at its ``ground_base``,
 ``127.0.0.1:5100``, plus each source's device id, so ``to_k1``, ``to_k2`` and
-``to_k3``, ids 9 to 11, arrive on ports 5109 to 5111 -- and into ``ambient``
-as the input ``in0``, ``in1`` or ``in2``.
+``to_k3``, ids 9 to 11, arrive on ports 5109 to 5111 -- and into
+``consensus_temp`` as the input ``in0``, ``in1`` or ``in2``.
 
-``ambient`` is a ``vote``: one temperature out of the three by the algorithm
-it names, ``median``, which takes the middle reading. A mean would be the wrong
+``consensus_temp`` is a ``vote``: one temperature out of the three by the
+algorithm it names, ``median``, which takes the middle reading. A mean would be the wrong
 arithmetic twice over -- it carries a bad reading into the answer in proportion
 to how wrong it is, and waiting for all three turns one dead sensor into no
 answer at all. The vote keeps the last reading from each input and produces a
@@ -2879,7 +2879,7 @@ the same, so they answer whether tcssim is ready at one address. What differs is
 gateway, ``yamcs``: the beacon is telemetry of APID ``0x110``, CONNECT and
 its answer are on ``0x111``, and each source drawn into the gateway node
 comes down as telemetry of its ``apid_base``, ``0x400``, plus the source's
-device id -- ``ambient`` on ``0x400``, ``gpio-out-tmass1`` and
+device id -- ``consensus_temp`` on ``0x400``, ``gpio-out-tmass1`` and
 ``gpio-out-tmass2`` on ``0x402`` and ``0x403``, and ``to_k1`` to ``to_k3`` on
 ``0x409`` to ``0x40b``.
 
@@ -2911,9 +2911,9 @@ each time a heater's switch changes, of these forms:
 .. code-block:: text
 
    connected: the vehicle is running this configuration
-   read: ambient <T> K, to_k1 <T> K, to_k2 <T> K, to_k3 <T> K,
+   read: consensus_temp <T> K, to_k1 <T> K, to_k2 <T> K, to_k3 <T> K,
    gpio-out-tmass1 off, gpio-out-tmass2 off
-   switched: gpio-out-tmass1 off -> on; ambient <T> K, ...
+   switched: gpio-out-tmass1 off -> on; consensus_temp <T> K, ...
 
 tcssim draws a window of its own, so it wants a display. Its ports are in
 the seventeen thousands, apart from the thermostat example's, but its GPIO

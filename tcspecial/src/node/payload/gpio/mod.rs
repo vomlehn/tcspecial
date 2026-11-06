@@ -574,7 +574,11 @@ impl UdpLines {
 }
 
 impl Lines {
-    /// The descriptor to wait on: the request's, or the socket's.
+    /// The descriptor to wait on.
+    ///
+    /// # Returns
+    ///
+    /// The request's descriptor, or the socket's.
     fn fd(&self) -> RawFd {
         match self {
             Lines::Chip { request, .. } => request.as_raw_fd(),
@@ -583,6 +587,10 @@ impl Lines {
     }
 
     /// The same lines, for the other half of the node.
+    ///
+    /// # Returns
+    ///
+    /// The lines, on duplicates of these descriptors.
     ///
     /// # Errors
     ///

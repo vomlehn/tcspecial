@@ -1155,6 +1155,43 @@ pub fn edge_box(
     ))
 }
 
+/// One of a subdiagram's edge terminals, where its page draws it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EdgeTerminal {
+    /// The terminal's name.
+    pub terminal: &'static str,
+    /// Its box's left and top: see [`edge_box`].
+    pub x: f32,
+    pub y: f32,
+    /// Whether its arrow points right, towards the payloads.
+    pub rightward: bool,
+}
+
+/// A subdiagram's four edge terminals, as its page draws them.
+///
+/// # Arguments
+///
+/// * `inside` - Where what is inside the page begins and ends: see
+///              [`edge_box`].
+///
+/// # Returns
+///
+/// Each terminal, where [`edge_box`] puts it.
+pub fn edge_terminals(inside: (f32, f32)) -> Vec<EdgeTerminal> {
+    ["world-in", "moc-out", "world-out", "moc-in"]
+        .into_iter()
+        .filter_map(|terminal| {
+            let (x, y, _, _) = edge_box(terminal, inside)?;
+            Some(EdgeTerminal {
+                terminal,
+                x,
+                y,
+                rightward: corner_of(terminal)?.rightward,
+            })
+        })
+        .collect()
+}
+
 /// Where a line joins one of a subdiagram's edge terminals, and which way it
 /// points there.
 ///

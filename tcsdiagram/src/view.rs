@@ -71,6 +71,29 @@ pub struct NodeLook {
     pub type_band: (f32, f32),
 }
 
+/// What a subdiagram's box says of a page nobody is looking at: how many
+/// nodes it holds, and how many lines cross its edge. Those are the two
+/// things worth knowing about a diagram you are not looking at, and they
+/// are what "simplified" means here -- not a smaller drawing of the
+/// contents, which would be unreadable.
+///
+/// # Arguments
+///
+/// * `inside`   - How many nodes the subdiagram holds.
+/// * `crossing` - How many lines have one end inside it and one outside,
+///                one per destination.
+///
+/// # Returns
+///
+/// The line the box shows.
+pub fn box_summary(inside: usize, crossing: usize) -> String {
+    format!(
+        "{inside} node{} · {crossing} crossing{}",
+        if inside == 1 { "" } else { "s" },
+        if crossing == 1 { "" } else { "s" }
+    )
+}
+
 /// What the line along the top of a node says it is: its type, and for a
 /// compute node the function it computes.
 ///

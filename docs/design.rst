@@ -9203,10 +9203,18 @@ Requirement
     node of the top file where tcsgui would place it and every link along the
     route tcsgui gives it. Where the panes are divided is the person's own
     tcsgui setting, read and never written, and the nodes are settled into
-    their panes by the rule the editor settles a file it opens with. A line to
-    a node in an included file is drawn to a stub labelled with that node:
-    the window draws the top file's nodes and not the boxes the editor draws
-    for the files it includes.
+    their panes by the rule the editor settles a file it opens with. Each
+    file the top file includes is drawn on the top page as the editor draws
+    it, a subdiagram's box saying how many nodes it holds and how many lines
+    cross its edge, and a line to a node inside it is drawn to the box.
+
+Requirement
+    Each subdiagram has a window of its own, open from the start beside the
+    top file's and drawn as tcsgui draws the subdiagram's page: its nodes,
+    its edge in a margin either side with the terminals a line from another
+    file crosses by, a node outside it drawn at that edge, and the Physics
+    pane holding the components the editor put on that page. Its links are
+    lit as the top page's are, a line crossing the edge on both pages.
 
 Requirement
     The drawing is one drawing. What a node, a link and the sheet look like --
@@ -9228,9 +9236,12 @@ Requirement
 Requirement
     The window takes no press: a node is not dragged, a terminal draws no
     link, a menu does not open. It keeps what the window manager gives every
-    window -- raising, lowering and closing -- and closing it stops tcspecial,
-    as an interrupt would: the pass finished, the links closed, the log
-    flushed. A tcspecial that stops, or that never starts, closes the window.
+    window -- raising, lowering and closing -- and closing any of its
+    windows stops tcspecial, as an interrupt would: the pass finished, the
+    links closed, the log flushed. Any, and not only the top page's, because
+    nothing in a window can be pressed to open a page again: a page closed
+    alone would be gone for the rest of the run. A tcspecial that stops, or
+    that never starts, closes every window.
 
 Requirement
     What the vehicle does to be shown is one atomic store per datum sent, into

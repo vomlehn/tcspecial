@@ -1,5 +1,6 @@
 // The visual window: a running tcspecial's graph, drawn as tcsgui draws the
-// configuration, with each link lit as data crosses it.
+// configuration, with each link lit as data crosses it. One window a page:
+// the top file's, and one for each subdiagram the top file includes.
 //
 // Built only into a tcspecial compiled with the `visual` feature, which never
 // flies. Everything on the canvas is tcsdiagram's -- the node shapes, the
@@ -13,18 +14,30 @@ import { Colors } from "../../tcsui/ui/colors.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
 import {
     Session, NodeView, LinkView, NodeShape, LinkLine, SheetGround,
-    PhysicsGround
+    PhysicsGround, Terminal, Type
 } from "../../tcsdiagram/ui/diagram.slint";
 
 // Exported so that the Rust can say this session changes nothing, which is
 // what takes the press off every terminal.
 export { Session, NodeView, LinkView }
 
+// One of a subdiagram's edge terminals, where its box would have it, in the
+// working panes' own coordinates, and which way its arrow points. See
+// tcsdiagram::style::edge_terminals.
+export struct EdgeView {
+    terminal: string,
+    x: length,
+    y: length,
+    rightward: bool,
+}
+
 export component VisualWindow inherits Window {
     default-font-size: Fonts.window;
 
-    // The configuration being flown, for the title.
+    // The configuration being flown, for the title, and the subdiagram this
+    // window draws: empty for the top page.
     in property <string> configuration;
+    in property <string> page;
 
     in property <[NodeView]> nodes;
     in property <[LinkView]> links;
@@ -48,28 +61,43 @@ export component VisualWindow inherits Window {
     in property <[NodeView]> physics-nodes;
     in property <[LinkView]> physics-links;
 
+    // A subdiagram's edge: the margin either side of what is inside its
+    // page, and the edge's terminals, where a line from another file arrives
+    // or leaves. None on the top page, which has nothing outside it. See
+    // tcsdiagram::style::edge_box.
+    in property <length> edge-width: 0px;
+    in property <[EdgeView]> edge-terminals: [];
+    // Where the working panes begin: past the left margin and the Physics
+    // pane.
+    property <length> left: root.physics-width + root.edge-width;
+    property <length> sheet-width: root.physics-width + 2 * root.edge-width
+        + root.working-width;
+
     // Said in the title as well as in the manual, because a window that looks
     // like the editor and is not one should say what it is where it is seen.
-    title: "tcspecial " + configuration + " -- visual, not for flight";
-    preferred-width: root.physics-width + root.working-width + 24px;
+    title: "tcspecial " + configuration
+        + (page == "" ? "" : " -- " + page) + " -- visual, not for flight";
+    preferred-width: root.sheet-width + 24px;
     preferred-height: 720px;
     background: Colors.window;
 
     sheet := ScrollView {
         width: 100%;
         height: 100%;
-        content-width: root.physics-width + root.working-width;
+        content-width: root.sheet-width;
         content-height: root.working-height;
 
         canvas := Rectangle {
-            width: root.physics-width + root.working-width;
+            width: root.sheet-width;
             height: root.working-height;
             background: white;
             border-width: 1px;
             border-color: #d8d8d4;
 
+            // Right of the left margin, against the payloads it joins, as
+            // tcsgui draws it.
             PhysicsGround {
-                x: 0;
+                x: root.edge-width;
                 y: 0;
                 physics-width: root.physics-width;
                 physics-ground: root.physics-ground;
@@ -83,7 +111,7 @@ export component VisualWindow inherits Window {
             // The configuration's sheet, right of the Physics pane, in the
             // coordinates its file holds.
             Rectangle {
-                x: root.physics-width;
+                x: root.left;
                 width: root.working-width;
                 height: root.working-height;
                 background: transparent;
@@ -123,13 +151,43 @@ export component VisualWindow inherits Window {
 
             // The line between the Physics pane and the payloads.
             Rectangle {
-                x: root.physics-width;
+                x: root.left;
                 width: 1px;
                 height: 100%;
                 background: #cbcdd1;
             }
             for n in physics-nodes: NodeShape {
                 node: n;
+            }
+
+            // A subdiagram's edge, as tcsgui draws it: a margin either side
+            // of the page's inside, each named as what it is, holding the
+            // terminals a line from another file arrives at or leaves by.
+            // Pale and named, so that what the margin is does not rest on
+            // its colour.
+            for side in root.edge-width > 0 ? [0, 1] : []: Rectangle {
+                x: side == 0 ? 0 : root.left + root.working-width;
+                width: root.edge-width;
+                height: root.working-height;
+                background: #f3f4f6;
+                border-width: 1px;
+                border-color: #d1d5db;
+                Text {
+                    x: (parent.width - self.width) / 2;
+                    y: 140px;
+                    text: "outside";
+                    font-size: Type.small;
+                    font-italic: true;
+                    color: #4b5563;
+                }
+            }
+            for edge in root.edge-terminals: Terminal {
+                x: root.left + edge.x;
+                y: edge.y;
+                rightward: edge.rightward;
+                sink: edge.terminal == "world-in" || edge.terminal == "moc-in";
+                ink: #4b5563;
+                mark: #374151;
             }
         }
     }

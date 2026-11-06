@@ -339,6 +339,26 @@ pub fn physics_width(percent: i32) -> i32 {
     at_percent(percent.clamp(settings::LEAST, settings::MOST))
 }
 
+/// Where what is inside a subdiagram's page begins and ends, in the working
+/// panes' own coordinates: from the Physics pane's left edge to the Gateway
+/// pane's right one. The page's edge is the margin either side of it.
+///
+/// The Physics pane inside rather than outside the edge, though it holds
+/// nothing of the subdiagram's file, because it is drawn against the
+/// payloads it joins: put past the edge, a line from a sensor to the zone
+/// it reads would cross the edge without leaving the page.
+///
+/// # Arguments
+///
+/// * `dividers` - Where the panes are.
+///
+/// # Returns
+///
+/// The left and right of the page's inside, in pixels.
+pub fn inside_of(dividers: Dividers) -> (i32, i32) {
+    (-dividers.physics, WORKING_WIDTH)
+}
+
 /// And back: what percentage of the working width the Physics pane's width
 /// is.
 ///

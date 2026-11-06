@@ -4,7 +4,8 @@
 //! panes, every node where the editor would put it, every link along the
 //! route the editor gives it, all of it from `tcsdiagram` -- with the
 //! simulator file's physics in the Physics pane to their left, as the editor
-//! draws it too, and a link is lit
+//! draws it too. One window a page, as the editor has: the top file's, and
+//! one for each subdiagram it includes, with its edge. A link is lit
 //! while data crosses it: a line three times as wide and a shade lighter is
 //! drawn under it, for [`LINE_BLINK`] after each datum is sent. The ordinary
 //! line stays on top, so the drawing is the editor's whether anything is
@@ -14,8 +15,9 @@
 //! with the `visual` feature, which no default build has, and asked for with
 //! `--visual`. The window takes no press -- a node is not dragged, a terminal
 //! draws no link -- and changes nothing the vehicle does: it keeps only what
-//! the window manager gives every window, and its close box stops tcspecial,
-//! as an interrupt would.
+//! the window manager gives every window, and the close box of any of them
+//! stops tcspecial, as an interrupt would: with no press to open a page
+//! again, a page closed alone would be a page gone for the rest of the run.
 //!
 //! What the vehicle does to be shown is one store per datum sent, into a slot
 //! of a table made before the vehicle starts: see [`sent`]. It allocates
@@ -24,6 +26,7 @@
 //! table on a timer of its own, on the main thread, which is the one a window
 //! has to run on; the vehicle runs beside it on a thread of its own.
 
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -32,7 +35,7 @@ use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use tcsdiagram::look::{self, ground_of};
 use tcsdiagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
 use tcsdiagram::style;
-use tcsdiagram::view::{self, LineOnSheet, LinkLook, NodeLook, OnSheet};
+use tcsdiagram::view::{self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet};
 use tcslibgs::graph::{Destination, Graph};
 
 use crate::runtime;
@@ -197,14 +200,48 @@ pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
     let lines = lines_of(&graph);
     watch(lines.len());
 
-    let window = match ui::VisualWindow::new() {
-        Ok(window) => window,
-        Err(why) => {
-            eprintln!("tcspecial --visual: the window cannot be opened: {why}");
+    let settings = tcsdiagram::settings::read().settings;
+    let mut dividers =
+        pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
+    dividers.physics = pane::physics_width(settings.physics_percent);
+    let pages = Pages::of(&graph, dividers);
+
+    // The top page first, then each subdiagram in the order the top file
+    // includes them.
+    let mut windows = Vec::new();
+    let mut shown = Vec::new();
+    for page in std::iter::once(None).chain(
+        graph
+            .includes
+            .iter()
+            .map(|include| Some(include.name.as_str())),
+    ) {
+        let window = match ui::VisualWindow::new() {
+            Ok(window) => window,
+            Err(why) => {
+                eprintln!(
+                    "tcspecial --visual: the window for {} cannot be opened: \
+                     {why}",
+                    page.unwrap_or(path)
+                );
+                return 1;
+            }
+        };
+        shown.push(draw(&window, path, &graph, &lines, &pages, page));
+        // Any window closed stops the vehicle, as the top one's does.
+        window.window().on_close_requested(|| {
+            let _ = slint::quit_event_loop();
+            slint::CloseRequestResponse::HideWindow
+        });
+        if let Err(why) = window.show() {
+            eprintln!(
+                "tcspecial --visual: the window for {} cannot be shown: {why}",
+                page.unwrap_or(path)
+            );
             return 1;
         }
-    };
-    let shown = draw(&window, path, &graph, &lines);
+        windows.push(window);
+    }
 
     let flying = {
         let path = path.to_string();
@@ -231,17 +268,16 @@ pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
         }
     };
 
-    // Each line lit or put out as the window looks. Only a line whose state
-    // changed is told, so a quiet vehicle is a window that does no work.
+    // Each line lit or put out as the windows look, on every page it is
+    // drawn on. Only a line whose state changed is told, so a quiet vehicle
+    // is a window that does no work.
     let timer = slint::Timer::default();
-    {
-        let links = shown.links.clone();
-        let rows = shown.rows;
-        timer.start(slint::TimerMode::Repeated, LOOK_EVERY, move || {
-            let now = Instant::now();
-            for (row, line) in rows.iter().enumerate() {
+    timer.start(slint::TimerMode::Repeated, LOOK_EVERY, move || {
+        let now = Instant::now();
+        for page in &shown {
+            for (row, line) in page.rows.iter().enumerate() {
                 let lit = is_lit(*line, now);
-                if let Some(mut link) = links.row_data(row) {
+                if let Some(mut link) = page.links.row_data(row) {
                     if link.lit != lit {
                         link.lit = lit;
                         // An allocation in the window's loop that cannot be
@@ -249,17 +285,18 @@ pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
                         // and what it does inside to redraw is its own. The
                         // window's loop is not the vehicle's, and a tcspecial
                         // with a window does not fly.
-                        links.set_row_data(row, link);
+                        page.links.set_row_data(row, link);
                     }
                 }
             }
-        });
-    }
+        }
+    });
 
-    if let Err(why) = window.run() {
+    if let Err(why) = slint::run_event_loop() {
         eprintln!("tcspecial --visual: the window stopped: {why}");
     }
     drop(timer);
+    drop(windows);
 
     // Closed, so the vehicle stops; or the vehicle stopped, and this is
     // already so.
@@ -274,13 +311,124 @@ struct Shown {
     rows: Vec<usize>,
 }
 
-/// Puts the graph in the window, as tcsgui would draw its top page.
+/// Which page each node of the configuration is on, and where each node and
+/// each subdiagram's box is drawn: worked out once, for every window.
+struct Pages {
+    /// By node, the subdiagram whose file it was read from: `None` for the
+    /// top file.
+    page: BTreeMap<String, Option<String>>,
+    /// By node and by subdiagram, where it is drawn, settled into its pane.
+    at: BTreeMap<String, (i32, i32)>,
+    /// Where the panes are divided.
+    dividers: pane::Dividers,
+}
+
+impl Pages {
+    /// Works out the pages of a configuration.
+    ///
+    /// Where the panes are divided is the person's own tcsgui setting, read
+    /// and never written, and every node and every subdiagram's box is
+    /// settled into its pane as the editor settles a file it opens, all of
+    /// them together and in the order of their names -- see tcsgui's
+    /// `Document::settle` -- so each is drawn where the editor would draw
+    /// it.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph`    - The configuration.
+    /// * `dividers` - Where the panes are divided.
+    ///
+    /// # Returns
+    ///
+    /// The pages.
+    fn of(graph: &Graph, dividers: pane::Dividers) -> Pages {
+        let page: BTreeMap<String, Option<String>> = graph
+            .nodes
+            .iter()
+            .map(|node| {
+                let file = graph.homes.get(&node.name);
+                let page = file.and_then(|file| graph.include_name(file));
+                (node.name.clone(), page)
+            })
+            .collect();
+
+        let mut named: Vec<(&str, &str)> = graph
+            .nodes
+            .iter()
+            .map(|node| (node.name.as_str(), node.node_type.as_str()))
+            .chain(
+                graph
+                    .includes
+                    .iter()
+                    .map(|include| (include.name.as_str(), "subdiagram")),
+            )
+            .collect();
+        named.sort();
+        let mut placing: Vec<Placing> = named
+            .iter()
+            .map(|(name, node_type)| Placing {
+                node_type,
+                at: graph
+                    .placed
+                    .get(*name)
+                    .map_or((0, 0), |placed| (placed.x, placed.y)),
+            })
+            .collect();
+        pane::settle(&mut placing, dividers);
+        let at = named
+            .iter()
+            .zip(&placing)
+            .map(|((name, _), placed)| (name.to_string(), placed.at))
+            .collect();
+
+        Pages { page, at, dividers }
+    }
+
+    /// Says which page a node is on.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// Its subdiagram's name, or `None` for the top page.
+    fn of_node(&self, node: &str) -> Option<&str> {
+        self.page.get(node).and_then(|page| page.as_deref())
+    }
+
+    /// Says where a node or a subdiagram's box is drawn.
+    fn at(&self, name: &str) -> (i32, i32) {
+        self.at.get(name).copied().unwrap_or_default()
+    }
+
+    /// Says whether a line is drawn on a page: on a subdiagram's page, one
+    /// with an end there; on the top page, one with an end there, and one
+    /// between two subdiagrams, drawn between their boxes, as the editor
+    /// draws it.
+    ///
+    /// # Arguments
+    ///
+    /// * `line` - The line.
+    /// * `page` - The page: a subdiagram's name, or `None` for the top.
+    ///
+    /// # Returns
+    ///
+    /// Whether it is drawn there.
+    fn shows(&self, line: &Line, page: Option<&str>) -> bool {
+        let (from, to) = (self.of_node(&line.from), self.of_node(&line.to));
+        match page {
+            Some(_) => from == page || to == page,
+            None => from.is_none() || to.is_none() || from != to,
+        }
+    }
+}
+
+/// Puts one page of the graph in a window, as tcsgui would draw it.
 ///
-/// Where the panes are divided is the person's own tcsgui setting, read and
-/// never written, and every node is settled into its pane as the editor
-/// settles a file it opens -- so a node is drawn where the editor would draw
-/// it. A node in an included file is on that file's page, not this one; a
-/// line to it is drawn to a stub, as the editor draws it.
+/// A node on another page is drawn as the editor draws it: on the top page,
+/// at its subdiagram's box; on a subdiagram's page, at the page's edge. Each
+/// box on the top page says what is inside it, as the editor's does.
 ///
 /// # Arguments
 ///
@@ -288,6 +436,8 @@ struct Shown {
 /// * `path`   - The configuration file, which the window names.
 /// * `graph`  - The configuration read from it.
 /// * `lines`  - Its lines, from [`lines_of`].
+/// * `pages`  - Which page each node is on, and where it is.
+/// * `page`   - The page drawn: a subdiagram's name, or `None` for the top.
 ///
 /// # Returns
 ///
@@ -297,52 +447,49 @@ fn draw(
     path: &str,
     graph: &Graph,
     lines: &[Line],
+    pages: &Pages,
+    page: Option<&str>,
 ) -> Shown {
-    let settings = tcsdiagram::settings::read().settings;
-    let mut dividers =
-        pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
-    dividers.physics = pane::physics_width(settings.physics_percent);
+    let dividers = pages.dividers;
+    let inside = pane::inside_of(dividers);
 
-    let top = graph.files.first();
-    let here = |name: &str| graph.homes.get(name) == top || top.is_none();
-
-    // In the order of the names, as the editor settles them: see
-    // tcsgui's Document::settle.
-    let mut nodes: Vec<&tcslibgs::graph::Node> = graph.nodes.iter().collect();
-    nodes.sort_by(|a, b| a.name.cmp(&b.name));
-    let mut placing: Vec<Placing> = nodes
+    let mut sheet: Vec<OnSheet> = graph
+        .nodes
         .iter()
-        .map(|node| Placing {
-            node_type: &node.node_type,
-            at: graph
-                .placed
-                .get(&node.name)
-                .map_or((0, 0), |placed| (placed.x, placed.y)),
+        .map(|node| {
+            let home = pages.of_node(&node.name);
+            match (page, home) {
+                // Seen from the top page, a node in a subdiagram is drawn
+                // at its box, whose terminals are the subdiagram's edge.
+                (None, Some(boxed)) => OnSheet {
+                    name: node.name.clone(),
+                    node_type: "subdiagram",
+                    at: pages.at(boxed),
+                    here: true,
+                    drawn: Drawn::AtItsBox,
+                },
+                _ => OnSheet {
+                    name: node.name.clone(),
+                    node_type: &node.node_type,
+                    at: pages.at(&node.name),
+                    here: home == page,
+                    // And seen from a subdiagram's page, a node outside it
+                    // at the page's own edge.
+                    drawn: if home == page {
+                        Drawn::Itself
+                    } else {
+                        Drawn::AtTheEdge(inside.0, inside.1)
+                    },
+                },
+            }
         })
         .collect();
-    pane::settle(&mut placing, dividers);
-
-    let sheet: Vec<OnSheet> = nodes
+    let mut nodes: Vec<ui::NodeView> = sheet
         .iter()
-        .zip(&placing)
-        .map(|(node, placed)| OnSheet {
-            name: node.name.clone(),
-            node_type: &node.node_type,
-            at: placed.at,
-            here: here(&node.name),
-            drawn: Default::default(),
-        })
-        .collect();
-
-    draw_physics(window, path, &sheet, dividers);
-
-    // The sheet is in the order of `nodes`, which is where each node's
-    // function is: a compute node's type line names it.
-    let nodes: Vec<ui::NodeView> = sheet
-        .iter()
-        .zip(&nodes)
-        .filter(|(node, _)| node.here)
+        .zip(&graph.nodes)
+        .filter(|(node, _)| node.here && node.drawn == Drawn::Itself)
         .map(|(node, said)| {
+            // A compute node's type line names its function.
             node_view(view::node_look(
                 &node.name,
                 node.node_type,
@@ -353,13 +500,47 @@ fn draw(
             ))
         })
         .collect();
+    if page.is_none() {
+        for include in &graph.includes {
+            let name = include.name.as_str();
+            let inside =
+                pages.page.values().filter(|p| p.as_deref() == Some(name));
+            let crossing = lines.iter().filter(|line| {
+                (pages.of_node(&line.from) == Some(name))
+                    != (pages.of_node(&line.to) == Some(name))
+            });
+            let summary = view::box_summary(inside.count(), crossing.count());
+            nodes.push(node_view(view::node_look(
+                name,
+                "subdiagram",
+                None,
+                pages.at(name),
+                false,
+                Some(&summary),
+            )));
+            sheet.push(OnSheet {
+                name: name.to_string(),
+                node_type: "subdiagram",
+                at: pages.at(name),
+                here: true,
+                drawn: Drawn::Itself,
+            });
+        }
+    }
 
-    // The lines with an end on this page, and which line of the
-    // configuration each is, so the window can light it.
+    let edge = if page.is_some() {
+        style::EDGE as i32
+    } else {
+        0
+    };
+    draw_physics(window, path, &sheet, dividers, page, edge);
+
+    // The lines drawn on this page, and which line of the configuration
+    // each is, so the window can light it.
     let (rows, on_page): (Vec<usize>, Vec<LineOnSheet>) = lines
         .iter()
         .enumerate()
-        .filter(|(_, line)| here(&line.from) || here(&line.to))
+        .filter(|(_, line)| pages.shows(line, page))
         .map(|(at, line)| {
             (
                 at,
@@ -382,6 +563,21 @@ fn draw(
 
     window.global::<ui::Session>().set_read_only(true);
     window.set_configuration(path.into());
+    window.set_page(page.unwrap_or_default().into());
+    window.set_edge_width(edge as f32);
+    if page.is_some() {
+        let inside = (inside.0 as f32, inside.1 as f32);
+        let terminals: Vec<ui::EdgeView> = style::edge_terminals(inside)
+            .into_iter()
+            .map(|edge| ui::EdgeView {
+                terminal: edge.terminal.into(),
+                x: edge.x,
+                y: edge.y,
+                rightward: edge.rightward,
+            })
+            .collect();
+        window.set_edge_terminals(ModelRc::new(VecModel::from(terminals)));
+    }
     window.set_nodes(ModelRc::new(VecModel::from(nodes)));
     window.set_links(ModelRc::from(links.clone()));
     window.set_working_width(WORKING_WIDTH as f32);
@@ -412,11 +608,16 @@ fn draw(
 /// * `sheet`    - The configuration's nodes, where they are drawn, which the
 ///                stand-ins' links go to.
 /// * `dividers` - Where the panes are, the Physics pane's width included.
+/// * `page`     - The page drawn, whose components are drawn: a
+///                subdiagram's name, or `None` for the top.
+/// * `edge`     - How wide the page's edge is, left of the Physics pane.
 fn draw_physics(
     window: &ui::VisualWindow,
     path: &str,
     sheet: &[OnSheet],
     dividers: pane::Dividers,
+    page: Option<&str>,
+    edge: i32,
 ) {
     window.set_physics_width(dividers.physics as f32);
     window.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
@@ -438,8 +639,10 @@ fn draw_physics(
             return;
         }
     };
-    let drawn = tcsdiagram::physics::of_simulator(&file);
-    let (nodes, links) = drawn.looks(sheet, dividers, dividers.physics);
+    let drawn = tcsdiagram::physics::of_simulator(&file, page);
+    // Drawn from where the working panes begin, past the edge and the
+    // Physics pane.
+    let (nodes, links) = drawn.looks(sheet, dividers, dividers.physics + edge);
     window.set_physics_nodes(ModelRc::new(VecModel::from(
         nodes.into_iter().map(node_view).collect::<Vec<_>>(),
     )));
@@ -577,18 +780,51 @@ mod tests {
         assert_eq!(checked, lines.len(), "every line is some delivery's");
     }
 
-    /// Every line of the worked example is drawn: its nodes are all in one
-    /// file, so all of them are on the page. (The thermostat example's are
-    /// not: most of them are in the file it includes.)
+    /// Every line of the worked example is drawn on the top page: its nodes
+    /// are all in one file, so there is no other page.
     #[test]
     fn every_line_of_a_configuration_in_one_file_is_drawn() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph = Graph::load(root.join("tests/manual/thermostat.ytcs"))
             .expect("the example reads");
         assert_eq!(graph.files.len(), 1, "it is one file");
+        let pages = Pages::of(&graph, pane::default_dividers());
+        assert!(lines_of(&graph).iter().all(|line| pages.shows(line, None)));
+    }
+
+    /// A configuration that includes a file is drawn on a page for each: a
+    /// line inside the subdiagram on its page and not the top one, a line
+    /// crossing its edge on both, and every line on some page. Each node is
+    /// on the page of the file it was read from.
+    #[test]
+    fn each_subdiagram_has_a_page_of_its_own() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph =
+            Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
+                .expect("the example reads");
+        let pages = Pages::of(&graph, pane::default_dividers());
+        let sub = Some("thermostat-common");
+        assert_eq!(pages.of_node("gateway"), None);
+        assert_eq!(pages.of_node("thermostat"), sub);
+
         let lines = lines_of(&graph);
-        let top = graph.files.first();
-        assert!(lines.iter().all(|line| graph.homes.get(&line.from) == top
-            && graph.homes.get(&line.to) == top));
+        let mut inside = 0;
+        let mut crossing = 0;
+        for line in &lines {
+            let ends = (pages.of_node(&line.from), pages.of_node(&line.to));
+            let (top, there) =
+                (pages.shows(line, None), pages.shows(line, sub));
+            assert!(top || there, "{} to {} is drawn", line.from, line.to);
+            if ends == (sub, sub) {
+                assert!(there && !top, "{} to {}", line.from, line.to);
+                inside += 1;
+            } else if ends.0 != ends.1 {
+                assert!(there && top, "{} to {}", line.from, line.to);
+                crossing += 1;
+            }
+        }
+        assert!(inside > 0 && crossing > 0, "{inside} in, {crossing} across");
+        // And the box is placed, in the vehicle's panes or the payloads'.
+        assert_ne!(pages.at("thermostat-common"), (0, 0));
     }
 }

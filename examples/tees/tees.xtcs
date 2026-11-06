@@ -42,11 +42,11 @@
                  aboard, and leaves it by moc-out for the tee. What
                  comes down arrives at ground_base plus the device id of the
                  node that sent it. -->
-            <gateway name="ground">
+            <gateway name="moc">
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:8700</ground_base>
                 <port>8600</port>
-                <moc-out>echo.ground</moc-out>
+                <moc-out>echo.moc</moc-out>
                 <world-in>echo</world-in>
                 <world-in>readings</world-in>
             </gateway>
@@ -99,8 +99,8 @@
                  two data sources, so each link names its own. -->
             <compute name="echo">
                 <moc-out>heater.echo</moc-out>
-                <world-out>ground.echo</world-out>
-                <moc-in>ground</moc-in>
+                <world-out>moc.echo</world-out>
+                <moc-in>moc</moc-in>
             </compute>
         </type>
         <type name="tee-payload">
@@ -110,7 +110,7 @@
                  be. -->
             <compute name="readings">
                 <moc-out>dropped.readings</moc-out>
-                <world-out>ground.readings</world-out>
+                <world-out>moc.readings</world-out>
                 <world-in>sensor</world-in>
             </compute>
         </type>
@@ -119,7 +119,7 @@
         <nodes>
             <node name="dropped" x="234" y="134"/>
             <node name="echo" x="34" y="34"/>
-            <node name="ground" x="469" y="34"/>
+            <node name="moc" x="469" y="34"/>
             <node name="heater" x="34" y="34"/>
             <node name="readings" x="34" y="134"/>
             <node name="sensor" x="34" y="134"/>

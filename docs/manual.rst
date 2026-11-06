@@ -2925,10 +2925,10 @@ The tees example
    aboard, and data dropped.
 
 The four nodes that do nothing to what passes, each taking one stream. What
-the ground sends goes up to the gateway node ``ground``, which binds
+the ground sends goes up to the gateway node ``moc``, which binds
 ``127.0.0.1:8600`` aboard, and leaves it for ``echo``, a ``tee-gateway``. The
 tee sends each command on by its ``moc-out`` to the ``heater``, as it was
-going, and again by its ``world-out`` back to ``ground`` -- so the ground sees
+going, and again by its ``world-out`` back to ``moc`` -- so the ground sees
 what the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device
 id, ``127.0.0.1:8701``. The ``sensor``'s readings go to ``readings``, a
 ``tee-payload``, which sends each down to the ground at ``127.0.0.1:8704`` and
@@ -3276,8 +3276,8 @@ carrying the identifier ``0x123`` and takes commands in frames carrying
 on the bus, filtered to its identifier, so ``motor_status`` hears the status
 frames and nothing else, and ``motor_command`` hears nothing it has not sent.
 Each status frame's data goes by ``motor_status``'s ``world-out`` to the
-gateway node ``ground`` and down to the MOC at ``ground_base`` plus its
-device id, ``127.0.0.1:3702``. What the ground sends up to ``ground``, which
+gateway node ``moc`` and down to the MOC at ``ground_base`` plus its
+device id, ``127.0.0.1:3702``. What the ground sends up to ``moc``, which
 binds ``127.0.0.1:3600``, leaves it by its ``moc-out`` for
 ``motor_command`` and goes out as one frame, so a command is at most eight
 bytes.
@@ -3331,8 +3331,8 @@ The iio example
 
 A sensor's buffer, which hands over whole sample sets as they are taken.
 ``sensor`` reads it and each read's sets go by its ``world-out`` to
-``ground`` and down to the MOC at ``127.0.0.1:3741``. Nothing goes up: a
-buffer is read and never written, so ``ground`` has no ``moc-out``. Which
+``moc`` and down to the MOC at ``127.0.0.1:3741``. Nothing goes up: a
+buffer is read and never written, so ``moc`` has no ``moc-out``. Which
 channels are in a set and how often one is taken are the sensor's settings,
 made in ``sysfs`` by whoever brings it up, and nothing in the configuration.
 

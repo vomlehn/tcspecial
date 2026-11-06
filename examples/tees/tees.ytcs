@@ -35,12 +35,12 @@ gateways:
       # to address:port, which this node binds aboard, and leaves it by
       # moc-out for the tee. What comes down arrives at ground_base plus the
       # device id of the node that sent it.
-      - gateway: ground
+      - gateway: moc
         address: "127.0.0.1"
         ground_base: "127.0.0.1:8700"
         port: "8600"
         moc-out:
-          - echo.ground
+          - echo.moc
         world-in: [echo, readings]
 
 payloads:
@@ -84,8 +84,8 @@ vehicle:
         moc-out:
           - heater.echo
         world-out:
-          - ground.echo
-        moc-in: [ground]
+          - moc.echo
+        moc-in: [moc]
   - type tee-payload:
       # Each reading goes on to the ground, as it was going, and again
       # vehicleward -- here to a node that drops it, standing where something
@@ -94,14 +94,14 @@ vehicle:
         moc-out:
           - dropped.readings
         world-out:
-          - ground.readings
+          - moc.readings
         world-in: [sensor]
 
 tcsgui:
   nodes:
     - { node: dropped, x: 234, y: 134 }
     - { node: echo, x: 34, y: 34 }
-    - { node: ground, x: 469, y: 34 }
+    - { node: moc, x: 469, y: 34 }
     - { node: heater, x: 34, y: 34 }
     - { node: readings, x: 34, y: 134 }
     - { node: sensor, x: 34, y: 134 }

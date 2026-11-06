@@ -43,11 +43,11 @@
                  commands. What comes down arrives at ground_base plus the
                  device id of the node that sent it: the motor's status,
                  device id 2, at 127.0.0.1:3702. -->
-            <gateway name="ground">
+            <gateway name="moc">
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:3700</ground_base>
                 <port>3600</port>
-                <moc-out>motor_command.ground</moc-out>
+                <moc-out>motor_command.moc</moc-out>
                 <world-in>motor_status</world-in>
             </gateway>
         </type>
@@ -60,7 +60,7 @@
             <payload name="motor_command">
                 <can_id>0x124</can_id>
                 <interface>vcan0</interface>
-                <moc-in>ground</moc-in>
+                <moc-in>moc</moc-in>
             </payload>
             <!-- A motor controller on the CAN bus vcan0, which sends its
                  status in frames carrying the identifier 0x123 and takes
@@ -74,13 +74,13 @@
             <payload name="motor_status">
                 <can_id>0x123</can_id>
                 <interface>vcan0</interface>
-                <world-out>ground.motor_status</world-out>
+                <world-out>moc.motor_status</world-out>
             </payload>
         </type>
     </payloads>
     <tcsgui>
         <nodes>
-            <node name="ground" x="469" y="34"/>
+            <node name="moc" x="469" y="34"/>
             <node name="motor_command" x="34" y="134"/>
             <node name="motor_status" x="34" y="34"/>
         </nodes>

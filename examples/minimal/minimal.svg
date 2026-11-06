@@ -26,7 +26,7 @@
 
   <!-- Column headings -->
   <text class="heading" x="45" y="44">PAYLOAD</text>
-  <text class="heading" x="660" y="44">GROUND</text>
+  <text class="heading" x="660" y="44">MOC</text>
 
   <!-- tcspecial, the vehicle -->
   <rect class="boundary" x="280" y="58" width="320" height="200" rx="14"/>
@@ -47,7 +47,7 @@
   <!-- the ground station -->
   <rect class="ground" x="660" y="118" width="215" height="80" rx="10"/>
   <text class="name" x="676" y="145">MOC</text>
-  <text class="kind" x="676" y="166">ground station</text>
+  <text class="kind" x="676" y="166">MOC</text>
   <text class="detail" x="676" y="185">receives on 127.0.0.1:6100</text>
 
   <!-- Links -->
@@ -62,7 +62,7 @@
   <!-- Legend -->
   <line x1="45" y1="300" x2="860" y2="300" stroke="#e5e7eb" stroke-width="1"/>
   <path class="groundward" d="M45,332 L95,332" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="105" y="336">data link, toward the ground</text>
+  <text class="label" x="105" y="336">data link, toward the MOC</text>
   <path class="telemetry" d="M330,332 L380,332" marker-end="url(#arrow-blue)"/>
   <text class="label" x="390" y="336">telemetry link, from the tcspecial section</text>
   <rect class="payload" x="45" y="356" width="22" height="16" rx="4"/>
@@ -70,5 +70,5 @@
   <rect class="socket" x="160" y="356" width="22" height="16" rx="4"/>
   <text class="label" x="190" y="369">opened by tcspecial</text>
   <rect class="ground" x="340" y="356" width="22" height="16" rx="4"/>
-  <text class="label" x="370" y="369">ground program</text>
+  <text class="label" x="370" y="369">MOC program</text>
 </svg>

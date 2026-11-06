@@ -77,7 +77,7 @@
   <text class="detail" x="656" y="234">  zone_temp, kelvin</text>
   <text class="detail" x="656" y="254">channel 0x3002:</text>
   <text class="detail" x="656" y="270">  heater_wanted, bool</text>
-  <text class="note" x="656" y="310">to the ground by</text>
+  <text class="note" x="656" y="310">to the MOC by</text>
   <text class="note" x="656" y="326">the deployment's own link</text>
 
   <!-- Up: a command from the bridge, to fsw and on to the heater -->

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="title desc">
   <title id="title">The tees example</title>
-  <desc id="desc">The ground sends a command up to the gateway node ground, which tcspecial binds at 127.0.0.1:8600. It leaves ground by its gateway-out link for echo, a tee-gateway, which sends it on by its gateway-out to the heater, as it was going, and again by its payload-out back to ground, and so down at 127.0.0.1:8701: ground_base, 8700, plus echo's device id, 1. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to ground, arriving at 127.0.0.1:8704, and again by its gateway-out to dropped, a null-gateway, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
+  <desc id="desc">The ground sends a command up to the gateway node moc, which tcspecial binds at 127.0.0.1:8600. It leaves moc by its gateway-out link for echo, a tee-gateway, which sends it on by its gateway-out to the heater, as it was going, and again by its payload-out back to moc, and so down at 127.0.0.1:8701: ground_base, 8700, plus echo's device id, 1. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to moc, arriving at 127.0.0.1:8704, and again by its gateway-out to dropped, a null-gateway, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -30,7 +30,7 @@
   <!-- Column headings -->
   <text class="heading" x="20" y="44">PAYLOADS</text>
   <text class="heading" x="245" y="44">TCSPECIAL (VEHICLE)</text>
-  <text class="heading" x="690" y="44">GROUND</text>
+  <text class="heading" x="690" y="44">MOC</text>
 
   <rect class="boundary" x="230" y="58" width="420" height="330" rx="14"/>
 
@@ -73,14 +73,14 @@
 
   <!-- The gateway node, the ground's end of the link both ways -->
   <rect class="socket" x="470" y="72" width="160" height="96" rx="10"/>
-  <text class="name" x="484" y="97">ground</text>
+  <text class="name" x="484" y="97">moc</text>
   <text class="kind" x="484" y="116">gateway node, id 2</text>
   <text class="detail" x="484" y="135">binds :8600</text>
   <text class="detail" x="484" y="152">ground_base :8700</text>
 
   <!-- The ground station -->
   <rect class="ground" x="690" y="72" width="190" height="96" rx="10"/>
-  <text class="name" x="704" y="97">ground station</text>
+  <text class="name" x="704" y="97">MOC</text>
   <text class="kind" x="704" y="116">sends a command,</text>
   <text class="kind" x="704" y="134">sees it come back,</text>
   <text class="kind" x="704" y="152">and the readings</text>
@@ -118,13 +118,13 @@
   <!-- Legend -->
   <line x1="20" y1="410" x2="880" y2="410" stroke="#e5e7eb" stroke-width="1"/>
   <path class="up" d="M20,437 L70,437" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="80" y="441">vehicleward: what the ground sends</text>
+  <text class="label" x="80" y="441">toward the vehicle: what the MOC sends</text>
   <path class="down" d="M330,437 L380,437" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="390" y="441">groundward: payload data</text>
+  <text class="label" x="390" y="441">toward the MOC: payload data</text>
   <rect class="vehicle" x="20" y="461" width="22" height="16" rx="4"/>
   <text class="label" x="50" y="474">vehicle node</text>
   <rect class="socket" x="175" y="461" width="22" height="16" rx="4"/>
   <text class="label" x="205" y="474">opened by tcspecial</text>
   <rect class="ground" x="355" y="461" width="22" height="16" rx="4"/>
-  <text class="label" x="385" y="474">ground program</text>
+  <text class="label" x="385" y="474">MOC program</text>
 </svg>

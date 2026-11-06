@@ -59,7 +59,7 @@
   <text class="kind" x="656" y="158">cFS software bus peer</text>
   <text class="detail" x="656" y="186">127.0.0.1:2234</text>
   <text class="detail" x="656" y="204">0x4242: thermometer</text>
-  <text class="note" x="656" y="236">to the ground by</text>
+  <text class="note" x="656" y="236">to the MOC by</text>
   <text class="note" x="656" y="252">whatever subscribes</text>
 
   <!-- Up: a command from the bridge, to fsw and on to the heater -->

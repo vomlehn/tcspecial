@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
   <title id="title">The gpio example</title>
-  <desc id="desc">Two lines of a chip of the kernel's gpio-sim, each a payload of its own. Each edge on line 0 is read by switch, device id 2, as a sixteen-byte record of when, which line and what it became, and goes by its payload-out link to ground, a gateway_radio node, and down to the MOC at 127.0.0.1:3722: ground_base, 3720, plus the id. A 1 or 0 the MOC sends up to 127.0.0.1:3620, which ground binds, leaves it by its gateway-out link for lamp, device id 1, which drives line 1 to it.</desc>
+  <desc id="desc">Two lines of a chip of the kernel's gpio-sim, each a payload of its own. Each edge on line 0 is read by switch, device id 2, as a sixteen-byte record of when, which line and what it became, and goes by its payload-out link to moc, a gateway_radio node, and down to the MOC at 127.0.0.1:3722: ground_base, 3720, plus the id. A 1 or 0 the MOC sends up to 127.0.0.1:3620, which moc binds, leaves it by its gateway-out link for lamp, device id 1, which drives line 1 to it.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -30,7 +30,7 @@
   <!-- Column headings -->
   <text class="heading" x="20" y="44">KERNEL DUMMY DEVICE</text>
   <text class="heading" x="245" y="44">TCSPECIAL (VEHICLE)</text>
-  <text class="heading" x="705" y="44">GROUND</text>
+  <text class="heading" x="705" y="44">MOC</text>
 
   <rect class="boundary" x="230" y="58" width="430" height="232" rx="14"/>
 
@@ -57,7 +57,7 @@
   <text class="detail" x="261" y="278">line 1, output</text>
 
   <rect class="socket" x="470" y="110" width="170" height="150" rx="10"/>
-  <text class="name" x="486" y="137">ground</text>
+  <text class="name" x="486" y="137">moc</text>
   <text class="kind" x="486" y="158">gateway_radio, id 0</text>
   <text class="detail" x="486" y="178">binds 127.0.0.1:3620</text>
   <text class="detail" x="486" y="198">ground_base</text>
@@ -65,7 +65,7 @@
 
   <rect class="ground" x="705" y="110" width="180" height="150" rx="10"/>
   <text class="name" x="721" y="137">MOC</text>
-  <text class="kind" x="721" y="158">ground station</text>
+  <text class="kind" x="721" y="158">MOC</text>
   <text class="detail" x="721" y="178">edges on :3722</text>
   <text class="note" x="721" y="198"></text>
   <text class="note" x="721" y="218">1 or 0 up</text>
@@ -88,13 +88,13 @@
   <!-- Legend -->
   <line x1="45" y1="320" x2="860" y2="320" stroke="#e5e7eb" stroke-width="1"/>
   <path class="down" d="M45,352 L95,352" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="105" y="356">data, solid: device to ground</text>
+  <text class="label" x="105" y="356">data, solid: device to MOC</text>
   <path class="up" d="M400,352 L450,352" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="460" y="356">command, dashed: ground to device</text>
+  <text class="label" x="460" y="356">command, dashed: MOC to device</text>
   <rect class="kernel" x="45" y="376" width="22" height="16" rx="4"/>
   <text class="label" x="75" y="389">made by the kernel</text>
   <rect class="socket" x="260" y="376" width="22" height="16" rx="4"/>
   <text class="label" x="290" y="389">opened by tcspecial</text>
   <rect class="ground" x="470" y="376" width="22" height="16" rx="4"/>
-  <text class="label" x="500" y="389">the ground</text>
+  <text class="label" x="500" y="389">the MOC</text>
 </svg>

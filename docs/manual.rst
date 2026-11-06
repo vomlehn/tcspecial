@@ -3304,9 +3304,9 @@ The gpio example
 Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. ``switch`` watches line 0
 for both edges: each becomes a sixteen-byte record -- when, which line, and
-what it became -- that goes by its ``world-out`` to ``ground`` and down to
+what it became -- that goes by its ``world-out`` to ``moc`` and down to
 the MOC at ``127.0.0.1:3722``. ``lamp`` drives line 1: what the ground sends
-up to ``127.0.0.1:3620`` leaves ``ground`` by its ``moc-out`` for it, the
+up to ``127.0.0.1:3620`` leaves ``moc`` by its ``moc-out`` for it, the
 text ``1`` lighting the lamp and ``0`` putting it out.
 
 The chip is one of the kernel's ``gpio-sim``, which ``sudo

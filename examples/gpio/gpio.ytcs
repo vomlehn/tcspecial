@@ -37,12 +37,12 @@ gateways:
       # moc-out for the lamp. What comes down arrives at ground_base plus
       # the device id of the node that sent it: the switch, device id 2, at
       # 127.0.0.1:3722.
-      - gateway: ground
+      - gateway: moc
         address: "127.0.0.1"
         ground_base: "127.0.0.1:3720"
         port: "3620"
         moc-out:
-          - lamp.ground
+          - lamp.moc
         world-in: [switch]
 
 payloads:
@@ -60,17 +60,17 @@ payloads:
         lines: "0"
         path: "/dev/gpiochip1"
         world-out:
-          - ground.switch
+          - moc.switch
   - type gpio_out:
       # A lamp on line 1, driven by what the ground sends: the text 1 to light
       # it, 0 to put it out, and anything else refused.
       - payload: lamp
         lines: "1"
         path: "/dev/gpiochip1"
-        moc-in: [ground]
+        moc-in: [moc]
 
 tcsgui:
   nodes:
-    - { node: ground, x: 469, y: 34 }
+    - { node: moc, x: 469, y: 34 }
     - { node: lamp, x: 34, y: 134 }
     - { node: switch, x: 34, y: 34 }

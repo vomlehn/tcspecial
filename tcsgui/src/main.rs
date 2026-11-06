@@ -53,7 +53,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use slint::{ModelRc, VecModel};
+use slint::{Model, ModelRc, VecModel};
 // How a configuration is drawn, shared with tcspecial's visual window: the
 // panes, the node shapes, the routes, the colours and the settings that say
 // where the panes are divided. Named here so that `crate::pane` and the rest
@@ -157,6 +157,15 @@ const _: () = assert!(GATEWAY_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
 
 /// Every window currently showing part of the document.
 ///
+/// Something selected on a page that is not one of its nodes.
+#[derive(Debug, Clone, PartialEq)]
+enum Picked {
+    /// A line, which is selected by a right click on it.
+    Link(Link),
+    /// A physics component, by its name.
+    Physics(String),
+}
+
 /// The top diagram, and one per open subdiagram. Held so that an edit made in
 /// any of them can redraw all of them -- which is the whole of keeping them in
 /// step: there is one document, and after every edit every window is drawn
@@ -192,6 +201,11 @@ struct Views {
     /// at two different nodes and a single selection would make one of them
     /// follow the other.
     chosen: Rc<RefCell<BTreeMap<String, String>>>,
+    /// What each window has selected that is not a node, by the window's
+    /// home: a line or a physics component. A window has a node in `chosen`
+    /// or something here, never both, and whichever it has is what the
+    /// Delete key takes.
+    picked: Rc<RefCell<BTreeMap<String, Picked>>>,
     /// The group window, if one is open.
     ///
     /// One window and not one per group, as subdiagrams have. A subdiagram is
@@ -315,20 +329,53 @@ impl Views {
     /// * `home` - The window to tell: `None` for the main window, or the
     ///            name of the group an open subdiagram window shows.
     fn chose(&self, home: &Home) {
-        let chosen = self.chosen.borrow();
-        let said = |home: &str| chosen.get(home).cloned().unwrap_or_default();
-        match home {
-            None => {
-                if let Some(top) = self.top.upgrade() {
-                    top.set_selected(said("").into());
-                }
-            }
-            Some(home) => {
-                if let Some(window) = self.open.get(home) {
-                    window.set_selected(said(home).into());
-                }
-            }
+        let key = home.clone().unwrap_or_default();
+        let window = match home {
+            None => self.top.upgrade(),
+            Some(home) => self.open.get(home).map(|w| w.clone_strong()),
+        };
+        let Some(window) = window else {
+            return;
+        };
+        let node = self.chosen.borrow().get(&key).cloned();
+        window.set_selected(node.unwrap_or_default().into());
+        // A line's place among the lines is the picking handler's to say,
+        // having it to hand; anything else selected is no line.
+        let picked = self.picked.borrow().get(&key).cloned();
+        if !matches!(picked, Some(Picked::Link(_))) {
+            window.set_selected_link(-1);
         }
+        let physics = match picked {
+            Some(Picked::Physics(name)) => name,
+            _ => String::new(),
+        };
+        window.set_selected_physics(physics.into());
+    }
+
+    /// Selects one thing on a page, or nothing, in place of whatever was
+    /// selected there, and draws it so.
+    ///
+    /// # Arguments
+    ///
+    /// * `home`   - The page: `None` for the top.
+    /// * `node`   - The node selected, if it is a node.
+    /// * `picked` - What is selected otherwise, if anything.
+    fn select(
+        &self,
+        home: &Home,
+        node: Option<String>,
+        picked: Option<Picked>,
+    ) {
+        let key = home.clone().unwrap_or_default();
+        match node {
+            Some(node) => self.chosen.borrow_mut().insert(key.clone(), node),
+            None => self.chosen.borrow_mut().remove(&key),
+        };
+        match picked {
+            Some(picked) => self.picked.borrow_mut().insert(key, picked),
+            None => self.picked.borrow_mut().remove(&key),
+        };
+        self.chose(home);
     }
 
     /// Says what went wrong where it cannot be missed.
@@ -479,6 +526,12 @@ impl Views {
                 lit.as_ref(),
             );
             top.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
+            top.set_selected_link(picked_index(
+                editor.document(),
+                &None,
+                held.as_ref(),
+                self.picked.borrow().get(""),
+            ));
         }
         for (name, window) in &self.open {
             let home = Some(name.clone());
@@ -490,6 +543,12 @@ impl Views {
                 lit.as_ref(),
             );
             window.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
+            window.set_selected_link(picked_index(
+                editor.document(),
+                &home,
+                held.as_ref(),
+                self.picked.borrow().get(name),
+            ));
         }
     }
 
@@ -523,6 +582,7 @@ impl Views {
         *self.errors.borrow_mut() = errors;
         let lit = self.lit.borrow();
         let chosen = self.chosen.borrow();
+        let picked = self.picked.borrow();
         let divider = self.divider.get();
         let lists = self.lists.get();
         // The link whose end is in somebody's hand, which is drawn nowhere:
@@ -558,7 +618,7 @@ impl Views {
                 &top,
                 editor,
                 &None,
-                chosen.get("").map(|s| s.as_str()),
+                (chosen.get("").map(|s| s.as_str()), picked.get("")),
                 divider,
                 lists,
                 (held.as_ref(), lit.as_ref()),
@@ -570,7 +630,7 @@ impl Views {
                 window,
                 editor,
                 &Some(name.clone()),
-                chosen.get(name).map(|s| s.as_str()),
+                (chosen.get(name).map(|s| s.as_str()), picked.get(name)),
                 divider,
                 lists,
                 (held.as_ref(), lit.as_ref()),
@@ -822,6 +882,7 @@ fn main() -> Result<(), slint::PlatformError> {
         top: ui.as_weak(),
         open: BTreeMap::new(),
         chosen: Rc::new(RefCell::new(BTreeMap::new())),
+        picked: Rc::new(RefCell::new(BTreeMap::new())),
         drawing: Rc::new(RefCell::new(None)),
         divider: divider.clone(),
         lists: lists.clone(),
@@ -1603,17 +1664,135 @@ fn wire(
         // its own, reached through the node's menu, so a press has
         // only the outline to change.
         let views = views.clone();
-        let chosen = chosen.clone();
         let home = home.clone();
         window.on_node_selected(move |name| {
-            chosen
-                .borrow_mut()
-                .insert(home.clone().unwrap_or_default(), name.to_string());
             // The outline only: choosing a node is the same press
             // that starts dragging it, and rebuilding the canvas here
             // would replace the element the pointer is holding. See
             // Views::chose.
-            views.borrow().chose(&home);
+            views.borrow().select(&home, Some(name.to_string()), None);
+        });
+    }
+    {
+        // A physics component pressed, selected as a node is.
+        let views = views.clone();
+        let home = home.clone();
+        window.on_physics_picked(move |name| {
+            let picked = Picked::Physics(name.to_string());
+            views.borrow().select(&home, None, Some(picked));
+        });
+    }
+    {
+        // Nothing selected: a click on the page that was on no line
+        // and no shape.
+        let views = views.clone();
+        let home = home.clone();
+        window.on_unpicked(move || {
+            views.borrow().select(&home, None, None);
+        });
+    }
+    {
+        // Which line is under a click, by its place among the page's
+        // lines: the nearest within a few pixels of its edge, so a line
+        // is as easy to hit as it is wide. Only the document's lines,
+        // not the ones the edge draws to what no line joins yet, which
+        // there is nothing to select or delete of.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        let weak = window.as_weak();
+        window.on_link_at(move |x, y| {
+            /// How far outside a line's edge a click still hits it.
+            const SLACK: f32 = 4.0;
+            let Some(window) = weak.upgrade() else {
+                return -1;
+            };
+            let views = views.borrow();
+            let held = views
+                .drawing
+                .borrow()
+                .as_ref()
+                .and_then(|drawing| drawing.holding.clone());
+            let editor = editor.borrow();
+            let real =
+                drawn_links(editor.document(), &home, held.as_ref()).len();
+            let links = window.get_links();
+            (0..links.row_count().min(real))
+                .filter_map(|at| {
+                    let line = links.row_data(at)?;
+                    let away = route::distance_to(&line.route, (x, y))?;
+                    let reach =
+                        tcsdiagram::view::line_width(line.wide) / 2.0 + SLACK;
+                    (away <= reach).then_some((at, away))
+                })
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+                .map_or(-1, |(at, _)| at as i32)
+        });
+    }
+    {
+        // A line selected by a right click on it.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        let weak = window.as_weak();
+        window.on_link_picked(move |at| {
+            let link = {
+                let views = views.borrow();
+                let held = views
+                    .drawing
+                    .borrow()
+                    .as_ref()
+                    .and_then(|drawing| drawing.holding.clone());
+                let editor = editor.borrow();
+                usize::try_from(at).ok().and_then(|at| {
+                    drawn_links(editor.document(), &home, held.as_ref())
+                        .get(at)
+                        .map(|link| (*link).clone())
+                })
+            };
+            let Some(link) = link else {
+                return;
+            };
+            views.borrow().select(&home, None, Some(Picked::Link(link)));
+            if let Some(window) = weak.upgrade() {
+                window.set_selected_link(at);
+            }
+        });
+    }
+    {
+        // A line deleted, from its menu or by the Delete key: at once,
+        // a line taking nothing with it, and undone by one undo.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        window.on_link_delete(move |at| {
+            let link = {
+                let views = views.borrow();
+                let held = views
+                    .drawing
+                    .borrow()
+                    .as_ref()
+                    .and_then(|drawing| drawing.holding.clone());
+                let editor = editor.borrow();
+                usize::try_from(at).ok().and_then(|at| {
+                    drawn_links(editor.document(), &home, held.as_ref())
+                        .get(at)
+                        .map(|link| (*link).clone())
+                })
+            };
+            let Some(link) = link else {
+                return;
+            };
+            {
+                let views = views.borrow();
+                let key = home.clone().unwrap_or_default();
+                let mut picked = views.picked.borrow_mut();
+                if picked.get(&key) == Some(&Picked::Link(link.clone())) {
+                    picked.remove(&key);
+                }
+            }
+            editor.borrow_mut().edit(Edit::RemoveLink { link });
+            views.borrow().refresh(&editor.borrow());
         });
     }
     let _ = window;
@@ -1687,6 +1866,7 @@ fn open_page(
 /// * `home`        - The page drawn: `None` for the top of the
 ///                   configuration.
 /// * `chosen`      - The name of the node drawn as chosen, if any.
+/// * `picked`      - What is selected that is not a node, if anything.
 /// * `dividers`    - Where the working pane's dividers are.
 /// * `lists`       - The gateway and vehicle selection lists' shares of
 ///                   their column, in per cent.
@@ -1697,7 +1877,7 @@ fn put(
     ui: &MainWindow,
     editor: &Editor,
     home: &Home,
-    chosen: Option<&str>,
+    (chosen, picked): (Option<&str>, Option<&Picked>),
     dividers: Dividers,
     lists: (i32, i32),
     (held, lit): (Option<&Link>, Option<&Link>),
@@ -1735,6 +1915,22 @@ fn put(
     ui.set_selected(chosen.unwrap_or_default().into());
     ui.set_nodes(ModelRc::from(Rc::new(VecModel::from(nodes))));
     ui.set_links(ModelRc::from(Rc::new(VecModel::from(links))));
+    // A line selected is found again by what it joins, its place among the
+    // lines being whatever this drawing made it; one that has gone is
+    // selected no longer, and nor is a component that has.
+    ui.set_selected_link(picked_index(editor.document(), home, held, picked));
+    let physics =
+        match picked {
+            Some(Picked::Physics(name))
+                if editor.document().simulator.as_ref().is_some_and(
+                    |sim| sim.world.components.contains_key(name),
+                ) =>
+            {
+                name.as_str()
+            }
+            _ => "",
+        };
+    ui.set_selected_physics(physics.into());
     ui.set_undo_depth(editor.undo_depth() as i32);
     ui.set_redo_depth(editor.journal().redoable() as i32);
     ui.set_undo_label(label(editor.journal().next_undo()));
@@ -4845,6 +5041,75 @@ fn label(edit: Option<&Edit>) -> slint::SharedString {
     edit.map(|e| e.describe()).unwrap_or_default().into()
 }
 
+/// The document's lines a page draws, in the order it draws them: each with
+/// an end on the page, and on the top page each between two subdiagrams.
+///
+/// The order is the page's `links`, which is how a line is named by its
+/// place there; the page draws after these the lines its edge has that no
+/// link of the document is.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page: `None` for the top.
+/// * `held`     - The link whose end is being dragged, which is left out.
+///
+/// # Returns
+///
+/// The lines, as the document holds them.
+fn drawn_links<'a>(
+    document: &'a Document,
+    home: &Home,
+    held: Option<&Link>,
+) -> Vec<&'a Link> {
+    let here = |name: &str| &Qualified::parse(name).in_ == home;
+    // A line between two subdiagrams is drawn on the top page, between their
+    // boxes, as well as on each of their pages.
+    let between = |link: &Link| {
+        home.is_none()
+            && Qualified::parse(&link.from).in_
+                != Qualified::parse(&link.to).in_
+    };
+    document
+        .links
+        .iter()
+        .filter(|link| here(&link.from) || here(&link.to) || between(link))
+        // Not the one whose end is in somebody's hand: a line that stayed put
+        // while its end was being dragged away would say the gesture had not
+        // started. It comes back where the hand put it down, or where it was.
+        .filter(|link| !held.is_some_and(|held| held.same_connection(link)))
+        .collect()
+}
+
+/// Where a selected line is among a page's lines, as the page's
+/// `selected-link` says it.
+///
+/// # Arguments
+///
+/// * `document` - The configuration.
+/// * `home`     - The page: `None` for the top.
+/// * `held`     - The link whose end is being dragged, which is not drawn.
+/// * `picked`   - What the page has selected, if anything.
+///
+/// # Returns
+///
+/// The line's place, or -1 when no line is selected or the one selected is
+/// not drawn there any more.
+fn picked_index(
+    document: &Document,
+    home: &Home,
+    held: Option<&Link>,
+    picked: Option<&Picked>,
+) -> i32 {
+    let Some(Picked::Link(picked)) = picked else {
+        return -1;
+    };
+    drawn_links(document, home, held)
+        .iter()
+        .position(|link| *link == picked)
+        .map_or(-1, |at| at as i32)
+}
+
 /// Builds what one window shows: the nodes that live in `home`, and the
 /// links between them.
 ///
@@ -4911,14 +5176,6 @@ fn views_of(
     // with an end on this one. The drawing is tcsdiagram's, which tcspecial's
     // visual window draws by too: see tcsdiagram::view::link_looks.
     let mut sheet = on_sheet(document, home, dividers);
-    let here = |name: &str| &Qualified::parse(name).in_ == home;
-    // A line between two subdiagrams is drawn on the top page, between their
-    // boxes, as well as on each of their pages.
-    let between = |link: &Link| {
-        home.is_none()
-            && Qualified::parse(&link.from).in_
-                != Qualified::parse(&link.to).in_
-    };
     // And on a subdiagram's page, each node it exports that no line joins
     // outside yet is drawn joined to the edge all the same: what the edge
     // shows is what may be joined there, and a node shown at it with
@@ -4936,14 +5193,8 @@ fn views_of(
             },
         });
     }
-    let drawn: Vec<&Link> = document
-        .links
-        .iter()
-        .filter(|link| here(&link.from) || here(&link.to) || between(link))
-        // Not the one whose end is in somebody's hand: a line that stayed put
-        // while its end was being dragged away would say the gesture had not
-        // started. It comes back where the hand put it down, or where it was.
-        .filter(|link| !held.is_some_and(|held| held.same_connection(link)))
+    let drawn: Vec<&Link> = drawn_links(document, home, held)
+        .into_iter()
         .chain(&unjoined)
         .collect();
     let lines: Vec<tcsdiagram::view::LineOnSheet> =
@@ -12259,6 +12510,180 @@ mod tests {
         a_typed_value_is_taken_when_it_is_done();
         a_component_placed_on_a_page_is_drawn_only_there();
         every_field_of_a_node_is_in_view_and_its_name_clears();
+        a_line_or_a_node_is_selected_by_a_right_click_and_deleted();
+    }
+
+    /// A right click on a line or a node selects it, and nothing else; the
+    /// Delete key takes what is selected, a line at once and a node after
+    /// asking; a click of either button on bare sheet selects nothing; and a
+    /// left click on a line leaves the selection as it was, offering the
+    /// line's menu, whose Delete takes the line.
+    ///
+    /// Through the window, as a person does it, for the markup's part: which
+    /// presses reach the page under the shapes, and where on it they land.
+    fn a_line_or_a_node_is_selected_by_a_right_click_and_deleted() {
+        use slint::platform::{Key, PointerEventButton, WindowEvent};
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("picked.ytcs"), dividers())
+                .expect("it opens"),
+        ));
+        for (name, node_type, at) in [
+            ("ground", "gateway_radio", (16, 120)),
+            ("sensor", "i2c", (dividers().vehicle + 24, 120)),
+        ] {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            editor.borrow_mut().edit(Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: at,
+            });
+        }
+        let link =
+            journal::Link::joining("sensor", Some("world-out"), "ground", None);
+        editor
+            .borrow_mut()
+            .edit(Edit::AddLink { link: link.clone() });
+
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = views_for(&ui);
+        let chosen = views.borrow().chosen.clone();
+        let drawing = views.borrow().drawing.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        // Wide enough that the sheet is drawn whole, so that a place on it
+        // is a place in the file's pixels.
+        ui.window()
+            .set_size(slint::LogicalSize::new(2400.0, 1000.0));
+        ui.show().expect("the window shows");
+
+        let canvas =
+            i_slint_backend_testing::ElementHandle::find_by_element_id(
+                &ui,
+                "Surface::canvas",
+            )
+            .next()
+            .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+        let on_sheet = |(x, y): (f32, f32)| {
+            slint::LogicalPosition::new(origin.x + x, origin.y + y)
+        };
+        // Halfway along the line's longest run, which is on the line and
+        // clear of both nodes.
+        let on_line = || {
+            let route = ui.get_links().row_data(0).expect("a line").route;
+            let numbers: Vec<f32> = route
+                .split_whitespace()
+                .filter_map(|word| word.parse().ok())
+                .collect();
+            let points: Vec<(f32, f32)> =
+                numbers.chunks(2).map(|pair| (pair[0], pair[1])).collect();
+            let (from, to) = points
+                .windows(2)
+                .map(|run| (run[0], run[1]))
+                .max_by(|a, b| {
+                    let long = |(f, t): &((f32, f32), (f32, f32))| {
+                        (t.0 - f.0).abs() + (t.1 - f.1).abs()
+                    };
+                    long(a).total_cmp(&long(b))
+                })
+                .expect("a run");
+            on_sheet(((from.0 + to.0) / 2.0, (from.1 + to.1) / 2.0))
+        };
+        let sensor = ui
+            .get_nodes()
+            .iter()
+            .find(|node| node.name == "sensor")
+            .expect("the sensor is drawn");
+        let on_sensor = on_sheet((
+            sensor.x + sensor.width / 2.0,
+            sensor.y + sensor.height / 2.0,
+        ));
+        let bare = on_sheet((dividers().payloads as f32 / 2.0, 900.0));
+        let click = |at: slint::LogicalPosition, button: PointerEventButton| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: at });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: at,
+                button,
+            });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: at,
+                button,
+            });
+        };
+        let delete = || {
+            let text: slint::SharedString = Key::Delete.into();
+            ui.window()
+                .dispatch_event(WindowEvent::KeyPressed { text: text.clone() });
+            ui.window()
+                .dispatch_event(WindowEvent::KeyReleased { text });
+        };
+
+        // The line, selected by a right click on it.
+        click(on_line(), PointerEventButton::Right);
+        assert_eq!(ui.get_selected_link(), 0, "a right click selects a line");
+        assert_eq!(ui.get_selected(), "");
+
+        // And nothing selected, by a click of either button on bare sheet.
+        click(bare, PointerEventButton::Left);
+        assert_eq!(ui.get_selected_link(), -1, "bare sheet selects nothing");
+        click(on_line(), PointerEventButton::Right);
+        click(bare, PointerEventButton::Right);
+        assert_eq!(ui.get_selected_link(), -1, "a right click on bare sheet");
+
+        // A node, selected by a right click on it, and the line no longer.
+        click(on_line(), PointerEventButton::Right);
+        click(on_sensor, PointerEventButton::Right);
+        assert_eq!(ui.get_selected(), "sensor", "a right click selects a node");
+        assert_eq!(ui.get_selected_link(), -1, "one thing at a time");
+        assert!(views.borrow().deleting.is_none(), "and opens nothing");
+
+        // A left click on the line offers its menu and selects nothing.
+        click(on_line(), PointerEventButton::Left);
+        assert_eq!(ui.get_selected(), "sensor", "a left click on a line");
+        assert_eq!(ui.get_selected_link(), -1);
+        // The menu itself is a popup the test cannot reach into: closed,
+        // as Escape closes it, and its Delete asked for as it would ask.
+        let escape: slint::SharedString = Key::Escape.into();
+        ui.window().dispatch_event(WindowEvent::KeyPressed {
+            text: escape.clone(),
+        });
+        ui.window()
+            .dispatch_event(WindowEvent::KeyReleased { text: escape });
+        ui.invoke_link_delete(0);
+        assert!(
+            editor.borrow().document().links.is_empty(),
+            "the menu's Delete takes the line"
+        );
+        editor.borrow_mut().undo();
+        views.borrow().refresh(&editor.borrow());
+
+        // Delete takes a selected line at once.
+        click(on_line(), PointerEventButton::Right);
+        delete();
+        assert!(
+            editor.borrow().document().links.is_empty(),
+            "the Delete key takes the selected line"
+        );
+        assert_eq!(ui.get_selected_link(), -1, "and it is selected no more");
+
+        // And asks before it takes a selected node.
+        click(on_sensor, PointerEventButton::Right);
+        delete();
+        assert!(views.borrow().deleting.is_some(), "a node's removal asks");
+        assert!(editor.borrow().document().node("sensor").is_some());
+        if let Some(window) = views.borrow_mut().deleting.take() {
+            window.hide().expect("the question goes");
+        }
+        ui.hide().expect("the window hides");
     }
 
     /// An error chosen from the errors button is gone to, and leaves the
@@ -12910,6 +13335,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -13189,6 +13615,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -13333,6 +13760,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -13492,6 +13920,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -13583,6 +14012,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -13729,6 +14159,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -13876,6 +14307,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -14001,6 +14433,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -14208,6 +14641,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -14415,7 +14849,7 @@ mod tests {
                 &ui,
                 &editor.borrow(),
                 &None,
-                None,
+                (None, None),
                 dividers(),
                 lists(),
                 (None, None),
@@ -14465,7 +14899,15 @@ mod tests {
             .expect("it opens");
             let ui = MainWindow::new().expect("a window");
             furnish!(&ui, descriptions());
-            put(&ui, &editor, &None, None, dividers(), lists(), (None, None));
+            put(
+                &ui,
+                &editor,
+                &None,
+                (None, None),
+                dividers(),
+                lists(),
+                (None, None),
+            );
 
             assert_eq!(
                 ui.get_links().row_count(),
@@ -14542,6 +14984,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -14693,6 +15136,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -14797,6 +15241,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -14965,6 +15410,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -15049,6 +15495,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -15209,6 +15656,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -15491,6 +15939,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -15584,6 +16033,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((
@@ -15720,6 +16170,7 @@ mod tests {
             top: ui.as_weak(),
             open: BTreeMap::new(),
             chosen: Rc::new(RefCell::new(BTreeMap::new())),
+            picked: Rc::new(RefCell::new(BTreeMap::new())),
             drawing: Rc::new(RefCell::new(None)),
             divider: Rc::new(std::cell::Cell::new(dividers())),
             lists: Rc::new(std::cell::Cell::new((

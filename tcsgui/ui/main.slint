@@ -823,6 +823,37 @@ component Surface inherits Rectangle {
     // Which node is drawn as chosen. What it says about itself is in a window
     // of its own -- see NodeWindow -- so this is all the canvas needs.
     in property <string> selected: "";
+    // Which line is selected instead, by its place in `links`, or -1; and
+    // which physics component, by name. At most one of the three is set:
+    // whatever is selected is what the Delete key takes.
+    in property <int> selected-link: -1;
+    in property <string> selected-physics: "";
+    // A line selected by a right click on it, by its place in `links`; a
+    // physics component selected by a press on it; and nothing selected, by
+    // a click on neither a line nor a shape.
+    callback link-picked(int);
+    callback physics-picked(string);
+    callback unpicked();
+    // A line deleted, by its place in `links`: from the menu a left click on
+    // it opens, or by the Delete key while it is selected.
+    callback link-delete(int);
+    // Which line is under a point, in the working panes' coordinates, by its
+    // place in `links`, or -1 for none: worked out in Rust, which has the
+    // lines' routes as points. See tcsdiagram::route::distance_to.
+    pure callback link-at(length, length) -> int;
+    // The line the menu a left click opened is about.
+    property <int> menu-link: -1;
+
+    // A node chosen, by a press on it of either button, and the keys given
+    // to the selection so that Delete reaches it.
+    function pick-node(name: string) {
+        root.node-selected(name);
+        picks.focus();
+    }
+    function pick-physics(name: string) {
+        root.physics-picked(name);
+        picks.focus();
+    }
 
     background: Colors.window;
 
@@ -1156,6 +1187,62 @@ component Surface inherits Rectangle {
                         border-width: 1px;
                         border-color: #d8d8d4;
 
+                        // What a line offers on a left click: being taken
+                        // out. Shown by the TouchArea below at the point
+                        // pressed, which takes the presses its own
+                        // right-click handling would otherwise see.
+                        link-menu := ContextMenuArea {
+                            width: 100%;
+                            height: 100%;
+                            Menu {
+                                MenuItem {
+                                    title: "Delete";
+                                    enabled: !Session.read-only;
+                                    activated => {
+                                        root.link-delete(root.menu-link);
+                                    }
+                                }
+                            }
+                        }
+
+                        // A press on the page that no shape took: on a
+                        // line, a right click selects it and a left click
+                        // offers its menu; anywhere else, either button
+                        // selects nothing, and any menu open is closed by
+                        // the press itself. Under everything on the page,
+                        // so that the shapes and terminals take their own
+                        // presses first; a line, being drawn by a Path,
+                        // takes none, and is found by where it runs.
+                        TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            pointer-event(event) => {
+                                if (event.kind != PointerEventKind.down) {
+                                    return;
+                                }
+                                if (event.button != PointerEventButton.left
+                                    && event.button
+                                        != PointerEventButton.right) {
+                                    return;
+                                }
+                                let line = root.link-at(
+                                    self.mouse-x - root.left, self.mouse-y);
+                                if (line < 0) {
+                                    root.unpicked();
+                                } else if (event.button
+                                           == PointerEventButton.right) {
+                                    root.link-picked(line);
+                                    picks.focus();
+                                } else {
+                                    root.menu-link = line;
+                                    link-menu.show({
+                                        x: self.mouse-x,
+                                        y: self.mouse-y
+                                    });
+                                }
+                            }
+                        }
+
                         // Right of the left margin, against the payloads it
                         // joins, so that a line from a sensor to the zone
                         // does not cross the page's edge.
@@ -1200,8 +1287,9 @@ component Surface inherits Rectangle {
                     }
 
                     // Links under nodes, so a line never crosses a label.
-                    for l in links: LinkLine {
+                    for l[i] in links: LinkLine {
                         link: l;
+                        selected: i == root.selected-link;
                     }
                     // And the line being drawn, under them as well: it is a
                     // link that is not one yet, and it follows the pointer, so
@@ -1229,7 +1317,7 @@ component Surface inherits Rectangle {
                             link-started(n.name, terminal);
                         }
                         link-dragging(x, y) => { link-moved(x, y); }
-                        chosen => { node-selected(n.name); }
+                        chosen => { root.pick-node(n.name); }
                         edit-requested => { node-edit(n.name); }
                         delete-requested => { node-delete(n.name); }
                     }
@@ -1242,6 +1330,8 @@ component Surface inherits Rectangle {
                         for n in root.physics-nodes: NodeShape {
                             node: n;
                             draggable: true;
+                            selected: n.name == root.selected-physics;
+                            chosen => { root.pick-physics(n.name); }
                             dragged(dx, dy) => {
                                 root.physics-moved(n.name, dx, dy);
                             }
@@ -1444,6 +1534,36 @@ component Surface inherits Rectangle {
                 // inside a ScrollView scrolls it to whatever took it, and a
                 // sheet that jumped when a line was picked up would throw the
                 // node somebody was aiming at out from under the pointer.
+                // The key the selection answers: Delete, or Backspace,
+                // takes whatever is selected -- a line at once, a node after
+                // asking, as its menu's Delete does, and a physics
+                // component as its menu's does. Given the focus when
+                // something is selected; out here for the reason the keys
+                // below are.
+                picks := FocusScope {
+                    width: 0px;
+                    height: 0px;
+                    key-pressed(event) => {
+                        if (event.text != Key.Delete
+                            && event.text != Key.Backspace) {
+                            return reject;
+                        }
+                        if (Session.read-only || root.joining != "") {
+                            return reject;
+                        }
+                        if (root.selected-link >= 0) {
+                            root.link-delete(root.selected-link);
+                        } else if (root.selected-physics != "") {
+                            root.physics-delete(root.selected-physics);
+                        } else if (root.selected != "") {
+                            root.node-delete(root.selected);
+                        } else {
+                            return reject;
+                        }
+                        return accept;
+                    }
+                }
+
                 if root.joining != "": keys := FocusScope {
                     width: 0px;
                     height: 0px;
@@ -1851,6 +1971,16 @@ export component MainWindow inherits Window {
     // What a node's own menu asks for: see NodeShape's menu.
     callback node-edit(string);
     callback node-delete(string);
+    // A line or a physics component selected instead of a node, nothing
+    // selected, a line deleted, and which line is under a point: see
+    // Surface's.
+    in property <int> selected-link: -1;
+    in property <string> selected-physics: "";
+    callback link-picked(int);
+    callback physics-picked(string);
+    callback unpicked();
+    callback link-delete(int);
+    pure callback link-at(length, length) -> int;
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
     // Every node to the top of its own pane: see the menu item.
@@ -2032,7 +2162,14 @@ export component MainWindow inherits Window {
         edge-terminals: root.edge-terminals;
         edge-started(terminal) => { root.edge-started(terminal); }
         selected: root.selected;
+        selected-link: root.selected-link;
+        selected-physics: root.selected-physics;
         node-selected(n) => { root.node-selected(n); }
+        link-picked(i) => { root.link-picked(i); }
+        physics-picked(n) => { root.physics-picked(n); }
+        unpicked => { root.unpicked(); }
+        link-delete(i) => { root.link-delete(i); }
+        link-at(x, y) => { return root.link-at(x, y); }
         node-edit(n) => { root.node-edit(n); }
         node-delete(n) => { root.node-delete(n); }
     }

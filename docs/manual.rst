@@ -253,7 +253,11 @@ terminal
     click on bare sheet puts the line down. A line already drawn is picked up
     by clicking the terminal at either end of it: the next node clicked offers
     to move that end there, and the node it was picked up from, or the Delete
-    key, offers to take it out. A subdiagram's box offers the nodes its file
+    key, offers to take it out. A line is also taken out from the menu a
+    click on it opens, or by a right click on it, which selects it, and the
+    Delete key. A right click selects a node or a physics component the same
+    way, and Delete then asks before the node goes; a click anywhere else on
+    the sheet selects nothing. A subdiagram's box offers the nodes its file
     exports at that terminal; inside the subdiagram, its page has an edge in
     a margin either side, labelled *outside*, the left one left of the
     Physics pane, and clicking an edge terminal

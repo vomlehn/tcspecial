@@ -332,10 +332,12 @@ export component NodeShape inherits Rectangle {
     // Where the pointer is while a line is being drawn from one of this
     // node's terminals. See Terminal::dragged.
     callback link-dragging(length, length);
-    // This node was pressed, so it is the one the panel should show.
+    // This node was pressed, so it is the one drawn as selected: by a right
+    // click, which does nothing else, or by the left press that offers its
+    // menu or starts a drag of it.
     callback chosen();
-    // What the menu a click opens asks for: the node's attributes, or the
-    // node's removal. See the menu itself, below the grip.
+    // What the menu a left click opens asks for: the node's attributes, or
+    // the node's removal. See the menu itself, below the grip.
     callback edit-requested();
     callback delete-requested();
 
@@ -563,15 +565,14 @@ export component NodeShape inherits Rectangle {
         }
     }
 
-    // What a click on a node offers: a node's own commands, which have
+    // What a left click on a node offers: a node's own commands, which have
     // nowhere else to live -- a node is not in the menu bar, and the menu bar
     // is for the configuration as a whole.
     //
     // Shown by the grip below, at the point that was pressed, and not by this
     // area answering the pointer itself: the grip covers the whole node and
     // takes every press, so a ContextMenuArea's own right-click handling
-    // never sees one. That is why a right click did nothing at all until the
-    // grip was taught to show this by name.
+    // never sees one, which is as wanted -- a right click selects.
     //
     // First among the node's children, so the grip and the terminals are
     // above it and a press reaches them.
@@ -610,12 +611,11 @@ export component NodeShape inherits Rectangle {
         pointer-event(event) => {
             if (event.kind == PointerEventKind.down
                 && event.button == PointerEventButton.right) {
-                // A right click asks what there is to do with this node,
-                // which is what a right click means everywhere else. On the
-                // press rather than the release, as a context menu is: by the
-                // time a button somebody is holding down comes up they are
-                // looking at the menu, not at the node.
-                menu.show({ x: self.mouse-x, y: self.mouse-y });
+                // A right click selects this node and does nothing else, so
+                // that the Delete key has something to take: the same for a
+                // node as for a line, which has no left press of its own to
+                // be selected by.
+                chosen();
             }
             if (event.kind == PointerEventKind.down
                 && event.button == PointerEventButton.left) {
@@ -788,6 +788,12 @@ export component LinkLine inherits Rectangle {
     in property <LinkView> link;
     // The link's own, which says which stream it carries. See LinkView::ink.
     in property <color> ink: link.ink;
+    // Whether the editor has this line selected, which outlines it in the
+    // dark grey a selected node is outlined in.
+    in property <bool> selected: false;
+    // How wide the line is drawn, and how wide its selection outline.
+    property <length> weight: link.wide ? 5px : 2.5px;
+    property <length> outline: weight + 6px;
 
     width: 100%;
     height: 100%;
@@ -815,6 +821,26 @@ export component LinkLine inherits Rectangle {
         commands: link.route;
         stroke: link.glow;
         stroke-width: 3 * (link.wide ? 5px : 2.5px);
+        fill: transparent;
+    }
+
+    // The selected line, under the ordinary one as the lit line is and
+    // fitted the same way, its box grown by the difference in half-strokes:
+    // wider by three pixels a side, so the line drawn over it reads as
+    // outlined rather than recoloured, and still says which stream it
+    // carries.
+    if root.selected: Path {
+        x: -(root.outline - root.weight) / 2;
+        y: -(root.outline - root.weight) / 2;
+        width: root.width + root.outline - root.weight;
+        height: root.height + root.outline - root.weight;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: link.route;
+        stroke: #333333;
+        stroke-width: root.outline;
         fill: transparent;
     }
 

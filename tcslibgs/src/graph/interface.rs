@@ -56,8 +56,8 @@ pub fn sends(node_type: &str) -> bool {
 /// answer comes back to.
 ///
 /// The one statement of the rule, read aboard to open the socket, by the
-/// simulator to stand in for the payload, and by the check that refuses an
-/// init with nowhere to go.
+/// simulator to simulate the payload, and by the check that refuses an init
+/// with nowhere to go.
 pub fn speaks_first(read: bool, asked: bool) -> bool {
     read && !asked
 }

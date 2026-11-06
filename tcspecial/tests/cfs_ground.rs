@@ -1,6 +1,5 @@
 //! The cfs example, commanded from the ground: tcslib's peer of the bus,
-//! through the stand-in for the cFS end that tcssim runs, against the
-//! vehicle itself.
+//! through the simulated cFS end that tcssim runs, against the vehicle itself.
 //!
 //! What `tests/cfs.rs` checks byte by byte, as the cFS end, this checks as a
 //! ground station sees it: through `tcslib::bus`, with the station's own
@@ -15,7 +14,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tcslib::beacon::{self, Arrived, Schedule};
-use tcslib::bus::StandIn;
+use tcslib::bus::SimulatedCfs;
 use tcslib::gateway::GatewayReceiver;
 use tcslib::matched::Matched;
 use tcslib::{command_links_of, CommandStatus, NodeId, TcsClient};
@@ -92,8 +91,8 @@ fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
     let graph = Graph::load(&configuration).expect("it reads");
     let digest = common::checksum_of(&configuration);
 
-    let _stand_in = StandIn::open(&graph)
-        .expect("the cFS end is stood in for")
+    let _cfs = SimulatedCfs::open(&graph)
+        .expect("the cFS end is simulated")
         .expect("the example answers over a bus");
     let _flying = Flying(
         Process::new(env!("CARGO_BIN_EXE_tcspecial"))

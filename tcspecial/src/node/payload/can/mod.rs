@@ -2,7 +2,7 @@
 //! identifier.
 //!
 //! **Supported.** Run against the kernel's virtual bus, by
-//! `tests/kernel-stand-ins.rs`, and against no CAN controller.
+//! `tests/kernel-dummies.rs`, and against no CAN controller.
 //!
 //! A CAN controller is a network interface, so this is a socket rather than an
 //! open device file: `PF_CAN`, `SOCK_RAW`, `CAN_RAW`, bound to the interface
@@ -165,9 +165,9 @@ impl CanEndpoint {
 ///
 /// A socket is bound to an index rather than to a name, and the name is what a
 /// file states. A name the kernel does not know is the common failure -- a bus
-/// that has not been brought up, or a virtual one that was never created --
-/// and the error says so, with the command that would make one, as the I2C
-/// stand-in does for its module.
+/// that has not been brought up, or a virtual one that was never created -- and
+/// the error says so, with the command that would make one, as the I2C dummy
+/// device does for its module.
 ///
 /// # Arguments
 ///

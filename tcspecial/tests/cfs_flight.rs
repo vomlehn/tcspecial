@@ -208,10 +208,10 @@ impl Ground {
     }
 }
 
-/// tcspecial joins cFS's own software bus as an SBN peer, and the beacon,
-/// a CONNECT and its answer, a reading, a command for fsw and a node
-/// command all cross SBN between the two, as `tests/cfs.rs` has them cross
-/// the test's stand-in for it.
+/// tcspecial joins cFS's own software bus as an SBN peer, and the beacon, a
+/// CONNECT and its answer, a reading, a command for fsw and a node command all
+/// cross SBN between the two, as `tests/cfs.rs` has them cross the test's
+/// simulated cFS end.
 #[test]
 #[ignore = "needs cFS's Linux build running: make cfs-test"]
 fn a_vehicle_answering_to_cfs_is_a_peer_of_cfs_itself() {

@@ -1,8 +1,8 @@
-//! tcspecial flown against the kernel's own stand-ins for a CAN bus, a GPIO
+//! tcspecial flown against the kernel's dummy devices for a CAN bus, a GPIO
 //! chip and an IIO sensor: what makes CAN and GPIO supported, and what will
 //! promote IIO, which stays experimental until its test has passed against a
-//! kernel whose `iio_dummy` has a buffer -- which a stock distribution
-//! kernel's has not.
+//! kernel whose `iio_dummy` has a buffer -- which a stock distribution kernel's
+//! has not.
 //!
 //! Each test flies an example -- `examples/can`, `examples/gpio` or
 //! `examples/iio` -- with its sockets moved to ports nothing holds and its
@@ -14,15 +14,15 @@
 //! commands reach the device where the type has an output, which an IIO
 //! sensor has not.
 //!
-//! The devices need root to make, so nothing here makes them:
-//! `sudo bin/mk-kernel-stand-ins` does, once, and gives them to the user who
-//! ran it. A test whose device is not there, or is not this user's to use,
-//! says which and what makes it, and passes having tested nothing -- so that
-//! `cargo test` passes on a host that has never been set up. Run them with
-//! `--nocapture` to see which did:
+//! The devices need root to make, so nothing here makes them: `sudo
+//! bin/mk-kernel-dummies` does, once, and gives them to the user who ran it. A
+//! test whose device is not there, or is not this user's to use, says which and
+//! what makes it, and passes having tested nothing -- so that `cargo test`
+//! passes on a host that has never been set up. Run them with `--nocapture` to
+//! see which did:
 //!
 //! ```text
-//! cargo test -p tcspecial --test kernel-stand-ins -- --nocapture
+//! cargo test -p tcspecial --test kernel-dummies -- --nocapture
 //! ```
 
 use std::io;
@@ -40,7 +40,7 @@ use tcslibgs::simulate::Host;
 mod common;
 
 /// What makes every device here, for a skipped test to name.
-const MAKE: &str = "sudo bin/mk-kernel-stand-ins";
+const MAKE: &str = "sudo bin/mk-kernel-dummies";
 
 /// How long anything here is waited for: tcspecial's start, a datum's
 /// arrival. Generous, because a loaded host running the whole workspace's
@@ -349,7 +349,7 @@ fn virtual_can() -> Result<String, String> {
         .unwrap_or_default();
     names.sort();
     for name in names {
-        if !tcslibgs::node::payload::can::judged(&host, &name).is_stand_in() {
+        if !tcslibgs::node::payload::can::judged(&host, &name).is_dummy() {
             continue;
         }
         // A bus that is there and down binds a socket and then fails every
@@ -605,7 +605,7 @@ fn gpio_sim() -> Result<Chip, String> {
 
     for (name, dir) in chips {
         let device = format!("/dev/{name}");
-        if !gpio::judged(&host, &device).is_stand_in() {
+        if !gpio::judged(&host, &device).is_dummy() {
             continue;
         }
         let lines = [dir.join("sim_gpio0"), dir.join("sim_gpio1")];

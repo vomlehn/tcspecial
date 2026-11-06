@@ -1,17 +1,16 @@
 //! A temperature sensor on an I2C bus, fixed to a thermal mass.
 //!
 //! An `i2c` device in everything a vehicle does with it: the same bus and
-//! address, the same terms, the same reads. What differs is what it is, which
-//! a configuration says by its type and a reader takes in at a glance, and
-//! one thing a desk needs: a run with stand-ins may reach it over UDP at its
-//! `stand_in`, where tcssim answers with the temperature of the thermal mass
-//! it is joined to. See [`crate::graph::reach::stands_in_over_udp`].
+//! address, the same terms, the same reads. What differs is what it is, which a
+//! configuration says by its type and a reader takes in at a glance, and one
+//! thing a desk needs: a simulated run may reach it over UDP at its
+//! `sim_address`, where tcssim answers with the temperature of the thermal mass
+//! it is joined to. See [`crate::graph::reach::simulated_over_udp`].
 //!
 //! So nothing here is a rule of its own. The terms are `i2c`'s, read by
-//! [`super::i2c::group_kind_named`] under this type's name so that a
-//! complaint names the type the file wrote, and a bus is judged a stand-in
-//! as `i2c` judges one. A rule written for `i2c` is this type's too, in one
-//! place.
+//! [`super::i2c::group_kind_named`] under this type's name so that a complaint
+//! names the type the file wrote, and a bus is judged a dummy device as `i2c`
+//! judges one. A rule written for `i2c` is this type's too, in one place.
 
 use crate::endpoint_config::{EndpointConfigResult, GroupKind, LinkTerms};
 
@@ -39,7 +38,7 @@ pub(crate) fn group_kind_of(
     super::i2c::group_kind_named(name, TYPE, g)
 }
 
-/// Judges whether the bus is a stand-in, as an `i2c` node's is: see
+/// Judges whether the bus is a dummy device, as an `i2c` node's is: see
 /// [`super::i2c::judged`].
 ///
 /// # Arguments

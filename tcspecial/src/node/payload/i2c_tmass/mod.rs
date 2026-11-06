@@ -6,8 +6,8 @@
 //! on purpose: a second copy of the code that reads a bus would be a second
 //! place for a fault in it to be fixed in and missed.
 //!
-//! What makes it a type of its own is what it is, which a configuration says
-//! by its type, and that a run with stand-ins may reach it at its `stand_in`
+//! What makes it a type of its own is what it is, which a configuration says by
+//! its type, and that a run that simulates it may reach it at its `sim_address`
 //! over UDP, where tcssim answers with the temperature of the thermal mass it
-//! is joined to. Under the flight setting `stand_in` is never used, and the
+//! is joined to. Under the flight setting `sim_address` is never used, and the
 //! bus is what is opened: see `tcslibgs::graph::reach::Reach::opened`.

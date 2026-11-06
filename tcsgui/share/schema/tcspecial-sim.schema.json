@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial-sim.schema.json",
   "title": "tcspecial simulator configuration",
-  "description": "What tcssim needs in order to stand in for the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
+  "description": "What tcssim needs in order to simulate the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
   "type": "object",
   "properties": {
     "description": {
@@ -13,7 +13,7 @@
       "type": "object",
       "properties": {
         "ready": {
-          "description": "The UDP address, as address:port, at which tcssim answers whether it has made its stand-ins. One no other run uses: a simulator left running holds it, and a second one started on the same address is refused.",
+          "description": "The UDP address, as address:port, at which tcssim answers whether it has made its simulated devices. One no other run uses: a simulator left running holds it, and a second one started on the same address is refused.",
           "type": "string"
         },
         "thermostat": {
@@ -21,7 +21,7 @@
             "string",
             "null"
           ],
-          "description": "The thermostat nodes of the configuration tcssim stands in for, one name or several separated by commas, as a vehicle of several zones, or a staged thermostat, has several: for each it reads the simulated sensors whose data reaches that node and switches the simulated heaters the node's data reaches, with the node's setpoint and band, so the loop closes with no tcspecial running. A name blank between commas, or written twice, is refused, and so are two of them switching one heater. Never with tcspecial running, whose own thermostat switches the same heaters."
+          "description": "The thermostat nodes of the configuration tcssim plays, one name or several separated by commas, as a vehicle of several zones, or a staged thermostat, has several: for each it reads the simulated sensors whose data reaches that node and switches the simulated heaters the node's data reaches, with the node's setpoint and band, so the loop closes with no tcspecial running. A name blank between commas, or written twice, is refused, and so are two of them switching one heater. Never with tcspecial running, whose own thermostat switches the same heaters."
         },
         "seed": {
           "type": [
@@ -50,7 +50,7 @@
         },
         "physics": {
           "type": "object",
-          "description": "The vehicle's physical components, which the stand-ins measure and act on, and how they are joined. Each component is a part simulated alone, with fixed terminals of its type's; a connection joins an output to an input of the same kind. A stand-in joins a terminal with connects: component.terminal. Every figure is written with its unit.",
+          "description": "The vehicle's physical components, which the simulated payloads measure and act on, and how they are joined. Each component is a part simulated alone, with fixed terminals of its type's; a connection joins an output to an input of the same kind. A simulated payload joins a terminal with connects: component.terminal. Every figure is written with its unit.",
           "properties": {
             "components": {
               "type": "array",
@@ -167,7 +167,7 @@
               "string",
               "null"
             ],
-            "description": "Whether the payloads that name this group are simulated: true for tcssim to stand in for them, false for the real devices. A payload in a group that states it does not state it too."
+            "description": "Whether the payloads that name this group are simulated: true for tcssim to simulate them, false for the real devices. A payload in a group that states it does not state it too."
           },
           "group": {
             "description": "The group's name, which a simulated payload names with group: to take its settings from it. An entry is named by this, its first key.",
@@ -181,7 +181,7 @@
             ]
           },
           "payload_address": {
-            "description": "Where the stand-in answers from, where it has an address of its own to bind.",
+            "description": "Where tcssim answers from, where it has an address of its own to bind.",
             "type": [
               "string",
               "null"
@@ -291,14 +291,14 @@
               "string",
               "null"
             ],
-            "description": "The terminal of the physics model this stand-in is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+            "description": "The terminal of the physics model this simulated payload is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
           },
           "offset": {
             "type": [
               "string",
               "null"
             ],
-            "description": "How far the place a reporting stand-in is on sits from what its terminal says, in the terminal's unit: `+0.2 K`. With `connects` to an output and refused otherwise."
+            "description": "How far the place a reporting simulated payload is on sits from what its terminal says, in the terminal's unit: `+0.2 K`. With `connects` to an output and refused otherwise."
           },
           "noise": {
             "type": [
@@ -343,7 +343,7 @@
       }
     },
     "simulated_payloads": {
-      "description": "The payloads tcssim stands in for, grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's simulated payloads, each named by its first key, `payload: <name>`. The type is the kind of payload it stands in for, the type the configuration writes that payload under: one of the interfaces a payload is reached over, a payload that is a program being the program itself and needing no stand-in. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
+      "description": "The payloads tcssim simulates, grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's simulated payloads, each named by its first key, `payload: <name>`. The type is the kind of payload it is, the type the configuration writes that payload under: one of the interfaces a payload is reached over, a payload that is a program being the program itself and not simulated. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
       "type": "array",
       "items": {
         "type": "object",
@@ -362,7 +362,7 @@
       }
     },
     "tcsgui": {
-      "description": "What the editor arranged: where each physics component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcssim stands in for and this says where somebody put the boxes on a screen; tcssim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcsgui section names its nodes.",
+      "description": "What the editor arranged: where each physics component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcssim simulates and this says where somebody put the boxes on a screen; tcssim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcsgui section names its nodes.",
       "type": "object",
       "properties": {
         "nodes": {
@@ -433,10 +433,10 @@
             "string",
             "null"
           ],
-          "description": "Whether this payload is simulated: true for tcssim to stand in for it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
+          "description": "Whether this payload is simulated: true for tcssim to simulate it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
         },
         "payload": {
-          "description": "The payload of the configuration this stands in for, by its name: the two files are joined by it. An entry is named by this, its first key.",
+          "description": "The payload of the configuration this simulates, by its name: the two files are joined by it. An entry is named by this, its first key.",
           "type": "string"
         },
         "group": {
@@ -454,7 +454,7 @@
           ]
         },
         "payload_address": {
-          "description": "Where the stand-in answers from, where it has an address of its own to bind.",
+          "description": "Where tcssim answers from, where it has an address of its own to bind.",
           "type": [
             "string",
             "null"
@@ -564,14 +564,14 @@
             "string",
             "null"
           ],
-          "description": "The terminal of the physics model this stand-in is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+          "description": "The terminal of the physics model this simulated payload is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
         },
         "offset": {
           "type": [
             "string",
             "null"
           ],
-          "description": "How far the place a reporting stand-in is on sits from what its terminal says, in the terminal's unit: `+0.2 K`. With `connects` to an output and refused otherwise."
+          "description": "How far the place a reporting simulated payload is on sits from what its terminal says, in the terminal's unit: `+0.2 K`. With `connects` to an output and refused otherwise."
         },
         "noise": {
           "type": [
@@ -615,12 +615,12 @@
       "additionalProperties": false
     },
     "heater": {
-      "description": "A heater: a resistance on a supply, switched on and off. Its terminals are on, an input driven by a decision; heat, in W; and current, in A. Its on must be joined to a stand-in the vehicle drives.",
+      "description": "A heater: a resistance on a supply, switched on and off. Its terminals are on, an input driven by a decision; heat, in W; and current, in A. Its on must be joined to a simulated payload the vehicle drives.",
       "type": "object",
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "power": {
           "type": [
@@ -662,7 +662,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "time_constant": {
           "type": [
@@ -725,7 +725,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "period": {
           "type": [
@@ -760,7 +760,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "current": {
           "type": [
@@ -781,7 +781,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "current": {
           "type": [
@@ -802,7 +802,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         }
       },
       "required": [
@@ -816,7 +816,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "capacity": {
           "type": [
@@ -865,7 +865,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "thrust": {
           "type": [
@@ -900,7 +900,7 @@
       "properties": {
         "component": {
           "type": "string",
-          "description": "What it is called, which a connection or a stand-in names it by: not empty, and with no dot in it."
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
         },
         "mass": {
           "type": [

@@ -1,12 +1,13 @@
-//! A simulated device on a CAN bus.
+//! A simulated payload on a CAN bus, such as the kernel's vcan dummy
+//! device.
 //!
 //! A supported type, flown against the kernel's virtual bus by
-//! `tcspecial/tests/kernel-stand-ins.rs`, which plays the device's end itself
+//! `tcspecial/tests/kernel-dummies.rs`, which plays the device's end itself
 //! rather than through this.
 //!
-//! The one kind whose stand-in is as faithful as a socket. A CAN
+//! The one kind whose simulation is as faithful as a socket. A CAN
 //! controller carries every member's frames to every other member, so the
-//! simulator does not have to stand in for anything: it opens a socket on the
+//! simulator has nothing to imitate but the device: it opens a socket on the
 //! same interface the handler is on, sends the device's frames with the
 //! device's identifier, and reads the handler's triggers off the same bus.
 //! Both ends are real, which is what lets a triggered device work here where
@@ -610,7 +611,7 @@ mod tests {
     ///
     /// Before the send is attempted, so this needs no bus. The device
     /// configuration refuses such a packet where the file is read, which is
-    /// what keeps it from reaching here in a real run; this is the stand-in's
+    /// what keeps it from reaching here in a real run; this is the simulator's
     /// own guard, for the trigger a file does not size.
     #[test]
     fn a_packet_larger_than_a_frame_is_refused() {

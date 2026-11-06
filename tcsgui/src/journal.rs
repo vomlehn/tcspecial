@@ -176,7 +176,7 @@ pub enum Edit {
     /// A setting of one simulated payload was set. Both values, so the
     /// inverse is a lookup.
     ///
-    /// `payload` is the payload of the configuration this one stands in for:
+    /// `payload` is the payload of the configuration this one simulates:
     /// the two files are joined by name, and the editor never invents a name
     /// the configuration does not have. Its own name, as the simulator's file
     /// writes it, without the subdiagram it is drawn in: see
@@ -215,11 +215,11 @@ pub enum Edit {
     /// with nothing stated yet. Undone by removing it.
     AddPhysics { name: String, kind: String },
     /// A physics component removed, with what it stated, the connections
-    /// that joined it and the stand-ins joined to it, so that undo puts back
-    /// the component that was there and not an empty one of the same name:
-    /// removing a component removes its connections and takes it out of
-    /// every stand-in's `connects`, which would name nothing otherwise, as
-    /// removing a node removes its links.
+    /// that joined it and the simulated payloads joined to it, so that undo
+    /// puts back the component that was there and not an empty one of the
+    /// same name: removing a component removes its connections and takes it
+    /// out of every simulated payload's `connects`, which would name nothing
+    /// otherwise, as removing a node removes its links.
     RemovePhysics {
         name: String,
         kind: String,
@@ -269,8 +269,9 @@ pub enum Edit {
     /// A connection was taken away. Undone by making it again.
     RemoveConnection { from: String, to: String },
     /// A physics component was renamed, and with it every connection, every
-    /// stand-in's and group's `connects` and its place in the Physics pane:
-    /// each says the component by name. Undone by renaming it back.
+    /// simulated payload's and group's `connects` and its place in the
+    /// Physics pane: each says the component by name. Undone by renaming it
+    /// back.
     RenamePhysics { was: String, now: String },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history

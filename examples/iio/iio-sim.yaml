@@ -1,21 +1,21 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payload of iio.ytcs.
+# How tcssim simulates the payload of iio.ytcs.
 description: Simulator settings for the payload of iio.ytcs
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once.
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
 tcssim:
   ready: "127.0.0.1:7911"
 
 simulated_payloads:
   - type iio:
-      # Where the path is the kernel's iio_dummy sensor, which
-      # bin/mk-kernel-stand-ins makes, the kernel stands in for it and fills its
-      # buffer from a timer, and tcssim makes nothing; anywhere else, tcssim
-      # puts a pseudo-terminal at the path and writes a sample set a second to
-      # it.
+      # Where the path is the kernel's iio_dummy sensor, a dummy device
+      # bin/mk-kernel-dummies makes, the kernel fills its buffer from a timer
+      # and tcssim makes nothing; anywhere else, tcssim puts a simulated
+      # device, a pseudo-terminal, at the path and writes a sample set a
+      # second to it.
       - payload: sensor
         packet_interval: 1 s
         simulate: true

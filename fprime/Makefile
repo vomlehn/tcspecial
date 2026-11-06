@@ -26,7 +26,7 @@ FPRIME_BIN = $(FPRIME_VENV)/bin
 FPRIME_UTIL = $(FPRIME_BIN)/fprime-util
 
 # The configuration the bridge is built for, and the simulator file that
-# stands in for its payloads in the test. The fprime example by default.
+# simulates its payloads in the test. The fprime example by default.
 FPRIME_CONFIG ?= $(TOP)/examples/fprime/fprime.ytcs
 FPRIME_SIM ?= $(TOP)/examples/fprime/fprime-sim.yaml
 
@@ -137,7 +137,7 @@ build: settings model
 	cd $(CURDIR) && PATH=$(FPRIME_BIN):$$PATH $(FPRIME_UTIL) build \
 		-j$(JOBS)
 
-# The bridge's test: tcssim standing in for the configuration's payloads,
+# The bridge's test: tcssim simulating the configuration's payloads,
 # tcspecial flying it, BridgeTest running the bridge, and F´'s ground system
 # commanding it and reading its channels, holding the ports' lock while it
 # runs. See bridge-test.

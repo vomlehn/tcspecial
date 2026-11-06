@@ -8,8 +8,8 @@
 //! simulator file is. This holds the links to that file.
 //!
 //! The manual's fixture, `tests/manual/thermostat-sim.yaml`, is the same
-//! vehicle with its payloads on buses, so its stand-ins differ; its physics
-//! is a copy of the shared file's, and is held to it.
+//! vehicle with its payloads on buses, so its simulated payloads differ; its
+//! physics is a copy of the shared file's, and is held to it.
 
 use std::path::{Path, PathBuf};
 

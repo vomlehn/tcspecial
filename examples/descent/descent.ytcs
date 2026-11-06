@@ -86,8 +86,8 @@ vehicle:
         world-in: [altitude, descent_rate, guidance, touchdown]
 
 payloads:
-  # Every payload is the far end of a UDP socket, which tcssim stands in
-  # for, so that the example runs on any desk and touches no hardware.
+  # Every payload is the far end of a UDP socket, which tcssim plays, so
+  # that the example runs on any desk and touches no hardware.
   - type network:
       # The Doppler velocimeter, five a second.
       - payload: doppler

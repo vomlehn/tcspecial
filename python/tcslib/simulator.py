@@ -89,8 +89,9 @@ def wait(at, ours, patience):
 
     Raises:
         NotReady: Nothing answered (``silent``), it was still making its
-                  stand-ins (``starting``), it is set up for another run
-                  (``differs``), or it could not stand in (``failed``).
+                  simulated devices (``starting``), it is set up for another
+                  run (``differs``), or it could not simulate a payload
+                  (``failed``).
     """
     started = time.monotonic()
     heard = False
@@ -102,8 +103,8 @@ def wait(at, ours, patience):
                 raise NotReady(
                     "starting",
                     f"the simulator at {at[0]}:{at[1]} was still making its "
-                    f"stand-ins after {waited:.1f} s: look at what tcssim "
-                    "says, or give it longer",
+                    f"simulated devices after {waited:.1f} s: look at what "
+                    "tcssim says, or give it longer",
                 )
             raise NotReady(
                 "silent",
@@ -128,7 +129,7 @@ def wait(at, ours, patience):
         if answer.state == "failed":
             raise NotReady(
                 "failed",
-                f"the simulator at {at[0]}:{at[1]} could not stand in: "
-                f"{answer.reason}",
+                f"the simulator at {at[0]}:{at[1]} could not simulate a "
+                f"payload: {answer.reason}",
             )
         time.sleep(min(RESEND_EVERY, left))

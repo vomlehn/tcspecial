@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payloads of the thermostat example's
+# How tcssim simulates the payloads of the thermostat example's
 # vehicle: thermostat.ytcs, with a radio for its gateway, and
 # thermostat-yamcs.ytcs, the same vehicle with Yamcs for its ground station.
 # One file for both, here in thermostat-common, which the two examples share
@@ -29,17 +29,17 @@
 # the latest decision at once.
 #
 # To close it in tcssim alone, with no tcspecial running, add
-# "thermostat: thermostat" to the tcssim section below: tcssim then stands in
-# for the thermostat node of that name, with its setpoint and band. Never
+# "thermostat: thermostat" to the tcssim section below: tcssim then plays
+# the thermostat node of that name, with its setpoint and band. Never
 # with tcspecial running, whose own thermostat switches the same heaters.
 description: Simulator settings for the payloads of thermostat.ytcs and
   thermostat-yamcs.ytcs
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once -- one for both of the examples this
-# file serves, which cannot run at once anyway: their heaters are the same
-# lines of the same GPIO chip.
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once -- one for both of the
+# examples this file serves, which cannot run at once anyway: their heaters
+# are the same lines of the same GPIO chip.
 tcssim:
   ready: "127.0.0.1:7907"
 
@@ -51,8 +51,8 @@ tcssim:
 #
 # Three parts, each simulated alone and joined below: a heater is switched
 # on and gives out heat; the zone takes heat and has a temperature. The
-# stand-ins below are joined to their terminals by name -- a sensor to
-# zone.temperature, a heater's stand-in to heater_1.on -- and the physics
+# simulated payloads below are joined to their terminals by name -- a sensor
+# to zone.temperature, a heater's switch to heater_1.on -- and the physics
 # says nothing about them.
 world:
   # The temperature the zone's surroundings are about: 288.15 K, three
@@ -140,7 +140,7 @@ simulated_payload_groups:
 
 simulated_payloads:
   # The heaters' switches and the lines that sense them, through the
-  # kernel's simulated chip: sudo bin/mk-kernel-stand-ins gpio makes it.
+  # kernel's simulated chip: sudo bin/mk-kernel-dummies gpio makes it.
   - type gpio:
       # The lines on the thermal mass, pulled to what each heater is doing --
       # line 2 to heater_1's, line 3 to heater_2's, in the order the node
@@ -153,7 +153,7 @@ simulated_payloads:
         packet_interval: 1 s
         simulate: true
 
-      # Driven and never read: each stand-in watches its line, counts each
+      # Driven and never read: tcssim watches each one's line, counts each
       # change the vehicle drives it to, and switches the heater it is joined
       # to. A heater's panel button is its power: disabled, it is an
       # unpowered or failed heater, and stays off whatever is decided;

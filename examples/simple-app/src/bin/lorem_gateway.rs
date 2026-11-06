@@ -1,6 +1,6 @@
 //! The example's ground end: it prints the line the vehicle sends.
 //!
-//! What stands in for ground software while this example runs. tcspecial
+//! What plays the ground software while this example runs. tcspecial
 //! sends `lorem`'s words as UDP datagrams to the configuration's gateway node,
 //! and this program gets them from that node with one function call --
 //! `tcslib::gateway::GatewayReceiver::receive` -- rather than opening a socket

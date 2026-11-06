@@ -226,11 +226,11 @@ pub(crate) fn group_kind_named(
 }
 
 /// The name the kernel's `i2c-stub` gives the adapter it makes, which is how
-/// `bin/mki2c` finds it and how a stand-in bus is told from a real one.
+/// `bin/mki2c` finds it and how a dummy bus is told from a real one.
 pub const STUB_ADAPTER: &str = "SMBus stub driver";
 
-/// What `--simulate` asks to change on an I2C node that is not a stand-in.
-const TO_STAND_IN: &str =
+/// What `--simulate` asks to change on an I2C node that is a real device.
+const TO_SIMULATE: &str =
     "point path at the i2c-stub bus, which bin/mki2c makes";
 
 /// Judges whether a bus is the kernel's `i2c-stub`, from the name of the
@@ -247,14 +247,14 @@ const TO_STAND_IN: &str =
 ///
 /// # Returns
 ///
-/// The judgement, with what to change if it is not a stand-in.
+/// The judgement, with what to change if it is a real device.
 pub fn judged(
     host: &crate::simulate::Host,
     bus: &str,
 ) -> crate::simulate::Judged {
     match host.device_of(bus) {
         Ok(device) => adapter_judged(bus, &device),
-        Err(found) => found.judged("path", TO_STAND_IN),
+        Err(found) => found.judged("path", TO_SIMULATE),
     }
 }
 
@@ -268,7 +268,7 @@ pub fn judged(
 ///
 /// # Returns
 ///
-/// A stand-in for the i2c-stub's adapter, hardware for any other name, and
+/// A dummy device for the i2c-stub's adapter, hardware for any other name, and
 /// cannot-tell when there is no name.
 fn adapter_judged(
     bus: &str,
@@ -276,30 +276,30 @@ fn adapter_judged(
 ) -> crate::simulate::Judged {
     use crate::simulate::{read_line, Judged};
     match read_line(&device.join("name")) {
-        Some(name) if name == STUB_ADAPTER => Judged::stand_in(
+        Some(name) if name == STUB_ADAPTER => Judged::dummy(
             format!("{bus} is the i2c-stub's adapter"),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         ),
         Some(name) => Judged::hardware(
             format!("{bus} is a real adapter ({name})"),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         ),
         None => Judged::cannot_tell(
             format!("{bus}'s adapter has no name in {}", device.display()),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         ),
     }
 }
 
 #[cfg(test)]
-mod stand_in_tests {
+mod judged_tests {
     use super::*;
     use crate::simulate::Verdict;
 
-    /// Makes a stand-in for an adapter's kernel directory.
+    /// Makes a directory that looks like an adapter's kernel directory.
     ///
     /// # Arguments
     ///
@@ -323,11 +323,11 @@ mod stand_in_tests {
     }
 
     #[test]
-    fn the_stub_is_a_stand_in_and_a_real_adapter_is_named() {
+    fn the_stub_is_a_dummy_and_a_real_adapter_is_named() {
         let stub = adapter(Some(STUB_ADAPTER));
         assert_eq!(
             adapter_judged("/dev/i2c-7", stub.path()).verdict,
-            Verdict::StandIn
+            Verdict::Dummy
         );
 
         let real = adapter(Some("i915 gmbus dpb"));

@@ -109,7 +109,7 @@ The ground can see which configuration is flying
     running without having to ask.
 
 The simulator is built from the same file
-    tcssim reads the configuration and stands in for its payloads, so a
+    tcssim reads the configuration and simulates its payloads, so a
     device change can be tried on the ground, against the ground station,
     before it is uplinked.
 

@@ -134,8 +134,8 @@ class Sbn:
     max_message: int
 
     def ground_processor_id(self):
-        """The processor ID a ground station joins a stand-in for the far
-        end as: see :func:`tcslibgs.sbn.ground_processor_id`."""
+        """The processor ID a ground station joins the simulated far end
+        as: see :func:`tcslibgs.sbn.ground_processor_id`."""
         return _sbn.ground_processor_id(self.processor_id,
                                         self.peer_processor_id)
 

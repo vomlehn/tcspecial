@@ -1,5 +1,5 @@
 //! Waiting for the simulator: how a harness learns that tcssim has made its
-//! stand-ins before it starts tcspecial.
+//! simulated devices before it starts tcspecial.
 //!
 //! The one way every harness waits -- tcsmoc, `tcssim --wait`, and a test --
 //! so that there is one statement of what the exchange is and of what each
@@ -24,7 +24,7 @@ pub enum NotReady {
     /// It answered, and was still starting when the time ran out: a
     /// simulator that has not finished.
     StillStarting { at: SocketAddr, waited: Duration },
-    /// It could not make a stand-in, or one has stopped.
+    /// It could not make a simulated device, or one has stopped.
     Failed { at: SocketAddr, reason: String },
     /// It is set up for something else: each difference, with what each side
     /// has.
@@ -47,12 +47,17 @@ impl std::fmt::Display for NotReady {
             ),
             NotReady::StillStarting { at, waited } => write!(
                 f,
-                "the simulator at {at} was still making its stand-ins after {} \
-                 s: look at what tcssim says, or give it longer",
+                "the simulator at {at} was still making its simulated \
+                 devices after {} s: look at what tcssim says, or give it \
+                 longer",
                 waited.as_secs_f32()
             ),
             NotReady::Failed { at, reason } => {
-                write!(f, "the simulator at {at} could not stand in: {reason}")
+                write!(
+                    f,
+                    "the simulator at {at} could not simulate a device: \
+                     {reason}"
+                )
             }
             NotReady::Differs { at, differences } => write!(
                 f,

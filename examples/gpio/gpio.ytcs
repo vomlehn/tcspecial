@@ -49,7 +49,7 @@ payloads:
   # Two lines of one chip, each a payload of its own because one is read and
   # the other driven, and a payload's lines go one way. The chip here is
   # /dev/gpiochip1, which is what the kernel's gpio-sim chip is numbered on a
-  # host with one chip of its own; bin/mk-kernel-stand-ins makes that chip and
+  # host with one chip of its own; bin/mk-kernel-dummies makes that chip and
   # prints the number it was given, which is the path to write here.
   - type gpio:
       # A lamp on line 1, driven by what the ground sends: the text 1 to light

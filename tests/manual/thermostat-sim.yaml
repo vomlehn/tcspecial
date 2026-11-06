@@ -1,11 +1,11 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payloads of thermostat.ytcs, the manual's
+# How tcssim simulates the payloads of thermostat.ytcs, the manual's
 # fixture: the thermostat example as it would be aboard, its sensors on I2C
 # and SPI and its heaters on GPIO. The example itself puts each on a UDP
 # socket instead, so that it runs on any desk; see
 # examples/thermostat/thermostat-sim.yaml. Run on a desk, these payloads
-# want the kernel's stand-ins at their paths: see bin/mk-kernel-stand-ins.
+# want the kernel's dummy devices at their paths: see bin/mk-kernel-dummies.
 #
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
@@ -22,12 +22,12 @@
 # the heaters warm it.
 #
 # To close it in tcssim alone, with no tcspecial running, add
-# "thermostat: thermostat" to the tcssim section below: tcssim then stands in
-# for the thermostat node of that name, with its setpoint and band. Never
+# "thermostat: thermostat" to the tcssim section below: tcssim then plays the
+# thermostat node of that name, with its setpoint and band. Never
 # with tcspecial running, whose own thermostat switches the same heaters.
 description: Simulator settings for the payloads of thermostat.ytcs
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
+# Where tcssim answers whether it has made its simulated devices, which whatever
 # starts the run asks before it starts tcspecial. A port no other example
 # uses, so that two can be run at once.
 tcssim:
@@ -42,8 +42,8 @@ tcssim:
 #
 # Three parts, each simulated alone and joined below: a heater is switched
 # on and gives out heat; the zone takes heat and has a temperature. The
-# stand-ins below are joined to their terminals by name -- a sensor to
-# zone.temperature, a heater's stand-in to heater_1.on -- and the physics
+# simulated payloads below are joined to their terminals by name -- a sensor
+# to zone.temperature, a heater's lines to heater_1.on -- and the physics
 # says nothing about them.
 world:
   # The temperature the zone's surroundings are about: 288.15 K, three
@@ -126,8 +126,8 @@ simulated_payload_groups:
 
 simulated_payloads:
   - type gpio:
-      # Driven and never read: their stand-ins send nothing, count each time the
-      # vehicle moves their lines, and switch the heater each is joined to.
+      # Driven and never read: tcssim sends nothing for them, counts each time
+      # the vehicle moves their lines, and switch the heater each is joined to.
       - payload: heaters_1
         connects: heater_1.on
         simulate: true

@@ -5,7 +5,7 @@
 //! that it says what the library does is a program that compiles against it
 //! and works: `examples/ground.c` with gcc and `examples/ground.cpp` with
 //! g++, each linked with the `libtcs.a` this crate builds, each run against a
-//! stand-in vehicle that sends beacons as tcspecial serializes them, answers
+//! simulated vehicle that sends beacons as tcspecial serializes them, answers
 //! CONNECT, PING and QUERY_NODE, takes a datum sent up to the gateway node, and
 //! sends one datum down from it. The two must print the same lines, and the
 //! right ones: among them that a PING and a datum sent up are refused unsent
@@ -160,7 +160,7 @@ fn compiled(
     Some(out.to_path_buf())
 }
 
-/// Runs a ground station against a stand-in vehicle, and checks what it
+/// Runs a ground station against a simulated vehicle, and checks what it
 /// printed.
 ///
 /// # Arguments

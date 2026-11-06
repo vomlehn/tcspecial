@@ -496,7 +496,7 @@ mod tests {
     /// have gone, and only those: not its own, not a running one's, and
     /// nothing that is not one.
     ///
-    /// Asked of a temporary directory and a stand-in for `/proc` of the test's
+    /// Asked of a temporary directory made to look like `/proc`, of the test's
     /// own, so that what is running is what the test says.
     #[test]
     fn a_test_process_removes_the_directories_of_those_gone() {

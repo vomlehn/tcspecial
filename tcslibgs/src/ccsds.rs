@@ -5,7 +5,7 @@
 //! CCSDS Space Packet (CCSDS 133.0-B): a six-byte primary header, no
 //! secondary header, and then exactly what the radio's link would carry in a
 //! datagram. This is the one statement of that header, read by the vehicle
-//! and by whatever stands in for the ground.
+//! and by whatever takes the place of the ground.
 //!
 //! ```text
 //! bits   3        1      1          11     2         14         16

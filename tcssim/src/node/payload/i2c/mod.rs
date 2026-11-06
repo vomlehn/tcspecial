@@ -1,4 +1,5 @@
-//! A simulated device on an I2C bus, by way of the kernel's `i2c-stub`.
+//! A simulated payload on an I2C bus, by way of the kernel's `i2c-stub`
+//! dummy device.
 //!
 //! A bus is the one kind of endpoint the simulator cannot simply be the far
 //! end of. A serial line has a pty; a socket has another socket; a device on
@@ -30,7 +31,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, lateness, make_the_path_lead_to,
+    a_packet, could_not_simulate, lateness, make_the_path_lead_to,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -87,7 +88,7 @@ impl SimulatedBus {
     ///
     /// # Arguments
     ///
-    /// * `what`    - The device's name, so that what the stand-in says of
+    /// * `what`    - The device's name, so that what the simulation says of
     ///               itself says which device it belongs to.
     /// * `path`    - The bus a handler was told to open; the stub itself
     ///               needs no link.
@@ -249,9 +250,9 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
     match found.first() {
         Some((_, adapter)) => Ok(format!("/dev/{adapter}")),
         None => Err(
-            "no I2C stub bus is loaded, so there is nothing to stand in for a \
-             device on one: sudo modprobe i2c-stub chip_addr=0x48, with the \
-             address the tcspecial configuration gives"
+            "no I2C stub bus is loaded, so there is no dummy device to \
+             simulate a device on: sudo modprobe i2c-stub chip_addr=0x48, with \
+             the address the tcspecial configuration gives"
                 .to_string(),
         ),
     }
@@ -393,9 +394,9 @@ pub fn run_i2c_node(
     ) {
         Ok(bus) => bus,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
-                format!("failed to stand in for an I2C device: {}", e),
+                format!("failed to simulate an I2C device: {}", e),
             );
             return;
         }
@@ -414,9 +415,9 @@ pub fn run_i2c_node(
         let started = Instant::now();
         let pacing = Pacing::read(&config);
 
-        // What the vehicle wrote to the bank since this end last looked --
-        // an init, a trigger, a decision -- counted as received, as every
-        // other stand-in counts what arrives. What this end wrote itself is
+        // What the vehicle wrote to the bank since this end last looked -- an
+        // init, a trigger, a decision -- counted as received, as every other
+        // simulated payload counts what arrives. What this end wrote itself is
         // not counted: see `Watched`.
         if let Some(now) = watched.changed(fd) {
             let bytes = &now.block[1..];

@@ -1,14 +1,14 @@
-//! The client's operations, driven against a stand-in for tcspecial.
+//! The client's operations, driven against a simulated tcspecial.
 //!
 //! tcslib is what a control application is built on, so what matters is that
 //! each operation sends the command it says and hands back what the answering
 //! telemetry carried. Until this existed the client had one test, of a
 //! builder's timeout field, and nothing exercised a command at all.
 //!
-//! The stand-in is a UDP socket that reads a command and answers it, which is
-//! the whole of what the client needs on the other end. Nothing starts
-//! tcspecial: a test that needed the flight software running could not be run
-//! twice at once, and would be testing that as much as this.
+//! The simulated tcspecial is a UDP socket that reads a command and answers
+//! it, which is the whole of what the client needs on the other end. Nothing
+//! starts tcspecial: a test that needed the flight software running could not
+//! be run twice at once, and would be testing that as much as this.
 
 use std::net::UdpSocket;
 use std::thread;
@@ -30,7 +30,7 @@ fn stub_sample(first: u8) -> DHSample {
     sample
 }
 
-/// Starts a stand-in spacecraft that answers commands as tcspecial would,
+/// Starts a simulated spacecraft that answers commands as tcspecial would,
 /// on a thread of its own, then stops.
 ///
 /// Every answer carries the command's own sequence number, which is what lets
@@ -154,8 +154,8 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
 /// Makes a client whose links all go to the one stub: the spacecraft's link
 /// and the one link every node is commanded on.
 ///
-/// The stub answers whatever arrives, so one socket stands in for every link
-/// here. What the links are for is tested where they are served; this is
+/// The stub answers whatever arrives, so one socket takes the place of every
+/// link here. What the links are for is tested where they are served; this is
 /// about every operation reaching the far end and coming back. The one
 /// payload is DH2, which is the payload the operations below ask about.
 ///
@@ -186,8 +186,8 @@ fn client_to(addr: &str) -> TcsClient {
     client
 }
 
-/// The checksum of the configuration these stations use, which the stand-in
-/// answers a CONNECT with.
+/// The checksum of the configuration these stations use, which the simulated
+/// spacecraft answers a CONNECT with.
 const DIGEST: ConfigDigest = ConfigDigest([0x5A; 16]);
 
 /// A station matched for listening: it has heard a clear beacon carrying
@@ -203,7 +203,7 @@ fn listening() -> Matched {
     matched
 }
 
-/// Makes the counts a stand-in vehicle says a node has moved.
+/// Makes the counts a simulated vehicle says a node has moved.
 ///
 /// # Returns
 ///
@@ -249,7 +249,7 @@ fn what_a_node_has_moved_comes_back() {
     assert_eq!(taken.data(), stub_sample(0x30).data());
     assert_eq!(given.data(), stub_sample(0x40).data());
 
-    stub.join().expect("the stand-in answered both");
+    stub.join().expect("the simulated spacecraft answered both");
 }
 
 /// A node's attribute is set by the node's id and the attribute's name.
@@ -276,7 +276,7 @@ fn a_nodes_attribute_is_set_by_id_and_name() {
     assert_eq!(status, CommandStatus::InvalidParameter);
     assert_eq!(reason.as_str(), "it is spelled half_band");
 
-    stub.join().expect("the stand-in answered");
+    stub.join().expect("the simulated spacecraft answered");
 }
 
 /// A node is started and stopped by its id, and the answer says which node.
@@ -297,7 +297,7 @@ fn a_node_is_commanded_by_its_id_and_the_answer_says_which() {
     assert!(status.is_success());
     assert_eq!(node, NodeId::of(3));
 
-    stub.join().expect("the stand-in answered both");
+    stub.join().expect("the simulated spacecraft answered both");
 }
 
 /// A client with no node link refuses a node command rather than sending it.
@@ -347,8 +347,8 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
 
     // Nothing is held back after a RESTART: the vehicle is what refuses a
     // command that follows it, answering it Unmatched until the start that
-    // comes back is matched. The stand-in answers everything, so these all
-    // succeed, a PING among them.
+    // comes back is matched. The simulated spacecraft answers everything, so
+    // these all succeed, a PING among them.
     assert_eq!(
         client
             .start_node(NodeId::of(2))
@@ -368,7 +368,7 @@ fn every_operation_reaches_the_spacecraft_and_comes_back() {
         CommandStatus::Success
     );
 
-    stub.join().expect("the stand-in answered every command");
+    stub.join().expect("the simulated spacecraft answered every command");
 }
 
 #[test]

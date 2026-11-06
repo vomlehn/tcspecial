@@ -67,8 +67,9 @@ gateways:
 payloads:
   # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
   # as a vehicle would carry them. On a desk each is reached over UDP at its
-  # stand_in, where tcssim answers with the zone's temperature, so that they
-  # touch no hardware; flown, without stand-ins, the buses are opened.
+  # sim_address, where tcssim answers with the zone's temperature, so that they
+  # touch no hardware; flown, with no simulated devices, the buses are
+  # opened.
   - type i2c_tmass:
       # One of three sensors of the same place, a trio, so that the
       # temperature survives one of them going wrong. Two bytes, signed,
@@ -78,7 +79,7 @@ payloads:
         group: "zone_temps"
         path: "/dev/i2c-1"
         read_size: "2"
-        stand_in: "127.0.0.1:17801"
+        sim_address: "127.0.0.1:17801"
         world-out:
           - temp1.temp_1
       # The second of the trio; the same part as temp_1, on the same bus.
@@ -87,7 +88,7 @@ payloads:
         group: "zone_temps"
         path: "/dev/i2c-1"
         read_size: "2"
-        stand_in: "127.0.0.1:17802"
+        sim_address: "127.0.0.1:17802"
         world-out:
           - temp2.temp_2
   - type spi_tmass:
@@ -100,7 +101,7 @@ payloads:
         path: "/dev/spidev0.0"
         read_size: "3"
         spi_mode: "0"
-        stand_in: "127.0.0.1:17803"
+        sim_address: "127.0.0.1:17803"
         world-out:
           - temp3.temp_3
 

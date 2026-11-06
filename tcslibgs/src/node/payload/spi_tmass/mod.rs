@@ -2,8 +2,8 @@
 //!
 //! A `spi` peripheral in everything a vehicle does with it, differing in what
 //! it is, which the type says: see [`super::i2c_tmass`], which is the same
-//! thing on an I2C bus and says why the two are types of their own. A run
-//! with stand-ins may reach it over UDP at its `stand_in`, as it may a `spi`
+//! thing on an I2C bus and says why the two are types of their own. A run that
+//! simulates it may reach it over UDP at its `sim_address`, as it may a `spi`
 //! node, where tcssim answers with the temperature of the thermal mass it is
 //! joined to.
 
@@ -33,8 +33,8 @@ pub(crate) fn group_kind_of(
     super::spi::group_kind_named(name, TYPE, g)
 }
 
-/// Judges whether the peripheral is a stand-in, as a `spi` node's is: see
-/// [`super::spi::judged`].
+/// Judges whether the peripheral is a simulated device, as a `spi` node's is:
+/// see [`super::spi::judged`].
 ///
 /// # Arguments
 ///

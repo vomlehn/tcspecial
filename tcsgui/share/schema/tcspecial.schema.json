@@ -185,7 +185,7 @@
           "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
           "type": "string"
         },
-        "stand_in": {
+        "sim_address": {
           "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
@@ -798,7 +798,7 @@
           "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
           "type": "string"
         },
-        "stand_in": {
+        "sim_address": {
           "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },
@@ -1435,7 +1435,7 @@
           "description": "Where a datagram payload that speaks first sends from -- a host and a port over udp, as 10.0.0.7:7001, or a path over unix_dgram -- and so the one address it is read from: anything else that reaches the vehicle's socket is turned away and counted. Optional; without it the payload is learnt from the first datagram that arrives. Not on a payload that is asked or only driven, which is reached at its address.",
           "type": "string"
         },
-        "stand_in": {
+        "sim_address": {
           "description": "Where an hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass payload is reached over UDP when it is simulated, as a loopback address and port: 127.0.0.1:7950. Used under --simulate=some or all, and not under none, the flight setting, when the device is opened.",
           "type": "string"
         },

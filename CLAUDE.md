@@ -22,9 +22,9 @@ argue from this order and say so.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib` -- what a ground station is built on: `TcsClient` for commands,
   `gateway::GatewayReceiver` for the vehicle's data, `beacon` for its
-  beacons, `simulator` for waiting until tcssim has made its stand-ins,
-  `bus` for a vehicle on a cFS software bus (the station's SBN peer, and
-  the stand-in for the cFS end that tcssim runs).
+  beacons, `simulator` for waiting until tcssim has made its simulated
+  devices, `bus` for a vehicle on a cFS software bus (the station's SBN peer,
+  and `SimulatedCfs`, the cFS end as tcssim simulates it).
 - `tcslib-c` -- tcslib for C and C++: beacons, data and commands behind one
   hand-written header, `include/tcs.h`, which `tests/c_and_cpp.rs` holds to
   the library by compiling a ground station against it with gcc and g++.
@@ -46,7 +46,7 @@ argue from this order and say so.
 
 A node type is three modules with the same name in three crates: its
 attributes and checks in `tcslibgs::node`, the flight-side node in
-`tcspecial::node`, and the simulator's stand-in in `tcssim::node`.
+`tcspecial::node`, and the simulator's simulated device in `tcssim::node`.
 
 ## Vocabulary
 
@@ -102,15 +102,18 @@ make html-check                 # every committed page made again, and current
 `tcslib/`, `tcslib-c/` and `tcslibgs/` builds their HTML pages.
 
 tcspecial, tcssim and tcsmoc take `--simulate=none|some|all`. Left out it is
-`none`, the flight setting, under which tcspecial refuses every stand-in and
-tcssim will not start, so a run on a desk gives `--simulate=all`, as the
-Makefiles' run targets do. tcspecial judges each payload a stand-in or not
+`none`, the flight setting, under which tcspecial refuses every simulated
+and dummy device and tcssim will not start, so a run on a desk gives
+`--simulate=all`, as the Makefiles' run targets do. tcspecial judges each
+payload a simulated device (tcssim's: a pseudo-terminal, a socket), a dummy
+device (the kernel's: i2c-stub, gpio-sim, vcan, iio_dummy) or a real device
 from what is at its endpoint (`tcslibgs::simulate`), never from a file.
+`network` and `device-file` nodes are always real devices and not judged.
 Which payloads are meant to be simulated is the simulator file's `simulate`,
 which tcssim holds to the same judgement; tcspecial never reads that file.
-An hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass node may give `stand_in`, a
-loopback UDP address it is reached at instead of its device under `some` and
-`all`.
+An hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass node may give
+`sim_address`, a loopback UDP address it is reached at instead of its device
+under `some` and `all`; the old name, `stand_in`, is refused.
 
 The GUIs and tcspecial may be launched when what is being checked can only be
 seen by running them, but `cargo test` comes first. They bind fixed ports:

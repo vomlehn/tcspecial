@@ -1,12 +1,12 @@
 //! The HDLC endpoint: a synchronous line, which Linux drives as a network
 //! interface.
 //!
-//! **Experimental, and not yet supported.** Run against no card, because
-//! there is no card and no stand-in: every other experimental type here has
-//! something in the kernel to run it against -- `vcan`, `i2c-stub`,
-//! `gpio-sim`, `iio_dummy` -- and generic HDLC has nothing. What is written
-//! here is held to the kernel's structures and constants by tests, which is
-//! how the GPIO endpoint was written before `gpio-sim` existed.
+//! **Experimental, and not yet supported.** Run against no card, because there
+//! is no card and no dummy device: every other experimental type here has
+//! something in the kernel to run it against -- `vcan`, `i2c-stub`, `gpio-sim`,
+//! `iio_dummy` -- and generic HDLC has nothing. What is written here is held to
+//! the kernel's structures and constants by tests, which is how the GPIO
+//! endpoint was written before `gpio-sim` existed.
 //!
 //! # What this does
 //!
@@ -262,8 +262,8 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
         return Err(TcsError::Config(format!(
             "{what}: this host has no interface called \"{interface}\": {}. A \
              synchronous line is a card -- a wanxl, a pci200syn, a pc300too or \
-             a FarSync -- and unlike a CAN bus there is no virtual one to \
-             stand in for it",
+             a FarSync -- and unlike a CAN bus there is no dummy one to \
+             run against",
             io::Error::last_os_error()
         )));
     }
@@ -859,7 +859,7 @@ mod tests {
             Ok(_) => panic!("this host has an interface called hdlc-nonesuch"),
         };
         assert!(
-            said.contains("hdlc-nonesuch") && said.contains("no virtual one"),
+            said.contains("hdlc-nonesuch") && said.contains("no dummy one"),
             "the complaint should name the interface and say what one is: \
              {said}"
         );

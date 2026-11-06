@@ -1,14 +1,14 @@
 //! The physical world the simulated payloads measure and act on.
 //!
-//! Where `node` holds the stand-ins for the hardware at the far end of each
+//! Where `node` holds the simulations of the hardware at the far end of each
 //! node, this holds what that hardware would sense and change: the components
-//! of the vehicle's physics model -- see `tcslibgs::node::physics` -- each a part
-//! simulated alone, joined into one [`world::World`] that is advanced from
-//! event to event as the stand-ins ask about it. So what a sensor reports
-//! follows from what the vehicle did.
+//! of the vehicle's physics model -- see `tcslibgs::node::physics` -- each a
+//! part simulated alone, joined into one [`world::World`] that is advanced from
+//! event to event as the simulated payloads ask about it. So what a sensor
+//! reports follows from what the vehicle did.
 //!
-//! A stand-in is joined to one terminal of the world, which is what its
-//! entry's `connects` names: it reports an output, or drives an input. That
+//! A simulated payload is joined to one terminal of the world, which is what
+//! its entry's `connects` names: it reports an output, or drives an input. That
 //! is its [`Attachment`].
 
 pub mod battery;
@@ -78,7 +78,7 @@ pub enum Attachment {
         unit: Option<Unit>,
         /// Whether it is enabled, and what the vehicle last sent it.
         /// Shared by the copies of its payload's configuration and by a
-        /// thermostat tcssim stands in for, so that all of them see the one
+        /// thermostat tcssim simulates, so that all of them see the one
         /// panel.
         power: Arc<Power>,
     },
@@ -299,8 +299,8 @@ impl Attachment {
         format!("{part}: {doing}")
     }
 
-    /// Says whether it drives an input, which a stand-in that sends nothing
-    /// asks.
+    /// Says whether it drives an input, which a simulated payload that sends
+    /// nothing asks.
     pub fn drives(&self) -> bool {
         matches!(self, Attachment::Drives { .. })
     }
@@ -317,7 +317,7 @@ impl Attachment {
     pub fn describe(&self, payload: &str) -> String {
         match self {
             // Read at simulated time nought, which does not start the
-            // clock: the run begins when a stand-in does.
+            // clock: the run begins when a simulated payload does.
             Attachment::Reports { world, place, .. } => format!(
                 "{payload} reports {}, which starts at {:.2}",
                 world.name_of(*place),
@@ -337,7 +337,7 @@ impl Attachment {
         }
     }
 
-    /// What a pulling stand-in's lines are to be now: each high where its
+    /// What a pulling payload's lines are to be now: each high where its
     /// decision is on. Written into `levels`, which its caller made once,
     /// so that asking allocates nothing.
     ///
@@ -347,7 +347,7 @@ impl Attachment {
     ///
     /// # Returns
     ///
-    /// Whether this is a pulling stand-in: for one of any other kind,
+    /// Whether this is a pulling payload: for one of any other kind,
     /// `levels` is left as it was.
     pub fn levels(&self, levels: &mut [bool]) -> bool {
         let Attachment::Pulls { world, places } = self else {
@@ -360,7 +360,7 @@ impl Attachment {
         true
     }
 
-    /// What a reporting or signalling stand-in sends now: its terminal,
+    /// What a reporting or signalling payload sends now: its terminal,
     /// read by its sensor, in its encoding, or a decision as the text `1`
     /// or `0`.
     ///
@@ -389,13 +389,13 @@ impl Attachment {
         }
     }
 
-    /// Waits until a signalling stand-in's decision changes from what it
-    /// last said, or until a moment, whichever is first.
+    /// Waits until a signalling payload's decision changes from what it last
+    /// said, or until a moment, whichever is first.
     ///
-    /// What lets the vehicle hear of a change the moment it happens rather
-    /// than at the stand-in's next turn to send: see
-    /// [`World::await_change`]. A stand-in of any other kind is not woken
-    /// early, and waits out the time.
+    /// What lets the vehicle hear of a change the moment it happens rather than
+    /// at the payload's next turn to send: see [`World::await_change`]. A
+    /// simulated payload of any other kind is not woken early, and waits out
+    /// the time.
     ///
     /// # Arguments
     ///
@@ -426,17 +426,17 @@ impl Attachment {
     }
 }
 
-/// Tells the world what the vehicle just drove this stand-in to, if it
+/// Tells the world what the vehicle just drove this payload to, if it
 /// drives an input.
 ///
-/// What arrives at a heater is the thermostat's decision, which a
-/// thermostat node sends as the text `1` or `0`: the value to drive a set
-/// of discrete lines to. What arrives at an engine's throttle is a value,
-/// four bytes of a count of its unit's steps, as every value on a link is.
-/// Anything else is left alone rather than guessed at -- a stand-in sent
-/// something that is not what its input takes is a configuration pointing
-/// the wrong link at it, and a simulator that read it as "off" would hide
-/// that by behaving plausibly.
+/// What arrives at a heater is the thermostat's decision, which a thermostat
+/// node sends as the text `1` or `0`: the value to drive a set of discrete
+/// lines to. What arrives at an engine's throttle is a value, four bytes of a
+/// count of its unit's steps, as every value on a link is. Anything else is
+/// left alone rather than guessed at -- a simulated payload sent something that
+/// is not what its input takes is a configuration pointing the wrong link at
+/// it, and a simulator that read it as "off" would hide that by behaving
+/// plausibly.
 ///
 /// Nothing at all for a payload that drives nothing: the caller does not
 /// have to ask first.
@@ -725,11 +725,11 @@ connections:
   - { from: engine.flow, to: lander.flow }
 ";
 
-    /// A stand-in waiting on the lander's contact is woken at touchdown --
-    /// the moment the fall reaches the ground, with nothing else asking the
-    /// world anything -- and not before.
+    /// A simulated payload waiting on the lander's contact is woken at
+    /// touchdown -- the moment the fall reaches the ground, with nothing else
+    /// asking the world anything -- and not before.
     #[test]
-    fn a_waiting_stand_in_is_woken_at_touchdown() {
+    fn a_waiting_simulated_payload_is_woken_at_touchdown() {
         let started = Instant::now();
         let (world, place) = world_of(LANDER);
         let contact = Attachment::Signals {
@@ -1057,7 +1057,7 @@ connections:
     ///
     /// The median of the three readings, and a heat decision that turns on
     /// below the band and off above it -- `vote` and `thermostat`, whose own
-    /// arithmetic is tested where it lives. Here they stand in for the
+    /// arithmetic is tested where it lives. Here they play the
     /// vehicle, so that what is tested is the loop: the world, the encoding,
     /// the two links and the heaters.
     ///

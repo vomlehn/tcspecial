@@ -86,7 +86,7 @@ attributes:
       quotes, bytes in brackets, or both one after another. A heater that must
       start off, a register to set before the part reads sensibly. A write that
       fails stops the node from starting.
-  - name: stand_in
+  - name: sim_address
     required: false
     about: >
       Where the sensor is reached over UDP when it is simulated, as a

@@ -607,8 +607,8 @@ fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
 /// started: a simulator that is there answers at once.
 const ASK_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
 
-/// How long a simulator this starts is given to make its stand-ins. Built
-/// by `cargo run` first, which is most of it.
+/// How long a simulator this starts is given to make its simulated devices.
+/// Built by `cargo run` first, which is most of it.
 const WAIT_FOR_SIMULATOR: std::time::Duration =
     std::time::Duration::from_secs(120);
 
@@ -647,7 +647,7 @@ fn simulator_for(
     if mode.is_flight() {
         eprintln!(
             "--simulate={mode}: tcssim is not started, a run like a flight \
-             having no stand-ins"
+             having no simulated devices"
         );
         return Ok(());
     }
@@ -2380,10 +2380,10 @@ pub fn run(
     let declined = declined_for(rows.len());
 
     // The simulator, where there is anything to simulate, ready before the
-    // vehicle starts: tcspecial judges each payload by what is at its
-    // endpoint before it opens anything, and a stand-in not made yet is one
-    // it does not find. Then the vehicle, which has no command interpreter to
-    // ask whether it is already running, so one is started.
+    // vehicle starts: tcspecial judges each payload by what is at its endpoint
+    // before it opens anything, and a simulated device not made yet is one it
+    // does not find. Then the vehicle, which has no command interpreter to ask
+    // whether it is already running, so one is started.
     //
     // An installed MOC missing either child is stopped here, before it has
     // started the other: a tcssim left running for a tcspecial that could
@@ -2856,7 +2856,7 @@ pub(crate) mod tests {
 
         link.lock().unwrap().disconnect();
         assert_eq!(
-            asked.join().expect("the stand-in"),
+            asked.join().expect("the simulated vehicle"),
             vec![("arm", other), ("restart", other)],
             "both onto the target, and nothing sent while it differed"
         );
@@ -2883,8 +2883,8 @@ pub(crate) mod tests {
         let ours = ConfigDigest([0x5Au8; 16]);
         let theirs = ConfigDigest([0x11u8; 16]);
 
-        // A stand-in that answers what it is sent and lists it: nothing
-        // but the one arm is to reach it.
+        // A simulated vehicle that answers what it is sent and lists it:
+        // nothing but the one arm is to reach it.
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
             .set_read_timeout(Some(std::time::Duration::from_secs(2)))
@@ -3011,13 +3011,13 @@ pub(crate) mod tests {
         link.lock().unwrap().disconnect();
         let _ = ui.hide();
         assert_eq!(
-            asked.join().expect("the stand-in"),
+            asked.join().expect("the simulated vehicle"),
             vec![CommandType::RestartArm],
             "the arm Go on sent, and nothing else"
         );
     }
 
-    /// The port of an address a stand-in is at.
+    /// The port of an address a simulated vehicle is at.
     ///
     /// # Arguments
     ///
@@ -3608,7 +3608,7 @@ vehicle:
     /// what the vehicle answered lands in Last Response. That was the one part
     /// of the command half nothing could check.
     ///
-    /// The vehicle is a stand-in on a loopback port, answering a CONNECT with
+    /// The vehicle is simulated on a loopback port, answering a CONNECT with
     /// the digest this window read and a STOP_NODE with success. It answers
     /// the real messages, by the same serialisation tcspecial uses, so the
     /// client is exercised rather than mocked.
@@ -3631,7 +3631,7 @@ vehicle:
         let matched = Matched::for_configuration(ours);
         matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
 
-        // A stand-in vehicle: one socket for both links, since what is being
+        // A simulated vehicle: one socket for both links, since what is being
         // tested is that a press gets an answer back and not which socket it
         // went out on. Two commands, then it stops.
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
@@ -3810,8 +3810,8 @@ vehicle:
             "what the Connect said should still be there: {}",
             ui.get_last_response()
         );
-        // Out of contact, a Connect asks nothing: were it to, the stand-in's
-        // list below would say so.
+        // Out of contact, a Connect asks nothing: were it to, the simulated
+        // vehicle's list below would say so.
         let out_of_contact = Mutex::new(tcslib::beacon::Contact::Lost);
         connected_in_contact(
             &ui,
@@ -3842,7 +3842,8 @@ vehicle:
         assert!(was_declined(&declined, 0), "Disable is the operator's word");
 
         // Contact made now asks nothing: the one node is one the operator
-        // stopped. Were it asked, the stand-in's list below would say so.
+        // stopped. Were it asked, the simulated vehicle's list below would
+        // say so.
         contact_made(&ui, &link, &agreed, model.as_ref(), &declined);
 
         // And the Set button in the panel's popup, which has to be opened
@@ -3950,7 +3951,7 @@ vehicle:
             "contact made should have asked the spacecraft"
         );
 
-        let sent = answering.join().expect("the stand-in answered");
+        let sent = answering.join().expect("the simulated vehicle answered");
         assert_eq!(
             sent,
             vec![

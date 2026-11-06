@@ -1,22 +1,22 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payloads of gpio.ytcs.
+# How tcssim simulates the payloads of gpio.ytcs.
 description: Simulator settings for the payloads of gpio.ytcs
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once.
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
 tcssim:
   ready: "127.0.0.1:7910"
 
 # tcssim moves the lines of the kernel's gpio-sim chip, which it finds and
-# does not make: bin/mk-kernel-stand-ins makes it, and gives its lines to the
+# does not make: bin/mk-kernel-dummies makes it, and gives its lines to the
 # user who ran that.
 simulated_payloads:
   - type gpio:
-      # Driven and never read: its stand-in watches the line and counts each
-      # change the vehicle drives it to, so that its panel shows each command
-      # reaching it.
+      # Driven and never read: tcssim watches the dummy chip's line and
+      # counts each change the vehicle drives it to, so that its panel shows
+      # each command reaching it.
       - payload: lamp
         simulate: true
       # The switch is pulled the other way every second, so that its line has an

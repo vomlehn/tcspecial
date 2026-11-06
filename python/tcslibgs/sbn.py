@@ -224,11 +224,11 @@ def read_subscriptions(message, ident):
 
 
 def ground_processor_id(processor_id, peer_processor_id):
-    """The processor ID a ground station joins a stand-in for the cFS end
-    as: one more than the larger of the vehicle's and the far end's.
+    """The processor ID a ground station joins the simulated cFS end as:
+    one more than the larger of the vehicle's and the far end's.
 
-    Only a stand-in takes a ground station as a peer: SBN on a real cFS
-    sends no peer what another published.
+    Only the simulated cFS end takes a ground station as a peer: SBN on a
+    real cFS sends no peer what another published.
 
     Args:
         processor_id:      ``sbn.processor_id``, the vehicle's.

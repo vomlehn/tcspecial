@@ -606,7 +606,7 @@ fn draw(
 /// * `window`   - The window to draw in.
 /// * `path`     - The configuration file.
 /// * `sheet`    - The configuration's nodes, where they are drawn, which the
-///                stand-ins' links go to.
+///                simulated payloads' links go to.
 /// * `dividers` - Where the panes are, the Physics pane's width included.
 /// * `page`     - The page drawn, whose components are drawn: a
 ///                subdiagram's name, or `None` for the top.

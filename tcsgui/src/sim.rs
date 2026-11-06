@@ -16,8 +16,8 @@
 //! numbers on it: they are edited from the menu, one window for the payloads
 //! and one for the groups. The physics model is different: its components
 //! are things joined to one another and to the payloads, so they are drawn,
-//! as nodes in the Physics pane, with their connections and each stand-in's
-//! `connects` as links. See [`Physics`].
+//! as nodes in the Physics pane, with their connections and each simulated
+//! payload's `connects` as links. See [`Physics`].
 //!
 //! # Held as text
 //!
@@ -68,7 +68,7 @@ pub struct Simulator {
     pub world: World,
     /// The groups of settings, by name.
     pub groups: BTreeMap<String, Settings>,
-    /// The simulated payloads, by the name of the payload each stands in for.
+    /// The simulated payloads, by the name of the payload each simulates.
     ///
     /// The names are the configuration's: every payload of a configuration
     /// needs settings here, and a name here that no payload has is an error
@@ -175,8 +175,8 @@ impl World {
     /// it stands: a figure without its unit or in another, a setting a type
     /// requires and is not given, an ambient temperature missing where there
     /// is a zone, a connection that names nothing or joins two outputs. What
-    /// the stand-ins are joined to is not here: the configuration says which
-    /// payloads there are, and `tcsverify` checks the two together.
+    /// the simulated payloads are joined to is not here: the configuration
+    /// says which payloads there are, and `tcsverify` checks the two together.
     ///
     /// # Returns
     ///
@@ -314,7 +314,8 @@ impl Simulator {
 
     /// Renames a physics component everywhere the file says it: the
     /// component, its place in the Physics pane, each connection to or from
-    /// one of its terminals, and each stand-in's and group's `connects`
+    /// one of its terminals, and each simulated payload's and group's
+    /// `connects`
     /// naming one.
     ///
     /// # Arguments
@@ -551,8 +552,8 @@ fn world_of(file: WorldFile) -> Result<World, String> {
                 if world.components.insert(name.clone(), component).is_some() {
                     return Err(format!(
                         "two physics components are called \"{name}\"; a \
-                         connection or a stand-in names one, so a name has \
-                         to name one component"
+                         connection or a simulated payload names one, so a \
+                         name has to name one component"
                     ));
                 }
             }
@@ -1626,7 +1627,7 @@ mod tests {
             assert!(group.contains(setting), "{setting}");
         }
         assert_eq!(payload.len(), group.len() + 1);
-        // Never `name`: a payload's name is the payload it stands in for and
+        // Never `name`: a payload's name is the payload it simulates and
         // comes from the configuration, and a group's is how it is chosen.
         assert!(!payload.contains(&"name"));
     }

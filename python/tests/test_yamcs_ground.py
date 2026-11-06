@@ -249,7 +249,7 @@ class YamcsDiesWithThisProgramTest(unittest.TestCase):
                 deadline = time.monotonic() + 10
                 while not pid_file.exists() or not pid_file.read_text():
                     self.assertLess(time.monotonic(), deadline,
-                                    "the stand-in yamcsd never started")
+                                    "the fake yamcsd never started")
                     time.sleep(0.05)
                 yamcs = int(pid_file.read_text())
                 program.send_signal(signal.SIGKILL)

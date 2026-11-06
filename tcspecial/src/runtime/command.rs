@@ -1640,8 +1640,8 @@ vehicle:
         }
     }
 
-    /// Stands in for the pass, doing whatever work the interpreter hands
-    /// over, on a thread of its own.
+    /// Simulates the pass, doing whatever work the interpreter hands over, on
+    /// a thread of its own.
     ///
     /// `how` says what each job comes to, so a test can have an opening fail
     /// with no device to fail on. The work is recorded as well as answered,
@@ -2229,7 +2229,7 @@ vehicle:
         let ids = tcslibgs::graph::telemetry::ids(&graph);
         let average = NodeId::of(ids["average"]);
 
-        // The pass stands in, and refuses what a fabric would refuse: an
+        // The pass is simulated, and refuses what a fabric would refuse: an
         // attribute no binding mentions.
         let (bench, done) = a_pass_answering(|work| match work {
             Work::Set { attribute, .. } if attribute == "setpoint" => Ok(()),

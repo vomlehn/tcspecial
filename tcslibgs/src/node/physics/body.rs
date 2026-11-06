@@ -49,7 +49,8 @@ pub const SETTINGS: &[&str] = &["mass", "gravity", "altitude", "velocity"];
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Body {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// Its mass at the start, fuel and all: `"1500 kg"`.

@@ -140,7 +140,9 @@ impl Vehicle {
     /// Told `--quiet` unless `verbose`, so that the console is this
     /// program's: tcspecial's startup summary is for somebody watching the
     /// vehicle start, and what stops it starting it says either way. Run with
-    /// `--simulate=all`, because the example's payload is a stand-in.
+    /// `--simulate=all`, as every example's run is: the example's payload is
+    /// a network node, a real device the mode does not count, so nothing the
+    /// mode counts is real and `all` refuses nothing.
     ///
     /// # Arguments
     ///
@@ -171,8 +173,9 @@ impl Vehicle {
                 program.display()
             ));
         }
-        // With stand-ins: the beacon example's payload is a program on this
-        // host, which the flight setting a run without the flag gets refuses.
+        // As every example is run, though `all` and the flight setting a
+        // run without the flag gets would each take this one: its payload is
+        // a network node, which the mode does not count.
         let args: &[&str] = if verbose {
             &["--simulate=all", configuration]
         } else {

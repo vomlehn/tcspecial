@@ -326,8 +326,8 @@ pub(crate) fn group_kind_named(
     }))
 }
 
-/// Judges whether a SPI device is a stand-in: a pseudo-terminal, which is
-/// what tcssim makes for a spi payload. See [`crate::simulate`].
+/// Judges whether a SPI device is a simulated device: a pseudo-terminal, which
+/// is what tcssim makes for a spi payload. See [`crate::simulate`].
 ///
 /// # Arguments
 ///
@@ -335,7 +335,7 @@ pub(crate) fn group_kind_named(
 ///
 /// # Returns
 ///
-/// The judgement, with what to change if it is not a stand-in.
+/// The judgement, with what to change if it is a real device.
 pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,

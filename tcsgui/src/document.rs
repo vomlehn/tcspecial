@@ -2350,9 +2350,9 @@ impl Document {
                         world.connections.remove(&joined);
                     }
                     world.components.remove(name);
-                    // Each stand-in keeps the terminals of other components
-                    // it named, in their order, and loses its connects where
-                    // that was all it named.
+                    // Each simulated payload keeps the terminals of other
+                    // components it named, in their order, and loses its
+                    // connects where that was all it named.
                     let mine = format!("{name}.");
                     for (payload, was) in joins {
                         let kept: Vec<&str> =
@@ -2963,7 +2963,7 @@ impl Document {
     ///
     /// The configuration's own payloads and their types, because it is what
     /// decides which payloads there are to simulate and what each is. Only
-    /// the payloads a stand-in can be made for, of a kind of payload: one
+    /// the payloads that can be simulated, of a kind of payload: one
     /// that is a program is the program itself, and has no type a simulated
     /// payload can be written under.
     ///
@@ -7080,8 +7080,8 @@ mod tests {
     }
 
     /// A physics component is renamed as a node is, to a name no node and
-    /// no other component has, and every connection, stand-in and group that
-    /// names it says the new name.
+    /// no other component has, and every connection, simulated payload and
+    /// group that names it says the new name.
     #[test]
     fn a_physics_component_is_renamed_wherever_it_is_named() {
         let mut document = Document::new();

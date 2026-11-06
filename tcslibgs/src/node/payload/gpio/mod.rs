@@ -1,9 +1,8 @@
 //! GPIO payloads: discrete lines, as events.
 //!
-//! **Supported**, as flown against the kernel's simulated chip, `gpio-sim`,
-//! by `tcspecial/tests/kernel-stand-ins.rs`; nothing has been run against
-//! hardware. See "What Is Supported and What Is Experimental" in
-//! `docs/design.rst`.
+//! **Supported**, as flown against the kernel's simulated chip, `gpio-sim`, by
+//! `tcspecial/tests/kernel-dummies.rs`; nothing has been run against hardware.
+//! See "What Is Supported and What Is Experimental" in `docs/design.rst`.
 //!
 //! A payload is not always a stream of data. A deployment switch, an arming
 //! line, a thermostat's output, a payload's own "I am alive" line: each is one
@@ -380,8 +379,8 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// What `--simulate` asks to change on a GPIO node that is not a stand-in.
-const TO_STAND_IN: &str =
+/// What `--simulate` asks to change on a GPIO node that is a real device.
+const TO_SIMULATE: &str =
     "point path at the gpio-sim chip, which bin/mkgpio makes";
 
 /// Judges whether a GPIO chip belongs to the kernel's `gpio-sim`, from where
@@ -398,14 +397,14 @@ const TO_STAND_IN: &str =
 ///
 /// # Returns
 ///
-/// The judgement, with what to change if it is not a stand-in.
+/// The judgement, with what to change if it is a real device.
 pub fn judged(
     host: &crate::simulate::Host,
     path: &str,
 ) -> crate::simulate::Judged {
     match host.device_of(path) {
         Ok(device) => chip_judged(path, &device),
-        Err(found) => found.judged("path", TO_STAND_IN),
+        Err(found) => found.judged("path", TO_SIMULATE),
     }
 }
 
@@ -495,7 +494,7 @@ pub fn simulated_chip(
 ///
 /// # Returns
 ///
-/// A stand-in when the directory is under a `gpio-sim` device, and hardware
+/// A dummy device when the directory is under a `gpio-sim` device, and hardware
 /// otherwise.
 fn chip_judged(
     path: &str,
@@ -508,10 +507,10 @@ fn chip_judged(
             .is_some_and(|part| part.starts_with("gpio-sim."))
     });
     if simulated {
-        return Judged::stand_in(
+        return Judged::dummy(
             format!("{path} is a chip of the kernel's gpio-sim"),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         );
     }
     let on = device
@@ -522,22 +521,22 @@ fn chip_judged(
     Judged::hardware(
         format!("{path} is a real chip, on {on}"),
         "path",
-        TO_STAND_IN,
+        TO_SIMULATE,
     )
 }
 
 #[cfg(test)]
-mod stand_in_tests {
+mod judged_tests {
     use super::*;
     use crate::simulate::Verdict;
     use std::path::Path;
 
     #[test]
-    fn a_chip_under_gpio_sim_is_a_stand_in_and_another_is_not() {
+    fn a_chip_under_gpio_sim_is_a_dummy_and_another_is_not() {
         let simulated = Path::new("/sys/devices/platform/gpio-sim.0/gpiochip5");
         assert_eq!(
             chip_judged("/dev/gpiochip5", simulated).verdict,
-            Verdict::StandIn
+            Verdict::Dummy
         );
 
         let real = Path::new("/sys/devices/pci0000:00/INTC1056:00/gpiochip0");

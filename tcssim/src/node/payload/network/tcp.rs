@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, hangs_up, ignore_this_request, lateness,
+    a_packet, could_not_simulate, hangs_up, ignore_this_request, lateness,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -39,7 +39,7 @@ pub fn run_tcp_node(
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
                 format!("failed to bind the TCP listener: {e}"),
             );

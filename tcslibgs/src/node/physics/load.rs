@@ -2,11 +2,11 @@
 //! can be shed.
 //!
 //! It gives out the `current` it draws, in amperes, and takes `shed`, a
-//! decision: while it is asserted the load is switched off and draws
-//! nothing. Unjoined, a load is never shed, as an essential one is not;
-//! joined to a stand-in, the vehicle sheds it by driving that stand-in, as
-//! a thermostat node does when the battery runs low. The arithmetic is
-//! tcssim's `physics::load`.
+//! decision: while it is asserted the load is switched off and draws nothing.
+//! Unjoined, a load is never shed, as an essential one is not; joined to a
+//! simulated payload, the vehicle sheds it by driving that, as a thermostat
+//! node does when the battery runs low. The arithmetic is tcssim's
+//! `physics::load`.
 
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +29,8 @@ pub const SETTINGS: &[&str] = &["current"];
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Load {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// What it draws while it is on: `"2 A"`.

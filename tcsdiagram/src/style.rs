@@ -1395,7 +1395,7 @@ impl NodeType {
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
             // A sensor on a thermal mass says what the device it is reached
-            // as says, and where a run with stand-ins reaches it instead.
+            // as says, and its sim_address, where a simulated run reaches it.
             NodeType::I2cTmass => &[
                 ("path", true),
                 ("address", true),
@@ -1410,7 +1410,7 @@ impl NodeType {
                 ("retries", false),
                 ("timeout", false),
                 ("init", false),
-                ("stand_in", false),
+                ("sim_address", false),
             ],
             NodeType::SpiTmass => &[
                 ("path", true),
@@ -1426,7 +1426,7 @@ impl NodeType {
                 ("bit_order", false),
                 ("cs_active", false),
                 ("init", false),
-                ("stand_in", false),
+                ("sim_address", false),
             ],
             NodeType::I2c => &[
                 ("path", true),
@@ -1457,7 +1457,7 @@ impl NodeType {
                 ("bit_order", false),
                 ("cs_active", false),
                 ("init", false),
-                ("stand_in", false),
+                ("sim_address", false),
             ],
             NodeType::Serial => &[
                 ("path", true),
@@ -1495,7 +1495,7 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
-                ("stand_in", false),
+                ("sim_address", false),
             ],
             NodeType::Can => &[
                 ("interface", true),
@@ -1516,7 +1516,7 @@ impl NodeType {
                 ("trigger_interval", false),
                 ("read_delay", false),
                 ("poll_interval", false),
-                ("stand_in", false),
+                ("sim_address", false),
             ],
             NodeType::Rpmsg => &[
                 ("path", true),
@@ -1527,7 +1527,7 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
-                ("stand_in", false),
+                ("sim_address", false),
             ],
             NodeType::Network => &[
                 ("protocol", true),
@@ -2529,7 +2529,7 @@ mod tests {
                 // How the label is set, which is one channel however many
                 // properties carry it: a face, a size, a weight and an italic
                 // are all type, and counting them separately would let four
-                // typographic tweaks stand in for a shape.
+                // typographic tweaks take the place of a shape.
                 (one.face, one.label_size, one.label_weight, one.label_italic)
                     != (
                         two.face,

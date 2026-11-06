@@ -41,11 +41,11 @@ static STOPPING: AtomicBool = AtomicBool::new(false);
 /// The run's simulation mode, `--simulate`, once `run_graph` has been given
 /// it: none until then, the flight setting.
 ///
-/// Held for the process, as the quiet flag is, because it is one fact about
-/// the whole run and is asked where a node is opened -- at the start and again
-/// on every START_NODE -- far below anything that could be handed it: see
-/// `EndpointPort::open`, where a node with a `stand_in` is reached over UDP
-/// when the run has stand-ins.
+/// Held for the process, as the quiet flag is, because it is one fact about the
+/// whole run and is asked where a node is opened -- at the start and again on
+/// every START_NODE -- far below anything that could be handed it: see
+/// `EndpointPort::open`, where a node with a `sim_address` is reached over UDP
+/// when the run simulates.
 static MODE: std::sync::OnceLock<Mode> = std::sync::OnceLock::new();
 
 /// The run's simulation mode: see [`MODE`].
@@ -148,12 +148,13 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
         "not commanded"
     });
 
-    // Whether each payload is a stand-in, judged from what is at the end of
-    // its endpoint and before anything is opened, and the run refused here if
-    // the mode is not met: opening is not always harmless, and a check made
-    // after opening would already have done what --simulate=all exists to
-    // prevent. Said in the summary whatever the answer, because what kind of
-    // run this is is what somebody watching it start needs to know first.
+    // Whether each payload is a real, a dummy or a simulated device, judged
+    // from what is at the end of its endpoint and before anything is opened,
+    // and the run refused here if the mode is not met: opening is not always
+    // harmless, and a check made after opening would already have done what
+    // --simulate=all exists to prevent. Said in the summary whatever the
+    // answer, because what kind of run this is is what somebody watching it
+    // start needs to know first.
     let refused = judged_against(graph, mode);
     if !refused.is_empty() {
         return Err(refused

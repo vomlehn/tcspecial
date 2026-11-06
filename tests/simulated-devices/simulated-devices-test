@@ -1,30 +1,31 @@
 #!/usr/bin/env python3
-"""stand-ins-test -- runs tcspecial against tcssim for each type of payload
-tcssim stands in for, and checks that each one's data reaches the ground.
+"""simulated-devices-test -- runs tcspecial against tcssim for each type of
+payload tcssim simulates, and checks that each one's data reaches the ground.
 
-    stand-ins-test <tree> <run directory>
+    simulated-devices-test <tree> <run directory>
 
 <tree> is the tcspecial tree, whose target/debug holds tcssim, tcspecial and
 tcsverify, and whose python/ holds tcslibgs; <run directory> is where what
-the run leaves is kept, emptied first. `make stand-ins-test` runs this with
-the right arguments.
+the run leaves is kept, emptied first. `make simulated-devices-test` runs this
+with the right arguments.
 
 One configuration with a payload of each type, written into the run
-directory, since a stand-in's path is there: a device file, a serial line,
-a serial line that is an RS-485 bus, a SPI peripheral, an rpmsg channel and
-an IIO buffer, each a file or pseudo-terminal tcssim makes, and an HDLC line
-reached at its stand_in over UDP. A CAN payload is added where a virtual CAN
+directory, since a simulated device's path is there: a device file, a serial
+line, a serial line that is an RS-485 bus, a SPI peripheral, an rpmsg channel
+and an IIO buffer, each a file or pseudo-terminal tcssim makes, and an HDLC line
+reached at its sim_address over UDP. A CAN payload is added where a virtual CAN
 bus is up, and a GPIO payload where a gpio-sim chip is there for this user
 to use; neither is made here, since both need root (see bin/mkvcan and
 bin/mkgpio), and the run says which it left out and why.
 
 Started in the order a test harness starts a run (see "Waiting for the
 Simulator" in docs/design.rst): tcssim with every payload sending, waited
-for until it has made its stand-ins; then tcspecial, --simulate=all. The
+for until it has made its simulated devices; then tcspecial, --simulate=all. The
 ground sends CONNECT until it is answered, and then listens at each
 payload's telemetry port. A payload passes if its data arrives, and the
 device file's must be the start of tcssim's text. When tcssim is stopped,
-by a signal as a harness stops it, every stand-in it made must be gone.
+by a signal as a harness stops it, every simulated device it made must be
+gone.
 Whatever was started is stopped however the run ends, so that nothing is
 left holding the ports.
 
@@ -55,22 +56,22 @@ TCS_CMD_RECV = 47400
 TCS_CMD_SEND = 47450
 BEACON_SEND = 47550
 BEACON_RECV = 47650
-HDLC_STAND_IN = 47950
+HDLC_SIM_ADDRESS = 47950
 READY = 47900
 
 # The interface every configuration in the tree speaks: see example.ytcs.
 INTERFACE = "ad9aac4dd5a6d88dd5e78824ba8a83ac"
 
-# How often a stand-in sends.
+# How often a simulated device sends.
 PACKET_INTERVAL = "200 ms"
 
 
 def payloads(run):
-    """The payloads this host can stand in for, in the order they are
+    """The payloads this host can simulate, in the order they are
     declared, which is the order of their telemetry ports.
 
     Args:
-        run: The run directory, where each stand-in's path is.
+        run: The run directory, where each simulated device's path is.
 
     Returns:
         A list of (name, type, configuration lines) and a list of what was
@@ -93,7 +94,7 @@ def payloads(run):
         ("iio", "iio", [f'path: "{run}/iio"']),
         ("hdlc", "hdlc",
          ['interface: "hdlc0"', 'standard: "v35"', 'clock_type: "external"',
-          f'stand_in: "127.0.0.1:{HDLC_STAND_IN}"']),
+          f'sim_address: "127.0.0.1:{HDLC_SIM_ADDRESS}"']),
     ]
     left_out = []
 
@@ -172,7 +173,7 @@ def write_configuration(run, made):
         The configuration's path.
     """
     lines = [
-        'description: "A payload of each type tcssim stands in for"',
+        'description: "A payload of each type tcssim simulates"',
         "",
         "tcspecial:",
         "  beacon:",
@@ -202,12 +203,12 @@ def write_configuration(run, made):
         lines.append(f"  - name: {name}")
         lines.append(f"    type: {kind}")
         lines.extend(f"    {term}" for term in terms)
-    configuration = os.path.join(run, "stand-ins.ytcs")
+    configuration = os.path.join(run, "simulated-devices.ytcs")
     with open(configuration, "w") as out:
         out.write("\n".join(lines) + "\n")
 
     sim = [
-        "description: Simulator settings for stand-ins.ytcs",
+        "description: Simulator settings for simulated-devices.ytcs",
         "tcssim:",
         f'  ready: "127.0.0.1:{READY}"',
         "simulated_payloads:",
@@ -216,7 +217,7 @@ def write_configuration(run, made):
         sim.extend([f"  - name: {name}", "    simulate: true",
                     f"    type: {kind}",
                     f"    packet_interval: {PACKET_INTERVAL}"])
-    with open(os.path.join(run, "stand-ins-sim.yaml"), "w") as out:
+    with open(os.path.join(run, "simulated-devices-sim.yaml"), "w") as out:
         out.write("\n".join(sim) + "\n")
     return configuration
 
@@ -360,7 +361,8 @@ def main():
     """Runs the test.
 
     Returns:
-        0 if every payload passed and tcssim cleared its stand-ins, else 1;
+        0 if every payload passed and tcssim cleared its simulated devices,
+        else 1;
         2 for wrong arguments.
     """
     if len(sys.argv) != 3:
@@ -426,7 +428,7 @@ def main():
                          if term.startswith("path:")), None)
             if path and path.startswith(run) and os.path.lexists(path):
                 print(f"  FAIL {name}: tcssim left {path}")
-                failed.append(f"{name}'s stand-in")
+                failed.append(f"{name}'s simulated device")
     finally:
         for process in reversed(started):
             stop(process)
@@ -434,7 +436,7 @@ def main():
     if failed:
         print(f"failed: {', '.join(failed)}; the logs are in {run}")
         return 1
-    print("every stand-in's data reached the ground")
+    print("every simulated device's data reached the ground")
     return 0
 
 

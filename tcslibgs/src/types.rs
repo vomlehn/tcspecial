@@ -227,9 +227,9 @@ pub enum DHType {
     I2c,
     /// A handler whose payload is a SPI peripheral.
     Spi,
-    /// A handler whose payload is a temperature sensor on an I2C bus, fixed
-    /// to a thermal mass: an `i2c` device that a run with stand-ins may reach
-    /// over UDP instead. See [`crate::node::payload::i2c_tmass`].
+    /// A handler whose payload is a temperature sensor on an I2C bus, fixed to
+    /// a thermal mass: an `i2c` device that a simulated run may reach over UDP
+    /// instead. See [`crate::node::payload::i2c_tmass`].
     I2cTmass,
     /// And one that is a SPI peripheral: see
     /// [`crate::node::payload::spi_tmass`].
@@ -404,8 +404,8 @@ fn binds_every_interface(address: &str) -> bool {
 
 impl DHType {
     /// Every kind, in the order [`DHType::spellings`] lists them: the
-    /// interfaces a payload node may be reached over, and the kinds a
-    /// simulator file may stand in for.
+    /// interfaces a payload node may be reached over, and the kinds a simulator
+    /// file may simulate.
     pub const ALL: [DHType; 12] = [
         DHType::Network,
         DHType::Device,
@@ -1216,8 +1216,8 @@ pub struct CanConfig {
     /// Whether frames are CAN FD, which is also what lets a packet be longer
     /// than eight bytes.
     pub fd: bool,
-    /// Whether the controller loops frames back to other sockets on this
-    /// host, which is what lets tcssim stand in for the payload.
+    /// Whether the controller loops frames back to other sockets on this host,
+    /// which is what lets tcssim simulate the payload.
     pub loopback: bool,
 }
 
@@ -1455,23 +1455,23 @@ pub struct DHConfig {
     pub stale_interval: Option<Duration>,
     /// Where this payload sends from, where its node says: see [`SendsFrom`].
     ///
-    /// Read by the simulator, whose stand-in sends from there; aboard it is
-    /// [`crate::graph::reach::Reach::sends_from`] that is read.
+    /// Read by the simulator, whose simulated device sends from there; aboard
+    /// it is [`crate::graph::reach::Reach::sends_from`] that is read.
     #[serde(default)]
     pub sends_from: Option<SendsFrom>,
     /// Where this payload is reached over UDP when it is simulated, where its
-    /// node says: see [`crate::graph::reach::Reach::stand_in`].
+    /// node says: see [`crate::graph::reach::Reach::sim_address`].
     ///
-    /// Read by the simulator, whose stand-in for it is then a UDP socket
-    /// there rather than anything at [`DHConfig::endpoint`], which is still
-    /// what the payload is and what its simulator entry is held to.
+    /// Read by the simulator, whose simulated device is then a UDP socket there
+    /// rather than anything at [`DHConfig::endpoint`], which is still what the
+    /// payload is and what its simulator entry is held to.
     #[serde(default)]
-    pub stand_in: Option<std::net::SocketAddr>,
+    pub sim_address: Option<std::net::SocketAddr>,
     /// Whether the payload is only driven: written to by the vehicle and
     /// never read, as a heater or a valve is.
     ///
-    /// A stand-in for one sends nothing and watches what arrives, counting
-    /// it, so that tcssim shows a driven payload as it shows every other. Its
+    /// A simulated one sends nothing and watches what arrives, counting it, so
+    /// that tcssim shows a driven payload as it shows every other. Its
     /// simulator entry then needs no packet interval, there being nothing to
     /// send.
     #[serde(default)]

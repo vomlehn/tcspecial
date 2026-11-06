@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payloads of simple-app.ytcs: it does not, and
+# How tcssim simulates the payloads of simple-app.ytcs: it does not, and
 # there is nothing here to say so with.
 #
 # The one payload of this example is a program, not a device, so there is
@@ -11,9 +11,9 @@
 # than nothing at all.
 description: Simulator settings for simple-app.ytcs, whose payload is a program
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once.
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
 tcssim:
   ready: "127.0.0.1:7905"
 

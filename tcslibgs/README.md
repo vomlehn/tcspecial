@@ -66,7 +66,7 @@ the editor is the one the vehicle would have refused the file with.
   ports each link to the ground arrives at.
 - `node`: one module per node type, giving each type's attributes and how
   they are checked. tcspecial and tcssim have trees of the same shape, one
-  for the node aboard and one for the simulator's stand-in for it.
+  for the node aboard and one for the simulator's simulated device.
 - `format`, `config`, `types`, `endpoint_config`, `whole`, `trigger`: reading
   the files. One parser per format, one set of types for both, one grammar
   for whole numbers, one for trigger bytes.

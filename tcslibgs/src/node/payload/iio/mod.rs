@@ -66,13 +66,14 @@ pub(crate) fn group_kind_of(
     Ok(GroupKind::Iio(IioParams))
 }
 
-/// What `--simulate` asks to change on an IIO node that is not a stand-in.
-const TO_STAND_IN: &str =
+/// What `--simulate` asks to change on an IIO node that is a real device.
+const TO_SIMULATE: &str =
     "point path at the iio_dummy sensor, which bin/mkiio makes, or at a \
      pseudo-terminal tcssim makes";
 
-/// Judges whether an IIO device is a stand-in: a sensor of the kernel's
-/// `iio_dummy`, or a pseudo-terminal. See [`crate::simulate`].
+/// Judges whether an IIO device is a dummy or a simulated device: a sensor of
+/// the kernel's `iio_dummy`, or a pseudo-terminal tcssim made. See
+/// [`crate::simulate`].
 ///
 /// A dummy sensor is made through configfs, under
 /// `kernel/config/iio/devices/dummy`, and the directory made there is the
@@ -85,25 +86,25 @@ const TO_STAND_IN: &str =
 ///
 /// # Returns
 ///
-/// The judgement, with what to change if it is not a stand-in.
+/// The judgement, with what to change if it is a real device.
 pub fn judged(
     host: &crate::simulate::Host,
     path: &str,
 ) -> crate::simulate::Judged {
     let on_a_terminal =
-        crate::simulate::pseudo_terminal(path, "path", TO_STAND_IN);
-    if on_a_terminal.is_stand_in() {
+        crate::simulate::pseudo_terminal(path, "path", TO_SIMULATE);
+    if on_a_terminal.is_simulated() {
         return on_a_terminal;
     }
     match host.device_of(path) {
         Ok(device) => sensor_judged(host, path, &device),
-        Err(found) => found.judged("path", TO_STAND_IN),
+        Err(found) => found.judged("path", TO_SIMULATE),
     }
 }
 
 /// Tells whether a device is a sensor of the kernel's `iio_dummy`, made by
-/// `bin/mkiio`: a stand-in the kernel makes, which the simulator finds rather
-/// than makes, as it finds an I2C stub.
+/// `bin/mkiio`: a dummy device the kernel makes, which the simulator finds
+/// rather than makes, as it finds an I2C stub.
 ///
 /// # Arguments
 ///
@@ -116,7 +117,7 @@ pub fn judged(
 /// kernel directory cannot be found.
 pub fn is_dummy(host: &crate::simulate::Host, path: &str) -> bool {
     match host.device_of(path) {
-        Ok(device) => sensor_judged(host, path, &device).is_stand_in(),
+        Ok(device) => sensor_judged(host, path, &device).is_dummy(),
         Err(_) => false,
     }
 }
@@ -131,7 +132,7 @@ pub fn is_dummy(host: &crate::simulate::Host, path: &str) -> bool {
 ///
 /// # Returns
 ///
-/// A stand-in when a dummy of its name is in configfs, cannot-tell when it
+/// A dummy device when a dummy of its name is in configfs, cannot-tell when it
 /// has no name, and hardware otherwise.
 fn sensor_judged(
     host: &crate::simulate::Host,
@@ -143,33 +144,33 @@ fn sensor_judged(
         return Judged::cannot_tell(
             format!("{path} has no name in {}", device.display()),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         );
     };
     if !name.is_empty()
         && is_dir(&host.sys.join("kernel/config/iio/devices/dummy").join(&name))
     {
-        Judged::stand_in(
+        Judged::dummy(
             format!("{path} is {name}, a sensor of the kernel's iio_dummy"),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         )
     } else {
         Judged::hardware(
             format!("{path} is {name}, a real sensor"),
             "path",
-            TO_STAND_IN,
+            TO_SIMULATE,
         )
     }
 }
 
 #[cfg(test)]
-mod stand_in_tests {
+mod judged_tests {
     use super::*;
     use crate::simulate::{Host, Verdict};
 
     #[test]
-    fn a_sensor_made_in_configfs_is_a_stand_in_and_another_is_not() {
+    fn a_sensor_made_in_configfs_is_a_dummy_and_another_is_not() {
         let sys = tempfile::tempdir().unwrap();
         let host = Host {
             sys: sys.path().to_path_buf(),
@@ -187,7 +188,7 @@ mod stand_in_tests {
 
         assert_eq!(
             sensor_judged(&host, "/dev/iio:device0", &dummy).verdict,
-            Verdict::StandIn
+            Verdict::Dummy
         );
         let judged = sensor_judged(&host, "/dev/iio:device1", &real);
         assert_eq!(judged.verdict, Verdict::Hardware);

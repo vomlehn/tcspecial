@@ -2,9 +2,9 @@
 //! software bus, over SBN's UDP protocol module.
 //!
 //! The one statement of SBN's wire format and of how a peer is kept, read by
-//! the vehicle and by whatever stands in for the cFS end. See "What SBN is,
-//! on the wire" in `docs/design.rst`, which says what in it was checked
-//! against SBN v7.0.1 and how.
+//! the vehicle and by whatever simulates the cFS end. See "What SBN is, on the
+//! wire" in `docs/design.rst`, which says what in it was checked against SBN
+//! v7.0.1 and how.
 //!
 //! # A datagram
 //!
@@ -373,16 +373,16 @@ pub fn read_subscriptions<'a>(
         }))
 }
 
-/// The processor ID a ground station joins a stand-in for the cFS end as:
-/// one more than the larger of the vehicle's and the far end's.
+/// The processor ID a ground station joins the simulated cFS end as: one more
+/// than the larger of the vehicle's and the far end's.
 ///
-/// Only a stand-in takes a ground station as a peer. SBN on a real cFS
-/// passes nothing from one peer on to another -- each peer's pipe is made
+/// Only the simulated cFS end takes a ground station as a peer. SBN on a real
+/// cFS passes nothing from one peer on to another -- each peer's pipe is made
 /// with `CFE_SB_PIPEOPTS_IGNOREMINE`, so what SBN itself published is never
 /// sent out again -- so a ground station joining a real cFS's SBN would be
 /// heard by nothing. The ID is worked out rather than stated because the
-/// configuration flies, and a station's ID is no fact of the vehicle's; it
-/// is worked out here, once, because the station and the stand-in must both
+/// configuration flies, and a station's ID is no fact of the vehicle's; it is
+/// worked out here, once, because the station and the simulated end must both
 /// arrive at it.
 ///
 /// # Arguments

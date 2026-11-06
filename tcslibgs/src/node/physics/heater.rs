@@ -1,12 +1,12 @@
 //! A heater: a resistive element on a supply, switched on and off.
 //!
-//! Driven at `on` by a decision -- a thermostat node's, through a stand-in
-//! the vehicle writes to -- and giving out its `heat`, in watts, to whatever
-//! it warms, and drawing its `current`, in amperes, from its supply. Both are
-//! nought while it is off. `heating` says whether it is on, as a decision: what
-//! a line sensing the heater reads, which is what it is doing rather than what
-//! it was told -- a heater whose stand-in is disabled is told nothing, and is
-//! off.
+//! Driven at `on` by a decision -- a thermostat node's, through a simulated
+//! payload the vehicle writes to -- and giving out its `heat`, in watts, to
+//! whatever it warms, and drawing its `current`, in amperes, from its supply.
+//! Both are nought while it is off. `heating` says whether it is on, as a
+//! decision: what a line sensing the heater reads, which is what it is doing
+//! rather than what it was told -- a heater whose simulated payload is disabled
+//! is told nothing, and is off.
 //!
 //! Its supply is not steady. Where `ripple` is stated the voltage wanders by
 //! that fraction of nominal, slowly, as `ripple_time` says; a resistance's
@@ -37,7 +37,8 @@ pub const SETTINGS: &[&str] = &["power", "voltage", "ripple", "ripple_time"];
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Heater {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// What it gives out while on at its nominal voltage, in watts:

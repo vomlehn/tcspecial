@@ -133,7 +133,7 @@ mod tests {
 
     use tcslibgs::node::vehicle::Restart;
 
-    /// Writes a program standing in for an app of this kind.
+    /// Writes a simulated program in place of an app of this kind.
     ///
     /// `cat`, reading and writing the one interface this kind is given:
     /// gateway data arrives at descriptor 1 and what it reads goes back to the
@@ -150,8 +150,8 @@ mod tests {
     /// # Panics
     ///
     /// If it cannot be written or made executable.
-    fn stands_in(where_: &std::path::Path) -> PathBuf {
-        let path = where_.join("stands_in");
+    fn simulated_app(where_: &std::path::Path) -> PathBuf {
+        let path = where_.join("simulated_app");
         let mut file = std::fs::File::create(&path).expect("a program");
         file.write_all(b"#!/bin/sh\nexec cat <&1\n")
             .expect("a program");
@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn packets_reach_the_program_and_come_back() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let program = stands_in(where_.path());
+        let program = simulated_app(where_.path());
         let mut node =
             crate::when_not_busy(|| AppGatewayVeh::of(&says(&program)))
                 .expect("it starts");
@@ -237,7 +237,7 @@ mod tests {
     #[test]
     fn a_node_of_another_kind_is_not_opened_as_this_one() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let mut params = says(&stands_in(where_.path()));
+        let mut params = says(&simulated_app(where_.path()));
         params.kind = Kind::PayloadVeh;
 
         let said =

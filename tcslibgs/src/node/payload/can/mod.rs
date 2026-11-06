@@ -1,8 +1,8 @@
 //! CAN payloads: the interface, the identifier, and the frame.
 //!
 //! **Supported**, as flown against the kernel's virtual bus by
-//! `tcspecial/tests/kernel-stand-ins.rs`; nothing has been run against a real
-//! CAN controller. See "What Is Supported and What Is Experimental" in
+//! `tcspecial/tests/kernel-dummies.rs`; nothing has been run against a real CAN
+//! controller. See "What Is Supported and What Is Experimental" in
 //! `docs/design.rst`.
 //!
 //! A CAN payload is not located by a device file. It is on a bus, reached
@@ -163,8 +163,8 @@ pub(crate) fn group_kind_of(
     Ok(GroupKind::Can(CanParams { fd, loopback }))
 }
 
-/// What `--simulate` asks to change on a CAN node that is not a stand-in.
-const TO_STAND_IN: &str =
+/// What `--simulate` asks to change on a CAN node that is a real device.
+const TO_SIMULATE: &str =
     "point interface at a vcan interface, which bin/mkvcan makes";
 
 /// The type the kernel gives a CAN interface, `ARPHRD_CAN`.
@@ -184,8 +184,8 @@ const ARPHRD_CAN: &str = "280";
 ///
 /// # Returns
 ///
-/// Absent when there is no such interface, cannot-tell when it is not CAN,
-/// a stand-in when it is virtual, and hardware otherwise.
+/// Absent when there is no such interface, cannot-tell when it is not CAN, a
+/// dummy device when it is virtual, and hardware otherwise.
 pub fn judged(
     host: &crate::simulate::Host,
     interface: &str,
@@ -196,24 +196,24 @@ pub fn judged(
         return Judged::absent(
             format!("there is no network interface called {interface}"),
             "interface",
-            TO_STAND_IN,
+            TO_SIMULATE,
         );
     };
     if read_line(&device.join("type")).as_deref() != Some(ARPHRD_CAN) {
         return Judged::cannot_tell(
             format!("{interface} is not a CAN interface"),
             "interface",
-            TO_STAND_IN,
+            TO_SIMULATE,
         );
     }
     let virtual_ = device
         .to_str()
         .is_some_and(|device| device.contains("/devices/virtual/net/"));
     if virtual_ {
-        return Judged::stand_in(
+        return Judged::dummy(
             format!("{interface} is a virtual CAN interface"),
             "interface",
-            TO_STAND_IN,
+            TO_SIMULATE,
         );
     }
     let driver = std::fs::canonicalize(device.join("device/driver"))
@@ -225,20 +225,20 @@ pub fn judged(
     Judged::hardware(
         format!("{interface} is a real CAN controller ({driver})"),
         "interface",
-        TO_STAND_IN,
+        TO_SIMULATE,
     )
 }
 
 #[cfg(test)]
-mod stand_in_tests {
+mod judged_tests {
     use super::*;
     use crate::simulate::{Host, Verdict};
 
-    /// Makes a network interface in a stand-in for `/sys`.
+    /// Makes a network interface in a tree made to look like `/sys`.
     ///
     /// # Arguments
     ///
-    /// * `sys`   - The stand-in for `/sys`.
+    /// * `sys` - The tree made to look like `/sys`.
     /// * `name`  - The interface's name.
     /// * `under` - The directory under `sys` its device is kept in.
     /// * `kind`  - What its `type` file says.
@@ -256,7 +256,7 @@ mod stand_in_tests {
     }
 
     #[test]
-    fn a_virtual_can_interface_is_a_stand_in_and_a_controller_is_not() {
+    fn a_virtual_can_interface_is_a_dummy_and_a_controller_is_not() {
         let sys = tempfile::tempdir().unwrap();
         let host = Host {
             sys: sys.path().to_path_buf(),
@@ -270,7 +270,7 @@ mod stand_in_tests {
         );
         interface(sys.path(), "lo", "devices/virtual/net", "772");
 
-        assert_eq!(judged(&host, "vcan0").verdict, Verdict::StandIn);
+        assert_eq!(judged(&host, "vcan0").verdict, Verdict::Dummy);
         assert_eq!(judged(&host, "can0").verdict, Verdict::Hardware);
         assert_eq!(judged(&host, "lo").verdict, Verdict::CannotTell);
         assert_eq!(judged(&host, "can9").verdict, Verdict::Absent);

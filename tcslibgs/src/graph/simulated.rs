@@ -1,18 +1,18 @@
-//! The payloads of a configuration that a simulator stands in for.
+//! The payloads of a configuration that a simulator simulates.
 //!
 //! What the simulator takes of a payload is a [`DHConfig`]: where the payload
-//! is, how big a packet is, and whether it sends of its own accord or answers
-//! a trigger. This makes one from a payload node, so that every stand-in the
-//! simulator has -- a socket, a pty, an I2C stub, a CAN bus -- needs to know
-//! nothing of the graph.
+//! is, how big a packet is, and whether it sends of its own accord or answers a
+//! trigger. This makes one from a payload node, so that every simulated device
+//! the simulator has -- a socket, a pty, an I2C stub, a CAN bus -- needs to
+//! know nothing of the graph.
 //!
 //! Where the payload is comes from [`reach_of`], which is what tcspecial opens
-//! a node with: so the simulator stands where the vehicle reaches. A node with
-//! a trigger answers one, as it does aboard.
+//! a node with: so the simulator is where the vehicle reaches. A node with a
+//! trigger answers one, as it does aboard.
 //!
 //! A configuration may leave payloads unsimulated on purpose -- a payload that
 //! is a program is the program itself, and a payload on real hardware needs no
-//! stand-in -- so only the payloads the simulator file names are simulated,
+//! simulating -- so only the payloads the simulator file names are simulated,
 //! and a file naming none is one with nothing to do.
 
 use super::reach::reach_of;
@@ -123,18 +123,18 @@ pub fn reading_of(
     }
 }
 
-/// Checks that what reaches a stand-in driving a value input is in that
-/// input's unit, which is how the stand-in reads it.
+/// Checks that what reaches a simulated payload driving a value input is in
+/// that input's unit, which is how the simulated payload reads it.
 ///
-/// A value on a link is a count of its unit's steps, so the stand-in of an
-/// engine's throttle reads what the vehicle sends it as a ratio, and the
-/// node that sends it has to send ratios: a guidance program answering
-/// newtons would have the engine read thousands of them as full throttle.
+/// A value on a link is a count of its unit's steps, so the simulated payload
+/// at an engine's throttle reads what the vehicle sends it as a ratio, and the
+/// node that sends it has to send ratios: a guidance program answering newtons
+/// would have the engine read thousands of them as full throttle.
 ///
 /// # Arguments
 ///
 /// * `graph`   - The configuration.
-/// * `payload` - The name of the payload node the stand-in is for.
+/// * `payload` - The name of the simulated payload node.
 /// * `unit`    - The unit of the input it drives.
 ///
 /// # Returns
@@ -171,7 +171,7 @@ pub fn driving_of(
 }
 
 /// Finds the setpoint and band of a thermostat node, for a simulator that
-/// stands in for it.
+/// simulates it.
 ///
 /// # Arguments
 ///
@@ -261,8 +261,8 @@ pub fn reaches(graph: &Graph, from: &str, to: &str) -> bool {
 /// # Errors
 ///
 /// A name in the simulator file that is not a payload node, or a payload node
-/// the simulator cannot stand in for (an app node, or one whose endpoint
-/// cannot be reached), is refused, saying which.
+/// the simulator cannot simulate (an app node, or one whose endpoint cannot be
+/// reached), is refused, saying which.
 pub fn handlers(
     graph: &Graph,
     sim_file: &SimConfigFile,
@@ -297,10 +297,10 @@ pub fn handlers(
         .filter(|n| n.is_payload() && named(&n.name))
     {
         // A payload that is only driven -- a heater, a valve -- is written to
-        // and never read. Its stand-in sends nothing and watches what
-        // arrives, counting it, so that it is shown and switched as every
-        // other simulated payload is; one joined to a heater switches it as
-        // well. See `crate::types::DHConfig::driven`.
+        // and never read. Simulated, it sends nothing and watches what arrives,
+        // counting it, so that it is shown and switched as every other
+        // simulated payload is; one joined to a heater switches it as well. See
+        // `crate::types::DHConfig::driven`.
         let leaves = graph.links.iter().any(|l| l.origin().node == node.name);
         let arrives = graph.links.iter().any(|l| {
             l.to.each()
@@ -308,14 +308,13 @@ pub fn handlers(
                 .any(|d| Destination::parse(d).node == node.name)
         });
 
-        // A payload that is a program is the program itself: tcspecial runs
-        // it, and there is no device or socket for a simulator to stand in
-        // for.
+        // A payload that is a program is the program itself: tcspecial runs it,
+        // and there is no device or socket for a simulator to simulate.
         if crate::node::app::Kind::of(&node.node_type).is_some() {
             return Err(format!(
                 "\"{}\" is an app node, a program tcspecial runs rather than \
                  something it reaches, so there is nothing for a simulator to \
-                 stand in for: leave it out of the simulator file",
+                 simulate: leave it out of the simulator file",
                 node.name
             ));
         }
@@ -350,7 +349,7 @@ pub fn handlers(
             mode,
             stale_interval: None,
             sends_from: reach.sends_from,
-            stand_in: reach.stand_in,
+            sim_address: reach.sim_address,
             driven: arrives && !leaves,
         });
     }

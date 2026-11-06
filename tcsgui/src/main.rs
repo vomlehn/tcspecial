@@ -4885,7 +4885,7 @@ fn panel_of(
     //
     // Only for a payload, and only where this session was given the
     // simulator's file. A computation, a log and the ground link are not
-    // simulated -- there is nothing standing in for them -- so there is
+    // simulated -- tcssim plays none of them -- so there is
     // nothing to show.
     if let Some(simulator) = &editor.document().simulator {
         if is_payload(&node.node_type) {
@@ -5040,9 +5040,9 @@ fn views_of(
 }
 
 /// The simulator file's physics, drawn: its components as nodes in the
-/// Physics pane, its connections and each stand-in's `connects` as links,
-/// in the coordinates of the whole canvas, whose nought is the Physics
-/// pane's left edge. Nothing for a session with no simulator file.
+/// Physics pane, its connections and each simulated payload's `connects` as
+/// links, in the coordinates of the whole canvas, whose nought is the
+/// Physics pane's left edge. Nothing for a session with no simulator file.
 ///
 /// A component the reader would refuse is drawn faulty, by what
 /// [`crate::sim::World::problems`] says, which is the reader's own checking:
@@ -5437,9 +5437,10 @@ fn wire_physics(
     {
         // Clicked down: over another component, a connection between the
         // two; over a payload, or the box of a subdiagram holding payloads, a
-        // stand-in's connects; each offered, and asked about where the click
-        // was. Over bare sheet the line is put down; over a shape that can
-        // take nothing of it, it stays in hand and the window says so.
+        // simulated payload's connects; each offered, and asked about where
+        // the click was. Over bare sheet the line is put down; over a shape
+        // that can take nothing of it, it stays in hand and the window says
+        // so.
         let editor = editor.clone();
         let views = views.clone();
         let drawing = drawing.clone();
@@ -5565,9 +5566,9 @@ enum PhysicsJoin {
     /// A connection, from an output to an input, as the file writes them:
     /// `heater_1.heat` and `zone.heat`.
     Connection { from: String, to: String },
-    /// A stand-in joined to a terminal: the payload, as the simulator file
-    /// keys it, and the terminal, as `heater_1.on`.
-    StandIn { payload: String, terminal: String },
+    /// A simulated payload joined to a terminal: the payload, as the
+    /// simulator file keys it, and the terminal, as `heater_1.on`.
+    Payload { payload: String, terminal: String },
 }
 
 impl PhysicsJoin {
@@ -5580,7 +5581,7 @@ impl PhysicsJoin {
     fn said(&self) -> String {
         match self {
             PhysicsJoin::Connection { from, to } => format!("{from} to {to}"),
-            PhysicsJoin::StandIn { payload, terminal } => {
+            PhysicsJoin::Payload { payload, terminal } => {
                 format!("{payload} with {terminal}")
             }
         }
@@ -5634,10 +5635,11 @@ fn physics_places(
 /// by, the way the line was drawn: `tcslibgs::node::physics::connectable` says
 /// which. Over a payload on the top page, or the box of a subdiagram, which
 /// is all of a subdiagram the top page shows, each payload there and each
-/// terminal of the component, the way the line was drawn, its stand-in may
-/// be joined to: `tcslibgs::sim_config::may_join` says which. A join already
-/// made is offered too, marked as made, so that the menu says why it cannot
-/// be chosen rather than leaving somebody to wonder where it went.
+/// terminal of the component, the way the line was drawn, its simulated
+/// payload may be joined to: `tcslibgs::sim_config::may_join` says which. A
+/// join already made is offered too, marked as made, so that the menu says
+/// why it cannot be chosen rather than leaving somebody to wonder where it
+/// went.
 ///
 /// # Arguments
 ///
@@ -5744,7 +5746,7 @@ fn physics_joins(
             {
                 let made = joined.contains(&named.as_str());
                 meant.push((
-                    PhysicsJoin::StandIn {
+                    PhysicsJoin::Payload {
                         payload: payload.clone(),
                         terminal: named,
                     },
@@ -5757,7 +5759,8 @@ fn physics_joins(
 }
 
 /// Whether a payload is a GPIO node watching its lines, rather than one
-/// driving them: whose stand-in is pulled to a decision for each line.
+/// driving them: whose simulated payload is pulled to a decision for each
+/// line.
 ///
 /// # Arguments
 ///
@@ -5782,9 +5785,10 @@ fn watches_lines(
 
 /// The edit that makes a join.
 ///
-/// A connection is added. A stand-in's `connects` is set to the terminal,
-/// or, for a payload watching lines, given the terminal after those it
-/// names already, one decision for each line in the order of its lines.
+/// A connection is added. A simulated payload's `connects` is set to the
+/// terminal, or, for a payload watching lines, given the terminal after
+/// those it names already, one decision for each line in the order of its
+/// lines.
 ///
 /// # Arguments
 ///
@@ -5802,7 +5806,7 @@ fn physics_edit(editor: &Editor, join: &PhysicsJoin) -> Option<Edit> {
             from: from.clone(),
             to: to.clone(),
         }),
-        PhysicsJoin::StandIn { payload, terminal } => {
+        PhysicsJoin::Payload { payload, terminal } => {
             let was = simulator
                 .payloads
                 .get(payload)
@@ -6002,9 +6006,9 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     window.set_editing("Physics components".into());
     window.set_about(
         "The simulator file's world: each component is a part of the \
-         vehicle simulated alone, and a stand-in is joined to one of its \
-         terminals by its connects. Every figure is written with its unit. \
-         A component is placed from the physics list."
+         vehicle simulated alone, and a simulated payload is joined to one \
+         of its terminals by its connects. Every figure is written with its \
+         unit. A component is placed from the physics list."
             .into(),
     );
     window.set_can_add(false);
@@ -8689,7 +8693,7 @@ mod tests {
         let joins = |end: PhysicsEnd, at| {
             physics_joins(&editor, dividers, &None, &end, at).expect("a shape")
         };
-        let stand_in = |payload: &str, terminal: &str| PhysicsJoin::StandIn {
+        let joined = |payload: &str, terminal: &str| PhysicsJoin::Payload {
             payload: payload.into(),
             terminal: terminal.into(),
         };
@@ -8708,7 +8712,7 @@ mod tests {
         assert!(joins(from("zone", true), middle_of("heater_1")).is_empty());
 
         let pulled = joins(from("heater_1", true), over((34, 34)));
-        assert_eq!(pulled, [(stand_in("lines-in", "heater_1.heating"), false)]);
+        assert_eq!(pulled, [(joined("lines-in", "heater_1.heating"), false)]);
         assert_eq!(
             physics_edit(&editor, &pulled[0].0),
             Some(Edit::SetSimPayload {
@@ -8720,12 +8724,12 @@ mod tests {
         );
         assert_eq!(
             joins(from("heater_2", true), over((34, 34))),
-            [(stand_in("lines-in", "heater_2.heating"), true)],
+            [(joined("lines-in", "heater_2.heating"), true)],
             "a decision the payload names already is offered as made"
         );
         assert_eq!(
             joins(from("heater_1", false), over((34, 166))),
-            [(stand_in("lines-out", "heater_1.on"), false)]
+            [(joined("lines-out", "heater_1.on"), false)]
         );
         assert_eq!(
             joins(from("heater_1", true), over((34, 280))).len(),
@@ -12376,7 +12380,7 @@ mod tests {
             "simulated_payloads:\n  - type i2c_tmass:\n      \
              - payload: temp_1\n        simulate: true\n",
         )
-        .expect("its stand-in");
+        .expect("its simulated payload");
         let mut opened = Editor::open(&path, dividers()).expect("it opens");
         opened.open_simulator(&sim).expect("it opens");
         let editor = Rc::new(RefCell::new(opened));
@@ -12399,7 +12403,7 @@ mod tests {
             .filter(|f| !f.is_heading && f.kind != "boolean")
             .map(|f| f.name.to_string())
             .collect();
-        assert!(named.len() > 20, "a sensor and its stand-in: {named:?}");
+        assert!(named.len() > 20, "a sensor, simulated: {named:?}");
         for name in &named {
             assert!(
                 testing::ElementHandle::find_by_accessible_label(&window, name)
@@ -15406,7 +15410,7 @@ mod tests {
             .collect();
         assert_eq!(after, crate::sim::Simulator::fields(true));
 
-        // A computation is not simulated -- nothing stands in for it -- so
+        // A computation is not simulated -- tcssim never plays one -- so
         // its panel carries none of this.
         let (_, _, _, fields, _) = panel_of(&editor.borrow(), &None, Some("k"));
         assert!(

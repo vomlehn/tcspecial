@@ -605,7 +605,7 @@ impl Telemetry {
     }
 
     /// This answer as it goes on the link, in a vector of its own: for an
-    /// answer sent once, as a test's stand-in sends one.
+    /// answer sent once, as a test playing the vehicle sends one.
     pub fn to_bytes(&self) -> Vec<u8> {
         AnswerPacker::new().pack(self).to_vec()
     }

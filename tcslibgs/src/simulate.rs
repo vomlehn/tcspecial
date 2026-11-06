@@ -1,4 +1,5 @@
-//! The simulation mode: how many of a run's payloads may be stand-ins.
+//! The simulation mode: how many of a run's payloads may be simulated or
+//! dummy devices.
 //!
 //! Given to tcspecial, tcssim and tcsmoc as `--simulate=<mode>` and never
 //! written in a configuration, so that the file flown is the file tested,
@@ -7,11 +8,17 @@
 //! "Simulation Modes" in `docs/design.rst`.
 //!
 //! What the mode is checked against is here too: whether each payload is a
-//! stand-in, [`judge`], found from what is at the end of its endpoint and not
-//! from what any file says, and whether a run's payloads are what its mode
-//! allows, [`refusals`]. How a stand-in of each type is told apart is that
-//! type's own rule, beside its other rules in `crate::node::payload`; this
-//! says which of them a node is asked, and what the answers come to.
+//! real device, a dummy device or a simulated device, [`judge`], found from
+//! what is at the end of its endpoint and not from what any file says, and
+//! whether a run's payloads are what its mode allows, [`refusals`].
+//!
+//! A simulated device is one tcssim makes: a pseudo-terminal, a socket. A
+//! dummy device is one the kernel makes under a real device's name: the
+//! i2c-stub's adapter, a gpio-sim chip, a vcan interface, an iio_dummy
+//! sensor, which the scripts in `bin/` make. How each type's are told apart
+//! is that type's own rule, beside its other rules in
+//! `crate::node::payload`; this says which of them a node is asked, and what
+//! the answers come to.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -25,15 +32,17 @@ use crate::types::{DHType, EndpointConfig};
 /// The flag, as it is written before its `=`.
 pub const FLAG: &str = "--simulate";
 
-/// How many of a run's payloads may be stand-ins.
+/// How many of a run's payloads may be simulated or dummy devices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
-    /// No payload may be a stand-in: the flight setting, and the setting a
-    /// run gets when the flag is left out.
+    /// Every payload must be a real device: the flight setting, and the
+    /// setting a run gets when the flag is left out.
     None,
-    /// At least one payload is a stand-in and at least one is not.
+    /// At least one payload is a simulated or dummy device and at least one
+    /// is not.
     Some,
-    /// Every payload is a stand-in, so that no hardware is exercised at all.
+    /// Every payload is a simulated or dummy device, so that no hardware is
+    /// exercised at all.
     All,
 }
 
@@ -145,24 +154,27 @@ pub fn take_mode(args: Vec<String>) -> Result<(Mode, Vec<String>), String> {
 /// What a payload was found to be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verdict {
-    /// One of the things the simulator, or the stub scripts in `bin/`, make.
-    StandIn,
-    /// Hardware: what was found is something the simulator does not make.
+    /// A simulated device: one tcssim makes, a pseudo-terminal or a socket.
+    Simulated,
+    /// A dummy device: one the kernel makes under a real device's name, such
+    /// as the i2c-stub's adapter, which the scripts in `bin/` make.
+    Dummy,
+    /// Hardware, the real device: what was found is neither of those.
     Hardware,
     /// Nothing could be told: what is there could not be looked at, or says
     /// nothing either way. Counted as hardware, because failing that way
-    /// round is the point of the mode -- a stand-in mistaken for hardware
-    /// costs a refused run, and hardware mistaken for a stand-in costs the
-    /// hardware.
+    /// round is the point of the mode -- a simulated or dummy device mistaken
+    /// for hardware costs a refused run, and hardware mistaken for either
+    /// costs the hardware.
     CannotTell,
     /// Nothing is there at all: no file at the path, no interface of the
     /// name. Counted as hardware for the mode, as what cannot be told is; and
     /// told apart from it for tcssim, for which nothing at a path is where a
-    /// stand-in it makes itself is about to go.
+    /// simulated device it makes is about to go.
     Absent,
 }
 
-/// What one payload was found to be, and how to make it a stand-in.
+/// What one payload was found to be, and how to make it simulated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Judged {
     pub verdict: Verdict,
@@ -172,34 +184,59 @@ pub struct Judged {
     /// The attribute that says what the node reaches: `path`, `interface` or
     /// `address`. What a refusal says to change.
     pub attribute: &'static str,
-    /// What would make the payload a stand-in, in the configuration's terms:
+    /// What would make the payload simulated, in the configuration's terms:
     /// `point path at the i2c-stub bus, which bin/mki2c makes`.
-    pub to_stand_in: &'static str,
+    pub to_simulate: &'static str,
 }
 
 impl Judged {
-    /// Judges a payload a stand-in.
+    /// Judges a payload a simulated device.
     ///
     /// # Arguments
     ///
     /// * `found`       - What was found, as a clause about what the node
     ///                   reaches.
     /// * `attribute`   - The attribute that says what the node reaches.
-    /// * `to_stand_in` - What would make the payload a stand-in.
+    /// * `to_simulate` - What would make the payload simulated.
     ///
     /// # Returns
     ///
     /// The judgement.
-    pub fn stand_in(
+    pub fn simulated(
         found: String,
         attribute: &'static str,
-        to_stand_in: &'static str,
+        to_simulate: &'static str,
     ) -> Judged {
         Judged {
-            verdict: Verdict::StandIn,
+            verdict: Verdict::Simulated,
             found,
             attribute,
-            to_stand_in,
+            to_simulate,
+        }
+    }
+
+    /// Judges a payload a dummy device.
+    ///
+    /// # Arguments
+    ///
+    /// * `found`       - What was found, as a clause about what the node
+    ///                   reaches.
+    /// * `attribute`   - The attribute that says what the node reaches.
+    /// * `to_simulate` - What would make the payload simulated.
+    ///
+    /// # Returns
+    ///
+    /// The judgement.
+    pub fn dummy(
+        found: String,
+        attribute: &'static str,
+        to_simulate: &'static str,
+    ) -> Judged {
+        Judged {
+            verdict: Verdict::Dummy,
+            found,
+            attribute,
+            to_simulate,
         }
     }
 
@@ -210,7 +247,7 @@ impl Judged {
     /// * `found`       - What was found, as a clause about what the node
     ///                   reaches.
     /// * `attribute`   - The attribute that says what the node reaches.
-    /// * `to_stand_in` - What would make the payload a stand-in.
+    /// * `to_simulate` - What would make the payload simulated.
     ///
     /// # Returns
     ///
@@ -218,13 +255,13 @@ impl Judged {
     pub fn hardware(
         found: String,
         attribute: &'static str,
-        to_stand_in: &'static str,
+        to_simulate: &'static str,
     ) -> Judged {
         Judged {
             verdict: Verdict::Hardware,
             found,
             attribute,
-            to_stand_in,
+            to_simulate,
         }
     }
 
@@ -235,7 +272,7 @@ impl Judged {
     /// * `found`       - What was found, as a clause about what the node
     ///                   reaches.
     /// * `attribute`   - The attribute that says what the node reaches.
-    /// * `to_stand_in` - What would make the payload a stand-in.
+    /// * `to_simulate` - What would make the payload simulated.
     ///
     /// # Returns
     ///
@@ -243,13 +280,13 @@ impl Judged {
     pub fn cannot_tell(
         found: String,
         attribute: &'static str,
-        to_stand_in: &'static str,
+        to_simulate: &'static str,
     ) -> Judged {
         Judged {
             verdict: Verdict::CannotTell,
             found,
             attribute,
-            to_stand_in,
+            to_simulate,
         }
     }
 
@@ -260,7 +297,7 @@ impl Judged {
     /// * `found`       - What was found, as a clause about what the node
     ///                   reaches.
     /// * `attribute`   - The attribute that says what the node reaches.
-    /// * `to_stand_in` - What would make the payload a stand-in.
+    /// * `to_simulate` - What would make the payload simulated.
     ///
     /// # Returns
     ///
@@ -268,18 +305,43 @@ impl Judged {
     pub fn absent(
         found: String,
         attribute: &'static str,
-        to_stand_in: &'static str,
+        to_simulate: &'static str,
     ) -> Judged {
         Judged {
             verdict: Verdict::Absent,
             found,
             attribute,
-            to_stand_in,
+            to_simulate,
         }
     }
 
-    pub fn is_stand_in(&self) -> bool {
-        self.verdict == Verdict::StandIn
+    /// Whether the payload was found to be a simulated device.
+    pub fn is_simulated(&self) -> bool {
+        self.verdict == Verdict::Simulated
+    }
+
+    /// Whether the payload was found to be a dummy device.
+    pub fn is_dummy(&self) -> bool {
+        self.verdict == Verdict::Dummy
+    }
+
+    /// Whether the payload was found to be a simulated or a dummy device:
+    /// anything but the real device, which is what the mode counts.
+    pub fn is_simulated_or_dummy(&self) -> bool {
+        self.is_simulated() || self.is_dummy()
+    }
+
+    /// Names what was found, with its article: for a message.
+    ///
+    /// # Returns
+    ///
+    /// "a simulated device", "a dummy device" or "hardware".
+    fn kind(&self) -> &'static str {
+        match self.verdict {
+            Verdict::Simulated => "a simulated device",
+            Verdict::Dummy => "a dummy device",
+            _ => "hardware",
+        }
     }
 
     /// Says what was found, in a word and a clause: for the startup summary.
@@ -289,11 +351,10 @@ impl Judged {
     /// The verdict in a word, then what was found.
     pub fn said(&self) -> String {
         let word = match self.verdict {
-            Verdict::StandIn => "a stand-in",
-            Verdict::Hardware => "hardware",
             Verdict::CannotTell | Verdict::Absent => {
                 "taken for hardware, as what could not be told"
             }
+            _ => self.kind(),
         };
         format!("{word}: {}", self.found)
     }
@@ -364,7 +425,7 @@ impl Unseen {
     /// # Arguments
     ///
     /// * `attribute`   - The attribute that says what the node reaches.
-    /// * `to_stand_in` - What would make the payload a stand-in.
+    /// * `to_simulate` - What would make the payload simulated.
     ///
     /// # Returns
     ///
@@ -372,12 +433,12 @@ impl Unseen {
     pub fn judged(
         self,
         attribute: &'static str,
-        to_stand_in: &'static str,
+        to_simulate: &'static str,
     ) -> Judged {
         if self.absent {
-            Judged::absent(self.said, attribute, to_stand_in)
+            Judged::absent(self.said, attribute, to_simulate)
         } else {
-            Judged::cannot_tell(self.said, attribute, to_stand_in)
+            Judged::cannot_tell(self.said, attribute, to_simulate)
         }
     }
 }
@@ -482,27 +543,27 @@ const PTY_SLAVE_MAJORS: std::ops::RangeInclusive<u64> = 136..=143;
 ///
 /// * `path`        - The device node's path.
 /// * `attribute`   - The attribute that names it.
-/// * `to_stand_in` - What would make the payload a stand-in.
+/// * `to_simulate` - What would make the payload simulated.
 ///
 /// # Returns
 ///
-/// A stand-in for a pseudo-terminal's slave, hardware for any other
+/// A simulated device for a pseudo-terminal's slave, hardware for any other
 /// character device, and what [`Unseen::judged`] says for anything else.
 pub(crate) fn pseudo_terminal(
     path: &str,
     attribute: &'static str,
-    to_stand_in: &'static str,
+    to_simulate: &'static str,
 ) -> Judged {
     match character_device(path) {
-        Err(found) => found.judged(attribute, to_stand_in),
+        Err(found) => found.judged(attribute, to_simulate),
         Ok((major, minor)) if PTY_SLAVE_MAJORS.contains(&major) => {
             let resolved = std::fs::canonicalize(path)
                 .map(|to| to.display().to_string())
                 .unwrap_or_else(|_| format!("{major}:{minor}"));
-            Judged::stand_in(
+            Judged::simulated(
                 format!("{path} resolves to a pseudo-terminal, {resolved}"),
                 attribute,
-                to_stand_in,
+                to_simulate,
             )
         }
         Ok((major, minor)) => Judged::hardware(
@@ -511,28 +572,33 @@ pub(crate) fn pseudo_terminal(
                  pseudo-terminal"
             ),
             attribute,
-            to_stand_in,
+            to_simulate,
         ),
     }
 }
 
 /// Whether `node` is counted by the mode: a node of an interface type other
-/// than the gateway.
+/// than the gateway, `network` and `device-file`.
 ///
 /// Computations, logs, tees and app nodes have no hardware behind them to
-/// stand in for -- an app node's program is the thing itself -- and the
+/// simulate -- an app node's program is the thing itself -- and the
 /// gateway is the link the run is commanded over, set up by whoever started
-/// the ground station.
+/// the ground station. A `network` or `device-file` node is a real device,
+/// a socket or a file, whatever answers at its far end: tcssim may be what
+/// does, where the simulator file says so, but the node is the same node
+/// either way, so there is nothing for the mode to tell apart.
 pub fn counted(node: &Node) -> bool {
     !is_gateway(&node.node_type)
-        && DHType::from_spelling(&node.node_type).is_some()
+        && DHType::from_spelling(&node.node_type).is_some_and(|kind| {
+            !matches!(kind, DHType::Network | DHType::Device)
+        })
 }
 
 /// Judges what a node was found to be under a mode, where the mode counts it.
 ///
 /// From what is at the end of the endpoint tcspecial will open under `mode`,
 /// by its type's own rule: its own endpoint, or the UDP socket its
-/// `stand_in` names where the run has stand-ins -- see
+/// `sim_address` names where the run simulates -- see
 /// `crate::graph::reach::Reach::opened`. Asked
 /// before anything is opened: opening is not always harmless, since a serial
 /// port raises its modem lines as it opens and a GPIO line requested as an
@@ -546,7 +612,7 @@ pub fn counted(node: &Node) -> bool {
 ///
 /// # Returns
 ///
-/// The judgement, naming `stand_in` as what to change where that is what is
+/// The judgement, naming `sim_address` as what to change where that is what is
 /// opened, or `None` for a node the mode does not count.
 pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
     if !counted(node) {
@@ -563,8 +629,15 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
         }
     };
     let judged = match &reach.opened(mode) {
+        // A node reached at its sim_address, the only network endpoint a
+        // counted node opens.
         EndpointConfig::Network(at) => payload::network::judged(at),
-        EndpointConfig::Device(at) => payload::device_file::judged(&at.path),
+        // Never opened by a counted node: see `counted`.
+        EndpointConfig::Device(at) => Judged::hardware(
+            format!("{} is a device file, which is a real device", at.path),
+            "path",
+            "nothing: a device-file node is a real device",
+        ),
         EndpointConfig::Serial(at) => payload::serial::judged(&at.path),
         EndpointConfig::I2c(at) => payload::i2c::judged(host, &at.bus),
         EndpointConfig::Spi(at) => payload::spi::judged(&at.path),
@@ -578,12 +651,13 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
         EndpointConfig::Gpio(at) => payload::gpio::judged(host, &at.path),
         EndpointConfig::Hdlc(at) => payload::hdlc::judged(&at.interface),
     };
-    // Reached at its stand_in, which is what to change, where it is.
-    if reach.stand_in.is_some() && !mode.is_flight() {
+    // Reached at its sim_address, which is what to change, where it is.
+    if reach.sim_address.is_some() && !mode.is_flight() {
         return Some(Judged {
-            attribute: "stand_in",
-            to_stand_in:
-                "give stand_in as a loopback address, such as 127.0.0.1:7950",
+            attribute: "sim_address",
+            to_simulate:
+                "give sim_address as a loopback address, such as \
+                 127.0.0.1:7950",
             ..judged
         });
     }
@@ -610,55 +684,63 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
     match mode {
         Mode::None => payloads
             .iter()
-            .filter(|(_, judged)| judged.is_stand_in())
+            .filter(|(_, judged)| judged.is_simulated_or_dummy())
             .map(|(name, judged)| {
                 format!(
-                    "{name}: {}, a stand-in, and {flag}, the flight setting, \
-                     allows none: point {} at the hardware, or give \
+                    "{name}: {}, {}, and {flag}, the flight setting, allows \
+                     only real devices: point {} at the hardware, or give \
                      {FLAG}=some or {FLAG}=all for a run that is not a flight",
-                    judged.found, judged.attribute
+                    judged.found,
+                    judged.kind(),
+                    judged.attribute
                 )
             })
             .collect(),
         Mode::All => payloads
             .iter()
-            .filter(|(_, judged)| !judged.is_stand_in())
+            .filter(|(_, judged)| !judged.is_simulated_or_dummy())
             .map(|(name, judged)| {
                 let found = match judged.verdict {
                     Verdict::CannotTell | Verdict::Absent => format!(
-                        "{}, so whether it is a stand-in cannot be told",
+                        "{}, so whether it is a real device cannot be told",
                         judged.found
                     ),
                     _ => judged.found.clone(),
                 };
                 format!(
-                    "{name}: {found}, and {flag} allows only stand-ins: {}",
-                    judged.to_stand_in
+                    "{name}: {found}, and {flag} allows only simulated and \
+                     dummy devices: {}",
+                    judged.to_simulate
                 )
             })
             .collect(),
         Mode::Some => {
-            let stand_ins =
-                payloads.iter().filter(|(_, j)| j.is_stand_in()).count();
+            let unreal = payloads
+                .iter()
+                .filter(|(_, j)| j.is_simulated_or_dummy())
+                .count();
             if payloads.is_empty() {
                 vec![format!(
-                    "{flag} wants at least one payload that is a stand-in and \
-                     one that is not, and this configuration has no payloads: \
-                     give {FLAG}=all or {FLAG}=none"
+                    "{flag} wants at least one payload that is a real device \
+                     and one that is not, and this configuration has no \
+                     payloads the mode counts (network and device-file \
+                     payloads are real devices, and not counted): give \
+                     {FLAG}=all or {FLAG}=none"
                 )]
-            } else if stand_ins == 0 {
+            } else if unreal == 0 {
                 vec![format!(
-                    "{flag} wants at least one payload that is a stand-in, and \
-                     none of the {} is one ({}): give {FLAG}=none for a run on \
-                     hardware alone, or make one of them a stand-in",
+                    "{flag} wants at least one payload that is a simulated or \
+                     dummy device, and none of the {} is one ({}): give \
+                     {FLAG}=none for a run on hardware alone, or simulate one \
+                     of them",
                     payloads.len(),
                     names(payloads)
                 )]
-            } else if stand_ins == payloads.len() {
+            } else if unreal == payloads.len() {
                 vec![format!(
-                    "{flag} wants at least one payload that is not a stand-in, \
-                     and every one is ({}): give {FLAG}=all for a run on \
-                     stand-ins alone",
+                    "{flag} wants at least one payload that is a real device, \
+                     and none is ({}): give {FLAG}=all for a run on simulated \
+                     and dummy devices alone",
                     names(payloads)
                 )]
             } else {
@@ -668,10 +750,10 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
     }
 }
 
-/// Whether tcssim makes a stand-in of this type for itself -- a
-/// pseudo-terminal, a socket -- rather than finding one the kernel made, as
-/// it does for an I2C bus, a GPIO chip and a CAN interface, which the scripts
-/// in `bin/` make.
+/// Whether tcssim makes a simulated device of this type for itself -- a
+/// pseudo-terminal, a socket -- rather than finding a dummy device the kernel
+/// made, as it does for an I2C bus, a GPIO chip and a CAN interface, which the
+/// scripts in `bin/` make.
 ///
 /// Nothing at the path of one tcssim makes for itself is where it is about to
 /// go; nothing where the kernel's should be is a script that was not run.
@@ -680,25 +762,26 @@ pub fn tcssim_makes(node_type: &str) -> bool {
 }
 
 /// Says what is wrong, if anything, with a payload's `simulate` against what
-/// is at its endpoint: for tcssim, which compares the two before it stands in
-/// for anything. See "Saying Which Payloads Are Simulated" in
+/// is at its endpoint: for tcssim, which compares the two before it
+/// simulates anything. See "Saying Which Payloads Are Simulated" in
 /// docs/design.rst.
 ///
 /// `simulate: true` where the endpoint is real hardware is a configuration
 /// pointing at hardware in a file that says it is simulated; `simulate:
-/// false` where it is a stand-in is a payload meant to be real that the run
-/// would in fact simulate. Nothing at the path is a disagreement only for a
-/// stand-in the kernel makes, which has to be there before tcssim starts.
+/// false` where it is a simulated or dummy device is a payload meant to be
+/// real that the run would in fact simulate. Nothing at the path is a
+/// disagreement only for a dummy device, which the kernel has to have made
+/// before tcssim starts.
 ///
 /// A payload the simulator file does not name is the real device; one whose
-/// endpoint is a stand-in all the same is refused, so that every simulated
-/// device is one tcssim controls and shows.
+/// endpoint is a simulated or dummy device all the same is refused, so that
+/// every payload simulated is one tcssim controls and shows.
 ///
 /// # Arguments
 ///
 /// * `name`      - The payload's name.
-/// * `node_type` - Its node type, which says whether tcssim makes its
-///                 stand-in itself.
+/// * `node_type` - Its node type, which says whether tcssim makes a
+///                 simulated device for it or finds a dummy device.
 /// * `simulate`  - Its `simulate`, or `None` where the simulator file does
 ///                 not name it.
 /// * `judged`    - What was found at its endpoint.
@@ -714,30 +797,31 @@ pub fn disagreement(
 ) -> Option<String> {
     let found = &judged.found;
     let Some(simulate) = simulate else {
-        return judged.is_stand_in().then(|| {
+        return judged.is_simulated_or_dummy().then(|| {
             format!(
-                "{name}: {found}, a stand-in, and the simulator file does not \
-                 name it: name it with simulate: true, for tcssim to control \
-                 it and show it as every other simulated payload is, or point \
-                 {} at the real device",
+                "{name}: {found}, {}, and the simulator file does not name \
+                 it: name it with simulate: true, for tcssim to control it \
+                 and show it as every other simulated payload is, or point {} \
+                 at the real device",
+                judged.kind(),
                 judged.attribute
             )
         });
     };
     match (simulate, judged.verdict) {
-        (true, Verdict::StandIn)
+        (true, Verdict::Simulated | Verdict::Dummy)
         | (false, Verdict::Hardware | Verdict::CannotTell) => None,
         (false, Verdict::Absent) => None,
         (true, Verdict::Absent) if tcssim_makes(node_type) => None,
         (true, _) => Some(format!(
             "{name}: {found}, and the simulator file says simulate: true: {}, \
              or say simulate: false for the real device",
-            judged.to_stand_in
+            judged.to_simulate
         )),
-        (false, Verdict::StandIn) => Some(format!(
-            "{name}: {found}, a stand-in, and the simulator file says \
-             simulate: false: point {} at the real device, or say simulate: \
-             true",
+        (false, Verdict::Simulated | Verdict::Dummy) => Some(format!(
+            "{name}: {found}, {}, and the simulator file says simulate: \
+             false: point {} at the real device, or say simulate: true",
+            judged.kind(),
             judged.attribute
         )),
     }
@@ -821,10 +905,23 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// A stand-in.
-    fn stand_in() -> Judged {
-        Judged::stand_in(
+    /// A dummy device.
+    fn dummy() -> Judged {
+        Judged::dummy(
             "/dev/i2c-7 is the i2c-stub's adapter".into(),
+            "path",
+            "fix it",
+        )
+    }
+
+    /// Makes the judgement of a serial payload on tcssim's pseudo-terminal.
+    ///
+    /// # Returns
+    ///
+    /// A simulated device.
+    fn simulated() -> Judged {
+        Judged::simulated(
+            "/tmp/ttyS0 resolves to a pseudo-terminal, /dev/pts/3".into(),
             "path",
             "fix it",
         )
@@ -848,13 +945,21 @@ mod tests {
     }
 
     #[test]
-    fn none_refuses_each_stand_in_saying_which_flag_a_test_wants() {
-        let (s, h) = (stand_in(), hardware());
-        let said = refusals(Mode::None, &[("a", &s), ("b", &h), ("c", &s)]);
+    fn none_refuses_each_unreal_device_saying_which_flag_a_test_wants() {
+        let (s, h, m) = (dummy(), hardware(), simulated());
+        let said = refusals(Mode::None, &[("a", &s), ("b", &h), ("c", &m)]);
         assert_eq!(said.len(), 2, "{said:?}");
         assert!(said[0].starts_with(
-            "a: /dev/i2c-7 is the i2c-stub's adapter, a stand-in"
+            "a: /dev/i2c-7 is the i2c-stub's adapter, a dummy device"
         ));
+        assert!(
+            said[1].starts_with(
+                "c: /tmp/ttyS0 resolves to a pseudo-terminal, /dev/pts/3, a \
+                 simulated device"
+            ),
+            "{}",
+            said[1]
+        );
         assert!(
             said[0].contains("--simulate=some or --simulate=all"),
             "{}",
@@ -865,27 +970,28 @@ mod tests {
     }
 
     #[test]
-    fn all_refuses_non_stand_ins_and_says_what_could_not_be_told() {
-        let (s, h, u) = (stand_in(), hardware(), unknown());
+    fn all_refuses_real_devices_and_says_what_could_not_be_told() {
+        let (s, h, u) = (dummy(), hardware(), unknown());
         let said = refusals(Mode::All, &[("a", &s), ("b", &h), ("c", &u)]);
         assert_eq!(
             said,
             [
                 "b: /dev/i2c-1 is a real adapter (gmbus), and --simulate=all \
-                 allows only stand-ins: fix it",
-                "c: nothing is at /dev/i2c-9, so whether it is a stand-in \
-                 cannot be told, and --simulate=all allows only stand-ins: fix \
-                 it",
+                 allows only simulated and dummy devices: fix it",
+                "c: nothing is at /dev/i2c-9, so whether it is a real device \
+                 cannot be told, and --simulate=all allows only simulated and \
+                 dummy devices: fix it",
             ]
         );
         assert!(refusals(Mode::All, &[("a", &s)]).is_empty());
-        // Nothing to stand in for is nothing exercised.
+        assert!(refusals(Mode::All, &[("a", &simulated())]).is_empty());
+        // Nothing to simulate is nothing exercised.
         assert!(refusals(Mode::All, &[]).is_empty());
     }
 
     #[test]
     fn some_wants_one_of_each_and_counts_what_could_not_be_told_as_hardware() {
-        let (s, h, u) = (stand_in(), hardware(), unknown());
+        let (s, h, u) = (dummy(), hardware(), unknown());
         assert!(refusals(Mode::Some, &[("a", &s), ("b", &h)]).is_empty());
         assert!(refusals(Mode::Some, &[("a", &s), ("c", &u)]).is_empty());
         let said = refusals(Mode::Some, &[("a", &s), ("b", &s)]);
@@ -896,8 +1002,8 @@ mod tests {
     }
 
     #[test]
-    fn simulate_disagrees_with_hardware_and_with_a_stand_in_meant_to_be_real() {
-        let (s, h, u) = (stand_in(), hardware(), unknown());
+    fn simulate_disagrees_with_hardware_and_with_a_dummy_meant_to_be_real() {
+        let (s, h, u) = (dummy(), hardware(), unknown());
         let absent =
             Judged::absent("nothing is at /tmp/ttyS9".into(), "path", "fix it");
 
@@ -912,34 +1018,39 @@ mod tests {
         assert!(said.contains("simulate: true: fix it"), "{said}");
         let said = disagreement("a", "i2c", Some(false), &s).expect("refused");
         assert!(said.contains(
-            "a stand-in, and the simulator file says simulate: false"
+            "a dummy device, and the simulator file says simulate: false"
         ));
 
-        // Nothing yet where tcssim makes the stand-in itself is where it is
-        // about to go; nothing where the kernel's should be is not.
+        // Nothing yet where tcssim makes the simulated device itself is where
+        // it is about to go; nothing where the kernel's dummy should be is
+        // not.
         assert_eq!(disagreement("a", "serial", Some(true), &absent), None);
         assert!(disagreement("a", "i2c", Some(true), &absent).is_some());
 
-        // A stand-in the file leaves out is one tcssim would not control.
+        // A dummy device the file leaves out is one tcssim would not
+        // control.
         let said = disagreement("a", "gpio", None, &s).expect("refused");
         assert!(said.contains("does not name it"), "{said}");
         assert_eq!(disagreement("a", "gpio", None, &h), None);
     }
 
     /// What the mode counts: the payloads reached over an interface, and not
-    /// the gateway, a computation, a log or an app.
+    /// a network or device-file node, the gateway, a computation, a log or an
+    /// app.
     #[test]
-    fn the_mode_counts_interfaces_and_not_the_gateway() {
+    fn the_mode_counts_interfaces_but_not_real_devices_or_the_gateway() {
         let node = |node_type: &str| Node {
             name: "n".into(),
             node_type: node_type.into(),
             group: None,
             attributes: Default::default(),
         };
-        for counted_type in ["i2c", "network", "device-file", "hdlc", "gpio"] {
+        for counted_type in ["i2c", "serial", "hdlc", "gpio"] {
             assert!(counted(&node(counted_type)), "{counted_type}");
         }
         for not in [
+            "network",
+            "device-file",
             "gateway_radio",
             "compute",
             "log",

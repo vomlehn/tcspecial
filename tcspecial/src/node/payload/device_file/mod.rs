@@ -56,11 +56,11 @@ impl DeviceEndpoint {
             .read(true)
             .write(true)
             // Not this process's terminal. A device that is a tty -- a real
-            // serial port, or a pty standing in for one -- becomes the
-            // controlling terminal of a process that opens it without this,
-            // and then a read from a background process group raises SIGTTIN
-            // and a hangup raises SIGHUP: a handler stopped or killed for
-            // reasons that have nothing to do with its payload.
+            // serial port, or a pty tcssim made to simulate one -- becomes the
+            // controlling terminal of a process that opens it without this, and
+            // then a read from a background process group raises SIGTTIN and a
+            // hangup raises SIGHUP: a handler stopped or killed for reasons
+            // that have nothing to do with its payload.
             .custom_flags(libc::O_NOCTTY)
             // Named, because a bare `No such file or directory` says neither
             // which handler could not start nor what it was reaching for.

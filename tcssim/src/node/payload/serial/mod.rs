@@ -17,7 +17,7 @@
 //! and the configuration names a port, so the path the handler was told to
 //! open is made a symbolic link to the slave for as long as the device runs.
 //! A path that is anything other than a link the simulator made is left alone
-//! and reported: a simulator that unlinked `/dev/ttyS0` to stand in for it
+//! and reported: a simulator that unlinked `/dev/ttyS0` to simulate it
 //! would be worse than one that could not.
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
@@ -28,7 +28,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    a_packet, could_not_simulate, ignore_this_request, lateness,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -57,9 +57,9 @@ pub fn run_serial_node(
     ) {
         Ok(line) => line,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
-                format!("failed to stand in for a serial line: {}", e),
+                format!("failed to simulate a serial line: {}", e),
             );
             return;
         }
@@ -272,7 +272,7 @@ mod tests {
     }
 
     /// A real device at the configured path is left alone, and said to be
-    /// there. A simulator that unlinked /dev/ttyS0 to stand in for it would
+    /// there. A simulator that unlinked /dev/ttyS0 to simulate it would
     /// be worse than one that could not.
     #[test]
     fn a_real_device_at_the_path_is_left_alone() {

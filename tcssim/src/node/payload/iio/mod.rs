@@ -1,8 +1,8 @@
-//! A simulated device that stands in for a sensor's sample buffer.
+//! A simulated device that plays a sensor's sample buffer.
 //!
 //! **Experimental, and not yet supported**: see "What Is Supported and What
-//! Is Experimental" in `docs/design.rst`. This stands in for the buffer with
-//! a pseudo-terminal where there is no `iio_dummy`.
+//! Is Experimental" in `docs/design.rst`. This simulates the buffer with a
+//! pseudo-terminal where there is no `iio_dummy`.
 //!
 //! What a handler does with an IIO device is open `/dev/iio:deviceN` and
 //! read packed samples out of it. The simulator can be the other end of
@@ -12,14 +12,14 @@
 //! as long as the device runs.
 //!
 //! What it is not is a sensor. The kernel's `iio_dummy` module provides one,
-//! and provides the wrong thing for this: it generates values of its own, so
-//! a simulator file would decide nothing about what the device produced --
-//! where the whole point of a simulated device is that its file decides. So
-//! the bytes here are the simulator's, as they are for every other kind, and
-//! what the stand-in does not reproduce is the half of IIO that is not the
-//! data: the channels and the buffer in `sysfs`. A handler does not touch
-//! those either -- the configuration records them and applies nothing -- so
-//! what is missing from the stand-in is missing from the handler too.
+//! and provides the wrong thing for this: it generates values of its own, so a
+//! simulator file would decide nothing about what the device produced -- where
+//! the whole point of a simulated device is that its file decides. So the bytes
+//! here are the simulator's, as they are for every other kind, and what the
+//! simulated device does not reproduce is the half of IIO that is not the data:
+//! the channels and the buffer in `sysfs`. A handler does not touch those
+//! either -- the configuration records them and applies nothing -- so what is
+//! missing from the simulated device is missing from the handler too.
 //!
 //! One direction only. A buffer is a stream out of a sensor, so nothing is
 //! ever sent to this device: an IIO device cannot be triggered, which the
@@ -33,7 +33,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, lateness, send_in_segments, wait_out_packet,
+    a_packet, could_not_simulate, lateness, send_in_segments, wait_out_packet,
     wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 use crate::pty::SimulatedNode;
@@ -54,19 +54,18 @@ pub fn run_iio_node(
     running: Arc<AtomicBool>,
     stats: Arc<std::sync::Mutex<PayloadStats>>,
 ) {
-    // A sensor of the kernel's iio_dummy, made by bin/mkiio, is a stand-in
-    // already, which the kernel fills from its own trigger: there is nothing
-    // to make, and no pseudo-terminal is put in its place. Its panel is
-    // there, as every simulated payload's is, and counts nothing -- the
-    // samples go from the kernel to the vehicle, and nothing of them passes
-    // here to be seen.
+    // A sensor of the kernel's iio_dummy, made by bin/mkiio, is a dummy device
+    // already, which the kernel fills from its own trigger: there is nothing to
+    // make, and no pseudo-terminal is put in its place. Its panel is there, as
+    // every simulated payload's is, and counts nothing -- the samples go from
+    // the kernel to the vehicle, and nothing of them passes here to be seen.
     if tcslibgs::node::payload::iio::is_dummy(
         &tcslibgs::simulate::Host::this(),
         &config.address,
     ) {
         eprintln!(
-            "{}: {} is a sensor of the kernel's iio_dummy, which stands in for \
-             itself",
+            "{}: {} is a sensor of the kernel's iio_dummy, a dummy device \
+             that makes its own samples",
             config.name, config.address
         );
         config.standing.made();
@@ -85,9 +84,9 @@ pub fn run_iio_node(
     ) {
         Ok(node) => node,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
-                format!("failed to stand in for a sample buffer: {}", e),
+                format!("failed to simulate a sample buffer: {}", e),
             );
             return;
         }
@@ -184,8 +183,9 @@ mod tests {
     /// The samples a simulated sensor produces are readable at the path a
     /// handler was told to open.
     ///
-    /// Which is the whole of the stand-in: the handler opens a character
-    /// device and reads packed samples, and that is what a pty's slave is.
+    /// Which is the whole of the simulated device: the handler opens a
+    /// character device and reads packed samples, and that is what a pty's
+    /// slave is.
     #[test]
     fn a_simulated_sensor_offers_samples_at_its_path() {
         let dir = tempfile::tempdir().expect("a temporary directory");
@@ -217,7 +217,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
         assert!(
             !std::path::Path::new(&path).exists(),
-            "the stand-in outlived the device"
+            "the simulated device outlived the payload"
         );
     }
 

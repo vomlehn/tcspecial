@@ -1,7 +1,7 @@
-//! Whether this simulator has made its stand-ins, and the socket it says so
+//! Whether this simulator has made its simulations, and the socket it says so
 //! on.
 //!
-//! Bound before any stand-in is made and kept bound for as long as tcssim
+//! Bound before any simulation is made and kept bound for as long as tcssim
 //! runs, so that a harness asking while it is still starting is told so, and
 //! so that a simulator left running from an earlier run is found: it holds
 //! the address, and a second one started beside it is refused rather than
@@ -21,7 +21,7 @@ const MAKING: u8 = 0;
 const MADE: u8 = 1;
 const FAILED: u8 = 2;
 
-/// Whether one payload's stand-in has been made: told by the payload's own
+/// Whether one payload's simulation has been made: told by the payload's own
 /// thread, which is the one that makes it.
 #[derive(Debug, Default)]
 pub struct Standing {
@@ -32,9 +32,9 @@ pub struct Standing {
 }
 
 impl Standing {
-    /// The stand-in exists and answers.
+    /// The simulation exists and answers.
     pub fn made(&self) {
-        // A stand-in that failed stays failed: a later success is a retry
+        // A simulation that failed stays failed: a later success is a retry
         // nothing here makes, and the answer must not go back to ready over
         // a failure nobody has seen.
         let _ = self.state.compare_exchange(
@@ -45,7 +45,8 @@ impl Standing {
         );
     }
 
-    /// Records that the stand-in could not be made, or has stopped, and why.
+    /// Records that the simulation could not be made, or has stopped, and
+    /// why.
     ///
     /// # Arguments
     ///
@@ -64,7 +65,7 @@ impl Standing {
         self.state.load(Ordering::SeqCst)
     }
 
-    /// Returns why the stand-in failed.
+    /// Returns why the simulation failed.
     ///
     /// # Returns
     ///
@@ -86,12 +87,12 @@ pub struct Readiness {
 }
 
 impl Readiness {
-    /// Works out the state now: failed if any stand-in failed, ready if
+    /// Works out the state now: failed if any simulation failed, ready if
     /// every one is made, and starting otherwise.
     ///
     /// # Returns
     ///
-    /// The state, and the first failed stand-in's reason, or
+    /// The state, and the first failed simulation's reason, or
     /// `Reason::EMPTY` if none failed.
     fn now(&self) -> (State, Reason) {
         if let Some(failed) = self.payloads.iter().find(|p| p.state() == FAILED)
@@ -203,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn ready_once_every_stand_in_is_made_and_failed_once_any_fails() {
+    fn ready_once_every_simulation_is_made_and_failed_once_any_fails() {
         let r = readiness(2);
         assert_eq!(r.now().0, State::Starting);
         r.payloads[0].made();

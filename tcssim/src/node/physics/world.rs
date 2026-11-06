@@ -3,28 +3,28 @@
 //!
 //! # How time moves
 //!
-//! Nothing ticks. The world is at some moment of simulated time, and is
-//! brought up to another only when something needs it there: a stand-in
-//! reading an output, or driving an input. Between the two it advances
-//! every component across the interval with its inputs held -- by each
-//! component's closed form, so the answer does not depend on how often it is
-//! asked -- except where a component has foreseen an event inside the
-//! interval: then the world advances to the event, lets it happen, gives
-//! every component its inputs again, and goes on. The events wait in a
-//! [`Queue`], soonest first, and each component's is set again whenever its
-//! inputs change, which is when what it foresees can change.
+//! Nothing ticks. The world is at some moment of simulated time, and is brought
+//! up to another only when something needs it there: a simulated payload
+//! reading an output, or driving an input. Between the two it advances every
+//! component across the interval with its inputs held -- by each component's
+//! closed form, so the answer does not depend on how often it is asked --
+//! except where a component has foreseen an event inside the interval: then the
+//! world advances to the event, lets it happen, gives every component its
+//! inputs again, and goes on. The events wait in a [`Queue`], soonest first,
+//! and each component's is set again whenever its inputs change, which is when
+//! what it foresees can change.
 //!
-//! So the world follows the wall clock -- each stand-in asks at the wall
-//! clock's moment, through the [`Clock`] -- at no cost while nothing asks,
+//! So the world follows the wall clock -- each simulated payload asks at the
+//! wall clock's moment, through the [`Clock`] -- at no cost while nothing asks,
 //! and at whatever rate the clock is given.
 //!
 //! # Inputs
 //!
-//! What is at an input is the sum of every output joined to it, for an
-//! input that sums, or the one output joined to it, or what a stand-in last
-//! drove it to: the model's check has made it one of those. They are worked
-//! out from every component's outputs as they stand, and held, at the start
-//! of each interval: a component's output is what the interval starts with.
+//! What is at an input is the sum of every output joined to it, for an input
+//! that sums, or the one output joined to it, or what a simulated payload last
+//! drove it to: the model's check has made it one of those. They are worked out
+//! from every component's outputs as they stand, and held, at the start of each
+//! interval: a component's output is what the interval starts with.
 //!
 //! # Order
 //!
@@ -37,10 +37,10 @@
 //!
 //! # Sharing
 //!
-//! Every stand-in's thread asks the one world, so its state is behind a
-//! lock, taken for an advance and never across anything that waits.
-//! Nothing is allocated once it is made: the inputs, the driven values and
-//! the queue have their room from the start.
+//! Every simulated payload's thread asks the one world, so its state is behind
+//! a lock, taken for an advance and never across anything that waits. Nothing
+//! is allocated once it is made: the inputs, the driven values and the queue
+//! have their room from the start.
 
 use std::sync::{Condvar, Mutex, MutexGuard};
 use std::time::Instant;
@@ -66,7 +66,7 @@ use super::thermal_mass::ThermalMass;
 ///
 /// A component that foresaw its next event at the moment it was already at,
 /// time after time, would hold the world's lock for ever, and every
-/// stand-in with it. That is a fault in the component, and the simulator
+/// payload with it. That is a fault in the component, and the simulator
 /// carrying on with the world a little behind is better than one that
 /// stops answering: what the log says is where to look.
 const MOST_EVENTS_AT_ONCE: usize = 10_000;
@@ -82,8 +82,8 @@ pub struct World {
     /// The model's connections.
     connections: Vec<Joined>,
     state: Mutex<State>,
-    /// Told whenever a stand-in drives an input, which can bring an event
-    /// sooner than a waiting stand-in was waiting for: see
+    /// Told whenever a simulated payload drives an input, which can bring an
+    /// event sooner than a waiting payload was waiting for: see
     /// [`World::await_change`].
     driven: Condvar,
 }
@@ -94,7 +94,7 @@ struct State {
     /// Where the world is, in simulated seconds.
     now: f64,
     components: Vec<Box<dyn Component>>,
-    /// What each stand-in last drove each input to, by component and
+    /// What each simulated payload last drove each input to, by component and
     /// terminal: nought until it does.
     driven: Vec<[f64; MOST_TERMINALS]>,
     /// What is at each component's inputs, as last held.
@@ -247,7 +247,7 @@ impl World {
     ///
     /// * `place`   - The output.
     /// * `seconds` - The simulated time; one the world has passed -- a
-    ///               stand-in whose moment was taken before another's, and
+    ///               payload whose moment was taken before another's, and
     ///               which reached the lock after it -- is answered as the
     ///               world is now.
     ///
@@ -270,7 +270,7 @@ impl World {
     /// # Arguments
     ///
     /// * `place`   - The input, which no connection joins: the model's
-    ///               check has made it a stand-in's.
+    ///               check has made it a simulated payload's.
     /// * `value`   - What it is driven to: one for on and nought for off,
     ///               for a decision.
     /// * `seconds` - The simulated time, as [`World::read_at`] takes it.
@@ -290,17 +290,17 @@ impl World {
     /// Waits for an output to change from what it was, and says what it
     /// changed to.
     ///
-    /// What a stand-in that signals a decision waits in, so that the vehicle
-    /// hears of the change -- a lander's contact with the ground -- at the
-    /// moment it happens, and not at the stand-in's next turn to send. The
+    /// What a simulated payload that signals a decision waits in, so that the
+    /// vehicle hears of the change -- a lander's contact with the ground -- at
+    /// the moment it happens, and not at the payload's next turn to send. The
     /// world is advanced to each event it foresees at that event's moment on
-    /// the wall clock, unasked by anything else: a change comes at an event,
-    /// or at a stand-in's drive, which wakes the wait too.
+    /// the wall clock, unasked by anything else: a change comes at an event, or
+    /// at a simulated payload's drive, which wakes the wait too.
     ///
     /// # Arguments
     ///
     /// * `place` - The output.
-    /// * `from`  - What it was, as the stand-in last said it.
+    /// * `from`  - What it was, as the simulated payload last said it.
     /// * `until` - When to stop waiting, on the wall clock.
     ///
     /// # Returns

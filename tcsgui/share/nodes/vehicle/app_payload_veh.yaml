@@ -4,7 +4,7 @@
 # something bolted to the vehicle. It is run with one file interface, on which
 # it reads payload data and writes gateway data -- so it takes what travels
 # groundward and answers with what travels vehicleward, which is the shape the
-# ground link has and the thing an app of this kind stands in for. The
+# ground link has and the thing an app of this kind plays. The
 # interfaces and the packets they carry are tcsapp; its Rust is
 # tcspecial/src/node/vehicle/app_payload_veh/.
 node: app_payload_veh

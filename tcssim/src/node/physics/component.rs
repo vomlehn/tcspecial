@@ -9,13 +9,13 @@
 //!
 //! # How a component is advanced
 //!
-//! The world holds each component's inputs steady from one moment to the
-//! next -- from one event, or one question a stand-in asks, to the next --
+//! The world holds each component's inputs steady from one moment to the next
+//! -- from one event, or one question a simulated payload asks, to the next --
 //! and a component advances across the interval as exactly as its arithmetic
-//! allows: by a closed form where there is one, which is what makes the
-//! answer independent of how often the world is looked at. Where a
-//! component's behaviour changes within an interval -- a threshold crossed --
-//! it says when, as its next event, and the world stops there.
+//! allows: by a closed form where there is one, which is what makes the answer
+//! independent of how often the world is looked at. Where a component's
+//! behaviour changes within an interval -- a threshold crossed -- it says when,
+//! as its next event, and the world stops there.
 
 /// The most terminals a component type has: the room each component's inputs
 /// are given, which is fixed so that holding them allocates nothing.

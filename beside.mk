@@ -18,7 +18,7 @@ BESIDE_GIT := $(shell git -C $(BESIDE_TREE) rev-parse \
 	--path-format=absolute --git-common-dir 2>/dev/null)
 BESIDE := $(abspath $(if $(BESIDE_GIT),$(BESIDE_GIT)/../..,$(BESIDE_TREE)/..))
 
-# The lock every run that binds the fixed ports holds -- the stand-ins test,
-# the F´ bridge's, the cFS run -- so that two never run at once, from this
-# checkout or one beside it.
+# The lock every run that binds the fixed ports holds -- the simulated-devices
+# test, the F´ bridge's, the cFS run -- so that two never run at once, from
+# this checkout or one beside it.
 TCS_PORTS_LOCK ?= $(BESIDE)/tcs-ports.lock

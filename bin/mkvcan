@@ -8,7 +8,7 @@
 # bitrate and no carrier, whose members are the sockets bound to it. That is
 # enough for both ends to be real -- tcssim joins the bus as one member and
 # tcspecial's handler as another -- which is why the CAN kind is the one
-# experimental payload whose stand-in is as faithful as a socket.
+# experimental payload whose dummy device is as faithful as a socket.
 #
 # What neither program can do is make the bus: creating an interface needs
 # root, so they find it and say what would make one. This is that.

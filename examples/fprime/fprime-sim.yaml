@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
 
-# How tcssim stands in for the payloads of fprime.ytcs.
+# How tcssim simulates the payloads of fprime.ytcs.
 #
 # The thermometer reads the zone and the heater warms it, so what the
 # flight computer sends the heater shows in the temperature it reads back:
@@ -8,15 +8,15 @@
 # channel climb.
 description: Simulator settings for the payloads of fprime.ytcs
 
-# Where tcssim answers whether it has made its stand-ins, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once.
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
 tcssim:
   ready: "127.0.0.1:7902"
 
 # The physics of the fprime example's vehicle: the zone its thermometer
-# reads and its heater warms. The stand-ins below are joined to its
-# terminals by name, with connects.
+# reads and its heater warms. The simulated payloads below are joined to
+# its terminals by name, with connects.
 world:
   # The temperature the zone's surroundings are, ten degrees: one for the
   # world, and not the zone's, because every zone of a vehicle is in the one
@@ -45,7 +45,7 @@ world:
 
 simulated_payloads:
   - type network:
-      # Driven and never read: its stand-in sends nothing, counts what the
+      # Driven and never read: tcssim sends nothing, counts what the
       # vehicle sends it, and switches the heater, which while it is on warms
       # the zone by a kelvin a second.
       - payload: heater

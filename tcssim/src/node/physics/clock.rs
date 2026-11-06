@@ -1,16 +1,16 @@
 //! The simulation's clock: how a moment of the wall clock maps to a moment
 //! of simulated time.
 //!
-//! The world is advanced to whatever moment a stand-in asks about, and a
-//! stand-in asks at the wall clock's time, because the vehicle at the other
+//! The world is advanced to whatever moment a simulated payload asks about, and
+//! a payload asks at the wall clock's time, because the vehicle at the other
 //! end of its link runs on the wall clock. So simulated time tracks it: a
 //! second of simulated time for a second of the wall clock.
 //!
-//! From when the run begins, which is when a stand-in first asks the world
-//! anything, and not from when the world was made. The stand-ins start
-//! stopped, and are started from tcssim's window, so a world counting from
-//! its making would have run on with nobody joined to it: a lander would be
-//! on the ground before its radar was switched on.
+//! From when the run begins, which is when a simulated payload first asks the
+//! world anything, and not from when the world was made. The simulated payloads
+//! start stopped, and are started from tcssim's window, so a world counting
+//! from its making would have run on with nobody joined to it: a lander would
+//! be on the ground before its radar was switched on.
 //!
 //! The rate is a factor on that, so that a world can run faster than the
 //! wall clock -- an hour's descent in a minute -- where nothing at the other

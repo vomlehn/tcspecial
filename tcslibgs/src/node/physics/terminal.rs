@@ -1,5 +1,5 @@
 //! A component's terminals: the places it is joined to other components and to
-//! the simulator's stand-ins.
+//! the simulator's simulated payloads.
 //!
 //! Each component type has a fixed list of them, stated in its module and
 //! nowhere else. A terminal has a direction, an input or an output, and a

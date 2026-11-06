@@ -399,7 +399,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#an-i2c-payload" id="toc-entry-24">An I<sup>2</sup>C Payload</a></li>
 <li><a class="reference internal" href="#a-spi-payload" id="toc-entry-25">A SPI Payload</a></li>
 <li><a class="reference internal" href="#temperature-sensors-on-a-thermal-mass" id="toc-entry-26">Temperature Sensors on a Thermal Mass</a></li>
-<li><a class="reference internal" href="#making-the-kernel-s-stand-ins" id="toc-entry-27">Making the Kernel's Stand-ins</a></li>
+<li><a class="reference internal" href="#making-the-kernel-s-dummy-devices" id="toc-entry-27">Making the Kernel's Dummy Devices</a></li>
 <li><a class="reference internal" href="#what-the-configuration-will-not-let-pass" id="toc-entry-28">What the Configuration Will Not Let Pass</a></li>
 <li><a class="reference internal" href="#an-example" id="toc-entry-29">An Example</a></li>
 <li><a class="reference internal" href="#not-yet-read" id="toc-entry-30">Not Yet Read</a></li>
@@ -450,9 +450,9 @@ ul.auto-toc {
 <li><a class="reference internal" href="#which-interface-it-is-written-for" id="toc-entry-67">Which interface it is written for</a></li>
 <li><a class="reference internal" href="#where-the-links-are" id="toc-entry-68">Where the links are</a></li>
 <li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-69">Where the logs' segments go</a></li>
-<li><a class="reference internal" href="#stand-ins-or-hardware-simulate" id="toc-entry-70">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
+<li><a class="reference internal" href="#simulated-dummy-or-real-devices-simulate" id="toc-entry-70">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
 <li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-71">Waiting for the simulator</a></li>
-<li><a class="reference internal" href="#every-stand-in-at-once" id="toc-entry-72">Every stand-in at once</a></li>
+<li><a class="reference internal" href="#every-simulated-device-at-once" id="toc-entry-72">Every simulated device at once</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-73">Building tcspecial for a vehicle</a></li>
@@ -979,30 +979,31 @@ and no others: a device file stating a <tt class="docutils literal">port</tt>, o
 <h2><a class="toc-backref" href="#toc-entry-9">Supported and experimental interfaces</a></h2>
 <p>Seven types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
 <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt> and <tt class="docutils literal">gpio</tt>.</p>
-<p>The last two were experimental until each was flown against the kernel's own
-stand-in for its device, which is what supported means for them: tcspecial's
+<p>The last two were experimental until each was flown against the kernel's
+dummy device for it, which is what supported means for them: tcspecial's
 node code is run against a CAN bus of the kernel's <tt class="docutils literal">vcan</tt> and a chip of its
 <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, the far end of each played through the kernel and not by
-tcssim, by <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>. Each test checks that the
+tcssim, by <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>. Each test checks that the
 device's data reaches the ground and that the ground's commands reach the
 device. Each type has an example that the test flies, in <tt class="docutils literal">examples/can</tt> and
 <tt class="docutils literal">examples/gpio</tt>.
-The devices need root to make, so the tests do not make them: see <a class="reference internal" href="#making-the-kernel-s-stand-ins">Making the
-Kernel's Stand-ins</a>. A test whose device is not there skips, saying which
+The devices need root to make, so the tests do not make them: see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the
+Kernel's Dummy Devices</a>. A test whose device is not there skips, saying which
 device and the command that makes it, so <tt class="docutils literal">cargo test</tt> passes on a host that
 has not been set up and proves nothing about these types there. What a
-stand-in cannot show is a real controller, chip or sensor: a bus's bitrate
+dummy device cannot show is a real controller, chip or sensor: a bus's bitrate
 and errors, a line's electrical behaviour, a driver's own channels.</p>
 <p>Some of what follows is still marked <strong>experimental, not yet supported</strong>:
 RS-485 on a serial line, and the <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and <tt class="docutils literal">hdlc</tt> types of
 payload. Each is written, parses, reaches a handler and has tests of its
-rules; none has been run against the hardware it describes or a stand-in the
-kernel makes. <tt class="docutils literal">iio</tt> has such a stand-in, <tt class="docutils literal">iio_dummy</tt>, and an example and
+rules; none has been run against the hardware it describes or a dummy device
+the kernel makes. <tt class="docutils literal">iio</tt> has such a dummy device, <tt class="docutils literal">iio_dummy</tt>, and an
+example and
 a test written to fly it, but a stock distribution kernel such as Ubuntu's
 builds the module without the buffer tcspecial reads, so the test has not
 run: the type is promoted once it has passed against a kernel that has the
-buffer (see <a class="reference internal" href="#an-iio-payload">An IIO Payload</a>). The others stay experimental because nothing
-in the kernel stands in for them, so there is nothing to fly them against
+buffer (see <a class="reference internal" href="#an-iio-payload">An IIO Payload</a>). The others stay experimental because the
+kernel has no dummy device for them, so there is nothing to fly them against
 short of the hardware: an rpmsg channel needs a remote processor and its
 firmware, a synchronous HDLC line needs a card, and RS-485's direction
 control is the driver of a real UART, which a pseudo-terminal refuses.</p>
@@ -1039,7 +1040,7 @@ trigger        what to send to make it answer, as one or more parts: text
 group, or the payload's own <tt class="docutils literal">trigger_interval</tt>, is the clock.</p>
 <p>A payload with no <tt class="docutils literal">trigger</tt> sends on its own, or holds a value to be read,
 so there is nothing to send it. A simulated one that sends is driven at the
-rate its simulator configuration gives it, which is how fast a stand-in
+rate its simulator configuration gives it, which is how fast tcssim
 produces data rather than how fast the payload would.</p>
 <p>A payload's name -- <tt class="docutils literal">payload: temp_1</tt> -- belongs to a handler and never to a
 group: it is what tells one handler of a group from another, and what every
@@ -1161,9 +1162,10 @@ the ground, and a <tt class="docutils literal">udp</tt> or <tt class="docutils l
 <tt class="docutils literal">trigger</tt>. That last is the payload that speaks first: the vehicle learns
 where it is from what arrives, and as the node opens nothing has. Give it a
 trigger and it is reached at its address, init and all.</p>
-<p>tcssim takes an init as something received. A stand-in that is asked answers
-it as it would any request, which a real part would not: the vehicle then
-reads one reading more than it asked for, on the pass after the node opened.</p>
+<p>tcssim takes an init as something received. A simulated payload that is asked
+answers it as it would any request, which a real part would not: the vehicle
+then reads one reading more than it asked for, on the pass after the node
+opened.</p>
 </div>
 </div>
 <div class="section" id="how-a-payload-s-data-is-read">
@@ -1559,11 +1561,11 @@ alone, strangers counted as above:</p>
 <p><tt class="docutils literal">sends_from</tt> is a host and a port over <tt class="docutils literal">udp</tt> -- an IP address, not a name
 -- and a path over <tt class="docutils literal">unix_dgram</tt>, and never the node's own address, which is
 where the handler waits. It is refused on a stream or a raw socket, which are
-connected and so know their other end already, and on a datagram payload
-that is asked or only driven, which is reached at its address and read only
-from there. Without it, a payload that restarts from a new port is heard
-again at once; with it, the payload must send from the address it names. The
-simulator's stand-in sends from there, and a simulator file that names a
+connected and so know their other end already, and on a datagram payload that
+is asked or only driven, which is reached at its address and read only from
+there. Without it, a payload that restarts from a new port is heard again at
+once; with it, the payload must send from the address it names. tcssim sends
+from there when it simulates the payload, and a simulator file that names a
 <tt class="docutils literal">payload_address</tt> or <tt class="docutils literal">payload_port</tt> for it as well is refused.</p>
 </div>
 <div class="section" id="a-network-payload">
@@ -1617,7 +1619,7 @@ tcspecial opens a raw socket of that protocol, connected to the address, so it
 hears only that payload and sends only to it, and a datagram read is handed
 on without its IP header. A raw socket needs <tt class="docutils literal">CAP_NET_RAW</tt>, which tcspecial
 must be given (<tt class="docutils literal">setcap cap_net_raw+ep</tt>); without it, the node is refused as
-it opens, saying so. tcssim does not stand in for a raw payload -- on one host
+it opens, saying so. tcssim does not simulate a raw payload -- on one host
 every raw socket of a protocol hears every datagram of it, its own included --
 and refuses a simulator file that asks it to.</p>
 <pre class="code yaml literal-block">
@@ -1638,7 +1640,7 @@ path           the device the handler opens
 <p>Nothing else: a plain device has no terms to be set and no address to be
 reached at. A device cannot be triggered -- tcspecial opens it and reads it,
 and there is nothing to write a request to.</p>
-<p>The simulator stands in for a device file with a file of text. It makes a
+<p>The simulator plays a device file with a file of text. It makes a
 regular file at <tt class="docutils literal">path</tt> and adds a packet of lorem ipsum to it every packet
 interval, at the pace and with the faults its simulator file gives, until the
 text runs out, about 2900 bytes of it. tcspecial reads what has been added
@@ -1647,7 +1649,10 @@ is removed when the simulator stops, whether by its <tt class="docutils literal"
 a signal (see <a class="reference internal" href="#the-tcssim-window">The tcssim window</a>); a file left by one killed outright holds
 a prefix of the text, and the next start replaces it. Where something else is
 already at <tt class="docutils literal">path</tt> -- a real device, or a file the simulator did not write --
-the simulator leaves it alone and says so, rather than standing in for it.</p>
+the simulator leaves it alone and says so, rather than writing over it.
+A device-file payload is a real device under every <tt class="docutils literal"><span class="pre">--simulate</span></tt> mode,
+whether or not tcssim's file of text is what it opens: see <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy
+or Real Devices: --simulate</a>.</p>
 <p>Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
 own, which is why each has a type of its own below.</p>
@@ -1666,7 +1671,7 @@ can_fd         true | false, default false -- CAN FD frames rather than
                than eight bytes
 loopback       true | false, default true -- whether the controller gives
                frames to other sockets on this host, which is what lets
-               tcssim stand in for the payload
+               tcssim simulate the payload
 </pre>
 <p>Both halves of where it is are required. Several payloads commonly share one
 bus and differ only in the identifier, which is the arrangement an
@@ -1676,14 +1681,14 @@ each read the other's frames.</p>
 <p>A frame is its own length and carries eight bytes, or sixty-four as CAN FD,
 and CAN does not fragment -- so a <tt class="docutils literal">read_size</tt> larger than a frame is
 refused where the file is read rather than discovered a frame at a time. The
-simulator's segment settings still apply: a stand-in's packet may go as
-several frames, each a segment.</p>
+simulator's segment settings still apply: a simulated payload's packet may
+go as several frames, each a segment.</p>
 <p>A CAN payload may be triggered, unlike a payload on an
 I<sup>2</sup>C bus. The handler sends its trigger with the same
 identifier, and the socket does not receive its own frames, so a handler never
 reads back the trigger it just sent.</p>
 <p>The simulator joins the same bus as another member of it, so both ends are
-real -- the one type whose stand-in is as faithful as a socket.
+real -- the one type whose dummy device is as faithful as a socket.
 What it cannot do is make the bus: a virtual one needs</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>ip<span class="whitespace"> </span>link<span class="whitespace"> </span>add<span class="whitespace"> </span>dev<span class="whitespace"> </span>vcan0<span class="whitespace"> </span><span class="name builtin">type</span><span class="whitespace"> </span>vcan<span class="whitespace">
@@ -1712,11 +1717,11 @@ prints in the angle brackets:</p>
 <span class="generic prompt">$ </span>ip<span class="whitespace"> </span>-brief<span class="whitespace"> </span>link<span class="whitespace"> </span>show<span class="whitespace"> </span><span class="name builtin">type</span><span class="whitespace"> </span>vcan<span class="whitespace">
 </span><span class="generic output">vcan0            UNKNOWN        &lt;NOARP,UP,LOWER_UP&gt;</span>
 </pre>
-<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> flies <a class="reference internal" href="#the-can-example">The can example</a> on such a
+<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies <a class="reference internal" href="#the-can-example">The can example</a> on such a
 bus, playing the motor itself with a socket of its own rather than with
 tcssim: a frame it puts on the bus reaches the ground, and a command the
-ground sends reaches it as a frame. <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> can</tt>
-makes the bus; see <a class="reference internal" href="#making-the-kernel-s-stand-ins">Making the Kernel's Stand-ins</a>.</p>
+ground sends reaches it as a frame. <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span> can</tt>
+makes the bus; see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>.</p>
 </div>
 <div class="section" id="a-gpio-payload">
 <h2><a class="toc-backref" href="#toc-entry-19">A GPIO Payload</a></h2>
@@ -1815,12 +1820,12 @@ rather than assumed; <tt class="docutils literal">bin/rmgpio</tt> takes it away 
 simulated set of discretes, and neither do the faults -- there are no bytes to
 drop or corrupt; what it does is pull each of its lines the other way every
 packet interval.</p>
-<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> flies <a class="reference internal" href="#the-gpio-example">The gpio example</a> on such a
+<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies <a class="reference internal" href="#the-gpio-example">The gpio example</a> on such a
 chip, pulling and reading its lines itself rather than through tcssim: each
 pull of the switch's line reaches the ground as a record, and a <tt class="docutils literal">1</tt> or
 <tt class="docutils literal">0</tt> from the ground is what the lamp's line becomes. <tt class="docutils literal">sudo
-<span class="pre">bin/mk-kernel-stand-ins</span> gpio</tt> makes the chip and gives it, and its lines'
-pulls, to the user who ran it; see <a class="reference internal" href="#making-the-kernel-s-stand-ins">Making the Kernel's Stand-ins</a>.</p>
+<span class="pre">bin/mk-kernel-dummies</span> gpio</tt> makes the chip and gives it, and its lines'
+pulls, to the user who ran it; see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>.</p>
 </div>
 <div class="section" id="an-hdlc-payload">
 <h2><a class="toc-backref" href="#toc-entry-20">An HDLC Payload</a></h2>
@@ -1866,15 +1871,15 @@ nothing to tell two payloads on one line apart -- which is what makes this
 different from a CAN interface, where the identifier does exactly that.</p>
 <p>Bringing the interface up is the platform's business, as it is for a CAN
 controller: <tt class="docutils literal">ip link set dev hdlc0 up</tt>, from whatever starts the vehicle.</p>
-<p><strong>The kernel has no stand-in.</strong> Every other experimental type has something
+<p><strong>The kernel has no dummy device.</strong> Every other experimental type has something
 in the kernel to be run against -- <tt class="docutils literal">vcan</tt> for a CAN bus, <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> for a
 bus device, <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> for discrete lines, <tt class="docutils literal">iio_dummy</tt> for a sensor -- and
 generic HDLC has none: the line itself needs a card, a <tt class="docutils literal">wanxl</tt>, a
-<tt class="docutils literal">pci200syn</tt>, a <tt class="docutils literal">pc300too</tt> or a FarSync. A node that gives <tt class="docutils literal">stand_in</tt>, a
-loopback address and port, is reached there over UDP instead under
+<tt class="docutils literal">pci200syn</tt>, a <tt class="docutils literal">pc300too</tt> or a FarSync. A node that gives <tt class="docutils literal">sim_address</tt>,
+a loopback address and port, is reached there over UDP instead under
 <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, and tcssim sends its frames there; one that
-does not is hardware, and tcssim refuses to simulate it. See <a class="reference internal" href="#stand-ins-or-hardware-simulate">Stand-ins or
-hardware: --simulate</a>.</p>
+does not is hardware, and tcssim refuses to simulate it. See <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy
+or Real Devices: --simulate</a>.</p>
 </div>
 <div class="section" id="an-rpmsg-payload">
 <h2><a class="toc-backref" href="#toc-entry-21">An rpmsg Payload</a></h2>
@@ -1900,7 +1905,7 @@ not fragment, so a <tt class="docutils literal">read_size</tt> larger than one m
 the file is read.</p>
 <p>An rpmsg payload may be triggered: the channel carries both directions, so the
 handler writes a request and the remote answers.</p>
-<p>The simulator stands in for the channel with a pseudo-terminal. What a pty is
+<p>The simulator plays the channel with a pseudo-terminal. What a pty is
 not is a message boundary -- the rpmsg driver hands over one message per read
 where a pty hands over whatever bytes are there -- which shows only where a
 payload writes faster than the handler reads.</p>
@@ -1925,25 +1930,25 @@ stream rule: nothing has to say where a read ends.</p>
 <p>An IIO payload cannot be triggered. A buffer is a stream out of the sensor --
 there is nothing on that descriptor to write -- so a file asking for one is
 refused, as a datagram payload asking for one is.</p>
-<p>The simulator stands in for the buffer with a pseudo-terminal, as it does for
-a serial line: the path the handler was told to open leads to it while the
-payload runs. What it does not stand in for is the <tt class="docutils literal">sysfs</tt> half, the
+<p>The simulator plays the buffer with a pseudo-terminal, as it does for a
+serial line: the path the handler was told to open leads to it while the
+payload runs. What it does not simulate is the <tt class="docutils literal">sysfs</tt> half, the
 channels and the buffer -- which the handler does not touch either.</p>
 <p>A pty carries the bytes but is not a buffer, and the kernel offers something
 that is: <tt class="docutils literal">iio_dummy</tt>, a sensor with no sensor in it, whose buffer a software
-trigger fills on a timer. There is no simulator side to that one -- a buffer
-is a stream out of the device and an IIO payload cannot be triggered, so the
-dummy <em>is</em> the payload and tcspecial reads it, which makes it the more
-faithful of the two stand-ins. <tt class="docutils literal">bin/mkiio</tt> makes one and prints the node to
+trigger fills on a timer. There is no simulator side to that one -- a buffer is
+a stream out of the device and an IIO payload cannot be triggered, so the dummy
+<em>is</em> the payload and tcspecial reads it, which makes the dummy device more
+faithful than the simulated one. <tt class="docutils literal">bin/mkiio</tt> makes one and prints the node to
 name in a configuration, and <tt class="docutils literal">bin/rmiio</tt> takes it away; a host's own sensors
 sit in the same numbering and are left alone, which is why the scripts go by
 name and not by number.</p>
-<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> is written to fly <a class="reference internal" href="#the-iio-example">The iio example</a>
+<p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> is written to fly <a class="reference internal" href="#the-iio-example">The iio example</a>
 on the dummy, checking that what reaches the ground is the kernel's samples,
 in whole sample sets. The dummy has a buffer only where the kernel was built
 with <tt class="docutils literal">CONFIG_IIO_SIMPLE_DUMMY_BUFFER</tt>, which a stock distribution kernel's
 is not -- Ubuntu's is not -- and without one there is no
-<tt class="docutils literal">/dev/iio:deviceN</tt> to read; <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> iio</tt> says so
+<tt class="docutils literal">/dev/iio:deviceN</tt> to read; <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span> iio</tt> says so
 before making anything, and the test says so where it skips. That test is
 what promotes the type, once it has passed.</p>
 </div>
@@ -2013,7 +2018,7 @@ point-to-point mode on a two-wire bus transmits into other transmitters. A
 line that will not take what the file asked for is refused rather than
 started.</p>
 <p>A simulated line is a pseudo-terminal, which has no transceiver and no RTS
-and would refuse the mode. On a line that is a stand-in tcspecial leaves the
+and would refuse the mode. On a simulated line tcspecial leaves the
 RS-485 terms unapplied, and says so as it starts; tcssim, at the far end,
 receives and sends the bus's bytes as on any line. So a set that states
 <tt class="docutils literal">rs485</tt> runs against tcssim as it is, and what goes unexercised is only the
@@ -2127,9 +2132,9 @@ can answer to one of those. With ten-bit addressing the whole range 0x000
 through 0x3FF is usable.</p>
 <p>There is no parity or byte length. I<sup>2</sup>C fixes the framing at
 eight data bits, most significant first, followed by an acknowledge bit.</p>
-<p>Such a payload cannot be triggered by a simulated stand-in: the master's own
+<p>Such a payload cannot be triggered by tcssim: the master's own
 read is the request, and a second master on the bus cannot see it.</p>
-<p>What stands in for the device is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, an adapter whose
+<p>The dummy device for it is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, an adapter whose
 chips are a bank of registers in memory: tcssim writes the bank and tcspecial
 reads it. The simulator finds that adapter rather than making one -- loading a
 module needs root -- and says how to make one if there is none.
@@ -2175,12 +2180,13 @@ fixed to a thermal mass: on an I2C bus, or a SPI peripheral. In flight each
 is the device on its bus, and says what an <tt class="docutils literal">i2c</tt> or a <tt class="docutils literal">spi</tt> node says,
 read the same way; what the type adds is what it is, and one attribute:</p>
 <pre class="code text literal-block">
-stand_in       a loopback address and port: 127.0.0.1:5201. Under
+sim_address    a loopback address and port: 127.0.0.1:5201. Under
                --simulate=some or all tcspecial reaches the sensor there
                over UDP instead of opening its bus, and tcssim answers
                with the temperature of the thermal mass the simulator
                file joins it to; under none, the flight setting, the bus
-               is opened
+               is opened. Its old name, stand_in, is refused, naming
+               sim_address
 </pre>
 <p>In the simulator file each is listed under its own type and joined to the
 thermal mass's <tt class="docutils literal">temperature</tt> by <tt class="docutils literal">connects</tt>, as the thermostat example's
@@ -2192,15 +2198,15 @@ are:</p>
         </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x48&quot;</span><span class="whitespace">
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
-        </span><span class="name tag">stand_in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5201&quot;</span>
+        </span><span class="name tag">sim_address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:5201&quot;</span>
 </pre>
 <p>A build has each as a Cargo feature of its own, which brings in its bus's:
 <tt class="docutils literal"><span class="pre">--features</span> i2c_tmass</tt> builds the I2C bus with it.</p>
 </div>
-<div class="section" id="making-the-kernel-s-stand-ins">
-<h2><a class="toc-backref" href="#toc-entry-27">Making the Kernel's Stand-ins</a></h2>
+<div class="section" id="making-the-kernel-s-dummy-devices">
+<h2><a class="toc-backref" href="#toc-entry-27">Making the Kernel's Dummy Devices</a></h2>
 <p>The CAN and GPIO types are supported because each is flown against the
-kernel's own stand-in for its device: a virtual CAN bus, <tt class="docutils literal">vcan0</tt>, and a
+kernel's dummy device for it: a virtual CAN bus, <tt class="docutils literal">vcan0</tt>, and a
 chip of <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> with eight lines. The experimental IIO type has a test
 written the same way, against a sensor of <tt class="docutils literal">iio_dummy</tt> whose buffer an
 <tt class="docutils literal">hrtimer</tt> trigger fills a hundred times a second, where the kernel's
@@ -2208,11 +2214,11 @@ written the same way, against a sensor of <tt class="docutils literal">iio_dummy
 tests nor tcssim do; one command does, run once with sudo from the account
 that runs the tests:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>bin/mk-kernel-stand-ins<span class="whitespace">
-</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>kernel-stand-ins-test
+<span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>bin/mk-kernel-dummies<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>kernel-dummies-test
 </pre>
 <p>With no arguments the first makes the CAN bus and the GPIO chip; named
-types are made alone, and <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> iio</tt> makes the
+types are made alone, and <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span> iio</tt> makes the
 IIO sensor, or <tt class="docutils literal">can gpio iio</tt> all three. It checks that the kernel has
 every module the types asked for need -- <tt class="docutils literal">vcan</tt> and <tt class="docutils literal"><span class="pre">can-raw</span></tt>;
 <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>; <tt class="docutils literal"><span class="pre">industrialio-configfs</span></tt>, <tt class="docutils literal"><span class="pre">iio-trig-hrtimer</span></tt> and an
@@ -2223,14 +2229,14 @@ its lines' pulls, the sensor's buffer -- to the user who ran sudo, since the
 kernel makes them root's and the tests are run as the user; a raw CAN socket
 is anyone's to open, so the bus needs nothing. The GPIO chip and the sensor
 are numbered as devices appear, and the scripts print the numbers they got.</p>
-<p>The second runs <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> alone, saying which
-tests flew and which skipped. <tt class="docutils literal">cargo test</tt> runs the same tests; one whose
-device is not there, or not this user's to use, passes having tested nothing,
-and says so -- which device, and the command that makes it -- where
-<tt class="docutils literal"><span class="pre">--nocapture</span></tt> shows it. The tests bind no fixed port, so they run beside
-anything else; they do use the devices, and <tt class="docutils literal">make <span class="pre">stand-ins-test</span></tt> uses the
-same bus and chip, so the two are not run at once.</p>
-<p><tt class="docutils literal">sudo <span class="pre">bin/rm-kernel-stand-ins</span></tt> takes away whichever were made. Nothing either
+<p>The second runs <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> alone, saying which tests
+flew and which skipped. <tt class="docutils literal">cargo test</tt> runs the same tests; one whose device is
+not there, or not this user's to use, passes having tested nothing, and says so
+-- which device, and the command that makes it -- where <tt class="docutils literal"><span class="pre">--nocapture</span></tt> shows
+it. The tests bind no fixed port, so they run beside anything else; they do use
+the devices, and <tt class="docutils literal">make <span class="pre">simulated-devices-test</span></tt> uses the same bus and chip, so
+the two are not run at once.</p>
+<p><tt class="docutils literal">sudo <span class="pre">bin/rm-kernel-dummies</span></tt> takes away whichever were made. Nothing either
 does survives a reboot, so the first is run again after one.</p>
 </div>
 <div class="section" id="what-the-configuration-will-not-let-pass">
@@ -2400,7 +2406,7 @@ one and disabled in the other; they were the payload's own, <tt class="docutils 
 <p>A heater, or any part the vehicle drives, sends nothing, so in tcssim the
 same button is its power. Disabled -- as every payload starts, unless tcssim
 is given <tt class="docutils literal"><span class="pre">--sending</span></tt> -- it is unpowered, or failed, and stays off whatever
-the vehicle, or a thermostat tcssim stands in for, decides: it gives the
+the vehicle, or a thermostat tcssim plays, decides: it gives the
 simulated world no heat. What it is sent meanwhile is kept, the latest
 replacing the one before, and <tt class="docutils literal">Enable</tt> applies that latest at once, since
 the vehicle sends a decision only when it changes. Nothing aboard changes:
@@ -2416,7 +2422,7 @@ what the spacecraft says to the command is the thing worth finding out.</p>
 and spelled the same way in each. It shows every
 parameter read for that payload: what the tcspecial configuration said about
 the payload and how it is reached, and what the simulator configuration said
-about how a stand-in for it behaves, each under the name of the file it came
+about how tcssim simulates it, each under the name of the file it came
 from.</p>
 <p>It shows nothing but what the files said. What a payload has actually done is
 on the panel itself, and only the attributes of that payload's own type appear
@@ -2547,7 +2553,7 @@ converted to kelvin, voted on, logged and sent to the ground, with a
 thermostat driving two heaters, each through a GPIO line,
 and two more lines sensing the heaters reported to the ground. Each
 sensor is the far end of a UDP socket and each line one of the
-kernel's simulated chip, which tcssim stands in for.</object>
+kernel's dummy chip, which tcssim drives.</object>
 <p class="caption"><tt class="docutils literal">examples/thermostat</tt>: a trio of sensors, a vote, a thermostat, its two
 heaters, and the lines that say what the heaters are doing.</p>
 </div>
@@ -2560,13 +2566,13 @@ the hardware allows.</p>
 them: <tt class="docutils literal">temp_1</tt> and <tt class="docutils literal">temp_2</tt> on an I<sup>2</sup>C bus, of type
 <tt class="docutils literal">i2c_tmass</tt>, and <tt class="docutils literal">temp_3</tt> a SPI peripheral, of type <tt class="docutils literal">spi_tmass</tt> --
 see <a class="reference internal" href="#temperature-sensors-on-a-thermal-mass">Temperature Sensors on a Thermal Mass</a>. On a desk each is reached over
-UDP at its <tt class="docutils literal">stand_in</tt> on this host, ports 5201 to 5203, where tcssim answers
-with the zone's temperature, so that the example touches no bus; flown, the
-buses are opened. The
+UDP at its <tt class="docutils literal">sim_address</tt> on this host, ports 5201 to 5203, where tcssim
+answers with the zone's temperature, so that the example touches no bus;
+flown, the buses are opened. The
 heaters, and the lines that sense them, are GPIO lines 2 to 5 of the kernel's
-simulated chip, <tt class="docutils literal">/dev/gpiochip1</tt>, which tcssim moves and watches: <tt class="docutils literal">sudo
-<span class="pre">bin/mk-kernel-stand-ins</span> gpio</tt> makes it, once, before the example is run --
-see <a class="reference internal" href="#making-the-kernel-s-stand-ins">Making the Kernel's Stand-ins</a>. The gpio example has lines 0 and 1, so
+dummy chip, <tt class="docutils literal">/dev/gpiochip1</tt>, which tcssim moves and watches: <tt class="docutils literal">sudo
+<span class="pre">bin/mk-kernel-dummies</span> gpio</tt> makes it, once, before the example is run --
+see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>. The gpio example has lines 0 and 1, so
 the two run at once; the thermostat-yamcs example has the same lines as this,
 so it and this do not.</p>
 <p>The three are sensors of <em>one place</em>, separated only because two parts cannot
@@ -2619,8 +2625,8 @@ alone.</p>
 <p>No payload here has a telemetry link of its own: the sensors' readings reach
 the ground through their conversions, the heaters' switches are driven and
 never read, and the lines sensing the heaters are drawn into the gateway node.
-Tcssim's stand-ins for the switches count each decision the vehicle drives
-them to, and its stand-in for <tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt> pulls each of its lines to its
+Tcssim counts each decision the vehicle drives the switches to, and pulls
+each of <tt class="docutils literal"><span class="pre">gpio-in-tmass</span></tt>'s lines to its
 heater's <tt class="docutils literal">heating</tt> -- <tt class="docutils literal">connects: heater_1.heating, heater_2.heating</tt>, one
 terminal for each line, in the order of the node's lines.</p>
 <p>The command binding on the gateway node says the ground may set the
@@ -2637,8 +2643,8 @@ the same vehicle with Yamcs as its ground station, links to too. Its world
 holds the vehicle's physics model: a zone and two heaters joined to it.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
-noise, which is what the model is for; each heater's switch's stand-in
-switches its heater while the vehicle has it on. So the loop closes through tcspecial: see
+noise, which is what the model is for; tcssim switches each heater while the
+vehicle has its switch on. So the loop closes through tcspecial: see
 <strong>The Simulator Configuration</strong> below. Naming the <tt class="docutils literal">thermostat</tt> node in the file's
 <tt class="docutils literal">tcssim</tt> section closes it in tcssim alone instead, with no tcspecial
 running.</p>
@@ -2743,7 +2749,7 @@ to the altitude -- six hundredths of it a second, between twenty and one --
 and answers the throttle that holds the lander's weight and closes the gap
 between the rate it has and the rate it wants, as a <tt class="docutils literal">ratio</tt>. Its answers go
 by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> link to <tt class="docutils literal">engine</tt>, the engine's throttle, which is
-driven with a value: four bytes of millionths, read by the stand-in as the
+driven with a value: four bytes of millionths, read by tcssim as the
 ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.</p>
 <p><tt class="docutils literal">doppler</tt>, a Doppler velocimeter, sends the velocity five times a second,
@@ -2757,12 +2763,13 @@ and a half, five hundred metres up and falling at twenty metres a second in
 the Moon's gravity, the engine's force and the fuel it burns joined to it. The
 body falls by the rocket equation in closed form, and the moment it reaches
 the ground -- which no closed form gives -- is found ahead of time and met
-exactly. The touchdown switch's stand-in waits on the model for that moment
+exactly. tcssim's touchdown switch waits on the model for that moment
 rather than for its next turn to send, so the vehicle hears of the landing
 when it happens. A run lands in about seventy-five seconds, at a metre and a
 half a second, with a third of the fuel left.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-descent</span></tt> runs it, on any desk. The lander does not
-start falling until a stand-in is started -- the run begins when one first
+start falling until a simulated payload is started -- the run begins when
+one first
 asks the model anything -- so enable <tt class="docutils literal">engine</tt> and <tt class="docutils literal">radar</tt> in tcssim first,
 and the rest after.</p>
 </div>
@@ -3071,7 +3078,8 @@ between the ground station and the vehicle, over CCSDS packets.</p>
 </div>
 <p>The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
-simulator file, with the physics model tcssim joins its stand-ins to: each
+simulator file, with the physics model tcssim joins its simulated payloads
+to: each
 example's is a link to <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>,
 so that each is found beside its configuration by name. The vehicle is
 written once, in <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat.ytcs</span></tt> and its
@@ -3187,7 +3195,7 @@ the <tt class="docutils literal">heater</tt>.</p>
 node that makes each a temperature, and that goes to <tt class="docutils literal">fsw</tt> as well: device
 id 4, <tt class="docutils literal">127.0.0.1:9704</tt>, channel <tt class="docutils literal">0x3004</tt>. In the simulator file the
 thermometer reports a zone of the physics model, in the encoding <tt class="docutils literal">zone_temp</tt>
-reads back, and the heater's stand-in switches a heater warming it, so that what the
+reads back, and tcssim's heater switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.</p>
 <p><tt class="docutils literal">zone_temp</tt>'s temperatures go on to <tt class="docutils literal">heater_wanted</tt>, a <tt class="docutils literal">thermostat</tt>
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
@@ -3402,18 +3410,19 @@ subscriptions carry another ident, is refused and disconnected, and the
 refusal is logged with what was expected and what arrived each time it
 connects again.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-cfs</span></tt> runs tcsmoc on the example as
-<tt class="docutils literal"><span class="pre">run-fprime</span></tt> does on its own. tcssim stands in for the cFS side as well as
-for the payloads: it binds <tt class="docutils literal">sbn.peer</tt> and is the software bus, with the
+<tt class="docutils literal"><span class="pre">run-fprime</span></tt> does on its own. tcssim simulates the cFS side as well as
+the payloads: it binds <tt class="docutils literal">sbn.peer</tt> and is the software bus, with the
 vehicle and tcsmoc both its peers, so tcsmoc's beacon light, its panels and
 its commands work as they do for a vehicle on the radio. tcsmoc joins as
 processor 3, one more than the larger of <tt class="docutils literal">processor_id</tt> and
 <tt class="docutils literal">peer_processor_id</tt>, and needs nothing more in the file. Everything built
 on tcslib -- the C/C++ library included -- does the same with no change to
 the station.</p>
-<p>Two things follow. tcssim stands in for the cFS side whenever it runs on a
+<p>Two things follow. tcssim simulates the cFS side whenever it runs on a
 configuration that answers to cFS, so it is not run beside a real cFS, which
 would be holding <tt class="docutils literal">sbn.peer</tt> itself; tcssim says so and stops if it finds
-the address taken. And a ground station can join only the stand-in: SBN on a
+the address taken. And a ground station can join only the simulated cFS
+side: SBN on a
 real cFS never sends one peer what another published, so behind a real cFS
 the vehicle is commanded from that cFS's own ground system, under the
 message IDs above.</p>
@@ -3422,7 +3431,8 @@ the cFS side's SBN: tcspecial subscribes, the beacon and a reading are
 published, a CONNECT and a node command are answered under their answer IDs,
 a command whose checksum is wrong is not, and a command for <tt class="docutils literal">fsw</tt> reaches
 the heater. <tt class="docutils literal">tcspecial/tests/cfs_ground.rs</tt> commands it from tcslib
-through the stand-in. The payloads' ports are in the eighty-six hundreds,
+through the simulated cFS side. The payloads' ports are in the eighty-six
+hundreds,
 which no other example uses.</p>
 <p><tt class="docutils literal">make <span class="pre">cfs-test</span></tt> flies the example against a real cFS. It builds cFS with
 SBN v7.0.1 and its UDP module in <tt class="docutils literal">CFS_SCRATCH</tt> (by default
@@ -3461,10 +3471,10 @@ device id, <tt class="docutils literal">127.0.0.1:3702</tt>. What the ground sen
 binds <tt class="docutils literal">127.0.0.1:3600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> for
 <tt class="docutils literal">motor_command</tt> and goes out as one frame, so a command is at most eight
 bytes.</p>
-<p><tt class="docutils literal">vcan0</tt> is the kernel's virtual bus, which <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span></tt>
+<p><tt class="docutils literal">vcan0</tt> is the kernel's virtual bus, which <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span></tt>
 makes; on a vehicle the interface is the controller's, such as <tt class="docutils literal">can0</tt>, and
 nothing else changes. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-can</span></tt> runs tcsmoc on the example,
-with tcssim on the bus as the motor. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt>
+with tcssim on the bus as the motor. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>
 flies it with the test as the motor. Every port the example uses is in the
 thirty-two to thirty-seven hundreds, ending in 00 or 10, which no other
 example uses.</p>
@@ -3486,12 +3496,12 @@ the MOC at <tt class="docutils literal">127.0.0.1:3722</tt>. <tt class="docutils
 up to <tt class="docutils literal">127.0.0.1:3620</tt> leaves <tt class="docutils literal">ground</tt> by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> for it, the
 text <tt class="docutils literal">1</tt> lighting the lamp and <tt class="docutils literal">0</tt> putting it out.</p>
 <p>The chip is one of the kernel's <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, which <tt class="docutils literal">sudo
-<span class="pre">bin/mk-kernel-stand-ins</span></tt> makes. The configuration names <tt class="docutils literal">/dev/gpiochip1</tt>,
+<span class="pre">bin/mk-kernel-dummies</span></tt> makes. The configuration names <tt class="docutils literal">/dev/gpiochip1</tt>,
 which is what that chip is on a host with one chip of its own; the number is
 given as chips appear, so a host with another number writes the one the
 script printed. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-gpio</span></tt> runs tcsmoc on the example,
 with tcssim pulling the switch's line every second and counting the lamp's
-changes. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> flies it, pulling and
+changes. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies it, pulling and
 reading the lines itself. Every port is in the thirty-two to thirty-seven
 hundreds, ending in 20 or 30.</p>
 </div>
@@ -3511,12 +3521,12 @@ channels are in a set and how often one is taken are the sensor's settings,
 made in <tt class="docutils literal">sysfs</tt> by whoever brings it up, and nothing in the configuration.</p>
 <p>The <tt class="docutils literal">iio</tt> type is experimental, and this example is what its test flies:
 see <a class="reference internal" href="#an-iio-payload">An IIO Payload</a>. The sensor is one of the kernel's <tt class="docutils literal">iio_dummy</tt>, which
-<tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-stand-ins</span> iio</tt> makes where the kernel's has a buffer,
-its buffer filled by a timer, so the kernel
-stands in for it entirely and tcssim makes nothing. The configuration names
+<tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span> iio</tt> makes where the kernel's has a buffer,
+its buffer filled by a timer, so the dummy device
+is the whole payload and tcssim makes nothing. The configuration names
 <tt class="docutils literal">/dev/iio:device1</tt>, which is what the dummy is on a host with one sensor of
 its own; write the number the script printed. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-iio</span></tt>
-runs tcsmoc on the example, and <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-stand-ins.rs</span></tt> is
+runs tcsmoc on the example, and <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> is
 written to fly it, checking that what arrives is whole sample sets. Every port
 is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.</p>
 </div>
@@ -3543,9 +3553,9 @@ simulated_payloads              a list of types
   type &lt;type&gt;          the type of payload, as the tcspecial
                        configuration writes it, holding the list of
                        the simulated payloads of that type
-    payload            the payload this one stands in for, naming the
+    payload            the payload this one simulates, naming the
                        entry
-    simulate           true for tcssim to stand in for it, false for the
+    simulate           true for tcssim to simulate it, false for the
                        real device: required, here or in its group
     protocol           which transport, for a network payload
     payload_address    the socket the payload answers from, if this file
@@ -3567,7 +3577,7 @@ in any order. A file in the shape before this one, each payload with
 entry; <tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites it, keeping its comments.</p>
 <p><strong>Simulated or real: simulate</strong></p>
 <p>Every payload the file names says whether it is simulated, with <tt class="docutils literal">simulate</tt>:
-<tt class="docutils literal">true</tt> has tcssim stand in for it, and <tt class="docutils literal">false</tt> leaves it to the real
+<tt class="docutils literal">true</tt> has tcssim simulate it, and <tt class="docutils literal">false</tt> leaves it to the real
 device, for which tcssim makes nothing. It is said once -- in the payload, or
 in the group it names -- and never in both, even where the two would agree: a
 payload does not override its group's. A payload the file does not name is
@@ -3585,20 +3595,22 @@ real too.</p>
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span>
 </pre>
-<p>Before it stands in for anything, tcssim compares each payload's <tt class="docutils literal">simulate</tt>
+<p>Before it simulates anything, tcssim compares each payload's <tt class="docutils literal">simulate</tt>
 with what is at the payload's endpoint, by the same rules tcspecial judges a
-stand-in by (see <a class="reference internal" href="#stand-ins-or-hardware-simulate">Stand-ins or hardware: --simulate</a>), and will not start on
-a disagreement: <tt class="docutils literal">simulate: true</tt> where the configuration points at real
-hardware, or <tt class="docutils literal">simulate: false</tt> where it points at a stand-in. A stand-in
-tcssim makes itself, a pseudo-terminal, a file or a socket, is not there
-yet, and
-that is no disagreement; one the scripts in <tt class="docutils literal">bin/</tt> make has to be. A
-payload the file does not name whose endpoint is a stand-in all the same is
-refused too: tcssim controls and shows every simulated device, so each one
-is named.</p>
-<p>Each simulated payload has the same panel, whatever stands in for it: its
+payload by (see <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy or Real Devices: --simulate</a>), and will
+not start on a disagreement: <tt class="docutils literal">simulate: true</tt> where the configuration
+points at real hardware, or <tt class="docutils literal">simulate: false</tt> where it points at a
+simulated or dummy device. A simulated device tcssim makes itself, a
+pseudo-terminal or a socket, is not there yet, and that is no disagreement;
+a dummy device, which the scripts in <tt class="docutils literal">bin/</tt> make, has to be. A payload the
+file does not name whose endpoint is a simulated or dummy device all the
+same is refused too: tcssim controls and shows every simulated payload, so
+each one is named. A <tt class="docutils literal">network</tt> or <tt class="docutils literal"><span class="pre">device-file</span></tt> payload is a real device
+either way and is not compared: <tt class="docutils literal">simulate: true</tt> has tcssim answer at its
+far end, and <tt class="docutils literal">false</tt> leaves it to whatever is there.</p>
+<p>Each simulated payload has the same panel, whatever simulates it: its
 button, which has it take part or not, and what it sent and what reached it.
-Where the operating system makes the stand-in, tcssim watches it -- the
+Where the kernel makes a dummy device, tcssim watches it -- the
 lines of a <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> chip, the registers of an <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> chip -- and
 counts what the vehicle does to it. Two things cannot be seen: a read of an
 <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> chip, which changes nothing, and the samples an <tt class="docutils literal">iio_dummy</tt>
@@ -3606,7 +3618,7 @@ sensor's kernel trigger makes. A payload that is only driven, such as a
 heater, sends nothing, counts what the vehicle sends it, and takes no packet
 interval. Switched off, a payload sends nothing, answers nothing and acts on
 nothing -- a heater warms no mass -- and still counts what reaches it.</p>
-<p><strong>What it stands in for</strong></p>
+<p><strong>What it simulates</strong></p>
 <p>Two things describe the payload rather than the simulation, and are required
 for that reason. The two files are joined by handler name and by nothing else
 -- and a name is what a set copied from another one keeps -- so a simulator
@@ -3689,14 +3701,14 @@ it cannot be seen working.</p>
 <p>A physics model gives them something to agree about. It is the vehicle's
 physical parts -- a zone, the heaters that warm it -- each simulated alone and
 joined to the others. Join the sensors to what they measure and the heaters'
-stand-ins to the heaters, and what the vehicle reads becomes a consequence of
+switches to the heaters, and what the vehicle reads becomes a consequence of
 what the vehicle drove.</p>
-<p>The model is in the simulator file's <tt class="docutils literal">world</tt> section, beside the stand-ins
-joined to it, so that one file says the whole of what tcssim simulates and a
-stand-in's <tt class="docutils literal">connects</tt> names a terminal the same file says is there. Two
+<p>The model is in the simulator file's <tt class="docutils literal">world</tt> section, beside the simulated
+payloads joined to it, so that one file says the whole of what tcssim simulates
+and a payload's <tt class="docutils literal">connects</tt> names a terminal the same file says is there. Two
 examples that fly one vehicle share it by sharing the whole simulator file, a
-link to it beside each configuration. The world is YAML only: a simulator
-file written in XML has none.</p>
+link to it beside each configuration. The world is YAML only: a simulator file
+written in XML has none.</p>
 <pre class="code text literal-block">
 world                  in the simulator file. Optional
   ambient_temp         the temperature every thermal mass's surroundings
@@ -3749,7 +3761,7 @@ to a sensor -- tcsgui asks which.</p>
 <p>Each component is one simple part, of one of these types:</p>
 <pre class="code text literal-block">
 heater                 a resistance on a supply, switched on and off
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   power                what it gives out while on, at its nominal
                        voltage: &quot;60 W&quot;
   voltage              its supply's nominal voltage: &quot;28 V&quot;
@@ -3760,7 +3772,7 @@ heater                 a resistance on a supply, switched on and off
 
 thermal_mass           one body at one temperature, in surroundings
                        about the world's ambient_temp
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   time_constant        how fast it loses the difference, as a length
                        of time
   capacity             how much heat it takes to warm it a kelvin:
@@ -3777,7 +3789,7 @@ thermal_mass           one body at one temperature, in surroundings
                        it starts at ambient_temp
 
 sun                    sunlight and shadow, through an orbit
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   period               how long one orbit takes: &quot;90 min&quot;
   eclipse              how much of it is in shadow, as a fraction,
                        written bare: &quot;0.35&quot;
@@ -3785,18 +3797,18 @@ sun                    sunlight and shadow, through an orbit
                        of its sunlight, as a fraction. Optional
 
 solar_array            panels turning light into current
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   current              what it gives in full sunlight: &quot;7 A&quot;
 
 load                   something on the bus that draws a current
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   current              what it draws while it is on: &quot;2 A&quot;
 
 bus                    where the sources' currents and the loads' meet
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
 
 battery                a store of charge on the bus
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   capacity             how much it holds full: &quot;10 Ah&quot;
   empty                its open-circuit voltage empty: &quot;24 V&quot;
   full                 its open-circuit voltage full, more than empty:
@@ -3805,14 +3817,14 @@ battery                a store of charge on the bus
   charge               how full it starts, as a fraction: &quot;0.6&quot;
 
 engine                 a throttled engine and its fuel
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   thrust               its thrust at full throttle: &quot;4500 N&quot;
   isp                  its specific impulse, as a length of time:
                        &quot;311 s&quot;
   fuel                 the fuel it starts with: &quot;100 kg&quot;
 
 body                   a mass falling under gravity, pushed and burning
-  component            the name connections and stand-ins use
+  component            the name connections and payloads use
   mass                 its mass at the start, fuel and all: &quot;1500 kg&quot;
   gravity              the gravity it falls in: &quot;1.62 m/s2&quot;
   altitude             how high it starts: &quot;500 m&quot;
@@ -3878,8 +3890,8 @@ and twenty watts, it would settle three hundred kelvin above its
 surroundings. It starts at the world's ambient temperature with the heaters off, because a
 vehicle coming up cold is the case a thermostat exists for, unless it states
 <tt class="docutils literal">start</tt>, and then there.</p>
-<p>A stand-in is joined to one terminal by a setting of its payload, which like
-every other setting may be stated on a group instead:</p>
+<p>A simulated payload is joined to one terminal by a setting of its own, which
+like every other setting may be stated on a group instead:</p>
 <pre class="code text literal-block">
 connects               the terminal it is joined to: zone.temperature,
                        heater_1.on. Joined to an output, it reports it;
@@ -3887,46 +3899,45 @@ connects               the terminal it is joined to: zone.temperature,
                        that watches lines names a decision for each line,
                        in the order of its lines: heater_1.heating,
                        heater_2.heating
-offset                 how far the place a reporting stand-in is on sits
+offset                 how far the place a reporting payload is on sits
                        from what its terminal says, in the terminal's
                        unit: &quot;+0.2 K&quot;. Optional
 </pre>
-<p>A stand-in joined to an output reports a value in the encoding of the
-conversion its readings go to, and a decision -- a lander's contact with the
-ground -- as the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>: at once when it changes, waiting on the
-model for the moment rather than for its next turn, and again every packet
-interval. A stand-in joined to an input drives it with what the vehicle sends:
-a decision, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, or a value, four bytes of its unit's steps, which
-has to come from a node sending that unit -- an engine's throttle from a
-<tt class="docutils literal">process</tt> answering a <tt class="docutils literal">ratio</tt>. An input is driven by one stand-in, and not by one and
-a connection too: two would each switch it over the other. A heater's <tt class="docutils literal">on</tt>
-that nothing drives is refused, being a part nothing can switch, and so is a
-component nothing is joined to, which is most likely a misspelled
-<tt class="docutils literal">connects</tt>.
+<p>A payload joined to an output reports a value in the encoding of the conversion
+its readings go to, and a decision -- a lander's contact with the ground -- as
+the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>: at once when it changes, waiting on the model for the
+moment rather than for its next turn, and again every packet interval. A
+payload joined to an input drives it with what the vehicle sends: a decision,
+<tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, or a value, four bytes of its unit's steps, which has to come
+from a node sending that unit -- an engine's throttle from a <tt class="docutils literal">process</tt>
+answering a <tt class="docutils literal">ratio</tt>. An input is driven by one payload, and not by one and a
+connection too: two would each switch it over the other. A heater's <tt class="docutils literal">on</tt> that
+nothing drives is refused, being a part nothing can switch, and so is a
+component nothing is joined to, which is most likely a misspelled <tt class="docutils literal">connects</tt>.
 A GPIO payload that watches lines is pulled rather than signalled: each of its
 lines is held high while its terminal's decision is on, and looked at every
-packet interval -- a line sensing a heater, pulled to the heater's
-<tt class="docutils literal">heating</tt>, which is on only while the heater is really heating, so a heater
-disabled in tcssim reads low whatever it is told. One terminal for each line
-is required, and a list of terminals anywhere else is refused.
-The settings that joined a payload to a thermal mass -- <tt class="docutils literal">reads</tt>, <tt class="docutils literal">heats</tt>,
-<tt class="docutils literal">output</tt>, <tt class="docutils literal">input</tt>, <tt class="docutils literal">rate</tt> -- are refused, told what says it now.</p>
+packet interval -- a line sensing a heater, pulled to the heater's <tt class="docutils literal">heating</tt>,
+which is on only while the heater is really heating, so a heater disabled in
+tcssim reads low whatever it is told. One terminal for each line is required,
+and a list of terminals anywhere else is refused. The settings that joined a
+payload to a thermal mass -- <tt class="docutils literal">reads</tt>, <tt class="docutils literal">heats</tt>, <tt class="docutils literal">output</tt>, <tt class="docutils literal">input</tt>,
+<tt class="docutils literal">rate</tt> -- are refused, told what says it now.</p>
 <p>A sensor sends the bytes the conversion its readings go to -- <tt class="docutils literal">to_kelvin</tt>
 or <tt class="docutils literal">to_value</tt> -- will read back as what it reports. The format, the scale
 and the offset are taken from that node, not stated here -- a scale written
 in two files is a scale that can disagree with itself -- so a sensor whose
 readings reach no conversion, or two, or one in another unit than its
 terminal, is refused.</p>
-<p>A heater's stand-in sends nothing: being driven is the whole of what it is
+<p>A simulated heater sends nothing: being driven is the whole of what it is
 for. Its packet interval is how often it looks for what the vehicle decided,
 which is the one thing pacing still means for a payload that sends nothing,
 and it wants to be shorter than the sample interval: the vehicle cannot see
 the band crossed until its next sample and the heaters cannot hear about it
 until they next look, so the zone overshoots by their heat over the sum of
 the two.</p>
-<p>A heater's stand-in has to be a payload the simulator can be driven through:
-a socket, or a set of discrete lines, whose stand-in watches the lines the
-vehicle drives.</p>
+<p>A simulated heater has to be a payload the simulator can be driven through:
+a socket, or a set of discrete lines, which tcssim watches as the vehicle
+drives them.</p>
 <p>A simulator file with a model, and its payloads joined to it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
@@ -3970,18 +3981,18 @@ vehicle drives.</p>
 </span><span class="name tag">          protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">udp</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
 <p><strong>How the world moves</strong></p>
-<p>tcssim makes one world of the model, which every stand-in joined to it
+<p>tcssim makes one world of the model, which every simulated payload joined to it
 shares, and nothing ticks: the world is brought up to a moment only when a
-stand-in reads or drives it, and a world nobody asks about costs nothing.
-Between two moments each component is advanced by its closed form, so what
-a sensor reads does not depend on how often it is read. Where a component's
-behaviour would change inside an interval -- a battery reaching full, the
-sun going into shadow, a lander reaching the ground -- it foresees the moment
-as an event, and the world stops there, lets it happen, and goes on, the events waiting in order of when they fall. Simulated time
-keeps pace with the wall clock, which the vehicle runs on, from when the run
-begins: the first time a running stand-in asks the world anything. Until then
-the world waits, so a lander is still where it starts when its radar is
-enabled.</p>
+simulated payload reads or drives it, and a world nobody asks about costs
+nothing. Between two moments each component is advanced by its closed form, so
+what a sensor reads does not depend on how often it is read. Where a
+component's behaviour would change inside an interval -- a battery reaching
+full, the sun going into shadow, a lander reaching the ground -- it foresees
+the moment as an event, and the world stops there, lets it happen, and goes on,
+the events waiting in order of when they fall. Simulated time keeps pace with
+the wall clock, which the vehicle runs on, from when the run begins: the first
+time a running simulated payload asks the world anything. Until then the world
+waits, so a lander is still where it starts when its radar is enabled.</p>
 <p><strong>Physically realistic noise</strong></p>
 <p>A simulated sensor reports the zone exactly, and three of them agree to the
 count, which real ones never do. Real readings go wrong in two places, and
@@ -4006,10 +4017,10 @@ lag                    its own time constant, as a length of time: a
                        sensor is a small body of its own and follows the
                        one it is on that far behind
 </pre>
-<p>A sensor's errors are refused on a stand-in that drives. At a heater, its
-<tt class="docutils literal">ripple</tt> and <tt class="docutils literal">ripple_time</tt>; in the zone, its <tt class="docutils literal">swing</tt>, <tt class="docutils literal">period</tt>,
+<p>A sensor's errors are refused on a simulated payload that drives. At a heater,
+its <tt class="docutils literal">ripple</tt> and <tt class="docutils literal">ripple_time</tt>; in the zone, its <tt class="docutils literal">swing</tt>, <tt class="docutils literal">period</tt>,
 <tt class="docutils literal">wander</tt> and <tt class="docutils literal">wander_time</tt>: what the world does is the model's, and what a
-stand-in gets wrong is the simulator file's.</p>
+simulated sensor gets wrong is the simulator file's.</p>
 <p>Everything that wanders -- a sensor's drift, the environment, a supply -- is
 an Ornstein-Uhlenbeck process: a departure drawn back towards nought, whose
 size is its standard deviation once settled and whose time is how long it
@@ -4033,8 +4044,8 @@ kelvin, with three hundredths of noise and four seconds of lag, and a better
 one; an environment swinging half a kelvin over ninety minutes and
 wandering a quarter of a kelvin; a start inside the band; places a fifth and three tenths of a kelvin off the middle;
 and supplies varying by two percent.</p>
-<p><strong>Standing in for the thermostat</strong></p>
-<p>tcssim can stand in for thermostat nodes as well, so that the loop closes
+<p><strong>Simulating the thermostat</strong></p>
+<p>tcssim can simulate thermostat nodes as well, so that the loop closes
 in the simulator alone, with no tcspecial running. Name the node in the
 <tt class="docutils literal">tcssim</tt> section -- or several, separated by commas, for a vehicle with a
 thermostat for each of several zones:</p>
@@ -4044,12 +4055,13 @@ thermostat for each of several zones:</p>
   </span><span class="name tag">thermostat</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span>
 </pre>
 <p>tcssim then takes each node's <tt class="docutils literal">setpoint</tt> and <tt class="docutils literal">half_band</tt> from the
-tcspecial configuration, and stands in for each alone. Its sensors are the
+tcspecial configuration, and simulates each alone. Its sensors are the
 simulated payloads reporting the world whose data reaches the node, and its
 heaters the simulated payloads driving it that data from the node reaches. A
 name left blank between commas, or written twice, is refused, and so are two
 nodes that switch one heater, which would each undo the other. Each reads
-each sensor's bytes as they leave the stand-in -- a dropped reading never
+each sensor's bytes as they leave the simulated sensor -- a dropped reading
+never
 arrives, and a truncated or corrupted one arrives as the vehicle would see
 it -- as the conversion the sensor feeds reads them, and decides on the
 median of each sensor's latest reading: more than the half band over the
@@ -5140,51 +5152,61 @@ overrides the quieter default as well.</p>
 </span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs
 </pre>
 </div>
-<div class="section" id="stand-ins-or-hardware-simulate">
-<h2><a class="toc-backref" href="#toc-entry-70">Stand-ins or hardware: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
-<p>Nothing in a configuration says whether a payload is the hardware or a
-stand-in for it, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
+<div class="section" id="simulated-dummy-or-real-devices-simulate">
+<h2><a class="toc-backref" href="#toc-entry-70">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
+<p>Nothing in a configuration says whether a payload is a real device, a dummy
+device the kernel makes under a real device's name or a simulated device
+tcssim makes, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
 and a real bus on the next. So each run says which kind of run it is, with
 <tt class="docutils literal"><span class="pre">--simulate</span></tt>, given to tcspecial, tcssim and tcsmoc alike:</p>
 <dl class="docutils">
 <dt><tt class="docutils literal"><span class="pre">--simulate=none</span></tt></dt>
-<dd>No payload may be a stand-in. This is the flight setting, and it is what a
-program started without the flag gets.</dd>
+<dd>Every payload must be a real device. This is the flight setting, and it
+is what a program started without the flag gets.</dd>
 <dt><tt class="docutils literal"><span class="pre">--simulate=some</span></tt></dt>
-<dd>At least one payload is a stand-in and at least one is not: a
-configuration being debugged against part of its hardware.</dd>
+<dd>At least one payload is a simulated or dummy device and at least one is
+a real device: a configuration being debugged against part of its
+hardware.</dd>
 <dt><tt class="docutils literal"><span class="pre">--simulate=all</span></tt></dt>
-<dd>Every payload is a stand-in, so that nothing exercises hardware at all.</dd>
+<dd>Every payload is a simulated or dummy device, so that nothing exercises
+hardware at all.</dd>
 </dl>
 <p>tcspecial decides for itself what each payload is, from what is at the end
 of its endpoint, before it opens anything, and says so as it starts:</p>
 <pre class="code console literal-block">
 <span class="generic output">simulation mode: all
   temp_1: hardware: /dev/i2c-1 is a real adapter (Synopsys DesignWare I2C adapter)
-  sensor: a stand-in: 127.0.0.1 is a loopback address, so the far end is on this host</span>
+  line: a simulated device: /tmp/ttyS0 resolves to a pseudo-terminal, /dev/pts/3</span>
 </pre>
 <p>A run whose payloads the mode does not allow is refused there, each payload
 named with what it reaches, what is there, and what would satisfy the mode.</p>
-<p>A payload is a stand-in when its endpoint is something <tt class="docutils literal">bin/</tt> or tcssim
-makes: an I2C bus whose adapter is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, a GPIO chip of
-<tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, a virtual CAN interface, an IIO sensor of <tt class="docutils literal">iio_dummy</tt>, a path
-that leads to a pseudo-terminal, which is what tcssim makes for a serial, SPI,
-rpmsg or IIO payload, or, for a device-file payload, a regular file, which is
-what tcssim makes for one and which no hardware is. A network payload is a
-stand-in when its address is a loopback address or a Unix-domain path. That is
-the weakest of the judgements: it says only that the far end is on this host,
-and a program on this host in front of real hardware passes it. A synchronous
-HDLC line is never a stand-in, and anything that cannot be told -- nothing at
-the path, a host name -- is taken for hardware.</p>
-<p>Four types have nothing in the operating system that stands in for them
+<p>A payload is a dummy device when its endpoint is one the scripts in <tt class="docutils literal">bin/</tt>
+have the kernel make: an I2C bus whose adapter is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>,
+a GPIO chip of <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, a virtual CAN interface, an IIO sensor of
+<tt class="docutils literal">iio_dummy</tt>. It is a simulated device when its endpoint is one tcssim
+makes: a path that leads to a pseudo-terminal, which is what tcssim makes
+for a serial, SPI, rpmsg or IIO payload, or a loopback <tt class="docutils literal">sim_address</tt>,
+below. A synchronous HDLC line with no <tt class="docutils literal">sim_address</tt> is always hardware,
+and anything that cannot be told -- nothing at the path -- is taken for
+hardware.</p>
+<p>A <tt class="docutils literal">network</tt> or <tt class="docutils literal"><span class="pre">device-file</span></tt> payload is a real device under every mode,
+and the mode does not count it: a socket or a file is the same node whether
+tcssim answers at its far end or something else does, so there is nothing
+to tell apart. tcssim answers there when the simulator file says
+<tt class="docutils literal">simulate: true</tt> for it. A run whose only payloads are of these types
+satisfies <tt class="docutils literal">none</tt> and <tt class="docutils literal">all</tt> alike, and <tt class="docutils literal">some</tt> never.</p>
+<p>Four types have nothing in the operating system to simulate them
 faithfully: an HDLC line has no virtual interface at all, and a
 pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
 sensor's bytes without its clock, its channel or its sysfs. Two more, the
-temperature sensors <tt class="docutils literal">i2c_tmass</tt> and <tt class="docutils literal">spi_tmass</tt>, stand in as the thermal
-mass they are fixed to. A node of one of those types may give <tt class="docutils literal">stand_in</tt>, a loopback address and port. Under
-<tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt> tcspecial reaches it there over UDP instead of
-opening the device, and tcssim answers there; under <tt class="docutils literal">none</tt> the device is
-opened, so the configuration that flies is the one that was tested:</p>
+temperature sensors <tt class="docutils literal">i2c_tmass</tt> and <tt class="docutils literal">spi_tmass</tt>, are simulated as the
+thermal mass they are fixed to. A node of one of those types may give
+<tt class="docutils literal">sim_address</tt>, a loopback address and port. Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or
+<tt class="docutils literal">all</tt> tcspecial reaches it there over UDP instead of opening the device,
+and tcssim answers there, a simulated device; under <tt class="docutils literal">none</tt> the device is
+opened, so the configuration that flies is the one that was tested. The
+attribute was once called <tt class="docutils literal">stand_in</tt>, which is refused, naming
+<tt class="docutils literal">sim_address</tt>:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">payloads</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type hdlc</span><span class="punctuation">:</span><span class="whitespace">
@@ -5192,7 +5214,7 @@ opened, so the configuration that flies is the one that was tested:</p>
         </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">hdlc0</span><span class="whitespace">
         </span><span class="name tag">standard</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">v35</span><span class="whitespace">
         </span><span class="name tag">clock_type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">external</span><span class="whitespace">
-        </span><span class="name tag">stand_in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7950&quot;</span>
+        </span><span class="name tag">sim_address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7950&quot;</span>
 </pre>
 <p>The Makefiles' run targets give every program <tt class="docutils literal"><span class="pre">--simulate=$(SIMULATE)</span></tt>,
 which is <tt class="docutils literal">all</tt> unless the command line says otherwise:</p>
@@ -5201,9 +5223,10 @@ which is <tt class="docutils literal">all</tt> unless the command line says othe
 </pre>
 <div class="section" id="waiting-for-the-simulator">
 <h3><a class="toc-backref" href="#toc-entry-71">Waiting for the simulator</a></h3>
-<p>A stand-in has to exist before tcspecial looks for it, so in a run with
-stand-ins tcssim is started first, and tcspecial only once tcssim has said it
-has made them all. tcssim makes every stand-in as it starts; a panel's button
+<p>A simulated device has to exist before tcspecial looks for it, so in a run
+with simulated devices tcssim is started first, and tcspecial only once
+tcssim has said it has made them all. tcssim makes every simulated device as
+it starts; a panel's button
 decides only whether that payload sends.</p>
 <p>tcssim says whether it is ready at the UDP address its simulator file gives
 in a <tt class="docutils literal">tcssim</tt> section, which every simulator file needs:</p>
@@ -5237,13 +5260,13 @@ through <tt class="docutils literal"><span class="pre">tcslib::simulator::wait</
 <span class="pre">--sending</span></tt> starts every one sending instead, for a test with nobody at the
 window: the F´ bridge's is one (see <a class="reference internal" href="#the-f-bridge">The F´ bridge</a>).</p>
 </div>
-<div class="section" id="every-stand-in-at-once">
-<h3><a class="toc-backref" href="#toc-entry-72">Every stand-in at once</a></h3>
-<p><tt class="docutils literal">make <span class="pre">stand-ins-test</span></tt> runs tcspecial against tcssim with a payload of each
-type tcssim stands in for, and checks that each one's data reaches the
+<div class="section" id="every-simulated-device-at-once">
+<h3><a class="toc-backref" href="#toc-entry-72">Every simulated device at once</a></h3>
+<p><tt class="docutils literal">make <span class="pre">simulated-devices-test</span></tt> runs tcspecial against tcssim with a payload
+of each type tcssim simulates, and checks that each one's data reaches the
 ground:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>make<span class="whitespace"> </span>stand-ins-test<span class="whitespace">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>simulated-devices-test<span class="whitespace">
 </span><span class="generic output">...
   ok   text: 50 datagrams, 800 bytes, part of tcssim's text
   ok   line: 50 datagrams, 800 bytes
@@ -5251,17 +5274,17 @@ ground:</p>
   ...
   left out can: no virtual CAN bus is up; make mkvcan makes one, as root</span>
 </pre>
-<p>It writes its configuration into <tt class="docutils literal"><span class="pre">tests/stand-ins/run</span></tt>, where the stand-ins'
-paths are: a device file, a serial line, a serial line that is an RS-485 bus,
-a SPI peripheral, an rpmsg channel and an IIO buffer, each a file or
-pseudo-terminal tcssim makes, and an HDLC line reached at its <tt class="docutils literal">stand_in</tt>.
-A CAN payload is added where a virtual CAN bus is up, and a GPIO payload where
-a <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> chip is there for the user running it; the test makes neither,
-since both need root, and says which it left out. It starts tcssim with
-<tt class="docutils literal"><span class="pre">--sending</span></tt>, waits for it, starts tcspecial, connects as a ground station
-does, and listens for ten seconds. Then it stops tcssim with a signal, as a
-harness does, and checks that every stand-in is gone. tcssim's window opens
-for the length of the test, so a display is needed.</p>
+<p>It writes its configuration into <tt class="docutils literal"><span class="pre">tests/simulated-devices/run</span></tt>, where the
+simulated devices' paths are: a device file, a serial line, a serial line that
+is an RS-485 bus, a SPI peripheral, an rpmsg channel and an IIO buffer, each a
+file or pseudo-terminal tcssim makes, and an HDLC line reached at its
+<tt class="docutils literal">sim_address</tt>. A CAN payload is added where a virtual CAN bus is up, and a
+GPIO payload where a <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> chip is there for the user running it; the
+test makes neither, since both need root, and says which it left out. It starts
+tcssim with <tt class="docutils literal"><span class="pre">--sending</span></tt>, waits for it, starts tcspecial, connects as a ground
+station does, and listens for ten seconds. Then it stops tcssim with a signal,
+as a harness does, and checks that every simulated device is gone. tcssim's
+window opens for the length of the test, so a display is needed.</p>
 <p>Its ports are 47000 to 47999, and it holds <tt class="docutils literal"><span class="pre">tcs-ports.lock</span></tt>, beside the
 main checkout (<tt class="docutils literal">TCS_PORTS_LOCK</tt>, from <tt class="docutils literal">beside.mk</tt>), while it runs, so that it never runs at the same time as another
 test that starts tcspecial and tcssim and holds the same lock.</p>
@@ -5328,7 +5351,7 @@ crosses a subdiagram's edge blinks on both pages.</p>
 <p>Nothing in the windows can be pressed. Close any of them to stop tcspecial,
 which stops as it does on an interrupt; if tcspecial stops first, the windows
 close.</p>
-<p>The window is for a run with stand-ins, so <tt class="docutils literal"><span class="pre">--visual</span></tt> wants
+<p>The window is for a run with simulated or dummy devices, so <tt class="docutils literal"><span class="pre">--visual</span></tt> wants
 <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal"><span class="pre">--simulate=all</span></tt> beside it. Under
 <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, which is the flight setting and what a run without
 <tt class="docutils literal"><span class="pre">--simulate</span></tt> gets, it is refused before anything is read: a window there
@@ -5970,8 +5993,8 @@ foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
 removed from them adds or removes a panel.</p>
 <p>SIGHUP, SIGINT and SIGTERM do what <tt class="docutils literal">Quit All</tt> does: every payload stops and
-its stand-in is cleared, and then tcssim exits with the status a shell gives
-a program the signal ended, 128 more than the signal's number -- 130 for
+its simulated device is cleared, and then tcssim exits with the status a shell
+gives a program the signal ended, 128 more than the signal's number -- 130 for
 SIGINT. A second signal, for a stop that is taking too long, ends tcssim at
 once with status 1 and clears nothing.</p>
 <p>Each panel shows, from the top:</p>

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Make the kernel stand-in a simulated set of discrete lines needs.
+# Make the dummy device, a gpio-sim chip, simulated discrete lines need.
 #
 # A discrete line is one of the payload types the simulator cannot simply be
 # the far end of: a line is a wire, and nothing in user space can drive one.

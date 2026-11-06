@@ -13,8 +13,8 @@
 #
 # Started in the order a test harness starts a run (see "Waiting for the
 # Simulator" in docs/design.rst): tcssim, which is waited for until it has
-# made its stand-ins; tcspecial on the configuration, --simulate=all; and
-# F´'s ground system. Then pytest, with F´'s test API, starts BridgeTest,
+# made its simulated devices; tcspecial on the configuration, --simulate=all;
+# and F´'s ground system. Then pytest, with F´'s test API, starts BridgeTest,
 # which opens the same configuration and connects to the ground system, and
 # holds the bridge to what docs/design.rst asks of it: see BridgeTest/test.
 # Whatever was started is stopped however the run ends, so that nothing is

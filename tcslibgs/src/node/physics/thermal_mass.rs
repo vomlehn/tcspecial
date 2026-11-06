@@ -49,7 +49,8 @@ pub const SETTINGS: &[&str] = &[
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ThermalMass {
-    /// What it is called, which is how a connection or a stand-in names it.
+    /// What it is called, which is how a connection or a simulated payload
+    /// names it.
     #[serde(rename = "component")]
     pub name: String,
     /// The temperature its surroundings were, which is the world's

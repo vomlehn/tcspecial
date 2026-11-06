@@ -1,5 +1,5 @@
-//! The ground's end of a cFS software bus: a ground station's SBN peer, and
-//! the stand-in for the cFS end that tcssim runs.
+//! The ground's end of a cFS software bus: a ground station's SBN peer, and the
+//! simulated cFS end that tcssim runs.
 //!
 //! A vehicle that answers to cFS has no command socket, no beacon socket and
 //! no telemetry sockets: everything it takes and sends crosses one SBN peer
@@ -7,18 +7,17 @@
 //! `docs/design.rst`, [`tcslibgs::sbn`] for the wire and [`tcslibgs::cfs`]
 //! for the packets on it; nothing here states either again.
 //!
-//! # The stand-in
+//! # The simulated cFS end
 //!
-//! [`StandIn`] is the far end of the bus as tcssim plays it: it binds
+//! [`SimulatedCfs`] is the far end of the bus as tcssim plays it: it binds
 //! `sbn.peer`, is processor `sbn.peer_processor_id` to the vehicle, and is a
-//! bus to every ground station that joins it -- what the vehicle publishes
-//! goes to each station that subscribed to it, and what a station publishes
-//! goes to the vehicle where the vehicle subscribed to it. A real cFS does
-//! not do that last part for a ground station: SBN never sends one peer what
-//! another published (see [`tcslibgs::sbn::ground_processor_id`]), so a
-//! ground station is a peer of the stand-in and of nothing else, and the
-//! ground commands a vehicle behind a real cFS through that cFS's own ground
-//! system.
+//! bus to every ground station that joins it -- what the vehicle publishes goes
+//! to each station that subscribed to it, and what a station publishes goes to
+//! the vehicle where the vehicle subscribed to it. A real cFS does not do that
+//! last part for a ground station: SBN never sends one peer what another
+//! published (see [`tcslibgs::sbn::ground_processor_id`]), so a ground station
+//! is a peer of the simulated end and of nothing else, and the ground commands
+//! a vehicle behind a real cFS through that cFS's own ground system.
 //!
 //! It is kept here, beside the station's peer, rather than in tcssim, so
 //! that the two ends are tested together and against the vehicle itself.
@@ -68,7 +67,7 @@ const ROOM: usize = 65_536;
 /// told to stop, and at the clock.
 const TICK: Duration = Duration::from_millis(100);
 
-/// How many ground stations the stand-in keeps at once: more than a desk
+/// How many ground stations the simulated end keeps at once: more than a desk
 /// runs, and few enough to be made at once when it starts.
 pub const STATIONS_AT_ONCE: usize = 8;
 
@@ -701,7 +700,7 @@ impl Keeper {
     }
 }
 
-/// One peer of the stand-in, as it keeps it.
+/// One peer of the simulated end, as it keeps it.
 struct Kept {
     /// Where it is, once heard from.
     at: Option<SocketAddr>,
@@ -760,25 +759,25 @@ impl Kept {
     }
 }
 
-/// Which of the stand-in's peers a datagram is from.
+/// Which of the simulated end's peers a datagram is from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Who {
     Vehicle,
     Station(usize),
 }
 
-/// The cFS end of the bus, stood in for: see the module's documentation.
+/// The cFS end of the bus, simulated: see the module's documentation.
 ///
 /// Stopped, and its thread joined, when it is dropped.
-pub struct StandIn {
+pub struct SimulatedCfs {
     at: SocketAddr,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
-impl StandIn {
-    /// Stands in for the cFS end of the bus a configuration answers over:
-    /// binds `sbn.peer` and keeps it on a thread of its own.
+impl SimulatedCfs {
+    /// Simulates the cFS end of the bus a configuration answers over: binds
+    /// `sbn.peer` and keeps it on a thread of its own.
     ///
     /// # Arguments
     ///
@@ -786,15 +785,15 @@ impl StandIn {
     ///
     /// # Returns
     ///
-    /// The stand-in, or `None` for a configuration that does not answer
+    /// The simulated end, or `None` for a configuration that does not answer
     /// over a bus.
     ///
     /// # Errors
     ///
     /// What is wrong with the `tcspecial` section or its message IDs, or a
     /// message naming `sbn.peer` where it cannot be bound -- something else
-    /// holds it, a cFS or a stand-in left running.
-    pub fn open(graph: &Graph) -> Result<Option<StandIn>, String> {
+    /// holds it, a cFS or a simulated end left running.
+    pub fn open(graph: &Graph) -> Result<Option<SimulatedCfs>, String> {
         let Some(bus) = bus_of(graph)? else {
             return Ok(None);
         };
@@ -802,13 +801,13 @@ impl StandIn {
         let socket =
             UdpSocket::bind(bus.sbn.peer.to_string()).map_err(|e| {
                 format!(
-                "the cFS end cannot be stood in for at sbn.peer, {}: {e} -- \
+                "the cFS end cannot be simulated at sbn.peer, {}: {e} -- \
                  is a cFS, or a simulator left running, holding it?",
                 bus.sbn.peer
             )
             })?;
         let at = socket.local_addr().map_err(|e| {
-            format!("the stand-in's socket has no address: {e}")
+            format!("the simulated cFS end's socket has no address: {e}")
         })?;
         let now = Instant::now();
         let mut hub = Hub {
@@ -842,10 +841,12 @@ impl StandIn {
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
         let thread = std::thread::Builder::new()
-            .name("sbn-stand-in".to_string())
+            .name("sbn-simulated".to_string())
             .spawn(move || hub.run(&stopping))
-            .map_err(|e| format!("the stand-in cannot be started: {e}"))?;
-        Ok(Some(StandIn {
+            .map_err(|e| {
+                format!("the simulated cFS end cannot be started: {e}")
+            })?;
+        Ok(Some(SimulatedCfs {
             at,
             stop,
             thread: Some(thread),
@@ -858,7 +859,7 @@ impl StandIn {
     }
 }
 
-impl Drop for StandIn {
+impl Drop for SimulatedCfs {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(thread) = self.thread.take() {
@@ -867,7 +868,7 @@ impl Drop for StandIn {
     }
 }
 
-/// The stand-in, as its thread keeps it.
+/// The simulated end, as its thread keeps it.
 struct Hub {
     socket: UdpSocket,
     us: Identity,
@@ -891,7 +892,7 @@ impl Hub {
     ///
     /// # Arguments
     ///
-    /// * `stop` - Set when the stand-in is to stop.
+    /// * `stop` - Set when the simulated end is to stop.
     fn run(&mut self, stop: &AtomicBool) {
         let mut fds = [libc::pollfd {
             fd: self.socket.as_raw_fd(),
@@ -923,9 +924,9 @@ impl Hub {
         }
     }
 
-    /// Sends heartbeats, and disconnects peers silent too long. The
-    /// stand-in never announces: SBN on a cFS does not speak first to a
-    /// peer on its own spacecraft.
+    /// Sends heartbeats, and disconnects peers silent too long. The simulated
+    /// end never announces: SBN on a cFS does not speak first to a peer on its
+    /// own spacecraft.
     ///
     /// # Arguments
     ///
@@ -1196,7 +1197,7 @@ mod tests {
         (dir, graph)
     }
 
-    /// A peer of the stand-in, played by the test.
+    /// A peer of the simulated end, played by the test.
     struct Played {
         socket: UdpSocket,
         processor_id: u32,
@@ -1204,12 +1205,12 @@ mod tests {
     }
 
     impl Played {
-        /// A peer of this processor ID, speaking to the stand-in at `to`.
+        /// A peer of this processor ID, speaking to the simulated end at `to`.
         ///
         /// # Arguments
         ///
         /// * `processor_id` - The processor ID it says it is.
-        /// * `to`           - Where the stand-in is.
+        /// * `to`           - Where the simulated end is.
         ///
         /// # Returns
         ///
@@ -1308,10 +1309,10 @@ mod tests {
     /// and what a station publishes reaches the vehicle that subscribed to
     /// it; a station of another ident is refused.
     #[test]
-    fn the_stand_in_passes_on_what_was_subscribed_to() {
+    fn the_simulated_end_passes_on_what_was_subscribed_to() {
         let (_dir, graph) = example();
-        let stand_in = StandIn::open(&graph).unwrap().expect("a bus");
-        let at = stand_in.local_addr();
+        let cfs = SimulatedCfs::open(&graph).unwrap().expect("a bus");
+        let at = cfs.local_addr();
         let vehicle = Played::new(2, at);
         let station = Played::new(3, at);
 

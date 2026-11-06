@@ -1,7 +1,7 @@
 //! The GPIO endpoint: discrete lines, as events a conduit can carry.
 //!
 //! **Supported.** Run against the kernel's simulated chip, by
-//! `tests/kernel-stand-ins.rs`, and against no hardware.
+//! `tests/kernel-dummies.rs`, and against no hardware.
 //!
 //! This is the one endpoint whose device data does not exist until it is
 //! made. Every other kind carries bytes somebody sent; a discrete line has no
@@ -985,7 +985,7 @@ mod tests {
 
     /// Several events waiting become several records in one read.
     ///
-    /// Against a pipe standing in for the request's descriptor, which is what
+    /// Against a pipe in place of the request's descriptor, which is what
     /// the kernel's end of it looks like from here: whole events, one after
     /// another.
     #[test]

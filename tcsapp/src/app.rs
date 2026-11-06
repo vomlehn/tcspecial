@@ -367,7 +367,7 @@ impl AppPl {
 /// The node type `app_all_pl`, and the same interface an `app_gateway_veh` is
 /// run with -- what tells the two apart is which side of the graph the node
 /// stands on, not what its program holds. A payload is asked for a reading and
-/// answers with one, so this is the kind that stands in for a payload as every
+/// answers with one, so this is the kind that plays a payload as every
 /// other payload behaves: see `tcslibgs::node::app`.
 #[derive(Debug)]
 pub struct AppAllPl {

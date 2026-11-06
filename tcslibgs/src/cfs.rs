@@ -3,8 +3,8 @@
 //! A vehicle that answers to cFS carries every command, answer, beacon and
 //! datum as a cFS packet: the CCSDS primary header, cFS's extended header, a
 //! secondary header, and then exactly what the UDP link would carry in a
-//! datagram. This is the one statement of that framing, read by the vehicle
-//! and by whatever stands in for the cFS end. See "What crosses the bus" in
+//! datagram. This is the one statement of that framing, read by the vehicle and
+//! by whatever simulates the cFS end. See "What crosses the bus" in
 //! `docs/design.rst`.
 //!
 //! The layouts are cFE's, as its `default_cfe_msg_hdr_priext.h` and
@@ -219,7 +219,7 @@ pub fn read_command(packet: &[u8]) -> Result<CommandFrame<'_>, &'static str> {
 
 /// Writes a command, its checksum made last over the rest.
 ///
-/// What the vehicle never sends, and what stands in for the cFS end does.
+/// What the vehicle never sends, and what simulates the cFS end does.
 ///
 /// # Arguments
 ///
@@ -267,7 +267,7 @@ pub struct TelemetryFrame<'a> {
 
 /// Reads a telemetry packet.
 ///
-/// What the vehicle never takes, and what stands in for the cFS end does.
+/// What the vehicle never takes, and what simulates the cFS end does.
 ///
 /// # Arguments
 ///

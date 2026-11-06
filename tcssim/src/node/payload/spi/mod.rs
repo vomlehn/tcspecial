@@ -1,4 +1,4 @@
-//! A simulated device standing in for a SPI peripheral.
+//! A simulated device playing a SPI peripheral.
 //!
 //! The one kind with nothing to be. A serial line has a pty, which is a line
 //! in everything but its rate. A device on a bus has the kernel's `i2c-stub`,
@@ -6,12 +6,13 @@
 //! equivalent for SPI: no module emulates a peripheral, because a peripheral
 //! is a thing a controller clocks, and nothing in user space can be clocked.
 //!
-//! So what stands in is a pty, as for a serial line, and the difference is
-//! worth being plain about. The bytes are real: a packet the simulator writes
-//! arrives at the handler, in the segments it was divided into, at the pace
-//! the simulator file gives. The clocking is not simulated at all -- there is
-//! no clock, no mode, no chip select and no word width -- and a handler that
-//! opens this finds a node that will not take its terms and says so.
+//! So the simulated device is a pty, as for a serial line, and the difference
+//! is worth being plain about. The bytes are real: a packet the simulator
+//! writes arrives at the handler, in the segments it was divided into, at the
+//! pace the simulator file gives. The clocking is not simulated at all --
+//! there is no clock, no mode, no chip select and no word width -- and a
+//! handler that opens this finds a node that will not take its terms and says
+//! so.
 //!
 //! What that tests is the handler's reading and writing of a peripheral, and
 //! the pacing of a device that produces data in blocks. What it cannot test
@@ -26,7 +27,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet, could_not_stand_in, ignore_this_request, lateness,
+    a_packet, could_not_simulate, ignore_this_request, lateness,
     send_in_segments, wait_out_packet, wait_while_running, Pacing,
     PayloadConfig, PayloadStats, Produce,
 };
@@ -34,8 +35,8 @@ use crate::pty::SimulatedNode;
 
 /// Runs a simulated device on a SPI link.
 ///
-/// As every other kind: a packet every packet interval, in segments, from
-/// Start until Stop. A segment is one write, which is as near as a stand-in
+/// As every other kind: a packet every packet interval, in segments, from Start
+/// until Stop. A segment is one write, which is as near as a simulated device
 /// gets to a transfer: a real peripheral answers a transfer the controller
 /// starts, and this one simply has the bytes ready.
 ///
@@ -55,9 +56,9 @@ pub fn run_spi_node(
     ) {
         Ok(node) => node,
         Err(e) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
-                format!("failed to stand in for a SPI peripheral: {}", e),
+                format!("failed to simulate a SPI peripheral: {}", e),
             );
             return;
         }
@@ -150,7 +151,7 @@ mod tests {
     /// The configured path leads to a node the handler can open, and the data
     /// there is the packets the device is producing.
     ///
-    /// Which is all a stand-in for a peripheral can offer: the bytes, in their
+    /// Which is all a simulated peripheral can offer: the bytes, in their
     /// segments, at their pace. Nothing here says anything about a clock,
     /// because there is nothing here that has one.
     #[test]

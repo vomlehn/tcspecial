@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Remove the I2C stand-in bin/mki2c makes.
+# Remove the I2C dummy device bin/mki2c makes.
 #
 # The cleanup half of bin/mki2c, which calls this rather than carrying a copy,
-# as each of the other three pairs does: remaking a stand-in means removing the
-# old one first, and removing it is also worth doing on its own -- after a run,
-# or before leaving a host the way it was found.
+# as each of the other three pairs does: remaking a dummy device means removing
+# the old one first, and removing it is also worth doing on its own -- after a
+# run, or before leaving a host the way it was found.
 #
 # An i2c-stub adapter *is* the module, so removing it means unloading that.
 # That makes this the blunt one of the four: there is no way to take away one

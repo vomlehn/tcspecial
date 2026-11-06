@@ -1,22 +1,21 @@
-//! A simulated device standing in for a device file: a file of text.
+//! The far end of a device file, played by the simulator: a file of text.
 //!
-//! A device file is opened and read by tcspecial itself, so what there is to
-//! stand in for is something at the path that produces data. The simulator
-//! makes a regular file there and lengthens it with a packet of lorem ipsum
-//! every packet interval, segment by segment, as the pacing says, until the
-//! text runs out. tcspecial reads what has been added each time it looks, and
-//! once the text is all there it reads nothing more: the data is sent for a
-//! while, and then stops. The faults apply to the text as to any packet: a
-//! dropped packet takes no text, and a truncated or corrupted one goes as it
-//! was cut or changed.
+//! A device file is opened and read by tcspecial itself, and is a real device
+//! whatever is at its path, so what the simulator plays is something at the
+//! path that produces data. The simulator makes a regular file there and
+//! lengthens it with a packet of lorem ipsum every packet interval, segment by
+//! segment, as the pacing says, until the text runs out. tcspecial reads what
+//! has been added each time it looks, and once the text is all there it reads
+//! nothing more: the data is sent for a while, and then stops. The faults apply
+//! to the text as to any packet: a dropped packet takes no text, and a
+//! truncated or corrupted one goes as it was cut or changed.
 //!
 //! The file is the simulator's own. It is made new at the start, and removed
 //! when the payload stops. A path where there is already something else -- a
 //! real device, or a file the simulator did not write -- is left alone and
-//! reported: a simulator that replaced `/dev/urandom` to stand in for it
-//! would be worse than one that could not. A file left by a run that ended
-//! without removing it is recognised by holding the start of the text, and
-//! is replaced.
+//! reported: a simulator that replaced `/dev/urandom` to play it would be worse
+//! than one that could not. A file left by a run that ended without removing it
+//! is recognised by holding the start of the text, and is replaced.
 //!
 //! See [`crate::payload`] for that pacing, which is common to every kind.
 
@@ -28,7 +27,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::payload::{
-    a_packet_from, could_not_stand_in, lateness, send_in_segments,
+    a_packet_from, could_not_simulate, lateness, send_in_segments,
     wait_out_packet, wait_while_running, Pacing, PayloadConfig, PayloadStats,
     Produce,
 };
@@ -114,9 +113,9 @@ pub fn run_device_file_node(
     let mut text = match TextFile::make(Path::new(&config.address)) {
         Ok(text) => text,
         Err(why) => {
-            could_not_stand_in(
+            could_not_simulate(
                 &config,
-                format!("failed to stand in for a device file: {why}"),
+                format!("failed to play a device file: {why}"),
             );
             return;
         }

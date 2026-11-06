@@ -385,10 +385,10 @@ impl EndpointPort {
     ) -> Result<EndpointPort, String> {
         let uses = Use::of(routes, &node.name)?;
         let reach = reach_of(node)?;
-        // Its endpoint, or where it is reached when simulated: a node of a
-        // type the operating system cannot stand in for, in a run with
-        // stand-ins, is reached over UDP at its stand_in, by the same rule of
-        // which end speaks first that a UDP payload has.
+        // Its endpoint, or where it is reached when simulated: a node of a type
+        // the operating system has no dummy device for, in a run that
+        // simulates, is reached over UDP at its sim_address, by the same rule
+        // of which end speaks first that a UDP payload has.
         let endpoint = reach.opened(crate::runtime::start::mode());
 
         let opened = if tcslibgs::gateway::is_gateway(&node.node_type) {
@@ -1631,7 +1631,7 @@ mod tests {
             .expect("a temperature a value carries")
     }
 
-    /// What a stand-in endpoint was asked to do, and what it will answer.
+    /// What a simulated endpoint was asked to do, and what it will answer.
     ///
     /// A pair of halves with no kernel behind them. Everything this module
     /// decides is about the two traits and not about any one interface, so
@@ -1651,10 +1651,10 @@ mod tests {
         write_answers: Vec<TcsResult<usize>>,
     }
 
-    /// A stand-in endpoint, and a descriptor that is always readable.
+    /// A simulated endpoint, and a descriptor that is always readable.
     ///
     /// `/dev/null` for the descriptor, which `EndpointPort::take` polls
-    /// before reading: the stand-in answers from its script rather than from
+    /// before reading: the endpoint answers from its script rather than from
     /// the descriptor, and what the poll has to say is only "there is
     /// something", which a read of /dev/null always does.
     struct Half(Arc<Mutex<Script>>, std::fs::File);
@@ -1726,7 +1726,7 @@ mod tests {
         }
     }
 
-    /// Makes a port over a stand-in endpoint, and the script both halves
+    /// Makes a port over a simulated endpoint, and the script both halves
     /// share.
     ///
     /// # Arguments
@@ -1748,13 +1748,13 @@ mod tests {
         (script, port)
     }
 
-    /// Makes a port whose stand-in is already scripted.
+    /// Makes a port whose simulated endpoint is already scripted.
     ///
     /// # Arguments
     ///
     /// * `what`    - The node's name.
     /// * `uses`    - Which way the graph uses it.
-    /// * `to_read` - What the stand-in's reads answer, in order.
+    /// * `to_read` - What the endpoint's reads answer, in order.
     ///
     /// # Returns
     ///
@@ -1857,9 +1857,9 @@ mod tests {
     /// A serial node on a real line hands over whole reads, however the
     /// bytes arrive.
     ///
-    /// End to end: a pseudo-terminal, which is the line tcssim stands in
-    /// with, a node on it as a configuration states one, opened as the vehicle
-    /// opens it. The line is raw, so the kernel hands over whatever bytes have
+    /// End to end: a pseudo-terminal, which is the line tcssim simulates with,
+    /// a node on it as a configuration states one, opened as the vehicle opens
+    /// it. The line is raw, so the kernel hands over whatever bytes have
     /// arrived; a sentence written in pieces comes out whole only because the
     /// node's stream rule said where it ends.
     #[test]
@@ -2589,7 +2589,7 @@ mod tests {
     /// traits, which is where this module's decisions are -- but `connect`
     /// itself is a line of delegation that no trait test would exercise, and
     /// a port that cannot open anything is of no use however well it
-    /// delegates. A named pipe stands in for the device: it needs no
+    /// delegates. A named pipe takes the place of the device: it needs no
     /// hardware, no privileges and no network, and it is a device file as far
     /// as the endpoint is concerned.
     #[test]
@@ -2955,7 +2955,8 @@ mod tests {
 
         // A pass takes what is there and then asks. On a real device the
         // first pass takes nothing, the question not having been asked yet;
-        // the stand-in answers at once, which is what lets the order be seen.
+        // the simulated endpoint answers at once, which is what lets the
+        // order be seen.
         let got = port
             .take(&mut buffer)
             .map(|taken| taken.bytes)
@@ -3132,10 +3133,10 @@ mod tests {
         use std::io::Write;
         use std::os::unix::fs::PermissionsExt;
 
-        /// A program standing in for an app, written in shell.
+        /// A simulated app, written in shell.
         ///
-        /// `cat` with its descriptors arranged for the kind of app it is
-        /// standing in for: the real apps are the `app_payload_veh`,
+        /// `cat` with its descriptors arranged for the kind of app it
+        /// simulates: the real apps are the `app_payload_veh`,
         /// `app_gateway_veh` and `app_all_veh` crates, which have tests of
         /// their own. What is tested here is this port and the fabric's
         /// streams, and five lines of shell keep that test about those.
@@ -3152,8 +3153,8 @@ mod tests {
         /// # Panics
         ///
         /// If the program cannot be written or made executable.
-        fn stands_in(where_: &Path, redirect: &str) -> std::path::PathBuf {
-            let path = where_.join("stands_in");
+        fn simulated_app(where_: &Path, redirect: &str) -> std::path::PathBuf {
+            let path = where_.join("simulated_app");
             let mut file = std::fs::File::create(&path).expect("a program");
             write!(file, "#!/bin/sh\nexec cat {redirect}\n")
                 .expect("a program");
@@ -3258,7 +3259,7 @@ mod tests {
             let where_ = tempfile::tempdir().expect("a directory");
             // Reads payload data at descriptor 0 and writes what it read back
             // to the same descriptor, which is gateway data there.
-            let program = stands_in(where_.path(), ">&0");
+            let program = simulated_app(where_.path(), ">&0");
             let mut port = crate::when_not_busy(|| {
                 AppPort::open(&node("fore", "app_payload_veh", &program))
             })
@@ -3284,7 +3285,7 @@ mod tests {
             // Plain `cat`: payload data read at descriptor 0 is written as
             // payload data at descriptor 1, and the vehicleward side is left
             // alone.
-            let program = stands_in(where_.path(), "");
+            let program = simulated_app(where_.path(), "");
             let mut port = crate::when_not_busy(|| {
                 AppPort::open(&node("through", "app_all_veh", &program))
             })
@@ -3307,7 +3308,7 @@ mod tests {
         #[test]
         fn a_datum_on_the_wrong_stream_is_refused() {
             let where_ = tempfile::tempdir().expect("a directory");
-            let program = stands_in(where_.path(), ">&0");
+            let program = simulated_app(where_.path(), ">&0");
             let mut port = crate::when_not_busy(|| {
                 AppPort::open(&node("fore", "app_payload_veh", &program))
             })
@@ -3331,7 +3332,7 @@ mod tests {
             let where_ = tempfile::tempdir().expect("a directory");
             // Reads at descriptor 1 and writes back to it, which is payload
             // data there.
-            let program = stands_in(where_.path(), "<&1");
+            let program = simulated_app(where_.path(), "<&1");
             let mut port = crate::when_not_busy(|| {
                 AppPort::open(&node("bay", "app_all_pl", &program))
             })

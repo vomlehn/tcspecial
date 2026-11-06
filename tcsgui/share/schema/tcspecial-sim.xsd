@@ -45,6 +45,22 @@
       <!-- Whether the payload is simulated, true or false: from the payload
            or its group, never both. -->
       <xs:element name="simulate" type="xs:string"/>
+      <!-- Whether the payload starts enabled, as though its panel's Enable
+           button had been pressed: <enable value="true"/>. Left out, or
+           false, it starts disabled; a payload's own overrides its
+           group's. -->
+      <xs:element name="enable">
+        <xs:complexType>
+          <xs:attribute name="value" use="required">
+            <xs:simpleType>
+              <xs:restriction base="xs:string">
+                <xs:enumeration value="true"/>
+                <xs:enumeration value="false"/>
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+        </xs:complexType>
+      </xs:element>
       <xs:element name="protocol" type="xs:string"/>
       <xs:element name="payload_address" type="xs:string"/>
       <xs:element name="payload_port" type="xs:string"/>

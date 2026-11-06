@@ -3367,6 +3367,8 @@ still refused, naming it.
    simulated_payload_groups        optional
      group                the name payloads refer to, naming the entry
      simulate             true or false, for every payload in the group
+     enable               true for every payload in the group to start
+                          enabled; a payload's own overrides it
      ...                  any of the settings below
 
    simulated_payloads              a list of types
@@ -3377,6 +3379,10 @@ still refused, naming it.
                           entry
        simulate           true for tcssim to simulate it, false for the
                           real device: required, here or in its group
+       enable             true for it to start enabled, as though its
+                          panel's Enable button had been pressed; left out,
+                          or false, it starts disabled. In XML,
+                          <enable value="true"/>
        protocol           which transport, for a network payload
        payload_address    the socket the payload answers from, if this file
                           cares to say
@@ -5312,9 +5318,11 @@ not running or an address that is wrong, or a simulator still starting, or one
 that failed or is set up for another run. A ground station of its own waits
 through ``tcslib::simulator::wait``, or ``tcslib.simulator.wait`` in Python.
 
-Each payload starts silent, until its panel's button is pressed. ``tcssim
---sending`` starts every one sending instead, for a test with nobody at the
-window: the F´ bridge's is one (see `The F´ bridge`_).
+Each payload starts silent, until its panel's button is pressed, unless the
+simulator file says ``enable: true`` of it or of its group, and then it starts
+sending as though the button had been pressed. ``tcssim --sending`` starts
+every one sending, for a test with nobody at the window: the F´ bridge's is
+one (see `The F´ bridge`_).
 
 Every simulated device at once
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -3580,6 +3580,8 @@ still refused, naming it.</p>
 simulated_payload_groups        optional
   group                the name payloads refer to, naming the entry
   simulate             true or false, for every payload in the group
+  enable               true for every payload in the group to start
+                       enabled; a payload's own overrides it
   ...                  any of the settings below
 
 simulated_payloads              a list of types
@@ -3590,6 +3592,10 @@ simulated_payloads              a list of types
                        entry
     simulate           true for tcssim to simulate it, false for the
                        real device: required, here or in its group
+    enable             true for it to start enabled, as though its
+                       panel's Enable button had been pressed; left out,
+                       or false, it starts disabled. In XML,
+                       &lt;enable value=&quot;true&quot;/&gt;
     protocol           which transport, for a network payload
     payload_address    the socket the payload answers from, if this file
                        cares to say
@@ -5300,9 +5306,11 @@ exits with a failure saying what it last heard: nothing, which is a tcssim
 not running or an address that is wrong, or a simulator still starting, or one
 that failed or is set up for another run. A ground station of its own waits
 through <tt class="docutils literal"><span class="pre">tcslib::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib.simulator.wait</tt> in Python.</p>
-<p>Each payload starts silent, until its panel's button is pressed. <tt class="docutils literal">tcssim
-<span class="pre">--sending</span></tt> starts every one sending instead, for a test with nobody at the
-window: the F´ bridge's is one (see <a class="reference internal" href="#the-f-bridge">The F´ bridge</a>).</p>
+<p>Each payload starts silent, until its panel's button is pressed, unless the
+simulator file says <tt class="docutils literal">enable: true</tt> of it or of its group, and then it starts
+sending as though the button had been pressed. <tt class="docutils literal">tcssim <span class="pre">--sending</span></tt> starts
+every one sending, for a test with nobody at the window: the F´ bridge's is
+one (see <a class="reference internal" href="#the-f-bridge">The F´ bridge</a>).</p>
 </div>
 <div class="section" id="every-simulated-device-at-once">
 <h3><a class="toc-backref" href="#toc-entry-72">Every simulated device at once</a></h3>

@@ -169,6 +169,14 @@
             ],
             "description": "Whether the payloads that name this group are simulated: true for tcssim to simulate them, false for the real devices. A payload in a group that states it does not state it too."
           },
+          "enable": {
+            "type": [
+              "boolean",
+              "string",
+              "null"
+            ],
+            "description": "Whether the payloads that name this group start enabled, as though each panel's Enable button had been pressed: true or false. Left out, they start disabled. A payload's own overrides it."
+          },
           "group": {
             "description": "The group's name, which a simulated payload names with group: to take its settings from it. An entry is named by this, its first key.",
             "type": "string"
@@ -436,6 +444,14 @@
             "null"
           ],
           "description": "Whether this payload is simulated: true for tcssim to simulate it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
+        },
+        "enable": {
+          "type": [
+            "boolean",
+            "string",
+            "null"
+          ],
+          "description": "Whether this payload starts enabled, as though its panel's Enable button had been pressed: true or false. Left out, or false, it starts disabled. Overrides its group's."
         },
         "payload": {
           "description": "The payload of the configuration this simulates, by its name: the two files are joined by it. An entry is named by this, its first key.",

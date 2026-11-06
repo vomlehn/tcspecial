@@ -1015,6 +1015,14 @@ pub struct SimSettings {
     /// a payload may not override its group's.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub simulate: Option<bool>,
+    /// Whether the simulated payload starts enabled, as though its panel's
+    /// Enable button had been pressed: `enable: true` in YAML,
+    /// `<enable value="true"/>` in XML. Left out, or false, it starts
+    /// disabled, as every payload did before this, and is enabled from its
+    /// panel or by tcssim's `--sending`. A payload's own overrides its
+    /// group's.
+    #[serde(default, deserialize_with = "enable_of")]
+    pub enable: Option<bool>,
     // What payload this is, said again. Neither of these is a setting of the
     // simulation: the payload configuration decides both, and a simulator
     // file that disagreed with it would be simulating something else. They
@@ -1215,6 +1223,58 @@ where
     })
 }
 
+/// Reads `enable`, which YAML writes as a scalar, `enable: true`, and XML as
+/// an element with the value in an attribute, `<enable value="true"/>`.
+///
+/// One setting in two spellings, as every setting is: the XML reader hands
+/// an attribute over as a field named with an `@`, so the element arrives as
+/// a map of one. An element with the value as its text, `<enable>true
+/// </enable>`, is taken too, being what every other setting is written as.
+///
+/// # Arguments
+///
+/// * `d` - The deserializer, at the setting.
+///
+/// # Returns
+///
+/// Whether the payload starts enabled; `None` for a setting left out or
+/// blank.
+///
+/// # Errors
+///
+/// A message for a value that is neither `true` nor `false`, saying what
+/// to write.
+fn enable_of<'de, D>(d: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Said {
+        Valued {
+            #[serde(rename = "@value")]
+            value: crate::Scalar,
+        },
+        Plain(crate::Scalar),
+    }
+    let Some(said) = Option::<Said>::deserialize(d)? else {
+        return Ok(None);
+    };
+    let text = match &said {
+        Said::Valued { value } | Said::Plain(value) => value.as_str(),
+    };
+    match text.trim() {
+        "" => Ok(None),
+        "true" => Ok(Some(true)),
+        "false" => Ok(Some(false)),
+        other => Err(serde::de::Error::custom(format!(
+            "enable is \"{other}\", which is neither true nor false: write \
+             enable: true, or <enable value=\"true\"/> in XML, for a payload \
+             that starts enabled, and leave it out for one that does not"
+        ))),
+    }
+}
+
 /// Reads a list of node names written as one text, separated by commas:
 /// `fore,aft`.
 ///
@@ -1274,6 +1334,7 @@ where
 /// payload is written under.
 pub const SETTINGS: &[&str] = &[
     "simulate",
+    "enable",
     "protocol",
     "payload_address",
     "payload_port",
@@ -1312,6 +1373,7 @@ impl SimSettings {
             // From one of the two and never both, which is checked where
             // it is asked: see `SimConfigFile::simulate_of`.
             simulate: self.simulate.or(base.simulate),
+            enable: self.enable.or(base.enable),
             dh_type: self.dh_type.clone().or_else(|| base.dh_type.clone()),
             protocol: self.protocol.clone().or_else(|| base.protocol.clone()),
             payload_address: self
@@ -1672,6 +1734,8 @@ pub struct ResolvedSim {
     /// What this payload is to the physics model, where it is joined to
     /// it.
     pub attached: Option<Attached>,
+    /// Whether it starts enabled: see [`SimSettings::enable`].
+    pub enabled: bool,
 }
 
 /// The ways a simulated payload is asked to misbehave.
@@ -2504,6 +2568,7 @@ impl SimConfigFile {
 
             Ok(ResolvedSim {
                 attached,
+                enabled: settings.enable.unwrap_or(false),
                 // Where its node says it sends from, if it says: the file
                 // may not say both, which `what_it_is` has refused.
                 payload_address: match &dh.sends_from {
@@ -2759,7 +2824,7 @@ mod tests {
                     "protocol" => "udp",
                     "payload_address" => "127.0.0.1",
                     "connects" => "zone.temperature",
-                    "simulate" => "true",
+                    "simulate" | "enable" => "true",
                     _ => "1",
                 };
                 format!("{name}: {value}")
@@ -2851,6 +2916,7 @@ simulated_payloads:
                 // system gives it.
                 payload_address: None,
                 payload_port: None,
+                enabled: false,
             }
         );
     }
@@ -2879,6 +2945,81 @@ simulated_payloads:
         assert_eq!(resolved[0].segment_size, 4);
         // Not overridden, so still the group's.
         assert_eq!(resolved[0].segment_interval, Duration::from_millis(1000));
+    }
+
+    /// A payload starts enabled where `enable` says true, its own or its
+    /// group's, a payload's own overriding the group's; left out, it starts
+    /// disabled. The XML spells it with the value in an attribute, and says
+    /// the same; a value that is neither true nor false is refused, told
+    /// what to write.
+    #[test]
+    fn a_payload_starts_enabled_where_enable_says_so() {
+        let yaml = parse(
+            "
+simulated_payload_groups:
+  - group: g
+    enable: true
+    packet_interval: 1 s
+    simulate: true
+simulated_payloads:
+  - type network:
+      - payload: DH0
+        group: g
+        protocol: udp
+      - payload: DH1
+        enable: false
+        group: g
+        protocol: udp
+      - payload: DH2
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
+",
+        );
+        let handlers =
+            [handler("DH0", 4), handler("DH1", 4), handler("DH2", 4)];
+        let enabled = |file: &SimConfigFile| -> Vec<bool> {
+            file.resolve(&handlers)
+                .expect("it fits")
+                .iter()
+                .map(|sim| sim.enabled)
+                .collect()
+        };
+        assert_eq!(enabled(&yaml), [true, false, false]);
+
+        let xml: SimConfigFile = crate::ConfigFormat::Xml
+            .parse(
+                "<simulator>\
+                 <simulated_payload_groups><group name=\"g\">\
+                 <enable value=\"true\"/>\
+                 <simulate>true</simulate>\
+                 <packet_interval>1 s</packet_interval></group>\
+                 </simulated_payload_groups>\
+                 <simulated_payloads><type name=\"network\">\
+                 <payload name=\"DH0\"><protocol>udp</protocol>\
+                 <group>g</group></payload>\
+                 <payload name=\"DH1\"><enable value=\"false\"/>\
+                 <protocol>udp</protocol><group>g</group></payload>\
+                 <payload name=\"DH2\"><protocol>udp</protocol>\
+                 <packet_interval>1 s</packet_interval>\
+                 <simulate>true</simulate></payload>\
+                 </type></simulated_payloads></simulator>",
+            )
+            .expect("parses");
+        assert_eq!(enabled(&xml), enabled(&yaml));
+
+        let refused = crate::ConfigFormat::Yaml
+            .parse::<SimConfigFile>(
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: DH0\n        enable: yes please\n",
+            )
+            .expect_err("neither true nor false")
+            .to_string();
+        assert!(
+            refused.contains("neither true nor false")
+                && refused.contains("enable: true"),
+            "{refused}"
+        );
     }
 
     #[test]

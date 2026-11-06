@@ -12984,6 +12984,17 @@ The window builds the label and the program decides what to do, so the two
 are checked against each other: a button that offered one thing and did
 the other would be worse than either button alone.</dd>
 <dt>Requirement</dt>
+<dd>A payload starts disabled unless its simulator file's <tt class="docutils literal">enable</tt> is
+<tt class="docutils literal">true</tt>, its own or its group's, a payload's own overriding the group's:
+<tt class="docutils literal">enable: true</tt> in YAML and <tt class="docutils literal">&lt;enable <span class="pre">value=&quot;true&quot;/&gt;</span></tt> in XML. Then it
+starts as though its <tt class="docutils literal">Enable</tt> had been pressed. Disabled is the
+default, so that a simulator never starts sending what nobody asked for,
+and a run that wants a payload sending from the start says which in the
+file it is run with rather than in a flag for every payload at once.
+<tt class="docutils literal"><span class="pre">--sending</span></tt> still starts every payload. <tt class="docutils literal">enable</tt> is the simulator's
+alone: tcspecial never reads the simulator file, and a configuration
+that flies says nothing of what a simulator does.</dd>
+<dt>Requirement</dt>
 <dd>A payload that failed to start offers <tt class="docutils literal">Enable</tt> again. It is not
 sending, which is what its status says, and the useful thing to offer is
 the start that failed rather than a stop of something that never began.</dd>

@@ -34,7 +34,7 @@
 
   <!-- Column headings -->
   <text class="heading" x="45" y="44">TCSPECIAL (VEHICLE)</text>
-  <text class="heading" x="640" y="44">GROUND</text>
+  <text class="heading" x="640" y="44">MOC</text>
 
   <rect class="boundary" x="30" y="58" width="560" height="262" rx="14"/>
 
@@ -59,7 +59,7 @@
   <!-- The ground station -->
   <rect class="ground" x="640" y="74" width="235" height="246" rx="10"/>
   <text class="name" x="656" y="101">ping_yamcs.py</text>
-  <text class="kind" x="656" y="122">ground station, through Yamcs</text>
+  <text class="kind" x="656" y="122">MOC, through Yamcs</text>
   <!-- Its beacon panel, drawn as it looks -->
   <rect class="socket" x="656" y="134" width="203" height="40" rx="6"/>
   <text class="label" x="668" y="159">Beacon:</text>
@@ -107,5 +107,5 @@
   <rect class="socket" x="200" y="401" width="22" height="16" rx="4"/>
   <text class="label" x="230" y="414">opened by tcspecial</text>
   <rect class="ground" x="380" y="401" width="22" height="16" rx="4"/>
-  <text class="label" x="410" y="414">ground program</text>
+  <text class="label" x="410" y="414">MOC program</text>
 </svg>

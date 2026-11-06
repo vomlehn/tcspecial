@@ -42,7 +42,7 @@
                  this node by moc-out; what comes down arrives at
                  ground_base plus the device id of the node that sent it:
                  the sensor, device id 1, at 127.0.0.1:3741. -->
-            <gateway name="ground">
+            <gateway name="moc">
                 <address>127.0.0.1</address>
                 <ground_base>127.0.0.1:3740</ground_base>
                 <port>3640</port>
@@ -63,13 +63,13 @@
                  path to write here. -->
             <payload name="sensor">
                 <path>/dev/iio:device1</path>
-                <world-out>ground.sensor</world-out>
+                <world-out>moc.sensor</world-out>
             </payload>
         </type>
     </payloads>
     <tcsgui>
         <nodes>
-            <node name="ground" x="469" y="34"/>
+            <node name="moc" x="469" y="34"/>
             <node name="sensor" x="34" y="34"/>
         </nodes>
     </tcsgui>

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
   <title id="title">The can example</title>
-  <desc id="desc">A motor controller on the kernel's virtual CAN bus, vcan0, reached as two payloads, one for each identifier its frames carry. Each frame carrying 0x123 is read by motor_status, device id 2, and goes by its payload-out link to ground, a gateway_radio node, and down to the MOC at 127.0.0.1:3702: ground_base, 3700, plus the id. A command the MOC sends up to 127.0.0.1:3600, which ground binds, leaves it by its gateway-out link for motor_command, device id 1, which puts it on the bus as one frame carrying 0x124.</desc>
+  <desc id="desc">A motor controller on the kernel's virtual CAN bus, vcan0, reached as two payloads, one for each identifier its frames carry. Each frame carrying 0x123 is read by motor_status, device id 2, and goes by its payload-out link to moc, a gateway_radio node, and down to the MOC at 127.0.0.1:3702: ground_base, 3700, plus the id. A command the MOC sends up to 127.0.0.1:3600, which moc binds, leaves it by its gateway-out link for motor_command, device id 1, which puts it on the bus as one frame carrying 0x124.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -30,7 +30,7 @@
   <!-- Column headings -->
   <text class="heading" x="20" y="44">KERNEL DUMMY DEVICE</text>
   <text class="heading" x="245" y="44">TCSPECIAL (VEHICLE)</text>
-  <text class="heading" x="705" y="44">GROUND</text>
+  <text class="heading" x="705" y="44">MOC</text>
 
   <rect class="boundary" x="230" y="58" width="430" height="232" rx="14"/>
 
@@ -57,7 +57,7 @@
   <text class="detail" x="261" y="278">can_id 0x124</text>
 
   <rect class="socket" x="470" y="110" width="170" height="150" rx="10"/>
-  <text class="name" x="486" y="137">ground</text>
+  <text class="name" x="486" y="137">moc</text>
   <text class="kind" x="486" y="158">gateway_radio, id 0</text>
   <text class="detail" x="486" y="178">binds 127.0.0.1:3600</text>
   <text class="detail" x="486" y="198">ground_base</text>
@@ -65,7 +65,7 @@
 
   <rect class="ground" x="705" y="110" width="180" height="150" rx="10"/>
   <text class="name" x="721" y="137">MOC</text>
-  <text class="kind" x="721" y="158">ground station</text>
+  <text class="kind" x="721" y="158">MOC</text>
   <text class="detail" x="721" y="178">status on :3702</text>
   <text class="note" x="721" y="198"></text>
   <text class="note" x="721" y="218">commands up</text>
@@ -88,13 +88,13 @@
   <!-- Legend -->
   <line x1="45" y1="320" x2="860" y2="320" stroke="#e5e7eb" stroke-width="1"/>
   <path class="down" d="M45,352 L95,352" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="105" y="356">data, solid: device to ground</text>
+  <text class="label" x="105" y="356">data, solid: device to MOC</text>
   <path class="up" d="M400,352 L450,352" marker-end="url(#arrow-amber)"/>
-  <text class="label" x="460" y="356">command, dashed: ground to device</text>
+  <text class="label" x="460" y="356">command, dashed: MOC to device</text>
   <rect class="kernel" x="45" y="376" width="22" height="16" rx="4"/>
   <text class="label" x="75" y="389">made by the kernel</text>
   <rect class="socket" x="260" y="376" width="22" height="16" rx="4"/>
   <text class="label" x="290" y="389">opened by tcspecial</text>
   <rect class="ground" x="470" y="376" width="22" height="16" rx="4"/>
-  <text class="label" x="500" y="389">the ground</text>
+  <text class="label" x="500" y="389">the MOC</text>
 </svg>

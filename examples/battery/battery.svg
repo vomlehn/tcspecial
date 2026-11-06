@@ -93,7 +93,7 @@
 
   <!-- The ground -->
   <rect class="groundside" x="1010" y="52" width="270" height="580" rx="16"/>
-  <text class="heading" x="1028" y="78">GROUND</text>
+  <text class="heading" x="1028" y="78">MOC</text>
 
   <!-- The gateway node, on the ground -->
   <rect class="gateway" x="1030" y="96" width="230" height="96" rx="10"/>
@@ -104,7 +104,7 @@
 
   <!-- The ground software -->
   <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>
-  <text class="name" x="1044" y="456">ground software</text>
+  <text class="name" x="1044" y="456">MOC software</text>
   <text class="kind" x="1044" y="477">processing and display</text>
   <text class="detail" x="1044" y="496">from bus_volts ... shedding</text>
 
@@ -151,7 +151,7 @@
   <!-- Legend -->
   <line x1="50" y1="678" x2="1260" y2="678" stroke="#e5e7eb" stroke-width="1"/>
   <path class="groundward" d="M50,710 L100,710" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="110" y="714">data link, toward the ground</text>
+  <text class="label" x="110" y="714">data link, toward the MOC</text>
   <path class="vehicleward" d="M330,710 L380,710" marker-end="url(#arrow-orange)"/>
   <text class="label" x="390" y="714">data link, toward the vehicle</text>
   <path class="command" d="M610,710 L660,710" marker-end="url(#arrow-orange)"/>
@@ -165,5 +165,5 @@
   <rect class="gateway" x="320" y="740" width="22" height="16" rx="4"/>
   <text class="label" x="350" y="753">gateway node</text>
   <rect class="ground" x="450" y="740" width="22" height="16" rx="4"/>
-  <text class="label" x="480" y="753">ground program</text>
+  <text class="label" x="480" y="753">MOC program</text>
 </svg>

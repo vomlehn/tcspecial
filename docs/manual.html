@@ -3177,10 +3177,10 @@ null-payload.</object>
 aboard, and data dropped.</p>
 </div>
 <p>The four nodes that do nothing to what passes, each taking one stream. What
-the ground sends goes up to the gateway node <tt class="docutils literal">ground</tt>, which binds
+the ground sends goes up to the gateway node <tt class="docutils literal">moc</tt>, which binds
 <tt class="docutils literal">127.0.0.1:8600</tt> aboard, and leaves it for <tt class="docutils literal">echo</tt>, a <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>. The
 tee sends each command on by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> to the <tt class="docutils literal">heater</tt>, as it was
-going, and again by its <tt class="docutils literal"><span class="pre">world-out</span></tt> back to <tt class="docutils literal">ground</tt> -- so the ground sees
+going, and again by its <tt class="docutils literal"><span class="pre">world-out</span></tt> back to <tt class="docutils literal">moc</tt> -- so the ground sees
 what the vehicle was told, arriving at <tt class="docutils literal">ground_base</tt> plus <tt class="docutils literal">echo</tt>'s device
 id, <tt class="docutils literal">127.0.0.1:8701</tt>. The <tt class="docutils literal">sensor</tt>'s readings go to <tt class="docutils literal">readings</tt>, a
 <tt class="docutils literal"><span class="pre">tee-payload</span></tt>, which sends each down to the ground at <tt class="docutils literal">127.0.0.1:8704</tt> and
@@ -3498,8 +3498,8 @@ carrying the identifier <tt class="docutils literal">0x123</tt> and takes comman
 on the bus, filtered to its identifier, so <tt class="docutils literal">motor_status</tt> hears the status
 frames and nothing else, and <tt class="docutils literal">motor_command</tt> hears nothing it has not sent.
 Each status frame's data goes by <tt class="docutils literal">motor_status</tt>'s <tt class="docutils literal"><span class="pre">world-out</span></tt> to the
-gateway node <tt class="docutils literal">ground</tt> and down to the MOC at <tt class="docutils literal">ground_base</tt> plus its
-device id, <tt class="docutils literal">127.0.0.1:3702</tt>. What the ground sends up to <tt class="docutils literal">ground</tt>, which
+gateway node <tt class="docutils literal">moc</tt> and down to the MOC at <tt class="docutils literal">ground_base</tt> plus its
+device id, <tt class="docutils literal">127.0.0.1:3702</tt>. What the ground sends up to <tt class="docutils literal">moc</tt>, which
 binds <tt class="docutils literal">127.0.0.1:3600</tt>, leaves it by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> for
 <tt class="docutils literal">motor_command</tt> and goes out as one frame, so a command is at most eight
 bytes.</p>
@@ -3547,8 +3547,8 @@ ground, a gateway_radio node, and down to the MOC.</object>
 </div>
 <p>A sensor's buffer, which hands over whole sample sets as they are taken.
 <tt class="docutils literal">sensor</tt> reads it and each read's sets go by its <tt class="docutils literal"><span class="pre">world-out</span></tt> to
-<tt class="docutils literal">ground</tt> and down to the MOC at <tt class="docutils literal">127.0.0.1:3741</tt>. Nothing goes up: a
-buffer is read and never written, so <tt class="docutils literal">ground</tt> has no <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Which
+<tt class="docutils literal">moc</tt> and down to the MOC at <tt class="docutils literal">127.0.0.1:3741</tt>. Nothing goes up: a
+buffer is read and never written, so <tt class="docutils literal">moc</tt> has no <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Which
 channels are in a set and how often one is taken are the sensor's settings,
 made in <tt class="docutils literal">sysfs</tt> by whoever brings it up, and nothing in the configuration.</p>
 <p>The <tt class="docutils literal">iio</tt> type is experimental, and this example is what its test flies:

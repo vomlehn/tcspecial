@@ -37,12 +37,12 @@ gateways:
       # moc-out for the motor's commands. What comes down arrives at
       # ground_base plus the device id of the node that sent it: the motor's
       # status, device id 2, at 127.0.0.1:3702.
-      - gateway: ground
+      - gateway: moc
         address: "127.0.0.1"
         ground_base: "127.0.0.1:3700"
         port: "3600"
         moc-out:
-          - motor_command.ground
+          - motor_command.moc
         world-in: [motor_status]
 
 payloads:
@@ -58,16 +58,16 @@ payloads:
       - payload: motor_command
         can_id: "0x124"
         interface: "vcan0"
-        moc-in: [ground]
+        moc-in: [moc]
       # Each status frame goes to the ground as it arrives.
       - payload: motor_status
         can_id: "0x123"
         interface: "vcan0"
         world-out:
-          - ground.motor_status
+          - moc.motor_status
 
 tcsgui:
   nodes:
-    - { node: ground, x: 469, y: 34 }
+    - { node: moc, x: 469, y: 34 }
     - { node: motor_command, x: 34, y: 134 }
     - { node: motor_status, x: 34, y: 34 }

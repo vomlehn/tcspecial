@@ -31,7 +31,7 @@
 
   <!-- Column headings -->
   <text class="heading" x="45" y="44">PAYLOAD</text>
-  <text class="heading" x="660" y="44">GROUND</text>
+  <text class="heading" x="660" y="44">MOC</text>
 
   <!-- tcspecial, the vehicle -->
   <rect class="boundary" x="280" y="58" width="320" height="230" rx="14"/>
@@ -58,7 +58,7 @@
   <!-- The ground station: the panel and nothing else -->
   <rect class="ground" x="660" y="90" width="215" height="140" rx="10"/>
   <text class="name" x="676" y="117">beacon</text>
-  <text class="kind" x="676" y="138">ground station</text>
+  <text class="kind" x="676" y="138">MOC</text>
   <text class="detail" x="676" y="157">receives on 127.0.0.1:5750</text>
   <!-- The panel it shows, drawn as it looks -->
   <rect class="socket" x="676" y="170" width="183" height="46" rx="6"/>
@@ -89,5 +89,5 @@
   <rect class="socket" x="160" y="376" width="22" height="16" rx="4"/>
   <text class="label" x="190" y="389">opened by tcspecial</text>
   <rect class="ground" x="340" y="376" width="22" height="16" rx="4"/>
-  <text class="label" x="370" y="389">ground program</text>
+  <text class="label" x="370" y="389">MOC program</text>
 </svg>

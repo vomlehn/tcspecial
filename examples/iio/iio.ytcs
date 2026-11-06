@@ -36,7 +36,7 @@ gateways:
       # read and never written, so nothing leaves this node by moc-out; what
       # comes down arrives at ground_base plus the device id of the node that
       # sent it: the sensor, device id 1, at 127.0.0.1:3741.
-      - gateway: ground
+      - gateway: moc
         address: "127.0.0.1"
         ground_base: "127.0.0.1:3740"
         port: "3640"
@@ -54,9 +54,9 @@ payloads:
       - payload: sensor
         path: "/dev/iio:device1"
         world-out:
-          - ground.sensor
+          - moc.sensor
 
 tcsgui:
   nodes:
-    - { node: ground, x: 469, y: 34 }
+    - { node: moc, x: 469, y: 34 }
     - { node: sensor, x: 34, y: 34 }

@@ -2754,7 +2754,10 @@ mod tests {
             &[("interface", "hdlc0"), ("stand_in", "127.0.0.1:7950")],
         );
         let said = reach_of(&old).unwrap_err();
-        assert!(said.contains("stand_in is now called sim_address"), "{said}");
+        assert!(
+            said.contains("stand_in is now called sim_address"),
+            "{said}"
+        );
     }
 
     #[test]

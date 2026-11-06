@@ -801,10 +801,10 @@ impl SimulatedCfs {
         let socket =
             UdpSocket::bind(bus.sbn.peer.to_string()).map_err(|e| {
                 format!(
-                "the cFS end cannot be simulated at sbn.peer, {}: {e} -- \
+                    "the cFS end cannot be simulated at sbn.peer, {}: {e} -- \
                  is a cFS, or a simulator left running, holding it?",
-                bus.sbn.peer
-            )
+                    bus.sbn.peer
+                )
             })?;
         let at = socket.local_addr().map_err(|e| {
             format!("the simulated cFS end's socket has no address: {e}")

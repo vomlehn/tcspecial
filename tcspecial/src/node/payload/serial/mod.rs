@@ -309,8 +309,7 @@ fn apply_line_terms(
     // setting none is allowed to start, so a pseudo-terminal here is a run
     // against tcssim, which carries the bus's bytes and has no turnaround.
     if let Some(terms) = &config.rs485 {
-        if tcslibgs::node::payload::serial::judged(&config.path)
-            .is_simulated()
+        if tcslibgs::node::payload::serial::judged(&config.path).is_simulated()
         {
             log::info!(
                 "{what}: {} is a simulated device, so its RS-485 terms are \

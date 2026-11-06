@@ -73,7 +73,11 @@ fn pseudo_terminal() -> (File, String) {
     // result is checked before it is used.
     let master_fd =
         unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-    assert!(master_fd >= 0, "no pty: {}", std::io::Error::last_os_error());
+    assert!(
+        master_fd >= 0,
+        "no pty: {}",
+        std::io::Error::last_os_error()
+    );
     // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
     // `master_fd` was just opened, is checked above, and nothing else takes
     // ownership of it; the uses below only borrow it while the File is alive.

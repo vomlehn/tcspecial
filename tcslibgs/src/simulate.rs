@@ -587,6 +587,14 @@ pub(crate) fn pseudo_terminal(
 /// a socket or a file, whatever answers at its far end: tcssim may be what
 /// does, where the simulator file says so, but the node is the same node
 /// either way, so there is nothing for the mode to tell apart.
+///
+/// # Arguments
+///
+/// * `node` - The node.
+///
+/// # Returns
+///
+/// Whether the mode counts it.
 pub fn counted(node: &Node) -> bool {
     !is_gateway(&node.node_type)
         && DHType::from_spelling(&node.node_type).is_some_and(|kind| {
@@ -655,8 +663,7 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
     if reach.sim_address.is_some() && !mode.is_flight() {
         return Some(Judged {
             attribute: "sim_address",
-            to_simulate:
-                "give sim_address as a loopback address, such as \
+            to_simulate: "give sim_address as a loopback address, such as \
                  127.0.0.1:7950",
             ..judged
         });

@@ -162,7 +162,7 @@ commands:
 
 tcsgui:
   nodes:
-    - { node: consensus_temp, x: 450, y: 242 }
+    - { node: consensus_temp, x: 525, y: 204 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }
     - { node: gpio-out-tmass2, x: 34, y: 469 }
     - { node: housekeeping, x: 469, y: 450 }

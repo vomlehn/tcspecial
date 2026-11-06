@@ -1861,18 +1861,18 @@ fn open_page(
 ///
 /// # Arguments
 ///
-/// * `ui`          - The page's window.
-/// * `editor`      - The session drawn.
-/// * `home`        - The page drawn: `None` for the top of the
-///                   configuration.
-/// * `chosen`      - The name of the node drawn as chosen, if any.
-/// * `picked`      - What is selected that is not a node, if anything.
-/// * `dividers`    - Where the working pane's dividers are.
-/// * `lists`       - The gateway and vehicle selection lists' shares of
-///                   their column, in per cent.
-/// * `(held, lit)` - The link whose end is being dragged, which is drawn
-///                   nowhere; and the one chosen from the errors button,
-///                   which is drawn lit.
+/// * `ui`               - The page's window.
+/// * `editor`           - The session drawn.
+/// * `home`             - The page drawn: `None` for the top of the
+///                        configuration.
+/// * `(chosen, picked)` - The name of the node drawn as chosen, if any; and
+///                        what is selected that is not a node, if anything.
+/// * `dividers`         - Where the working pane's dividers are.
+/// * `lists`            - The gateway and vehicle selection lists' shares
+///                        of their column, in per cent.
+/// * `(held, lit)`      - The link whose end is being dragged, which is
+///                        drawn nowhere; and the one chosen from the
+///                        errors button, which is drawn lit.
 fn put(
     ui: &MainWindow,
     editor: &Editor,

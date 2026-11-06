@@ -266,7 +266,7 @@ mod tests {
     fn each_node_sends_the_unit_the_configuration_says() {
         let graph = thermostat();
         assert_eq!(unit_of(&graph, "to_k1"), Some(Unit::Kelvin));
-        assert_eq!(unit_of(&graph, "ambient"), Some(Unit::Kelvin));
+        assert_eq!(unit_of(&graph, "consensus_temp"), Some(Unit::Kelvin));
         assert_eq!(unit_of(&graph, "thermostat"), None);
         assert_eq!(unit_of(&graph, "temp_1"), None);
         assert_eq!(unit_of(&graph, "nobody"), None);
@@ -299,10 +299,10 @@ mod tests {
         let mut graph = thermostat();
         with(&mut graph, "to_k3", "function", "to_value");
         with(&mut graph, "to_k3", "unit", "V");
-        assert_eq!(unit_of(&graph, "ambient"), None);
+        assert_eq!(unit_of(&graph, "consensus_temp"), None);
         let found = problems(&graph);
         assert!(
-            found.iter().any(|(node, why)| node == "ambient"
+            found.iter().any(|(node, why)| node == "consensus_temp"
                 && why.contains("kelvin")
                 && why.contains("volts")
                 && why.contains("to_k3")),
@@ -316,7 +316,7 @@ mod tests {
     fn a_thermostat_reading_bytes_is_refused() {
         let mut graph = thermostat();
         for link in &mut graph.links {
-            if link.from.starts_with("ambient") {
+            if link.from.starts_with("consensus_temp") {
                 link.from = "temp_1".to_string();
             }
         }

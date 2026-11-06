@@ -3293,7 +3293,7 @@ payloads:
         assert_eq!(
             named,
             vec![
-                ("ambient".to_string(), 0),
+                ("consensus_temp".to_string(), 0),
                 // The heaters' switches, each reporting what it was last
                 // told, which the ground sees in place of the thermostat's
                 // decision.

@@ -64,7 +64,7 @@ gateways:
         apid_base: "0x400"
         ground_base: "127.0.0.1:17700"
         port: "17600"
-        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
+        world-in: [consensus_temp, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
 tcsgui:
   nodes:

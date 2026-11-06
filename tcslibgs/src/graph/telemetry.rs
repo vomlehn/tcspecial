@@ -929,7 +929,7 @@ mod tests {
     #[test]
     fn every_node_has_a_device_id() {
         let ids = ids(&example("thermostat"));
-        assert_eq!(ids["ambient"], 0);
+        assert_eq!(ids["consensus_temp"], 0);
         assert_eq!(ids["gateway"], 1);
         assert_eq!(ids["gpio-out-tmass1"], 2);
         assert_eq!(ids["gpio-out-tmass2"], 3);
@@ -958,7 +958,7 @@ mod tests {
         assert_eq!(
             summary(&links),
             vec![
-                ("ambient", 0, "127.0.0.1", 5100),
+                ("consensus_temp", 0, "127.0.0.1", 5100),
                 // The heaters' switches, each reporting what it was last
                 // told, which the ground sees in place of the thermostat's
                 // decision.

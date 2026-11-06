@@ -71,7 +71,7 @@
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:17700</ground_base>
                 <port>17600</port>
-                <world-in>ambient</world-in>
+                <world-in>consensus_temp</world-in>
                 <world-in>gpio-out-tmass1</world-in>
                 <world-in>gpio-out-tmass2</world-in>
                 <world-in>to_k1</world-in>

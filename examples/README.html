@@ -817,8 +817,8 @@ once a second, as the group <code>zone_temps</code>:
 reading goes through a conversion of its own to kelvin –
 <code>to_k1</code>, <code>to_k2</code>, <code>to_k3</code>, the parts
 differing in format and scale – and the three meet at
-<code>ambient</code>, which takes their median, so that one sensor
-failing cannot take the zone’s temperature with it.
+<code>consensus_temp</code>, which takes their median, so that one
+sensor failing cannot take the zone’s temperature with it.
 <code>thermostat</code> holds that to a setpoint, 293.15 K with a half
 band of 2 K, and drives two heaters, each through a GPIO line of its
 own, <code>gpio-out-tmass1</code> and <code>gpio-out-tmass2</code>,
@@ -920,7 +920,7 @@ and from the ground carries a CCSDS primary header:</p>
 <td>its <code>apid_base</code>, 0x400</td>
 </tr>
 <tr>
-<td><code>ambient</code></td>
+<td><code>consensus_temp</code></td>
 <td>down</td>
 <td><code>apid_base</code> plus its device id, 0x400</td>
 </tr>
@@ -949,10 +949,10 @@ with the unit in a <code>UnitSet</code>, read from its four bytes of a
 signed count of the unit’s steps through a calibrator, and a decision –
 what a heater’s switch was told – is a boolean. So Yamcs’s web
 interface, at <a href="http://localhost:17090"
-class="uri">http://localhost:17090</a>, shows <code>ambient</code> and
-<code>to_k1</code> to <code>to_k3</code> as temperatures in K and
-<code>gpio-out-tmass1</code> and <code>gpio-out-tmass2</code> as true or
-false.</p>
+class="uri">http://localhost:17090</a>, shows
+<code>consensus_temp</code> and <code>to_k1</code> to <code>to_k3</code>
+as temperatures in K and <code>gpio-out-tmass1</code> and
+<code>gpio-out-tmass2</code> as true or false.</p>
 <p>It starts Yamcs, then tcssim – every payload sending from the start,
 as though its panel’s button had been pressed – and, once tcssim says it
 is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs

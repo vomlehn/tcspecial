@@ -1724,8 +1724,6 @@ fn wire(
         let home = home.clone();
         let weak = window.as_weak();
         window.on_link_at(move |x, y| {
-            /// How far outside a line's edge a click still hits it.
-            const SLACK: f32 = 4.0;
             let Some(window) = weak.upgrade() else {
                 return -1;
             };
@@ -1738,17 +1736,25 @@ fn wire(
             let editor = editor.borrow();
             let real =
                 drawn_links(editor.document(), &home, held.as_ref()).len();
-            let links = window.get_links();
-            (0..links.row_count().min(real))
-                .filter_map(|at| {
-                    let line = links.row_data(at)?;
-                    let away = route::distance_to(&line.route, (x, y))?;
-                    let reach =
-                        tcsdiagram::view::line_width(line.wide) / 2.0 + SLACK;
-                    (away <= reach).then_some((at, away))
-                })
-                .min_by(|a, b| a.1.total_cmp(&b.1))
-                .map_or(-1, |(at, _)| at as i32)
+            line_under(&window.get_links(), real, (x, y))
+                .map_or(-1, |at| at as i32)
+        });
+    }
+    {
+        // What a pointer resting on a line is told.
+        let weak = window.as_weak();
+        window.on_tip_at(move |x, y, page_x| {
+            weak.upgrade()
+                .map_or_else(Default::default, |w| tip_at(&w, (x, y), page_x))
+        });
+    }
+    {
+        // Where the drawing is, or the selection, for the View menu to zoom
+        // to.
+        let weak = window.as_weak();
+        window.on_extent(move |selection| {
+            weak.upgrade()
+                .map_or_else(Default::default, |w| extent_of(&w, selection))
         });
     }
     {
@@ -8192,7 +8198,125 @@ fn link_view(look: tcsdiagram::view::LinkLook) -> LinkView {
         wide: look.wide,
         label: look.label.into(),
         comment: look.comment.into(),
+        tip: look.tip.into(),
     }
+}
+
+/// Which line a point is on: the nearest within a few pixels of its edge,
+/// so a line is as easy to hit as it is wide. The one rule for a click on a
+/// line and for a pointer resting on one, so the line a tip is about is the
+/// line a click there would select.
+///
+/// # Arguments
+///
+/// * `links` - The lines, as the markup draws them.
+/// * `rows`  - How many of them, from the first, may be found.
+/// * `at`    - The point, in the lines' own coordinates.
+///
+/// # Returns
+///
+/// The line's place in `links`, or `None` for no line near enough.
+fn line_under(
+    links: &impl Model<Data = LinkView>,
+    rows: usize,
+    at: (f32, f32),
+) -> Option<usize> {
+    /// How far outside a line's edge a point is still on it.
+    const SLACK: f32 = 4.0;
+    (0..links.row_count().min(rows))
+        .filter_map(|row| {
+            let line = links.row_data(row)?;
+            let away = route::distance_to(&line.route, at)?;
+            let reach = tcsdiagram::view::line_width(line.wide) / 2.0 + SLACK;
+            (away <= reach).then_some((row, away))
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(row, _)| row)
+}
+
+/// What a pointer resting on the sheet is told: the tip of the line under
+/// it, found as a click finds a line. Every line of the page, the edge's as
+/// well, a line to a node on another page being one somebody may well ask
+/// about; and the physics lines, which are drawn under them.
+///
+/// # Arguments
+///
+/// * `window` - The window, whose lines are asked.
+/// * `at`     - The point, in the working panes' coordinates.
+/// * `page_x` - The point's x across the whole sheet, for physics lines.
+///
+/// # Returns
+///
+/// The line's tip, or nothing for no line there.
+fn tip_at(
+    window: &MainWindow,
+    at: (f32, f32),
+    page_x: f32,
+) -> slint::SharedString {
+    let tip = |links: ModelRc<LinkView>, at| {
+        line_under(&links, links.row_count(), at)
+            .and_then(|row| links.row_data(row))
+            .map(|line| line.tip)
+    };
+    tip(window.get_links(), at)
+        .or_else(|| tip(window.get_physics_links(), (page_x, at.1)))
+        .unwrap_or_default()
+}
+
+/// Where on the sheet the drawing is, every node and component of it, or
+/// only what is selected: what the View menu zooms to.
+///
+/// # Arguments
+///
+/// * `window`    - The window, whose nodes, lines and selection are asked.
+/// * `selection` - Whether only the selected node, line or component.
+///
+/// # Returns
+///
+/// The smallest box round them, in the whole sheet's coordinates, the
+/// working panes' shifted past the margin and the Physics pane as the markup
+/// draws them; a width of nought for nothing.
+fn extent_of(window: &MainWindow, selection: bool) -> Extent {
+    let left = window.get_physics_width() + window.get_edge_width();
+    let node_box = |node: &NodeView, shift: f32| {
+        (
+            node.x + shift,
+            node.y,
+            node.x + shift + node.width,
+            node.y + node.height,
+        )
+    };
+    let selected = window.get_selected();
+    let physics = window.get_selected_physics();
+    let mut boxes: Vec<(f32, f32, f32, f32)> = window
+        .get_nodes()
+        .iter()
+        .filter(|node| !selection || node.name == selected)
+        .map(|node| node_box(&node, left))
+        .chain(
+            window
+                .get_physics_nodes()
+                .iter()
+                .filter(|node| !selection || node.name == physics)
+                .map(|node| node_box(&node, 0.0)),
+        )
+        .collect();
+    if selection {
+        let line = usize::try_from(window.get_selected_link())
+            .ok()
+            .and_then(|row| window.get_links().row_data(row))
+            .and_then(|line| route::bounds_of(&line.route));
+        boxes.extend(line.map(|(l, t, r, b)| (l + left, t, r + left, b)));
+    }
+    boxes
+        .into_iter()
+        .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
+        .map_or_else(Extent::default, |(l, t, r, b)| Extent {
+            x: l,
+            y: t,
+            width: r - l,
+            height: b - t,
+        })
 }
 
 /// Gives the hue each family of colours is built around, in degrees of the
@@ -8647,6 +8771,90 @@ mod tests {
         let zoom = window.get_sheet_zoom();
         assert!(zoom >= 0.5, "drawn at {zoom}");
         assert!(sheet * zoom <= width - 180.0, "drawn at {zoom} in {width}");
+    }
+
+    /// A pointer resting on a line is told that line's tip -- a working
+    /// pane's line before a physics line under it, a physics line where it
+    /// is alone -- and nothing off every line.
+    #[test]
+    fn a_resting_pointer_is_told_the_tip_of_the_line_under_it() {
+        i_slint_backend_testing::init_no_event_loop();
+        let window = MainWindow::new().expect("a window");
+        let line = |tip: &str, points: &[(f32, f32)]| LinkView {
+            route: route::drawn_route(points).into(),
+            tip: tip.into(),
+            ..Default::default()
+        };
+        let model = |lines: Vec<LinkView>| {
+            ModelRc::from(Rc::new(VecModel::from(lines)))
+        };
+        window.set_links(model(vec![line(
+            "a \u{2192} b",
+            &[(0.0, 50.0), (200.0, 50.0)],
+        )]));
+        window.set_physics_links(model(vec![line(
+            "zone.heater_1",
+            &[(100.0, 0.0), (100.0, 300.0)],
+        )]));
+        // The working panes start 100 pixels into the sheet.
+        assert_eq!(tip_at(&window, (50.0, 52.0), 150.0), "a \u{2192} b");
+        assert_eq!(tip_at(&window, (0.0, 200.0), 101.0), "zone.heater_1");
+        assert_eq!(tip_at(&window, (50.0, 200.0), 150.0), "");
+    }
+
+    /// The View menu zooms to every node and component, or to the one node,
+    /// line or component selected, in the whole sheet's coordinates; to
+    /// nothing, with nothing there.
+    #[test]
+    fn the_view_menu_zooms_to_the_drawing_or_the_selection() {
+        i_slint_backend_testing::init_no_event_loop();
+        let window = MainWindow::new().expect("a window");
+        let model =
+            |rows: Vec<NodeView>| ModelRc::from(Rc::new(VecModel::from(rows)));
+        let node = |name: &str, x, y| NodeView {
+            name: name.into(),
+            x,
+            y,
+            width: 100.0,
+            height: 50.0,
+            ..Default::default()
+        };
+        assert_eq!(extent_of(&window, false).width, 0.0, "an empty sheet");
+        window.set_physics_width(200.0);
+        window.set_nodes(model(vec![
+            node("a", 10.0, 20.0),
+            node("b", 300.0, 400.0),
+        ]));
+        window.set_physics_nodes(model(vec![node("zone", 5.0, 600.0)]));
+        let all = extent_of(&window, false);
+        assert_eq!(
+            (all.x, all.y, all.width, all.height),
+            (5.0, 20.0, 595.0, 630.0)
+        );
+
+        assert_eq!(extent_of(&window, true).width, 0.0, "nothing selected");
+        window.set_selected("b".into());
+        let b = extent_of(&window, true);
+        assert_eq!((b.x, b.y, b.width, b.height), (500.0, 400.0, 100.0, 50.0));
+
+        window.set_selected("".into());
+        window.set_links(ModelRc::from(Rc::new(VecModel::from(vec![
+            LinkView {
+                route: route::drawn_route(&[
+                    (0.0, 10.0),
+                    (50.0, 10.0),
+                    (50.0, 90.0),
+                ])
+                .into(),
+                ..Default::default()
+            },
+        ]))));
+        window.set_selected_link(0);
+        let line = extent_of(&window, true);
+        assert_eq!(
+            (line.x, line.y, line.width, line.height),
+            (200.0, 10.0, 50.0, 80.0)
+        );
     }
 
     /// In a read-only session the startup warning's two ways out are not

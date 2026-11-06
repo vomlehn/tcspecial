@@ -15,6 +15,15 @@ import {
 export { Session, Space, Type, TerminalView, NodeView, LinkView }
 
 // One thing that might be wrong, as the concerns window shows it.
+// A part of the sheet a window is zoomed to show, in the coordinates of the
+// whole sheet: see Surface's zoom-onto. Nothing, a width of nought.
+export struct Extent {
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
 export struct ConcernRow {
     // The sentence: which node, and what about it.
     said: string,
@@ -622,8 +631,62 @@ component Surface inherits Rectangle {
     // the drawing scales -- a node dragged, a line drawn and a node placed
     // are all in the sheet's pixels, which the window toolkit maps a press
     // into -- so nothing that reads a position knows it.
-    out property <float> zoom: max(0.5, min(1.0, sheet.visible-width
-        / max(1px, root.sheet-width)));
+    //
+    // That is the zoom a window starts at, and goes back to when the View
+    // menu says to fit the width. The menu's other entries choose one
+    // instead, which is kept in `zoom-chosen` until the next; nought is
+    // none chosen. A chosen zoom may be under a half, a person who asked to
+    // see the whole page being shown it, types too small to read and all.
+    in-out property <float> zoom-chosen: 0;
+    out property <float> zoom: root.zoom-chosen > 0 ? root.zoom-chosen
+        : max(0.5, min(1.0, sheet.visible-width
+            / max(1px, root.sheet-width)));
+
+    // The sheet zoomed so that `area` fills the view, with a margin round
+    // it, and scrolled so that it is in the middle. Never past twice the
+    // size, at which one node fills a window, nor under a quarter, at which
+    // a node is a dot. Nothing for an empty area.
+    //
+    // The view's top is said as canvas-offset, in the sheet's pixels, and
+    // not only as the viewport's offset: the change of zoom moves the
+    // viewport back to canvas-offset, so that is the one that must be right.
+    public function zoom-onto(area: Extent) {
+        if (area.width <= 0) {
+            return;
+        }
+        let margin = 2 * Space.room;
+        let z = max(0.25, min(2.0, min(
+            sheet.visible-width / (area.width + 2 * margin),
+            sheet.visible-height / (area.height + 2 * margin))));
+        root.zoom-chosen = z;
+        root.look-at(area.x + area.width / 2, area.y + area.height / 2, z);
+    }
+    // The zoom chosen outright, keeping whatever is in the middle of the
+    // view there.
+    public function zoom-to(z: float) {
+        let middle-x = (sheet.visible-width / 2 - sheet.content-x)
+            / root.zoom;
+        let middle-y = (sheet.visible-height / 2 - sheet.content-y)
+            / root.zoom;
+        root.zoom-chosen = z;
+        root.look-at(middle-x, middle-y, z);
+    }
+    // And the zoom the window would choose for itself, back.
+    public function zoom-to-width() {
+        root.zoom-chosen = 0;
+    }
+    // The view scrolled so that a point on the sheet is in its middle at
+    // zoom `z`, or as near as the sheet's edges let it be.
+    function look-at(x: length, y: length, z: float) {
+        sheet.content-x = min(0px, max(
+            sheet.visible-width - root.sheet-width * z,
+            sheet.visible-width / 2 - x * z));
+        let top = min(0px, max(
+            sheet.visible-height - root.working-height * z,
+            sheet.visible-height / 2 - y * z));
+        root.canvas-offset = top / z;
+        sheet.content-y = top;
+    }
     // A subdiagram's page: how wide the margin either side of what is
     // inside it is -- the Physics pane and the working panes -- which holds
     // the page's edge, and the edge's terminals, in the working panes' own
@@ -727,9 +790,9 @@ component Surface inherits Rectangle {
     // was carried. Let go anywhere but over the sheet -- back over the lists,
     // say -- it is put back, and nothing is placed.
     //
-    // The sheet's page is scaled about its middle, which is the toolkit's
-    // origin for a scale, so the point is taken off the scroll and then the
-    // scale undone about that middle.
+    // A point on the sheet is drawn at the zoom times its place, plus the
+    // scroll, as the dividers over the sheet are placed; so the point is
+    // taken off the scroll and then the scale undone.
     function put-down(entry: PaletteEntry, physics: bool, x: length,
                       y: length) {
         root.carrying = false;
@@ -741,19 +804,19 @@ component Surface inherits Rectangle {
         }
         if (physics) {
             root.drop-physics(entry.node.node-type,
-                page.width / 2 + (x - sheet.absolute-position.x
-                    - sheet.content-x - page.width / 2) / root.zoom
+                (x - sheet.absolute-position.x - sheet.content-x)
+                    / root.zoom
                     - entry.node.width / 2,
-                page.height / 2 + (y - sheet.absolute-position.y
-                    - sheet.content-y - page.height / 2) / root.zoom
+                (y - sheet.absolute-position.y - sheet.content-y)
+                    / root.zoom
                     - entry.node.height / 2);
         } else {
             root.drop-node(entry.node.name, entry.node.node-type, entry.sets,
-                page.width / 2 + (x - sheet.absolute-position.x
-                    - sheet.content-x - page.width / 2) / root.zoom
+                (x - sheet.absolute-position.x - sheet.content-x)
+                    / root.zoom
                     - entry.node.width / 2,
-                page.height / 2 + (y - sheet.absolute-position.y
-                    - sheet.content-y - page.height / 2) / root.zoom
+                (y - sheet.absolute-position.y - sheet.content-y)
+                    / root.zoom
                     - entry.node.height / 2);
         }
     }
@@ -842,6 +905,17 @@ component Surface inherits Rectangle {
     // place in `links`, or -1 for none: worked out in Rust, which has the
     // lines' routes as points. See tcsdiagram::route::distance_to.
     pure callback link-at(length, length) -> int;
+    // What a pointer resting on the sheet is told about the line under it,
+    // or nothing for none: a configuration's line by the point in the
+    // working panes' coordinates, and a physics line, failing that, by the
+    // point in the whole sheet's. See tcsdiagram::view::tip_of.
+    pure callback tip-at(length, length, length) -> string;
+    // What the tip says now: nothing while no line is pointed at, and
+    // nothing while a line is being drawn, whose pointer is busy.
+    property <string> tip: ground.has-hover && root.drawing-route == ""
+        ? root.tip-at(ground.mouse-x - root.left, ground.mouse-y,
+            ground.mouse-x)
+        : "";
     // The line the menu a right click opened is about.
     property <int> menu-link: -1;
 
@@ -1158,6 +1232,10 @@ component Surface inherits Rectangle {
             // however far it is scrolled: see below.
             Rectangle {
                 horizontal-stretch: 1;
+                // Clipped, so a divider whose place is scrolled out of the
+                // view -- off to the left, zoomed in -- is not drawn over
+                // the lists beside it.
+                clip: true;
                 sheet := ScrollView {
                 width: 100%;
                 height: 100%;
@@ -1213,8 +1291,10 @@ component Surface inherits Rectangle {
                         // the press itself. Under everything on the page,
                         // so that the shapes and terminals take their own
                         // presses first; a line, being drawn by a Path,
-                        // takes none, and is found by where it runs.
-                        TouchArea {
+                        // takes none, and is found by where it runs. The
+                        // pointer resting here is how a line's tip is
+                        // found, likewise.
+                        ground := TouchArea {
                             width: 100%;
                             height: 100%;
                             pointer-event(event) => {
@@ -1258,6 +1338,7 @@ component Surface inherits Rectangle {
                         }
                         for l in root.physics-links: LinkLine {
                             link: l;
+                            captioned: false;
                         }
 
                     canvas := Rectangle {
@@ -1289,8 +1370,13 @@ component Surface inherits Rectangle {
                     }
 
                     // Links under nodes, so a line never crosses a label.
+                    // Uncaptioned: a line's label and comment are in its
+                    // tip, which is drawn over everything, where written
+                    // beside it they ran into the next line's and over
+                    // nodes.
                     for l[i] in links: LinkLine {
                         link: l;
+                        captioned: false;
                         selected: i == root.selected-link;
                     }
                     // And the line being drawn, under them as well: it is a
@@ -1525,6 +1611,39 @@ component Surface inherits Rectangle {
                     at: (root.left + root.vehicle-divider) * root.zoom
                         + sheet.content-x;
                     moved(dx) => { root.vehicle-divider-moved(dx / root.zoom); }
+                }
+
+                // The tip of the line pointed at, below and right of the
+                // pointer so as not to cover what is pointed at, and kept
+                // inside the view. Over the sheet rather than on it, so it
+                // is drawn over every node and is read at the window's own
+                // size whatever the sheet's zoom. Takes no presses, having
+                // no TouchArea: the sheet under it takes them.
+                if root.tip != "": Rectangle {
+                    property <length> at-x: ground.mouse-x * root.zoom
+                        + sheet.content-x + Space.wide;
+                    property <length> at-y: ground.mouse-y * root.zoom
+                        + sheet.content-y + Space.room;
+                    width: min(28rem, tip-text.preferred-width
+                        + 2 * Space.step);
+                    height: tip-text.preferred-height + 2 * Space.tight;
+                    x: max(0px, min(self.at-x, parent.width - self.width));
+                    y: self.at-y + self.height > parent.height
+                        ? max(0px, self.at-y - 2 * Space.room - self.height)
+                        : self.at-y;
+                    background: #fffff0;
+                    border-width: 1px;
+                    border-color: #6b7280;
+                    border-radius: 3px;
+                    tip-text := Text {
+                        x: Space.step;
+                        y: Space.tight;
+                        width: parent.width - 2 * Space.step;
+                        text: root.tip;
+                        wrap: word-wrap;
+                        font-size: Type.small;
+                        color: #1f2937;
+                    }
                 }
 
                 // The keys a line in hand answers: Escape puts it down, and
@@ -1983,6 +2102,14 @@ export component MainWindow inherits Window {
     callback unpicked();
     callback link-delete(int);
     pure callback link-at(length, length) -> int;
+    pure callback tip-at(length, length, length) -> string;
+    // Where the drawing is on the sheet, every node and component of it,
+    // or only what is selected: what the View menu zooms to. A width of
+    // nought for nothing. Worked out in Rust, which can look a node up by
+    // its name.
+    pure callback extent(bool) -> Extent;
+    // The zoom the View menu chose, and none, which is the window's own.
+    out property <float> zoom-chosen: surface.zoom-chosen;
     // The menu asked for what tcspecial is configured with.
     callback edit-parameters();
     // Every node to the top of its own pane: see the menu item.
@@ -2072,6 +2199,37 @@ export component MainWindow inherits Window {
                 enabled: !root.inert && !Session.read-only;
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
+            }
+        }
+        // How large the sheet is drawn. The window chooses for itself to
+        // begin with, drawing it as wide as the window and no larger; these
+        // are for a diagram too big for that to show at once, and for one
+        // part of it looked at closely.
+        Menu {
+            title: "View";
+            MenuItem {
+                enabled: !root.inert;
+                title: "Zoom to the drawing";
+                activated => { surface.zoom-onto(root.extent(false)); }
+            }
+            // Disabled with nothing selected, rather than doing nothing.
+            MenuItem {
+                enabled: !root.inert && (root.selected != ""
+                    || root.selected-link >= 0
+                    || root.selected-physics != "");
+                title: "Zoom to the selection";
+                activated => { surface.zoom-onto(root.extent(true)); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                enabled: !root.inert;
+                title: "Actual size";
+                activated => { surface.zoom-to(1.0); }
+            }
+            MenuItem {
+                enabled: !root.inert;
+                title: "Fit the width";
+                activated => { surface.zoom-to-width(); }
             }
         }
     }
@@ -2172,6 +2330,7 @@ export component MainWindow inherits Window {
         unpicked => { root.unpicked(); }
         link-delete(i) => { root.link-delete(i); }
         link-at(x, y) => { return root.link-at(x, y); }
+        tip-at(x, y, page-x) => { return root.tip-at(x, y, page-x); }
         node-edit(n) => { root.node-edit(n); }
         node-delete(n) => { root.node-delete(n); }
     }

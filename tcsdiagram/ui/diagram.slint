@@ -216,6 +216,9 @@ export struct LinkView {
     label: string,
     // What somebody wrote about this connection.
     comment: string,
+    // What a pointer resting on the line is told: both ends, the input it
+    // arrives at, and the comment, whole. See tcsdiagram::view::tip_of.
+    tip: string,
     // Whether data has just crossed it: tcspecial's visual window lights a
     // line while what was sent over it is less than LINE_BLINK old, and the
     // editor never does. Lit, the line has a second one under it, three times
@@ -786,6 +789,10 @@ export component LinkLine inherits Rectangle {
     // Whether the editor has this line selected, which outlines it in the
     // dark grey a selected node is outlined in.
     in property <bool> selected: false;
+    // Whether the label and comment are written beside the line. A window
+    // that can be pointed at says them in a tip instead, where they cannot
+    // be written over a neighbour's or over a node: see tcsgui's Surface.
+    in property <bool> captioned: true;
     // How wide the line is drawn, and how wide its selection outline.
     property <length> weight: link.wide ? 5px : 2.5px;
     property <length> outline: weight + 6px;
@@ -887,7 +894,7 @@ export component LinkLine inherits Rectangle {
     // Which input the link arrives at, where it says so. Text rather than
     // only a line weight, because a name is what the configuration file will
     // show and the two should agree.
-    if link.label != "": Text {
+    if root.captioned && link.label != "": Text {
         x: link.label-x;
         y: link.label-y - 14px;
         text: link.label;
@@ -895,7 +902,7 @@ export component LinkLine inherits Rectangle {
         color: ink;
     }
     // And what somebody wrote about the connection, under the line.
-    if link.comment != "": Text {
+    if root.captioned && link.comment != "": Text {
         x: link.label-x;
         y: link.label-y + 4px;
         text: link.comment;

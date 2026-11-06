@@ -4385,8 +4385,11 @@ room for the name. A physics connection is drawn between the two components
 it joins, and each simulated payload's <tt class="docutils literal">connects</tt> between its component and
 the payload node, each from or to a terminal, the arrow the way
 the value goes: both dashed and in that purple, where a configuration's links
-are solid. tcspecial's visual window draws the same pane from the simulator
-file tcssim would read for the configuration, and only
+are solid. Neither is labelled, the lanes they run in being narrow; a pointer
+resting on one is told the terminal it is joined to in a tip, which is what
+tells a line into a thermal mass's <tt class="docutils literal">heat</tt> from one into its <tt class="docutils literal">heater_1</tt>
+when both enter its one input box. tcspecial's visual window draws the same
+pane from the simulator file tcssim would read for the configuration, and only
 draws it. See <tt class="docutils literal"><span class="pre">tcsdiagram::physics</span></tt>.</p>
 <p>The physics list is at the top of the selection column, its pane being the
 leftmost, with a line under it that is dragged as the others are. Its entries
@@ -4438,6 +4441,16 @@ is scaled. A drag, a line drawn, a node placed, a divider moved and the
 sheet scrolled are all still measured in the sheet's own pixels, so nothing
 that reads a position knows how large it is drawn. Half size is the floor
 because below it a node's type cannot be read.</p>
+<p>That is the size a window starts at, and <strong>View -&gt; Fit the width</strong> goes back
+to it. The View menu's other entries choose a size outright: <strong>Zoom to the
+drawing</strong> fits every node and component in the view, <strong>Zoom to the
+selection</strong> the one node, line or component selected, and <strong>Actual size</strong>
+draws the sheet at its own size, keeping what is in the middle of the view
+there. A zoom chosen outright may be under a half -- somebody who asked to see
+the whole drawing is shown it -- and is never under a quarter, at which a node
+is a dot, nor over twice, at which one node fills a window. Zooming to
+something scrolls it to the middle of the view. Zoom to the selection, with
+nothing selected, is greyed rather than doing nothing.</p>
 <p>What that buys is a drawing that can be compared with last mission's. The three
 parts change on different schedules -- the ground is the other end of the link
 and not the vehicle at all, the vehicle's own graph persists, and what it
@@ -4788,6 +4801,19 @@ bends, then distance.</p>
 bundle have their longest runs side by side, so their labels would be written
 over each other. A label that would cover one already written moves along its
 own run instead, its length at a time, to the first place that is clear.</p>
+<p>tcsgui writes neither a line's label nor its comment on the sheet. Moved clear
+of each other, labels still ran over the next bundle and over nodes, and a
+comment a paragraph long, the thermostat's over its two switches, was drawn
+across the log. A pointer resting on a line is shown a tip instead, over
+everything and at the window's own size whatever the zoom: the node the line
+leaves, the node it reaches and the input there where it names one -- which
+is what the labels said, the far node of a line to another page included --
+and under them the comment, whole, each paragraph run together to be wrapped
+at the tip's width. The tip is each line's own, so every line of a list a
+comment is written over says it, where the drawing wrote it on the first. The
+line a tip is about is found as a click finds one, so it is the line a click
+there would select. tcspecial's visual window, which nobody points at, still
+writes the labels and comments beside the lines.</p>
 <p>Two overlaps are not the router's to fix, and both are short. Two links
 leaving one terminal leave from the same point, so their first segments run
 together for the length of a stub whatever either does afterwards; the same
@@ -5477,7 +5503,8 @@ and arranging puts it where anybody could have dragged it.</p>
 anything on the canvas -- there is nothing to press on a diagram that would mean
 &quot;the configuration&quot;, or &quot;the groups&quot;, or &quot;the way out&quot;. <strong>File</strong> holds Save,
 Save as, the two kinds of group, and Exit; <strong>Edit</strong> holds the tcspecial
-parameters, arranging the nodes, and generating the Rust.</p>
+parameters, arranging the nodes, and generating the Rust; <strong>View</strong> holds how
+large the sheet is drawn.</p>
 <p>Exit offers to write anything the files do not have before it goes, which is
 normally nothing. Four answers rather than two: <em>Save and leave</em>, <em>Save as and
 leave</em>, for files that cannot be written where they are, <em>Leave without

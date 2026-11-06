@@ -534,7 +534,8 @@ pub fn looks(
         let right = (a_at.at.0 + a_at.size.0 as i32 + shift) as f32;
         let out = right + 8.0 + 6.0 * (n % 3) as f32;
         let points = [start, (out, start.1), (out, end.1), end];
-        links.push(link(&points));
+        let tip = crate::view::tip_of(from, to, None, None);
+        links.push(link(&points, tip));
     }
 
     // Each join between its component's terminal and the left of its
@@ -575,10 +576,16 @@ pub fn looks(
         let across = (shift as f32 - 6.0 - 4.0 * (n % 4) as f32).max(mine.0);
         let mut points =
             vec![mine, (across, mine.1), (across, theirs.1), theirs];
-        if input {
+        // Named by the side the data leaves, so the tip reads the way the
+        // arrow points: the terminal, which the drawing does not label, is
+        // what tells heat from heater_1 where both enter one box.
+        let tip = if input {
             points.reverse();
-        }
-        links.push(link(&points));
+            crate::view::tip_of(join.payload, join.terminal, None, None)
+        } else {
+            crate::view::tip_of(join.terminal, join.payload, None, None)
+        };
+        links.push(link(&points, tip));
     }
     (drawn, links)
 }
@@ -588,14 +595,15 @@ pub fn looks(
 /// # Arguments
 ///
 /// * `points` - The route, from where the data leaves to where it arrives.
+/// * `tip`    - What a pointer resting on it is told: see `tip_of`.
 ///
 /// # Returns
 ///
 /// The link, dashed, with its arrowhead at the last point, and no label:
 /// the lanes between the Physics pane and the payloads are narrow, and a
 /// terminal's name in each would be written over the next. What a link
-/// joins is in the physics window, by name.
-fn link(points: &[(f32, f32)]) -> LinkLook {
+/// joins is said by its tip, and in the physics window, by name.
+fn link(points: &[(f32, f32)], tip: String) -> LinkLook {
     let last = points[points.len() - 1];
     let before = points[points.len() - 2];
     let arrives_right = last.0 >= before.0;
@@ -616,6 +624,7 @@ fn link(points: &[(f32, f32)]) -> LinkLook {
         wide: false,
         label: String::new(),
         comment: String::new(),
+        tip,
     }
 }
 
@@ -992,6 +1001,11 @@ mod tests {
             assert_eq!(link.ink, PHYSICS_LINE);
             assert!(link.route.matches('M').count() > 2, "dashed");
         }
+        // Each tells a resting pointer what it joins, by terminal, which the
+        // drawing does not say: a line into a heater's input and one into
+        // the zone's heat enter one box.
+        assert_eq!(links[0].tip, "heater_1.heat \u{2192} zone.heat");
+        assert_eq!(links[1].tip, "zone.temperature \u{2192} temp_1");
         // The zone's temperature is an output: its join arrives at the
         // payload, going right.
         assert!(links[1]

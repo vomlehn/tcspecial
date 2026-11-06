@@ -2393,7 +2393,7 @@ mod tests {
         let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
         assert!(!configuration.is_null(), "the example opens");
         for (node, sends) in [
-            (c"temp1", 1),
+            (c"to_k1", 1),
             (c"ambient", 1),
             (c"thermostat", 0),
             (c"temp_1", 0),

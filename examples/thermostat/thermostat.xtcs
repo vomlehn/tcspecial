@@ -41,65 +41,16 @@
                 <world-in>ambient</world-in>
                 <world-in>gpio-out-tmass1</world-in>
                 <world-in>gpio-out-tmass2</world-in>
-                <world-in>temp1</world-in>
-                <world-in>temp2</world-in>
-                <world-in>temp3</world-in>
+                <world-in>to_k1</world-in>
+                <world-in>to_k2</world-in>
+                <world-in>to_k3</world-in>
             </gateway>
         </type>
     </gateways>
-    <payloads>
-        <!-- The three sensors of the zone, two on an I2C bus and one -->
-        <!-- on a SPI bus, as a vehicle would carry them. On a desk each -->
-        <!-- is reached over UDP at its sim_address, where tcssim answers -->
-        <!-- with the zone's temperature, so that they touch no -->
-        <!-- hardware; flown, with no simulated devices, the buses are -->
-        <!-- opened. -->
-        <type name="i2c_tmass">
-            <!-- One of three sensors of the same place, a trio, so that the -->
-            <!-- temperature survives one of them going wrong. Two bytes, -->
-            <!-- signed, big endian. -->
-            <payload name="temp_1">
-                <address>0x48</address>
-                <group>zone_temps</group>
-                <path>/dev/i2c-1</path>
-                <read_size>2</read_size>
-                <sim_address>127.0.0.1:5201</sim_address>
-                <world-out>temp1.temp_1</world-out>
-            </payload>
-            <!-- The second of the trio; the same part as temp_1, on the -->
-            <!-- same bus. -->
-            <payload name="temp_2">
-                <address>0x49</address>
-                <group>zone_temps</group>
-                <path>/dev/i2c-1</path>
-                <read_size>2</read_size>
-                <sim_address>127.0.0.1:5202</sim_address>
-                <world-out>temp2.temp_2</world-out>
-            </payload>
-        </type>
-        <type name="spi_tmass">
-            <!-- The third. A different part on a different bus: three -->
-            <!-- bytes, unsigned, its own scale and so its own conversion, -->
-            <!-- so that no one bus and no one part number can take the -->
-            <!-- whole trio out. -->
-            <payload name="temp_3">
-                <group>zone_temps</group>
-                <max_speed>1000000</max_speed>
-                <path>/dev/spidev0.0</path>
-                <read_size>3</read_size>
-                <spi_mode>0</spi_mode>
-                <sim_address>127.0.0.1:5203</sim_address>
-                <world-out>temp3.temp_3</world-out>
-            </payload>
-        </type>
-    </payloads>
     <tcsgui>
         <nodes>
-            <node name="thermostat-common" x="563" y="374"/>
             <node name="gateway" x="790" y="34"/>
-            <node name="temp_1" x="34" y="34"/>
-            <node name="temp_2" x="34" y="166"/>
-            <node name="temp_3" x="53" y="299"/>
+            <node name="thermostat-common" x="299" y="53"/>
         </nodes>
     </tcsgui>
 </configuration>

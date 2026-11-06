@@ -3269,18 +3269,18 @@ payloads:
                 // decision.
                 ("gpio-out-tmass1".to_string(), 2),
                 ("gpio-out-tmass2".to_string(), 3),
-                ("temp1".to_string(), 5),
-                ("temp2".to_string(), 6),
-                ("temp3".to_string(), 7),
+                ("to_k1".to_string(), 9),
+                ("to_k2".to_string(), 10),
+                ("to_k3".to_string(), 11),
             ]
         );
-        // temp3, device id 7, at ground_base plus that.
+        // to_k3, device id 11, at ground_base plus that.
         assert!(
             panels[5].config.contains("to gateway"),
             "{}",
             panels[5].config
         );
-        assert!(panels[5].config.contains("5107"), "{}", panels[5].config);
+        assert!(panels[5].config.contains("5111"), "{}", panels[5].config);
     }
 
     /// The minimal example's sensor reports over payload_telemetry.

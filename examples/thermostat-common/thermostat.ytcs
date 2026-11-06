@@ -1,21 +1,19 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
 # The vehicle the two thermostat examples share, which each includes:
-# the three conversions and the vote between them, the thermostat and
-# its log, the heaters' switches, the group the
+# the three sensors, the three conversions and the vote between them,
+# the thermostat and its log, the heaters' switches, the group the
 # sensors are read in, and the setpoint the ground may set. What
-# differs between the two is in each example's own file: the
-# tcspecial section, the gateway node, and the three sensors, whose
-# ports differ so that both examples can run at once. The gateway
-# node is called gateway in both, which is the name the links here
-# send to it by and the command binding takes the setpoint from.
+# differs between the two is in each example's own file: the tcspecial
+# section and the gateway node. The gateway node is called
+# gateway in both, which is the name the links here send to it by and
+# the command binding takes the setpoint from.
 
-# What the examples that include this file may join: the three
-# conversions, whose readings arrive from the sensors in each example's
-# own file, and every reading that leaves for the gateway node there.
+# What the examples that include this file may join: every reading that
+# leaves for the gateway node there. Nothing arrives from outside, the
+# sensors being here.
 exports:
-  world-in: [temp1, temp2, temp3]
-  world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
+  world-out: [ambient, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2, to_k3]
 
 payload_groups:
   - name: "zone_temps"
@@ -36,36 +34,6 @@ vehicle:
           - gateway.ambient
           - thermostat.ambient
         world-in: [in0, in1, in2]
-      - compute: temp1
-        format: "i16_be"
-        function: "to_kelvin"
-        offset: "273.15"
-        scale: "0.0625"
-        world-out:
-          - ambient.in0
-          - gateway.temp1
-          - housekeeping.temp1
-        world-in: [temp_1]
-      - compute: temp2
-        format: "i16_be"
-        function: "to_kelvin"
-        offset: "273.15"
-        scale: "0.0625"
-        world-out:
-          - ambient.in1
-          - gateway.temp2
-          - housekeeping.temp2
-        world-in: [temp_2]
-      - compute: temp3
-        format: "u24_be"
-        function: "to_kelvin"
-        offset: "255.37"
-        scale: "0.0078"
-        world-out:
-          - ambient.in2
-          - gateway.temp3
-          - housekeeping.temp3
-        world-in: [temp_3]
       # setpoint is set from the ground; half_band is how far either side
       # of it the heaters are switched at, the setpoint being in the middle
       # of the band.
@@ -85,11 +53,41 @@ vehicle:
         world-out:
           - housekeeping.thermostat
         world-in: [ambient]
+      # Each sensor's reading, to kelvin, for the vote and the gateway node:
+      # the parts differ in format and scale, so each has a conversion of
+      # its own.
+      - compute: to_k1
+        format: "i16_be"
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        world-out:
+          - ambient.in0
+          - gateway.to_k1
+        world-in: [temp_1]
+      - compute: to_k2
+        format: "i16_be"
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        world-out:
+          - ambient.in1
+          - gateway.to_k2
+        world-in: [temp_2]
+      - compute: to_k3
+        format: "u24_be"
+        function: "to_kelvin"
+        offset: "255.37"
+        scale: "0.0078"
+        world-out:
+          - ambient.in2
+          - gateway.to_k3
+        world-in: [temp_3]
   - type log:
       - compute: housekeeping
         directory: "/tmp/telemetry"
         format: "variable_ts_rc"
-        world-in: [temp1, temp2, temp3, thermostat]
+        world-in: [thermostat]
 
 payloads:
   # The heaters' switches, on the thermal mass, through the kernel's
@@ -115,6 +113,45 @@ payloads:
         moc-in: [thermostat]
         world-out:
           - gateway.gpio-out-tmass2
+  # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
+  # as a vehicle would carry them, each converted to kelvin for the
+  # vote. On a desk the two on I2C are on the kernel's dummy bus,
+  # i2c-stub, whose registers tcssim fills with the zone's temperature, and
+  # the one on SPI is reached over UDP at its sim_address, where tcssim
+  # answers the same; flown, with no simulated devices, the buses are
+  # opened.
+  - type i2c:
+      # One of three sensors of the same place, a trio, so that the
+      # temperature survives one of them going wrong. Two bytes, signed,
+      # big endian.
+      - payload: temp_1
+        address: "0x48"
+        group: "zone_temps"
+        path: "/dev/i2c-1"
+        read_size: "2"
+        world-out:
+          - to_k1.temp_1
+      # The second of the trio; the same part as temp_1, on the same bus.
+      - payload: temp_2
+        address: "0x49"
+        group: "zone_temps"
+        path: "/dev/i2c-1"
+        read_size: "2"
+        world-out:
+          - to_k2.temp_2
+  - type spi:
+      # The third. A different part on a different bus: three bytes,
+      # unsigned, its own scale and so its own conversion, so that no one
+      # bus and no one part number can take the whole trio out.
+      - payload: temp_3
+        group: "zone_temps"
+        max_speed: "1000000"
+        path: "/dev/spidev0.0"
+        read_size: "3"
+        spi_mode: "0"
+        sim_address: "127.0.0.1:5203"
+        world-out:
+          - to_k3.temp_3
 
 commands:
   # the zone temperature the heaters are held at, in kelvin
@@ -122,11 +159,14 @@ commands:
 
 tcsgui:
   nodes:
-    - { node: ambient, x: 469, y: 166 }
+    - { node: ambient, x: 450, y: 242 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }
     - { node: gpio-out-tmass2, x: 34, y: 469 }
     - { node: housekeeping, x: 469, y: 450 }
-    - { node: temp1, x: 261, y: 34 }
-    - { node: temp2, x: 261, y: 166 }
-    - { node: temp3, x: 261, y: 280 }
+    - { node: temp_1, x: 53, y: 72 }
+    - { node: temp_2, x: 34, y: 166 }
+    - { node: temp_3, x: 53, y: 280 }
     - { node: thermostat, x: 601, y: 242 }
+    - { node: to_k1, x: 299, y: 166 }
+    - { node: to_k2, x: 299, y: 242 }
+    - { node: to_k3, x: 299, y: 317 }

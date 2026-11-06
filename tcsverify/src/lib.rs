@@ -805,7 +805,7 @@ fn differences_between(
 /// The line, from 1; the file's first line where nothing is found.
 fn line_of_path(text: &str, path: &[String]) -> usize {
     const NOT_WRITTEN: [&str; 4] = ["nodes", "attributes", "links", "to"];
-    let lines: Vec<&str> = text.lines().collect();
+    let lines = outside_comments(text);
     let mut from = 0;
     let mut found = None;
     let parts = path
@@ -821,9 +821,8 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
         // A whole name, outside a comment: `heater` is not found in
         // `heaters`, and a comment saying what an attribute is for is not
         // where it is set.
-        let names = |line: &&str| {
-            let said = line.trim_start();
-            if said.starts_with('#') || said.starts_with("<!--") {
+        let names = |line: &String| {
+            if line.trim_start().starts_with('#') {
                 return false;
             }
             let in_a_name =
@@ -840,6 +839,44 @@ fn line_of_path(text: &str, path: &[String]) -> usize {
         }
     }
     found.unwrap_or(THE_FILE_ITSELF)
+}
+
+/// Blanks out what XML comments say, line by line, following a comment over
+/// as many lines as it takes.
+///
+/// A comment of several lines has words on lines that do not start it, and
+/// a name in them is not where the name is written.
+///
+/// # Arguments
+///
+/// * `text` - The file's text.
+///
+/// # Returns
+///
+/// Each line of the text, without what any comment on it says.
+fn outside_comments(text: &str) -> Vec<String> {
+    let mut open = false;
+    text.lines()
+        .map(|line| {
+            let mut kept = String::new();
+            let mut rest = line;
+            loop {
+                if open {
+                    let Some(end) = rest.find("-->") else { break };
+                    rest = &rest[end + "-->".len()..];
+                    open = false;
+                } else if let Some(start) = rest.find("<!--") {
+                    kept.push_str(&rest[..start]);
+                    rest = &rest[start + "<!--".len()..];
+                    open = true;
+                } else {
+                    kept.push_str(rest);
+                    break;
+                }
+            }
+            kept
+        })
+        .collect()
 }
 
 /// Checks a configuration: reads it, then asks what is wrong with it.
@@ -1312,8 +1349,8 @@ mod tests {
                 .expect("the line is there")
         };
 
-        // Both heaters' power with no unit: one finding at each heater.
-        edit(&model, "power: \"4 W\"", "power: \"4\"");
+        // The zone's heaters' power with no unit: one finding, at the zone.
+        edit(&model, "_power: \"4 W\"", "_power: \"4\"");
         let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
         let found: Vec<(PathBuf, usize)> = report
             .findings
@@ -1322,34 +1359,28 @@ mod tests {
             .collect();
         assert_eq!(
             found,
-            [
-                (model.clone(), line_in(&model, "- component: heater_1")),
-                (model.clone(), line_in(&model, "- component: heater_2")),
-            ],
+            [(model.clone(), line_in(&model, "- component: zone"))],
             "{:?}",
             report.said()
         );
-        edit(&model, "power: \"4\"", "power: \"4 W\"");
+        edit(&model, "_power: \"4\"", "_power: \"4 W\"");
 
-        // A heater's simulated payload joined to its heat, an output: the
-        // heater's on is then joined to nothing, at the heater, and the payload
-        // reports watts nothing converts, at the payload.
-        edit(&sim, "connects: heater_2.on", "connects: heater_2.heat");
+        // A heater's switch joined to the zone's temperature, an output: the
+        // payload then reports kelvin nothing converts, at the payload.
+        edit(
+            &sim,
+            "connects: zone.heater_2",
+            "connects: zone.temperature",
+        );
         let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
         let said = report.said();
-        assert_eq!(report.findings.len(), 2, "{said:?}");
+        assert_eq!(report.findings.len(), 1, "{said:?}");
         assert_eq!(report.findings[0].file, sim);
         assert_eq!(
             report.findings[0].line,
-            line_in(&model, "- component: heater_2")
-        );
-        assert!(report.findings[0].message.contains("heater_2.on is joined"));
-        assert_eq!(report.findings[1].file, sim);
-        assert_eq!(
-            report.findings[1].line,
             line_in(&sim, "- payload: gpio-out-tmass2")
         );
-        assert!(report.findings[1].message.contains("nothing converts"));
+        assert!(report.findings[0].message.contains("nothing converts"));
     }
 
     /// A simulated payload driving a value is reported at its entry where what
@@ -1398,6 +1429,21 @@ mod tests {
         assert!(verify_pair(&yaml, &xml, &sim, Limits::EVERYTHING, &ALL)
             .findings
             .is_empty());
+    }
+
+    /// A name in a comment of several lines is not where it is written,
+    /// on the comment's first line or any after it.
+    #[test]
+    fn a_name_in_a_comment_of_several_lines_is_passed_over() {
+        let text = "\
+<compute name=\"thermostat\">
+    <!-- the setpoint the ground may
+         set, and the setpoint's band -->
+    <setpoint>293.15</setpoint>
+</compute>
+";
+        let path = ["thermostat".to_string(), "setpoint".to_string()];
+        assert_eq!(line_of_path(text, &path), 4);
     }
 
     /// A value changed in one spelling is reported: where, and what each

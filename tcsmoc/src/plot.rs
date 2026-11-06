@@ -1564,7 +1564,7 @@ pub(crate) mod tests {
             Some(Plotted::Trace(0, Unit::Kelvin))
         );
         assert_eq!(
-            plot.plotted("temp2"),
+            plot.plotted("to_k2"),
             Some(Plotted::Trace(2, Unit::Kelvin))
         );
         // Each heater's switch, reporting what it was last told.

@@ -40,11 +40,10 @@ tcssim:
 # thermostat-yamcs examples share, held the same by
 # examples/thermostat-yamcs/tests/shared.rs. Change the two together.
 #
-# Three parts, each simulated alone and joined below: a heater is switched
-# on and gives out heat; the zone takes heat and has a temperature. The
-# simulated payloads below are joined to their terminals by name -- a sensor
-# to zone.temperature, a heater's lines to heater_1.on -- and the physics
-# says nothing about them.
+# The zone is the one part: it takes the heat of its own two heaters and
+# has a temperature. The simulated payloads below are joined to its
+# terminals by name -- a sensor to zone.temperature, a heater's line to
+# zone.heater_1 -- and the physics says nothing about them.
 world:
   # The temperature the zone's surroundings are about: 288.15 K, three
   # kelvin below the bottom of the thermostat's band of 291.15 to 295.15 K,
@@ -57,32 +56,18 @@ world:
 
   physics:
     components:
-      - type heater:
-          # Two film heaters of four watts on a 28 volt bus, which on the zone
-          # below is a fifth of a kelvin a second each. Either alone holds the
-          # zone in the band, so a heater disabled in tcssim's window --
-          # unpowered, or failed -- is seen on its line's strip, which stays
-          # off while the other does the work, and both disabled let the zone
-          # fall out of the band. The supply wanders by two percent over
-          # twenty seconds or so, and a heater's power with its square.
-          - component: heater_1
-            power: "4 W"
-            ripple: "0.02"
-            ripple_time: "20 s"
-            voltage: "28 V"
-
-          - component: heater_2
-            power: "4 W"
-            ripple: "0.02"
-            ripple_time: "20 s"
-            voltage: "28 V"
-
       - type thermal_mass:
           # The zone loses the difference between itself and its
           # surroundings with a fifty second constant, which at the setpoint
           # is a tenth of a kelvin a second of cooling, and takes twenty
           # joules to warm a kelvin, so that each heater's four watts is a
           # fifth of a kelvin a second.
+          #
+          # Its two heaters are four watt films, and either alone holds the
+          # zone in the band, so a heater disabled in tcssim's window --
+          # unpowered, or failed -- is seen on its line's strip, which stays
+          # off while the other does the work, and both disabled let the zone
+          # fall out of the band.
           #
           # Its surroundings barely move: half a kelvin either side of the
           # world's ambient_temp over a ninety minute orbit, and a quarter of
@@ -98,19 +83,14 @@ world:
           # dip.
           - component: zone
             capacity: "20 J/K"
+            heater_1_power: "4 W"
+            heater_2_power: "4 W"
             period: "90 min"
             start: "292.15 K"
             swing: "0.5 K"
             time_constant: "50 s"
             wander: "0.25 K"
             wander_time: "10 min"
-
-    connections:
-      # Both heaters warm the zone, whose heat is the sum of what reaches it.
-      - from: heater_1.heat
-        to: zone.heat
-      - from: heater_2.heat
-        to: zone.heat
 
 simulated_payload_groups:
   # The three sensors are read together, every tenth of a second, as their
@@ -127,13 +107,14 @@ simulated_payload_groups:
 simulated_payloads:
   - type gpio_out:
       # Driven and never read: tcssim sends nothing for them, counts each time
-      # the vehicle moves their lines, and switch the heater each is joined to.
+      # the vehicle moves their lines, and switch the heater of the
+      # zone each is joined to.
       - payload: heaters_1
-        connects: heater_1.on
+        connects: zone.heater_1
         simulate: true
 
       - payload: heaters_2
-        connects: heater_2.on
+        connects: zone.heater_2
         simulate: true
 
   - type i2c:

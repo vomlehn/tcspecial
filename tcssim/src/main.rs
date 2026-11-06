@@ -2830,12 +2830,7 @@ mod tests {
                     sensors.push((*place, *offset, sensor.clone()));
                 }
                 Attachment::Drives { place, .. } => {
-                    // Its heat, the output after its on.
-                    let heat = tcslibgs::node::physics::Place {
-                        terminal: place.terminal + 1,
-                        ..*place
-                    };
-                    heaters.push((payload.clone(), attachment.clone(), heat));
+                    heaters.push((payload.clone(), attachment.clone(), *place));
                 }
                 Attachment::Signals { .. } | Attachment::Pulls { .. } => {}
             }
@@ -2844,8 +2839,8 @@ mod tests {
         assert_eq!(sensors.len(), 3);
         let named: Vec<&str> = heaters.iter().map(|h| h.0.as_str()).collect();
         assert_eq!(named, ["gpio-out-tmass1", "gpio-out-tmass2"]);
-        for (n, (_, heater, heat)) in heaters.iter().enumerate() {
-            assert_eq!(world.name_of(*heat), format!("heater_{}.heat", n + 1));
+        for (n, (_, heater, place)) in heaters.iter().enumerate() {
+            assert_eq!(world.name_of(*place), format!("zone.heater_{}", n + 1));
             heater.enable_at(enabled[n], 0.0);
         }
 
@@ -2891,9 +2886,15 @@ mod tests {
                 run.decided_on += step;
                 run.came_on += usize::from(!was);
             }
+            // A heater of the zone's own heats while its input is held on.
             let heating: Vec<bool> = heaters
                 .iter()
-                .map(|(_, _, heat)| world.read_at(*heat, now) > 0.0)
+                .map(|(_, heater, _)| {
+                    matches!(
+                        heater.driving(),
+                        Some(node::physics::Driving::At(on)) if on > 0.5
+                    )
+                })
                 .collect();
             for (n, on) in heating.iter().enumerate() {
                 if *on {

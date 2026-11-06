@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn each_node_sends_the_unit_the_configuration_says() {
         let graph = thermostat();
-        assert_eq!(unit_of(&graph, "temp1"), Some(Unit::Kelvin));
+        assert_eq!(unit_of(&graph, "to_k1"), Some(Unit::Kelvin));
         assert_eq!(unit_of(&graph, "ambient"), Some(Unit::Kelvin));
         assert_eq!(unit_of(&graph, "thermostat"), None);
         assert_eq!(unit_of(&graph, "temp_1"), None);
@@ -297,15 +297,15 @@ mod tests {
     #[test]
     fn a_vote_between_two_units_is_refused() {
         let mut graph = thermostat();
-        with(&mut graph, "temp3", "function", "to_value");
-        with(&mut graph, "temp3", "unit", "V");
+        with(&mut graph, "to_k3", "function", "to_value");
+        with(&mut graph, "to_k3", "unit", "V");
         assert_eq!(unit_of(&graph, "ambient"), None);
         let found = problems(&graph);
         assert!(
             found.iter().any(|(node, why)| node == "ambient"
                 && why.contains("kelvin")
                 && why.contains("volts")
-                && why.contains("temp3")),
+                && why.contains("to_k3")),
             "{found:?}"
         );
     }

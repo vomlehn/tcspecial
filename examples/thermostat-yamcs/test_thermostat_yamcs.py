@@ -63,21 +63,21 @@ class SetupTest(unittest.TestCase):
              # told, where the thermostat's decision is not sent down.
              ("gpio-out-tmass1", "/TcsYamcs/gpio-out-tmass1", DECISION, ()),
              ("gpio-out-tmass2", "/TcsYamcs/gpio-out-tmass2", DECISION, ()),
-             ("temp1", "/TcsYamcs/temp1", KELVIN, ()),
-             ("temp2", "/TcsYamcs/temp2", KELVIN, ()),
-             ("temp3", "/TcsYamcs/temp3", KELVIN, ())])
+             ("to_k1", "/TcsYamcs/to_k1", KELVIN, ()),
+             ("to_k2", "/TcsYamcs/to_k2", KELVIN, ()),
+             ("to_k3", "/TcsYamcs/to_k3", KELVIN, ())])
 
     def test_the_example_says_its_apids_and_ports(self):
         setup = thermostat_yamcs.Setup(options())
         # ambient 0, gateway 1, gpio-out-tmass1 and 2 2 and 3, housekeeping
-        # 4, temp1 to temp3 5 to 7, temp_1 to temp_3 8 to 10, thermostat 11.
+        # 4, temp_1 to temp_3 5 to 7, thermostat 8, to_k1 to to_k3 9 to 11.
         self.assertEqual([(link.source, link.apid, link.ground.port)
                           for link in setup.links],
                          [("ambient", 0x400, 17700),
                           ("gpio-out-tmass1", 0x402, 17702),
                           ("gpio-out-tmass2", 0x403, 17703),
-                          ("temp1", 0x405, 17705), ("temp2", 0x406, 17706),
-                          ("temp3", 0x407, 17707)])
+                          ("to_k1", 0x409, 17709), ("to_k2", 0x40a, 17710),
+                          ("to_k3", 0x40b, 17711)])
         self.assertEqual(setup.config.beacon_apid(), 0x110)
         self.assertEqual(setup.config.command_apid(), 0x111)
         self.assertEqual(setup.beacon.recv.port, 17510)
@@ -126,7 +126,7 @@ class MdbTest(unittest.TestCase):
         return kind
 
     def test_the_readings_and_the_vote_are_temperatures(self):
-        for parameter in ("temp1", "temp2", "temp3", "ambient"):
+        for parameter in ("to_k1", "to_k2", "to_k3", "ambient"):
             kind = self.kind_of(parameter)
             self.assertEqual(kind.tag, f"{{{generated.NAMESPACE}}}"
                                        "FloatParameterType")
@@ -169,12 +169,12 @@ class MdbTest(unittest.TestCase):
                           if name.endswith("Packet")
                           and name[:-len("Packet")] in
                           ("ambient", "gpio-out-tmass1", "gpio-out-tmass2",
-                           "temp1", "temp2", "temp3")},
+                           "to_k1", "to_k2", "to_k3")},
                          {"ambientPacket": 0x400,
                           "gpio-out-tmass1Packet": 0x402,
                           "gpio-out-tmass2Packet": 0x403,
-                          "temp1Packet": 0x405, "temp2Packet": 0x406,
-                          "temp3Packet": 0x407})
+                          "to_k1Packet": 0x409, "to_k2Packet": 0x40a,
+                          "to_k3Packet": 0x40b})
 
     def test_no_line_is_wider_than_80_columns(self):
         config = configuration.load(HERE / "thermostat-yamcs.xtcs")
@@ -194,8 +194,8 @@ class MdbTest(unittest.TestCase):
                           ("ambient-downlink", 17700),
                           ("gpio-out-tmass1-downlink", 17702),
                           ("gpio-out-tmass2-downlink", 17703),
-                          ("temp1-downlink", 17705), ("temp2-downlink", 17706),
-                          ("temp3-downlink", 17707)])
+                          ("to_k1-downlink", 17709), ("to_k2-downlink", 17710),
+                          ("to_k3-downlink", 17711)])
 
 
 class FakeYamcs:
@@ -239,7 +239,7 @@ def a_yamcs():
     """A Yamcs whose mission database is the example's: kelvin for each
     temperature, nothing for the heaters' switches."""
     return FakeYamcs({f"/TcsYamcs/{name}": ["K"]
-                      for name in ("temp1", "temp2", "temp3", "ambient")})
+                      for name in ("to_k1", "to_k2", "to_k3", "ambient")})
 
 
 class ReadingsTest(unittest.TestCase):
@@ -250,16 +250,16 @@ class ReadingsTest(unittest.TestCase):
         yamcs = a_yamcs()
         readings = readings_of(yamcs)
         self.assertEqual(readings.line(),
-                         "ambient --, temp1 --, temp2 --, temp3 --, "
+                         "ambient --, to_k1 --, to_k2 --, to_k3 --, "
                          "gpio-out-tmass1 --, gpio-out-tmass2 --")
         yamcs.values.update({"/TcsYamcs/ambient": 291.2341,
-                             "/TcsYamcs/temp1": 291.0,
+                             "/TcsYamcs/to_k1": 291.0,
                              "/TcsYamcs/gpio-out-tmass1": True,
                              "/TcsYamcs/gpio-out-tmass2": False})
         readings.read()
         self.assertEqual(readings.line(),
-                         "ambient 291.234 K, temp1 291.000 K, temp2 --, "
-                         "temp3 --, gpio-out-tmass1 on, "
+                         "ambient 291.234 K, to_k1 291.000 K, to_k2 --, "
+                         "to_k3 --, gpio-out-tmass1 on, "
                          "gpio-out-tmass2 off")
         self.assertFalse(readings.arrived())
 
@@ -281,7 +281,7 @@ class ReadingsTest(unittest.TestCase):
             thermostat_yamcs.say_changes(changed, readings)
         self.assertEqual(said.getvalue().splitlines(),
                          ["switched: gpio-out-tmass1 on -> off; "
-                          "ambient 295.200 K, temp1 --, temp2 --, temp3 --, "
+                          "ambient 295.200 K, to_k1 --, to_k2 --, to_k3 --, "
                           "gpio-out-tmass1 off, gpio-out-tmass2 --"])
 
     def test_bytes_are_shown_as_hex(self):

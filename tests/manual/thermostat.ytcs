@@ -107,18 +107,16 @@ vehicle:
         world-in: [temp1, temp2, temp3, thermostat]
 
 payloads:
-  - type gpio:
+  - type gpio_out:
       # Two heaters, each three circuits driven together, both near
       # the sensors on the same thermal mass. Separate nodes rather
       # than six lines on one, so that one can be stopped from the
       # ground while the other goes on warming the mass.
       - payload: heaters_1
-        direction: "output"
         lines: "3,4,5"
         path: "/dev/gpiochip0"
         moc-in: [thermostat]
       - payload: heaters_2
-        direction: "output"
         lines: "6,7,8"
         path: "/dev/gpiochip0"
         moc-in: [thermostat]

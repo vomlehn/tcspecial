@@ -119,6 +119,17 @@ const RENAMED: &[Renamed] = &[
         new: "moc-out",
         then: SOURCE,
     },
+    // One type of discrete lines with a direction became three, each with
+    // the terminals of what its lines are, and the type says the direction
+    // now. A file is told the three, and to take direction out.
+    Renamed {
+        old: "gpio",
+        place: Place::NodeType,
+        new: "gpio_in",
+        then: " where its lines are watched, or gpio_out where they are \
+               driven, or gpio_inout where they are driven and reported to \
+               the ground -- and take direction out, which the type says now",
+    },
     Renamed {
         old: "app-moc-arg",
         place: Place::Key,
@@ -427,7 +438,7 @@ mod tests {
                     gateways:\n  \
                     - type gateway_radio:\n      \
                     - gateway: down\n        \
-                    world-in: [readings]\n        \
+                    world-in: [readings, switch]\n        \
                     moc-out:\n          \
                     - sensor.asked\n          \
                     - echo.asked\n          \
@@ -435,7 +446,12 @@ mod tests {
                     - app.asked\n\
                     payloads:\n  \
                     - type i2c:\n      \
-                    - { payload: sensor, moc-in: [asked] }\n\
+                    - { payload: sensor, moc-in: [asked] }\n  \
+                    - type gpio_in:\n      \
+                    - payload: switch\n        \
+                    lines: \"0\"\n        \
+                    path: /dev/gpiochip0\n        \
+                    world-out: [down.switch]\n\
                     vehicle:\n  \
                     - type tee-gateway:\n      \
                     - { compute: echo, moc-in: [asked] }\n  \
@@ -468,6 +484,7 @@ mod tests {
                     <type name=\"gateway_radio\">\n\
                     <gateway name=\"down\">\n\
                     <world-in>readings</world-in>\n\
+                    <world-in>switch</world-in>\n\
                     <moc-out>sensor.asked</moc-out>\n\
                     <moc-out>echo.asked</moc-out>\n\
                     <moc-out>drop.asked</moc-out>\n\
@@ -479,6 +496,13 @@ mod tests {
                     <type name=\"i2c\">\n\
                     <payload name=\"sensor\">\n\
                     <moc-in>asked</moc-in>\n\
+                    </payload>\n\
+                    </type>\n\
+                    <type name=\"gpio_in\">\n\
+                    <payload name=\"switch\">\n\
+                    <lines>0</lines>\n\
+                    <path>/dev/gpiochip0</path>\n\
+                    <world-out>down.switch</world-out>\n\
                     </payload>\n\
                     </type>\n\
                     </payloads>\n\

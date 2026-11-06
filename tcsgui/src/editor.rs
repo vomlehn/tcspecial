@@ -1636,12 +1636,12 @@ tcsgui:
             !simulator.world.components.is_empty(),
             "the world's components, for the Physics pane"
         );
-        assert!(simulator.payloads.contains_key("gpio-in-tmass"));
+        assert!(simulator.payloads.contains_key("gpio-out-tmass1"));
         let tmass = editor
             .document()
             .nodes
             .iter()
-            .find(|node| node.name == "gpio-in-tmass")
+            .find(|node| node.name == "gpio-out-tmass1")
             .expect("the payload");
         assert_eq!(
             tmass.home.as_deref(),
@@ -1655,14 +1655,14 @@ tcsgui:
     /// settings, there too.
     ///
     /// The window a setting is typed into knows the node by the name the
-    /// editor holds it under, `thermostat-common/gpio-in-tmass`
-    /// here; the file knows it as `gpio-in-tmass`, and an entry written
+    /// editor holds it under, `thermostat-common/gpio-out-tmass1`
+    /// here; the file knows it as `gpio-out-tmass1`, and an entry written
     /// under the other name joins nothing the next session can open.
     #[test]
     fn an_included_payloads_simulated_settings_keep_its_own_name() {
         let where_ = tempfile::tempdir().expect("a directory");
         let (path, sim) = thermostat_example(where_.path());
-        let held = "thermostat-common/gpio-in-tmass";
+        let held = "thermostat-common/gpio-out-tmass1";
 
         let mut editor = Editor::open(&path, crate::pane::default_dividers())
             .expect("it opens");
@@ -1679,12 +1679,12 @@ tcsgui:
         let written =
             std::fs::read_to_string(&sim).expect("the simulator file");
         assert!(
-            !written.contains("thermostat/gpio-in-tmass"),
+            !written.contains("thermostat/gpio-out-tmass1"),
             "a qualified name is a payload nobody has: {written}"
         );
         let entry = written
             .split("- payload: ")
-            .find(|entry| entry.starts_with("gpio-in-tmass\n"))
+            .find(|entry| entry.starts_with("gpio-out-tmass1\n"))
             .expect("the payload's entry");
         assert!(entry.contains("drop_percent: 7\n"), "{entry}");
 
@@ -1699,14 +1699,14 @@ tcsgui:
             .document()
             .nodes
             .iter()
-            .position(|node| node.name == "gpio-in-tmass")
+            .position(|node| node.name == "gpio-out-tmass1")
             .expect("the payload");
-        editor.settle_name(at, "gpio-in-mass");
+        editor.settle_name(at, "gpio-out-mass1");
         let simulator =
             editor.document().simulator.as_ref().expect("still adopted");
-        assert!(!simulator.payloads.contains_key("gpio-in-tmass"));
+        assert!(!simulator.payloads.contains_key("gpio-out-tmass1"));
         assert_eq!(
-            simulator.payloads["gpio-in-mass"]
+            simulator.payloads["gpio-out-mass1"]
                 .get("drop_percent")
                 .map(String::as_str),
             Some("7")
@@ -1721,7 +1721,7 @@ tcsgui:
             .as_ref()
             .is_some_and(|simulator| simulator
                 .payloads
-                .contains_key("gpio-in-mass")));
+                .contains_key("gpio-out-mass1")));
     }
 
     /// A configuration that is there and cannot be read is refused, and the
@@ -2532,14 +2532,14 @@ tcsgui:
 
         // And one drawn in the included file: that file's position line.
         let before = every_file(root);
-        let held = "thermostat-common/gpio-in-tmass";
+        let held = "thermostat-common/gpio-out-tmass1";
         // Wherever settling put it as the file was opened, which depends
-        // on the panes: the file has it at 91, 544.
+        // on the panes: the file has it at 34, 393.
         let was = at(&editor, held);
         editor.edit(Edit::MoveNode {
             node: held.to_string(),
             was,
-            now: (95, 550),
+            now: (38, 400),
         });
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
         editor.forget_history();
@@ -2549,13 +2549,13 @@ tcsgui:
             &[
                 (
                     "examples/thermostat-common/thermostat.ytcs",
-                    "    - { node: gpio-in-tmass, x: 91, y: 544 }\n",
-                    "    - { node: gpio-in-tmass, x: 95, y: 550 }\n",
+                    "    - { node: gpio-out-tmass1, x: 34, y: 393 }\n",
+                    "    - { node: gpio-out-tmass1, x: 38, y: 400 }\n",
                 ),
                 (
                     "examples/thermostat-common/thermostat.xtcs",
-                    "<node name=\"gpio-in-tmass\" x=\"91\" y=\"544\"/>",
-                    "<node name=\"gpio-in-tmass\" x=\"95\" y=\"550\"/>",
+                    "<node name=\"gpio-out-tmass1\" x=\"34\" y=\"393\"/>",
+                    "<node name=\"gpio-out-tmass1\" x=\"38\" y=\"400\"/>",
                 ),
             ],
         );

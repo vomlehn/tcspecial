@@ -22,6 +22,7 @@ use std::os::fd::BorrowedFd;
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
+use tcslibgs::graph::terminals::Stream;
 use tcslibgs::{
     EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError,
     TcsResult,
@@ -31,7 +32,11 @@ use tcslibgs::{
 use crate::node::payload::can::CanEndpoint;
 #[cfg(feature = "device-file")]
 use crate::node::payload::device_file::DeviceEndpoint;
-#[cfg(feature = "gpio")]
+#[cfg(any(
+    feature = "gpio_in",
+    feature = "gpio_out",
+    feature = "gpio_inout"
+))]
 use crate::node::payload::gpio::GpioEndpoint;
 #[cfg(feature = "hdlc")]
 use crate::node::payload::hdlc::HdlcEndpoint;
@@ -178,6 +183,17 @@ pub trait EndpointReadable: EndpointWaitable {
     /// every endpoint whose data arrives, which is what the default is.
     fn due(&self) -> bool {
         false
+    }
+
+    /// Which stream the last read's data is on, where the endpoint says.
+    ///
+    /// An endpoint with one source terminal leaves it to the link, which is
+    /// every one of them but a set of lines both watched and driven: what it
+    /// watched goes groundward and what it was told to drive is passed on
+    /// vehicleward, and a datum sent down the other's links would be a
+    /// reading sent out as a command. `None`, the default, is no opinion.
+    fn stream(&self) -> Option<Stream> {
+        None
     }
 }
 
@@ -443,10 +459,13 @@ pub fn bind_endpoint_pair(
         }
         // Discrete lines, watched for changes or driven: the request is made
         // once and the pair shares its descriptor, the kernel giving a line
-        // to one request at a time. Which half of the pair does anything
-        // follows from the configured direction, and the other half says so.
-        // See node/gpio.
-        #[cfg(feature = "gpio")]
+        // to one request at a time, and what one half is told the other
+        // reports -- a report asked for, a value passed on. See node/gpio.
+        #[cfg(any(
+            feature = "gpio_in",
+            feature = "gpio_out",
+            feature = "gpio_inout"
+        ))]
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;
@@ -726,10 +745,13 @@ pub fn hearing_endpoint_pair(
         }
         // Discrete lines, watched for changes or driven: the request is made
         // once and the pair shares its descriptor, the kernel giving a line
-        // to one request at a time. Which half of the pair does anything
-        // follows from the configured direction, and the other half says so.
-        // See node/gpio.
-        #[cfg(feature = "gpio")]
+        // to one request at a time, and what one half is told the other
+        // reports -- a report asked for, a value passed on. See node/gpio.
+        #[cfg(any(
+            feature = "gpio_in",
+            feature = "gpio_out",
+            feature = "gpio_inout"
+        ))]
         EndpointConfig::Gpio(gpio_config) => {
             let reader = GpioEndpoint::new(what, gpio_config)?;
             let writer = reader.try_clone()?;

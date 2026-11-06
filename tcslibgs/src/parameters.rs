@@ -193,9 +193,27 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
         }
         EndpointConfig::Gpio(gpio) => {
             let _ = writeln!(out, "  path             {}", gpio.path);
-            let offsets: Vec<String> =
-                gpio.lines.iter().map(|n| n.to_string()).collect();
-            let _ = writeln!(out, "  lines            {}", offsets.join(", "));
+            let offsets = |lines: &[u32]| {
+                lines
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            if !gpio.inputs.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "  watched lines    {}",
+                    offsets(&gpio.inputs)
+                );
+            }
+            if !gpio.outputs.is_empty() {
+                let _ = writeln!(
+                    out,
+                    "  driven lines     {}",
+                    offsets(&gpio.outputs)
+                );
+            }
             let _ = writeln!(
                 out,
                 "  edge             {}",

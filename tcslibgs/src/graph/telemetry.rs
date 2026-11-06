@@ -931,12 +931,11 @@ mod tests {
         let ids = ids(&example("thermostat"));
         assert_eq!(ids["ambient"], 0);
         assert_eq!(ids["gateway"], 1);
-        assert_eq!(ids["gpio-in-tmass"], 2);
-        assert_eq!(ids["gpio-out-tmass1"], 3);
-        assert_eq!(ids["gpio-out-tmass2"], 4);
-        assert_eq!(ids["temp1"], 6);
-        assert_eq!(ids["temp_1"], 9);
-        assert_eq!(ids["thermostat"], 12);
+        assert_eq!(ids["gpio-out-tmass1"], 2);
+        assert_eq!(ids["gpio-out-tmass2"], 3);
+        assert_eq!(ids["temp1"], 5);
+        assert_eq!(ids["temp_1"], 8);
+        assert_eq!(ids["thermostat"], 11);
     }
 
     /// The order the nodes are in means nothing: shuffled, they have the
@@ -960,13 +959,14 @@ mod tests {
             summary(&links),
             vec![
                 ("ambient", 0, "127.0.0.1", 5100),
-                // The lines sensing the heaters, which the ground sees in
-                // place of the thermostat's decision: what the heaters are
-                // doing, which a failed heater does not hide.
-                ("gpio-in-tmass", 2, "127.0.0.1", 5102),
-                ("temp1", 6, "127.0.0.1", 5106),
-                ("temp2", 7, "127.0.0.1", 5107),
-                ("temp3", 8, "127.0.0.1", 5108),
+                // The heaters' switches, each reporting what it was last
+                // told, which the ground sees in place of the thermostat's
+                // decision.
+                ("gpio-out-tmass1", 2, "127.0.0.1", 5102),
+                ("gpio-out-tmass2", 3, "127.0.0.1", 5103),
+                ("temp1", 5, "127.0.0.1", 5105),
+                ("temp2", 6, "127.0.0.1", 5106),
+                ("temp3", 7, "127.0.0.1", 5107),
             ]
         );
         assert!(links
@@ -998,8 +998,8 @@ mod tests {
     #[test]
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
-        // temp_2, id 10, unlinked: 6100 + 10 = 6110; a gateway base of 6104
-        // puts temp1, id 6, on the same port.
+        // temp_2, id 9, unlinked: 6100 + 9 = 6109; a gateway base of 6104
+        // puts temp1, id 5, on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
         let gateway = graph
             .nodes
@@ -1010,10 +1010,10 @@ mod tests {
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:6104"),
         );
-        let refused = of(&graph).expect_err("two sources on 6110");
+        let refused = of(&graph).expect_err("two sources on 6109");
         assert!(refused.why.contains("temp1"), "{}", refused.why);
         assert!(refused.why.contains("temp_2"), "{}", refused.why);
-        assert!(refused.why.contains("6110"), "{}", refused.why);
+        assert!(refused.why.contains("6109"), "{}", refused.why);
     }
 
     /// A base with no room for the ids counted from it is refused.

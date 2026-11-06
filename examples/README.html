@@ -700,9 +700,10 @@ each command the ground sends goes to it as one frame with identifier
 </tr>
 <tr>
 <td><code>gpio</code></td>
-<td>Two lines of a GPIO chip: each edge of a switch on line 0 goes to
-the ground as a sixteen-byte record, and a 1 or 0 from the ground drives
-a lamp on line 1.</td>
+<td>Two lines of a GPIO chip: each edge of a switch on line 0, a
+<code>gpio_in</code>, goes to the ground as a sixteen-byte record, and a
+1 or 0 from the ground drives a lamp on line 1, a
+<code>gpio_out</code>.</td>
 </tr>
 <tr>
 <td><code>iio</code></td>
@@ -721,11 +722,13 @@ the interface is the controller’s, such as <code>can0</code>, and
 nothing else changes.</p>
 <pre><code>make run-can</code></pre>
 <h3 id="gpio">gpio</h3>
-<p>The chip is one of the kernel’s <code>gpio-sim</code>, whose lines
-exist in memory: a line’s <code>pull</code> file sets what an input is
-pulled to, which the kernel reports to tcspecial as an edge, and its
-<code>value</code> file says what an output is driven to. tcssim pulls
-the switch’s line the other way every second and counts the lamp’s
+<p>The switch is a <code>gpio_in</code>, whose line is watched, and the
+lamp a <code>gpio_out</code>, whose line is driven: see “A GPIO Payload”
+in the manual. The chip is one of the kernel’s <code>gpio-sim</code>,
+whose lines exist in memory: a line’s <code>pull</code> file sets what
+an input is pulled to, which the kernel reports to tcspecial as an edge,
+and its <code>value</code> file says what an output is driven to. tcssim
+pulls the switch’s line the other way every second and counts the lamp’s
 changes. The configuration names <code>/dev/gpiochip1</code>, which is
 what the simulated chip is on a host with one chip of its own; the
 number is given as chips appear, so write the one
@@ -819,22 +822,19 @@ failing cannot take the zone’s temperature with it.
 <code>thermostat</code> holds that to a setpoint, 293.15 K with a half
 band of 2 K, and drives two heaters, each through a GPIO line of its
 own, <code>gpio-out-tmass1</code> and <code>gpio-out-tmass2</code>,
-which go on and off together. Its decision is logged and not sent down:
-what the ground hears is <code>gpio-in-tmass</code>, two lines on the
-thermal mass sensing the heaters, read for their levels every second, so
-the ground sees what the heaters are doing rather than what they were
-told. The ground commands the setpoint, and <code>housekeeping</code>
-logs the readings, the decisions and the lines in
-<code>/tmp/telemetry</code>.</p>
+which go on and off together. Each switch is a <code>gpio_inout</code>:
+it drives its line, and every second sends the ground the last value it
+was told, so the ground follows the heaters on a beat. The ground
+commands the setpoint, and <code>housekeeping</code> logs the readings
+and the decisions in <code>/tmp/telemetry</code>.</p>
 <p>The sensors are temperature sensors on the zone: <code>temp_1</code>
 and <code>temp_2</code> on an I2C bus, of type <code>i2c_tmass</code>,
 and <code>temp_3</code> a SPI peripheral, of type
 <code>spi_tmass</code>. On a desk each is reached over UDP at its
 <code>sim_address</code> on this host, ports 5201 to 5203, where tcssim
 answers with the zone’s temperature; flown, the buses are opened. The
-heaters’ switches and the lines sensing them are lines 2 to 5 of the
-kernel’s dummy GPIO chip, <code>/dev/gpiochip1</code>, which tcssim
-moves and watches: make it once with
+heaters’ switches are lines 4 and 5 of the kernel’s dummy GPIO chip,
+<code>/dev/gpiochip1</code>, which tcssim watches: make it once with
 <code>sudo bin/mk-kernel-dummies gpio</code> (see “Payloads on the
 kernel’s dummy devices”, below). The gpio example has lines 0 and 1 of
 it, so the two run at once. The buses themselves are flown against
@@ -853,37 +853,32 @@ starts at 292.15 K, inside the band, and cools towards its surroundings,
 over a ninety minute orbit; each heater’s switch is joined to
 <code>heater_1.on</code> or <code>heater_2.on</code>, so the heaters
 warm it while the vehicle has them on: the loop closes through
-tcspecial. tcssim pulls <code>gpio-in-tmass</code>’s line 2 to
-<code>heater_1.heating</code> and its line 3 to
-<code>heater_2.heating</code>, which are on only while each heater is
-really heating. The heaters are four watts each, and either alone holds
-the band, the thermostat cycling whichever are working; a heater
-disabled in tcssim shows on its line’s strip, and with both disabled the
-zone falls into the plot’s lower red.</p>
+tcspecial. The heaters are four watts each, and either alone holds the
+band, the thermostat cycling whichever are working; a heater disabled in
+tcssim shows in the temperature, and with both disabled the zone falls
+into the plot’s lower red.</p>
 <p>A heater whose switch’s panel in tcssim is not enabled is unpowered,
 or failed: it stays off whatever the thermostat decides, and enabled
-again it takes the latest decision at once. The ground sees it on its
-line of <code>gpio-in-tmass</code>, which stays low, and in the
-temperature.</p>
+again it takes the latest decision at once. The ground sees it in the
+temperature: its switch goes on reporting what it was told.</p>
 <pre><code>make run-thermostat</code></pre>
 <p>That runs tcsmoc on the example, as <code>run-simple</code> does, and
 tcsmoc opens its plot window beside its own: each sensor’s temperature
 and their vote over the last ten seconds, a dot at each reading, with
 the setpoint’s rule and the thermostat’s band, and under them a strip
-for each line of <code>gpio-in-tmass</code>,
-<code>gpio-in-tmass line 2</code> and <code>line 3</code>, on while its
-heater is heating. Press Connect in tcsmoc, and Enable on each payload
-in tcssim, to start the data and the heating; press Disable on a
-heater’s switch in tcssim to take it away, and its strip stays off while
-the zone falls behind in the cold part of the orbit.</p>
+for each heater’s switch, <code>gpio-out-tmass1</code> and
+<code>gpio-out-tmass2</code>, on while it was told on. Press Connect in
+tcsmoc, and Enable on each payload in tcssim, to start the data and the
+heating; press Disable on a heater’s switch in tcssim to take it away,
+and the zone falls behind in the cold part of the orbit.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – tcsmoc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions, vote, thermostat and
 log are its own nodes.</li>
 <li>Payload: Rust – tcssim simulates the three sensors, with the zone
-they read, and for the heaters’ switches and the lines sensing them, on
-the kernel’s simulated GPIO chip.</li>
+they read, and the heaters’ switches, on the kernel’s simulated GPIO
+chip.</li>
 </ul>
 <h3 id="thermostat-yamcs">thermostat-yamcs</h3>
 <p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at
@@ -927,14 +922,14 @@ and from the ground carries a CCSDS primary header:</p>
 <td><code>apid_base</code> plus its device id, 0x400</td>
 </tr>
 <tr>
-<td><code>gpio-in-tmass</code></td>
+<td><code>gpio-out-tmass1</code>, <code>gpio-out-tmass2</code></td>
 <td>down</td>
-<td>0x402</td>
+<td>0x402 and 0x403</td>
 </tr>
 <tr>
 <td><code>temp1</code>, <code>temp2</code>, <code>temp3</code></td>
 <td>down</td>
-<td>0x406 to 0x408</td>
+<td>0x405 to 0x407</td>
 </tr>
 </tbody>
 </table>
@@ -948,12 +943,12 @@ are, by <code>python/tcslibgs/form.py</code> – the Python spelling of
 window and the F´ bridge go by, and nothing a configuration does not
 already state: a conversion’s or a vote’s value is a float in its unit,
 with the unit in a <code>UnitSet</code>, read from its four bytes of a
-signed count of the unit’s steps through a calibrator, and lines read
-for their levels are a record for each line, its level a boolean. So
-Yamcs’s web interface, at <a href="http://localhost:17090"
+signed count of the unit’s steps through a calibrator, and a decision –
+what a heater’s switch was told – is a boolean. So Yamcs’s web
+interface, at <a href="http://localhost:17090"
 class="uri">http://localhost:17090</a>, shows <code>ambient</code> and
 <code>temp1</code> to <code>temp3</code> as temperatures in K and
-<code>gpio-in-tmass_line2</code> and <code>_line3</code> as true or
+<code>gpio-out-tmass1</code> and <code>gpio-out-tmass2</code> as true or
 false.</p>
 <p>It starts Yamcs, then tcssim – every payload sending from the start,
 as though its panel’s button had been pressed – and, once tcssim says it

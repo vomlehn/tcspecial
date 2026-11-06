@@ -802,16 +802,22 @@ impl EndpointPort {
     }
 }
 
-impl Port for EndpointPort {
-    fn strangers(&mut self) -> u64 {
-        self.reader.strangers()
-    }
-
-    /// What this device had, on no stream in particular.
+impl EndpointPort {
+    /// What this device had, before the stream it is on is said: see
+    /// [`Port::take`].
     ///
-    /// A device has one source terminal, so which way its data goes is the
-    /// link's business and not its own: see [`Taken`].
-    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+    /// # Arguments
+    ///
+    /// * `buffer` - Where what was read is put.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were read.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where it could not be read or asked.
+    fn take_unstreamed(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         if !self.uses.produces() {
             return Err(format!(
                 "{}: nothing is read from this node -- the configuration has \
@@ -880,14 +886,67 @@ impl Port for EndpointPort {
         }
     }
 
-    fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+    /// What has arrived at this device without asking it, before the stream
+    /// it is on is said: see [`Port::take_unasked`].
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - Where what was read is put.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were read.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node, where it could not be read.
+    fn take_unasked_unstreamed(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> Result<Taken, String> {
         if !self.uses.produces() {
-            return self.take(buffer);
+            return self.take_unstreamed(buffer);
         }
         let want = self
             .read_size
             .map_or(buffer.len(), |size| size.min(buffer.len()));
         self.read_one(buffer, want).map(Taken::of)
+    }
+}
+
+impl Port for EndpointPort {
+    fn strangers(&mut self) -> u64 {
+        self.reader.strangers()
+    }
+
+    /// What this device had, on no stream in particular -- but for a set of
+    /// lines that says, which is the one device with a source on each.
+    ///
+    /// A device has one source terminal, so which way its data goes is the
+    /// link's business and not its own: see [`Taken`] and
+    /// [`crate::endpoint::EndpointReadable::stream`].
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        let taken = self.take_unstreamed(buffer)?;
+        Ok(Taken {
+            stream: self.reader.stream(),
+            ..taken
+        })
+    }
+
+    fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        let taken = self.take_unasked_unstreamed(buffer)?;
+        Ok(Taken {
+            stream: self.reader.stream(),
+            ..taken
+        })
+    }
+
+    /// Whether this node has something to pass on because of what was just
+    /// delivered to it: a set of lines driven passes on what it was driven
+    /// to, and one asked for a report has the report. False for every other
+    /// device, whose readings come when it is read.
+    fn ready(&self) -> bool {
+        self.reader.due()
     }
 
     fn ask(&mut self) -> Result<(), String> {

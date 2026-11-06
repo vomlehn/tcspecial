@@ -87,7 +87,9 @@ mod tests {
             "can",
             "rpmsg",
             "iio",
-            "gpio",
+            "gpio_in",
+            "gpio_out",
+            "gpio_inout",
             "app_pl",
             "app_all_pl",
         ] {

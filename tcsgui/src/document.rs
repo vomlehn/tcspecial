@@ -2726,12 +2726,15 @@ impl Document {
         // Only a payload that is read. One that is written and never read -- a
         // heater, a valve, a latch -- is driven rather than asked, and a
         // trigger on one would be bytes written before a read that never
-        // happens.
+        // happens. And only one asked by a trigger at all, which a program
+        // and a set of discrete lines are not: see
+        // tcslibgs::graph::check::asked_by_a_trigger.
         for node in &self.nodes {
             let payload = NodeType::ALL
                 .iter()
                 .find(|t| t.spelling() == node.node_type)
-                .is_some_and(|t| t.is_payload());
+                .is_some_and(|t| t.is_payload())
+                && tcslibgs::graph::check::asked_by_a_trigger(&node.node_type);
             if !payload || node.attributes.contains_key("trigger") {
                 continue;
             }
@@ -4384,9 +4387,8 @@ pub fn thermostat_example() -> Document {
         ("heaters_1", (34, 393), "3,4,5"),
         ("heaters_2", (34, 470), "6,7,8"),
     ] {
-        place(&mut document, name, "gpio", at);
+        place(&mut document, name, "gpio_out", at);
         set(&mut document, name, "path", "/dev/gpiochip0");
-        set(&mut document, name, "direction", "output");
         set(&mut document, name, "lines", lines);
     }
     note(
@@ -4506,6 +4508,35 @@ mod tests {
         }
     }
 
+    /// A set of discrete lines driven and read -- a heater's switch that
+    /// reports what it was told -- is not marked for wanting a trigger, as
+    /// the ground check does not refuse it: see
+    /// `tcslibgs::graph::check::asked_by_a_trigger`.
+    #[test]
+    fn driven_lines_that_report_are_not_marked_for_a_trigger() {
+        let mut document = Document::new();
+        for edit in [
+            add("k", "compute"),
+            add("switch", "gpio_inout"),
+            add("down", "gateway_radio"),
+            Edit::AddLink {
+                link: Link::new("k", "switch", None),
+            },
+            Edit::AddLink {
+                link: Link::new("switch", "down", None),
+            },
+        ] {
+            document.apply(&edit);
+        }
+        let faults = document.faults();
+        assert!(
+            !faults
+                .iter()
+                .any(|f| matches!(f, Fault::UntriggeredInput { .. })),
+            "{faults:?}"
+        );
+    }
+
     /// The editor marks a link into a payload that states no trigger.
     ///
     /// The same rule the ground check and the flight software apply, applied
@@ -4578,7 +4609,7 @@ mod tests {
         let mut document = Document::new();
         for edit in [
             add("thermostat", "compute"),
-            add("heaters", "gpio"),
+            add("heaters", "gpio_out"),
             Edit::AddLink {
                 link: Link::new("thermostat", "heaters", None),
             },

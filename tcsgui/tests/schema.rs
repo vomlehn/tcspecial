@@ -389,7 +389,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
         <drop_percent>1</drop_percent>
       </payload>
     </type>
-    <type name=\"gpio\">
+    <type name=\"gpio_in\">
       <payload name=\"heater\">
         <connects>heater.on</connects>
       </payload>
@@ -428,8 +428,9 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
         String::from_utf8_lossy(&output.stderr)
     );
     // And a kind that is not one is refused.
-    let output =
-        valid(&every.replace("<type name=\"gpio\">", "<type name=\"ping\">"));
+    let output = valid(
+        &every.replace("<type name=\"gpio_in\">", "<type name=\"ping\">"),
+    );
     assert!(!output.status.success(), "ping is not a kind of payload");
 }
 

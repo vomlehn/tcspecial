@@ -18,9 +18,26 @@
 //! than a record would never deliver anything. `graph::reach` holds a node
 //! to it.
 //!
-//! What a GPIO payload cannot be is triggered. These are inputs: there is
-//! nothing to write a request to, and writing would mean driving an output,
-//! which is commanding a payload rather than asking it for data.
+//! Three node types, one for each thing a set of lines can be to the graph,
+//! told apart by the terminals each has -- see [`Kind`]:
+//!
+//! * `gpio_in`, lines watched. Their events and reports are world data,
+//!   leaving by `world-out` towards the ground; what arrives at `world-in`
+//!   asks for a report of what the lines are now.
+//! * `gpio_out`, lines driven. What arrives at `moc-in` sets them -- a
+//!   thermostat's decision, a command -- and is passed on out of
+//!   `moc-out`, towards whatever the lines drive.
+//! * `gpio_inout`, driven as a `gpio_out`'s are, and saying so: what arrives
+//!   at `moc-in` drives the lines and goes on by `moc-out` where it changes
+//!   them, and every `state_interval` the last value the lines were told goes
+//!   out by `world-out` towards the ground. A heater a thermostat switches,
+//!   whose state the ground follows on a beat.
+//!
+//! The type says which, and nothing else does. A single `gpio` with a
+//! `direction` said it once, and drew a set of driven lines with a payload's
+//! terminals -- a sink for moc data and a source for world data -- when what
+//! goes through them is moc data both ways. A file still saying `gpio` is
+//! told the new words: see `crate::graph::renamed`.
 
 use std::time::Duration;
 
@@ -77,65 +94,82 @@ pub enum Bias {
     PullDown,
 }
 
-/// Whether the lines are read or driven.
+/// Which of the three GPIO node types a node is: whether its lines are
+/// watched, driven, or some of each.
 ///
-/// Not a thing a set of lines can be both of. A line requested as an input
-/// and written to is a line the kernel refuses to write, and one requested as
-/// an output produces no edges to read -- so which it is has to be stated,
-/// and stating it is what lets a configuration be refused for driving
-/// something it declared it would watch.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum Direction {
-    /// Watched: changes on these lines are events. The default, because a set
-    /// of discretes is more often something read -- a deployment switch, an
-    /// arming line -- than something driven.
-    #[default]
-    Input,
-    /// Driven: what arrives sets these lines.
-    Output,
+/// The one place the three words are, and what each means, so that the
+/// reader, the terminals, the drawing and the vehicle cannot disagree about
+/// which is which.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Kind {
+    /// `gpio_in`: watched.
+    In,
+    /// `gpio_out`: driven.
+    Out,
+    /// `gpio_inout`: driven, and reporting what it was told.
+    Inout,
 }
 
-impl Direction {
-    /// Reads the direction a `direction` attribute asks for.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The word as the file wrote it, in lower case.
+impl Kind {
+    /// Every kind, in the order the words are listed.
+    pub const ALL: [Kind; 3] = [Kind::In, Kind::Out, Kind::Inout];
+
+    /// The node type a configuration writes for this kind.
     ///
     /// # Returns
     ///
-    /// The direction.
-    ///
-    /// # Errors
-    ///
-    /// A message for a word that is neither `input` nor `output`.
-    pub fn of(name: &str) -> Result<Direction, String> {
-        match name {
-            "input" => Ok(Direction::Input),
-            "output" => Ok(Direction::Output),
-            other => Err(format!(
-                "direction: \"{other}\" is neither input nor output"
-            )),
+    /// `gpio_in`, `gpio_out` or `gpio_inout`.
+    pub fn type_name(self) -> &'static str {
+        match self {
+            Kind::In => "gpio_in",
+            Kind::Out => "gpio_out",
+            Kind::Inout => "gpio_inout",
         }
     }
 
-    /// Whether these lines are driven.
-    pub fn is_output(self) -> bool {
-        self == Direction::Output
+    /// The kind a node type is, if it is one of the three.
+    ///
+    /// # Arguments
+    ///
+    /// * `node_type` - The node's `type`.
+    ///
+    /// # Returns
+    ///
+    /// The kind, or `None` for a type that is not a set of lines.
+    pub fn of(node_type: &str) -> Option<Kind> {
+        Kind::ALL
+            .into_iter()
+            .find(|kind| kind.type_name() == node_type)
+    }
+
+    /// Whether lines of this kind are watched.
+    pub fn watches(self) -> bool {
+        self == Kind::In
+    }
+
+    /// Whether lines of this kind are driven.
+    pub fn drives(self) -> bool {
+        self != Kind::In
+    }
+
+    /// Whether lines of this kind report the last value they were told to
+    /// be, by `world-out`, every `state_interval`.
+    pub fn reports(self) -> bool {
+        self == Kind::Inout
     }
 }
 
 /// What a GPIO node's lines are set to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GpioParams {
-    /// The offsets of the lines, lowest first: see [`lines_of`].
-    pub lines: Vec<u32>,
-    /// Whether they are read or driven.
-    pub direction: Direction,
-    /// Which changes are events.
+    /// Which of the three types it is.
+    pub kind: Kind,
+    /// The offsets of the lines watched, lowest first: see [`lines_of`].
+    /// None but for a `gpio_in`.
+    pub inputs: Vec<u32>,
+    /// And of the lines driven, lowest first. None for a `gpio_in`.
+    pub outputs: Vec<u32>,
+    /// Which changes of a watched line are events.
     pub edge: Edge,
     /// What holds the lines.
     pub bias: Bias,
@@ -184,7 +218,8 @@ fn length_of_time(
 /// # Arguments
 ///
 /// * `name`   - The node's name, for the messages.
-/// * `stated` - The `lines` attribute as the file wrote it.
+/// * `term`   - Which attribute it is, which is `lines`.
+/// * `stated` - The attribute as the file wrote it.
 ///
 /// # Returns
 ///
@@ -194,7 +229,11 @@ fn length_of_time(
 ///
 /// An offset that is not a whole number or is named twice, and a list that
 /// names no line or more than `MOST_LINES`.
-pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
+pub fn lines_of(
+    name: &str,
+    term: &str,
+    stated: &Scalar,
+) -> EndpointConfigResult<Vec<u32>> {
     let mut lines = Vec::new();
 
     for word in stated
@@ -202,13 +241,14 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
         .split([',', ' ', '\t'])
         .filter(|word| !word.trim().is_empty())
     {
-        let offset = parse_u32(name, "lines", &Scalar::of(word.trim()))?;
+        let offset = parse_u32(name, term, &Scalar::of(word.trim()))?;
         if lines.contains(&offset) {
             return Err(bad(
                 name,
                 &format!(
-                    "lines names offset {offset} twice: a line watched twice \
-                     would report every change of it twice"
+                    "{term} names offset {offset} twice: a line watched twice \
+                     would report every change of it twice, and one driven \
+                     twice is one line said twice"
                 ),
             ));
         }
@@ -218,8 +258,10 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
     if lines.is_empty() {
         return Err(bad(
             name,
-            "lines must name at least one line: a payload watching no lines \
-             has nothing to report",
+            &format!(
+                "{term} must name at least one line: a node with no lines has \
+                 nothing to watch and nothing to drive"
+            ),
         ));
     }
 
@@ -227,7 +269,7 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
         return Err(bad(
             name,
             &format!(
-                "lines names {} lines, and one request may name {MOST_LINES}",
+                "{term} names {} lines, and one request may name {MOST_LINES}",
                 lines.len()
             ),
         ));
@@ -237,46 +279,100 @@ pub fn lines_of(name: &str, stated: &Scalar) -> EndpointConfigResult<Vec<u32>> {
     Ok(lines)
 }
 
-/// Reads what a GPIO payload says about its lines, and what it must say.
+/// Reads what a GPIO node says about its lines, and what it must say.
+///
+/// Each type states its `lines` -- a `gpio_in`'s watched, a `gpio_out`'s and
+/// a `gpio_inout`'s driven. A `gpio_in` may state the watching terms,
+/// `edge`, `bias`, `debounce` and `state_interval`, and a `gpio_inout` must
+/// state the `state_interval` it reports on.
 ///
 /// # Arguments
 ///
 /// * `name` - The node's name, for the messages.
+/// * `kind` - Which of the three types it is.
 /// * `g`    - The node's terms as the file states them.
 ///
 /// # Returns
 ///
-/// The lines, their direction, and how inputs are watched.
+/// The lines, and how the watched ones are watched.
 ///
 /// # Errors
 ///
-/// A term that does not belong to GPIO, a `stream`, a missing or bad
-/// `lines`, a value that does not read, a watching term on output lines,
-/// and input lines watched for no edge and reported at no interval.
+/// A term that does not belong to the type, `direction`, a `stream`, missing
+/// or bad lines, a value that does not read, and watched lines watched for no
+/// edge and reported at no interval.
 pub(crate) fn group_kind_of(
     name: &str,
+    kind: Kind,
     g: LinkTerms,
 ) -> EndpointConfigResult<GroupKind> {
-    reject_foreign_fields(
-        name,
-        "gpio",
-        &g,
-        &[
-            "lines",
-            "edge",
-            "bias",
-            "debounce",
-            "state_interval",
-            "direction",
-        ],
-    )?;
+    let type_name = kind.type_name();
+
+    // The word the type took over, refused with what to do: it is a file
+    // written for the one `gpio` there was, and reading it as foreign would
+    // say what is wrong and not why.
+    if g.direction.is_some() {
+        return Err(bad(
+            name,
+            &format!(
+                "direction is said by the type now: a {type_name} {}, so take \
+                 direction out -- and where these lines are not that, the type \
+                 to write is gpio_in for watched lines, gpio_out for driven \
+                 ones, or gpio_inout for driven lines the ground is told of",
+                match kind {
+                    Kind::In => "watches its lines",
+                    Kind::Out => "drives its lines",
+                    Kind::Inout => "drives its lines and reports them",
+                }
+            ),
+        ));
+    }
+
+    const WATCHING: [&str; 4] = ["edge", "bias", "debounce", "state_interval"];
+    let allowed: Vec<&str> = match kind {
+        Kind::In => ["lines"].into_iter().chain(WATCHING).collect(),
+        Kind::Out => vec!["lines"],
+        Kind::Inout => vec!["lines", "state_interval"],
+    };
+
+    // The watching terms on a type that only drives, said apart from any
+    // other foreign word: the usual cause is a set of lines turned into a
+    // gpio_out with the rest of its words left as they were.
+    if !kind.watches() {
+        for (term, given) in [
+            ("edge", g.edge.is_some()),
+            ("bias", g.bias.is_some()),
+            ("debounce", g.debounce.is_some()),
+            (
+                "state_interval",
+                g.state_interval.is_some() && !kind.reports(),
+            ),
+        ] {
+            if given {
+                return Err(bad(
+                    name,
+                    &format!(
+                        "{term} is about watching a line, and a {type_name} \
+                         drives its lines: an output has no edges to report \
+                         and nothing to debounce"
+                    ),
+                ));
+            }
+        }
+    }
+
+    reject_foreign_fields(name, type_name, &g, &allowed)?;
 
     // An event is its own length, so there is nothing for a rule about where
     // a read ends to say.
-    reject_stream(name, "gpio", g.stream.is_some())?;
+    reject_stream(name, type_name, g.stream.is_some())?;
 
-    let lines = require(name, "gpio", "lines", g.lines.as_ref())?;
-    let lines = lines_of(name, lines)?;
+    let lines = require(name, type_name, "lines", g.lines.as_ref())?;
+    let lines = lines_of(name, "lines", lines)?;
+    let (inputs, outputs) = match kind {
+        Kind::In => (lines, Vec::new()),
+        Kind::Out | Kind::Inout => (Vec::new(), lines),
+    };
 
     let edge = match g.edge.as_ref() {
         Some(stated) => match stated.as_str().to_ascii_lowercase().as_str() {
@@ -323,44 +419,22 @@ pub(crate) fn group_kind_of(
         None => None,
     };
 
-    let direction = match g.direction.as_ref() {
-        Some(stated) => Direction::of(&stated.as_str().to_ascii_lowercase())
-            .map_err(|why| bad(name, &why))?,
-        None => Direction::Input,
-    };
-
-    // Terms that only mean something for lines being watched. Refused rather
-    // than ignored on an output: an edge or a debounce on a line nothing reads
-    // is a file saying something it does not mean, and the usual cause is a
-    // set of lines whose direction was changed and whose other terms were left
-    // as they were.
-    if direction.is_output() {
-        for (term, given) in [
-            ("edge", g.edge.is_some()),
-            ("bias", g.bias.is_some()),
-            ("debounce", g.debounce.is_some()),
-            ("state_interval", g.state_interval.is_some()),
-        ] {
-            if given {
-                return Err(bad(
-                    name,
-                    &format!(
-                        "{term} is about watching a line, and these lines are \
-                         driven: an output has no edges to report and nothing \
-                         to debounce"
-                    ),
-                ));
-            }
-        }
-    }
-
     // Lines that are watched are watched somehow. Edges are the default, so
     // the only way to ask for neither is to say so -- `edge: none` with no
-    // report -- and that is a payload that would send nothing at all: the
+    // report -- and that is a node that would send nothing at all: the
     // configuration asked for the lines and then asked for nothing about
     // them.
-    if !direction.is_output() && edge == Edge::None && state_interval.is_none()
-    {
+    // And lines that report what they were told report it on a beat, which
+    // is the only thing that sends anything from them groundward.
+    if kind.reports() && state_interval.is_none() {
+        return Err(bad(
+            name,
+            "a gpio_inout reports the last value its lines were told every \
+             state_interval, and says none: say how often, as 1 s",
+        ));
+    }
+
+    if kind.watches() && edge == Edge::None && state_interval.is_none() {
         return Err(bad(
             name,
             "these lines are watched for no edges and reported at no interval, \
@@ -370,8 +444,9 @@ pub(crate) fn group_kind_of(
     }
 
     Ok(GroupKind::Gpio(GpioParams {
-        lines,
-        direction,
+        kind,
+        inputs,
+        outputs,
         edge,
         bias,
         debounce,
@@ -609,6 +684,7 @@ mod tests {
     ///
     /// # Arguments
     ///
+    /// * `kind`   - Which of the three types it is.
     /// * `stated` - Each term stated, with its value as written.
     ///
     /// # Returns
@@ -618,8 +694,8 @@ mod tests {
     /// # Panics
     ///
     /// If the terms are refused, or are not GPIO lines.
-    fn params(stated: &[(&str, &str)]) -> GpioParams {
-        match group_kind_of("discretes", terms(stated)).expect("lines") {
+    fn params(kind: Kind, stated: &[(&str, &str)]) -> GpioParams {
+        match group_kind_of("discretes", kind, terms(stated)).expect("lines") {
             GroupKind::Gpio(gpio) => gpio,
             other => panic!("expected GPIO lines, got {other:?}"),
         }
@@ -630,10 +706,11 @@ mod tests {
     #[test]
     fn a_payload_watches_the_lines_it_names() {
         assert_eq!(
-            params(&[("lines", "0, 1, 5")]),
+            params(Kind::In, &[("lines", "0, 1, 5")]),
             GpioParams {
-                lines: vec![0, 1, 5],
-                direction: Direction::Input,
+                kind: Kind::In,
+                inputs: vec![0, 1, 5],
+                outputs: Vec::new(),
                 edge: Edge::Both,
                 bias: Bias::None,
                 debounce: None,
@@ -652,28 +729,29 @@ mod tests {
     #[test]
     fn lines_are_watched_by_edges_or_by_report_or_by_both() {
         // The default, unchanged: edges, and no report.
-        let said = params(&[("lines", "0")]);
+        let said = params(Kind::In, &[("lines", "0")]);
         assert_eq!(said.edge, Edge::Both);
         assert_eq!(said.state_interval, None);
 
         // A report and no edges, which is a set of lines read for what they
         // are rather than for when they changed.
-        let said = params(&[
-            ("lines", "0"),
-            ("edge", "none"),
-            ("state_interval", "5 s"),
-        ]);
+        let said = params(
+            Kind::In,
+            &[("lines", "0"), ("edge", "none"), ("state_interval", "5 s")],
+        );
         assert_eq!(said.edge, Edge::None);
         assert_eq!(said.state_interval, Some(Duration::from_secs(5)));
 
         // And both, which is edges with a refresh behind them.
-        let said = params(&[("lines", "0"), ("state_interval", "1 s")]);
+        let said =
+            params(Kind::In, &[("lines", "0"), ("state_interval", "1 s")]);
         assert_eq!(said.edge, Edge::Both);
         assert_eq!(said.state_interval, Some(Duration::from_secs(1)));
 
         // Neither is refused, and the complaint says both ways out.
         let why = group_kind_of(
             "discretes",
+            Kind::In,
             terms(&[("lines", "0"), ("edge", "none")]),
         )
         .expect_err("lines nobody watches");
@@ -687,6 +765,7 @@ mod tests {
         // length of time is never nought, here or anywhere else.
         let why = group_kind_of(
             "discretes",
+            Kind::In,
             terms(&[("lines", "0"), ("state_interval", "0 s")]),
         )
         .expect_err("a report every no time");
@@ -696,11 +775,8 @@ mod tests {
         // about edges.
         let why = group_kind_of(
             "discretes",
-            terms(&[
-                ("lines", "17"),
-                ("direction", "output"),
-                ("state_interval", "1 s"),
-            ]),
+            Kind::Out,
+            terms(&[("lines", "17"), ("state_interval", "1 s")]),
         )
         .expect_err("a report of a line this node drives");
         assert!(format!("{why}").contains("state_interval"), "{why}");
@@ -709,25 +785,36 @@ mod tests {
     /// Offsets may be written as a schematic writes them.
     #[test]
     fn offsets_are_read_in_either_notation() {
-        assert_eq!(params(&[("lines", "0 1 17")]).lines, vec![0, 1, 17]);
-        assert_eq!(params(&[("lines", "0x0a,0x0b")]).lines, vec![10, 11]);
-        assert_eq!(params(&[("lines", " 3 ")]).lines, vec![3]);
+        assert_eq!(
+            params(Kind::In, &[("lines", "0 1 17")]).inputs,
+            vec![0, 1, 17]
+        );
+        assert_eq!(
+            params(Kind::In, &[("lines", "0x0a,0x0b")]).inputs,
+            vec![10, 11]
+        );
+        assert_eq!(params(Kind::In, &[("lines", " 3 ")]).inputs, vec![3]);
         // In no order but the offsets' own.
-        assert_eq!(params(&[("lines", "17, 0 1")]).lines, vec![0, 1, 17]);
+        assert_eq!(
+            params(Kind::In, &[("lines", "17, 0 1")]).inputs,
+            vec![0, 1, 17]
+        );
     }
 
     /// A payload that names no lines, or one twice, is refused.
     #[test]
     fn a_payload_names_lines_once_each_and_at_least_one() {
-        let said = group_kind_of("discretes", terms(&[("lines", "")]))
-            .expect_err("a payload watching nothing");
+        let said =
+            group_kind_of("discretes", Kind::In, terms(&[("lines", "")]))
+                .expect_err("a payload watching nothing");
         assert!(
             format!("{said}").contains("at least one"),
             "the error should say what is wanted: {said}"
         );
 
-        let said = group_kind_of("discretes", terms(&[("lines", "4, 4")]))
-            .expect_err("one line watched twice");
+        let said =
+            group_kind_of("discretes", Kind::In, terms(&[("lines", "4, 4")]))
+                .expect_err("one line watched twice");
         assert!(
             format!("{said}").contains("twice"),
             "the error should say what is wrong: {said}"
@@ -735,9 +822,12 @@ mod tests {
 
         let many: Vec<String> =
             (0..=MOST_LINES as u32).map(|n| n.to_string()).collect();
-        let said =
-            group_kind_of("discretes", terms(&[("lines", &many.join(","))]))
-                .expect_err("more lines than a request may name");
+        let said = group_kind_of(
+            "discretes",
+            Kind::In,
+            terms(&[("lines", &many.join(","))]),
+        )
+        .expect_err("more lines than a request may name");
         assert!(
             format!("{said}").contains("64"),
             "the error should say the limit: {said}"
@@ -748,12 +838,15 @@ mod tests {
     /// neither is refused.
     #[test]
     fn what_a_payload_may_say_about_its_lines() {
-        let said = params(&[
-            ("lines", "2"),
-            ("edge", "falling"),
-            ("bias", "pull_up"),
-            ("debounce", "5 ms"),
-        ]);
+        let said = params(
+            Kind::In,
+            &[
+                ("lines", "2"),
+                ("edge", "falling"),
+                ("bias", "pull_up"),
+                ("debounce", "5 ms"),
+            ],
+        );
         assert_eq!(said.edge, Edge::Falling);
         assert_eq!(said.bias, Bias::PullUp);
         assert_eq!(said.debounce, Some(Duration::from_micros(5_000)));
@@ -764,6 +857,7 @@ mod tests {
         ] {
             let said = group_kind_of(
                 "discretes",
+                Kind::In,
                 terms(&[("lines", "0"), (field, value)]),
             )
             .expect_err("a word that is not a value");
@@ -775,6 +869,7 @@ mod tests {
 
         let said = group_kind_of(
             "discretes",
+            Kind::In,
             terms(&[("lines", "0"), ("debounce", "0 s")]),
         )
         .expect_err("no debouncing at all");
@@ -790,6 +885,7 @@ mod tests {
     fn a_term_of_another_link_is_refused() {
         let said = group_kind_of(
             "discretes",
+            Kind::In,
             terms(&[("lines", "0"), ("datarate", "9600")]),
         )
         .expect_err("a line's rate on a set of discretes");
@@ -799,36 +895,65 @@ mod tests {
         );
     }
 
-    /// Lines are watched unless the file says they are driven.
+    /// The type says whether the lines are watched or driven, and a file
+    /// that still says `direction` is told to take it out and which type to
+    /// write.
     #[test]
-    fn lines_are_watched_unless_the_file_says_driven() {
-        assert_eq!(params(&[("lines", "0")]).direction, Direction::Input);
-        assert_eq!(
-            params(&[("lines", "0"), ("direction", "input")]).direction,
-            Direction::Input
-        );
-        assert_eq!(
-            params(&[("lines", "17, 18, 19"), ("direction", "output")])
-                .direction,
-            Direction::Output
-        );
+    fn the_type_says_whether_lines_are_watched_or_driven() {
+        let watched = params(Kind::In, &[("lines", "0")]);
+        assert_eq!((watched.inputs, watched.outputs), (vec![0], vec![]));
+        let driven = params(Kind::Out, &[("lines", "17, 18, 19")]);
+        assert_eq!(driven.kind, Kind::Out);
+        assert_eq!((driven.inputs, driven.outputs), (vec![], vec![17, 18, 19]));
 
-        // However the file capitalised it, as the other words of a link are
-        // read.
-        assert_eq!(
-            params(&[("lines", "0"), ("direction", "OUTPUT")]).direction,
-            Direction::Output
-        );
+        for kind in Kind::ALL {
+            assert_eq!(Kind::of(kind.type_name()), Some(kind));
+            let said = group_kind_of(
+                "discretes",
+                kind,
+                terms(&[("lines", "0"), ("direction", "output")]),
+            )
+            .expect_err("a direction the type says now");
+            let said = format!("{said}");
+            assert!(
+                said.contains("take direction out")
+                    && said.contains("gpio_inout"),
+                "the error should say what to do: {said}"
+            );
+        }
+        assert_eq!(Kind::of("gpio"), None, "the old word is no type");
+    }
+
+    /// A `gpio_inout` drives its `lines` as a `gpio_out` does, reports them
+    /// every `state_interval`, which it has to say, and says nothing about
+    /// watching them.
+    #[test]
+    fn a_gpio_inout_drives_its_lines() {
+        let told =
+            params(Kind::Inout, &[("lines", "5 4"), ("state_interval", "1 s")]);
+        assert_eq!(told.kind, Kind::Inout);
+        assert_eq!((told.inputs, told.outputs), (vec![], vec![4, 5]));
+        assert_eq!(told.state_interval, Some(Duration::from_secs(1)));
+
+        // Reported on a beat, and so saying how often.
+        let said =
+            group_kind_of("discretes", Kind::Inout, terms(&[("lines", "4")]))
+                .expect_err("a report never made");
+        assert!(format!("{said}").contains("state_interval"), "{said}");
+        assert!(Kind::Inout.drives() && Kind::Inout.reports());
+        assert!(!Kind::Inout.watches());
 
         let said = group_kind_of(
             "discretes",
-            terms(&[("lines", "0"), ("direction", "both")]),
+            Kind::Inout,
+            terms(&[
+                ("lines", "4"),
+                ("state_interval", "1 s"),
+                ("edge", "rising"),
+            ]),
         )
-        .expect_err("a direction that is neither");
-        assert!(
-            format!("{said}").contains("neither input nor output"),
-            "the error should say what the choices are: {said}"
-        );
+        .expect_err("a watching term on driven lines");
+        assert!(format!("{said}").contains("edge"), "{said}");
     }
 
     /// A driven line may not also say how it is watched.
@@ -845,26 +970,24 @@ mod tests {
         ] {
             let said = group_kind_of(
                 "heaters",
-                terms(&[
-                    ("lines", "17"),
-                    ("direction", "output"),
-                    (term, value),
-                ]),
+                Kind::Out,
+                terms(&[("lines", "17"), (term, value)]),
             )
             .expect_err("a watching term on a driven line");
             let said = format!("{said}");
             assert!(
-                said.contains(term) && said.contains("driven"),
+                said.contains(term) && said.contains("drives"),
                 "the error should name the term and say why: {said}"
             );
         }
 
         // And an output that says nothing else is what a heater looks like.
         assert_eq!(
-            params(&[("lines", "17, 18, 19"), ("direction", "output")]),
+            params(Kind::Out, &[("lines", "17, 18, 19")]),
             GpioParams {
-                lines: vec![17, 18, 19],
-                direction: Direction::Output,
+                kind: Kind::Out,
+                inputs: Vec::new(),
+                outputs: vec![17, 18, 19],
                 edge: Edge::Both,
                 bias: Bias::None,
                 debounce: None,

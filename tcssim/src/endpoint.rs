@@ -216,8 +216,11 @@ pub fn payload_config_attached(
 
     // And which lines a set of discretes moves, which is the one thing a GPIO
     // payload produces: not bytes a file sized.
+    // Watched lines it moves, and driven lines -- a gpio_out's and a
+    // gpio_inout's -- it watches for what the vehicle drives them to: see
+    // `driven`.
     let gpio_lines = match &dh.endpoint {
-        EndpointConfig::Gpio(gpio) => gpio.lines.clone(),
+        EndpointConfig::Gpio(gpio) => gpio.lines(),
         _ => Vec::new(),
     };
 
@@ -320,7 +323,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
         }
         EndpointConfig::Gpio(gpio) => {
             let offsets: Vec<String> =
-                gpio.lines.iter().map(|n| n.to_string()).collect();
+                gpio.lines().iter().map(|n| n.to_string()).collect();
             format!("GPIO {} lines {}", gpio.path, offsets.join(","))
         }
         // A synchronous line: the interface, and whose clock it is on, which

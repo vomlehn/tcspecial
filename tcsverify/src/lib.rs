@@ -1272,7 +1272,7 @@ mod tests {
                     line_of("heaters_1"),
                     tcslibgs::graph::built::not_built_message(
                         "heaters_1",
-                        "gpio"
+                        "gpio_out"
                     )
                     .as_str()
                 ),
@@ -1280,7 +1280,7 @@ mod tests {
                     line_of("heaters_2"),
                     tcslibgs::graph::built::not_built_message(
                         "heaters_2",
-                        "gpio"
+                        "gpio_out"
                     )
                     .as_str()
                 ),
@@ -1473,7 +1473,14 @@ mod tests {
                 "{said:?}"
             );
         }
-        assert!(said.len() <= 4, "{said:?}");
+        // And the line from it, to the ground, which leaves a node each
+        // spelling calls something else.
+        assert!(
+            said.iter()
+                .any(|m| m.contains("links / gpio-out-tmass1.world-out")),
+            "{said:?}"
+        );
+        assert!(said.len() <= 6, "{said:?}");
     }
 
     /// The order anything is written in means nothing -- a node's device id

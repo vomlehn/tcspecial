@@ -46,19 +46,12 @@ gateways:
         world-in: [switch]
 
 payloads:
-  # Two lines of one chip, each a payload of its own because one is read and
-  # the other driven, and a payload's lines go one way. The chip here is
+  # Two lines of one chip: a lamp the ground drives, a gpio_out, and a
+  # switch the ground is told about, a gpio_in. The chip here is
   # /dev/gpiochip1, which is what the kernel's gpio-sim chip is numbered on a
   # host with one chip of its own; bin/mk-kernel-dummies makes that chip and
   # prints the number it was given, which is the path to write here.
-  - type gpio:
-      # A lamp on line 1, driven by what the ground sends: the text 1 to light
-      # it, 0 to put it out, and anything else refused.
-      - payload: lamp
-        direction: "output"
-        lines: "1"
-        path: "/dev/gpiochip1"
-        moc-in: [ground]
+  - type gpio_in:
       # A switch on line 0. Each time it changes, the kernel's edge becomes a
       # sixteen-byte record -- when, which line, and what it became -- and the
       # record goes to the ground.
@@ -68,6 +61,13 @@ payloads:
         path: "/dev/gpiochip1"
         world-out:
           - ground.switch
+  - type gpio_out:
+      # A lamp on line 1, driven by what the ground sends: the text 1 to light
+      # it, 0 to put it out, and anything else refused.
+      - payload: lamp
+        lines: "1"
+        path: "/dev/gpiochip1"
+        moc-in: [ground]
 
 tcsgui:
   nodes:

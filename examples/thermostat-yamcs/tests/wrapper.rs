@@ -6,10 +6,11 @@
 //! parameter of the type the configuration says its data are: a value as a
 //! float in its unit, read from four bytes of a signed count of the unit's
 //! steps through a calibrator, a decision as a boolean, read from the
-//! character `1` or `0`, and a GPIO payload's lines read for their levels as
-//! each line's record, its level a boolean. Nothing but a run against Yamcs itself would show
-//! the wrapper and the vehicle disagreeing -- a byte order, a scale off by a
-//! thousand, a sign lost -- so this generates the wrapper, as
+//! character `1` or `0` -- a thermostat's, and what a heater's switch was
+//! told -- and a GPIO payload's lines read for their levels as each line's
+//! record, its level a boolean. Nothing but a run against Yamcs itself would
+//! show the wrapper and the vehicle disagreeing -- a byte order, a scale off
+//! by a thousand, a sign lost -- so this generates the wrapper, as
 //! `thermostat_yamcs.py` does, and works it as Yamcs would, with
 //! `yamcs_common`'s interpreter, on what the vehicle sends: each value made
 //! by `tcslibgs::node::vehicle::compute::value_bytes`, each line's record as
@@ -126,50 +127,22 @@ fn readings_and_the_vote_decode_as_temperatures() {
     }
 }
 
-/// One line's record, as `tcspecial` reports a line read for its level:
-/// the time, in microseconds since the epoch, then the line's offset and its
-/// level, each a 32-bit word, every number most significant byte first.
-///
-/// # Arguments
-///
-/// * `micros` - The time.
-/// * `offset` - The line's offset on its chip.
-/// * `level`  - 1 for high, 0 for low.
-///
-/// # Returns
-///
-/// The record's sixteen bytes.
-fn record(micros: u64, offset: u32, level: u32) -> Vec<u8> {
-    let mut record = micros.to_be_bytes().to_vec();
-    record.extend(offset.to_be_bytes());
-    record.extend(level.to_be_bytes());
-    assert_eq!(record.len(), tcslibgs::node::payload::gpio::EVENT_BYTES);
-    record
-}
-
-/// The lines sensing the heaters, framed under gpio-in-tmass's APID, a
-/// record for each in the order of their offsets, are each heater's level:
-/// on and off, with each record's time and line.
+/// The heaters' switches, each reporting what it was last told, framed
+/// under its own APID, are each the decision it was: the character `1` on,
+/// `0` off, read as a boolean.
 #[test]
-fn the_heaters_lines_decode_as_their_levels() {
+fn the_heaters_switches_decode_as_their_decisions() {
     let path = here().join("thermostat-yamcs.xtcs");
     let xtce = generated_mdb(&path);
-    let apid = apid_of(&apids(&path), "gpio-in-tmass");
-    for (two, three) in [(1, 0), (0, 1), (1, 1), (0, 0)] {
-        let mut data = record(1_793_000_000_000_000, 2, two);
-        data.extend(record(1_793_000_000_000_001, 3, three));
-        let packet = framed(apid, &data);
-        let decoded = decode(&xtce, &packet);
-        assert_eq!(decoded.container, "gpio-in-tmassPacket");
-        assert_eq!(decoded.end, Some(packet.len() * 8), "all of it is read");
-        assert_eq!(decoded.booleans["gpio-in-tmass_line2"], Ok(two == 1));
-        assert_eq!(decoded.booleans["gpio-in-tmass_line3"], Ok(three == 1));
-        assert_eq!(decoded.integers["gpio-in-tmass_line2_offset"], 2);
-        assert_eq!(decoded.integers["gpio-in-tmass_line3_offset"], 3);
-        assert_eq!(
-            decoded.integers["gpio-in-tmass_line3_time"],
-            1_793_000_000_000_001
-        );
+    let apids = apids(&path);
+    for heater in ["gpio-out-tmass1", "gpio-out-tmass2"] {
+        for (said, on) in [(b"1", true), (b"0", false)] {
+            let packet = framed(apid_of(&apids, heater), said);
+            let decoded = decode(&xtce, &packet);
+            assert_eq!(decoded.container, format!("{heater}Packet"));
+            assert_eq!(decoded.end, Some(packet.len() * 8), "all of it");
+            assert_eq!(decoded.booleans[heater], Ok(on), "{heater}");
+        }
     }
 }
 

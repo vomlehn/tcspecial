@@ -135,7 +135,9 @@ pub const PHYSICS_LINE: &str = "#b5679a";
 /// nodes of one panel may share a colour -- which is allowed here because
 /// colour is the redundant channel: every pair of types differs in two of
 /// outline, edge, border width, size and label, and
-/// `style::NodeType::appearance` is held to that by its own test.
+/// `style::NodeType::appearance` is held to that by its own test -- but for
+/// the three kinds of discrete lines, drawn alike and told apart by colour
+/// and by the type written along each one's top.
 ///
 /// What this gave up is the twelve units between *neighbours* in one panel.
 /// A ramp of ten in one hue family cannot keep it -- see `design.rst` -- so
@@ -249,6 +251,10 @@ pub fn came_later(node_type: NodeType) -> u8 {
         | NodeType::TeePayload
         | NodeType::I2cTmass
         | NodeType::SpiTmass => 2,
+        // And the two kinds of discrete lines that came when the one gpio
+        // was split, gpio_in keeping its place and its colour: each takes a
+        // colour already in use, as every type that came later does.
+        NodeType::GpioOut | NodeType::GpioInout => 3,
         _ => 0,
     }
 }

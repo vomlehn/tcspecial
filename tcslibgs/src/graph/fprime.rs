@@ -166,7 +166,8 @@ impl Form {
     ///
     /// [`Form::Value`] for a node that sends values in a unit, and
     /// [`Form::Decision`] for one that sends decisions, as
-    /// [`node_produces`] and [`units::unit_of`] say; [`Form::Lines`] for a
+    /// [`node_produces`] and [`units::unit_of`] say, and for a `gpio_inout`,
+    /// which reports what its lines were told; [`Form::Lines`] for a
     /// GPIO payload's lines read for their levels on an interval and
     /// watched for no edge; [`Form::Datum`] for every other, including a
     /// node of values whose unit cannot be settled, which `Graph::check`
@@ -178,11 +179,16 @@ impl Form {
             ..
         })) = graph.node(source).map(crate::graph::reach::reach_of)
         {
-            let levels = !gpio.direction.is_output()
+            // What a gpio_inout reports is what its lines were told: a
+            // decision, as a thermostat's is.
+            if gpio.kind.reports() {
+                return Form::Decision;
+            }
+            let levels = !gpio.inputs.is_empty()
                 && gpio.edge == crate::LineEdge::None
                 && gpio.state_interval.is_some();
             return if levels {
-                Form::Lines(gpio.lines.len())
+                Form::Lines(gpio.inputs.len())
             } else {
                 Form::Datum
             };
@@ -1033,9 +1039,8 @@ mod tests {
         assert_eq!(Form::of(&thermostat, "ambient"), Form::Value(Unit::Kelvin));
         assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
         assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
-        // Lines read for their levels, and lines that are driven.
-        assert_eq!(Form::of(&thermostat, "gpio-in-tmass"), Form::Lines(2));
-        assert_eq!(Form::of(&thermostat, "gpio-out-tmass1"), Form::Datum);
+        // Driven lines that report what they were told: decisions.
+        assert_eq!(Form::of(&thermostat, "gpio-out-tmass1"), Form::Decision);
         assert_eq!(Form::Lines(2).fpp_type(), "Datum");
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");

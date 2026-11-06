@@ -849,9 +849,10 @@ fn take(
 /// that cannot be written at all cannot carry one. Two cannot, and each for
 /// its own reason:
 ///
-/// A set of discrete lines is read or driven and not both. Writing to lines
-/// that are watched would be driving them, which is commanding a device
-/// rather than reading it, and the kernel's request is for one direction.
+/// A set of discrete lines is asked by what arrives at its `world-in`, and
+/// driven by what arrives at its `moc-in`: a trigger written to it would be
+/// one of those two arriving on a clock, which is neither, and a datum that
+/// drove a heater because a timer went off would be the worst of them.
 ///
 /// A sensor's sample buffer is read and never written. What an IIO device is
 /// configured with -- its channels, its sample rate, its trigger in the
@@ -869,9 +870,10 @@ fn take(
 fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
     match endpoint {
         EndpointConfig::Gpio(_) => Some(
-            "a set of discrete lines is read or driven and not both: writing \
-             to lines that are watched would be commanding a device rather \
-             than reading it",
+            "a set of discrete lines has no trigger: watched lines report on \
+             their own edges and state_interval, and are asked for a report \
+             by a line into their world-in; driven lines are set by what \
+             arrives at their moc-in",
         ),
         EndpointConfig::Iio(_) => Some(
             "a sensor's sample buffer is read and not written: what an IIO \
@@ -899,10 +901,10 @@ fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
 /// buffer; `None` for every other interface.
 fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
     match endpoint {
-        EndpointConfig::Gpio(gpio) if !gpio.direction.is_output() => Some(
+        EndpointConfig::Gpio(gpio) if gpio.outputs.is_empty() => Some(
             "these lines are watched and not driven: an init is written, and \
-             writing to lines that are watched would be driving them. Say \
-             direction: output if they are driven",
+             writing to lines that are watched would be driving them. Make it \
+             a gpio_out, or a gpio_inout, if lines of it are driven",
         ),
         EndpointConfig::Iio(_) => Some(
             "a sensor's sample buffer is read and not written: what an IIO \
@@ -1209,7 +1211,9 @@ fn kind_of(node: &Node) -> Result<DHType, String> {
         "can" => Ok(DHType::Can),
         "iio" => Ok(DHType::Iio),
         "rpmsg" => Ok(DHType::Rpmsg),
-        "gpio" => Ok(DHType::Gpio),
+        "gpio_in" => Ok(DHType::GpioIn),
+        "gpio_out" => Ok(DHType::GpioOut),
+        "gpio_inout" => Ok(DHType::GpioInout),
         "hdlc" => Ok(DHType::Hdlc),
         "device-file" => Ok(DHType::Device),
         "network" => Ok(DHType::Network),
@@ -1594,7 +1598,6 @@ mod tests {
     use super::*;
     use crate::endpoint_config::LengthPrefix;
     use crate::graph::Graph;
-    use crate::node::payload::gpio::Direction;
     use crate::node::payload::spi::SpiMode;
     use std::collections::BTreeMap;
     use std::path::Path;
@@ -1749,8 +1752,8 @@ mod tests {
         match &reach("heaters_1").endpoint {
             EndpointConfig::Gpio(gpio) => {
                 assert_eq!(gpio.path, "/dev/gpiochip0");
-                assert_eq!(gpio.lines, vec![3, 4, 5]);
-                assert_eq!(gpio.direction, Direction::Output);
+                assert_eq!(gpio.outputs, vec![3, 4, 5]);
+                assert!(gpio.inputs.is_empty());
                 assert_eq!(gpio.debounce, None);
             }
             other => panic!("the heaters should be discrete lines: {other:?}"),
@@ -1839,7 +1842,7 @@ mod tests {
     fn an_attribute_that_locates_another_type_is_refused() {
         let said = reach_of(&node(
             "heaters",
-            "gpio",
+            "gpio_out",
             &[("path", "/dev/gpiochip0"), ("lines", "3"), ("port", "5000")],
         ))
         .expect_err("a port on a set of lines");
@@ -1954,7 +1957,7 @@ mod tests {
     fn an_interface_that_cannot_be_asked_refuses_a_trigger() {
         let said = reach_of(&node(
             "asked_lines",
-            "gpio",
+            "gpio_in",
             &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "0"),
@@ -1963,7 +1966,7 @@ mod tests {
         ))
         .expect_err("a set of discrete lines cannot be asked");
         assert!(
-            said.contains("asked_lines") && said.contains("driven"),
+            said.contains("asked_lines") && said.contains("world-in"),
             "the complaint should say why it cannot be asked: {said}"
         );
 
@@ -2002,11 +2005,10 @@ mod tests {
     fn an_init_is_taken_where_the_payload_can_be_written() {
         let heaters = reach_of(&node(
             "heaters",
-            "gpio",
+            "gpio_out",
             &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "4,5"),
-                ("direction", "output"),
                 ("init", "\"0\""),
             ],
         ))
@@ -2027,12 +2029,12 @@ mod tests {
 
         let said = reach_of(&node(
             "switches",
-            "gpio",
+            "gpio_in",
             &[("path", "/dev/gpiochip0"), ("lines", "0"), ("init", "[01]")],
         ))
         .expect_err("watched lines are not written");
         assert!(
-            said.contains("switches") && said.contains("direction: output"),
+            said.contains("switches") && said.contains("gpio_out"),
             "{said}"
         );
 
@@ -2068,7 +2070,7 @@ mod tests {
     fn a_set_of_lines_is_read_in_whole_records() {
         let lines = |size: &str| {
             reached(
-                "gpio",
+                "gpio_in",
                 &[
                     ("path", "/dev/gpiochip0"),
                     ("lines", "3"),
@@ -2590,7 +2592,7 @@ mod tests {
     #[test]
     fn a_gpio_node_is_a_chip_and_the_lines_it_watches() {
         let opened = endpoint(
-            "gpio",
+            "gpio_in",
             &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "3, 7"),
@@ -2603,14 +2605,14 @@ mod tests {
         match &opened {
             EndpointConfig::Gpio(gpio) => {
                 assert_eq!(gpio.path, "/dev/gpiochip0");
-                assert_eq!(gpio.lines, vec![3, 7]);
+                assert_eq!(gpio.inputs, vec![3, 7]);
                 assert_eq!(gpio.edge, crate::LineEdge::Rising);
                 assert_eq!(gpio.bias, crate::Bias::PullUp);
                 assert_eq!(gpio.debounce, Some(Duration::from_micros(5_000)));
             }
             other => panic!("expected a GPIO endpoint, got {other:?}"),
         }
-        assert_eq!(opened.kind(), DHType::Gpio);
+        assert_eq!(opened.kind(), DHType::GpioIn);
     }
 
     /// An rpmsg node reaches its endpoint with its channel and its service. A

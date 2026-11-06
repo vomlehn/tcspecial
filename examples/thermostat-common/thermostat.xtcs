@@ -4,7 +4,7 @@
     xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
     <!-- The vehicle the two thermostat examples share, which each includes: -->
     <!-- the three conversions and the vote between them, the thermostat and -->
-    <!-- its log, the heaters and the lines that sense them, the group the -->
+    <!-- its log, the heaters' switches, the group the -->
     <!-- sensors are read in, and the setpoint the ground may set. What -->
     <!-- differs between the two is in each example's own file: the -->
     <!-- tcspecial section, the gateway node, and the three sensors, whose -->
@@ -21,7 +21,8 @@
         <world-in>temp2</world-in>
         <world-in>temp3</world-in>
         <world-out>ambient</world-out>
-        <world-out>gpio-in-tmass</world-out>
+        <world-out>gpio-out-tmass1</world-out>
+        <world-out>gpio-out-tmass2</world-out>
         <world-out>temp1</world-out>
         <world-out>temp2</world-out>
         <world-out>temp3</world-out>
@@ -90,10 +91,9 @@
                 <!-- with no way to be warmed: either alone holds the band -->
                 <!-- while the orbit is warm, and both together hold it in -->
                 <!-- the cold too, each switched through a line of its own. -->
-                <!-- What it decides goes to the heaters and the log and not -->
-                <!-- to the ground: the ground is told what the heaters are -->
-                <!-- doing, by gpio-in-tmass, which a heater that has failed -->
-                <!-- does not hide. -->
+                <!-- What it decides goes to the heaters and the log, and the -->
+                <!-- ground is told it by the switches of the heaters, each -->
+                <!-- reporting what it was last told. -->
                 <moc-out>gpio-out-tmass1.thermostat</moc-out>
                 <moc-out>gpio-out-tmass2.thermostat</moc-out>
                 <world-out>housekeeping.thermostat</world-out>
@@ -104,7 +104,6 @@
             <compute name="housekeeping">
                 <directory>/tmp/telemetry</directory>
                 <format>variable_ts_rc</format>
-                <world-in>gpio-in-tmass</world-in>
                 <world-in>temp1</world-in>
                 <world-in>temp2</world-in>
                 <world-in>temp3</world-in>
@@ -113,42 +112,30 @@
         </type>
     </vehicle>
     <payloads>
-        <!-- The heaters and the lines that sense them, on the thermal -->
-        <!-- mass, through the simulated chip of the kernel, which -->
-        <!-- bin/mk-kernel-dummies makes: lines 2 to 5, which leaves 0 -->
+        <!-- The switches of the heaters, on the thermal mass, through -->
+        <!-- the simulated chip of the kernel, which -->
+        <!-- bin/mk-kernel-dummies makes: lines 4 and 5, which leaves 0 -->
         <!-- and 1 to the gpio example. -->
-        <type name="gpio">
-            <!-- Two lines on the thermal mass, one sensing each heater: -->
-            <!-- high while it is heating. Read every second for what they -->
-            <!-- are, rather than for when they change, so the ground hears -->
-            <!-- the state of the heaters on a beat and a lost report is -->
-            <!-- made good by the next; one bit a line, each a sixteen-byte -->
-            <!-- record of when, which line and what it is, to the ground -->
-            <!-- and the log. -->
-            <!-- Disabled from the ground, it reports nothing at all. -->
-            <payload name="gpio-in-tmass">
-                <edge>none</edge>
-                <lines>2,3</lines>
-                <path>/dev/gpiochip1</path>
-                <state_interval>1 s</state_interval>
-                <world-out>gateway.gpio-in-tmass</world-out>
-                <world-out>housekeeping.gpio-in-tmass</world-out>
-            </payload>
-            <!-- The switches of the two heaters, each a line the thermostat -->
-            <!-- drives - 1 for on, 0 for off. One payload each, so that one -->
-            <!-- can be stopped from the ground while the other goes on -->
-            <!-- warming the mass. -->
+        <type name="gpio_inout">
+            <!-- Each a line the thermostat drives, 1 for on and 0 for -->
+            <!-- off, and tells the heater it switches, and every second the -->
+            <!-- ground what it was last told, so the ground follows the -->
+            <!-- heaters on a beat and a lost report is made good by the -->
+            <!-- next. One payload each, so that one can be stopped from -->
+            <!-- the ground while the other goes on warming the mass. -->
             <payload name="gpio-out-tmass1">
-                <direction>output</direction>
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
+                <state_interval>1 s</state_interval>
                 <moc-in>thermostat</moc-in>
+                <world-out>gateway.gpio-out-tmass1</world-out>
             </payload>
             <payload name="gpio-out-tmass2">
-                <direction>output</direction>
                 <lines>5</lines>
                 <path>/dev/gpiochip1</path>
+                <state_interval>1 s</state_interval>
                 <moc-in>thermostat</moc-in>
+                <world-out>gateway.gpio-out-tmass2</world-out>
             </payload>
         </type>
     </payloads>
@@ -160,7 +147,6 @@
     <tcsgui>
         <nodes>
             <node name="ambient" x="469" y="166"/>
-            <node name="gpio-in-tmass" x="91" y="544"/>
             <node name="gpio-out-tmass1" x="34" y="393"/>
             <node name="gpio-out-tmass2" x="34" y="469"/>
             <node name="housekeeping" x="469" y="450"/>

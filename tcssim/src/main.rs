@@ -2593,9 +2593,8 @@ mod tests {
         assert!(!thermostat.reads("gpio-out-tmass1"));
         let heaters: Vec<&str> = thermostat.heaters().collect();
         assert_eq!(heaters, ["gpio-out-tmass1", "gpio-out-tmass2"]);
-        // The three sensors, the two heaters' switches, and the lines that
-        // sense the heaters.
-        assert_eq!(attached.len(), 6);
+        // The three sensors and the two heaters' switches.
+        assert_eq!(attached.len(), 5);
 
         // Naming a node that is not a thermostat node is refused.
         simulate_for(&mut sim_file, &["thermostat", "temp1"]);

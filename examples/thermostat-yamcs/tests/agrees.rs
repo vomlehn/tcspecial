@@ -181,8 +181,8 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
         }
         assert_eq!(mine, theirs, "{name}: the Python and the Rust disagree");
     }
-    // What the example is for: temperatures, and the levels of the lines
-    // sensing its two heaters.
+    // What the example is for: temperatures, and what its two heaters'
+    // switches were told.
     let forms: Vec<&str> = rust
         .iter()
         .filter(|(name, _)| name == "source")
@@ -192,7 +192,8 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
         forms,
         [
             "Value(Kelvin)",
-            "Lines(2)",
+            "Decision",
+            "Decision",
             "Value(Kelvin)",
             "Value(Kelvin)",
             "Value(Kelvin)",

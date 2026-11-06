@@ -31,7 +31,9 @@
       <xs:enumeration value="can"/>
       <xs:enumeration value="iio"/>
       <xs:enumeration value="rpmsg"/>
-      <xs:enumeration value="gpio"/>
+      <xs:enumeration value="gpio_in"/>
+      <xs:enumeration value="gpio_out"/>
+      <xs:enumeration value="gpio_inout"/>
       <xs:enumeration value="hdlc"/>
     </xs:restriction>
   </xs:simpleType>

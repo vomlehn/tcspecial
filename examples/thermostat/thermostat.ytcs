@@ -35,7 +35,7 @@ gateways:
         address: "127.0.0.1"
         ground_base: "127.0.0.1:5100"
         port: "5000"
-        world-in: [ambient, gpio-in-tmass, temp1, temp2, temp3]
+        world-in: [ambient, gpio-out-tmass1, gpio-out-tmass2, temp1, temp2, temp3]
 
 payloads:
   # The three sensors of the zone, two on an I2C bus and one on a SPI bus,

@@ -2305,9 +2305,11 @@ vehicle:
                             .map_or_else(kept, Arc::clone),
                     })
                         as Box<dyn Port>),
-                    "gpio" => Ok(Box::new(Ground {
-                        got: Arc::clone(&opening_heaters),
-                    }) as Box<dyn Port>),
+                    "gpio_in" | "gpio_out" | "gpio_inout" => {
+                        Ok(Box::new(Ground {
+                            got: Arc::clone(&opening_heaters),
+                        }) as Box<dyn Port>)
+                    }
                     "gateway_radio" => Ok(Box::new(Ground {
                         got: Arc::clone(&opening_ground),
                     })
@@ -2660,10 +2662,11 @@ vehicle:
                 "spi" => Ok(Box::new(Steady {
                     reading: &[0x00, 0x10, 0x00],
                 }) as Box<dyn Port>),
-                "gpio" | "gateway_radio" => Ok(Box::new(Sink {
-                    got: Arc::clone(&opening),
-                })
-                    as Box<dyn Port>),
+                "gpio_in" | "gpio_out" | "gpio_inout" | "gateway_radio" => {
+                    Ok(Box::new(Sink {
+                        got: Arc::clone(&opening),
+                    }) as Box<dyn Port>)
+                }
                 _ => open(node, routes, abandon, &SegSend::none(), None),
             },
             move |_: &Telemetered| {
@@ -3164,7 +3167,8 @@ vehicle:
                     ));
                 }
                 match node.node_type.as_str() {
-                    "spi" | "gpio" | "gateway_radio" => {
+                    "spi" | "gpio_in" | "gpio_out" | "gpio_inout"
+                    | "gateway_radio" => {
                         Ok(Box::new(Ground::default()) as Box<dyn Port>)
                     }
                     _ => open(node, routes, abandon, &SegSend::none(), None),
@@ -3192,8 +3196,8 @@ vehicle:
 
         let described = described(&graph);
         assert_eq!(described["temp_1"], "i2c, read");
-        assert_eq!(described["heaters_1"], "gpio, driven");
-        assert_eq!(described["heaters_2"], "gpio, driven");
+        assert_eq!(described["heaters_1"], "gpio_out, driven");
+        assert_eq!(described["heaters_2"], "gpio_out, driven");
         assert_eq!(described["gateway"], "gateway_radio, read");
         assert_eq!(described["temp1"], "compute");
         assert_eq!(described["housekeeping"], "log");

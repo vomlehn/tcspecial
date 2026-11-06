@@ -434,26 +434,36 @@ impl Plot {
             }
             // A GPIO payload's watched lines, each a switch whose state is
             // the line's: what a line sensing a heater says the heater is
-            // doing. A node whose reach does not settle is refused before the
-            // window opens.
+            // doing. And a gpio_inout's report, what a heater was told. A
+            // node whose reach does not settle is refused before the window
+            // opens.
             if let Ok(tcslibgs::graph::reach::Reach {
                 endpoint: tcslibgs::EndpointConfig::Gpio(gpio),
                 ..
             }) = tcslibgs::graph::reach::reach_of(node)
             {
-                if !gpio.direction.is_output() {
+                if !gpio.inputs.is_empty() {
                     line_sets.push(LineSet {
                         name: node.name.clone(),
                         first: switches.len(),
-                        offsets: gpio.lines.clone(),
+                        offsets: gpio.inputs.clone(),
                     });
-                    for offset in &gpio.lines {
+                    for offset in &gpio.inputs {
                         switches.push(Switch {
                             name: format!("{} line {offset}", node.name),
                             drives: Vec::new(),
                             changes: VecDeque::with_capacity(CHANGES),
                         });
                     }
+                } else if gpio.kind.reports() {
+                    // A gpio_inout's report is what its lines were last
+                    // told, a decision, drawn as a thermostat's is: a strip
+                    // of its own, on and off.
+                    switches.push(Switch {
+                        name: node.name.clone(),
+                        drives: Vec::new(),
+                        changes: VecDeque::with_capacity(CHANGES),
+                    });
                 }
                 continue;
             }
@@ -589,6 +599,10 @@ impl Plot {
             switch.changes.pop_front();
         }
         switch.changes.push_back((at, on));
+        // Heard, as a reading is: a plot of switches alone -- a set of lines
+        // and nothing measured -- would otherwise wait for a reading that
+        // never comes, and say it had heard nothing.
+        self.started.get_or_insert(at);
     }
 
     /// How the window is laid out: the traces in each panel, and how many
@@ -1553,7 +1567,9 @@ pub(crate) mod tests {
             plot.plotted("temp2"),
             Some(Plotted::Trace(2, Unit::Kelvin))
         );
-        assert_eq!(plot.plotted("gpio-in-tmass"), Some(Plotted::Lines(0)));
+        // Each heater's switch, reporting what it was last told.
+        assert_eq!(plot.plotted("gpio-out-tmass1"), Some(Plotted::Switch(0)));
+        assert_eq!(plot.plotted("gpio-out-tmass2"), Some(Plotted::Switch(1)));
         assert_eq!(plot.plotted("thermostat"), None);
         assert_eq!(plot.plotted("temp_1"), None);
 
@@ -1562,17 +1578,18 @@ pub(crate) mod tests {
         assert_eq!(drawn.said, "Nothing heard yet");
         let labels: Vec<&str> =
             drawn.switches.iter().map(|s| s.label.as_str()).collect();
-        assert_eq!(labels, ["gpio-in-tmass line 2", "gpio-in-tmass line 3"]);
+        assert_eq!(labels, ["gpio-out-tmass1", "gpio-out-tmass2"]);
         assert!(drawn.switches.iter().all(|s| s.on.is_none()));
         assert!(drawn.panels[0].paths.iter().all(String::is_empty));
     }
 
     /// A GPIO payload's records, one for each line, each set that line's
     /// strip; a record of a line the node does not name, or a datum that is
-    /// not whole records, changes nothing.
+    /// not whole records, changes nothing. And a plot of switches alone, as
+    /// the gpio example's is, is drawn once one has been heard.
     #[test]
     fn each_lines_record_sets_its_strip() {
-        let graph = example("thermostat");
+        let graph = example("gpio");
         let plot = Mutex::new(Plot::of(&graph, reaching(&graph)).unwrap());
         let record = |line: u32, on: u32| {
             let mut record = [0u8; EVENT_BYTES];
@@ -1581,12 +1598,13 @@ pub(crate) mod tests {
             record
         };
         let t0 = Instant::now();
-        plot.lock().unwrap().reading(0, t0, 293.0);
-        let mut both = record(2, 1).to_vec();
-        both.extend(record(3, 0));
-        take(&plot, Plotted::Lines(0), &both, t0);
-        take(&plot, Plotted::Lines(0), &record(7, 1), t0);
-        take(&plot, Plotted::Lines(0), &both[..20], t0);
+        // The switch, line 0, high; then a line it does not name, and a
+        // record and a piece.
+        take(&plot, Plotted::Lines(0), &record(0, 1), t0);
+        take(&plot, Plotted::Lines(0), &record(7, 0), t0);
+        let mut ragged = record(0, 0).to_vec();
+        ragged.extend(&record(0, 0)[..4]);
+        take(&plot, Plotted::Lines(0), &ragged, t0);
         let mut drawn = Drawn::default();
         plot.lock().unwrap().draw(
             t0 + Duration::from_secs(1),
@@ -1596,7 +1614,7 @@ pub(crate) mod tests {
         );
         let states: Vec<Option<bool>> =
             drawn.switches.iter().map(|s| s.on).collect();
-        assert_eq!(states, [Some(true), Some(false)]);
+        assert_eq!(states, [Some(true)]);
     }
 
     /// The descent example's values are in three units, so three panels,
@@ -1926,8 +1944,8 @@ pub(crate) mod tests {
         assert_eq!(
             labels,
             vec![
-                "gpio-in-tmass line 2",
-                "gpio-in-tmass line 3",
+                "gpio-out-tmass1",
+                "gpio-out-tmass2",
                 "thermostat \u{2192} gpio-out-tmass1, gpio-out-tmass2",
                 "thermostat_low \u{2192} gpio-out-tmass2",
             ]

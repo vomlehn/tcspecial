@@ -59,9 +59,9 @@
         <type name="gateway_yamcs">
             <!-- Yamcs's end of the link. Each reading drawn into this node
                  comes down to Yamcs at ground_base plus its source's device
-                 id (temp3 is the ninth of the thirteen names, here and in
-                 the file this one includes, device id 8, so 17708) as
-                 telemetry of APID apid_base plus that device id, 0x408.
+                 id (temp3 is the eighth of the twelve names, here and in
+                 the file this one includes, device id 7, so 17707) as
+                 telemetry of APID apid_base plus that device id, 0x407.
                  What Yamcs sends up to address:port goes as a telecommand
                  of APID apid_base. -->
             <gateway name="gateway">
@@ -70,7 +70,8 @@
                 <ground_base>127.0.0.1:17700</ground_base>
                 <port>17600</port>
                 <world-in>ambient</world-in>
-                <world-in>gpio-in-tmass</world-in>
+                <world-in>gpio-out-tmass1</world-in>
+                <world-in>gpio-out-tmass2</world-in>
                 <world-in>temp1</world-in>
                 <world-in>temp2</world-in>
                 <world-in>temp3</world-in>

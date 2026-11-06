@@ -39,7 +39,8 @@
                 <ground_base>127.0.0.1:5100</ground_base>
                 <port>5000</port>
                 <world-in>ambient</world-in>
-                <world-in>gpio-in-tmass</world-in>
+                <world-in>gpio-out-tmass1</world-in>
+                <world-in>gpio-out-tmass2</world-in>
                 <world-in>temp1</world-in>
                 <world-in>temp2</world-in>
                 <world-in>temp3</world-in>

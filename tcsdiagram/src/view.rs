@@ -738,8 +738,8 @@ mod tests {
         };
         let nodes = [
             at("thermostat", "compute", 400),
-            at("heater1", "gpio", 40),
-            at("heater2", "gpio", 40),
+            at("heater1", "gpio_out", 40),
+            at("heater2", "gpio_out", 40),
             at("log", "log", 600),
         ];
         let said = "asserted below the setpoint";

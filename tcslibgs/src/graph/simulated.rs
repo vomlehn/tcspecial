@@ -350,7 +350,14 @@ pub fn handlers(
             stale_interval: None,
             sends_from: reach.sends_from,
             sim_address: reach.sim_address,
-            driven: arrives && !leaves,
+            // A set of lines says by its type, which the links cannot: a
+            // gpio_out and a gpio_inout pass on what drives them, so they are
+            // read too, and are driven all the same.
+            driven: match crate::node::payload::gpio::Kind::of(&node.node_type)
+            {
+                Some(kind) => kind.drives(),
+                None => arrives && !leaves,
+            },
         });
     }
     Ok(handlers)

@@ -736,6 +736,7 @@ fn link_view(look: LinkLook) -> ui::LinkView {
         wide: look.wide,
         label: look.label.into(),
         comment: look.comment.into(),
+        tip: look.tip.into(),
     }
 }
 

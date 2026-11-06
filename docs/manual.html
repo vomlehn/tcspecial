@@ -688,7 +688,7 @@ name its far end does not list is refused where the file is read, saying
 which names it does list. A name is one word with no dot in it, and may be
 listed with nothing arriving at it yet. tcsgui names a line it draws after
 the node it leaves, and adds the name to the list for you.</p>
-<p class="last">Each terminal may be linked to one other: a <tt class="docutils literal"><span class="pre">world-out</span></tt> to a
+<p>Each terminal may be linked to one other: a <tt class="docutils literal"><span class="pre">world-out</span></tt> to a
 <tt class="docutils literal"><span class="pre">world-in</span></tt>, a <tt class="docutils literal"><span class="pre">world-in</span></tt> to a <tt class="docutils literal"><span class="pre">world-out</span></tt>, a <tt class="docutils literal"><span class="pre">moc-out</span></tt> to
 a <tt class="docutils literal"><span class="pre">moc-in</span></tt>, a <tt class="docutils literal"><span class="pre">moc-in</span></tt> to a <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Anything else would
 carry one stream into the other. In tcsgui the terminals are drawn as small
@@ -721,6 +721,17 @@ main one, with the same panes, lists, Physics pane and edits.
 A node with no terminal of that stream offers nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
 <tt class="docutils literal"><span class="pre">world-in</span></tt> in its upper left, and what it sends leaves by the
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> in its lower left.</p>
+<p class="last">A line's names are not written beside it in tcsgui. Resting the pointer
+on a line shows a tip: the node it leaves, the node it reaches and the
+input there where it names one, and under them whatever comment the
+file has for it. A physics line's tip names the component's terminal,
+which tells a line into a thermal mass's <tt class="docutils literal">heat</tt> from one into its
+<tt class="docutils literal">heater_1</tt>, both entering the one box. The <strong>View</strong> menu zooms the
+sheet: <strong>Zoom to the drawing</strong> fits every node and component in the
+window, <strong>Zoom to the selection</strong> fits the node, line or component
+selected, <strong>Actual size</strong> draws it at its own size, and <strong>Fit the
+width</strong>, which is how a window starts, draws it as wide as the window
+and no wider than its own size.</p>
 </dd>
 <dt><tt class="docutils literal"><span class="pre">null-gateway</span></tt> and <tt class="docutils literal"><span class="pre">null-payload</span></tt> nodes</dt>
 <dd>Vehicle nodes that take one stream and drop it: a <tt class="docutils literal"><span class="pre">null-gateway</span></tt> takes

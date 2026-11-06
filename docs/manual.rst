@@ -271,6 +271,18 @@ terminal
     ``world-in`` in its upper left, and what it sends leaves by the
     ``moc-out`` in its lower left.
 
+    A line's names are not written beside it in tcsgui. Resting the pointer
+    on a line shows a tip: the node it leaves, the node it reaches and the
+    input there where it names one, and under them whatever comment the
+    file has for it. A physics line's tip names the component's terminal,
+    which tells a line into a thermal mass's ``heat`` from one into its
+    ``heater_1``, both entering the one box. The **View** menu zooms the
+    sheet: **Zoom to the drawing** fits every node and component in the
+    window, **Zoom to the selection** fits the node, line or component
+    selected, **Actual size** draws it at its own size, and **Fit the
+    width**, which is how a window starts, draws it as wide as the window
+    and no wider than its own size.
+
 ``null-gateway`` and ``null-payload`` nodes
     Vehicle nodes that take one stream and drop it: a ``null-gateway`` takes
     what the ground sends at its ``moc-in``, and a ``null-payload`` takes a

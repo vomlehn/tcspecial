@@ -375,6 +375,9 @@ pub struct LinkLook {
     pub wide: bool,
     pub label: String,
     pub comment: String,
+    /// What a pointer resting on the line is told: which node and input it
+    /// leaves and reaches, and what somebody wrote about it. See [`tip_of`].
+    pub tip: String,
 }
 
 /// How wide a line is drawn, as the markup draws it: a link into a named
@@ -656,9 +659,53 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
                     }
                     _ => String::new(),
                 },
+                tip: tip_of(line.from, line.to, named_input, line.comment),
             }
         })
         .collect()
+}
+
+/// What a pointer resting on a line is told about it: the node it leaves,
+/// the node it reaches and the input there where it names one, and under
+/// those whatever somebody wrote about it.
+///
+/// Said whole, on every line, where the drawing must be brief: a comment
+/// written over a list of links is drawn on the first of them only, and a
+/// label at all only where an input is named, but a person pointing at one
+/// line is asking about that line.
+///
+/// # Arguments
+///
+/// * `from`    - The node the line leaves, or a component's terminal.
+/// * `to`      - The node it reaches, or a component's terminal.
+/// * `input`   - The input it arrives at, where it names one.
+/// * `comment` - What somebody wrote about it, if anything.
+///
+/// # Returns
+///
+/// The tip: the ends on one line, and each paragraph of the comment on
+/// one of its own.
+pub fn tip_of(
+    from: &str,
+    to: &str,
+    input: Option<&str>,
+    comment: Option<&str>,
+) -> String {
+    let mut tip = match input {
+        Some(input) => format!("{from} \u{2192} {to}.{input}"),
+        None => format!("{from} \u{2192} {to}"),
+    };
+    // The comment's own line breaks are where its file was wrapped, which
+    // is not where the tip is: each paragraph is run together, for the tip
+    // to wrap at its own width.
+    for paragraph in comment.unwrap_or_default().split("\n\n") {
+        let mut words = paragraph.split_whitespace().peekable();
+        if words.peek().is_some() {
+            tip.push('\n');
+            tip.push_str(&words.collect::<Vec<_>>().join(" "));
+        }
+    }
+    tip
 }
 
 /// About how much room a link's label takes, in pixels: as wide as its
@@ -760,6 +807,33 @@ mod tests {
             .map(|look| look.comment)
             .collect();
         assert_eq!(drawn, [said, "", said]);
+
+        // The tip is each line's own, so every line of the list says it.
+        let tips: Vec<String> = link_looks(&nodes, &lines)
+            .into_iter()
+            .map(|look| look.tip)
+            .collect();
+        assert_eq!(
+            tips,
+            [
+                format!("thermostat \u{2192} heater1\n{said}"),
+                format!("thermostat \u{2192} heater2\n{said}"),
+                format!("log \u{2192} heater1\n{said}"),
+            ]
+        );
+    }
+
+    /// A tip names both ends, and the input where the line names one, and
+    /// runs each paragraph of a comment together, the file's line breaks
+    /// being where the file was wrapped and not where the tip is.
+    #[test]
+    fn a_tip_names_both_ends_and_rewraps_its_comment() {
+        assert_eq!(tip_of("a", "b", None, None), "a \u{2192} b");
+        assert_eq!(tip_of("a", "b", Some("x"), Some("")), "a \u{2192} b.x");
+        assert_eq!(
+            tip_of("a", "b", None, Some("one\n  two\n\nthree\n")),
+            "a \u{2192} b\none two\nthree"
+        );
     }
 
     /// Lines that run side by side have their labels apart, each still on

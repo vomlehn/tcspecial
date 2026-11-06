@@ -592,6 +592,44 @@ pub fn drawing(anchor: (f32, f32), at: (f32, f32)) -> String {
 /// The shortest distance from `at` to the line, in pixels, or `None` for
 /// path data naming fewer than two points or that cannot be read.
 pub fn distance_to(route: &str, at: (f32, f32)) -> Option<f32> {
+    points_of(route)?
+        .windows(2)
+        .map(|run| from_segment(run[0], run[1], at))
+        .reduce(f32::min)
+}
+
+/// The smallest box a line drawn as a route lies in, which is what a window
+/// zoomed to the line has to show.
+///
+/// # Arguments
+///
+/// * `route` - The line as SVG path data, as [`drawn_route`] writes it.
+///
+/// # Returns
+///
+/// Its left, top, right and bottom, or `None` for path data that
+/// [`distance_to`] could not read either.
+pub fn bounds_of(route: &str) -> Option<(f32, f32, f32, f32)> {
+    let points = points_of(route)?;
+    Some(points.iter().fold(
+        (f32::MAX, f32::MAX, f32::MIN, f32::MIN),
+        |(left, top, right, bottom), &(x, y)| {
+            (left.min(x), top.min(y), right.max(x), bottom.max(y))
+        },
+    ))
+}
+
+/// Every point path data names, read as [`distance_to`] describes.
+///
+/// # Arguments
+///
+/// * `route` - The line as SVG path data.
+///
+/// # Returns
+///
+/// The points in order, or `None` for fewer than two or for data that
+/// cannot be read.
+fn points_of(route: &str) -> Option<Vec<(f32, f32)>> {
     let numbers: Vec<f32> = route
         .split_whitespace()
         .filter(|word| !word.chars().all(|c| c.is_ascii_alphabetic()))
@@ -600,12 +638,7 @@ pub fn distance_to(route: &str, at: (f32, f32)) -> Option<f32> {
     if !numbers.len().is_multiple_of(2) || numbers.len() < 4 {
         return None;
     }
-    let points: Vec<(f32, f32)> =
-        numbers.chunks(2).map(|pair| (pair[0], pair[1])).collect();
-    points
-        .windows(2)
-        .map(|run| from_segment(run[0], run[1], at))
-        .reduce(f32::min)
+    Some(numbers.chunks(2).map(|pair| (pair[0], pair[1])).collect())
 }
 
 /// How far a point is from a straight segment.
@@ -2152,5 +2185,14 @@ mod tests {
         assert_eq!(distance_to("", (0.0, 0.0)), None);
         assert_eq!(distance_to("M 1 2", (0.0, 0.0)), None);
         assert_eq!(distance_to("M 1 2 L x 3", (0.0, 0.0)), None);
+    }
+
+    /// A route is bounded by the points it names, and path data that is
+    /// not a line has no bounds.
+    #[test]
+    fn a_route_is_bounded_by_its_points() {
+        let route = drawn_route(&[(10.0, 40.0), (100.0, 40.0), (100.0, 5.0)]);
+        assert_eq!(bounds_of(&route), Some((10.0, 5.0, 100.0, 40.0)));
+        assert_eq!(bounds_of("M 1 2"), None);
     }
 }

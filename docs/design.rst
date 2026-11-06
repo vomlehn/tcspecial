@@ -4100,8 +4100,11 @@ room for the name. A physics connection is drawn between the two components
 it joins, and each simulated payload's ``connects`` between its component and
 the payload node, each from or to a terminal, the arrow the way
 the value goes: both dashed and in that purple, where a configuration's links
-are solid. tcspecial's visual window draws the same pane from the simulator
-file tcssim would read for the configuration, and only
+are solid. Neither is labelled, the lanes they run in being narrow; a pointer
+resting on one is told the terminal it is joined to in a tip, which is what
+tells a line into a thermal mass's ``heat`` from one into its ``heater_1``
+when both enter its one input box. tcspecial's visual window draws the same
+pane from the simulator file tcssim would read for the configuration, and only
 draws it. See ``tcsdiagram::physics``.
 
 The physics list is at the top of the selection column, its pane being the
@@ -4157,6 +4160,17 @@ is scaled. A drag, a line drawn, a node placed, a divider moved and the
 sheet scrolled are all still measured in the sheet's own pixels, so nothing
 that reads a position knows how large it is drawn. Half size is the floor
 because below it a node's type cannot be read.
+
+That is the size a window starts at, and **View -> Fit the width** goes back
+to it. The View menu's other entries choose a size outright: **Zoom to the
+drawing** fits every node and component in the view, **Zoom to the
+selection** the one node, line or component selected, and **Actual size**
+draws the sheet at its own size, keeping what is in the middle of the view
+there. A zoom chosen outright may be under a half -- somebody who asked to see
+the whole drawing is shown it -- and is never under a quarter, at which a node
+is a dot, nor over twice, at which one node fills a window. Zooming to
+something scrolls it to the middle of the view. Zoom to the selection, with
+nothing selected, is greyed rather than doing nothing.
 
 What that buys is a drawing that can be compared with last mission's. The three
 parts change on different schedules -- the ground is the other end of the link
@@ -4545,6 +4559,20 @@ A line's label is written at the middle of its longest run, and the lines of a
 bundle have their longest runs side by side, so their labels would be written
 over each other. A label that would cover one already written moves along its
 own run instead, its length at a time, to the first place that is clear.
+
+tcsgui writes neither a line's label nor its comment on the sheet. Moved clear
+of each other, labels still ran over the next bundle and over nodes, and a
+comment a paragraph long, the thermostat's over its two switches, was drawn
+across the log. A pointer resting on a line is shown a tip instead, over
+everything and at the window's own size whatever the zoom: the node the line
+leaves, the node it reaches and the input there where it names one -- which
+is what the labels said, the far node of a line to another page included --
+and under them the comment, whole, each paragraph run together to be wrapped
+at the tip's width. The tip is each line's own, so every line of a list a
+comment is written over says it, where the drawing wrote it on the first. The
+line a tip is about is found as a click finds one, so it is the line a click
+there would select. tcspecial's visual window, which nobody points at, still
+writes the labels and comments beside the lines.
 
 Two overlaps are not the router's to fix, and both are short. Two links
 leaving one terminal leave from the same point, so their first segments run
@@ -5314,7 +5342,8 @@ The menu bar holds what belongs to the configuration as a whole rather than to
 anything on the canvas -- there is nothing to press on a diagram that would mean
 "the configuration", or "the groups", or "the way out". **File** holds Save,
 Save as, the two kinds of group, and Exit; **Edit** holds the tcspecial
-parameters, arranging the nodes, and generating the Rust.
+parameters, arranging the nodes, and generating the Rust; **View** holds how
+large the sheet is drawn.
 
 Exit offers to write anything the files do not have before it goes, which is
 normally nothing. Four answers rather than two: *Save and leave*, *Save as and

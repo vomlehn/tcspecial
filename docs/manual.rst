@@ -1840,9 +1840,11 @@ runs the four, and ``make rmstubs`` runs the four that undo them: the stub
 module unloaded, and the simulated chip and dummy sensor this tree made taken
 down while another program's is left alone. It prints the bus to name in a configuration, which is
 numbered as adapters appear and so is not the same from one run to the next.
-The stub's chips are fixed when the module is loaded, which is why the address
-is the script's argument rather than something a configuration can choose
-afterwards: ``./bin/mki2c 0x50`` reloads it with a chip there.
+The stub's chips are fixed when the module is loaded, which is why their
+addresses are the script's arguments rather than something a configuration can
+choose afterwards: ``./bin/mki2c 0x50 0x51`` reloads it with chips there, up
+to ten of them. Given none, it makes the thermostat's two, at ``0x48`` and
+``0x49``.
 
 A SPI Payload
 -------------

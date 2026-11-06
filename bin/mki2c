@@ -23,16 +23,48 @@
 
 set -euo pipefail
 
-# The chip the stub answers for.
+# The chips the stub answers for, one an address.
 #
-# 0x48 because that is the address every message in the source offers as the
-# example, so a configuration written from those messages works against this
-# without being told a different number.
+# 0x48 and 0x49 by default, the thermostat's two sensors on I2C, temp_1 and
+# temp_2, which are where the examples and the manual's fixture put them;
+# 0x48 is also the address every message in the source offers as the example,
+# so a configuration written from those messages works against this without
+# being told a different number.
 #
-# The stub's chips are fixed when the module is loaded, so an address given
-# here is applied by reloading it. That is why the address is worth passing:
-#   ./bin/mki2c 0x50
-address="${1:-0x48}"
+# The stub's chips are fixed when the module is loaded, so the addresses given
+# here are applied by reloading it. That is why they are worth passing:
+#   ./bin/mki2c 0x50 0x51
+if [ "$#" -gt 0 ]; then
+	addresses=("$@")
+else
+	addresses=(0x48 0x49)
+fi
+
+# The stub takes at most ten chips, each at a 7-bit address outside the ones
+# the I2C specification reserves, 0x00 to 0x02 and 0x78 up. An address it
+# would refuse, or one given twice, is refused here, saying which, rather
+# than left to modprobe's "Invalid argument".
+if [ "${#addresses[@]}" -gt 10 ]; then
+	echo "mki2c: ${#addresses[@]} addresses given, and i2c-stub takes at" \
+		"most ten" >&2
+	exit 2
+fi
+seen=" "
+for address in "${addresses[@]}"; do
+	if ! [[ "$address" =~ ^0x[0-9a-fA-F]{1,2}$ ]] ||
+		(( address < 0x03 || address > 0x77 )); then
+		echo "mki2c: \"$address\" is not a 7-bit I2C address" \
+			"from 0x03 to 0x77, written in hex, such as" \
+			"0x48" >&2
+		exit 2
+	fi
+	if [[ "$seen" == *" $((address)) "* ]]; then
+		echo "mki2c: $address is given twice" >&2
+		exit 2
+	fi
+	seen+="$((address)) "
+done
+chip_addr="$(IFS=,; echo "${addresses[*]}")"
 
 # What find_stub() in tcssim matches an adapter's name against. The same
 # string, because a stub this script made and a stub tcssim will not recognise
@@ -64,8 +96,8 @@ here="$(cd -- "$(dirname -- "$0")" && pwd)"
 # module needs it, because without it there is no /dev/i2c-N to open.
 modprobe i2c-dev
 
-echo "mki2c: loading i2c-stub with a chip at $address"
-modprobe i2c-stub "chip_addr=$address"
+echo "mki2c: loading i2c-stub with chips at ${addresses[*]}"
+modprobe i2c-stub "chip_addr=$chip_addr"
 
 # Find what it became, the way tcssim finds it: the adapter whose name is the
 # stub's, lowest number first. Numeric names only -- some adapters are called
@@ -94,7 +126,7 @@ fi
 echo "mki2c: done"
 echo
 echo "  an I2C payload:   path: /dev/i2c-$stub"
-echo "                    bus_address: $address"
+echo "                    address: one of ${addresses[*]}"
 echo
 echo "The bus number is assigned as adapters appear, so it can differ from one"
 echo "run of this to the next; a payload set that names it has to name this."

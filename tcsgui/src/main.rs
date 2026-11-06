@@ -1488,12 +1488,34 @@ fn wire(
                 stop_joining(&window, &drawing);
                 return;
             };
+            // A line from a payload, clicked on a physics component: what
+            // the payload's simulation can be joined to there, as a line
+            // from the component to the payload would offer.
+            let dividers = views.borrow().divider.get();
+            let component =
+                payload_joins(&editor.borrow(), dividers, &home, &from, (x, y));
+            if let Some((component, meant)) = component {
+                if meant.is_empty() {
+                    window.set_join_hint(
+                        format!(
+                            "{component} has nothing this line can join. {}",
+                            in_hand(&from.terminal, from.holding.is_some())
+                        )
+                        .into(),
+                    );
+                    return;
+                }
+                let offers = physics_offers(&editor.borrow(), &meant);
+                window.set_join_heading(component.into());
+                window.set_join_offers(offers_model(&offers));
+                *asking.borrow_mut() = offers;
+                return;
+            }
             let document_node = {
                 let editor = editor.borrow();
                 let document = editor.document();
                 // A line taken on another page is no line on this
                 // one: see anchored.
-                let dividers = views.borrow().divider.get();
                 let anchor = anchored(document, &home, dividers, &from);
                 // The page's own edge, where a node of the page is
                 // shown outside it, named for the menu as the
@@ -5650,22 +5672,7 @@ fn wire_physics(
                 );
                 return;
             }
-            let offers: Vec<Offer> = meant
-                .iter()
-                .map(|(join, made)| {
-                    let edit = physics_edit(&editor.borrow(), join);
-                    match edit {
-                        Some(edit) if !made => Offer {
-                            said: join.said(),
-                            edit: Some(edit),
-                        },
-                        _ => Offer {
-                            said: format!("{} (joined already)", join.said()),
-                            edit: None,
-                        },
-                    }
-                })
-                .collect();
+            let offers = physics_offers(&editor.borrow(), &meant);
             window.set_join_heading("Join which?".into());
             window.set_join_offers(offers_model(&offers));
             *asking.borrow_mut() = offers;
@@ -5931,6 +5938,121 @@ fn physics_joins(
         }
     }
     Some(meant)
+}
+
+/// What a line drawn from a payload's terminal can mean, clicked down on a
+/// physics component: each terminal of the component the payload's
+/// simulation may be joined to, as a line drawn the other way would offer.
+///
+/// Which way the terminal faces settles which of the component's terminals:
+/// the `moc` terminals carry what drives a payload, which drives an input
+/// of the component -- a heater's switch, a zone's own heater -- and the
+/// `world` ones what it reports, which is an output it reports -- a zone's
+/// temperature. `tcslibgs::sim_config::may_join` says which of those a
+/// payload may join, as it does for a line drawn from the component.
+///
+/// # Arguments
+///
+/// * `editor`   - The session.
+/// * `dividers` - Where the panes are.
+/// * `home`     - The page clicked on: `None` for the top.
+/// * `from`     - The terminal the line was drawn from.
+/// * `at`       - Where it was clicked down, in the configuration's own
+///                coordinates, the Physics pane's being negative.
+///
+/// # Returns
+///
+/// The component clicked on and what the line can mean there, each with
+/// whether it is made already; `None` where no component is there, or the
+/// line is not from a payload with a simulator file to join it in.
+fn payload_joins(
+    editor: &Editor,
+    dividers: Dividers,
+    home: &Home,
+    from: &Drawing,
+    at: (f32, f32),
+) -> Option<(String, Vec<(PhysicsJoin, bool)>)> {
+    let (x, y) = at;
+    let document = editor.document();
+    let simulator = document.simulator.as_ref()?;
+    let node = document.node(&from.node)?;
+    if pane::pane_of(&node.node_type) != Pane::Payloads {
+        return None;
+    }
+    let (component, kind) = physics_places(editor, dividers, home)
+        .into_iter()
+        .find(|(_, _, place)| {
+            let (left, top) = (place.at.0 as f32, place.at.1 as f32);
+            x >= left
+                && x <= left + place.size.0 as f32
+                && y >= top
+                && y <= top + place.size.1 as f32
+        })
+        .map(|(name, kind, _)| (name, kind))?;
+    let way = if from.terminal.starts_with("moc-") {
+        tcslibgs::node::physics::terminal::Direction::In
+    } else {
+        tcslibgs::node::physics::terminal::Direction::Out
+    };
+    let payload = crate::sim::Simulator::key_of(&node.name);
+    let said = simulator
+        .payloads
+        .get(&payload)
+        .and_then(|settings| settings.get("connects"))
+        .map(String::as_str)
+        .unwrap_or_default();
+    let joined: Vec<&str> = tcslibgs::sim_config::terminals_of(said).collect();
+    let watches = watches_lines(&node.node_type);
+    let meant = tcslibgs::node::physics::terminals_of(&kind)
+        .unwrap_or_default()
+        .iter()
+        .filter(|terminal| {
+            terminal.direction == way
+                && tcslibgs::sim_config::may_join(watches, terminal)
+        })
+        .map(|terminal| {
+            let named = format!("{component}.{}", terminal.name);
+            let made = joined.contains(&named.as_str());
+            (
+                PhysicsJoin::Payload {
+                    payload: payload.clone(),
+                    terminal: named,
+                },
+                made,
+            )
+        })
+        .collect();
+    Some((component, meant))
+}
+
+/// What the menu offers for each thing a physics line can mean: its edit,
+/// or, for one made already, the reason it cannot be chosen.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `meant`  - Each thing it can mean, and whether it is made already.
+///
+/// # Returns
+///
+/// The offers, in the same order.
+fn physics_offers(
+    editor: &Editor,
+    meant: &[(PhysicsJoin, bool)],
+) -> Vec<Offer> {
+    meant
+        .iter()
+        .map(|(join, made)| match physics_edit(editor, join) {
+            Some(edit) if !made => Offer {
+                said: join.said(),
+                edit: Some(edit),
+            },
+            _ => Offer {
+                said: format!("{} (joined already)", join.said()),
+                edit: None,
+            },
+        })
+        .collect()
 }
 
 /// Whether a payload is a GPIO node watching lines, rather than only
@@ -8844,13 +8966,31 @@ mod tests {
 
         assert_eq!(
             joins(from("heater_1", true), middle_of("zone")),
-            [(
-                PhysicsJoin::Connection {
-                    from: "heater_1.heat".into(),
-                    to: "zone.heat".into(),
-                },
-                false
-            )]
+            [
+                (
+                    PhysicsJoin::Connection {
+                        from: "heater_1.heat".into(),
+                        to: "zone.heat".into(),
+                    },
+                    false
+                ),
+                // And whether it is heating, into one of the zone's own
+                // heaters' switches, a decision for a decision.
+                (
+                    PhysicsJoin::Connection {
+                        from: "heater_1.heating".into(),
+                        to: "zone.heater_1".into(),
+                    },
+                    false
+                ),
+                (
+                    PhysicsJoin::Connection {
+                        from: "heater_1.heating".into(),
+                        to: "zone.heater_2".into(),
+                    },
+                    false
+                )
+            ]
         );
         assert!(joins(from("zone", true), middle_of("zone")).is_empty());
         assert!(joins(from("zone", true), middle_of("heater_1")).is_empty());
@@ -8890,6 +9030,62 @@ mod tests {
             ),
             None,
             "bare sheet is nothing to ask about"
+        );
+
+        // And the other way about: a line from a payload's terminal,
+        // clicked on a component. What drives the payload drives an input
+        // there -- the zone's own heaters among them -- and what a watched
+        // line reports is a decision the component gives.
+        let on = |name: &str| {
+            let (_, _, place) = physics_places(&editor, dividers, &None)
+                .into_iter()
+                .find(|(component, ..)| component == name)
+                .expect("drawn");
+            (place.at.0 as f32 + 20.0, place.at.1 as f32 + 20.0)
+        };
+        let line = |node: &str, terminal: &str| Drawing {
+            node: node.into(),
+            terminal: terminal.into(),
+            holding: None,
+        };
+        let (component, meant) = payload_joins(
+            &editor,
+            dividers,
+            &None,
+            &line("lines-out", "moc-out"),
+            on("zone"),
+        )
+        .expect("a component there");
+        assert_eq!(component, "zone");
+        let offered: Vec<String> =
+            meant.iter().map(|(join, _)| join.said()).collect();
+        assert_eq!(
+            offered,
+            [
+                "lines-out with zone.heat",
+                "lines-out with zone.heater_1",
+                "lines-out with zone.heater_2"
+            ]
+        );
+        let (_, meant) = payload_joins(
+            &editor,
+            dividers,
+            &None,
+            &line("lines-in", "world-out"),
+            on("heater_2"),
+        )
+        .expect("a component there");
+        assert_eq!(meant, [(joined("lines-in", "heater_2.heating"), true)]);
+        assert_eq!(
+            payload_joins(
+                &editor,
+                dividers,
+                &None,
+                &line("lines-out", "moc-out"),
+                (900.0, 900.0)
+            ),
+            None,
+            "no component there"
         );
     }
 
@@ -12502,11 +12698,11 @@ mod tests {
         a_line_or_a_node_is_selected_by_a_right_click_and_deleted();
     }
 
-    /// A right click on a line or a node selects it, and nothing else; the
-    /// Delete key takes what is selected, a line at once and a node after
-    /// asking; a click of either button on bare sheet selects nothing; and a
-    /// left click on a line leaves the selection as it was, offering the
-    /// line's menu, whose Delete takes the line.
+    /// A click of either button on a line or a node selects it, a right
+    /// click opening its menu too; the Delete key takes what is selected, a
+    /// line at once and a node after asking; a click of either button on
+    /// bare sheet selects nothing; and the line's menu's Delete takes the
+    /// line.
     ///
     /// Through the window, as a person does it, for the markup's part: which
     /// presses reach the page under the shapes, and where on it they land.
@@ -12607,6 +12803,17 @@ mod tests {
                 position: at,
                 button,
             });
+            // A right click on a node or a line opens its menu, which the
+            // next click would only close, as a menu is closed everywhere:
+            // closed here as a person closes it, by Escape, to go on.
+            if button == PointerEventButton::Right {
+                let escape: slint::SharedString = Key::Escape.into();
+                ui.window().dispatch_event(WindowEvent::KeyPressed {
+                    text: escape.clone(),
+                });
+                ui.window()
+                    .dispatch_event(WindowEvent::KeyReleased { text: escape });
+            }
         };
         let delete = || {
             let text: slint::SharedString = Key::Delete.into();
@@ -12635,10 +12842,11 @@ mod tests {
         assert_eq!(ui.get_selected_link(), -1, "one thing at a time");
         assert!(views.borrow().deleting.is_none(), "and opens nothing");
 
-        // A left click on the line offers its menu and selects nothing.
+        // A left click on the line selects it as a right click does, and
+        // offers no menu: that is the right button's.
         click(on_line(), PointerEventButton::Left);
-        assert_eq!(ui.get_selected(), "sensor", "a left click on a line");
-        assert_eq!(ui.get_selected_link(), -1);
+        assert_eq!(ui.get_selected_link(), 0, "a left click on a line");
+        assert_eq!(ui.get_selected(), "");
         // The menu itself is a popup the test cannot reach into: closed,
         // as Escape closes it, and its Delete asked for as it would ask.
         let escape: slint::SharedString = Key::Escape.into();

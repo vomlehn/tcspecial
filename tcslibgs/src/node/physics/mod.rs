@@ -449,6 +449,24 @@ impl Resolution {
         }
     }
 
+    /// What is wrong with joining something to one of its terminals, where
+    /// its type has a rule about that: see
+    /// [`thermal_mass::Resolved::unpowered`].
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal` - The terminal joined, by name.
+    ///
+    /// # Returns
+    ///
+    /// What to say, or `None`.
+    pub fn joined_wrongly(&self, terminal: &str) -> Option<String> {
+        match self {
+            Resolution::ThermalMass(zone) => zone.unpowered(terminal),
+            _ => None,
+        }
+    }
+
     /// Its terminals, in its type's order.
     ///
     /// # Returns
@@ -1028,12 +1046,20 @@ components:
         }
     }
 
-    /// A line drawn from a heater to a zone can mean only its heat into the
-    /// zone's; one drawn the other way, or from a type there is none of,
+    /// A line drawn from a heater to a zone can mean its heat into the
+    /// zone's, or whether it is heating into one of the zone's own heaters'
+    /// switches; one drawn the other way, or from a type there is none of,
     /// means nothing; and every pair it offers is one a file may write.
     #[test]
     fn a_line_between_two_components_means_the_terminals_of_one_kind() {
-        assert_eq!(connectable("heater", "thermal_mass"), [("heat", "heat")]);
+        assert_eq!(
+            connectable("heater", "thermal_mass"),
+            [
+                ("heat", "heat"),
+                ("heating", "heater_1"),
+                ("heating", "heater_2")
+            ]
+        );
         assert!(connectable("thermal_mass", "heater").is_empty());
         assert!(connectable("nonesuch", "thermal_mass").is_empty());
         for from in TYPES {

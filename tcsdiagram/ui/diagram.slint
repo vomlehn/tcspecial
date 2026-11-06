@@ -572,7 +572,8 @@ export component NodeShape inherits Rectangle {
     // Shown by the grip below, at the point that was pressed, and not by this
     // area answering the pointer itself: the grip covers the whole node and
     // takes every press, so a ContextMenuArea's own right-click handling
-    // never sees one, which is as wanted -- a right click selects.
+    // never sees one: the grip shows it on a right click itself, having
+    // selected the node first.
     //
     // First among the node's children, so the grip and the terminals are
     // above it and a press reaches them.
@@ -611,11 +612,12 @@ export component NodeShape inherits Rectangle {
         pointer-event(event) => {
             if (event.kind == PointerEventKind.down
                 && event.button == PointerEventButton.right) {
-                // A right click selects this node and does nothing else, so
-                // that the Delete key has something to take: the same for a
-                // node as for a line, which has no left press of its own to
-                // be selected by.
+                // A right click selects this node, so that the Delete key has
+                // something to take, and offers its menu where it was
+                // pressed: the button every other program opens a menu with,
+                // the same for a node as for a line.
                 chosen();
+                menu.show({ x: self.mouse-x, y: self.mouse-y });
             }
             if (event.kind == PointerEventKind.down
                 && event.button == PointerEventButton.left) {
@@ -627,27 +629,20 @@ export component NodeShape inherits Rectangle {
             }
             if (event.kind == PointerEventKind.up
                 && event.button == PointerEventButton.left) {
-                // A left press that stayed put is a click, and it offers the
-                // same menu; one that moved is a drag, and the editor is told
-                // where the node went.
+                // A left press that stayed put is a click, which selected the
+                // node as it went down and does nothing more; one that moved
+                // is a drag, and the editor is told where the node went.
                 //
                 // "Stayed put" is within a few pixels, not exactly nowhere.
                 // The test here was that the release was at the very pixel of
                 // the press, which a hand on a mouse does not manage: every
                 // click carried a fraction of a pixel, every click was read as
-                // a drag, and the menu was unreachable by the gesture that was
-                // supposed to be its own. The same slack keeps a trembling
-                // click from recording a one-pixel move as an edit.
-                //
-                // Told apart here rather than in Rust because the menu has to
-                // be shown by the element that owns it, at the point that was
-                // pressed. Rust is told only about the drag, and still asks
-                // the same question of it -- a gesture that works out to no
-                // movement records no edit.
-                if (abs(self.mouse-x - self.pressed-x) <= root.slop
-                    && abs(self.mouse-y - self.pressed-y) <= root.slop) {
-                    menu.show({ x: self.mouse-x, y: self.mouse-y });
-                } else {
+                // a drag. The same slack keeps a trembling click from
+                // recording a one-pixel move as an edit. Rust is told only
+                // about the drag, and still asks the same question of it -- a
+                // gesture that works out to no movement records no edit.
+                if (abs(self.mouse-x - self.pressed-x) > root.slop
+                    || abs(self.mouse-y - self.pressed-y) > root.slop) {
                     dragged(self.mouse-x - self.pressed-x,
                             self.mouse-y - self.pressed-y);
                 }

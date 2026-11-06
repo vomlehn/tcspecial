@@ -4470,28 +4470,30 @@ nobody reads yet is on purpose. It is remembered by node and kind, so a concern
 that stops applying leaves both lists by itself and comes back if the line it
 was about is deleted -- nothing has to be tidied up after drawing.
 
-A click on a node opens a menu of what there is to do with it: **Edit**, which
+A right click on a node opens a menu of what there is to do with it: **Edit**, which
 opens the window of what the node says, and **Delete**, which asks before
 anything goes. A node is not in the menu bar -- that is for the configuration
 as a whole -- and it has nowhere else to put its own commands, so the node
 itself is where they are asked for. Edit is first because it is what nearly
-every click wants, and because it is what a click used to do on its own.
+every menu is opened for.
 
-A left click that moved nothing opens it: a press is how a drag starts, so a
-gesture that moved the node is a move and one that stayed put is this.
-Choosing a node is still the left press -- a node somebody has started to move
-is the node they are interested in -- so the node the menu is about is the node
-drawn as chosen while it is open. The grip that takes a drag covers the whole
-node and is above everything, so it takes every press on it and Slint's
-``ContextMenuArea`` underneath never sees one; the grip shows the menu by name.
+The right button opens it, as it opens a menu in every other program: a left
+click opening one was a menu nobody expected, under a hand that meant to
+select or to drag. A right click selects the node too, so the node the menu is
+about is the node drawn as chosen while it is open. A left press selects the
+node and starts a drag -- a node somebody has started to move is the node they
+are interested in -- and a left click that moved nothing does no more than
+select. The grip that takes a drag covers the whole node and is above
+everything, so it takes every press on it and Slint's ``ContextMenuArea``
+underneath never sees one; the grip shows the menu by name.
 
-A right click selects, and does nothing else: a node, a physics component or
-a line, outlined in the dark grey a selected node always was, a line by a
-wider line under it so that it still says which stream it carries. One thing
-is selected on a page at a time, and the Delete key, or Backspace, takes it --
-a line at once, a node after asking, as its menu's Delete does. A left click on
-a line opens a menu of its own, whose one item is Delete, and leaves the
-selection as it was. A click of either button anywhere else on the page
+A click of either button selects: a node, a physics component or a line,
+outlined in the dark grey a selected node always was, a line by a wider line
+under it so that it still says which stream it carries. One thing is selected
+on a page at a time, and the Delete key, or Backspace, takes it -- a line at
+once, a node after asking, as its menu's Delete does. A right click on a line
+selects it and opens a menu of its own, whose one item is Delete. A click of
+either button anywhere else on the page
 selects nothing, and closes whatever menu was open. A line is a ``Path``, and a
 press on a path is not reported, so the press goes to the page underneath,
 which asks which line runs within a few pixels of the point, by the line's
@@ -11466,6 +11468,19 @@ Requirement
     A type is written once, with a component under it. Each type's settings,
     terminals and rules are stated once, in ``tcslibgs::node::physics``; its
     arithmetic is the simulator's, in ``tcssim::physics``.
+
+Requirement
+    A ``thermal_mass`` has two heaters of its own, ``heater_1`` and
+    ``heater_2``: inputs taking a decision, each adding its stated
+    ``heater_1_power`` or ``heater_2_power`` to the mass's heat while it is
+    on. A heater's switch -- a ``gpio_out`` or a ``gpio_inout`` -- may then be
+    joined straight to the zone it warms, with no heater component between
+    them, where nothing about the heater needs modelling but its power. A
+    zone whose ``heater_N`` is joined and which states no power for it is
+    refused, told what to write: a heater that switched and warmed nothing
+    would be a model that looked right. Two, and fixed, because a
+    component's terminals are its type's, and two heaters on one zone is what
+    a vehicle that must not lose its only way to warm it carries.
 
 Requirement
     Nothing in a model is in an order that means anything: not the types,

@@ -1863,6 +1863,12 @@ impl SimConfigFile {
                         ),
                     ));
                 }
+                if let Some(why) = model.components[place.component]
+                    .what
+                    .joined_wrongly(&at.terminal)
+                {
+                    return Err(bad(&at.component, why));
+                }
                 if model.connections.iter().any(|c| c.to == place) {
                     return Err(bad(
                         &at.component,
@@ -1878,6 +1884,11 @@ impl SimConfigFile {
         for connection in &model.connections {
             joined.insert(connection.from.component);
             joined.insert(connection.to.component);
+            let to = &model.components[connection.to.component];
+            let terminal = to.what.terminals()[connection.to.terminal].name;
+            if let Some(why) = to.what.joined_wrongly(terminal) {
+                return Err(bad(&to.name, why));
+            }
         }
 
         for (n, component) in model.components.iter().enumerate() {
@@ -4483,6 +4494,32 @@ physics:
     const HEATER_1: &str = "connects: heater_1.on";
     const HEATER_2: &str = "connects: heater_2.on";
 
+    /// A payload joined straight to one of a zone's own heaters is refused
+    /// while the zone states no power for that heater, told what to write,
+    /// and is taken once it does.
+    #[test]
+    fn a_zones_own_heater_joined_needs_its_power() {
+        let mut file = joined(SENSOR, "connects: zone.heater_1", HEATER_2);
+        let err = file.physics().unwrap_err().to_string();
+        assert!(
+            err.contains("heater_1 is joined")
+                && err.contains("heater_1_power: \"4 W\""),
+            "{err}"
+        );
+
+        let powered = MODEL.replace(
+            "time_constant: 50 s",
+            "time_constant: 50 s\n          heater_1_power: \"4 W\"",
+        );
+        file.world =
+            Some(WorldSection::parse(&powered).expect("the model parses"));
+        let said = match file.physics() {
+            Ok(_) => String::new(),
+            Err(err) => err.to_string(),
+        };
+        assert!(!said.contains("heater_1_power"), "{said}");
+    }
+
     /// A simulator file that still declares its masses itself is refused,
     /// told where they go now; one naming a model in a file of its own is
     /// refused, told to move it in; and one with its model in its world
@@ -4765,6 +4802,8 @@ physics:
                     wander: None,
                     wander_time: None,
                     start: None,
+                    heater_1_power: None,
+                    heater_2_power: None,
                 },
             ),
         );

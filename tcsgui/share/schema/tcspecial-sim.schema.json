@@ -712,6 +712,20 @@
             "null"
           ],
           "description": "Where it starts, written with its unit: `292.15 K`. Left out, it starts at its surroundings, the world's ambient_temp."
+        },
+        "heater_1_power": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What its first heater of its own gives while its heater_1 is on, written with its unit: `4 W`. Wanted where heater_1 is joined."
+        },
+        "heater_2_power": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "And its second's, while heater_2 is on. Wanted where heater_2 is joined."
         }
       },
       "required": [

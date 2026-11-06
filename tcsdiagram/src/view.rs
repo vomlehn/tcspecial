@@ -576,6 +576,8 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
     // lines run together. Drawn on the first line of the list only, and kept
     // on all of them, so the file is written as it was.
     let mut commented: Vec<(&str, &str)> = Vec::new();
+    // The labels already placed, as boxes: see `label_box`.
+    let mut labelled: Vec<(f32, f32, f32, f32)> = Vec::new();
     lines
         .iter()
         .map(|line| {
@@ -619,8 +621,20 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
             let drawn = route::drawn_route(&points);
             let marker = route::marker_on(&points);
             // The label goes at the middle of the route's longest run, which
-            // is on the line wherever the line had to go.
-            let (label_x, label_y) = route::label_on(ends, &points);
+            // is on the line wherever the line had to go -- or along that run
+            // from the middle, where a label already placed is there: lines
+            // that run side by side have their middles side by side.
+            let size = label_size(&label);
+            let (label_x, label_y) = route::label_places(ends, &points, size)
+                .into_iter()
+                .find(|at| {
+                    let mine = label_box(*at, size);
+                    !labelled.iter().any(|theirs| overlap(mine, *theirs))
+                })
+                .unwrap_or_else(|| route::label_on(ends, &points));
+            if !label.is_empty() {
+                labelled.push(label_box((label_x, label_y), size));
+            }
             taken.push(points);
 
             LinkLook {
@@ -645,6 +659,65 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
             }
         })
         .collect()
+}
+
+/// About how much room a link's label takes, in pixels: as wide as its
+/// letters and one line of the window's type tall.
+///
+/// An estimate, because the width of a string is the toolkit's to know and
+/// this is worked out before anything is drawn. Generous rather than tight:
+/// labels kept a little further apart than they needed to be are still read,
+/// where two that touch are not.
+///
+/// # Arguments
+///
+/// * `label` - What the label says.
+///
+/// # Returns
+///
+/// Its width and height; nothing for no label.
+fn label_size(label: &str) -> (f32, f32) {
+    // Twelve points is sixteen pixels; a letter is about half of that wide,
+    // and a line a third again as tall.
+    const LETTER: f32 = 8.0;
+    const LINE: f32 = 21.0;
+    if label.is_empty() {
+        (0.0, 0.0)
+    } else {
+        (label.chars().count() as f32 * LETTER, LINE)
+    }
+}
+
+/// Where a label put at `at` is drawn, as its left, top, right and bottom.
+///
+/// The markup writes a label from `at` rightwards, its top fourteen pixels
+/// above it: see `ui/diagram.slint`.
+///
+/// # Arguments
+///
+/// * `at`   - Where the label is put, in pixels.
+/// * `size` - Its width and height, as `label_size` gives them.
+///
+/// # Returns
+///
+/// The box.
+fn label_box(at: (f32, f32), size: (f32, f32)) -> (f32, f32, f32, f32) {
+    let top = at.1 - 14.0;
+    (at.0, top, at.0 + size.0, top + size.1)
+}
+
+/// Whether two boxes overlap, edges touching not counted.
+///
+/// # Arguments
+///
+/// * `a` - One box, as `label_box` gives it.
+/// * `b` - The other.
+///
+/// # Returns
+///
+/// Whether some area is in both.
+fn overlap(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> bool {
+    a.0 < b.2 && b.0 < a.2 && a.1 < b.3 && b.1 < a.3
 }
 
 #[cfg(test)]
@@ -687,6 +760,45 @@ mod tests {
             .map(|look| look.comment)
             .collect();
         assert_eq!(drawn, [said, "", said]);
+    }
+
+    /// Lines that run side by side have their labels apart, each still on
+    /// its own line, where at the middles of their runs the labels were
+    /// written over each other.
+    #[test]
+    fn the_labels_of_lines_side_by_side_do_not_overlap() {
+        let at = |name: &'static str, node_type, x, y| OnSheet {
+            name: name.into(),
+            node_type,
+            at: (x, y),
+            here: true,
+            drawn: Drawn::Itself,
+        };
+        let nodes =
+            [at("sensor", "i2c", 40, 40), at("mean", "compute", 400, 400)];
+        let line = |input| LineOnSheet {
+            from: "sensor",
+            origin: Some("world-out"),
+            to: "mean",
+            input: Some(input),
+            comment: None,
+        };
+        let lines = [line("in0"), line("in1"), line("in2"), line("in3")];
+        let looks = link_looks(&nodes, &lines);
+        let boxes: Vec<_> = looks
+            .iter()
+            .map(|look| {
+                label_box((look.label_x, look.label_y), label_size(&look.label))
+            })
+            .collect();
+        for (n, one) in boxes.iter().enumerate() {
+            for two in &boxes[n + 1..] {
+                assert!(
+                    !overlap(*one, *two),
+                    "labels over each other: {boxes:?}"
+                );
+            }
+        }
     }
 
     /// A compute node's type line names its function, and every other node's

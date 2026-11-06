@@ -86,7 +86,10 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
   is built, tested and documented as C/C++.
 - Configurations are YAML or XML, chosen by the file's extension. The two
   spellings of a configuration must say the same thing, so change both
-  together. `tcsverify a.xtcs a.ytcs a-sim.yaml` compares them.
+  together. `tcsverify a.xtcs a.ytcs a-sim.yaml` compares them, and
+  `make comparespellings`, part of `make check`, compares every shipped
+  pair. tcsgui writes both spellings when both exist; an edit by hand
+  is made to both.
 
 ## Building and testing
 

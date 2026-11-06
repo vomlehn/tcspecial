@@ -13571,6 +13571,20 @@ Requirement
     decision.
 
 Requirement
+    What tcsmoc started ends when tcsmoc ends, however it ends. Quit, the
+    close box, SIGINT and SIGTERM stop tcssim and tcspecial and then exit;
+    a tcsmoc killed outright, or one that panics, never runs that code, so
+    each child is also given the kernel's parent-death signal, SIGTERM, and
+    ends with it. Under ``cargo run`` the signal reaches the program itself,
+    cargo replacing itself with it. The children are started from tcsmoc's
+    main thread, the signal being sent when the starting thread ends. See
+    ``dies_with_the_moc`` in ``tcsmoc/src/main.rs``.
+
+A child left behind holds the command ports, the beacon socket and every
+payload's port, and the next tcsmoc on that configuration fails to bind them
+-- or, worse, attaches to the stale tcspecial and runs against it.
+
+Requirement
     A ``START_NODE`` for a node tcspecial does not have says which id came
     in, how many nodes this tcspecial does serve, and that the two ends are
     reading different configurations.

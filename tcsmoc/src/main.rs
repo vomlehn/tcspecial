@@ -584,11 +584,57 @@ fn child_command(
     if let Some(program) = child_program(name, installed)? {
         let mut command = Command::new(program);
         command.args([flag.as_str(), payload_path]);
+        dies_with_the_moc(&mut command);
         return Ok(command);
     }
     let mut command = Command::new("cargo");
     command.args(["run", "--bin", name, "--", &flag, payload_path]);
+    dies_with_the_moc(&mut command);
     Ok(command)
+}
+
+/// Has the kernel stop a child when the MOC ends, however it ends.
+///
+/// Quit, the close box and a signal stop the children already, but a MOC
+/// that ends without running that code -- killed with SIGKILL, or a panic on
+/// a thread of its own -- left tcspecial and tcssim running, holding the
+/// command ports, the beacon socket and every payload's port, which the next
+/// MOC on that configuration then failed to bind. The kernel's parent-death
+/// signal stops them whatever happened to the MOC.
+///
+/// SIGTERM rather than SIGKILL, so that tcspecial ends as it ends when told
+/// to by a person. It reaches the program itself under `cargo run` as well,
+/// cargo replacing itself with the program it ran, and the signal surviving
+/// that exec.
+///
+/// The signal is sent when the thread that started the child ends, not the
+/// process: so children are started from the MOC's main thread, which lasts
+/// as long as the MOC does. A MOC that ended between the fork and the prctl
+/// would never send it, so the child checks that its parent is still the
+/// MOC and does not start where it is not.
+///
+/// # Arguments
+///
+/// * `command` - The child's command, not yet started.
+fn dies_with_the_moc(command: &mut Command) {
+    use std::os::unix::process::CommandExt;
+
+    let moc = std::process::id() as libc::pid_t;
+    // SAFETY: prctl and getppid are async-signal-safe, and touch nothing of
+    // this process's but the child's own death signal.
+    unsafe {
+        command.pre_exec(move || {
+            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            if libc::getppid() != moc {
+                return Err(std::io::Error::other(
+                    "the MOC that started it has already ended",
+                ));
+            }
+            Ok(())
+        });
+    }
 }
 
 /// Where an installed MOC's child is: beside the MOC.
@@ -1093,6 +1139,37 @@ pub(crate) fn stop_if_asked(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A child is sent SIGTERM when what started it ends, however it ends.
+    /// The kernel sends it when the starting thread ends, so a thread that
+    /// starts a child and returns stands in for a MOC killed outright.
+    #[test]
+    fn a_child_is_stopped_when_what_started_it_ends() {
+        use std::os::unix::process::ExitStatusExt;
+        use std::time::Instant;
+
+        let mut child = thread::spawn(|| {
+            let mut command = Command::new("sleep");
+            command.arg("30");
+            dies_with_the_moc(&mut command);
+            command.spawn().expect("sleep starts")
+        })
+        .join()
+        .expect("the starting thread ends");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = child.try_wait().expect("waited on") {
+                assert_eq!(status.signal(), Some(libc::SIGTERM), "{status}");
+                return;
+            }
+            if Instant::now() > deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("the child outlived what started it");
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
 
     use std::ffi::OsStr;
     use std::path::Path;

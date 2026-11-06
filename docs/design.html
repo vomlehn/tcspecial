@@ -13596,6 +13596,20 @@ something else may still be using it, and shutting down a command
 interpreter because a ground display was closed is not the display's
 decision.</dd>
 <dt>Requirement</dt>
+<dd>What tcsmoc started ends when tcsmoc ends, however it ends. Quit, the
+close box, SIGINT and SIGTERM stop tcssim and tcspecial and then exit;
+a tcsmoc killed outright, or one that panics, never runs that code, so
+each child is also given the kernel's parent-death signal, SIGTERM, and
+ends with it. Under <tt class="docutils literal">cargo run</tt> the signal reaches the program itself,
+cargo replacing itself with it. The children are started from tcsmoc's
+main thread, the signal being sent when the starting thread ends. See
+<tt class="docutils literal">dies_with_the_moc</tt> in <tt class="docutils literal">tcsmoc/src/main.rs</tt>.</dd>
+</dl>
+<p>A child left behind holds the command ports, the beacon socket and every
+payload's port, and the next tcsmoc on that configuration fails to bind them
+-- or, worse, attaches to the stale tcspecial and runs against it.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
 <dd>A <tt class="docutils literal">START_NODE</tt> for a node tcspecial does not have says which id came
 in, how many nodes this tcspecial does serve, and that the two ends are
 reading different configurations.</dd>

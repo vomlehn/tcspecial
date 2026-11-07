@@ -121,8 +121,9 @@ under `some` and `all`; the old name, `stand_in`, is refused.
 The GUIs and tcspecial may be launched when what is being checked can only be
 seen by running them, but `cargo test` comes first. They bind fixed ports:
 commands on 4000, payload commands on 4200, beacons on 5550 and 5650, payload
-telemetry on 6000 and 6100. tcsmoc starts tcspecial and tcssim itself, so
-killing tcsmoc can leave them running; look for strays afterwards.
+telemetry on 6000 and 6100. tcsmoc starts tcspecial and tcssim itself, and
+they are sent SIGTERM when it ends, however it ends, even by `kill -9`. Ones
+started some other way are not, so look for strays on those ports afterwards.
 
 ## Working in this tree
 

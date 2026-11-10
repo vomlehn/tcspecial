@@ -2797,8 +2797,8 @@ ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.</p>
 <p><tt class="docutils literal">doppler</tt>, a Doppler velocimeter, sends the velocity five times a second,
 which <tt class="docutils literal">descent_rate</tt> makes metres a second, for the ground.
-Guidance does not take it: a process takes values in one unit, and guidance
-takes metres. <tt class="docutils literal">touchdown</tt> is a switch on a landing leg, sending <tt class="docutils literal">1</tt> on
+Guidance does not take it: a process takes the one type its <tt class="docutils literal"><span class="pre">type-in</span></tt>
+states, and guidance's is <tt class="docutils literal">metre</tt>. <tt class="docutils literal">touchdown</tt> is a switch on a landing leg, sending <tt class="docutils literal">1</tt> on
 the ground and <tt class="docutils literal">0</tt> off it, straight to the ground.</p>
 <p>The physics model, in the world of <tt class="docutils literal"><span class="pre">descent-sim.yaml</span></tt>, is an <tt class="docutils literal">engine</tt> of four and a
 half kilonewtons with a hundred kilograms of fuel, and a <tt class="docutils literal">body</tt> of a tonne

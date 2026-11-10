@@ -51,10 +51,11 @@ use tcslibgs::unit::Unit;
 
 /// The most a computation hands on at once.
 ///
-/// Every computation's result is a value -- four bytes, see
-/// `tcslibgs::node::vehicle::compute::VALUE_BYTES` -- or a decision of one
-/// byte, so this is room to spare rather than a limit anything meets.
-pub const OUT_BYTES: usize = 16;
+/// A built-in's result is a value -- four bytes, see
+/// `tcslibgs::node::vehicle::compute::VALUE_BYTES` -- or a decision of at
+/// most eight; a program's may be a structure, at most sixteen fields of at
+/// most eight bytes each, which is this.
+pub const OUT_BYTES: usize = 128;
 
 /// What a computation hands on: a few bytes, held in place.
 ///
@@ -92,6 +93,25 @@ impl Out {
             bytes,
             len: value.len(),
         })
+    }
+
+    /// These bytes, a datum of a computation's type: a structure is at
+    /// most sixteen fields of at most eight bytes each.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The datum, at most [`OUT_BYTES`].
+    ///
+    /// # Returns
+    ///
+    /// The datum.
+    pub fn of_bytes(data: &[u8]) -> Out {
+        let mut bytes = [0u8; OUT_BYTES];
+        bytes[..data.len()].copy_from_slice(data);
+        Out {
+            bytes,
+            len: data.len(),
+        }
     }
 
     /// One byte.
@@ -326,7 +346,7 @@ pub fn make(
             // The node's own wakeup, so that disabling the node gives up the
             // wait for an answer rather than waiting out a deadline that may
             // be seconds long.
-            let mut program = process::Process::of(params.clone(), reads()?)
+            let mut program = process::Process::of(params.clone())
                 .abandoned_for(abandon.clone());
             program
                 .start()

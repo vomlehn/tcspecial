@@ -740,9 +740,11 @@ pub struct ProcessParams {
     pub executable: String,
     pub timeout: Duration,
     pub restart: Restart,
-    /// What the program's answers are numbers of, which nothing else can
-    /// say: it is a program, and what it computes is its own business.
-    pub unit: Unit,
+    /// What the program is handed, as a line of text: its `type-in`.
+    pub takes: LinkType,
+    /// What its answers are, which nothing else can say -- it is a program,
+    /// and what it computes is its own business: its `type-out`.
+    pub sends: LinkType,
 }
 
 /// What a compute node computes, settled.
@@ -1089,14 +1091,29 @@ pub fn params_of(
                 Restart::of(attributes.get("restart").map(Scalar::as_str))
                     .map_err(named)?;
 
-            value_type(attributes, "type-in").map_err(named)?;
-            let unit = value_type(attributes, "type-out").map_err(named)?;
+            // Any type with a text form, which a program reads and writes:
+            // see `crate::link_text`.
+            let texted = |name: &str| {
+                let kind = stated_type(attributes, name).map_err(named)?;
+                if crate::link_text::has_text(&kind) {
+                    Ok(kind)
+                } else {
+                    Err(named(format!(
+                        "{name} is {kind}, which has no text form for a \
+                         program to read or write: a value, a whole number, \
+                         a boolean or a structure of them"
+                    )))
+                }
+            };
+            let takes = texted("type-in")?;
+            let sends = texted("type-out")?;
 
             Ok(Computation::Process(ProcessParams {
                 executable,
                 timeout,
                 restart,
-                unit,
+                takes,
+                sends,
             }))
         }
         // Covered by the match above, which refuses a function this does not
@@ -1732,7 +1749,8 @@ mod tests {
                 executable: "/opt/flight/attitude".to_string(),
                 timeout: Duration::from_millis(500),
                 restart: Restart::Never,
-                unit: Unit::Ratio,
+                takes: LinkType::Basic(Basic::Value(Unit::Kelvin)),
+                sends: LinkType::Basic(Basic::Value(Unit::Ratio)),
             })
         );
 

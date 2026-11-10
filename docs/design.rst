@@ -617,8 +617,8 @@ Typed links
    reported as one unsigned whole number, a bit outside them refused; and
    a thermal mass's heater on where what it is driven with is not nought.
    A ``gpio_in`` reports its lines' levels as that number every
-   ``state_interval``, and has no edges. Still to come: a ``process``'s text
-   forms, apps' packets, the F´ and cFS bridges'
+   ``state_interval``, and has no edges. A ``process`` exchanges any type
+   with a text form. Still to come: apps' packets, the F´ and cFS bridges'
    channels of each type -- a whole number is still a ``Datum`` channel
    there -- and each configuration's own XTCE. Where
    the rest of this section and the rest of this document disagree, the
@@ -2591,17 +2591,19 @@ per answer on its standard output:
    out:                 an empty line: nothing to send yet
 
 Requirement
-    The program is handed lines and answers in lines, in decimal, in the
-    units the graph says: what it is handed in the unit of what feeds it, and
-    its answers in the ``unit`` the node states. A value on a link is four
-    bytes of a count of steps, and tcspecial converts at the pipe in
-    both directions: a line is what every language reads without a library,
-    which is the point of this type of node existing at all, and a program that
-    had to unpack a binary integer and scale it would not be writable in
-    a shell. Nothing is lost by the trip -- a value is a whole number of
-    its unit's steps, so the decimal places say all of it -- and a program's answer
-    is held to the range a reading is held to, with the complaint naming the
-    program.
+    The program is handed lines and answers in lines: what it is handed of
+    the node's ``type-in``, and its answers of its ``type-out``, each
+    written in that type's one text form (`Programs at the edge`_) -- a
+    value in decimal in its unit, a whole number in decimal, a ``boolean`` as
+    ``1`` or ``0``, a structure as ``name=value`` fields. tcspecial converts at
+    the pipe in both directions: a line is what every language reads without
+    a library, which is the point of this type of node existing at all, and a
+    program that had to unpack a binary integer and scale it would not be
+    writable in a shell. Nothing is lost by the trip -- a value is a whole
+    number of its unit's steps, so the decimal places say all of it -- and a
+    program's answer is held to its type, a value to the range a reading is
+    held to, with the complaint naming the program. A string or bytes has no
+    text form, and a ``process`` stating one is refused.
 
 Requirement
     An empty line is the program saying "nothing to send yet", and is the same

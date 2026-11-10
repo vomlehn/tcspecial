@@ -2494,8 +2494,8 @@ and the lander drops the rest.
 
 ``doppler``, a Doppler velocimeter, sends the velocity five times a second,
 which ``descent_rate`` makes metres a second, for the ground.
-Guidance does not take it: a process takes values in one unit, and guidance
-takes metres. ``touchdown`` is a switch on a landing leg, sending ``1`` on
+Guidance does not take it: a process takes the one type its ``type-in``
+states, and guidance's is ``metre``. ``touchdown`` is a switch on a landing leg, sending ``1`` on
 the ground and ``0`` off it, straight to the ground.
 
 The physics model, in the world of ``descent-sim.yaml``, is an ``engine`` of four and a

@@ -1155,8 +1155,8 @@ takes (<a class="reference internal" href="#type-and-encoding">Type and encoding
 reported as one unsigned whole number, a bit outside them refused; and
 a thermal mass's heater on where what it is driven with is not nought.
 A <tt class="docutils literal">gpio_in</tt> reports its lines' levels as that number every
-<tt class="docutils literal">state_interval</tt>, and has no edges. Still to come: a <tt class="docutils literal">process</tt>'s text
-forms, apps' packets, the F´ and cFS bridges'
+<tt class="docutils literal">state_interval</tt>, and has no edges. A <tt class="docutils literal">process</tt> exchanges any type
+with a text form. Still to come: apps' packets, the F´ and cFS bridges'
 channels of each type -- a whole number is still a <tt class="docutils literal">Datum</tt> channel
 there -- and each configuration's own XTCE. Where
 the rest of this section and the rest of this document disagree, the
@@ -3084,17 +3084,19 @@ out:                 an empty line: nothing to send yet
 </pre>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The program is handed lines and answers in lines, in decimal, in the
-units the graph says: what it is handed in the unit of what feeds it, and
-its answers in the <tt class="docutils literal">unit</tt> the node states. A value on a link is four
-bytes of a count of steps, and tcspecial converts at the pipe in
-both directions: a line is what every language reads without a library,
-which is the point of this type of node existing at all, and a program that
-had to unpack a binary integer and scale it would not be writable in
-a shell. Nothing is lost by the trip -- a value is a whole number of
-its unit's steps, so the decimal places say all of it -- and a program's answer
-is held to the range a reading is held to, with the complaint naming the
-program.</dd>
+<dd>The program is handed lines and answers in lines: what it is handed of
+the node's <tt class="docutils literal"><span class="pre">type-in</span></tt>, and its answers of its <tt class="docutils literal"><span class="pre">type-out</span></tt>, each
+written in that type's one text form (<a class="reference internal" href="#programs-at-the-edge">Programs at the edge</a>) -- a
+value in decimal in its unit, a whole number in decimal, a <tt class="docutils literal">boolean</tt> as
+<tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, a structure as <tt class="docutils literal">name=value</tt> fields. tcspecial converts at
+the pipe in both directions: a line is what every language reads without
+a library, which is the point of this type of node existing at all, and a
+program that had to unpack a binary integer and scale it would not be
+writable in a shell. Nothing is lost by the trip -- a value is a whole
+number of its unit's steps, so the decimal places say all of it -- and a
+program's answer is held to its type, a value to the range a reading is
+held to, with the complaint naming the program. A string or bytes has no
+text form, and a <tt class="docutils literal">process</tt> stating one is refused.</dd>
 <dt>Requirement</dt>
 <dd>An empty line is the program saying &quot;nothing to send yet&quot;, and is the same
 answer a built-in gives by handing back nothing. A computation over several

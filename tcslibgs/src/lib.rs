@@ -48,6 +48,8 @@ pub mod link;
 /// The ordinary commands' and answers' packing code, which tcs-xtce
 /// generated from `xtce/link.xtce`: used through [`link`].
 mod link_packet;
+/// A link's types as a program reads and writes them, a line of text.
+pub mod link_text;
 /// The type a link between two nodes carries: see "Typed links" in
 /// `docs/design.rst`.
 pub mod link_type;

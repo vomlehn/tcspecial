@@ -53,8 +53,9 @@ use std::time::{Duration, Instant};
 use nix::poll::{poll, PollFd, PollFlags};
 
 use crate::runtime::node_state::Abandon;
+use tcslibgs::link_text::{read_text, write_text};
+use tcslibgs::link_type::LinkType;
 use tcslibgs::node::vehicle::compute::{ProcessParams, Restart};
-use tcslibgs::unit::Unit;
 
 use super::{Function, Out};
 
@@ -104,10 +105,10 @@ pub struct Process {
     answer: Vec<u8>,
     /// The program's name in quotes, as a complaint about its answer names it.
     quoted: String,
-    /// What the values handed to the program are numbers of.
-    reads: Unit,
-    /// What its answers are numbers of, as the node states.
-    answers: Unit,
+    /// What the program is handed, written as a line: its `type-in`.
+    takes: LinkType,
+    /// What its answers are, read from a line: its `type-out`.
+    sends: LinkType,
 }
 
 /// Room for a line to the program and its answer: a value as decimal text,
@@ -127,18 +128,17 @@ impl Process {
     /// # Arguments
     ///
     /// * `params` - The program, how long it has to answer, whether it is
-    ///              started again when it stops, and what its answers are
-    ///              numbers of.
-    /// * `reads`  - What the values handed to it are numbers of.
+    ///              started again when it stops, and the types it is handed
+    ///              and answers.
     ///
     /// # Returns
     ///
     /// The node, its program not started and with nothing to abandon a
     /// wait for.
-    pub fn of(params: ProcessParams, reads: Unit) -> Process {
+    pub fn of(params: ProcessParams) -> Process {
         Process {
-            reads,
-            answers: params.unit,
+            takes: params.takes,
+            sends: params.sends,
             quoted: format!("\"{}\"", params.executable),
             executable: params.executable,
             timeout: params.timeout,
@@ -495,27 +495,22 @@ impl Function for Process {
             self.start()?;
         }
 
-        // What the program reads: the value as a decimal, and the input's name
+        // What the program reads: the datum as text, and the input's name
         // where the link gave one. See the module comment.
         //
-        // The value arrives as four bytes of micro-kelvin -- see
-        // `super::as_value` -- and goes to the program as text, because the
-        // far end is a program reading lines. This is the one boundary where a
-        // value is written out and read back, and both halves of it are here:
-        // the number this writes and the number the answer is read as.
+        // The datum arrives as its type's own layout and goes to the program
+        // as text, because the far end is a program reading lines: see
+        // `tcslibgs::link_text`. This is the one boundary where a datum is
+        // written out and read back, and both halves of it are here.
         //
-        // Written into the node's own line, which `as_text` would have made a
-        // string of: the same decimal, by the same `Display`.
-        let datum = super::from_value(data, self.reads, "what arrived")?;
+        // Written into the node's own line, which keeps its room.
         self.line.clear();
-        {
-            use std::fmt::Write as _;
-            // Writing to a String does not fail.
-            let _ = match input {
-                Some(input) => writeln!(self.line, "{input}={datum}"),
-                None => writeln!(self.line, "{datum}"),
-            };
+        if let Some(input) = input {
+            self.line.push_str(input);
+            self.line.push('=');
         }
+        write_text(&self.takes, data, &mut self.line)?;
+        self.line.push('\n');
 
         match self.ask() {
             // The program's answer is a number it wrote as text, and what
@@ -527,9 +522,10 @@ impl Function for Process {
                         self.executable
                     )
                 })?;
-                let number =
-                    super::from_text(said, self.answers, &self.quoted)?;
-                Ok(Some(Out::value(number, self.answers)?))
+                let mut answer = [0u8; super::OUT_BYTES];
+                let n =
+                    read_text(&self.sends, said, &self.quoted, &mut answer)?;
+                Ok(Some(Out::of_bytes(&answer[..n])))
             }
             Ok(false) => Ok(None),
             Err(why) => {
@@ -585,6 +581,7 @@ impl Drop for Process {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tcslibgs::link_type::Basic;
     // What a program is handed and what it answers with: a value on the link
     // and a decimal in the pipe. See `give`.
     use crate::node::vehicle::compute::{as_value, from_value};
@@ -619,15 +616,15 @@ mod tests {
         timeout: Duration,
         restart: Restart,
     ) -> Process {
-        Process::of(
-            ProcessParams {
-                executable: executable.to_string(),
-                timeout,
-                restart,
-                unit: tcslibgs::unit::Unit::Kelvin,
-            },
-            tcslibgs::unit::Unit::Kelvin,
-        )
+        let kelvin =
+            LinkType::Basic(Basic::Value(tcslibgs::unit::Unit::Kelvin));
+        Process::of(ProcessParams {
+            executable: executable.to_string(),
+            timeout,
+            restart,
+            takes: kelvin.clone(),
+            sends: kelvin,
+        })
     }
 
     /// A program told nothing is a program left stopped.
@@ -822,6 +819,31 @@ mod tests {
     /// The program answers 1 for a line that begins with the name and 0 for
     /// one that does not, because what it answers with is a number: the line
     /// itself is not one, and a program that echoed it would be answering
+    /// A program handed a whole number reads it in decimal, and one that
+    /// answers a structure writes its fields as name=value: each type's one
+    /// text form, both ways. An answer that is not the type is refused.
+    #[test]
+    fn a_program_reads_and_writes_each_types_text() {
+        let (_where, name) = program(
+            "while read line; do case \"$line\" in 7) echo x=-3 on=1;; \
+             *) echo x=nought;; esac; done\n",
+        );
+        let mut p = Process::of(ProcessParams {
+            executable: name,
+            timeout: Duration::from_secs(2),
+            restart: Restart::Never,
+            takes: LinkType::of("u8").expect("a type"),
+            sends: LinkType::of("x: i16, on: boolean").expect("a type"),
+        });
+        start_despite_the_race(&mut p);
+
+        let out = p.give(None, &[7]).expect("an answer").expect("a datum");
+        assert_eq!(&out[..], &[0xff, 0xfd, 1], "x is -3 and on is 1");
+
+        let why = p.give(None, &[8]).expect_err("not a structure");
+        assert!(why.contains("computation"), "{why}");
+    }
+
     /// with something this cannot read as a value.
     #[test]
     fn a_named_input_arrives_named() {

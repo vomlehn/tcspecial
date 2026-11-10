@@ -2740,6 +2740,57 @@ gateways:
         assert_eq!(why, ["sensor is in another file", "nobody is not a node"]);
     }
 
+    /// A line to one of a vote's named inputs arrives at its `world-in`.
+    ///
+    /// `vote.in0` names an input of the vote, not a terminal, so the
+    /// export it needs is the vote's `world-in`: a file exporting that is
+    /// joined, and one that does not is told to add the vote to
+    /// `world-in`, never to an `in0` no exports section can have.
+    #[test]
+    fn a_line_to_a_named_input_crosses_at_world_in() {
+        use crate::graph::check::Problem;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let top = where_.path().join("vehicle.ytcs");
+        std::fs::write(
+            &top,
+            "include:\n  - subdiagram: zone\n    path: zone\n\
+             gateways:\n  - type gateway_radio:\n      \
+             - gateway: ground\n        world-in: [vote]\n\
+             payloads:\n  - type i2c:\n      - payload: sensor\n        \
+             world-out:\n          - vote.in0\n",
+        )
+        .unwrap();
+        let zone = |exports: &str| {
+            std::fs::write(
+                where_.path().join("zone.ytcs"),
+                format!(
+                    "{exports}vehicle:\n  - type compute:\n      \
+                     - compute: vote\n        function: \"vote\"\n        \
+                     algorithm: \"median\"\n        world-in: [in0]\n        \
+                     world-out:\n          - ground.vote\n"
+                ),
+            )
+            .unwrap();
+            Graph::load(&top)
+                .expect("it loads")
+                .check()
+                .into_iter()
+                .filter(|p| matches!(p, Problem::NotExported { .. }))
+                .map(|p| p.describe())
+                .collect::<Vec<_>>()
+        };
+
+        let said = zone("exports:\n  world-out: [vote]\n");
+        assert_eq!(said.len(), 1, "{said:?}");
+        assert!(
+            said[0].contains("add \"vote\" to world-in under exports"),
+            "{said:?}"
+        );
+        assert!(zone("exports:\n  world-in: [vote]\n  world-out: [vote]\n")
+            .is_empty());
+    }
+
     /// A top file has nothing around it, so nothing to export to.
     #[test]
     fn a_top_file_may_not_export() {

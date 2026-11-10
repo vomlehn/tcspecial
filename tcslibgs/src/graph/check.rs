@@ -805,13 +805,18 @@ impl Graph {
             let Some(leaving) = self.node(&origin.node) else {
                 continue;
             };
+            // A computation's end may name one of its own inputs or
+            // outputs, a vote's `in0`, which is no terminal: an export is
+            // of one of the four, so such an end is taken as the terminal
+            // the other end's stream pairs with, as an unnamed one is.
             let leaves = terminals::terminal_at(
                 &leaving.node_type,
                 origin.input.as_deref(),
                 false,
             )
             .ok()
-            .flatten();
+            .flatten()
+            .filter(|t| terminals::stream_of(t).is_some());
             for destination in link.to.each() {
                 let Destination { node, input } =
                     Destination::parse(destination);
@@ -824,7 +829,8 @@ impl Graph {
                     true,
                 )
                 .ok()
-                .flatten();
+                .flatten()
+                .filter(|t| terminals::stream_of(t).is_some());
                 // A computation's terminals are its own business, so either
                 // end may be unnamed: then it is the one the other end's
                 // stream pairs with, a reading arriving at a `world-in`.

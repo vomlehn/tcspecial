@@ -3890,8 +3890,11 @@ Requirement
     that name a line from another file may reach; a line crossing anywhere
     else is refused, saying which list to add the node to, and so is a list
     naming a node that is not in the file or a terminal its type has not
-    got. A top file has nothing around it, and one with an ``exports``
-    section is refused as it is read.
+    got. A line to one of a computation's named inputs, a vote's ``in0``,
+    reaches it at its ``world-in``, since a named input is which way in
+    and not a terminal: no exports list could name it. A top file has
+    nothing around it, and one with an ``exports`` section is refused as
+    it is read.
 
 An included file is a part of the vehicle somebody else may own, and its
 ``exports`` are its edge: what of it the files around it are allowed to join.

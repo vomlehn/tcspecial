@@ -1150,9 +1150,14 @@ type, stated as <a class="reference internal" href="#every-terminal-carries-one-
 checked at both ends -- <tt class="docutils literal"><span class="pre">tcslibgs::graph::link_types</span></tt> -- and a
 device's reading laid out as its type's own as it is read; and every
 datum checked, as it is delivered, against the type the node it reaches
-takes (<a class="reference internal" href="#type-and-encoding">Type and encoding</a>). A decision is still the text <tt class="docutils literal">1</tt> or
-<tt class="docutils literal">0</tt> whatever its <tt class="docutils literal"><span class="pre">type-out</span></tt>, and GPIO lines are still driven and
-reported in that text. Where
+takes (<a class="reference internal" href="#type-and-encoding">Type and encoding</a>); a thermostat's decision sent as its
+<tt class="docutils literal"><span class="pre">type-out</span></tt>, a <tt class="docutils literal">boolean</tt> or a whole number; GPIO lines driven and
+reported as one unsigned whole number, a bit outside them refused; and
+a thermal mass's heater on where what it is driven with is not nought.
+Still to come: a <tt class="docutils literal">gpio_in</tt>'s levels in place of its edge records, a
+<tt class="docutils literal">process</tt>'s text forms, apps' packets, the F´ and cFS bridges'
+channels of each type -- a whole number is still a <tt class="docutils literal">Datum</tt> channel
+there -- and each configuration's own XTCE. Where
 the rest of this section and the rest of this document disagree, the
 rest says what runs today, and <a class="reference internal" href="#what-typed-links-replace">What typed links replace</a> lists the
 passages it will change.</p>
@@ -1471,13 +1476,10 @@ string.</p>
 <p>These passages describe the untyped links and change as typed links are
 built:</p>
 <ul class="simple">
-<li><a class="reference internal" href="#compute-elements">Compute elements</a>: a decision is the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>; it becomes
-the <tt class="docutils literal"><span class="pre">type-out</span></tt> of the thermostat that makes it, and <tt class="docutils literal">from_decision</tt>
-reads text only where a <tt class="docutils literal">process</tt> writes it.</li>
 <li><a class="reference internal" href="#app-nodes">App nodes</a>: a packet's bytes are the program's business; they become
 its terminal's type, encoded.</li>
-<li><a class="reference internal" href="#gpio-payloads-discrete-lines">GPIO Payloads: Discrete Lines</a>: the <tt class="docutils literal">edge</tt> attribute, the sixteen-byte
-records, and lines driven by the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>.</li>
+<li><a class="reference internal" href="#gpio-payloads-discrete-lines">GPIO Payloads: Discrete Lines</a>: the <tt class="docutils literal">edge</tt> attribute and the
+sixteen-byte records.</li>
 <li><a class="reference internal" href="#gateways-what-the-vehicle-answers-to">Gateways: what the vehicle answers to</a>, F´: a source's channel is chosen
 by the kind of node it is.</li>
 <li>The Yamcs mission database, written for the Yamcs gateway node, which the
@@ -2292,13 +2294,14 @@ by tcslib-c's <tt class="docutils literal">tcs_value_in</tt> -- <tt class="docut
 value is -- and a datum from it that is not a value is
 written to no channel, counted in <tt class="docutils literal">DataNotValues</tt> and said in an event:
 four bytes made a number whatever they held would be a temperature nobody
-measured. A <tt class="docutils literal">thermostat</tt> node sends decisions, the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and
-its channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
-<tt class="docutils literal">from_decision</tt>, the one statement of what a decision is, by which a
-<tt class="docutils literal">gpio_out</tt> node aboard reads the state its lines are driven to -- and a datum
-from it that is not one is written to no channel, counted in
-<tt class="docutils literal">DataNotDecisions</tt> and said in an event. Every other source's channel is
-<tt class="docutils literal">Tcs.Datum</tt>: its length, and its first 64 bytes. A longer one goes as its
+measured. A source that states it sends a <tt class="docutils literal">boolean</tt> -- a <tt class="docutils literal">thermostat</tt>
+whose <tt class="docutils literal"><span class="pre">type-out</span></tt> is one -- sends decisions, the one byte 1 or 0, and its
+channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
+<tt class="docutils literal">from_decision</tt>, the one statement of what a decision is -- and a datum from
+it that is not one is written to no channel, counted in <tt class="docutils literal">DataNotDecisions</tt>
+and said in an event. Every other source's channel is <tt class="docutils literal">Tcs.Datum</tt>,
+a whole number's among them until the bridge writes one of its own type
+(see <a class="reference internal" href="#typed-links">Typed links</a>): its length, and its first 64 bytes. A longer one goes as its
 first 64 bytes with its whole length, is counted, and is said in an event,
 so that nothing is cut short quietly.</p>
 <p>A thermostat sends only a change of decision to anything but the lines it
@@ -10629,14 +10632,12 @@ and their <tt class="docutils literal">state_interval</tt> and are asked by what
 trigger would be one of those arriving on a clock, and a heater driven
 because a timer went off is the worst of them.</dd>
 <dt>Requirement</dt>
-<dd>Driven lines are driven together, to the one state, by a decision on a
-link -- the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and nothing else, a decision being the
-one thing on a link that is text rather than a value. There is nothing in the
-configuration to say which line of a set is which, so a pattern would
-have no meaning; and three heater circuits switched one at a time would be
-three thermal states of a vehicle on the way to the one asked for. A datum
-that is neither <tt class="docutils literal">1</tt> nor <tt class="docutils literal">0</tt> is refused and not guessed at, because what
-is on the other end of an output is a heater or a valve.</dd>
+<dd>Driven lines are driven by one unsigned whole number on a link, a bit
+for each line -- the narrowest of <tt class="docutils literal">u8</tt> to <tt class="docutils literal">u64</tt> with room for them,
+bit 0 the first line the node lists -- as <a class="reference internal" href="#gpio-lines">GPIO lines</a> says, and are
+set together, in one call, to what its bits say. A number with a bit set
+beyond the lines, or not of that width, is refused and not guessed at,
+because what is on the other end of an output is a heater or a valve.</dd>
 <dt>Requirement</dt>
 <dd>The bits and the mask of a set-values call are indexed by a line's place
 in the request and not by its offset on the chip, which is how the v2

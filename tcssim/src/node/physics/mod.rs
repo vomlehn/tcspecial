@@ -429,9 +429,11 @@ impl Attachment {
 /// Tells the world what the vehicle just drove this payload to, if it
 /// drives an input.
 ///
-/// What arrives at a heater is the thermostat's decision, which a thermostat
-/// node sends as the text `1` or `0`: the value to drive a set of discrete
-/// lines to. What arrives at an engine's throttle is a value, four bytes of a
+/// What arrives at a heater is a whole number, most significant byte first:
+/// what a set of discrete lines was driven to, or a thermostat's decision, 1
+/// or 0, as the type it sends. It is passed to the world as that number, and
+/// what is driven reads it -- a thermal mass's heater is on when it is not
+/// nought. What arrives at an engine's throttle is a value, four bytes of a
 /// count of its unit's steps, as every value on a link is. Anything else is
 /// left alone rather than guessed at -- a simulated payload sent something that
 /// is not what its input takes is a configuration pointing the wrong link at
@@ -458,15 +460,16 @@ pub fn driven(attachment: &Option<Attachment>, which: &str, data: &[u8]) {
     let now = Instant::now();
     let value = match unit {
         Some(unit) => from_value(data, *unit, which),
-        None => match data.trim_ascii() {
-            b"1" => Ok(1.0),
-            b"0" => Ok(0.0),
-            _ => Err(format!(
-                "{which} was sent {} bytes that are not a decision: a \
-                 heater is driven to 1 or 0",
-                data.len()
-            )),
-        },
+        None if !data.is_empty() && data.len() <= 8 => {
+            let mut bytes = [0u8; 8];
+            bytes[8 - data.len()..].copy_from_slice(data);
+            Ok(u64::from_be_bytes(bytes) as f64)
+        }
+        None => Err(format!(
+            "{which} was sent {} bytes, which are not a whole number: a \
+             heater is driven with one of up to eight bytes",
+            data.len()
+        )),
     };
     match value {
         Ok(value) => driving.sent_at(value, world.seconds(now)),
@@ -905,7 +908,7 @@ connections:
         let payload = SimulatedPayload::new(config);
         let attachment = Some(attachment);
 
-        driven(&attachment, "heaters_1", b"1");
+        driven(&attachment, "heaters_1", &[1]);
         assert_eq!(
             attachment.as_ref().and_then(Attachment::driving),
             Some(Driving::Disabled)
@@ -1257,8 +1260,7 @@ connections:
             .expect("a socket for the vehicle");
         let drive = |on: bool| {
             for at in &heaters {
-                let _ = driving
-                    .send_to(if on { b"1" } else { b"0" }, ("127.0.0.1", *at));
+                let _ = driving.send_to(&[u8::from(on)], ("127.0.0.1", *at));
             }
         };
 

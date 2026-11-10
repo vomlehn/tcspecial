@@ -622,9 +622,10 @@ naming the number. Where a value becomes text -- the lines a program reads and
 writes, or the value typed into a command -- it is converted at that
 boundary and nowhere else.</dd>
 <dt>decision</dt>
-<dd>What a computation sends a device: the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, one byte. It is
-not a value, a heater's line not being a number, and it is asserted on
-every sample rather than only when it changes.</dd>
+<dd>What a thermostat sends a device: 1 to assert and 0 to unassert, as the
+type its <tt class="docutils literal"><span class="pre">type-out</span></tt> names -- a <tt class="docutils literal">boolean</tt>, one byte, or the whole
+number a set of GPIO lines takes. It is not a value, and it is asserted
+on every sample rather than only when it changes.</dd>
 <dt>group</dt>
 <dd>Devices that share one sampling interval, so that a set of sensors is read
 as close to simultaneously as the hardware allows rather than each on a
@@ -1843,16 +1844,15 @@ the same record; the only difference is that a change carries the time of the
 change and a report carries the time it was looked at.</p>
 <p>Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.</p>
-<p>Driven lines are driven together, to the same state. What arrives is a
-<strong>decision</strong> -- the text <tt class="docutils literal">1</tt> to assert and <tt class="docutils literal">0</tt> to unassert, which is what
-the thermostat compute element emits -- and anything else is refused rather
-than taken for one of them: the thing on the other end is a
-heater, and a datum that cannot be read is not guessed at. The lines are a
-set and not a pattern because there is nothing in the file to say which line
-is which, and because three heater circuits switched one at a time would be
-three thermal states of a vehicle on the way to the one that was asked for.
-The kernel counts them by their place in the request, so lines <tt class="docutils literal">3,4,5</tt>
-named in that order are the low three bits of the call that drives them.</p>
+<p>Driven lines are driven by one unsigned whole number, a bit for each line:
+the narrowest of <tt class="docutils literal">u8</tt>, <tt class="docutils literal">u16</tt>, <tt class="docutils literal">u32</tt> and <tt class="docutils literal">u64</tt> with room for them, bit 0
+the first line the node lists, so lines <tt class="docutils literal">3,4,5</tt> are the low three bits of a
+<tt class="docutils literal">u8</tt>. A thermostat driving a one-line switch states <tt class="docutils literal"><span class="pre">type-out:</span> &quot;u8&quot;</tt> and
+sends 1 or 0. A number of another width, or with a bit set where the node has
+no line, is refused rather than guessed at: the thing on the other end is a
+heater. The lines are set together, in one call, which is also how the kernel
+counts them, by their place in the request. What a <tt class="docutils literal">gpio_inout</tt> reports is
+the same number.</p>
 <p>The same value arrives over and over, and that is deliberate. A thermostat
 asserts its decision on every sample rather than only when it changes, so the
 lines are held at what the vehicle last decided and a decision that went
@@ -4004,8 +4004,10 @@ offset                 how far the place a reporting payload is on sits
 its readings go to, and a decision -- a lander's contact with the ground -- as
 the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>: at once when it changes, waiting on the model for the
 moment rather than for its next turn, and again every packet interval. A
-payload joined to an input drives it with what the vehicle sends: a decision,
-<tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, or a value, four bytes of its unit's steps, which has to come
+payload joined to an input drives it with what the vehicle sends: a whole
+number -- a set of lines, or a thermostat's decision as the <tt class="docutils literal">u8</tt> a switch
+takes, a thermal mass's heater being on where it is not nought -- or a value,
+four bytes of its unit's steps, which has to come
 from a node sending that unit -- an engine's throttle from a <tt class="docutils literal">process</tt>
 answering a <tt class="docutils literal">ratio</tt>. An input is driven by one payload, and not by one and a
 connection too: two would each switch it over the other. A heater's <tt class="docutils literal">on</tt> that

@@ -50,15 +50,15 @@ use std::io::{ErrorKind, Read};
 use std::mem;
 use std::net::{SocketAddr, UdpSocket};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use nix::poll::PollFlags;
 use tcslibgs::{
     graph::terminals::Stream,
+    link_type::Basic,
     node::payload::gpio::{state_read, state_said, EVENT_BYTES},
-    node::vehicle::compute::from_decision,
     Bias, GpioConfig, LineEdge, TcsError, TcsResult, Timestamp,
 };
 
@@ -201,20 +201,17 @@ struct Shared {
     /// A report of the watched lines' levels was asked for, by a datum at
     /// `world-in`, and has not been made.
     asked: AtomicBool,
-    /// What the driven lines were last driven to: [`UNSET`], [`LOW`] or
-    /// [`HIGH`].
-    driven: AtomicU8,
-    /// A value to pass on by `moc-out`, as the same three: what the lines
-    /// were driven to, where it changed them, and it has not been read.
-    passing: AtomicU8,
+    /// What the lines were last driven to, a bit for each by its place,
+    /// where they have been driven at all: see `told`.
+    driven: AtomicU64,
+    /// Whether the lines have been driven at all.
+    told: AtomicBool,
+    /// A value to pass on by `moc-out`: what the lines were driven to, where
+    /// it changed them, and it has not been read -- see `passes`.
+    passing: AtomicU64,
+    /// Whether there is a value to pass on.
+    passes: AtomicBool,
 }
-
-/// Nothing driven yet, or nothing to pass on.
-const UNSET: u8 = 0;
-/// Driven low.
-const LOW: u8 = 1;
-/// Driven high.
-const HIGH: u8 = 2;
 
 /// Where the lines are: a chip's, or tcssim's over UDP.
 enum Lines {
@@ -726,7 +723,7 @@ impl GpioEndpoint {
     /// the clock, once they have been told something.
     fn told_due(&self) -> bool {
         self.reports
-            && self.shared.driven.load(Ordering::Acquire) != UNSET
+            && self.shared.told.load(Ordering::Acquire)
             && self.on_time()
     }
 
@@ -919,30 +916,81 @@ fn ask_for_lines(
     Ok(lines)
 }
 
-/// Reads what arrived as the state the lines are to be driven to.
+/// Reads what arrived as the number the lines are to be driven to.
 ///
-/// The text `1` to assert and `0` to unassert, which is what a compute
-/// element's decision looks like on a link, and what a ground station can
-/// send by hand. Anything else is refused rather than taken for one of them:
-/// the thing on the other end of this is a heater or a valve, and a datum
-/// that cannot be read is not guessed at. What a decision is, is
-/// `tcslibgs::node::vehicle::compute::from_decision`, which the ground reads
-/// one by too.
+/// One unsigned whole number, the narrowest of `u8`, `u16`, `u32` and `u64`
+/// with a bit for each line, most significant byte first: bit 0 is the first
+/// line the node lists, bit 1 the next. A bit set where the node has no line
+/// is refused, and the lines are left as they were: the bit names no line,
+/// so driving from it would be guessing what was meant. See "GPIO lines" in
+/// the design.
 ///
 /// # Arguments
 ///
-/// * `what` - The handler, for what a complaint says.
-/// * `data` - What arrived, surrounding white space allowed.
+/// * `what`  - The handler, for what a complaint says.
+/// * `count` - How many lines the node has.
+/// * `data`  - What arrived.
 ///
 /// # Returns
 ///
-/// True to assert the lines, false to unassert them.
+/// The lines' bits, by their places.
 ///
 /// # Errors
 ///
-/// `TcsError::Endpoint` if `data` is not the text `1` or `0`.
-fn state_of(what: &str, data: &[u8]) -> TcsResult<bool> {
-    from_decision(data, what).map_err(TcsError::Endpoint)
+/// `TcsError::Endpoint` if `data` is not that number's width, or sets a bit
+/// beyond the node's lines.
+fn lines_read(what: &str, count: usize, data: &[u8]) -> TcsResult<u64> {
+    let width = lines_width(count);
+    if data.len() != width {
+        return Err(TcsError::Endpoint(format!(
+            "{what}: {count} lines are driven with a {} of {width} bytes, and \
+             {} arrived",
+            Basic::lines(count).name(),
+            data.len()
+        )));
+    }
+    let mut bytes = [0u8; 8];
+    bytes[8 - width..].copy_from_slice(data);
+    let bits = u64::from_be_bytes(bytes);
+    if count < 64 && bits >> count != 0 {
+        return Err(TcsError::Endpoint(format!(
+            "{what}: {bits:#x} sets a bit beyond its {count} lines, which no \
+             line answers to: refused, the lines left as they were"
+        )));
+    }
+    Ok(bits)
+}
+
+/// Writes a set of lines' number, as [`lines_read`] reads it.
+///
+/// # Arguments
+///
+/// * `count`  - How many lines the node has.
+/// * `bits`   - The lines' bits, by their places.
+/// * `buffer` - Where it is written, with room for eight bytes.
+///
+/// # Returns
+///
+/// How many bytes were written: the number's width.
+fn lines_said(count: usize, bits: u64, buffer: &mut [u8]) -> usize {
+    let width = lines_width(count);
+    buffer[..width].copy_from_slice(&bits.to_be_bytes()[8 - width..]);
+    width
+}
+
+/// Says how many bytes a set of lines' number is.
+///
+/// # Arguments
+///
+/// * `count` - How many lines.
+///
+/// # Returns
+///
+/// The width of the narrowest unsigned whole number with a bit for each.
+fn lines_width(count: usize) -> usize {
+    Basic::lines(count)
+        .width()
+        .expect("a set of lines is a whole number")
 }
 
 /// Builds what the kernel is asked for: every driven line of the request at
@@ -961,9 +1009,9 @@ fn state_of(what: &str, data: &[u8]) -> TcsResult<bool> {
 /// # Returns
 ///
 /// The values, with a mask covering every driven line.
-fn values_for(driven: u64, wanted: bool) -> LineValues {
+fn values_for(driven: u64, wanted: u64) -> LineValues {
     LineValues {
-        bits: if wanted { driven } else { 0 },
+        bits: wanted & driven,
         mask: driven,
     }
 }
@@ -1028,7 +1076,7 @@ impl EndpointReadable for GpioEndpoint {
     fn due(&self) -> bool {
         self.report_due()
             || self.told_due()
-            || self.shared.passing.load(Ordering::Acquire) != UNSET
+            || self.shared.passes.load(Ordering::Acquire)
     }
 
     /// Which stream the last read was on: see
@@ -1046,25 +1094,24 @@ impl EndpointReadable for GpioEndpoint {
     /// each becomes one record, so a buffer that cannot hold another record
     /// is where this stops.
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
-        // What the driven lines were set to, passed on as the decision it
-        // was: the text a thermostat's decision is, which is what whatever
-        // the lines drive reads one as.
-        let passing = self.shared.passing.swap(UNSET, Ordering::AcqRel);
-        if passing != UNSET && !buffer.is_empty() {
-            buffer[0] = if passing == HIGH { b'1' } else { b'0' };
+        // What the driven lines were set to, passed on as the number it
+        // was, which is what whatever the lines drive reads.
+        let count = self.offsets.len();
+        if buffer.len() >= 8 && self.shared.passes.swap(false, Ordering::AcqRel)
+        {
+            let passing = self.shared.passing.load(Ordering::Acquire);
             self.last = Some(Stream::Vehicleward);
-            return Ok(1);
+            return Ok(lines_said(count, passing, buffer));
         }
         self.last = Some(Stream::Groundward);
 
         // What a gpio_inout's lines were last told, as the decision it was,
         // on the report clock: the ground follows a heater's switch on a
         // beat, and a report lost is made good by the next.
-        if self.told_due() && !buffer.is_empty() {
+        if self.told_due() && buffer.len() >= 8 {
             let told = self.shared.driven.load(Ordering::Acquire);
-            buffer[0] = if told == HIGH { b'1' } else { b'0' };
             self.wind();
-            return Ok(1);
+            return Ok(lines_said(count, told, buffer));
         }
         if self.watched == 0 {
             return Ok(0);
@@ -1184,7 +1231,7 @@ impl EndpointWritable for GpioEndpoint {
             return Ok(data.len());
         }
 
-        let wanted = state_of(&self.what, data)?;
+        let wanted = lines_read(&self.what, self.offsets.len(), data)?;
         let values = values_for(self.driven, wanted);
 
         match &self.lines {
@@ -1213,9 +1260,11 @@ impl EndpointWritable for GpioEndpoint {
             }
         }
 
-        let now = if wanted { HIGH } else { LOW };
-        if self.shared.driven.swap(now, Ordering::AcqRel) != now {
+        let now = values.bits;
+        let was = self.shared.driven.swap(now, Ordering::AcqRel);
+        if !self.shared.told.swap(true, Ordering::AcqRel) || was != now {
             self.shared.passing.store(now, Ordering::Release);
+            self.shared.passes.store(true, Ordering::Release);
         }
 
         // The whole of what arrived, which is what a caller counts as sent.
@@ -1561,45 +1610,74 @@ mod tests {
     fn the_values_are_indexed_by_place_in_the_request() {
         // Three lines asserted: the low three bits, whatever their offsets on
         // the chip are.
-        let on = values_for(0b111, true);
+        let on = values_for(0b111, 0b111);
         assert_eq!(on.mask, 0b111);
         assert_eq!(on.bits, 0b111);
 
         // And unasserted: the same lines meant, all of them low. A mask of
         // zero would be a call that said nothing.
-        let off = values_for(0b111, false);
+        let off = values_for(0b111, 0);
         assert_eq!(off.mask, 0b111);
         assert_eq!(off.bits, 0);
 
+        // Some lines of the three, by their bits.
+        assert_eq!(values_for(0b111, 0b101).bits, 0b101);
+
         // Driven lines among watched ones: the watched are not set.
-        assert_eq!(values_for(0b1100, true).bits, 0b1100);
+        assert_eq!(values_for(0b1100, 0b1111).bits, 0b1100);
 
         // Which places a set of lines is at in the request.
         assert_eq!(mask_of(&[2, 3, 4, 5], &[5, 3]), 0b1010);
     }
 
-    /// What a decision looks like arriving, and what else does not.
+    /// What drives a set of lines is one number with a bit per line, as
+    /// wide as the narrowest type with room for them, and nothing else.
     #[test]
-    fn a_state_is_one_or_zero_and_nothing_else() {
-        assert!(state_of("heaters", b"1").expect("asserted"));
-        assert!(!state_of("heaters", b"0").expect("unasserted"));
+    fn lines_are_driven_with_a_number_of_their_width() {
+        assert_eq!(lines_read("heaters", 3, &[0b101]).expect("a u8"), 0b101);
+        assert_eq!(lines_read("heater", 1, &[1]).expect("one line"), 1);
+        assert_eq!(
+            lines_read("bank", 12, &[0x0f, 0xff]).expect("a u16"),
+            0x0fff
+        );
+        assert_eq!(lines_read("all", 64, &[0xff; 8]).expect("a u64"), u64::MAX);
 
-        // As the compute elements emit them, a line's worth at a time.
-        assert!(state_of("heaters", b"1\n").expect("asserted"));
-
-        for refused in [&b"on"[..], b"true", b"2", b"", b"1 0", &[0xff]] {
-            let said = match state_of("heaters", refused) {
+        for (count, refused) in [
+            (3, &[0b1000][..]),
+            (1, &[2]),
+            (3, &[0, 1]),
+            (12, &[1]),
+            (3, &[]),
+            (3, b"1"),
+        ] {
+            let said = match lines_read("heaters", count, refused) {
                 Err(e) => format!("{e}"),
-                Ok(state) => panic!(
-                    "{:?} was taken for {state}",
-                    String::from_utf8_lossy(refused)
-                ),
+                Ok(bits) => panic!("{refused:?} was taken for {bits:#b}"),
             };
             assert!(
                 said.contains("heaters"),
                 "the refusal should name the node: {said}"
             );
         }
+
+        let mut buffer = [0u8; 8];
+        assert_eq!(lines_said(3, 0b101, &mut buffer), 1);
+        assert_eq!(buffer[0], 0b101);
+        assert_eq!(lines_said(12, 0x0fff, &mut buffer), 2);
+        assert_eq!(&buffer[..2], &[0x0f, 0xff]);
+    }
+
+    /// Leaves an endpoint as a drive that reached the kernel leaves it.
+    ///
+    /// # Arguments
+    ///
+    /// * `reader` - The endpoint.
+    /// * `bits`   - What its lines were driven to.
+    fn drove(reader: &GpioEndpoint, bits: u64) {
+        reader.shared.driven.store(bits, Ordering::Release);
+        reader.shared.told.store(true, Ordering::Release);
+        reader.shared.passing.store(bits, Ordering::Release);
+        reader.shared.passes.store(true, Ordering::Release);
     }
 
     /// Driven lines report nothing of their own: what is read of them is
@@ -1612,12 +1690,11 @@ mod tests {
         assert_eq!(reader.read(&mut buffer).expect("nothing"), 0);
         assert!(!reader.due());
 
-        // As a drive that reached the kernel leaves it: see write_on.
-        reader.shared.driven.store(HIGH, Ordering::Release);
-        reader.shared.passing.store(HIGH, Ordering::Release);
+        // As a drive that reached the kernel leaves it: see write.
+        drove(&reader, 1);
         assert!(reader.due());
         assert_eq!(reader.read(&mut buffer).expect("passed on"), 1);
-        assert_eq!(&buffer[..1], b"1");
+        assert_eq!(&buffer[..1], &[1]);
         assert_eq!(reader.stream(), Some(Stream::Vehicleward));
         assert!(!reader.due(), "passed on once");
         assert_eq!(reader.read(&mut buffer).expect("nothing"), 0);
@@ -1638,12 +1715,11 @@ mod tests {
         assert!(!reader.due(), "nothing told yet");
 
         // As a drive that reached the kernel leaves it: see write.
-        reader.shared.driven.store(HIGH, Ordering::Release);
-        reader.shared.passing.store(HIGH, Ordering::Release);
+        drove(&reader, 1);
         assert_eq!(reader.read(&mut buffer).expect("passed on"), 1);
         assert_eq!(reader.stream(), Some(Stream::Vehicleward));
         assert_eq!(reader.read(&mut buffer).expect("reported"), 1);
-        assert_eq!(&buffer[..1], b"1");
+        assert_eq!(&buffer[..1], &[1]);
         assert_eq!(reader.stream(), Some(Stream::Groundward));
 
         // And not again until the clock comes round.
@@ -1663,7 +1739,7 @@ mod tests {
     fn a_write_to_driven_lines_is_attempted() {
         let (mut endpoint, end) = on_a_pipe("heaters", vec![4], 0, 0b1);
 
-        let said = match endpoint.write(b"1") {
+        let said = match endpoint.write(&[1]) {
             Err(e) => format!("{e}"),
             Ok(n) => {
                 panic!("a pipe took a line request's ioctl, and {n} bytes")
@@ -1803,7 +1879,9 @@ mod tests {
         let mut said = [0u8; 8];
         assert_eq!(tcssim.recv(&mut said).expect("a hello"), 0);
 
-        endpoint.write(b"1").expect("driven");
+        // Both lines on: bits 0 and 1, which tcssim is sent a character
+        // each for.
+        endpoint.write(&[0b11]).expect("driven");
         let n = tcssim.recv(&mut said).expect("the drive");
         assert_eq!(&said[..n], b"11");
 
@@ -1811,15 +1889,15 @@ mod tests {
         assert_eq!(endpoint.read(&mut buffer).expect("passed on"), 1);
         assert_eq!(
             (buffer[0], endpoint.stream()),
-            (b'1', Some(Stream::Vehicleward))
+            (0b11, Some(Stream::Vehicleward))
         );
         assert_eq!(endpoint.read(&mut buffer).expect("reported"), 1);
         assert_eq!(
             (buffer[0], endpoint.stream()),
-            (b'1', Some(Stream::Groundward))
+            (0b11, Some(Stream::Groundward))
         );
 
-        endpoint.write(b"0").expect("driven");
+        endpoint.write(&[0]).expect("driven");
         let n = tcssim.recv(&mut said).expect("the drive");
         assert_eq!(&said[..n], b"00");
     }

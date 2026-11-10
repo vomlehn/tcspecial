@@ -30,9 +30,10 @@ from dataclasses import dataclass
 VALUE_BYTES = 4
 
 #: A decision to assert and to unassert, as each travels:
-#: ``compute::DECISION_ON`` and ``DECISION_OFF``.
-DECISION_ON = "1"
-DECISION_OFF = "0"
+#: ``compute::DECISION_ON`` and ``DECISION_OFF``: a ``boolean``, the one
+#: byte 1 or 0.
+DECISION_ON = 1
+DECISION_OFF = 0
 
 
 @dataclass(frozen=True)
@@ -124,28 +125,27 @@ def type_name(unit):
     return "".join(words)
 
 
-#: What a computation's function produces: ``compute::produces``.
-VALUE_FUNCTIONS = ("to_kelvin", "to_value", "vote", "process")
-DECISION_FUNCTIONS = ("thermostat",)
-
-
 @dataclass(frozen=True)
 class Form:
     """What a node sends: ``Datum``, ``Value`` (with its :class:`Unit`),
-    ``Decision`` or ``Lines`` (with its lines' offsets), as ``fprime::Form``
-    names them."""
+    ``Decision``, ``Whole`` (with its type's name) or ``Lines`` (with its
+    lines' offsets), as ``fprime::Form`` names them."""
 
     kind: str
     unit: Unit = None
     #: For ``Lines``: the offsets of the lines, lowest first, which is the
     #: order their records come in.
     lines: tuple = ()
+    #: For ``Whole``: the type's name, ``u8`` to ``i64``.
+    whole: str = None
 
     def __str__(self):
         """The form as the Rust's ``Debug`` writes it: ``Datum``,
-        ``Value(Kelvin)``, ``Decision``, ``Lines(2)``."""
+        ``Value(Kelvin)``, ``Decision``, ``Whole(U8)``, ``Lines(2)``."""
         if self.kind == "Lines":
             return f"Lines({len(self.lines)})"
+        if self.kind == "Whole":
+            return f"Whole({self.whole.upper()})"
         if self.unit is None:
             return self.kind
         return f"{self.kind}({self.unit.variant})"
@@ -180,17 +180,66 @@ def form_of(config, source):
     if source not in names:
         return DATUM
     node = config.node(source)
-    if node.node_type == "gpio_inout":
-        # What it reports is what its lines were told: a decision.
-        return DECISION
-    if node.node_type in ("gpio_in", "gpio_out"):
+    if node.node_type == "gpio_in":
         return _lines_form(node)
-    function = _function(config, source)
-    if function in DECISION_FUNCTIONS:
+    said = _sends(node)
+    if said in WHOLE:
+        return Form("Whole", whole=said)
+    if said == "boolean":
         return DECISION
-    if function in VALUE_FUNCTIONS:
-        return Form("Value", _unit(config, source, []))
-    return DATUM
+    if said is None or said in ("bytes", "string") or ":" in said:
+        return DATUM
+    return Form("Value", unit_of_type_name(said, f'{config.path}: '
+                                                  f'"{source}"'))
+
+
+#: The whole numbers' names: ``link_type::Basic``'s.
+WHOLE = ("u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")
+
+#: The type each of a device's formats lays out:
+#: ``compute::Format::basic``.
+FORMAT_TYPES = {"u8": "u8", "i8": "i8", "i16_be": "i16", "u16_be": "u16",
+                "u24_be": "u32", "i16_le": "i16", "i32_be": "i32",
+                "u32_be": "u32"}
+
+
+def _sends(node):
+    """The type a node states it sends at its ``world-out``:
+    ``link_types::carries``.
+
+    Args:
+        node: The node.
+
+    Returns:
+        The type's name as the configuration writes it, or ``None`` for a
+        node that takes any type and sends nothing.
+    """
+    said = {name: str(value).strip()
+            for name, value in node.attributes.items()}
+    kind = node.node_type
+    if kind == "compute":
+        function = said.get("function")
+        if function == "to_kelvin":
+            return "kelvin"
+        if function == "vote":
+            return said.get("carries")
+        return said.get("type-out")
+    if kind in ("tee-gateway", "tee-payload"):
+        return said.get("carries", "bytes")
+    if kind == "ping":
+        return "string"
+    if kind in ("gpio_out", "gpio_inout"):
+        count = len(said.get("lines", "").replace(",", " ").split())
+        return next(name for name, most in (("u8", 8), ("u16", 16),
+                                            ("u32", 32), ("u64", 64))
+                    if count <= most)
+    if kind.startswith(("null-", "gateway_")) or kind == "log":
+        return None
+    if "world-out-type" in said:
+        return said["world-out-type"]
+    if "format" in said and not kind.startswith("app_"):
+        return FORMAT_TYPES.get(said["format"])
+    return "bytes"
 
 
 #: The bytes of one line's record: ``gpio::EVENT_BYTES``.
@@ -221,47 +270,3 @@ def _lines_form(node):
     offsets = sorted(int(word, 0) for word in
                      said.get("lines", "").replace(",", " ").split())
     return Form("Lines", lines=tuple(offsets))
-
-
-def _function(config, name):
-    """A node's computation.
-
-    Args:
-        config: The configuration.
-        name:   The node's name.
-
-    Returns:
-        Its ``function``, or ``None`` for a node that is not a compute
-        node.
-    """
-    node = config.node(name)
-    if node.node_type != "compute":
-        return None
-    return node.attributes.get("function", "").strip() or None
-
-
-def _unit(config, name, asking):
-    """The unit a node of values sends them in: ``units::unit_of``, which
-    is the value type the node states.
-
-    Args:
-        config: The configuration.
-        name:   The node's name.
-        asking: Unused: nothing is worked out from what feeds a node.
-
-    Returns:
-        The :class:`Unit`.
-
-    Raises:
-        ValueError: As :func:`form_of`, or the node sends no values.
-    """
-    function = _function(config, name)
-    where = f'{config.path}: "{name}" ({function})'
-    if function == "to_kelvin":
-        return UNITS[0]
-    attribute = "carries" if function == "vote" else "type-out"
-    said = config.node(name).attributes.get(attribute)
-    if said is None:
-        raise ValueError(f"{where}: {attribute} is not set, and a {function} "
-                         "states the value type it sends")
-    return unit_of_type_name(str(said), where)

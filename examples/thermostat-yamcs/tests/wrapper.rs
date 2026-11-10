@@ -128,20 +128,20 @@ fn readings_and_the_vote_decode_as_temperatures() {
 }
 
 /// The heaters' switches, each reporting what it was last told, framed
-/// under its own APID, are each the decision it was: the character `1` on,
-/// `0` off, read as a boolean.
+/// under its own APID, are each the number its line was told: a u8, read
+/// as an integer.
 #[test]
-fn the_heaters_switches_decode_as_their_decisions() {
+fn the_heaters_switches_decode_as_what_they_were_told() {
     let path = here().join("thermostat-yamcs.xtcs");
     let xtce = generated_mdb(&path);
     let apids = apids(&path);
     for heater in ["gpio-out-tmass1", "gpio-out-tmass2"] {
-        for (said, on) in [(b"1", true), (b"0", false)] {
-            let packet = framed(apid_of(&apids, heater), said);
+        for told in [1u8, 0] {
+            let packet = framed(apid_of(&apids, heater), &[told]);
             let decoded = decode(&xtce, &packet);
             assert_eq!(decoded.container, format!("{heater}Packet"));
             assert_eq!(decoded.end, Some(packet.len() * 8), "all of it");
-            assert_eq!(decoded.booleans[heater], Ok(on), "{heater}");
+            assert_eq!(decoded.integers[heater], u64::from(told), "{heater}");
         }
     }
 }

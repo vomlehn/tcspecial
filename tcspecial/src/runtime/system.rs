@@ -2777,7 +2777,13 @@ vehicle:
                     "the ground",
                 ) {
                     Ok(number) => format!("{number}"),
-                    Err(_) => String::from_utf8_lossy(datum).to_string(),
+                    // A decision, sent as the u8 the heaters' switches
+                    // take: shown as the number it is.
+                    Err(_) => datum
+                        .iter()
+                        .map(|byte| byte.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" "),
                 }
             })
             .collect();
@@ -2816,7 +2822,7 @@ vehicle:
             vehicle.heaters.lock().expect("the record").clone(),
             // One decision, reaching both heaters: they are driven together,
             // so that one failing leaves the other warming the mass.
-            vec![b"1".to_vec(), b"1".to_vec()],
+            vec![vec![1u8], vec![1u8]],
             "a zone below the band should have both its heaters on"
         );
         assert!(
@@ -3231,7 +3237,7 @@ vehicle:
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
             // One decision reaching both heaters.
-            vec![b"1".to_vec(), b"1".to_vec()],
+            vec![vec![1u8], vec![1u8]],
             "a zone below the band has both its heaters on"
         );
 
@@ -3287,7 +3293,7 @@ vehicle:
         assert_eq!(
             vehicle.heaters.lock().expect("the record").clone(),
             // On, then off: each decision reaching both heaters.
-            vec![b"1".to_vec(), b"1".to_vec(), b"0".to_vec(), b"0".to_vec()],
+            vec![vec![1u8], vec![1u8], vec![0u8], vec![0u8]],
             "the same zone is now above the band, so both heaters go off"
         );
     }

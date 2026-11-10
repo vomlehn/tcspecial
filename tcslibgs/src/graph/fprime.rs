@@ -32,10 +32,10 @@
 use std::fmt::Write as _;
 
 use super::telemetry::{self, Via};
-use super::units;
 use super::Graph;
 use crate::gateway::GatewayKind;
-use crate::node::vehicle::compute::{node_produces, Produces};
+use crate::graph::link_types::{self, Carries};
+use crate::link_type::{Basic, LinkType};
 use crate::unit::Unit;
 
 /// One of the bridge's own channels: not a source's, and the same in every
@@ -145,8 +145,13 @@ pub enum Form {
     /// reads.
     Value(Unit),
     /// A decision, as a `bool`, true for on, which tcslib-c's
-    /// `tcs_decision_on` reads.
+    /// `tcs_decision_on` reads: a source that states it sends a `boolean`.
     Decision,
+    /// A whole number of this type, which a source states it sends: a
+    /// sensor's reading, a set of GPIO lines, a thermostat's decision sent
+    /// as what a switch takes. F´'s channel for it is the bytes, as a
+    /// `Datum`, until the bridge writes one of its own type.
+    Whole(Basic),
     /// The levels of this many GPIO lines, a record each, in the order the
     /// node names them, every datum. F´'s channel for it is the bytes, as a
     /// `Datum`: a ground that reads lines -- Yamcs, tcsmoc's plot -- reads
@@ -164,41 +169,42 @@ impl Form {
     ///
     /// # Returns
     ///
-    /// [`Form::Value`] for a node that sends values in a unit, and
-    /// [`Form::Decision`] for one that sends decisions, as
-    /// [`node_produces`] and [`units::unit_of`] say, and for a `gpio_inout`,
-    /// which reports what its lines were told; [`Form::Lines`] for a
-    /// GPIO payload's lines read for their levels on an interval and
-    /// watched for no edge; [`Form::Datum`] for every other, including a
-    /// node of values whose unit cannot be settled, which `Graph::check`
-    /// refuses, and lines watched for edges, whose datum may hold the one
-    /// line that changed.
+    /// What the source states it sends at its `world-out`, as `link_types`
+    /// reads it: [`Form::Value`] for a value type, [`Form::Decision`] for a
+    /// `boolean`, [`Form::Whole`] for a whole number -- a `gpio_inout`
+    /// reports what its lines were told as one -- and [`Form::Datum`] for
+    /// every other, and for a node that is not there or whose type cannot be
+    /// read, which `Graph::check` refuses. A `gpio_in`, which sends records
+    /// of its lines, is [`Form::Lines`] where it reads their levels on an
+    /// interval and watches for no edge, and [`Form::Datum`] where it
+    /// watches for edges, whose datum may hold the one line that changed.
     pub fn of(graph: &Graph, source: &str) -> Form {
-        if let Some(Ok(crate::graph::reach::Reach {
+        let Some(node) = graph.node(source) else {
+            return Form::Datum;
+        };
+        if let Ok(crate::graph::reach::Reach {
             endpoint: crate::EndpointConfig::Gpio(gpio),
             ..
-        })) = graph.node(source).map(crate::graph::reach::reach_of)
+        }) = crate::graph::reach::reach_of(node)
         {
-            // What a gpio_inout reports is what its lines were told: a
-            // decision, as a thermostat's is.
-            if gpio.kind.reports() {
-                return Form::Decision;
+            if gpio.kind == crate::node::payload::gpio::Kind::In {
+                let levels = !gpio.inputs.is_empty()
+                    && gpio.edge == crate::LineEdge::None
+                    && gpio.state_interval.is_some();
+                return if levels {
+                    Form::Lines(gpio.inputs.len())
+                } else {
+                    Form::Datum
+                };
             }
-            let levels = !gpio.inputs.is_empty()
-                && gpio.edge == crate::LineEdge::None
-                && gpio.state_interval.is_some();
-            return if levels {
-                Form::Lines(gpio.inputs.len())
-            } else {
-                Form::Datum
-            };
         }
-        let produces = graph
-            .node(source)
-            .and_then(|node| node_produces(&node.node_type, &node.attributes));
-        match (produces, units::unit_of(graph, source)) {
-            (Some(Produces::Value), Some(unit)) => Form::Value(unit),
-            (Some(Produces::Decision), _) => Form::Decision,
+        match link_types::carries(node, "world-out") {
+            Ok(Carries::Only(LinkType::Basic(basic))) => match basic {
+                Basic::Value(unit) => Form::Value(unit),
+                Basic::Boolean => Form::Decision,
+                whole if whole.is_whole() => Form::Whole(whole),
+                _ => Form::Datum,
+            },
             _ => Form::Datum,
         }
     }
@@ -210,7 +216,7 @@ impl Form {
     /// `Datum`, the component's own struct, `F64` or `bool`.
     pub fn fpp_type(self) -> &'static str {
         match self {
-            Form::Datum | Form::Lines(_) => "Datum",
+            Form::Datum | Form::Lines(_) | Form::Whole(_) => "Datum",
             Form::Value(_) => "F64",
             Form::Decision => "bool",
         }
@@ -227,6 +233,9 @@ impl Form {
             Form::Datum => "its bytes".to_string(),
             Form::Value(unit) => format!("a value, in {}", unit.name()),
             Form::Decision => "a decision, true for on".to_string(),
+            Form::Whole(basic) => {
+                format!("a whole number, a {}, as bytes", basic.name())
+            }
             Form::Lines(count) => {
                 format!("the levels of {count} lines, a record each, as bytes")
             }
@@ -678,7 +687,7 @@ impl Model {
                 cpp_string(&channel.name)
             );
             let _ = match form {
-                Form::Datum | Form::Lines(_) => writeln!(
+                Form::Datum | Form::Lines(_) | Form::Whole(_) => writeln!(
                     out,
                     "\t\tthis->tlmWrite_{}(this->asDatum(datum));",
                     channel.name
@@ -820,7 +829,8 @@ mod tests {
 
     /// heater_wanted, device id 2, a thermostat, is the channel 0x3002,
     /// named after it and holding a decision; the thermometer, device id 3,
-    /// is 0x3003 and holds its bytes; zone_temp, device id 4, a conversion,
+    /// is 0x3003 and holds the i16 it reads; zone_temp, device id 4, a
+    /// conversion,
     /// is 0x3004 and holds a temperature; and the bridge's own follow the
     /// last device id.
     #[test]
@@ -847,7 +857,7 @@ mod tests {
                         local: 3,
                         id: 0x3003,
                     },
-                    form: Form::Datum,
+                    form: Form::Whole(Basic::I16),
                 },
                 Source {
                     channel: Channel {
@@ -1025,10 +1035,12 @@ mod tests {
         assert_eq!(models.len(), 2);
     }
 
-    /// A value is a temperature by what the configuration says of the node
-    /// that sends it -- a conversion, a vote -- and a decision is on or off
-    /// by the same, a thermostat; nothing else is either: a sensor, a node
-    /// the configuration lacks.
+    /// A value is a temperature by the type the node that sends it states --
+    /// a conversion, a vote -- a decision is on or off where a node states it
+    /// sends a boolean, and a whole number is one where it states that: a
+    /// sensor's reading, a thermostat's decision sent as the u8 a switch
+    /// takes, what a switch's lines were told. A node the configuration
+    /// lacks is bytes.
     #[test]
     fn only_a_node_that_sends_values_has_a_temperature() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
@@ -1040,10 +1052,13 @@ mod tests {
             Form::of(&thermostat, "consensus_temp"),
             Form::Value(Unit::Kelvin)
         );
-        assert_eq!(Form::of(&thermostat, "thermostat"), Form::Decision);
-        assert_eq!(Form::of(&thermostat, "temp_1"), Form::Datum);
-        // Driven lines that report what they were told: decisions.
-        assert_eq!(Form::of(&thermostat, "gpio-out-tmass1"), Form::Decision);
+        assert_eq!(Form::of(&thermostat, "thermostat"), Form::Whole(Basic::U8));
+        assert_eq!(Form::of(&thermostat, "temp_1"), Form::Whole(Basic::I16));
+        // Driven lines that report what they were told: the number.
+        assert_eq!(
+            Form::of(&thermostat, "gpio-out-tmass1"),
+            Form::Whole(Basic::U8)
+        );
         assert_eq!(Form::Lines(2).fpp_type(), "Datum");
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");

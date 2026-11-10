@@ -179,9 +179,10 @@ impl Thermostat {
             state.decision?
         };
 
+        // 1 or 0, as the one-byte whole number a heater's switch takes.
         let data: &[u8] = match decision {
-            Decision::On => b"1",
-            Decision::Off => b"0",
+            Decision::On => &[1],
+            Decision::Off => &[0],
         };
         for (heater, attachment) in &self.heaters {
             driven(&Some(attachment.clone()), heater, data);
@@ -279,6 +280,7 @@ mod tests {
         let params = ThermostatParams {
             setpoint: 293.15,
             half_band: 2.0,
+            sends: tcslibgs::link_type::Basic::U8,
         };
         (
             Thermostat::new("thermostat", params, sensors, heaters),

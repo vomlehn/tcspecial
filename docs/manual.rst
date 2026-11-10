@@ -160,9 +160,10 @@ value
     boundary and nowhere else.
 
 decision
-    What a computation sends a device: the text ``1`` or ``0``, one byte. It is
-    not a value, a heater's line not being a number, and it is asserted on
-    every sample rather than only when it changes.
+    What a thermostat sends a device: 1 to assert and 0 to unassert, as the
+    type its ``type-out`` names -- a ``boolean``, one byte, or the whole
+    number a set of GPIO lines takes. It is not a value, and it is asserted
+    on every sample rather than only when it changes.
 
 group
     Devices that share one sampling interval, so that a set of sensors is read
@@ -1427,16 +1428,15 @@ change and a report carries the time it was looked at.
 Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.
 
-Driven lines are driven together, to the same state. What arrives is a
-**decision** -- the text ``1`` to assert and ``0`` to unassert, which is what
-the thermostat compute element emits -- and anything else is refused rather
-than taken for one of them: the thing on the other end is a
-heater, and a datum that cannot be read is not guessed at. The lines are a
-set and not a pattern because there is nothing in the file to say which line
-is which, and because three heater circuits switched one at a time would be
-three thermal states of a vehicle on the way to the one that was asked for.
-The kernel counts them by their place in the request, so lines ``3,4,5``
-named in that order are the low three bits of the call that drives them.
+Driven lines are driven by one unsigned whole number, a bit for each line:
+the narrowest of ``u8``, ``u16``, ``u32`` and ``u64`` with room for them, bit 0
+the first line the node lists, so lines ``3,4,5`` are the low three bits of a
+``u8``. A thermostat driving a one-line switch states ``type-out: "u8"`` and
+sends 1 or 0. A number of another width, or with a bit set where the node has
+no line, is refused rather than guessed at: the thing on the other end is a
+heater. The lines are set together, in one call, which is also how the kernel
+counts them, by their place in the request. What a ``gpio_inout`` reports is
+the same number.
 
 The same value arrives over and over, and that is deliberate. A thermostat
 asserts its decision on every sample rather than only when it changes, so the
@@ -3829,8 +3829,10 @@ A payload joined to an output reports a value in the encoding of the conversion
 its readings go to, and a decision -- a lander's contact with the ground -- as
 the text ``1`` or ``0``: at once when it changes, waiting on the model for the
 moment rather than for its next turn, and again every packet interval. A
-payload joined to an input drives it with what the vehicle sends: a decision,
-``1`` or ``0``, or a value, four bytes of its unit's steps, which has to come
+payload joined to an input drives it with what the vehicle sends: a whole
+number -- a set of lines, or a thermostat's decision as the ``u8`` a switch
+takes, a thermal mass's heater being on where it is not nought -- or a value,
+four bytes of its unit's steps, which has to come
 from a node sending that unit -- an engine's throttle from a ``process``
 answering a ``ratio``. An input is driven by one payload, and not by one and a
 connection too: two would each switch it over the other. A heater's ``on`` that

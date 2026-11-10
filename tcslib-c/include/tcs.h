@@ -365,13 +365,15 @@ int tcs_value_in(const char *symbol, const uint8_t *data, size_t length,
 		 double *value);
 
 /* A decision is what a thermostat -- a compute node whose function is
- * thermostat -- sends: the text 1 to assert, 0 to unassert, which is what the
- * lines it drives take. As with values, only the configuration says which
- * nodes send decisions, and these two are how a station asks it and reads
- * one. */
+ * thermostat -- sends where its type-out is boolean: the one byte 1 to
+ * assert, 0 to unassert. One whose type-out is a whole number, as the lines
+ * it drives take, sends that number instead. As with values, only the
+ * configuration says which nodes send decisions, and these two are how a
+ * station asks it and reads one. */
 
 /** Says whether a node sends decisions, as the configuration says: a
- * compute node whose function is thermostat.
+ * compute node whose function is thermostat and whose type-out is
+ * boolean.
  *
  * @param configuration  The configuration.
  * @param node           The node's name, as a datum's source gives it.
@@ -386,7 +388,7 @@ int tcs_configuration_sends_decisions(const tcs_configuration *configuration,
  * @param data    The datum's bytes; may be NULL where length is 0.
  * @param length  How many bytes data holds.
  * @param on      Where 1 is written for on, 0 for off.
- * @return        0, or -1 where the datum is not 1 or 0. */
+ * @return        0, or -1 where the datum is not the one byte 1 or 0. */
 int tcs_decision_on(const uint8_t *data, size_t length, int *on);
 
 /* ---- Data up to the vehicle --------------------------------------------- */

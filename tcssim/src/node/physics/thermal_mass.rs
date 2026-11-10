@@ -159,9 +159,19 @@ impl Component for ThermalMass {
         // own adds its power while on; one with no power stated is not joined,
         // the model's check having refused it.
         let [one, two] = self.figures.heater_power;
+        // What a heater is driven with is a number -- the whole number its
+        // switch's lines are -- and this is the one place it is read as on
+        // or off: on when it is not nought. See "GPIO lines" in the design.
+        let on = |input: f64, power: Option<f64>| {
+            if input != 0.0 {
+                power.unwrap_or(0.0)
+            } else {
+                0.0
+            }
+        };
         self.heat = inputs[HEAT]
-            + inputs[HEATER_1] * one.unwrap_or(0.0)
-            + inputs[HEATER_2] * two.unwrap_or(0.0);
+            + on(inputs[HEATER_1], one)
+            + on(inputs[HEATER_2], two);
     }
 
     fn advance(&mut self, from: f64, to: f64) {

@@ -372,14 +372,13 @@ fn took_a_drive(
             return;
         }
     };
-    let all = (1u64 << count) - 1;
-    if now == 0 || now == all {
-        crate::node::physics::driven(
-            &config.attachment,
-            &config.name,
-            &datagram[..1],
-        );
-    }
+    // The lines as the one number they are, which is what the world is
+    // driven with: see `physics::driven`.
+    crate::node::physics::driven(
+        &config.attachment,
+        &config.name,
+        &now.to_be_bytes(),
+    );
     if *driven != Some(now) {
         *driven = Some(now);
         let mut guard = stats.lock().unwrap();
@@ -496,13 +495,17 @@ fn watch_driven_lines(
             *value = if high { b'1' } else { b'0' };
         }
         if now != was && !first {
-            if now.iter().all(|&v| v == now[0]) {
-                crate::node::physics::driven(
-                    &config.attachment,
-                    &config.name,
-                    &now[..1],
-                );
-            }
+            // The lines as the one number they are, lowest first.
+            let bits = now
+                .iter()
+                .enumerate()
+                .filter(|(_, &v)| v == b'1')
+                .fold(0u64, |bits, (n, _)| bits | 1 << n);
+            crate::node::physics::driven(
+                &config.attachment,
+                &config.name,
+                &bits.to_be_bytes(),
+            );
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&now);
             guard.bytes_recv += lines.len() as u64 * EVENT_BYTES;

@@ -612,9 +612,14 @@ Typed links
    checked at both ends -- ``tcslibgs::graph::link_types`` -- and a
    device's reading laid out as its type's own as it is read; and every
    datum checked, as it is delivered, against the type the node it reaches
-   takes (`Type and encoding`_). A decision is still the text ``1`` or
-   ``0`` whatever its ``type-out``, and GPIO lines are still driven and
-   reported in that text. Where
+   takes (`Type and encoding`_); a thermostat's decision sent as its
+   ``type-out``, a ``boolean`` or a whole number; GPIO lines driven and
+   reported as one unsigned whole number, a bit outside them refused; and
+   a thermal mass's heater on where what it is driven with is not nought.
+   Still to come: a ``gpio_in``'s levels in place of its edge records, a
+   ``process``'s text forms, apps' packets, the F´ and cFS bridges'
+   channels of each type -- a whole number is still a ``Datum`` channel
+   there -- and each configuration's own XTCE. Where
    the rest of this section and the rest of this document disagree, the
    rest says what runs today, and `What typed links replace`_ lists the
    passages it will change.
@@ -933,13 +938,10 @@ What typed links replace
 These passages describe the untyped links and change as typed links are
 built:
 
-* `Compute elements`_: a decision is the text ``1`` or ``0``; it becomes
-  the ``type-out`` of the thermostat that makes it, and ``from_decision``
-  reads text only where a ``process`` writes it.
 * `App nodes`_: a packet's bytes are the program's business; they become
   its terminal's type, encoded.
-* `GPIO Payloads: Discrete Lines`_: the ``edge`` attribute, the sixteen-byte
-  records, and lines driven by the text ``1`` or ``0``.
+* `GPIO Payloads: Discrete Lines`_: the ``edge`` attribute and the
+  sixteen-byte records.
 * `Gateways: what the vehicle answers to`_, F´: a source's channel is chosen
   by the kind of node it is.
 * The Yamcs mission database, written for the Yamcs gateway node, which the
@@ -1797,13 +1799,14 @@ by tcslib-c's ``tcs_value_in`` -- ``from_value``, the one statement of what a
 value is -- and a datum from it that is not a value is
 written to no channel, counted in ``DataNotValues`` and said in an event:
 four bytes made a number whatever they held would be a temperature nobody
-measured. A ``thermostat`` node sends decisions, the text ``1`` or ``0``, and
-its channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
-``from_decision``, the one statement of what a decision is, by which a
-``gpio_out`` node aboard reads the state its lines are driven to -- and a datum
-from it that is not one is written to no channel, counted in
-``DataNotDecisions`` and said in an event. Every other source's channel is
-``Tcs.Datum``: its length, and its first 64 bytes. A longer one goes as its
+measured. A source that states it sends a ``boolean`` -- a ``thermostat``
+whose ``type-out`` is one -- sends decisions, the one byte 1 or 0, and its
+channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
+``from_decision``, the one statement of what a decision is -- and a datum from
+it that is not one is written to no channel, counted in ``DataNotDecisions``
+and said in an event. Every other source's channel is ``Tcs.Datum``,
+a whole number's among them until the bridge writes one of its own type
+(see `Typed links`_): its length, and its first 64 bytes. A longer one goes as its
 first 64 bytes with its whole length, is counted, and is said in an event,
 so that nothing is cut short quietly.
 
@@ -10523,14 +10526,12 @@ Requirement
     because a timer went off is the worst of them.
 
 Requirement
-    Driven lines are driven together, to the one state, by a decision on a
-    link -- the text ``1`` or ``0``, and nothing else, a decision being the
-    one thing on a link that is text rather than a value. There is nothing in the
-    configuration to say which line of a set is which, so a pattern would
-    have no meaning; and three heater circuits switched one at a time would be
-    three thermal states of a vehicle on the way to the one asked for. A datum
-    that is neither ``1`` nor ``0`` is refused and not guessed at, because what
-    is on the other end of an output is a heater or a valve.
+    Driven lines are driven by one unsigned whole number on a link, a bit
+    for each line -- the narrowest of ``u8`` to ``u64`` with room for them,
+    bit 0 the first line the node lists -- as `GPIO lines`_ says, and are
+    set together, in one call, to what its bits say. A number with a bit set
+    beyond the lines, or not of that width, is refused and not guessed at,
+    because what is on the other end of an output is a heater or a valve.
 
 Requirement
     The bits and the mask of a set-values call are indexed by a line's place

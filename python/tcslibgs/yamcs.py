@@ -866,9 +866,10 @@ def _form_type(root, names, link):
     of the unit's steps, most significant first, which a calibrator turns
     into the unit: what ``compute::from_value`` reads. Its unit is said in
     a ``UnitSet``, but a ratio's, which has no symbol. A decision is a
-    boolean read from the one character ``compute::from_decision`` reads,
-    ``1`` for on and ``0`` for off; anything else is not one, and Yamcs
-    says it cannot read it. Any other node's data is :data:`BODY_TYPE`.
+    boolean read from the one byte ``compute::from_decision`` reads, 1 for
+    on and 0 for off. A whole number is an integer as wide as its type,
+    most significant byte first. Any other node's data is
+    :data:`BODY_TYPE`.
 
     Args:
         root:  The wrapper's root.
@@ -884,21 +885,34 @@ def _form_type(root, names, link):
     form = link.form
     if form.kind == "Datum":
         return BODY_TYPE
-    name = value_type(form.unit) if form.kind == "Value" else DECISION_TYPE
+    if form.kind == "Value":
+        name = value_type(form.unit)
+    elif form.kind == "Whole":
+        name = f"{form.whole.upper()}WholeType"
+    else:
+        name = DECISION_TYPE
     types = _one(root, "./x:TelemetryMetaData/x:ParameterTypeSet",
                  "parameter type sets")
     if any(kind.get("name") == name for kind in types):
         return name
     names.take("parameter type", name, link.source)
     if form.kind == "Decision":
-        _comment(types, "A decision: the one character 1 for on, 0 for "
-                        "off.")
-        kind = _child(types, "BooleanParameterType", name=name,
-                      oneStringValue=DECISION_ON,
-                      zeroStringValue=DECISION_OFF)
-        encoding = _child(kind, "StringDataEncoding")
-        fixed = _child(_child(encoding, "SizeInBits"), "Fixed")
-        _child(fixed, "FixedValue").text = "8"
+        _comment(types, f"A decision: the one byte {DECISION_ON} for on, "
+                        f"{DECISION_OFF} for off.")
+        kind = _child(types, "BooleanParameterType", name=name)
+        _child(kind, "IntegerDataEncoding", sizeInBits="8",
+               encoding="unsigned")
+        return name
+    if form.kind == "Whole":
+        bits = form.whole[1:]
+        signed = form.whole.startswith("i")
+        _comment(types, f"A whole number, a {form.whole}, most significant "
+                        "byte first.")
+        kind = _child(types, "IntegerParameterType", name=name,
+                      signed="true" if signed else "false", sizeInBits=bits)
+        _child(kind, "IntegerDataEncoding", sizeInBits=bits,
+               encoding="twosComplement" if signed else "unsigned",
+               byteOrder="mostSignificantByteFirst")
         return name
     unit = form.unit
     steps = {1e6: "millionths", 1e3: "thousandths"}[unit.per_unit]

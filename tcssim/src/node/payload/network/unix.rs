@@ -780,12 +780,12 @@ mod tests {
         // of its own and may not have reached it yet.
         let vehicle = UnixDatagram::unbound().expect("the vehicle's socket");
         let deadline = Instant::now() + Duration::from_secs(5);
-        while Instant::now() < deadline && vehicle.send_to(b"1", &path).is_err()
+        while Instant::now() < deadline && vehicle.send_to(&[1], &path).is_err()
         {
             std::thread::sleep(Duration::from_millis(10));
         }
         vehicle
-            .send_to(b"1", &path)
+            .send_to(&[1], &path)
             .expect("the heater is driven on");
 
         // Warming, which is the whole of what a heater does: three kelvin a

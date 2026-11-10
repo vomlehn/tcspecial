@@ -149,9 +149,10 @@ class FormTest(unittest.TestCase):
             config = vehicle(directory, to_value("furlongs"))
             with self.assertRaisesRegex(ValueError, "not a value type"):
                 form_of(config, "c")
+            # One that states no type is read as bytes, as the Rust reads
+            # it: tcsverify refuses it.
             config = vehicle(directory, 'function: "to_value"')
-            with self.assertRaisesRegex(ValueError, "type-out is not set"):
-                form_of(config, "c")
+            self.assertEqual(form_of(config, "c"), DATUM)
 
 
 class TypedParameterTest(unittest.TestCase):

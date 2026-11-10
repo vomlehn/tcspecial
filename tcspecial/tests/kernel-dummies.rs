@@ -270,8 +270,7 @@ impl Flown {
             }
         }
         panic!(
-            "{:?}, sent up to {}, did not reach the device",
-            String::from_utf8_lossy(command),
+            "{command:?}, sent up to {}, did not reach the device",
             self.up
         );
     }
@@ -686,8 +685,9 @@ fn a_gpio_payload_is_flown_on_a_simulated_chip() {
     chip.pull(false);
 
     // The lamp lit, and put out, by what the ground sends.
-    flown.command_until(b"1", || chip.lamp() == "1");
-    flown.command_until(b"0", || chip.lamp() == "0");
+    // The lamp's one line is driven with a u8, its bit 0 the line.
+    flown.command_until(&[1], || chip.lamp() == "1");
+    flown.command_until(&[0], || chip.lamp() == "0");
 }
 
 /// A GPIO payload read for what its lines are, with no edges to wake it,

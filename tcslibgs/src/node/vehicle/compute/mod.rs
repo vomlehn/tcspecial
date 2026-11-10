@@ -205,7 +205,8 @@ pub fn from_value(data: &[u8], unit: Unit, what: &str) -> Result<f64, String> {
 pub enum Produces {
     /// A value: four bytes of micro-kelvin, which [`from_value`] reads.
     Value,
-    /// A decision: the text `1` or `0`, which [`from_decision`] reads.
+    /// A decision: a `boolean`, one byte, 1 or 0, which [`from_decision`]
+    /// reads.
     Decision,
 }
 
@@ -213,8 +214,8 @@ pub enum Produces {
 ///
 /// Three of the four make a value: a conversion makes one out of a part's
 /// counts, a vote makes one out of several, and a program's answer is read as
-/// one. A thermostat is the exception -- what it produces is a decision, the
-/// text `1` or `0`, because what it drives is a set of discrete lines.
+/// one. A thermostat is the exception -- what it produces is a decision, 1 or
+/// 0, as the type it states it sends: see [`node_produces`].
 ///
 /// Asked by whoever has to read a datum back: the ground shows a reading as a
 /// temperature and a decision as on or off, and the only thing that can tell
@@ -281,9 +282,19 @@ pub fn node_produces(
     if node_type != "compute" {
         return None;
     }
-    attributes
+    match attributes
         .get("function")
         .and_then(|function| produces(function.as_str()))
+    {
+        // A decision only where it is sent as one, a `boolean`: sent as a
+        // whole number, it is that number, which is no decision to read
+        // back as on or off.
+        Some(Produces::Decision) => match stated_type(attributes, "type-out") {
+            Ok(LinkType::Basic(Basic::Boolean)) => Some(Produces::Decision),
+            _ => None,
+        },
+        other => other,
+    }
 }
 
 /// Tells whether what this node sends is a value: see [`node_produces`].
@@ -321,25 +332,21 @@ pub fn node_sends_a_decision(
     node_produces(node_type, attributes) == Some(Produces::Decision)
 }
 
-/// A decision to assert, as it travels: the one byte `1`.
-///
-/// Text, like every other datum a person may read on a link or in a log, so
-/// a telemetry log shows the decision rather than a byte; and `1` and `0`
-/// because that is the value a set of discrete lines is driven to.
-pub const DECISION_ON: u8 = b'1';
+/// A decision to assert, as it travels: a `boolean`, the one byte 1.
+pub const DECISION_ON: u8 = 1;
 
-/// A decision to unassert, as it travels: the one byte `0`.
-pub const DECISION_OFF: u8 = b'0';
+/// A decision to unassert, as it travels: the one byte 0.
+pub const DECISION_OFF: u8 = 0;
 
-/// Reads a decision: the text `1` or `0`.
+/// Reads a decision: a `boolean`, the one byte 1 or 0.
 ///
-/// White space either side is allowed, because a decision may come from a
-/// program that writes lines as well as from a thermostat; anything else is
-/// refused, because what reads a decision drives something with it, and a
-/// decision that cannot be read is not guessed at.
+/// Anything else is refused, because what reads a decision drives something
+/// with it, and a decision that cannot be read is not guessed at. A
+/// decision a program writes is text, and is read as text where the program
+/// is, at a `process` node's pipe.
 ///
-/// The one statement of what a decision is, read by the lines that a
-/// decision drives aboard and by the ground that shows one.
+/// The one statement of what a decision is, read by the ground that shows
+/// one.
 ///
 /// # Arguments
 ///
@@ -352,18 +359,14 @@ pub const DECISION_OFF: u8 = b'0';
 ///
 /// # Errors
 ///
-/// A message when `data` is not `1` or `0`.
+/// A message when `data` is not the one byte 1 or 0.
 pub fn from_decision(data: &[u8], what: &str) -> Result<bool, String> {
-    match std::str::from_utf8(data).map(str::trim) {
-        Ok(text) if text.as_bytes() == [DECISION_ON] => Ok(true),
-        Ok(text) if text.as_bytes() == [DECISION_OFF] => Ok(false),
-        Ok(other) => Err(format!(
-            "{what}: {other:?} is neither 1 nor 0, which is what a \
-             decision is, and one that cannot be read is not guessed at"
-        )),
-        Err(_) => Err(format!(
-            "{what}: what arrived is not text, so it is not the decision 1 \
-             or 0"
+    match data {
+        [DECISION_ON] => Ok(true),
+        [DECISION_OFF] => Ok(false),
+        _ => Err(format!(
+            "{what}: {data:?} is not a decision, which is the one byte 1 or \
+             0, and one that cannot be read is not guessed at"
         )),
     }
 }
@@ -726,6 +729,9 @@ pub struct ThermostatParams {
     /// band around a goal, so the goal and the half-width are the two numbers
     /// there are.
     pub half_band: f64,
+    /// What it sends its decision as: its `type-out`, a `boolean` or a whole
+    /// number, 1 when asserted and 0 when not.
+    pub sends: Basic,
 }
 
 /// A computation that is a program of its own.
@@ -1025,20 +1031,25 @@ pub fn params_of(
             }
 
             value_type(attributes, "type-in").map_err(named)?;
-            match stated_type(attributes, "type-out").map_err(named)? {
-                LinkType::Basic(basic)
-                    if basic == Basic::Boolean || basic.is_whole() => {}
-                other => {
-                    return Err(named(format!(
-                        "type-out is {other}, and a thermostat sends its \
+            let sends =
+                match stated_type(attributes, "type-out").map_err(named)? {
+                    LinkType::Basic(basic)
+                        if basic == Basic::Boolean || basic.is_whole() =>
+                    {
+                        basic
+                    }
+                    other => {
+                        return Err(named(format!(
+                            "type-out is {other}, and a thermostat sends its \
                          decision as a boolean or as a whole number, 1 or 0"
-                    )))
-                }
-            }
+                        )))
+                    }
+                };
 
             Ok(Computation::Thermostat(ThermostatParams {
                 setpoint: number(attributes, "setpoint").map_err(named)?,
                 half_band,
+                sends,
             }))
         }
         "process" => {
@@ -1378,9 +1389,15 @@ mod tests {
         // A compute node with no function is a node that will be refused;
         // until then it does not have its data read as a temperature.
         assert!(!node_sends_a_value("compute", &node(&[])));
+        // A thermostat's decision is one where it is sent as a boolean,
+        // and a whole number where it is sent as one.
         assert!(node_sends_a_decision(
             "compute",
-            &node(&[("function", "thermostat")])
+            &node(&[("function", "thermostat"), ("type-out", "boolean")])
+        ));
+        assert!(!node_sends_a_decision(
+            "compute",
+            &node(&[("function", "thermostat"), ("type-out", "u8")])
         ));
         assert!(!node_sends_a_decision(
             "compute",
@@ -1421,22 +1438,19 @@ mod tests {
         assert!(why.contains("change the function to thermostat"), "{why}");
     }
 
-    /// A decision is 1 or 0, with white space either side, and nothing
-    /// else: not a value, not a word, not bytes that are not text.
+    /// A decision is a boolean, the one byte 1 or 0, and nothing else: not
+    /// a value, not the text a person types, not two bytes.
     #[test]
     fn a_decision_is_1_or_0() {
-        assert_eq!(from_decision(b"1", "x"), Ok(true));
-        assert_eq!(from_decision(b"0", "x"), Ok(false));
-        assert_eq!(from_decision(b" 1\n", "x"), Ok(true));
+        assert_eq!(from_decision(&[1], "x"), Ok(true));
+        assert_eq!(from_decision(&[0], "x"), Ok(false));
         assert_eq!(from_decision(&[DECISION_OFF], "x"), Ok(false));
-        for bad in [&b""[..], b"2", b"10", b"on", b"\x00\x00\x00\x01"] {
+        for bad in [&b""[..], &[2], b"1", b"0", &[0, 1], b"\x00\x00\x00\x01"] {
             let why = from_decision(bad, "heater_wanted")
                 .expect_err("not a decision");
             assert!(why.contains("heater_wanted"), "{why}");
-            assert!(why.contains("neither 1 nor 0"), "{why}");
+            assert!(why.contains("not a decision"), "{why}");
         }
-        let why = from_decision(&[0xff], "x").expect_err("not text");
-        assert!(why.contains("not text"), "{why}");
     }
 
     /// A program's pipe carries a decimal, and it round-trips.
@@ -1703,6 +1717,7 @@ mod tests {
             Computation::Thermostat(ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
+                sends: Basic::U8,
             })
         );
 

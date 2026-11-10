@@ -1955,9 +1955,9 @@ mod tests {
     /// A temperature on a link, which is a value and not text.
     ///
     /// What a sensor's conversion produces and what a computation reads: see
-    /// [`crate::node::vehicle::compute::as_value`]. A decision is still text,
-    /// so the decisions these tests look for are written as `b"1"` and
-    /// `b"0"`.
+    /// [`crate::node::vehicle::compute::as_value`]. A decision is the u8 the
+    /// example's thermostat sends, so the decisions these tests look for are
+    /// `[1]` and `[0]`.
     ///
     /// # Arguments
     ///
@@ -2265,7 +2265,7 @@ vehicle:
             .collect();
         assert_eq!(
             decisions,
-            [&b"1"[..]],
+            [&[1u8][..]],
             "the decision reaches the ground as well as the heaters, once"
         );
 
@@ -2291,7 +2291,7 @@ vehicle:
                 .collect();
             assert_eq!(
                 driven,
-                vec![b"1".to_vec()],
+                vec![vec![1u8]],
                 "{which}: a zone below the band should have its heaters on"
             );
         }
@@ -2457,7 +2457,7 @@ vehicle:
             // Vehicleward: what a thermostat sends a heater is a command, and
             // the link it goes down is the one leaving the computation's
             // `moc-out`.
-            vec![(None, Some(Stream::Vehicleward), b"1".to_vec())],
+            vec![(None, Some(Stream::Vehicleward), vec![1u8])],
             "294 is more than two degrees below 300"
         );
     }
@@ -2520,12 +2520,12 @@ vehicle:
                 .given
                 .iter()
                 .map(|(_, _, data)| data.clone())
-                .filter(|data| data == b"1" || data == b"0")
+                .filter(|data| data == &[1] || data == &[0])
                 .collect()
         };
-        assert_eq!(said(&heaters), vec![b"1".to_vec()]);
-        assert_eq!(said(&log), vec![b"1".to_vec()]);
-        assert_eq!(said(&gateway), vec![b"1".to_vec()]);
+        assert_eq!(said(&heaters), vec![vec![1u8]]);
+        assert_eq!(said(&log), vec![vec![1u8]]);
+        assert_eq!(said(&gateway), vec![vec![1u8]]);
 
         // Four more samples, still cold. Each asserts the decision to both
         // heaters again -- it is what they are to be held at -- and the
@@ -2537,20 +2537,16 @@ vehicle:
         assert_eq!(said(&heaters).len(), 5, "{:?}", said(&heaters));
         assert_eq!(said(&second).len(), 5, "both heaters are held, not one");
         assert!(
-            said(&heaters).iter().all(|datum| datum == b"1"),
+            said(&heaters).iter().all(|datum| datum == &[1]),
             "every assertion is the same decision: {:?}",
             said(&heaters)
         );
         assert_eq!(
             said(&log),
-            vec![b"1".to_vec()],
+            vec![vec![1u8]],
             "the log should hold the transition and not the repetitions"
         );
-        assert_eq!(
-            said(&gateway),
-            vec![b"1".to_vec()],
-            "and so should the ground"
-        );
+        assert_eq!(said(&gateway), vec![vec![1u8]], "and so should the ground");
 
         // A reading inside the band decides nothing new, and the heaters are
         // still held at what they were told: that is what the band means.
@@ -2563,10 +2559,10 @@ vehicle:
         // the first one and the heaters are driven to it.
         let moved = fabric.deliver("ambient", &kelvin(300.0));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
-        assert_eq!(said(&heaters).last(), Some(&b"0".to_vec()));
+        assert_eq!(said(&heaters).last(), Some(&vec![0u8]));
         assert_eq!(
             said(&log),
-            vec![b"1".to_vec(), b"0".to_vec()],
+            vec![vec![1u8], vec![0u8]],
             "a reader of the log sees when the heaters actually switched"
         );
     }

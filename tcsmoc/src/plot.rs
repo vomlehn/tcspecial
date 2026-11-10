@@ -5,8 +5,10 @@
 //! is anything `tcslibgs::graph::units::unit_of` gives a unit -- a
 //! conversion, a vote, a program's answer -- read by the rule the vehicle
 //! writes it by, `tcslibgs::node::vehicle::compute::from_value`, in that
-//! unit. A switch is a node that sends decisions, a `thermostat`, read by
-//! `from_decision`; or one line of a GPIO payload that watches lines, read
+//! unit. A switch is a node that sends decisions, a `thermostat`, or a
+//! `gpio_inout`'s report of what its lines were told -- a `boolean` or a
+//! whole number, drawn on where it is not nought; or one line of a GPIO
+//! payload that watches lines, read
 //! from the records its node sends -- a line sensing a heater is the
 //! heater's real state, where a thermostat's decision is what it was told.
 //! Nothing is guessed from a datum's width.
@@ -70,9 +72,7 @@ use slint::{
 use tcslibgs::graph::units::{input_unit, unit_of};
 use tcslibgs::graph::Graph;
 use tcslibgs::node::payload::gpio::EVENT_BYTES;
-use tcslibgs::node::vehicle::compute::{
-    from_decision, from_value, params_of, Computation,
-};
+use tcslibgs::node::vehicle::compute::{from_value, params_of, Computation};
 use tcslibgs::unit::Unit;
 
 use crate::{
@@ -1331,11 +1331,16 @@ pub fn take(plot: &Mutex<Plot>, plotted: Plotted, data: &[u8], at: Instant) {
                 plot.reading(i, at, value);
             }
         }
+        // A boolean or a whole number, as the switch states it sends:
+        // drawn on where it is not nought, which is how the strip shows it
+        // and nothing more. More than a whole number's eight bytes, or none,
+        // is not plotted.
         Plotted::Switch(i) => {
-            if let (Ok(on), Ok(mut plot)) =
-                (from_decision(data, ""), plot.lock())
-            {
-                plot.decision(i, at, on);
+            if data.is_empty() || data.len() > 8 {
+                return;
+            }
+            if let Ok(mut plot) = plot.lock() {
+                plot.decision(i, at, data.iter().any(|&byte| byte != 0));
             }
         }
         // One record for each line reported, each the time, the line's

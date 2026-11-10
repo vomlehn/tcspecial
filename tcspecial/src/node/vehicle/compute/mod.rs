@@ -94,11 +94,30 @@ impl Out {
         })
     }
 
-    /// One byte: a decision.
+    /// One byte.
     pub const fn byte(byte: u8) -> Out {
         let mut bytes = [0u8; OUT_BYTES];
         bytes[0] = byte;
         Out { bytes, len: 1 }
+    }
+
+    /// A decision, as the type a computation sends it as: 1 when asserted
+    /// and 0 when not, a `boolean` as one byte and a whole number as wide as
+    /// its type, most significant byte first.
+    ///
+    /// # Arguments
+    ///
+    /// * `asserted` - The decision.
+    /// * `sends`    - The type it is sent as.
+    ///
+    /// # Returns
+    ///
+    /// The decision, in the form it takes on a link.
+    pub fn decision(asserted: bool, sends: tcslibgs::link_type::Basic) -> Out {
+        let width = sends.width().unwrap_or(1);
+        let mut bytes = [0u8; OUT_BYTES];
+        bytes[width - 1] = u8::from(asserted);
+        Out { bytes, len: width }
     }
 }
 
@@ -383,6 +402,7 @@ mod tests {
             tcslibgs::node::vehicle::compute::ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
+                sends: tcslibgs::link_type::Basic::U8,
             },
             tcslibgs::unit::Unit::Kelvin,
         );
@@ -431,7 +451,7 @@ mod tests {
         );
         assert_eq!(
             decision,
-            Some(Out::byte(b'1')),
+            Some(Out::byte(1)),
             "a cold zone should assert the heater lines"
         );
 
@@ -451,7 +471,7 @@ mod tests {
             &mut thermostat,
             [360, 360, 360],
         );
-        assert_eq!(decision, Some(Out::byte(b'0')));
+        assert_eq!(decision, Some(Out::byte(0)));
         let decision = pass(
             &mut converters,
             &mut voted,
@@ -470,7 +490,7 @@ mod tests {
         );
         assert_eq!(
             decision,
-            Some(Out::byte(b'1')),
+            Some(Out::byte(1)),
             "a higher setpoint should call for the heaters again"
         );
     }

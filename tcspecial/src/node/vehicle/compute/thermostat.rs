@@ -35,9 +35,8 @@
 //! state it keeps is still the last decision; what changed is that silence is
 //! no longer how it is held.
 
-use tcslibgs::node::vehicle::compute::{
-    ThermostatParams, DECISION_OFF, DECISION_ON,
-};
+use tcslibgs::link_type::Basic;
+use tcslibgs::node::vehicle::compute::ThermostatParams;
 use tcslibgs::unit::Unit;
 
 use super::{from_text, from_value, Function, Out};
@@ -54,21 +53,19 @@ pub enum Decision {
 impl Decision {
     /// Gives what goes along the link for this decision.
     ///
-    /// `1` and `0`, which is what a set of discrete lines takes: the value to
-    /// drive them to. The form is `tcslibgs`'s, which the ground reads a
-    /// decision back by.
+    /// 1 and 0, as the type the thermostat sends: a `boolean`, or the whole
+    /// number a set of discrete lines takes, the value to drive them to. See
+    /// "Typed links" in the design.
+    ///
+    /// # Arguments
+    ///
+    /// * `sends` - The thermostat's `type-out`.
     ///
     /// # Returns
     ///
-    /// The one byte `1` for `On` and `0` for `Off`.
-    fn as_value(self) -> Out {
-        // Constants, so that a decision made or held allocates nothing.
-        const ON: Out = Out::byte(DECISION_ON);
-        const OFF: Out = Out::byte(DECISION_OFF);
-        match self {
-            Decision::On => ON,
-            Decision::Off => OFF,
-        }
+    /// 1 for `On` and 0 for `Off`, as that type. Allocates nothing.
+    fn as_value(self, sends: Basic) -> Out {
+        Out::decision(self == Decision::On, sends)
     }
 }
 
@@ -86,6 +83,8 @@ pub struct Thermostat {
     last: Option<Decision>,
     /// What the readings, the setpoint and the band are numbers of.
     unit: Unit,
+    /// What it sends its decision as.
+    sends: Basic,
 }
 
 impl Thermostat {
@@ -110,6 +109,7 @@ impl Thermostat {
             half_band: params.half_band,
             last: None,
             unit,
+            sends: params.sends,
         }
     }
 
@@ -169,7 +169,7 @@ impl Function for Thermostat {
         }
 
         self.last = Some(wanted);
-        Ok(Some(wanted.as_value()))
+        Ok(Some(wanted.as_value(self.sends)))
     }
 
     /// The decision the heaters are held at, until it changes.
@@ -180,7 +180,7 @@ impl Function for Thermostat {
     /// before any decision answers this way too, which is the one case where
     /// a sample produces nothing at all.
     fn held(&self) -> Option<Out> {
-        self.last.map(Decision::as_value)
+        self.last.map(|decision| decision.as_value(self.sends))
     }
 
     /// The setpoint and the band, which are what the ground commands.
@@ -265,6 +265,7 @@ mod tests {
             ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
+                sends: tcslibgs::link_type::Basic::U8,
             },
             tcslibgs::unit::Unit::Kelvin,
         )
@@ -276,15 +277,9 @@ mod tests {
         let mut h = thermostat();
 
         // More than two degrees under: on.
-        assert_eq!(
-            h.give(None, &kelvin(290_f64)).unwrap(),
-            Some(Out::byte(b'1'))
-        );
+        assert_eq!(h.give(None, &kelvin(290_f64)).unwrap(), Some(Out::byte(1)));
         // More than two degrees over: off.
-        assert_eq!(
-            h.give(None, &kelvin(296_f64)).unwrap(),
-            Some(Out::byte(b'0'))
-        );
+        assert_eq!(h.give(None, &kelvin(296_f64)).unwrap(), Some(Out::byte(0)));
     }
 
     /// Inside the band, nothing happens.
@@ -313,25 +308,16 @@ mod tests {
     fn only_a_change_is_sent() {
         let mut h = thermostat();
 
-        assert_eq!(
-            h.give(None, &kelvin(280_f64)).unwrap(),
-            Some(Out::byte(b'1'))
-        );
+        assert_eq!(h.give(None, &kelvin(280_f64)).unwrap(), Some(Out::byte(1)));
         // Still cold, and still on: nothing to say.
         for _ in 0..10 {
             assert_eq!(h.give(None, &kelvin(281_f64)).unwrap(), None);
         }
         // Now hot: one command.
-        assert_eq!(
-            h.give(None, &kelvin(300_f64)).unwrap(),
-            Some(Out::byte(b'0'))
-        );
+        assert_eq!(h.give(None, &kelvin(300_f64)).unwrap(), Some(Out::byte(0)));
         assert_eq!(h.give(None, &kelvin(301_f64)).unwrap(), None);
         // And cold again.
-        assert_eq!(
-            h.give(None, &kelvin(280_f64)).unwrap(),
-            Some(Out::byte(b'1'))
-        );
+        assert_eq!(h.give(None, &kelvin(280_f64)).unwrap(), Some(Out::byte(1)));
     }
 
     /// A vehicle that comes up cold decides on its first reading.
@@ -344,7 +330,7 @@ mod tests {
         let mut h = thermostat();
         assert_eq!(
             h.give(None, &kelvin(250_f64)).unwrap(),
-            Some(Out::byte(b'1')),
+            Some(Out::byte(1)),
             "a cold vehicle should switch the heaters on at once"
         );
     }
@@ -353,17 +339,14 @@ mod tests {
     #[test]
     fn the_setpoint_can_be_moved_from_the_ground() {
         let mut h = thermostat();
-        assert_eq!(
-            h.give(None, &kelvin(290_f64)).unwrap(),
-            Some(Out::byte(b'1'))
-        );
+        assert_eq!(h.give(None, &kelvin(290_f64)).unwrap(), Some(Out::byte(1)));
 
         // Ask for a much colder zone: 290 is now too warm.
         h.set_setpoint(280.0);
         assert_eq!(h.setpoint(), 280.0);
         assert_eq!(
             h.give(None, &kelvin(290_f64)).unwrap(),
-            Some(Out::byte(b'0')),
+            Some(Out::byte(0)),
             "the same temperature should now call for the heaters off"
         );
     }
@@ -440,6 +423,7 @@ mod tests {
             ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
+                sends: tcslibgs::link_type::Basic::U8,
             },
             tcslibgs::unit::Unit::Kelvin,
         );
@@ -458,26 +442,26 @@ mod tests {
         // Cold: a decision, and from here on that is what they are held at.
         assert_eq!(
             h.give(None, &kelvin(290.0_f64)).unwrap(),
-            Some(Out::byte(b'1'))
+            Some(Out::byte(1))
         );
-        assert_eq!(h.held(), Some(Out::byte(b'1')));
+        assert_eq!(h.held(), Some(Out::byte(1)));
 
         // Still cold: nothing new to send, and the same thing to hold them
         // at. The two together are what puts the decision on the wire every
         // sample without putting it in the log every sample.
         assert_eq!(h.give(None, &kelvin(290.0_f64)).unwrap(), None);
-        assert_eq!(h.held(), Some(Out::byte(b'1')));
+        assert_eq!(h.held(), Some(Out::byte(1)));
 
         // Back inside the band: the decision stands, because that is what a
         // band is for.
         assert_eq!(h.give(None, &kelvin(293.0_f64)).unwrap(), None);
-        assert_eq!(h.held(), Some(Out::byte(b'1')));
+        assert_eq!(h.held(), Some(Out::byte(1)));
 
         // And over the top of it: a new decision, held from now on.
         assert_eq!(
             h.give(None, &kelvin(296.0_f64)).unwrap(),
-            Some(Out::byte(b'0'))
+            Some(Out::byte(0))
         );
-        assert_eq!(h.held(), Some(Out::byte(b'0')));
+        assert_eq!(h.held(), Some(Out::byte(0)));
     }
 }

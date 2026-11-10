@@ -192,8 +192,8 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
         forms,
         [
             "Value(Kelvin)",
-            "Decision",
-            "Decision",
+            "Whole(U8)",
+            "Whole(U8)",
             "Value(Kelvin)",
             "Value(Kelvin)",
             "Value(Kelvin)",

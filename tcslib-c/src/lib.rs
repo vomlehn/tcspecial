@@ -1239,8 +1239,8 @@ pub unsafe extern "C" fn tcs_value_in(
     })
 }
 
-/// Says whether what a node sends is a decision: the text `1` or `0`, which
-/// [`tcs_decision_on`] reads. The configuration's answer,
+/// Says whether what a node sends is a decision: a `boolean`, the one byte
+/// 1 or 0, which [`tcs_decision_on`] reads. The configuration's answer,
 /// `tcslibgs::node::vehicle::compute::node_sends_a_decision`.
 ///
 /// # Arguments
@@ -1281,7 +1281,7 @@ pub unsafe extern "C" fn tcs_configuration_sends_decisions(
     })
 }
 
-/// Reads a decision -- the text `1` or `0` -- as on or off, by
+/// Reads a decision -- a `boolean`, the one byte 1 or 0 -- as on or off, by
 /// `tcslibgs::node::vehicle::compute::from_decision`, the one statement of
 /// what a decision is.
 ///
@@ -2294,7 +2294,7 @@ mod tests {
         use super::*;
 
         let mut on = -1;
-        for (written, said) in [(&b"1"[..], 1), (b"0", 0)] {
+        for (written, said) in [(&[1u8][..], 1), (&[0u8][..], 0)] {
             // SAFETY: readable bytes, and a writable int.
             let read = unsafe {
                 tcs_decision_on(written.as_ptr(), written.len(), &mut on)
@@ -2312,7 +2312,7 @@ mod tests {
         // SAFETY: this thread's error buffer, which `Text` keeps terminated
         // and which lives as long as the thread.
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
-        assert!(why.to_string_lossy().contains("neither 1 nor 0"), "{why:?}");
+        assert!(why.to_string_lossy().contains("not a decision"), "{why:?}");
     }
 
     /// What unit a node's values are in is the configuration's, and a value
@@ -2433,15 +2433,20 @@ mod tests {
 
         let path = CString::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../examples/thermostat/thermostat.ytcs"
+            "/../examples/fprime/fprime.ytcs"
         ))
         .expect("a path");
         // SAFETY: a NUL-terminated path that outlives the call.
         let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
         assert!(!configuration.is_null(), "the example opens");
-        for (node, sends) in
-            [(c"thermostat", 1), (c"consensus_temp", 0), (c"temp_1", 0)]
-        {
+        // A thermostat sending a boolean sends decisions; one sending a
+        // whole number, as the thermostat example's does to its switches,
+        // sends that number.
+        for (node, sends) in [
+            (c"heater_wanted", 1),
+            (c"zone_temp", 0),
+            (c"thermometer", 0),
+        ] {
             let mut decisions = -1;
             // SAFETY: a live configuration, a NUL-terminated name and a
             // writable int.

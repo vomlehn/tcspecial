@@ -30,6 +30,8 @@ X = {"x": generated.NAMESPACE}
 
 #: A value in kelvin, as the readings and the vote are.
 KELVIN = Form("Value", UNITS[0])
+#: What a heater's switch reports: the u8 its one line was told.
+SWITCH = Form("Whole", whole="u8")
 
 
 def options(**changed):
@@ -59,10 +61,10 @@ class SetupTest(unittest.TestCase):
             [(source.node, source.parameter, source.form, source.drives)
              for source in setup.sources],
             [("consensus_temp", "/TcsYamcs/consensus_temp", KELVIN, ()),
-             # The heaters' switches, each on or off: what each was last
-             # told, where the thermostat's decision is not sent down.
-             ("gpio-out-tmass1", "/TcsYamcs/gpio-out-tmass1", DECISION, ()),
-             ("gpio-out-tmass2", "/TcsYamcs/gpio-out-tmass2", DECISION, ()),
+             # The heaters' switches, each the u8 its line was last told,
+             # where the thermostat's decision is not sent down.
+             ("gpio-out-tmass1", "/TcsYamcs/gpio-out-tmass1", SWITCH, ()),
+             ("gpio-out-tmass2", "/TcsYamcs/gpio-out-tmass2", SWITCH, ()),
              ("to_k1", "/TcsYamcs/to_k1", KELVIN, ()),
              ("to_k2", "/TcsYamcs/to_k2", KELVIN, ()),
              ("to_k3", "/TcsYamcs/to_k3", KELVIN, ())])
@@ -144,18 +146,21 @@ class MdbTest(unittest.TestCase):
             self.assertEqual((float(term.get("coefficient")),
                               term.get("exponent")), (1e-6, "1"))
 
-    def test_each_heaters_switch_is_a_decision(self):
+    def test_each_heaters_switch_is_the_number_its_line_was_told(self):
         for parameter in ("gpio-out-tmass1", "gpio-out-tmass2"):
             kind = self.kind_of(parameter)
             self.assertEqual(kind.tag, f"{{{generated.NAMESPACE}}}"
-                                       "BooleanParameterType")
-            self.assertEqual(kind.get("name"), generated.DECISION_TYPE)
+                                       "IntegerParameterType")
+            self.assertEqual(kind.get("name"), "U8WholeType")
+            encoding, = kind.iterfind("./x:IntegerDataEncoding", X)
+            self.assertEqual((encoding.get("sizeInBits"),
+                              encoding.get("encoding")), ("8", "unsigned"))
 
     def test_each_type_is_written_once(self):
         names = [kind.get("name") for kind in self.root.iterfind(
             ".//x:ParameterTypeSet/*", X)]
         self.assertEqual(names.count("KelvinValueType"), 1)
-        self.assertEqual(names.count(generated.DECISION_TYPE), 1)
+        self.assertEqual(names.count("U8WholeType"), 1)
 
     def test_each_container_is_its_sources_apid(self):
         found = {}
@@ -246,7 +251,7 @@ def a_yamcs():
 class ReadingsTest(unittest.TestCase):
     """What the program shows of what arrives."""
 
-    def test_temperatures_are_shown_with_their_units_and_decisions_on_or_off(
+    def test_temperatures_are_shown_with_their_units_and_switches_as_numbers(
             self):
         yamcs = a_yamcs()
         readings = readings_of(yamcs)
@@ -255,25 +260,25 @@ class ReadingsTest(unittest.TestCase):
                          "gpio-out-tmass1 --, gpio-out-tmass2 --")
         yamcs.values.update({"/TcsYamcs/consensus_temp": 291.2341,
                              "/TcsYamcs/to_k1": 291.0,
-                             "/TcsYamcs/gpio-out-tmass1": True,
-                             "/TcsYamcs/gpio-out-tmass2": False})
+                             "/TcsYamcs/gpio-out-tmass1": 1,
+                             "/TcsYamcs/gpio-out-tmass2": 0})
         readings.read()
         self.assertEqual(readings.line(),
                          "consensus_temp 291.234 K, to_k1 291.000 K, "
-                         "to_k2 --, to_k3 --, gpio-out-tmass1 on, "
-                         "gpio-out-tmass2 off")
+                         "to_k2 --, to_k3 --, gpio-out-tmass1 1, "
+                         "gpio-out-tmass2 0")
         self.assertFalse(readings.arrived())
 
-    def test_a_decision_that_changes_is_said(self):
+    def test_a_switch_that_changes_is_said(self):
         yamcs = a_yamcs()
         readings = readings_of(yamcs)
-        yamcs.values["/TcsYamcs/gpio-out-tmass1"] = True
+        yamcs.values["/TcsYamcs/gpio-out-tmass1"] = 1
         first = readings.read()
         self.assertEqual([(source.node, was, now)
                           for source, was, now in first],
-                         [("gpio-out-tmass1", None, True)])
+                         [("gpio-out-tmass1", None, 1)])
         self.assertEqual(readings.read(), [], "the same is no change")
-        yamcs.values["/TcsYamcs/gpio-out-tmass1"] = False
+        yamcs.values["/TcsYamcs/gpio-out-tmass1"] = 0
         yamcs.values["/TcsYamcs/consensus_temp"] = 295.2
         changed = readings.read()
         said = io.StringIO()
@@ -281,9 +286,9 @@ class ReadingsTest(unittest.TestCase):
             thermostat_yamcs.say_changes(first, readings)
             thermostat_yamcs.say_changes(changed, readings)
         self.assertEqual(said.getvalue().splitlines(),
-                         ["switched: gpio-out-tmass1 on -> off; "
+                         ["switched: gpio-out-tmass1 1 -> 0; "
                           "consensus_temp 295.200 K, to_k1 --, to_k2 --, "
-                          "to_k3 --, gpio-out-tmass1 off, gpio-out-tmass2 --"])
+                          "to_k3 --, gpio-out-tmass1 0, gpio-out-tmass2 --"])
 
     def test_the_worlds_ambient_is_shown_after_the_readings(self):
         setup = thermostat_yamcs.Setup(options())

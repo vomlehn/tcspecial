@@ -74,6 +74,10 @@ from tcslibgs import configuration  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
 from tcslibgs.form import DECISION, UNITS, Form  # noqa: E402
 
+#: The forms a switch's data take: a decision, sent as a boolean, or the
+#: whole number a switch's lines were told.
+SWITCHES = ("Decision", "Whole")
+
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
 HTTP_PORT = 17090
 
@@ -250,7 +254,7 @@ class Setup:
             The names its ``moc-out`` links reach, in order, for a
             source of decisions; none for any other.
         """
-        if link.form.kind != "Decision":
+        if link.form.kind not in SWITCHES:
             return ()
         targets = self.config.node(link.source).links.get("moc-out", [])
         return tuple(target.split(".", 1)[0] for target in targets)
@@ -289,7 +293,8 @@ def shown(source, value, units):
 
     Returns:
         A temperature to three places with its unit, a decision as ``on``
-        or ``off``, bytes as hex, or :data:`NOTHING_YET`.
+        or ``off``, a whole number -- what a switch's lines were told -- as
+        the number, bytes as hex, or :data:`NOTHING_YET`.
     """
     if value is None:
         return NOTHING_YET
@@ -297,6 +302,8 @@ def shown(source, value, units):
         return " ".join([f"{value:.3f}"] + list(units))
     if source.form.kind == "Decision":
         return "on" if value else "off"
+    if source.form.kind == "Whole":
+        return str(int(value))
     return value.hex() if isinstance(value, bytes) else str(value)
 
 
@@ -333,7 +340,7 @@ class Readings:
                 continue
             value = latest[source.parameter][0]
             was = self.values.get(source.parameter)
-            if source.form.kind == "Decision" and value != was:
+            if source.form.kind in SWITCHES and value != was:
                 changed.append((source, was, value))
             self.values[source.parameter] = value
         return changed
@@ -381,7 +388,7 @@ class Readings:
             zone's temperature comes before the readings voted on -- then
             decisions, then anything else, each by name within.
         """
-        rank = {"Value": 0, "Decision": 1}
+        rank = {"Value": 0, "Decision": 1, "Whole": 1}
 
         def key(source):
             """Where a source is shown.

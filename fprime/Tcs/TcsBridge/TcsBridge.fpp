@@ -232,6 +232,16 @@ module Tcs {
       format "{} sent a datum that is not a decision: {}" \
       throttle 10
 
+    @ A node the configuration says sends a whole number sent a datum that
+    @ is not one of its type's width: it went to no channel, and is counted
+    @ in DataNotWholes
+    event NotAWhole(
+      source: string size NODE_NAME_BYTES @< The node that sent it
+      why: string size 256 @< What tcslib-c said
+    ) severity warning low id 20 \
+      format "{} sent a datum that is not a whole number of its type: {}" \
+      throttle 10
+
     @ tcspecial answered RESTART_ARM or RESTART
     event RestartAnswered(
       cmd: string size 16 @< The command

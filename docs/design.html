@@ -1157,9 +1157,9 @@ a thermal mass's heater on where what it is driven with is not nought.
 A <tt class="docutils literal">gpio_in</tt> reports its lines' levels as that number every
 <tt class="docutils literal">state_interval</tt>, and has no edges. A <tt class="docutils literal">process</tt> exchanges any type
 with a text form, and each packet an app writes is held to its
-terminal's type. Still to come: the F´ and cFS bridges' channels of each
-type -- a whole number is still a <tt class="docutils literal">Datum</tt> channel there -- and each
-configuration's own XTCE. Where
+terminal's type. The F´ bridge writes each source to a channel of its
+type, and the cFS bridge publishes each datum as its type lays it out.
+Still to come: each configuration's own XTCE. Where
 the rest of this section and the rest of this document disagree, the
 rest says what runs today, and <a class="reference internal" href="#what-typed-links-replace">What typed links replace</a> lists the
 passages it will change.</p>
@@ -1432,10 +1432,12 @@ things of different types is two app nodes. A packet that said which of
 several types it is would need a tag the program wrote and a link check
 that took any of several, and nothing yet needs that.</dd>
 <dt>Requirement</dt>
-<dd>The F´ and cFS bridges write each source to a channel of the source's
-type, from the type its terminal states rather than from what kind of
-node it is: an <tt class="docutils literal">F64</tt> in its unit for a value, <tt class="docutils literal">U8</tt> to <tt class="docutils literal">U64</tt> and
-their signed kinds for an integer, a <tt class="docutils literal">bool</tt> for a <tt class="docutils literal">boolean</tt>.</dd>
+<dd>The F´ bridge writes each source to a channel of the source's type,
+from the type its terminal states rather than from what kind of node it
+is: an <tt class="docutils literal">F64</tt> in its unit for a value, <tt class="docutils literal">U8</tt> to <tt class="docutils literal">U64</tt> and their
+signed kinds for an integer, a <tt class="docutils literal">bool</tt> for a <tt class="docutils literal">boolean</tt>, and a
+<tt class="docutils literal">Datum</tt> for the rest. The cFS bridge publishes each datum as its type
+lays it out, which is what a cFS app reading it decodes.</dd>
 </dl>
 </div>
 <div class="section" id="the-configuration-s-own-xtce">
@@ -2297,9 +2299,13 @@ whose <tt class="docutils literal"><span class="pre">type-out</span></tt> is one
 channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
 <tt class="docutils literal">from_decision</tt>, the one statement of what a decision is -- and a datum from
 it that is not one is written to no channel, counted in <tt class="docutils literal">DataNotDecisions</tt>
-and said in an event. Every other source's channel is <tt class="docutils literal">Tcs.Datum</tt>,
-a whole number's among them until the bridge writes one of its own type
-(see <a class="reference internal" href="#typed-links">Typed links</a>): its length, and its first 64 bytes. A longer one goes as its
+and said in an event. A source that states a whole number -- a sensor's
+reading, what a set of lines is, a thermostat's decision sent as what a
+switch takes -- has a channel of that type, <tt class="docutils literal">U8</tt> to <tt class="docutils literal">I64</tt>, read by
+<tt class="docutils literal">tcs_unsigned_in</tt> or <tt class="docutils literal">tcs_signed_in</tt>; a datum from it that is not one of
+its type's width is written to no channel, counted in <tt class="docutils literal">DataNotWholes</tt> and
+said in an event. Every other source's channel is <tt class="docutils literal">Tcs.Datum</tt>: its length,
+and its first 64 bytes. A longer one goes as its
 first 64 bytes with its whole length, is counted, and is said in an event,
 so that nothing is cut short quietly.</p>
 <p>A thermostat sends only a change of decision to anything but the lines it

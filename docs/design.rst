@@ -619,9 +619,9 @@ Typed links
    A ``gpio_in`` reports its lines' levels as that number every
    ``state_interval``, and has no edges. A ``process`` exchanges any type
    with a text form, and each packet an app writes is held to its
-   terminal's type. Still to come: the F´ and cFS bridges' channels of each
-   type -- a whole number is still a ``Datum`` channel there -- and each
-   configuration's own XTCE. Where
+   terminal's type. The F´ bridge writes each source to a channel of its
+   type, and the cFS bridge publishes each datum as its type lays it out.
+   Still to come: each configuration's own XTCE. Where
    the rest of this section and the rest of this document disagree, the
    rest says what runs today, and `What typed links replace`_ lists the
    passages it will change.
@@ -891,10 +891,12 @@ Requirement
     that took any of several, and nothing yet needs that.
 
 Requirement
-    The F´ and cFS bridges write each source to a channel of the source's
-    type, from the type its terminal states rather than from what kind of
-    node it is: an ``F64`` in its unit for a value, ``U8`` to ``U64`` and
-    their signed kinds for an integer, a ``bool`` for a ``boolean``.
+    The F´ bridge writes each source to a channel of the source's type,
+    from the type its terminal states rather than from what kind of node it
+    is: an ``F64`` in its unit for a value, ``U8`` to ``U64`` and their
+    signed kinds for an integer, a ``bool`` for a ``boolean``, and a
+    ``Datum`` for the rest. The cFS bridge publishes each datum as its type
+    lays it out, which is what a cFS app reading it decodes.
 
 The configuration's own XTCE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1802,9 +1804,13 @@ whose ``type-out`` is one -- sends decisions, the one byte 1 or 0, and its
 channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
 ``from_decision``, the one statement of what a decision is -- and a datum from
 it that is not one is written to no channel, counted in ``DataNotDecisions``
-and said in an event. Every other source's channel is ``Tcs.Datum``,
-a whole number's among them until the bridge writes one of its own type
-(see `Typed links`_): its length, and its first 64 bytes. A longer one goes as its
+and said in an event. A source that states a whole number -- a sensor's
+reading, what a set of lines is, a thermostat's decision sent as what a
+switch takes -- has a channel of that type, ``U8`` to ``I64``, read by
+``tcs_unsigned_in`` or ``tcs_signed_in``; a datum from it that is not one of
+its type's width is written to no channel, counted in ``DataNotWholes`` and
+said in an event. Every other source's channel is ``Tcs.Datum``: its length,
+and its first 64 bytes. A longer one goes as its
 first 64 bytes with its whole length, is counted, and is said in an event,
 so that nothing is cut short quietly.
 

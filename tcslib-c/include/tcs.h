@@ -391,6 +391,31 @@ int tcs_configuration_sends_decisions(const tcs_configuration *configuration,
  * @return        0, or -1 where the datum is not the one byte 1 or 0. */
 int tcs_decision_on(const uint8_t *data, size_t length, int *on);
 
+/* A whole number is what a node sends where it states a whole number's type
+ * -- u8 to u64, i8 to i64: a sensor's reading, what a set of GPIO lines is,
+ * a thermostat's decision sent as what a switch takes. As wide as its type,
+ * most significant byte first, the signed ones in two's complement. */
+
+/** Reads an unsigned whole number.
+ *
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds.
+ * @param width   How many bytes the number is: 1, 2, 4 or 8.
+ * @param value   Where the number is written.
+ * @return        0, or -1 where the datum is not width bytes. */
+int tcs_unsigned_in(const uint8_t *data, size_t length, size_t width,
+		    uint64_t *value);
+
+/** Reads a signed whole number.
+ *
+ * @param data    The datum's bytes; may be NULL where length is 0.
+ * @param length  How many bytes data holds.
+ * @param width   How many bytes the number is: 1, 2, 4 or 8.
+ * @param value   Where the number is written.
+ * @return        0, or -1 where the datum is not width bytes. */
+int tcs_signed_in(const uint8_t *data, size_t length, size_t width,
+		  int64_t *value);
+
 /* ---- Data up to the vehicle --------------------------------------------- */
 
 /* The way up to a gateway node: the address and port it binds aboard, from

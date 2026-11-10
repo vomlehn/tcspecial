@@ -246,10 +246,7 @@ fn the_fprime_example_has_its_bridge_model_written() {
         fppi.contains(&format!("CONFIGURATION_DIGEST = \"{checksum}\"")),
         "{fppi}"
     );
-    assert!(
-        fppi.contains("telemetry $thermometer: Datum id 3"),
-        "{fppi}"
-    );
+    assert!(fppi.contains("telemetry $thermometer: I16 id 3"), "{fppi}");
     assert!(model.join("TcsBridgeModel.cpp").is_file());
 
     let (lines, status) = run(&[&flag, example]);

@@ -21,6 +21,10 @@
 
 #include "Os/Mutex.hpp"
 #include "Os/Task.hpp"
+// Named here, and not left to the component's own header: that includes it
+// only where some channel of the model is a Datum, and asDatum() uses it
+// whatever the model's channels are.
+#include "Tcs/TcsBridge/DatumSerializableAc.hpp"
 #include "Tcs/TcsBridge/FppConstantsAc.hpp"
 #include "Tcs/TcsBridge/TcsBridgeComponentAc.hpp"
 #include "tcs.h"
@@ -96,8 +100,8 @@ private:
 
 	/** Writes a datum to the channel of the node that produced it, as
 	 * what the configuration says its data are: through asDatum(),
-	 * asValue() or asDecision(). In model/TcsBridgeModel.cpp, which
-	 * tcsverify --fprime-model writes.
+	 * asValue(), asDecision(), asUnsigned() or asSigned(). In
+	 * model/TcsBridgeModel.cpp, which tcsverify --fprime-model writes.
 	 *
 	 * @param datum  The datum, and the node that produced it.
 	 * @return       true, or false where the model has no channel for the
@@ -140,6 +144,24 @@ private:
 	 * @param on     Where the decision is written, true for on.
 	 * @return       true where it was a decision. */
 	bool asDecision(const tcs_datum &datum, bool &on);
+
+	/** Reads a datum as an unsigned whole number of its type's width, as
+	 * tcslib-c reads one, counting and saying it where it is not one.
+	 *
+	 * @param datum  The datum.
+	 * @param width  How many bytes the number is: 1, 2, 4 or 8.
+	 * @param value  Where the number is written.
+	 * @return       true where it was one. */
+	bool asUnsigned(const tcs_datum &datum, size_t width, U64 &value);
+
+	/** Reads a datum as a signed whole number of its type's width, as
+	 * tcslib-c reads one, counting and saying it where it is not one.
+	 *
+	 * @param datum  The datum.
+	 * @param width  How many bytes the number is: 1, 2, 4 or 8.
+	 * @param value  Where the number is written.
+	 * @return       true where it was one. */
+	bool asSigned(const tcs_datum &datum, size_t width, I64 &value);
 
 	// ---- The rest ----------------------------------------------------
 
@@ -242,6 +264,7 @@ private:
 	U32 m_cutShort;          // data longer than a channel holds
 	U32 m_notValues;         // data from a node of values, not one
 	U32 m_notDecisions;      // data from a node of decisions, not one
+	U32 m_notWholes;         // data from a node of whole numbers, not one
 	char m_said[TCS_TEXT_BYTES]; // what the beacon last said, as an event
 };
 

@@ -116,11 +116,16 @@ def test_a_simulated_reading_arrives_as_a_channel_value(fprime_test_api):
         of_bridge("thermometer"), timeout=ARRIVING
     )
     value = reading.get_val()
-    # Two bytes, i16_be, as zone_temp reads them and tcssim sends them.
-    assert value["length"] == 2, value
+    # An i16, as the thermometer states it sends and zone_temp reads it:
+    # sixteenths of a degree above freezing, so a zone between 273.15 and
+    # 400 K is nought to a little over 2000 of them.
+    assert isinstance(value, int) and 0 <= value < 2100, value
     fprime_test_api.assert_telemetry(
         of_bridge("PacketsProcessed"), value=predicates.greater_than(0),
         timeout=ARRIVING,
+    )
+    fprime_test_api.assert_telemetry(
+        of_bridge("DataNotWholes"), value=0, timeout=ARRIVING
     )
 
 

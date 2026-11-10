@@ -117,6 +117,12 @@ pub const OWN_CHANNELS: &[Own] = &[
         about: "Data from a node that sends decisions that were not one, \
                 and went to no channel",
     },
+    Own {
+        name: "DataNotWholes",
+        fpp_type: "U32",
+        about: "Data from a node that sends whole numbers that were not one \
+                of its type's width, and went to no channel",
+    },
 ];
 
 /// What a source's channel holds: what the configuration says the source's
@@ -143,8 +149,8 @@ pub enum Form {
     Decision,
     /// A whole number of this type, which a source states it sends: a
     /// sensor's reading, a set of GPIO lines, a thermostat's decision sent
-    /// as what a switch takes. F´'s channel for it is the bytes, as a
-    /// `Datum`, until the bridge writes one of its own type.
+    /// as what a switch takes. F´'s channel for it is of that type, `U8`
+    /// to `I64`, read by tcslib-c's `tcs_unsigned_in` or `tcs_signed_in`.
     Whole(Basic),
 }
 
@@ -186,7 +192,17 @@ impl Form {
     /// `Datum`, the component's own struct, `F64` or `bool`.
     pub fn fpp_type(self) -> &'static str {
         match self {
-            Form::Datum | Form::Whole(_) => "Datum",
+            Form::Datum => "Datum",
+            Form::Whole(basic) => match basic {
+                Basic::U8 => "U8",
+                Basic::U16 => "U16",
+                Basic::U32 => "U32",
+                Basic::U64 => "U64",
+                Basic::I8 => "I8",
+                Basic::I16 => "I16",
+                Basic::I32 => "I32",
+                _ => "I64",
+            },
             Form::Value(_) => "F64",
             Form::Decision => "bool",
         }
@@ -203,9 +219,7 @@ impl Form {
             Form::Datum => "its bytes".to_string(),
             Form::Value(unit) => format!("a value, in {}", unit.name()),
             Form::Decision => "a decision, true for on".to_string(),
-            Form::Whole(basic) => {
-                format!("a whole number, a {}, as bytes", basic.name())
-            }
+            Form::Whole(basic) => format!("a whole number, a {}", basic.name()),
         }
     }
 
@@ -654,7 +668,27 @@ impl Model {
                 cpp_string(&channel.name)
             );
             let _ = match form {
-                Form::Datum | Form::Whole(_) => writeln!(
+                Form::Whole(basic) => {
+                    let signed = matches!(
+                        basic,
+                        Basic::I8 | Basic::I16 | Basic::I32 | Basic::I64
+                    );
+                    let (held, reader) = if signed {
+                        ("I64", "asSigned")
+                    } else {
+                        ("U64", "asUnsigned")
+                    };
+                    writeln!(
+                        out,
+                        "\t\t{held} value = 0;\n\t\t\
+                         if (this->{reader}(datum, {}, value)) {{\n\t\t\t\
+                         this->tlmWrite_{}(static_cast<{}>(value));\n\t\t}}",
+                        basic.width().expect("a whole number"),
+                        channel.name,
+                        Form::Whole(*basic).fpp_type()
+                    )
+                }
+                Form::Datum => writeln!(
                     out,
                     "\t\tthis->tlmWrite_{}(this->asDatum(datum));",
                     channel.name
@@ -879,12 +913,13 @@ mod tests {
             "constant ID_BASE = 0x3000",
             "constant NODE_NAME_BYTES = 13",
             "telemetry $heater_wanted: bool id 2",
-            "telemetry $thermometer: Datum id 3",
+            "telemetry $thermometer: I16 id 3",
             "telemetry $zone_temp: F64 id 4 format \"{} K\"",
             "telemetry $BeaconStage: Stage id 5",
             "telemetry $DataCutShort: U32 id 13",
             "telemetry $DataNotValues: U32 id 14",
             "telemetry $DataNotDecisions: U32 id 15",
+            "telemetry $DataNotWholes: U32 id 16",
         ] {
             assert!(fpp.contains(said), "{said} in:\n{fpp}");
         }
@@ -896,7 +931,10 @@ mod tests {
     fn the_cpp_says_every_source_and_node() {
         let cpp = of(&example(), "fsw").expect("a model").cpp("x", "0123");
         assert!(
-            cpp.contains("this->tlmWrite_thermometer(this->asDatum(datum));"),
+            cpp.contains(
+                "if (this->asSigned(datum, 2, value)) {\n\t\t\t\
+                 this->tlmWrite_thermometer(static_cast<I16>(value));"
+            ),
             "{cpp}"
         );
         assert!(
@@ -964,7 +1002,7 @@ mod tests {
             "{}",
             refused.why
         );
-        assert!(of(&based_at("0xfffffff0"), "fsw").is_ok());
+        assert!(of(&based_at("0xffffffef"), "fsw").is_ok());
     }
 
     /// Two bridges whose IDs overlap are refused, naming both and their
@@ -1026,7 +1064,7 @@ mod tests {
             Form::of(&thermostat, "gpio-out-tmass1"),
             Form::Whole(Basic::U8)
         );
-        assert_eq!(Form::Whole(Basic::U8).fpp_type(), "Datum");
+        assert_eq!(Form::Whole(Basic::U8).fpp_type(), "U8");
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");
         assert_eq!(Form::Datum.fpp_type(), "Datum");

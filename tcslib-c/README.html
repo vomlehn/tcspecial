@@ -294,7 +294,7 @@ c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm<
 c++ my_station.cpp $(pkg-config --cflags --libs tcs)</code></pre>
 <h3 id="the-abi-version">The ABI version</h3>
 <p><code>&lt;ABI&gt;</code> is the library’s ABI version, the one whole
-number in <code>abi-version</code>, now 2. It is the shared library’s
+number in <code>abi-version</code>, now 3. It is the shared library’s
 soname, <code>libtcs.so.&lt;ABI&gt;</code>, which a station linked with
 the library asks for at run time; <code>build.rs</code> sets the soname
 from the file, and the Makefile installs the library under the same
@@ -317,6 +317,12 @@ wanted, rather than run against a library it does not match.</p>
 <code>tcs_client_restart_arm</code> and <code>tcs_client_restart</code>
 gained the target checksum, and the generation the client used to track
 went.</p>
+<p>It went from 2 to 3 with typed links: a decision became a
+<code>boolean</code>, the one byte 1 or 0, where it was the text
+<code>1</code> or <code>0</code>, so <code>tcs_decision_on</code> reads
+another datum than it did, and
+<code>tcs_configuration_sends_decisions</code> answers yes only for a
+thermostat whose <code>type-out</code> is <code>boolean</code>.</p>
 <p><code>examples/ground.c</code> is a ground station in C, and
 <code>examples/ground.cpp</code> the same one in C++: each reads the
 configuration, waits for the first beacon, connects and pings, asks

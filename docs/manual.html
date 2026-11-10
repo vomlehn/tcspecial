@@ -3285,20 +3285,22 @@ fprime example unless told otherwise, with</p>
 <p>which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the <tt class="docutils literal">gateway_fprime</tt> node is a channel named after it,
 at <tt class="docutils literal">fprime_id_base</tt> plus its device id -- <tt class="docutils literal">thermometer</tt>, <tt class="docutils literal">0x3003</tt> --
-of the type the configuration says its data are. A node that sends values, a
-compute node whose function is <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt>, <tt class="docutils literal">vote</tt> or
-<tt class="docutils literal">process</tt>, has an <tt class="docutils literal">F64</tt> channel in that node's unit, formatted with it --
-<tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3004</tt>, in kelvin --
-and a datum from it that is not a value goes to no channel, is counted in
-<tt class="docutils literal">DataNotValues</tt> and is said in a <tt class="docutils literal">NotAValue</tt> event. A node that sends
-decisions, a compute node whose function is <tt class="docutils literal">thermostat</tt>, has a <tt class="docutils literal">bool</tt>
-channel, true for on -- <tt class="docutils literal">heater_wanted</tt>, <tt class="docutils literal">0x3002</tt> -- and a datum from it
-that is not <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> goes to no channel, is counted in
+of the type the node states it sends. A node that sends a value type --
+<tt class="docutils literal">to_kelvin</tt>, a <tt class="docutils literal">to_value</tt>, <tt class="docutils literal">vote</tt> or <tt class="docutils literal">process</tt> -- has an <tt class="docutils literal">F64</tt>
+channel in that node's unit, formatted with it -- <tt class="docutils literal">zone_temp</tt>, <tt class="docutils literal">0x3004</tt>,
+in kelvin -- and a datum from it that is not a value goes to no channel, is
+counted in <tt class="docutils literal">DataNotValues</tt> and is said in a <tt class="docutils literal">NotAValue</tt> event. A node
+that sends a <tt class="docutils literal">boolean</tt> -- a thermostat whose <tt class="docutils literal"><span class="pre">type-out</span></tt> is one -- has a
+<tt class="docutils literal">bool</tt> channel, true for on -- <tt class="docutils literal">heater_wanted</tt>, <tt class="docutils literal">0x3002</tt> -- and a datum
+from it that is not the one byte 1 or 0 goes to no channel, is counted in
 <tt class="docutils literal">DataNotDecisions</tt> and is said in a <tt class="docutils literal">NotADecision</tt> event. A thermostat
 sends the ground only a change of decision, so its channel shows what was
-last decided while the bridge was matched. Every other node's
-channel holds a datum's length and its first 64 bytes, a GPIO payload's
-lines read for their levels among them, their records as they came. A node
+last decided while the bridge was matched. A node that sends a whole number
+-- a sensor's reading, what a set of GPIO lines is -- has a channel of that
+type, <tt class="docutils literal">U8</tt> to <tt class="docutils literal">I64</tt> -- <tt class="docutils literal">thermometer</tt>, <tt class="docutils literal">0x3003</tt>, an <tt class="docutils literal">I16</tt> -- and a
+datum from it that is not one of its type's width goes to no channel, is
+counted in <tt class="docutils literal">DataNotWholes</tt> and is said in a <tt class="docutils literal">NotAWhole</tt> event. Every
+other node's channel holds a datum's length and its first 64 bytes. A node
 drawn into it
 must be
 named as F´ names things, with letters, digits and underscores, and every
@@ -3307,7 +3309,8 @@ two <tt class="docutils literal">gateway_fprime</tt> nodes whose F´ IDs overlap
 follow every device id: <tt class="docutils literal">BeaconStage</tt>, <tt class="docutils literal">RestartFlag</tt>,
 <tt class="docutils literal">ListeningMatched</tt>, <tt class="docutils literal">CommandingMatched</tt>, <tt class="docutils literal">PacketsReceived</tt>,
 <tt class="docutils literal">PacketsProcessed</tt>, <tt class="docutils literal">PacketsMalformed</tt>, <tt class="docutils literal">PacketsMismatched</tt>,
-<tt class="docutils literal">DataCutShort</tt>, <tt class="docutils literal">DataNotValues</tt> and <tt class="docutils literal">DataNotDecisions</tt>.</p>
+<tt class="docutils literal">DataCutShort</tt>, <tt class="docutils literal">DataNotValues</tt>, <tt class="docutils literal">DataNotDecisions</tt> and
+<tt class="docutils literal">DataNotWholes</tt>.</p>
 <p>The bridge is built for that configuration and runs on no other: given
 another, it says so in a <tt class="docutils literal">ModelDiffers</tt> event and does nothing. It sends
 CONNECT itself, once for each beacon heard while it is unmatched, and says
@@ -4286,7 +4289,7 @@ and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keep
 in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a class="reference internal" href="#where-the-logs-segments-go">Where the logs' segments
 go</a>).</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt></dt>
-<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs.so.1</tt> and <tt class="docutils literal">lib/libtcs.a</tt>
+<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs.so.3</tt> and <tt class="docutils literal">lib/libtcs.a</tt>
 with <tt class="docutils literal">include/tcs.h</tt> and <tt class="docutils literal">lib/pkgconfig/tcs.pc</tt>; the Python
 packages <tt class="docutils literal">tcslibgs</tt>, <tt class="docutils literal">tcslib</tt> and <tt class="docutils literal">tcsui</tt> in
 <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; and <tt class="docutils literal">bin/tcsgui</tt> with its descriptions
@@ -4325,8 +4328,8 @@ in Debian's machine-readable format, and <tt class="docutils literal">changelog.
 as the package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and
 lintian's overrides, in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The
 ground package also has a trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once
-<tt class="docutils literal">libtcs.so.1</tt> is installed or removed. The RPMs say the same in their own
-<tt class="docutils literal">License</tt>, <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs.so.1</tt> is
+<tt class="docutils literal">libtcs.so.3</tt> is installed or removed. The RPMs say the same in their own
+<tt class="docutils literal">License</tt>, <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs.so.3</tt> is
 not executable in the .deb, as Debian wants a shared library to be, and is
 in the RPM, where rpm reads what a library provides only from an executable
 file; otherwise the two hold the same files under <tt class="docutils literal">/opt/tcs</tt>.</p>
@@ -4381,7 +4384,7 @@ was copied.</p>
 </pre>
 <p>Everything <tt class="docutils literal">make <span class="pre">install-files</span></tt> installs, and so everything in the
 packages, is
-stripped: the programs and <tt class="docutils literal">libtcs.so.1</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
+stripped: the programs and <tt class="docutils literal">libtcs.so.3</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
 which leaves what they need to be run and linked with, and <tt class="docutils literal">libtcs.a</tt>
 with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a program linked with
 it needs. That takes a fifth to a quarter off what each package installs:
@@ -4461,7 +4464,7 @@ package's profile script puts it there -- a station includes
 <span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span>
 </pre>
-<p>That links with <tt class="docutils literal">libtcs.so.1</tt>, which the loader finds through the ground
+<p>That links with <tt class="docutils literal">libtcs.so.3</tt>, which the loader finds through the ground
 package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">1</tt> is libtcs's ABI version, which is
 not the package's: it goes up only when a station built against the old
 <tt class="docutils literal">tcs.h</tt> would not work with the new library, so an upgrade that keeps it

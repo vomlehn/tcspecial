@@ -121,7 +121,7 @@ c++ my_station.cpp $(pkg-config --cflags --libs tcs)
 ### The ABI version
 
 `<ABI>` is the library's ABI version, the one whole number in `abi-version`,
-now 2. It is the shared library's soname, `libtcs.so.<ABI>`, which a station
+now 3. It is the shared library's soname, `libtcs.so.<ABI>`, which a station
 linked with the library asks for at run time; `build.rs` sets the soname
 from the file, and the Makefile installs the library under the same name,
 so the number is stated once. It is not the crate's version, and changes
@@ -142,6 +142,11 @@ than run against a library it does not match.
 It went from 1 to 2 when the link lost its header: `tcs_client_restart_arm`
 and `tcs_client_restart` gained the target checksum, and the generation the
 client used to track went.
+
+It went from 2 to 3 with typed links: a decision became a `boolean`, the one
+byte 1 or 0, where it was the text `1` or `0`, so `tcs_decision_on` reads
+another datum than it did, and `tcs_configuration_sends_decisions` answers
+yes only for a thermostat whose `type-out` is `boolean`.
 
 `examples/ground.c` is a ground station in C, and `examples/ground.cpp` the
 same one in C++: each reads the configuration, waits for the first beacon,

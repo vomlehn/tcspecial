@@ -1315,6 +1315,109 @@ pub unsafe extern "C" fn tcs_decision_on(
     })
 }
 
+/// Reads an unsigned whole number of `width` bytes, most significant first:
+/// a `u8` to `u64` a node states it sends -- a sensor's reading, what a set
+/// of GPIO lines is.
+///
+/// # Arguments
+///
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+/// * `width`  - How many bytes the number is: 1, 2, 4 or 8.
+/// * `value`  - Where the number is written.
+///
+/// # Returns
+///
+/// 0, or -1 where the datum is not `width` bytes, `width` is none of those,
+/// or an argument is NULL.
+///
+/// # Safety
+///
+/// As [`tcs_decision_on`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_unsigned_in(
+    data: *const u8,
+    length: usize,
+    width: usize,
+    value: *mut u64,
+) -> c_int {
+    guard(-1, || {
+        let out = out_of(value, "value")?;
+        let data = bytes_of(data, length)?;
+        *out = whole_of(data, width)?;
+        Ok(0)
+    })
+}
+
+/// Reads a signed whole number of `width` bytes, most significant first, in
+/// two's complement: an `i8` to `i64` a node states it sends.
+///
+/// # Arguments
+///
+/// * `data`   - The datum's bytes.
+/// * `length` - How many bytes `data` holds.
+/// * `width`  - How many bytes the number is: 1, 2, 4 or 8.
+/// * `value`  - Where the number is written.
+///
+/// # Returns
+///
+/// 0, or -1 where the datum is not `width` bytes, `width` is none of those,
+/// or an argument is NULL.
+///
+/// # Safety
+///
+/// As [`tcs_decision_on`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_signed_in(
+    data: *const u8,
+    length: usize,
+    width: usize,
+    value: *mut i64,
+) -> c_int {
+    guard(-1, || {
+        let out = out_of(value, "value")?;
+        let data = bytes_of(data, length)?;
+        let raw = whole_of(data, width)?;
+        // Shifted to the top and back, which carries the sign down.
+        let shift = 64 - 8 * width as u32;
+        *out = ((raw << shift) as i64) >> shift;
+        Ok(0)
+    })
+}
+
+/// Reads the bytes of a whole number, most significant first.
+///
+/// # Arguments
+///
+/// * `data`  - The datum.
+/// * `width` - How many bytes it should be.
+///
+/// # Returns
+///
+/// The number's bits.
+///
+/// # Errors
+///
+/// What [`fail`] makes of a width that is not 1, 2, 4 or 8, or a datum that
+/// is not that width.
+fn whole_of(data: &[u8], width: usize) -> Result<u64, Failed> {
+    if ![1, 2, 4, 8].contains(&width) {
+        return Err(fail(format_args!(
+            "a whole number is 1, 2, 4 or 8 bytes, and {width} was asked for"
+        )));
+    }
+    if data.len() != width {
+        return Err(fail(format_args!(
+            "the datum is {} bytes, and a whole number of {width} was asked \
+             for",
+            data.len()
+        )));
+    }
+    let mut bytes = [0u8; 8];
+    bytes[8 - width..].copy_from_slice(data);
+    Ok(u64::from_be_bytes(bytes))
+}
+
 /// Reads bytes from C.
 ///
 /// # Arguments
@@ -2313,6 +2416,44 @@ mod tests {
         // and which lives as long as the thread.
         let why = unsafe { CStr::from_ptr(tcs_last_error()) };
         assert!(why.to_string_lossy().contains("not a decision"), "{why:?}");
+    }
+
+    /// A whole number from C reads as its type's own layout, signed or not,
+    /// and one of another width is refused.
+    #[test]
+    fn a_whole_number_reads_as_its_type_lays_it_out() {
+        use super::*;
+
+        let mut unsigned = 0u64;
+        // SAFETY: readable bytes, and a writable number.
+        let read = unsafe {
+            tcs_unsigned_in([0x01, 0x02].as_ptr(), 2, 2, &mut unsigned)
+        };
+        assert_eq!((read, unsigned), (0, 0x0102));
+
+        let mut signed = 0i64;
+        // SAFETY: as above.
+        let read =
+            unsafe { tcs_signed_in([0xff, 0xfe].as_ptr(), 2, 2, &mut signed) };
+        assert_eq!((read, signed), (0, -2));
+        // SAFETY: as above.
+        let read = unsafe {
+            tcs_signed_in((-5i64).to_be_bytes().as_ptr(), 8, 8, &mut signed)
+        };
+        assert_eq!((read, signed), (0, -5));
+
+        for (length, width) in [(3, 2), (3, 3)] {
+            // SAFETY: as above, three readable bytes.
+            let read = unsafe {
+                tcs_unsigned_in(
+                    [1, 2, 3].as_ptr(),
+                    length,
+                    width,
+                    &mut unsigned,
+                )
+            };
+            assert_eq!(read, -1, "{length} {width}");
+        }
     }
 
     /// What unit a node's values are in is the configuration's, and a value

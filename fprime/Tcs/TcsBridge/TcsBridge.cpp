@@ -72,7 +72,7 @@ TcsBridge::TcsBridge(const char *name)
 	  m_open(false), m_heard(), m_stopping(false), m_tick(),
 	  m_connectedAt(0), m_connectedNs(0), m_connected(Connected::NEVER),
 	  m_datum(), m_cutShort(0), m_notValues(0),
-	  m_notDecisions(0), m_said()
+	  m_notDecisions(0), m_notWholes(0), m_said()
 {
 }
 
@@ -284,6 +284,36 @@ bool TcsBridge::asDecision(const tcs_datum &datum, bool &on)
 	return true;
 }
 
+bool TcsBridge::asUnsigned(const tcs_datum &datum, size_t width, U64 &value)
+{
+	// Read by tcslib-c, so that what a whole number is -- its width, its
+	// byte order -- is said once. One of another width is written to no
+	// channel.
+	uint64_t read = 0;
+	if (tcs_unsigned_in(datum.data, datum.length, width, &read) != 0) {
+		m_notWholes++;
+		this->log_WARNING_LO_NotAWhole(Fw::String(datum.source),
+					       Fw::String(tcs_last_error()));
+		return false;
+	}
+	value = read;
+	return true;
+}
+
+bool TcsBridge::asSigned(const tcs_datum &datum, size_t width, I64 &value)
+{
+	// As asUnsigned(), in two's complement.
+	int64_t read = 0;
+	if (tcs_signed_in(datum.data, datum.length, width, &read) != 0) {
+		m_notWholes++;
+		this->log_WARNING_LO_NotAWhole(Fw::String(datum.source),
+					       Fw::String(tcs_last_error()));
+		return false;
+	}
+	value = read;
+	return true;
+}
+
 void TcsBridge::connectIfDue(const Heard &heard)
 {
 	int listening = 0, commanding = 0;
@@ -360,6 +390,7 @@ void TcsBridge::writeChannels(const Heard &heard)
 	this->tlmWrite_DataCutShort(m_cutShort);
 	this->tlmWrite_DataNotValues(m_notValues);
 	this->tlmWrite_DataNotDecisions(m_notDecisions);
+	this->tlmWrite_DataNotWholes(m_notWholes);
 }
 
 bool TcsBridge::open(const char *command, FwOpcodeType opCode, U32 cmdSeq)

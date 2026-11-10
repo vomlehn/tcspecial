@@ -3045,20 +3045,22 @@ fprime example unless told otherwise, with
 which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the ``gateway_fprime`` node is a channel named after it,
 at ``fprime_id_base`` plus its device id -- ``thermometer``, ``0x3003`` --
-of the type the configuration says its data are. A node that sends values, a
-compute node whose function is ``to_kelvin``, ``to_value``, ``vote`` or
-``process``, has an ``F64`` channel in that node's unit, formatted with it --
-``zone_temp``, ``0x3004``, in kelvin --
-and a datum from it that is not a value goes to no channel, is counted in
-``DataNotValues`` and is said in a ``NotAValue`` event. A node that sends
-decisions, a compute node whose function is ``thermostat``, has a ``bool``
-channel, true for on -- ``heater_wanted``, ``0x3002`` -- and a datum from it
-that is not ``1`` or ``0`` goes to no channel, is counted in
+of the type the node states it sends. A node that sends a value type --
+``to_kelvin``, a ``to_value``, ``vote`` or ``process`` -- has an ``F64``
+channel in that node's unit, formatted with it -- ``zone_temp``, ``0x3004``,
+in kelvin -- and a datum from it that is not a value goes to no channel, is
+counted in ``DataNotValues`` and is said in a ``NotAValue`` event. A node
+that sends a ``boolean`` -- a thermostat whose ``type-out`` is one -- has a
+``bool`` channel, true for on -- ``heater_wanted``, ``0x3002`` -- and a datum
+from it that is not the one byte 1 or 0 goes to no channel, is counted in
 ``DataNotDecisions`` and is said in a ``NotADecision`` event. A thermostat
 sends the ground only a change of decision, so its channel shows what was
-last decided while the bridge was matched. Every other node's
-channel holds a datum's length and its first 64 bytes, a GPIO payload's
-lines read for their levels among them, their records as they came. A node
+last decided while the bridge was matched. A node that sends a whole number
+-- a sensor's reading, what a set of GPIO lines is -- has a channel of that
+type, ``U8`` to ``I64`` -- ``thermometer``, ``0x3003``, an ``I16`` -- and a
+datum from it that is not one of its type's width goes to no channel, is
+counted in ``DataNotWholes`` and is said in a ``NotAWhole`` event. Every
+other node's channel holds a datum's length and its first 64 bytes. A node
 drawn into it
 must be
 named as F´ names things, with letters, digits and underscores, and every
@@ -3067,7 +3069,8 @@ two ``gateway_fprime`` nodes whose F´ IDs overlap. The bridge's own channels
 follow every device id: ``BeaconStage``, ``RestartFlag``,
 ``ListeningMatched``, ``CommandingMatched``, ``PacketsReceived``,
 ``PacketsProcessed``, ``PacketsMalformed``, ``PacketsMismatched``,
-``DataCutShort``, ``DataNotValues`` and ``DataNotDecisions``.
+``DataCutShort``, ``DataNotValues``, ``DataNotDecisions`` and
+``DataNotWholes``.
 
 The bridge is built for that configuration and runs on no other: given
 another, it says so in a ``ModelDiffers`` event and does nothing. It sends
@@ -4138,7 +4141,7 @@ There are three, because three kinds of machine take them:
    in ``/opt/tcs/bin``, beside tcspecial (see `Where the logs' segments
    go`_).
 ``tcspecial-ground``
-   What a ground station is built on. ``lib/libtcs.so.1`` and ``lib/libtcs.a``
+   What a ground station is built on. ``lib/libtcs.so.3`` and ``lib/libtcs.a``
    with ``include/tcs.h`` and ``lib/pkgconfig/tcs.pc``; the Python
    packages ``tcslibgs``, ``tcslib`` and ``tcsui`` in
    ``lib/python3/site-packages``; and ``bin/tcsgui`` with its descriptions
@@ -4180,8 +4183,8 @@ in Debian's machine-readable format, and ``changelog.Debian.gz``, both made
 as the package is built, from ``LICENSE-MIT`` and the version; and
 lintian's overrides, in ``/usr/share/lintian/overrides/<package>``. The
 ground package also has a trigger that has dpkg run ``ldconfig`` once
-``libtcs.so.1`` is installed or removed. The RPMs say the same in their own
-``License``, ``%changelog``, ``%post`` and ``%postun``. ``libtcs.so.1`` is
+``libtcs.so.3`` is installed or removed. The RPMs say the same in their own
+``License``, ``%changelog``, ``%post`` and ``%postun``. ``libtcs.so.3`` is
 not executable in the .deb, as Debian wants a shared library to be, and is
 in the RPM, where rpm reads what a library provides only from an executable
 file; otherwise the two hold the same files under ``/opt/tcs``.
@@ -4243,7 +4246,7 @@ was copied.
 
 Everything ``make install-files`` installs, and so everything in the
 packages, is
-stripped: the programs and ``libtcs.so.1`` with ``strip --strip-unneeded``,
+stripped: the programs and ``libtcs.so.3`` with ``strip --strip-unneeded``,
 which leaves what they need to be run and linked with, and ``libtcs.a``
 with ``strip --strip-debug``, which keeps the symbols a program linked with
 it needs. That takes a fifth to a quarter off what each package installs:
@@ -4338,7 +4341,7 @@ package's profile script puts it there -- a station includes
    $ cc  station.c   $(pkg-config --cflags --libs tcs)
    $ c++ station.cpp $(pkg-config --cflags --libs tcs)
 
-That links with ``libtcs.so.1``, which the loader finds through the ground
+That links with ``libtcs.so.3``, which the loader finds through the ground
 package's ``ld.so.conf.d`` file. The ``1`` is libtcs's ABI version, which is
 not the package's: it goes up only when a station built against the old
 ``tcs.h`` would not work with the new library, so an upgrade that keeps it

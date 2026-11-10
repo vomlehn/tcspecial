@@ -449,6 +449,27 @@ set-interfaces:
 	cd $(RUST) && cargo run -q --bin tcsverify -- --set-interface \
 		$(SHIPPED_CONFIGURATIONS)
 
+# Every shipped configuration's own XTCE, the file beside it of its name
+# with the extension .xtce: what the vehicle flying it sends the ground. One
+# for each configuration, its two spellings saying the same; written from
+# the YAML spelling, and from example.ytcs's.
+OWN_XTCE_CONFIGURATIONS = $(filter %.ytcs,$(SHIPPED_CONFIGURATIONS))
+
+# Write each one's own XTCE again, after a configuration or
+# tcslibgs/xtce/types.xtce changes: tcsverify --xtce, which says what it
+# wrote.
+.PHONY: xtce
+xtce:
+	cd $(RUST) && cargo run -q --bin tcsverify -- --xtce \
+		$(OWN_XTCE_CONFIGURATIONS)
+
+# Fail where one is not what tcsverify would write, naming each, so that a
+# configuration and what the ground is told of it are reviewed together.
+.PHONY: xtce-check
+xtce-check:
+	cd $(RUST) && cargo run -q --bin tcsverify -- --xtce-check \
+		$(OWN_XTCE_CONFIGURATIONS) >/dev/null
+
 # Compare the two spellings of every one of them.
 #
 # Every pair is compared before the target fails, so one run says every set
@@ -1169,6 +1190,7 @@ check:
 		--test visual
 	cd $(RUST) && cargo fmt -- --check
 	$(MAKE) --no-print-directory comparespellings
+	$(MAKE) --no-print-directory xtce-check
 	$(MAKE) --no-print-directory html-check
 
 # The F´ bridge, which F´'s own tools build rather than cargo: see

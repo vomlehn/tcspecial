@@ -10,6 +10,8 @@
 //! tcsverify --ambient examples/thermostat/thermostat-sim.yaml
 //! tcsverify --ambient examples/thermostat/thermostat.ytcs
 //! tcsverify --set-interface examples/*/*.ytcs examples/*/*.xtcs
+//! tcsverify --xtce examples/thermostat/thermostat.ytcs
+//! tcsverify --xtce-check examples/*/*.ytcs
 //! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 //! tcsverify --fprime-model=fprime/Tcs/TcsBridge/model fprime.ytcs
 //! ```
@@ -39,6 +41,8 @@ usage: tcsverify [options] <tcspecial configuration file> \
        tcsverify --interface-digest
        tcsverify --ambient <payload simulator file | configuration>
        tcsverify --set-interface <configuration>...
+       tcsverify --xtce <configuration>...
+       tcsverify --xtce-check <configuration>...
        tcsverify -h | --help
 
 Checks the files and prints the problems it finds, each as
@@ -126,7 +130,17 @@ configuration.
                      other byte of the file left as it was, and say for
                      each what was changed; a file that names it already
                      is not written. For when tcslibgs/xtce/link.xtce or
-                     types.xtce has changed and every configuration is to follow it
+                     types.xtce has changed and every configuration is
+                     to follow it
+  --xtce             with one or more configurations and nothing else:
+                     write each one's own XTCE beside it, the file of its
+                     name with the extension .xtce -- what the vehicle
+                     sends the ground, each source a parameter of its
+                     type -- and say for each whether it was written; a
+                     file that says it already is not written
+  --xtce-check       as --xtce, writing nothing: name each configuration
+                     whose own XTCE is not what --xtce would write, with
+                     status 1 where there is one
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
@@ -164,6 +178,11 @@ const AMBIENT_FLAG: &str = "--ambient";
 /// Writes this build's interface digest into each configuration named: see
 /// `tcsverify::set_interface`. A shape of its own.
 const SET_INTERFACE_FLAG: &str = "--set-interface";
+
+/// Writes each configuration's own XTCE beside it, or says which is not
+/// what would be written: see `tcsverify::own_xtce`. Shapes of their own.
+const XTCE_FLAG: &str = "--xtce";
+const XTCE_CHECK_FLAG: &str = "--xtce-check";
 
 /// Keeps the configuration, once checked, in the directory given: see
 /// `tcslibgs::store`.
@@ -210,6 +229,12 @@ fn main() -> ExitCode {
     }
     if args.first().is_some_and(|arg| arg == SET_INTERFACE_FLAG) {
         return set_interfaces(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == XTCE_FLAG) {
+        return own_xtces(&args[1..], true);
+    }
+    if args.first().is_some_and(|arg| arg == XTCE_CHECK_FLAG) {
+        return own_xtces(&args[1..], false);
     }
     if args.iter().any(|arg| arg == AMBIENT_FLAG) {
         return match args.as_slice() {
@@ -571,6 +596,67 @@ fn set_interfaces(files: &[std::ffi::OsString]) -> ExitCode {
                 "{}: interface set to {ours}, where it named none",
                 path.display()
             ),
+            Err(why) => {
+                eprintln!("tcsverify: {why}");
+                failed = true;
+            }
+        }
+    }
+    if failed {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// Writes each configuration's own XTCE beside it, or names each whose own
+/// XTCE is not what would be written.
+///
+/// # Arguments
+///
+/// * `files` - The configurations.
+/// * `write` - Whether to write them, for `--xtce`, rather than only say
+///             which are stale, for `--xtce-check`.
+///
+/// # Returns
+///
+/// 0 when every one is current now, 1 when one could not be written or,
+/// only checking, is stale, said on stderr, and 2 for no files or another
+/// option.
+fn own_xtces(files: &[std::ffi::OsString], write: bool) -> ExitCode {
+    use tcsverify::own_xtce::{of, path_of, Found};
+
+    let flag = if write { XTCE_FLAG } else { XTCE_CHECK_FLAG };
+    if files.is_empty()
+        || files.iter().any(|f| f.to_string_lossy().starts_with('-'))
+    {
+        eprintln!(
+            "tcsverify: {flag} is given configurations and nothing \
+             else\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
+    }
+    let mut failed = false;
+    for file in files {
+        let path = std::path::Path::new(file);
+        let xtce = path_of(path);
+        match of(path, write) {
+            Ok(Found::Current) => {
+                println!("{}: says {} already", xtce.display(), path.display())
+            }
+            Ok(Found::Written) => {
+                println!("{}: written from {}", xtce.display(), path.display())
+            }
+            Ok(Found::Stale) => {
+                eprintln!(
+                    "tcsverify: {} is not what {} says: run tcsverify \
+                     {XTCE_FLAG} {}",
+                    xtce.display(),
+                    path.display(),
+                    path.display()
+                );
+                failed = true;
+            }
             Err(why) => {
                 eprintln!("tcsverify: {why}");
                 failed = true;

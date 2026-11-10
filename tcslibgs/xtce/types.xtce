@@ -60,7 +60,7 @@
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
       </BooleanParameterType>
       <!-- The value types, one per unit. -->
-      <FloatParameterType name="kelvin"
+      <FloatParameterType name="kelvin" sizeInBits="64"
           shortDescription="Temperature.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">kelvin</AncillaryData>
@@ -77,7 +77,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="volt"
+      <FloatParameterType name="volt" sizeInBits="64"
           shortDescription="Potential: a bus or a cell.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">volts</AncillaryData>
@@ -94,7 +94,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="ampere"
+      <FloatParameterType name="ampere" sizeInBits="64"
           shortDescription="Current: a load, a source, a bus.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">amperes</AncillaryData>
@@ -111,7 +111,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="watt"
+      <FloatParameterType name="watt" sizeInBits="64"
           shortDescription="Power.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">watts</AncillaryData>
@@ -128,7 +128,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="metre"
+      <FloatParameterType name="metre" sizeInBits="64"
           shortDescription="Length: an altitude, a distance.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">metres</AncillaryData>
@@ -145,7 +145,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="metre_per_second"
+      <FloatParameterType name="metre_per_second" sizeInBits="64"
           shortDescription="Speed.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">metres a second</AncillaryData>
@@ -163,7 +163,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="newton"
+      <FloatParameterType name="newton" sizeInBits="64"
           shortDescription="Force: a thrust.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">newtons</AncillaryData>
@@ -180,7 +180,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="kilogram_per_second"
+      <FloatParameterType name="kilogram_per_second" sizeInBits="64"
           shortDescription="A flow of mass: what an engine burns.">
         <AncillaryDataSet>
           <AncillaryData
@@ -199,7 +199,7 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <FloatParameterType name="ratio"
+      <FloatParameterType name="ratio" sizeInBits="64"
           shortDescription="A fraction of a whole: a charge, a throttle.">
         <AncillaryDataSet>
           <AncillaryData name="tcspecial.name">a ratio</AncillaryData>

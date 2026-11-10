@@ -170,6 +170,39 @@ fn every_shipped_configuration_names_this_builds_interface() {
     );
 }
 
+/// Every shipped configuration's own XTCE is what tcsverify writes, in both
+/// spellings: a change to a configuration or to `tcslibgs/xtce/types.xtce`
+/// that left one behind fails here, saying the one command that brings them
+/// all up to date.
+#[test]
+fn every_shipped_configurations_own_xtce_is_current() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files: Vec<PathBuf> = example_files("ytcs")
+        .into_iter()
+        .chain(example_files("xtcs"))
+        .collect();
+    for top in ["example.ytcs", "example.xtcs"] {
+        files.push(root.join(top));
+    }
+    files.extend(entries(&root.join("tests/manual")).filter(|path| {
+        path.extension().is_some_and(|e| e == "ytcs" || e == "xtcs")
+    }));
+    let mut stale = Vec::new();
+    for path in &files {
+        match tcsverify::own_xtce::of(path, false) {
+            Ok(tcsverify::own_xtce::Found::Current) => {}
+            Ok(_) => stale.push(path.display().to_string()),
+            Err(why) => panic!("{why}"),
+        }
+    }
+    assert!(files.len() >= 18, "{files:?}");
+    assert!(
+        stale.is_empty(),
+        "the own XTCE of these is not what they say: run `make xtce` \
+         (tcsverify --xtce) and commit it: {stale:?}"
+    );
+}
+
 /// Every example is a pair, and nothing is found wrong or unfinished in
 /// either file. Warnings count: an example is something to copy, and one
 /// that is not finished teaches somebody to leave theirs unfinished.

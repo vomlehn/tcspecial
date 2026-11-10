@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- What the vehicle sends the ground, flying the configuration
+     descent: each node whose data reaches it, as a parameter named
+     for the node, of the type the node sends, in a container of its own.
+     The types are tcslibgs/xtce/types.xtce's, copied. A string or bytes
+     is all of what carries it, and no count is sent before it: its
+     length, and bytes_length, are what the ground is given by how it is
+     framed. How each gateway frames what it sends is the ground
+     station's to add.
+
+     Written by tcsverify, asked for it by its xtce option, from the
+     configuration and types.xtce, and not to be edited: see "The
+     configuration's own XTCE" in tcspecial's docs/design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="descent">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <FloatParameterType name="metre" sizeInBits="64"
+          shortDescription="Length: an altitude, a distance.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">metres</AncillaryData>
+          <AncillaryData name="tcspecial.step">millimetres</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>m</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <FloatParameterType name="metre_per_second" sizeInBits="64"
+          shortDescription="Speed.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">metres a second</AncillaryData>
+          <AncillaryData
+              name="tcspecial.step">micro-metres a second</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>m/s</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <FloatParameterType name="ratio" sizeInBits="64"
+          shortDescription="A fraction of a whole: a charge, a throttle.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">a ratio</AncillaryData>
+          <AncillaryData name="tcspecial.step">millionths</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>ratio</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <IntegerParameterType name="bytes_length" signed="false"
+          sizeInBits="32">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="4096"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="bytes">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="bytes_length"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
+      <Parameter name="altitude" parameterTypeRef="metre"/>
+      <Parameter name="descent_rate" parameterTypeRef="metre_per_second"/>
+      <Parameter name="guidance" parameterTypeRef="ratio"/>
+      <Parameter name="touchdown" parameterTypeRef="bytes"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="altitude_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="altitude"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="descent_rate_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="descent_rate"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="guidance_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="guidance"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="touchdown_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="touchdown"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

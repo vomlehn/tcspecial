@@ -32,14 +32,16 @@ each named as the document names it, its types and parameters copied in
 from it. A command cannot be put behind another's header from outside, so
 the document is copied rather than referred to, and the copy is held to
 what the document says by refusing anything of it the copy would not say
-the same (:data:`COPIED`). The data of every other node is laid out by no
-XTCE, so its container holds what follows the header whole, as a
-parameter named after the node: of the type the configuration says the
-node's data are (:func:`tcslibgs.form.form_of`, the same that tcsmoc's plot
-window and the F´ bridge go by), a value as a number in its unit, read from
-its four bytes, and a decision as a boolean, read from its ``1`` or ``0``;
-and binary, whole, for every other node. A gateway node's command takes its
-data whole, as a binary argument. Only the standard library is used.
+the same (:data:`COPIED`). Every other node's container holds what follows
+the header as a parameter named after the node, of the type the
+configuration's own XTCE gives it -- the file ``tcsverify --xtce`` writes
+beside the configuration -- copied from there as a node's document is: a
+value as a number in its unit, read from its four bytes, a decision as a
+boolean, read from its one byte, a whole number as an integer as wide as
+its type. A string, bytes or a structure is binary, whole: all of what
+follows the header, whose length the header gives. A gateway node's command
+takes its data whole, as a binary argument. Only the standard library is
+used.
 """
 
 import re
@@ -49,7 +51,7 @@ from pathlib import Path
 
 from . import interface
 from .configuration import HostPort
-from .form import DATUM, DECISION_OFF, DECISION_ON, VALUE_BYTES, form_of
+from .form import DATUM, form_of, own_xtce
 
 #: The XTCE namespace Yamcs 5 reads: XTCE 1.2.
 NAMESPACE = "http://www.omg.org/spec/XTCE/20180204"
@@ -77,10 +79,12 @@ INDENT = "  "
 #: copy would not say the same behind a header.
 COPIED = frozenset({
     "StringParameterType", "IntegerParameterType", "BinaryParameterType",
+    "FloatParameterType", "BooleanParameterType",
     "StringArgumentType", "IntegerArgumentType", "BinaryArgumentType",
     "StringDataEncoding", "IntegerDataEncoding", "BinaryDataEncoding",
     "SizeInBits", "Fixed", "FixedValue", "Variable", "TerminationChar",
-    "LeadingSize"})
+    "LeadingSize", "UnitSet", "Unit", "DefaultCalibrator",
+    "PolynomialCalibrator", "Term", "AncillaryDataSet", "AncillaryData"})
 
 #: A name XTCE allows: its ``NameType``, no space, period, slash, colon or
 #: square bracket.
@@ -93,13 +97,9 @@ RESTRICTED = {"beacon": "BeaconPacket", "commands": "AnswerPacket"}
 #: The template's command the command links' APID is assigned to.
 CONNECT = "Connect"
 
-#: The binary parameter type a node's data is read as: what follows the
-#: header, whole.
+#: The binary parameter type a node's data is read as where its type
+#: has no width of its own: what follows the header, whole.
 BODY_TYPE = "PacketBodyType"
-
-#: The parameter type a decision is read as: a boolean, from the one byte
-#: 1 or 0.
-DECISION_TYPE = "DecisionType"
 
 #: The simulated world's ambient temperature, which nothing on the link
 #: carries: a local parameter, which the ground station sets from the
@@ -161,9 +161,12 @@ class Telemetry:
     #: The source's interface document, which its data is laid out by, or
     #: ``None`` where it has none.
     document: Path = None
-    #: What the configuration says its data are, where no document lays
-    #: them out: a :class:`tcslibgs.form.Form`.
+    #: What its data are, where no document lays them out: a
+    #: :class:`tcslibgs.form.Form`, read from the configuration's own XTCE.
     form: object = DATUM
+    #: The configuration's own XTCE, which gives its parameter's type, or
+    #: ``None`` where its document lays it out.
+    own: Path = None
 
     @property
     def container(self):
@@ -233,9 +236,10 @@ def telemetry(config):
 
     Raises:
         ValueError: The configuration does not answer to Yamcs, an APID or
-                    a port does not read, fit, or is used twice, or a node
-                    of values says no unit it has (see
+                    a port does not read, fit, or is used twice, or its own
+                    XTCE is not there or does not read (see
                     :func:`tcslibgs.form.form_of`).
+        OSError: Its own XTCE cannot be read.
     """
     uses = [use for use in config.apids()
             if use.carries in ("downlink", "payload_telemetry")]
@@ -253,8 +257,10 @@ def telemetry(config):
             name = use.node
         document = interface.node_document(config.node(use.node).node_type)
         form = DATUM if document else form_of(config, use.node)
+        own = None if document else own_xtce(config)
         links.append(Telemetry(name, use.node, use.apid, ground,
-                               use.carries, use.gateway, document, form))
+                               use.carries, use.gateway, document, form,
+                               own))
     return links
 
 
@@ -781,7 +787,7 @@ class _Copier:
                              "than a name and a type, which the Yamcs "
                              "wrapper does not copy")
         kind = parameter.get("parameterTypeRef")
-        self._type(document, "parameter type", kind)
+        self.type(document, "parameter type", kind)
         self._names.take("parameter", name, document.path.name,
                          "rename it in the document")
         _child(self._sets["parameter"], "Parameter", name=name,
@@ -800,9 +806,9 @@ class _Copier:
             ValueError: As :meth:`Document.copy`, or its name is one the
                         wrapper has of its own.
         """
-        self._type(document, "argument type", name)
+        self.type(document, "argument type", name)
 
-    def _type(self, document, what, name):
+    def type(self, document, what, name):
         """Copies a type of a document, unless it is copied already.
 
         Args:
@@ -838,91 +844,30 @@ def _comment(parent, text):
     parent.append(ET.Comment(f" {text} "))
 
 
-def value_type(unit):
-    """The name of the parameter type a value in a unit is read as.
-
-    Args:
-        unit: The :class:`tcslibgs.form.Unit`.
-
-    Returns:
-        ``<Unit>ValueType``, by the Rust's name for the unit, which an XTCE
-        name allows where a symbol, ``m/s``, may not be.
-    """
-    return f"{unit.variant}ValueType"
-
-
-def _form_type(root, names, link):
+def _own_type(names, copier, link):
     """The parameter type a source's data is read as, where no document
-    lays it out, added to the wrapper the first time it is needed.
-
-    A value is a float in its unit, read from four bytes of a signed count
-    of the unit's steps, most significant first, which a calibrator turns
-    into the unit: what ``compute::from_value`` reads. Its unit is said in
-    a ``UnitSet``, but a ratio's, which has no symbol. A decision is a
-    boolean read from the one byte ``compute::from_decision`` reads, 1 for
-    on and 0 for off. A whole number is an integer as wide as its type,
-    most significant byte first. Any other node's data is
-    :data:`BODY_TYPE`.
+    lays it out: its type in the configuration's own XTCE, copied into the
+    wrapper the first time it is needed, or :data:`BODY_TYPE` for a type
+    with no width of its own.
 
     Args:
-        root:  The wrapper's root.
-        names: The :class:`_Names` it holds.
-        link:  The :class:`Telemetry`.
+        names:  The :class:`_Names` the wrapper holds.
+        copier: The :class:`_Copier` that copies a document's types.
+        link:   The :class:`Telemetry`.
 
     Returns:
         The type's name.
 
     Raises:
-        ValueError: As :meth:`_Names.take`.
+        ValueError: As :meth:`Document.find` and :meth:`_Copier.type`.
+        OSError: The configuration's own XTCE cannot be read.
     """
-    form = link.form
-    if form.kind == "Datum":
+    if link.form.kind == "Datum":
         return BODY_TYPE
-    if form.kind == "Value":
-        name = value_type(form.unit)
-    elif form.kind == "Whole":
-        name = f"{form.whole.upper()}WholeType"
-    else:
-        name = DECISION_TYPE
-    types = _one(root, "./x:TelemetryMetaData/x:ParameterTypeSet",
-                 "parameter type sets")
-    if any(kind.get("name") == name for kind in types):
-        return name
-    names.take("parameter type", name, link.source)
-    if form.kind == "Decision":
-        _comment(types, f"A decision: the one byte {DECISION_ON} for on, "
-                        f"{DECISION_OFF} for off.")
-        kind = _child(types, "BooleanParameterType", name=name)
-        _child(kind, "IntegerDataEncoding", sizeInBits="8",
-               encoding="unsigned")
-        return name
-    if form.kind == "Whole":
-        bits = form.whole[1:]
-        signed = form.whole.startswith("i")
-        _comment(types, f"A whole number, a {form.whole}, most significant "
-                        "byte first.")
-        kind = _child(types, "IntegerParameterType", name=name,
-                      signed="true" if signed else "false", sizeInBits=bits)
-        _child(kind, "IntegerDataEncoding", sizeInBits=bits,
-               encoding="twosComplement" if signed else "unsigned",
-               byteOrder="mostSignificantByteFirst")
-        return name
-    unit = form.unit
-    steps = {1e6: "millionths", 1e3: "thousandths"}[unit.per_unit]
-    _comment(types, f"A value in {unit.name}: a signed count of "
-                    f"{steps} of one.")
-    kind = _child(types, "FloatParameterType", name=name, sizeInBits="64")
-    if unit.variant != "Ratio":
-        _child(_child(kind, "UnitSet"), "Unit",
-               description=unit.name).text = unit.symbol
-    encoding = _child(kind, "IntegerDataEncoding",
-                      sizeInBits=str(8 * VALUE_BYTES),
-                      encoding="twosComplement",
-                      byteOrder="mostSignificantByteFirst")
-    polynomial = _child(_child(encoding, "DefaultCalibrator"),
-                        "PolynomialCalibrator")
-    _child(polynomial, "Term", coefficient=repr(1 / unit.per_unit),
-           exponent="1")
+    own = Document(link.own)
+    name = own.find("parameter", link.source,
+                    own.path.name).get("parameterTypeRef")
+    copier.type(own, "parameter type", name)
     return name
 
 
@@ -944,7 +889,7 @@ def _downlink(root, names, copier, link):
                       "container sets")
     names.take("container", link.container, link.source)
     if link.document is None:
-        kind = _form_type(root, names, link)
+        kind = _own_type(names, copier, link)
         names.take("parameter", link.name, link.source)
         _child(_one(root, "./x:TelemetryMetaData/x:ParameterSet",
                     "parameter sets"),

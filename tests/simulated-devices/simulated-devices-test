@@ -60,7 +60,7 @@ HDLC_SIM_ADDRESS = 47950
 READY = 47900
 
 # The interface every configuration in the tree speaks: see example.ytcs.
-INTERFACE = "c4d65b8e01d6d67e37dac523e739f09a"
+INTERFACE = "55ad11486347bc8efc163e1ba051e577"
 
 # How often a simulated device sends.
 PACKET_INTERVAL = "200 ms"

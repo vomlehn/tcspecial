@@ -2350,6 +2350,35 @@ def ambient(path, tcsverify=None):
                       or f"{program} gave no temperature")
 
 
+def write_own_xtce(path, tcsverify=None):
+    """Writes a configuration's own XTCE beside it, as tcsverify does:
+    ``tcsverify --xtce``. For a configuration made where none is committed,
+    as a test makes one; a shipped configuration's is committed beside it.
+
+    Args:
+        path:      The configuration file.
+        tcsverify: The tcsverify program to run, or ``None`` to find one with
+                   :func:`find_tcsverify`.
+
+    Returns:
+        A pair: ``True`` and ``None``; or ``False`` and the reason it was
+        not written, an old one beside the configuration having been
+        removed, so that what the configuration no longer says is not read.
+    """
+    Path(path).with_suffix(".xtce").unlink(missing_ok=True)
+    program = tcsverify or find_tcsverify()
+    if program is None:
+        return False, "tcsverify is not built or on the PATH"
+    try:
+        done = subprocess.run([program, "--xtce", str(path)],
+                              capture_output=True, text=True, timeout=60)
+    except OSError as why:
+        return False, f"{program} cannot be run: {why}"
+    if done.returncode != 0:
+        return False, done.stderr.strip() or f"{program} wrote nothing"
+    return True, None
+
+
 def digest(path, tcsverify=None):
     """The configuration's digest, as tcsverify works it out.
 

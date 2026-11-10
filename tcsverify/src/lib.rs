@@ -43,6 +43,7 @@ use tcslibgs::{ConfigFormat, SimConfigFile, TcsError};
 
 pub mod fprime_model;
 pub mod locate;
+pub mod own_xtce;
 pub mod set_interface;
 pub mod startup;
 
@@ -1639,7 +1640,7 @@ mod tests {
 
     const SOUND_GRAPH: &str = "tcspecial:
   gateway: radio
-  interface: \"c4d65b8e01d6d67e37dac523e739f09a\"
+  interface: \"55ad11486347bc8efc163e1ba051e577\"
   state_file: /tmp/tcspecial-test.state
   tcs_cmd:
     recv: 0.0.0.0:4000
@@ -1988,7 +1989,7 @@ gateways:
     const GOOD: &str = "description: two payloads
 tcspecial:
   gateway: radio
-  interface: \"c4d65b8e01d6d67e37dac523e739f09a\"
+  interface: \"55ad11486347bc8efc163e1ba051e577\"
   state_file: /tmp/tcspecial-test.state
   beacon:
     default_interval: \"5 s\"

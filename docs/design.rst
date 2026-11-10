@@ -621,7 +621,9 @@ Typed links
    with a text form, and each packet an app writes is held to its
    terminal's type. The F´ bridge writes each source to a channel of its
    type, and the cFS bridge publishes each datum as its type lays it out.
-   Still to come: each configuration's own XTCE. Where
+   Each configuration's own XTCE states what each node sends the ground,
+   and Yamcs's mission database takes its types from it. Still to come:
+   the commands for the attributes command bindings set. Where
    the rest of this section and the rest of this document disagree, the
    rest says what runs today, and `What typed links replace`_ lists the
    passages it will change.
@@ -904,20 +906,45 @@ The configuration's own XTCE
 Requirement
     Each configuration has an XTCE document of its own, beside it, named
     for it -- ``examples/thermostat/thermostat.xtce`` -- which states what
-    the vehicle sends the ground and takes from it. Each node that reports
-    to a gateway node is a parameter, named for the node, of the type its
-    ``world-out`` sends, in a container of its own; each attribute a command
-    binding sets is an argument of a command of that attribute's type. The
-    types it uses are copied into it from ``types.xtce``, so that a ground
-    station is given one file.
+    the vehicle sends the ground and takes from it. Each node whose data
+    reaches the ground -- drawn into a gateway node, or a payload nothing
+    touches, which reports over ``payload_telemetry`` -- is a parameter,
+    named for the node, of the type its ``world-out`` sends, in a container
+    of its own, ``<node>_packet``. The types it uses are copied into it from
+    ``types.xtce``, a structure being an aggregate of them, so that a ground
+    station is given one file. ``tcslibgs::graph::own_xtce`` writes it.
 
 Requirement
-    ``tcsverify`` writes it from the configuration and ``types.xtce``, and
-    nobody writes it by hand: everything it says is said there already. It
-    is committed beside the configuration, and ``make check`` fails when it
-    is not what ``tcsverify`` would write, so that the ground's interface and
-    the vehicle's configuration are reviewed together. It replaces the
-    mission database generated for Yamcs today.
+    Each attribute a command binding sets is to be an argument of a command
+    of that attribute's type. That part is not built: a ``SET_NODE``
+    carries its value as the text the configuration would write, and how
+    the document is to say so is not yet settled.
+
+Requirement
+    It says nothing of framing. A gateway frames what it sends as its kind
+    does -- a port of each source's own over a radio, a CCSDS header and an
+    APID under Yamcs, a message ID on a bus -- and that is the ground
+    station's to add. A string or bytes is all of what carries it, with no
+    count before it: its length is what the framing gives. ``types.xtce``
+    sizes ``bytes`` by a parameter, ``bytes_length``, which the document
+    states and puts in no container.
+
+Requirement
+    ``tcsverify --xtce`` writes it from the configuration and
+    ``types.xtce``, and nobody writes it by hand: everything it says is said
+    there already. It is committed beside the configuration, and ``make
+    check`` fails when it is not what ``tcsverify`` would write -- ``make
+    xtce-check``, ``tcsverify --xtce-check`` -- so that the ground's
+    interface and the vehicle's configuration are reviewed together. ``make
+    xtce`` writes every shipped configuration's again.
+
+Requirement
+    A ground station reads what each node sends from it, and works out
+    nothing of its own: ``python/tcslibgs/form.py`` reads each node's form
+    there, and Yamcs's mission database is built on it, each source's
+    parameter type copied from it into the wrapper that adds Yamcs's
+    framing (`Framing is a gateway's`_). So the rules for what each node
+    sends are the Rust's alone.
 
 Requirement
     It is the ground's, and it does not go on the vehicle (`What goes on the
@@ -944,8 +971,9 @@ built:
 
 * `Gateways: what the vehicle answers to`_, F´: a source's channel is chosen
   by the kind of node it is.
-* The Yamcs mission database, written for the Yamcs gateway node, which the
-  configuration's own XTCE replaces.
+* The Yamcs mission database, written for the Yamcs gateway node: each
+  source's type now comes from the configuration's own XTCE (`Framing is a
+  gateway's`_).
 
 Logs are left as they are. A log node takes any number of sources and
 records their bytes, and how logging is to work is to be designed again;
@@ -962,7 +990,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "c4d65b8e01d6d67e37dac523e739f09a"
+     interface: "55ad11486347bc8efc163e1ba051e577"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -7322,8 +7350,11 @@ document's command, each named as the document names it and copied into
 the mission database, because a command cannot be put behind another's
 header from outside. Only what the copy says the same is copied, and a
 document that says more is refused. Any other node's container is named
-after it and holds its data as a binary parameter, and any other gateway
-node's command is named after it and carries its data whole. So nothing per
+after it and holds its data as a parameter of the type the configuration's
+own XTCE gives it (`The configuration's own XTCE`_), copied from there as a
+document's type is; a string, bytes or a structure is binary, all of what
+follows the header. Any other gateway node's command is named after it and
+carries its data whole. So nothing per
 APID is stated twice, and a node added is decoded once the mission database
 is regenerated; the ping-yamcs example's tests hold the generated APIDs to
 the Rust's and work the containers and commands as Yamcs would on packets

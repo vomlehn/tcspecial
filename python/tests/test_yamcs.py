@@ -20,6 +20,7 @@ from xml.etree import ElementTree
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tcslibgs import configuration, interface  # noqa: E402
+from tests import loaded  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
 from tcslibgs.configuration import HostPort, came_from  # noqa: E402
 
@@ -144,7 +145,7 @@ def yamcs(directory, base="0x300", gateway="yamcs", renamed=None,
         text = (text.replace(f": {old}\n", f": {new}\n")
                 .replace(f"from: {old},", f"from: {new},"))
     path.write_text(text)
-    return configuration.load(path)
+    return loaded(path)
 
 
 class ApidTest(unittest.TestCase):
@@ -308,7 +309,7 @@ class MdbTest(unittest.TestCase):
         path.write_text(path.read_text().replace(
             "          - p.m\n",
             "          - p.m\n          - n.m\n"))
-        config = configuration.load(path)
+        config = loaded(path)
         uplink, = generated.uplinks(config)
         self.assertEqual((uplink.command, uplink.document), ("m", None))
 

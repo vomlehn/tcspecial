@@ -4984,7 +4984,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "c4d65b8e01d6d67e37dac523e739f09a"
+     interface: "55ad11486347bc8efc163e1ba051e577"
 
 It is the digest of the ``tcslibgs/xtce/link.xtce`` a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4999,7 +4999,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --interface-digest
-   c4d65b8e01d6d67e37dac523e739f09a
+   55ad11486347bc8efc163e1ba051e577
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -5010,8 +5010,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to c4d65b8e01d6d67e37dac523e739f09a, from 0123...
-   vehicle.xtcs: interface is c4d65b8e01d6d67e37dac523e739f09a already
+   vehicle.ytcs: interface set to 55ad11486347bc8efc163e1ba051e577, from 0123...
+   vehicle.xtcs: interface is 55ad11486347bc8efc163e1ba051e577 already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and
@@ -5032,6 +5032,33 @@ fails if either is ever changed. Nor does any cover
 ``tcslibgs/xtce/ping.xtce``, the ping node's interface document, which is
 the ping node's and not tcspecial's: a test in ``tcslibgs`` holds it to the
 code that writes and reads a ping instead.
+
+What the ground is told: the configuration's own XTCE
+-----------------------------------------------------
+
+Beside each configuration is an XTCE document of its own, of its name with
+the extension ``.xtce`` -- ``examples/thermostat/thermostat.xtce`` -- which
+says what the vehicle flying it sends the ground. Each node whose data
+reaches the ground, drawn into a gateway node or a payload nothing touches,
+is a parameter named after the node, of the type its ``world-out`` sends, in
+a container of its own, ``<node>_packet``; the types are copied from
+``tcslibgs/xtce/types.xtce``. A ground station that reads XTCE is given that
+one file, and adds to it how its gateway frames what it sends: the Yamcs
+ground programs build Yamcs's mission database on it.
+
+Nobody writes it by hand. tcsverify writes it from the configuration, and
+writes the same from either spelling:
+
+.. code-block:: text
+
+   $ tcsverify --xtce vehicle.ytcs
+   vehicle.xtce: written from vehicle.ytcs
+
+Commit it beside the configuration, and write it again whenever the
+configuration changes. ``tcsverify --xtce-check`` names each configuration
+whose document is not what ``--xtce`` would write, and fails where there is
+one. In the tree, ``make xtce`` writes every shipped configuration's, and
+``make check`` fails while one is stale.
 
 Where the links are
 -------------------

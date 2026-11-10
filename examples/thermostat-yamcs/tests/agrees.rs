@@ -5,13 +5,14 @@
 //! configuration from what it reads -- where Yamcs sends commands, where it
 //! listens for each source's data and the beacon, the APIDs that tell them
 //! apart -- and its mission database gives each source's parameter the type
-//! the configuration says its data are, by `tcslibgs/form.py`. A port, an
-//! APID or a form the two sides work out differently is a Yamcs that listens
-//! where nothing arrives, or reads a temperature as something else. So this
-//! holds the Python's answers for `thermostat-yamcs.xtcs` to the Rust's for
-//! `thermostat-yamcs.ytcs`, and the Python's form of every node of every
-//! example to `tcslibgs::graph::fprime::Form::of`, which tcsmoc's plot
-//! window and the F´ bridge go by, so that the two cannot drift.
+//! the configuration's own XTCE says its data are, by `tcslibgs/form.py`. A
+//! port, an APID or a form the two sides work out differently is a Yamcs
+//! that listens where nothing arrives, or reads a temperature as something
+//! else. So this holds the Python's answers for `thermostat-yamcs.xtcs` to
+//! the Rust's for `thermostat-yamcs.ytcs`, and the Python's form of every
+//! node of every example, read from its own XTCE, to
+//! `tcslibgs::graph::fprime::Form::of`, which tcsmoc's plot window and the
+//! F´ bridge go by, so that the two cannot drift.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -250,20 +251,28 @@ fn python_forms(path: &Path) -> Vec<String> {
     lines
 }
 
-/// The form of every node of every example is what `Form::of` says: the
-/// readings and votes in their units -- kelvin, volts, amperes, metres and
-/// the rest -- the thermostats' and the battery's decisions, and every other
-/// node's bytes. And a node nobody has is bytes too.
+/// The form of every node of every example that reaches the ground is what
+/// `Form::of` says: the readings and votes in their units -- kelvin, volts,
+/// amperes, metres and the rest -- the thermostats' and the battery's
+/// decisions, and every other node's bytes. A node that does not reach the
+/// ground, which its own XTCE does not name, is bytes, and so is a node
+/// nobody has.
 #[test]
 fn every_nodes_form_is_the_rusts() {
     let mut values = 0;
     for (xml, yaml) in every_example() {
         let graph = Graph::load(&yaml).expect("the example reads");
+        let reaching = telemetry::sources(&graph);
         let mut theirs: Vec<String> = graph
             .nodes
             .iter()
             .map(|node| {
-                format!("{} {:?}", node.name, Form::of(&graph, &node.name))
+                let form = if reaching.contains(&node.name) {
+                    Form::of(&graph, &node.name)
+                } else {
+                    Form::Datum
+                };
+                format!("{} {form:?}", node.name)
             })
             .collect();
         theirs.sort();

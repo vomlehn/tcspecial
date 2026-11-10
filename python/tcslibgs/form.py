@@ -1,30 +1,34 @@
-"""What a node sends, as the configuration says it: a value in a unit, a
-decision, or bytes.
+"""What a node sends the ground: a value in a unit, a decision, a whole
+number, or bytes.
 
 The Python spelling of ``tcslibgs::graph::fprime::Form``, with
-``tcslibgs::unit``'s table of units and ``tcslibgs::graph::units::unit_of``
-behind it. The configuration says one thing of a datum's type, and only of
-some nodes: a compute node says, by its function, what it sends.
+``tcslibgs::unit``'s table of units behind it. What each node sends is not
+worked out here from what the configuration says of it: it is read from the
+configuration's own XTCE, which ``tcsverify --xtce`` writes beside it from
+the configuration and ``tcslibgs/xtce/types.xtce`` (see "The
+configuration's own XTCE" in ``docs/design.rst``), so the rules are the
+Rust's alone.
 
 * A value -- four bytes of a signed count of its unit's steps, most
-  significant first (``compute::from_value``) -- is a number in the unit
-  its node states: ``to_kelvin`` is in kelvin, ``to_value`` and
-  ``process`` state their ``type-out``, and a ``vote`` what it ``carries``,
-  each a value type's name, ``kelvin`` or ``metre_per_second``.
-* A decision -- the text ``1`` or ``0`` (``compute::from_decision``) -- is
-  on or off: what a ``thermostat`` sends.
-* A set of GPIO lines read for their levels on an interval, and watched for
-  no edge, sends a sixteen-byte record for each line every time, in the
-  order of its offsets, lowest first: its lines' levels.
-* Every other node's data is bytes, as they came.
+  significant first (``compute::from_value``) -- is a number in its unit:
+  a parameter of a value type, ``kelvin`` or ``metre_per_second``.
+* A decision -- a ``boolean``, the one byte 1 or 0
+  (``compute::from_decision``) -- is on or off.
+* A whole number, ``u8`` to ``i64``, most significant byte first: a
+  sensor's reading, or what a set of GPIO lines is.
+* Every other node's data is bytes, as they came: a string, bytes, or a
+  structure.
 
 tcsmoc's plot window and the F´ bridge's dictionary know a node's data by
 this, and so does the Yamcs mission database :mod:`tcslibgs.yamcs`
 generates; ``examples/thermostat-yamcs/tests/agrees.rs`` holds the answers
-here to the Rust's for every node, and this table to the Rust's.
+here to the Rust's for every node that reaches the ground, and this table
+of units to the Rust's.
 """
 
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from pathlib import Path
 
 #: The bytes a value takes on a link: ``compute::VALUE_BYTES``.
 VALUE_BYTES = 4
@@ -150,83 +154,69 @@ DATUM = Form("Datum")
 DECISION = Form("Decision")
 
 
+def own_xtce(config):
+    """Names a configuration's own XTCE: ``tcsverify::own_xtce::path_of``.
+
+    Args:
+        config: The :class:`tcslibgs.configuration.Configuration`.
+
+    Returns:
+        The file beside its top file, of its name with the extension
+        ``.xtce``.
+    """
+    return Path(config.path).with_suffix(".xtce")
+
+
 def form_of(config, source):
-    """Finds the form of what a node sends, as the configuration says it:
-    ``Form::of``.
+    """Finds the form of what a node sends the ground, as the
+    configuration's own XTCE says it: ``Form::of``, for a node that reaches
+    the ground.
 
     Args:
         config: The :class:`tcslibgs.configuration.Configuration`.
         source: The node's name.
 
     Returns:
-        What the node states it sends at its ``world-out``: a value's
-        :class:`Form`, with its unit; :data:`DECISION` for a ``boolean``; a
-        ``Whole`` form for a whole number -- a sensor's reading, what a set
-        of GPIO lines is; :data:`DATUM` for every other node, and for one
-        that is not there or states no type.
+        A value's :class:`Form`, with its unit, for a parameter of a value
+        type; :data:`DECISION` for a ``boolean``; a ``Whole`` form for a
+        whole number -- a sensor's reading, what a set of GPIO lines is;
+        :data:`DATUM` for a string, bytes or a structure, and for a node
+        that does not reach the ground, which the document does not name.
 
     Raises:
-        ValueError: A node states a value type that is none.
+        ValueError: The document is not there, does not read, or gives the
+                    node a type it does not have.
+        OSError: The document cannot be read.
     """
-    names = {node.name for node in config.nodes}
-    if source not in names:
+    path = own_xtce(config)
+    try:
+        root = ET.parse(path).getroot()
+    except FileNotFoundError:
+        raise ValueError(f"{path}: not there: tcsverify --xtce "
+                         f"{config.path} writes it") from None
+    except ET.ParseError as why:
+        raise ValueError(f"{path}: {why}") from None
+    namespace = root.tag[1:].split("}", 1)[0] if "}" in root.tag else ""
+    x = {"x": namespace}
+    said = None
+    for parameter in root.iterfind("./x:TelemetryMetaData/x:ParameterSet"
+                                   "/x:Parameter", x):
+        if parameter.get("name") == source:
+            said = parameter.get("parameterTypeRef")
+    if said is None:
         return DATUM
-    node = config.node(source)
-    said = _sends(node)
+    if not any(kind.get("name") == said for kind in root.iterfind(
+            "./x:TelemetryMetaData/x:ParameterTypeSet/*", x)):
+        raise ValueError(f'{path}: "{source}" is of the type "{said}", '
+                         "which the document does not have")
     if said in WHOLE:
         return Form("Whole", whole=said)
     if said == "boolean":
         return DECISION
-    if said is None or said in ("bytes", "string") or ":" in said:
-        return DATUM
-    return Form("Value", unit_of_type_name(said, f'{config.path}: '
-                                                  f'"{source}"'))
+    if any(type_name(unit) == said for unit in UNITS):
+        return Form("Value", unit_of_type_name(said, f'{path}: "{source}"'))
+    return DATUM
 
 
 #: The whole numbers' names: ``link_type::Basic``'s.
 WHOLE = ("u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64")
-
-#: The type each of a device's formats lays out:
-#: ``compute::Format::basic``.
-FORMAT_TYPES = {"u8": "u8", "i8": "i8", "i16_be": "i16", "u16_be": "u16",
-                "u24_be": "u32", "i16_le": "i16", "i32_be": "i32",
-                "u32_be": "u32"}
-
-
-def _sends(node):
-    """The type a node states it sends at its ``world-out``:
-    ``link_types::carries``.
-
-    Args:
-        node: The node.
-
-    Returns:
-        The type's name as the configuration writes it, or ``None`` for a
-        node that takes any type and sends nothing.
-    """
-    said = {name: str(value).strip()
-            for name, value in node.attributes.items()}
-    kind = node.node_type
-    if kind == "compute":
-        function = said.get("function")
-        if function == "to_kelvin":
-            return "kelvin"
-        if function == "vote":
-            return said.get("carries")
-        return said.get("type-out")
-    if kind in ("tee-gateway", "tee-payload"):
-        return said.get("carries", "bytes")
-    if kind == "ping":
-        return "string"
-    if kind in ("gpio_in", "gpio_out", "gpio_inout"):
-        count = len(said.get("lines", "").replace(",", " ").split())
-        return next(name for name, most in (("u8", 8), ("u16", 16),
-                                            ("u32", 32), ("u64", 64))
-                    if count <= most)
-    if kind.startswith(("null-", "gateway_")) or kind == "log":
-        return None
-    if "world-out-type" in said:
-        return said["world-out-type"]
-    if "format" in said and not kind.startswith("app_"):
-        return FORMAT_TYPES.get(said["format"])
-    return "bytes"

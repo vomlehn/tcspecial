@@ -52,6 +52,7 @@ pub mod grouped;
 pub mod interface;
 pub mod link_types;
 pub mod mirror;
+pub mod own_xtce;
 pub mod parameters;
 pub mod reach;
 pub mod renamed;
@@ -2379,7 +2380,7 @@ mod tests {
     path: zone
 tcspecial:
   gateway: radio
-  interface: \"c4d65b8e01d6d67e37dac523e739f09a\"
+  interface: \"55ad11486347bc8efc163e1ba051e577\"
   tcs_cmd:
     \
              recv: 0.0.0.0:4000

@@ -178,7 +178,8 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
 ///
 /// The readings are in the file the example includes, so that is copied
 /// with them changed, into a `thermostat-common` beside the copy of the
-/// example, as in `examples`; both in a directory of the unit's own.
+/// example, as in `examples`; both in a directory of the unit's own. Its own
+/// XTCE is written beside it, as `make xtce` writes the example's.
 ///
 /// # Arguments
 ///
@@ -212,12 +213,16 @@ fn in_unit(dir: &Path, unit: Unit) -> PathBuf {
         .expect("written");
     let path = at.join("thermostat-yamcs/in.xtcs");
     std::fs::copy(here().join("thermostat-yamcs.xtcs"), &path).expect("copied");
+    let graph = tcslibgs::graph::Graph::load(&path).expect("the copy reads");
+    let own =
+        tcslibgs::graph::own_xtce::written(&graph, "in").expect("its own XTCE");
+    std::fs::write(path.with_extension("xtce"), own).expect("written");
     path
 }
 
 /// In every unit there is, a reading and the vote decode as values in that
 /// unit, at its own scale -- a millionth of a volt, a thousandth of a metre
-/// -- and with its symbol, but a ratio, which has none.
+/// -- and with its symbol, as `types.xtce` gives it.
 #[test]
 fn values_in_every_unit_decode_in_it() {
     let dir = tempfile::tempdir().expect("a directory");
@@ -239,11 +244,7 @@ fn values_in_every_unit_decode_in_it() {
                     (read - number).abs() <= 0.5 / unit.per_unit(),
                     "{unit:?} {source}: {read} for {number}"
                 );
-                if unit == Unit::Ratio {
-                    assert!(units.is_empty(), "{units:?}");
-                } else {
-                    assert_eq!(units, [unit.symbol()], "{unit:?}");
-                }
+                assert_eq!(units, [unit.symbol()], "{unit:?}");
             }
         }
     }

@@ -18,9 +18,11 @@
      node. A node whose type has an interface document of its own, as the
      ping node has tcslibgs/xtce/ping.xtce, is given what that states,
      copied in from it; any other node's data is a parameter of the type
-     the configuration says it is, as tcslibgs/form.py reads it (a value
-     as a float in its unit, a decision as a boolean), or else of
-     PacketBodyType, and what a gateway node takes the DataArg below. -->
+     the configuration's own XTCE gives it, the file tcsverify writes
+     beside the configuration, copied in from there (a value as a float in
+     its unit, a boolean, a whole number), or else, for a string, bytes or
+     a structure, of PacketBodyType; and what a gateway node takes is the
+     DataArg below. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="TcsYamcs">
   <TelemetryMetaData>
     <ParameterTypeSet>

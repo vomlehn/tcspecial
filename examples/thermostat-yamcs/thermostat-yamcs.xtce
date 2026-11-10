@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- What the vehicle sends the ground, flying the configuration
+     thermostat-yamcs: each node whose data reaches it, as a parameter named
+     for the node, of the type the node sends, in a container of its own.
+     The types are tcslibgs/xtce/types.xtce's, copied. A string or bytes
+     is all of what carries it, and no count is sent before it: its
+     length, and bytes_length, are what the ground is given by how it is
+     framed. How each gateway frames what it sends is the ground
+     station's to add.
+
+     Written by tcsverify, asked for it by its xtce option, from the
+     configuration and types.xtce, and not to be edited: see "The
+     configuration's own XTCE" in tcspecial's docs/design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214"
+    name="thermostat-yamcs">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="u8" signed="false" sizeInBits="8">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <FloatParameterType name="kelvin" sizeInBits="64"
+          shortDescription="Temperature.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">kelvin</AncillaryData>
+          <AncillaryData name="tcspecial.step">micro-kelvin</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>K</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="consensus_temp" parameterTypeRef="kelvin"/>
+      <Parameter name="gpio-out-tmass1" parameterTypeRef="u8"/>
+      <Parameter name="gpio-out-tmass2" parameterTypeRef="u8"/>
+      <Parameter name="to_k1" parameterTypeRef="kelvin"/>
+      <Parameter name="to_k2" parameterTypeRef="kelvin"/>
+      <Parameter name="to_k3" parameterTypeRef="kelvin"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="consensus_temp_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="consensus_temp"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="gpio-out-tmass1_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="gpio-out-tmass1"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="gpio-out-tmass2_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="gpio-out-tmass2"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="to_k1_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="to_k1"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="to_k2_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="to_k2"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="to_k3_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="to_k3"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

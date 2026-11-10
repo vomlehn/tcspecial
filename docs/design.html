@@ -1159,7 +1159,9 @@ A <tt class="docutils literal">gpio_in</tt> reports its lines' levels as that nu
 with a text form, and each packet an app writes is held to its
 terminal's type. The F´ bridge writes each source to a channel of its
 type, and the cFS bridge publishes each datum as its type lays it out.
-Still to come: each configuration's own XTCE. Where
+Each configuration's own XTCE states what each node sends the ground,
+and Yamcs's mission database takes its types from it. Still to come:
+the commands for the attributes command bindings set. Where
 the rest of this section and the rest of this document disagree, the
 rest says what runs today, and <a class="reference internal" href="#what-typed-links-replace">What typed links replace</a> lists the
 passages it will change.</p>
@@ -1446,19 +1448,41 @@ lays it out, which is what a cFS app reading it decodes.</dd>
 <dt>Requirement</dt>
 <dd>Each configuration has an XTCE document of its own, beside it, named
 for it -- <tt class="docutils literal">examples/thermostat/thermostat.xtce</tt> -- which states what
-the vehicle sends the ground and takes from it. Each node that reports
-to a gateway node is a parameter, named for the node, of the type its
-<tt class="docutils literal"><span class="pre">world-out</span></tt> sends, in a container of its own; each attribute a command
-binding sets is an argument of a command of that attribute's type. The
-types it uses are copied into it from <tt class="docutils literal">types.xtce</tt>, so that a ground
-station is given one file.</dd>
+the vehicle sends the ground and takes from it. Each node whose data
+reaches the ground -- drawn into a gateway node, or a payload nothing
+touches, which reports over <tt class="docutils literal">payload_telemetry</tt> -- is a parameter,
+named for the node, of the type its <tt class="docutils literal"><span class="pre">world-out</span></tt> sends, in a container
+of its own, <tt class="docutils literal">&lt;node&gt;_packet</tt>. The types it uses are copied into it from
+<tt class="docutils literal">types.xtce</tt>, a structure being an aggregate of them, so that a ground
+station is given one file. <tt class="docutils literal"><span class="pre">tcslibgs::graph::own_xtce</span></tt> writes it.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">tcsverify</tt> writes it from the configuration and <tt class="docutils literal">types.xtce</tt>, and
-nobody writes it by hand: everything it says is said there already. It
-is committed beside the configuration, and <tt class="docutils literal">make check</tt> fails when it
-is not what <tt class="docutils literal">tcsverify</tt> would write, so that the ground's interface and
-the vehicle's configuration are reviewed together. It replaces the
-mission database generated for Yamcs today.</dd>
+<dd>Each attribute a command binding sets is to be an argument of a command
+of that attribute's type. That part is not built: a <tt class="docutils literal">SET_NODE</tt>
+carries its value as the text the configuration would write, and how
+the document is to say so is not yet settled.</dd>
+<dt>Requirement</dt>
+<dd>It says nothing of framing. A gateway frames what it sends as its kind
+does -- a port of each source's own over a radio, a CCSDS header and an
+APID under Yamcs, a message ID on a bus -- and that is the ground
+station's to add. A string or bytes is all of what carries it, with no
+count before it: its length is what the framing gives. <tt class="docutils literal">types.xtce</tt>
+sizes <tt class="docutils literal">bytes</tt> by a parameter, <tt class="docutils literal">bytes_length</tt>, which the document
+states and puts in no container.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal">tcsverify <span class="pre">--xtce</span></tt> writes it from the configuration and
+<tt class="docutils literal">types.xtce</tt>, and nobody writes it by hand: everything it says is said
+there already. It is committed beside the configuration, and <tt class="docutils literal">make
+check</tt> fails when it is not what <tt class="docutils literal">tcsverify</tt> would write -- <tt class="docutils literal">make
+<span class="pre">xtce-check</span></tt>, <tt class="docutils literal">tcsverify <span class="pre">--xtce-check</span></tt> -- so that the ground's
+interface and the vehicle's configuration are reviewed together. <tt class="docutils literal">make
+xtce</tt> writes every shipped configuration's again.</dd>
+<dt>Requirement</dt>
+<dd>A ground station reads what each node sends from it, and works out
+nothing of its own: <tt class="docutils literal">python/tcslibgs/form.py</tt> reads each node's form
+there, and Yamcs's mission database is built on it, each source's
+parameter type copied from it into the wrapper that adds Yamcs's
+framing (<a class="reference internal" href="#framing-is-a-gateway-s">Framing is a gateway's</a>). So the rules for what each node
+sends are the Rust's alone.</dd>
 <dt>Requirement</dt>
 <dd>It is the ground's, and it does not go on the vehicle (<a class="reference internal" href="#what-goes-on-the-vehicle">What goes on the
 vehicle</a>). It needs no digest of its own: what it says is fixed by the
@@ -1482,8 +1506,9 @@ built:</p>
 <ul class="simple">
 <li><a class="reference internal" href="#gateways-what-the-vehicle-answers-to">Gateways: what the vehicle answers to</a>, F´: a source's channel is chosen
 by the kind of node it is.</li>
-<li>The Yamcs mission database, written for the Yamcs gateway node, which the
-configuration's own XTCE replaces.</li>
+<li>The Yamcs mission database, written for the Yamcs gateway node: each
+source's type now comes from the configuration's own XTCE (<a class="reference internal" href="#framing-is-a-gateway-s">Framing is a
+gateway's</a>).</li>
 </ul>
 <p>Logs are left as they are. A log node takes any number of sources and
 records their bytes, and how logging is to work is to be designed again;
@@ -1498,7 +1523,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c4d65b8e01d6d67e37dac523e739f09a&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;55ad11486347bc8efc163e1ba051e577&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">
@@ -7484,8 +7509,11 @@ document's command, each named as the document names it and copied into
 the mission database, because a command cannot be put behind another's
 header from outside. Only what the copy says the same is copied, and a
 document that says more is refused. Any other node's container is named
-after it and holds its data as a binary parameter, and any other gateway
-node's command is named after it and carries its data whole. So nothing per
+after it and holds its data as a parameter of the type the configuration's
+own XTCE gives it (<a class="reference internal" href="#the-configuration-s-own-xtce">The configuration's own XTCE</a>), copied from there as a
+document's type is; a string, bytes or a structure is binary, all of what
+follows the header. Any other gateway node's command is named after it and
+carries its data whole. So nothing per
 APID is stated twice, and a node added is decoded once the mission database
 is regenerated; the ping-yamcs example's tests hold the generated APIDs to
 the Rust's and work the containers and commands as Yamcs would on packets

@@ -132,14 +132,16 @@ class MdbTest(unittest.TestCase):
             kind = self.kind_of(parameter)
             self.assertEqual(kind.tag, f"{{{generated.NAMESPACE}}}"
                                        "FloatParameterType")
-            self.assertEqual(kind.get("name"), "KelvinValueType")
+            # As types.xtce states it, copied through the configuration's
+            # own XTCE: most significant byte first, XTCE's default.
+            self.assertEqual((kind.get("name"), kind.get("sizeInBits")),
+                             ("kelvin", "64"))
             unit, = kind.iterfind("./x:UnitSet/x:Unit", X)
-            self.assertEqual((unit.text, unit.get("description")),
-                             ("K", "kelvin"))
+            self.assertEqual(unit.text, "K")
             encoding, = kind.iterfind("./x:IntegerDataEncoding", X)
             self.assertEqual(
                 (encoding.get("sizeInBits"), encoding.get("encoding"),
-                 encoding.get("byteOrder")),
+                 encoding.get("byteOrder", "mostSignificantByteFirst")),
                 ("32", "twosComplement", "mostSignificantByteFirst"))
             term, = encoding.iterfind(
                 "./x:DefaultCalibrator/x:PolynomialCalibrator/x:Term", X)
@@ -151,7 +153,7 @@ class MdbTest(unittest.TestCase):
             kind = self.kind_of(parameter)
             self.assertEqual(kind.tag, f"{{{generated.NAMESPACE}}}"
                                        "IntegerParameterType")
-            self.assertEqual(kind.get("name"), "U8WholeType")
+            self.assertEqual(kind.get("name"), "u8")
             encoding, = kind.iterfind("./x:IntegerDataEncoding", X)
             self.assertEqual((encoding.get("sizeInBits"),
                               encoding.get("encoding")), ("8", "unsigned"))
@@ -159,8 +161,8 @@ class MdbTest(unittest.TestCase):
     def test_each_type_is_written_once(self):
         names = [kind.get("name") for kind in self.root.iterfind(
             ".//x:ParameterTypeSet/*", X)]
-        self.assertEqual(names.count("KelvinValueType"), 1)
-        self.assertEqual(names.count("U8WholeType"), 1)
+        self.assertEqual(names.count("kelvin"), 1)
+        self.assertEqual(names.count("u8"), 1)
 
     def test_each_container_is_its_sources_apid(self):
         found = {}

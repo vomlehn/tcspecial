@@ -1,10 +1,11 @@
-"""What a node sends, as the configuration says it, and the Yamcs parameter
-type it is given for it.
+"""What a node sends the ground, as the configuration's own XTCE says it,
+and the Yamcs parameter type it is given for it.
 
 The Python spelling of ``tcslibgs::graph::fprime::Form::of``, which
 ``examples/thermostat-yamcs/tests/agrees.rs`` holds to the Rust for every
-node of every example; and the typed parameters ``tcslibgs.yamcs`` gives a
-node whose data no interface document lays out.
+node of every example that reaches the ground; and the typed parameters
+``tcslibgs.yamcs`` copies from the configuration's own XTCE for a node whose
+data no interface document lays out.
 """
 
 import sys
@@ -15,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tcslibgs import configuration, interface  # noqa: E402
+from tests import loaded  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
 from tcslibgs.form import (  # noqa: E402
     DATUM, DECISION, UNITS, Form, form_of, unit_of_type_name)
@@ -120,7 +122,7 @@ def vehicle(directory, c=TO_KELVIN, d=TO_KELVIN, carries="kelvin"):
     path = Path(directory) / "vehicle.ytcs"
     path.write_text(VEHICLE.format(interface=interface.of_this_tree().hex(),
                                    c=c, d=d, carries=carries))
-    return configuration.load(path)
+    return loaded(path)
 
 
 class FormTest(unittest.TestCase):
@@ -144,15 +146,18 @@ class FormTest(unittest.TestCase):
             self.assertEqual(str(form_of(config, "c")),
                              "Value(MetrePerSecond)")
 
-    def test_what_tcsverify_refuses_is_not_read_as_anything(self):
+    def test_what_tcsverify_refuses_has_no_own_xtce_to_read(self):
+        # A type that is none, and none stated: tcsverify writes no own
+        # XTCE for either, and what each node sends is not guessed at.
+        for c in (to_value("furlongs"), 'function: "to_value"'):
+            with tempfile.TemporaryDirectory() as directory:
+                config = vehicle(directory, c)
+                with self.assertRaisesRegex(ValueError, "not there"):
+                    form_of(config, "c")
+
+    def test_a_node_that_does_not_reach_the_ground_is_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
-            config = vehicle(directory, to_value("furlongs"))
-            with self.assertRaisesRegex(ValueError, "not a value type"):
-                form_of(config, "c")
-            # One that states no type is read as bytes, as the Rust reads
-            # it: tcsverify refuses it.
-            config = vehicle(directory, 'function: "to_value"')
-            self.assertEqual(form_of(config, "c"), DATUM)
+            self.assertEqual(form_of(vehicle(directory), "g"), DATUM)
 
 
 class TypedParameterTest(unittest.TestCase):
@@ -202,13 +207,15 @@ class TypedParameterTest(unittest.TestCase):
         self.assertEqual(self.local(types["t"]), "BooleanParameterType")
         self.assertEqual(types["s"].get("name"), generated.BODY_TYPE)
 
-    def test_a_ratio_has_no_unit(self):
+    def test_a_value_type_is_types_xtces(self):
         with tempfile.TemporaryDirectory() as directory:
             types = self.types(vehicle(directory, to_value("ratio"),
                                        to_value("ratio"), "ratio"))
-        self.assertEqual(types["c"].get("name"), "RatioValueType")
-        self.assertIsNone(types["c"].find(
-            f"./{{{generated.NAMESPACE}}}UnitSet"))
+        x = {"x": generated.NAMESPACE}
+        self.assertEqual(types["c"].get("name"), "ratio")
+        self.assertEqual(types["c"].get("sizeInBits"), "64")
+        self.assertEqual(types["c"].find("./x:UnitSet/x:Unit", x).text,
+                         "ratio")
 
 
 if __name__ == "__main__":

@@ -2156,7 +2156,7 @@ mod tests {
         crate::graph::parameters::nest(
             &[
                 ("gateway", "radio"),
-                ("interface", "c4d65b8e01d6d67e37dac523e739f09a"),
+                ("interface", "55ad11486347bc8efc163e1ba051e577"),
                 ("tcs_cmd.recv", "0.0.0.0:4000"),
                 ("tcs_cmd.send", "127.0.0.1:4100"),
                 ("payload_telemetry.source_base", "0.0.0.0:6000"),

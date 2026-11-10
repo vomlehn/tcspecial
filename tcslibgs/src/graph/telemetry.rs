@@ -253,6 +253,41 @@ pub fn payload_link_name(payload: &str) -> String {
     format!("{payload} telemetry")
 }
 
+/// Names every node whose data reaches the ground, as [`of`] counts them,
+/// without asking where it arrives: each drawn into a gateway node, and,
+/// where the configuration has a `tcspecial` section, each payload nothing
+/// touches.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The nodes' names, sorted.
+pub fn sources(graph: &Graph) -> BTreeSet<String> {
+    let mut found = BTreeSet::new();
+    for link in &graph.links {
+        let reaches_a_gateway = link.to.each().iter().any(|destination| {
+            graph
+                .node(&Destination::parse(destination).node)
+                .is_some_and(|n| crate::gateway::is_gateway(&n.node_type))
+        });
+        if reaches_a_gateway {
+            found.insert(link.origin().node);
+        }
+    }
+    if graph.tcspecial.is_some() {
+        let drawn = touched(graph);
+        for node in graph.nodes.iter().filter(|n| n.is_payload()) {
+            if !drawn.contains(node.name.as_str()) {
+                found.insert(node.name.clone());
+            }
+        }
+    }
+    found
+}
+
 /// Finds every link to the ground this configuration has.
 ///
 /// A gateway node with no `ground_base`, or one that does not read, contributes

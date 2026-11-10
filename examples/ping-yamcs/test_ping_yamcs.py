@@ -197,13 +197,18 @@ def with_more_nodes(directory):
     touches, "sensor" and "tank", which report over payload_telemetry.
     Their names sort after "gateway" and "ping", whose device ids stay 0
     and 1. Written in a ``ping-yamcs`` directory of its own, with a copy of
-    the file it includes in a ``ping-common`` beside it, as in ``examples``.
+    the file it includes in a ``ping-common`` beside it, as in ``examples``,
+    and its own XTCE beside it, as ``make xtce`` writes the example's.
 
     Args:
         directory: Where to write it.
 
     Returns:
         The copy's path.
+
+    Raises:
+        unittest.SkipTest: Its own XTCE cannot be written: tcsverify is not
+                           built.
     """
     text = (HERE / "ping-yamcs.xtcs").read_text()
     payloads = textwrap.indent(textwrap.dedent("""\
@@ -243,6 +248,9 @@ def with_more_nodes(directory):
     (directory / "ping-yamcs").mkdir(exist_ok=True)
     path = directory / "ping-yamcs" / "with-more-nodes.xtcs"
     path.write_text(text.replace("    <tcsgui>", payloads + "    <tcsgui>"))
+    written, why = configuration.write_own_xtce(path)
+    if not written:
+        raise unittest.SkipTest(f"no own XTCE for the copy: {why}")
     return path
 
 

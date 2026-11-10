@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- What the vehicle sends the ground, flying the configuration
+     simple-app: each node whose data reaches it, as a parameter named
+     for the node, of the type the node sends, in a container of its own.
+     The types are tcslibgs/xtce/types.xtce's, copied. A string or bytes
+     is all of what carries it, and no count is sent before it: its
+     length, and bytes_length, are what the ground is given by how it is
+     framed. How each gateway frames what it sends is the ground
+     station's to add.
+
+     Written by tcsverify, asked for it by its xtce option, from the
+     configuration and types.xtce, and not to be edited: see "The
+     configuration's own XTCE" in tcspecial's docs/design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="simple-app">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="bytes_length" signed="false"
+          sizeInBits="32">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="4096"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="bytes">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="bytes_length"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
+      <Parameter name="lorem" parameterTypeRef="bytes"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="lorem_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="lorem"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

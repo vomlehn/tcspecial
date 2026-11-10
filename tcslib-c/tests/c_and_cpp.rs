@@ -273,11 +273,17 @@ vehicle:
                         ping::now().expect("a clock"),
                     ) {
                         Ok(answer) => {
+                            // A string, sent the ground after the count of
+                            // its bytes, in groups of seven bits.
+                            let mut counted = Vec::new();
+                            tcslibgs::link_type::counted(
+                                answer.as_bytes(),
+                                tcslibgs::link_type::Count::Groups,
+                                &mut counted,
+                            )
+                            .expect("counted");
                             sender
-                                .send_to(
-                                    answer.as_bytes(),
-                                    ("127.0.0.1", ground_data),
-                                )
+                                .send_to(&counted, ("127.0.0.1", ground_data))
                                 .expect("the answer");
                         }
                         Err(_) => sent_up.push(buffer[..size].to_vec()),
@@ -369,9 +375,10 @@ vehicle:
                     // The query answered, the node's data follows, as it
                     // would from a node that is running.
                     if matches!(command, tcslibgs::Command::QueryNode(_)) {
+                        // A string, after the count of its bytes.
                         sender
                             .send_to(
-                                b"hello from ping",
+                                b"\x0fhello from ping",
                                 ("127.0.0.1", ground_data),
                             )
                             .expect("the datum");

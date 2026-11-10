@@ -15,6 +15,8 @@ tcslib = { path = "../../tcslib" }
 [dev-dependencies]
 tcsapp = { path = "../../tcsapp" }
 tempfile = "3"
+# The ground test sends each word as tcspecial does, after its count.
+tcslibgs = { path = "../../tcslibgs" }
 
 [lints]
 workspace = true

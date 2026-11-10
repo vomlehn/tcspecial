@@ -274,7 +274,9 @@ fn a_vehicle_answering_to_cfs_is_a_peer_of_cfs_itself() {
         sensor.send_to(b"293.15", THERMOMETER_AT).expect("sent");
         reading = ground.published(THERMOMETER, Duration::from_millis(500));
     }
-    assert_eq!(reading.as_deref(), Some(&b"293.15"[..]));
+    // The thermometer's bytes, published after the count of them in groups
+    // of seven bits: nothing on the bus decodes them by XTCE.
+    assert_eq!(reading.as_deref(), Some(&b"\x06293.15"[..]));
 
     // A command for fsw, published as its cmd_msgid, goes on to the heater.
     let mut buffer = [0u8; 64];

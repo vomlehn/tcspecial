@@ -17,6 +17,7 @@ use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
 use tcslibgs::ccsds::{read_header, PacketType, Sender};
+use tcslibgs::link_type::{uncounted, Count};
 use tcslibgs::{Beacon, Command, ConnectCommand, Telemetry};
 
 mod common;
@@ -179,8 +180,10 @@ vehicle:
     let pong = heard(&downlink, Duration::from_secs(5)).expect("a pong");
     let data = read_header(&pong, PacketType::Telemetry, 0x201)
         .expect("a framed pong");
+    // A string: after the 32-bit count of its bytes, as XTCE encodes it.
+    let start = uncounted(data, Count::Xtce).expect("counted");
     assert!(
-        data.starts_with(b"ping #1 1760900000.000000001 "),
+        data[start..].starts_with(b"ping #1 1760900000.000000001 "),
         "{data:?}"
     );
 
@@ -310,5 +313,6 @@ payloads:
     };
     let data = read_header(&packet, PacketType::Telemetry, 0x301)
         .expect("framed under payload_telemetry.apid_base plus 1");
-    assert_eq!(data, b"reading 42");
+    // Bytes, after the 32-bit count of them, as XTCE encodes it.
+    assert_eq!(data, b"\0\0\0\x0areading 42");
 }

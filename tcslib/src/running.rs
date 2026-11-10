@@ -221,8 +221,10 @@ payloads:
     let mut buffer = vec![0u8; DATUM_BYTES];
     let to = std::net::SocketAddr::from(([127, 0, 0, 1], port));
 
+    // As tcspecial sends an untyped source's bytes: after their count.
+    let datagram = b"\x06293.15";
     let mut round = |gateway: &mut GatewayReceiver| {
-        vehicle.send_to(b"293.15", to).expect("sent");
+        vehicle.send_to(datagram, to).expect("sent");
         let arrival = gateway
             .receive_into(Some(Duration::from_secs(5)), &mut buffer)
             .expect("it reads")
@@ -271,13 +273,13 @@ payloads:
     };
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
     vehicle
-        .send_to(b"293.15", ("127.0.0.1", port))
+        .send_to(b"\x06293.15", ("127.0.0.1", port))
         .expect("sent");
     let mut small = [0u8; 3];
     let why = gateway
         .receive_into(Some(Duration::from_secs(5)), &mut small)
-        .expect_err("six bytes do not fit in three");
-    assert!(why.contains("sent 6 bytes"), "{why}");
+        .expect_err("seven bytes do not fit in three");
+    assert!(why.contains("sent 7 bytes"), "{why}");
 }
 
 /// Pinging, and folding in the answer, allocate nothing once the first of

@@ -2698,6 +2698,27 @@ pub(crate) mod tests {
     use super::*;
     use std::path::Path;
 
+    /// A datum as tcspecial sends it the ground from a source of a string
+    /// or bytes: after the count of its bytes, in groups of seven bits.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The datum.
+    ///
+    /// # Returns
+    ///
+    /// The datagram.
+    fn as_sent(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        tcslibgs::link_type::counted(
+            data,
+            tcslibgs::link_type::Count::Groups,
+            &mut out,
+        )
+        .expect("counted");
+        out
+    }
+
     /// A restart target is this window's configuration where nothing is
     /// typed, a checksum where 32 lower-case hex digits are, and otherwise a
     /// configuration file, checked first: one with problems is refused with
@@ -3140,7 +3161,7 @@ vehicle:
         let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket");
         vehicle
-            .send_to(answer.as_bytes(), ("127.0.0.1", port))
+            .send_to(&as_sent(answer.as_bytes()), ("127.0.0.1", port))
             .expect("sent");
 
         let deadline =
@@ -3217,11 +3238,11 @@ payloads:
         let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket");
         vehicle
-            .send_to(b"from a", ("127.0.0.1", port))
+            .send_to(&as_sent(b"from a"), ("127.0.0.1", port))
             .expect("sent");
         for _ in 0..2 {
             vehicle
-                .send_to(b"293.15", ("127.0.0.1", port + 1))
+                .send_to(&as_sent(b"293.15"), ("127.0.0.1", port + 1))
                 .expect("sent");
         }
 

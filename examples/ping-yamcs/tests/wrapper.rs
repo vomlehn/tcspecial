@@ -40,7 +40,9 @@ use tcslibgs::{Beacon, Command, ConfigDigest, ConfigVersion};
 mod common;
 
 use common::{here, with_more_nodes, worked_out_of};
-use yamcs_common::{decode, encode, framed, generated_mdb, Element, Given};
+use yamcs_common::{
+    counted, decode, encode, framed, generated_mdb, Element, Given,
+};
 
 /// The wrapper `tcslibgs/yamcs.py` generates for the example's
 /// configuration, as `ping_yamcs.py` writes it for Yamcs.
@@ -140,7 +142,7 @@ fn a_pings_answer_decodes_as_its_text() {
         (u64::MAX, largest, largest),
     ] {
         let (answer, fields) = answer_and_fields(count, sent, answered);
-        let packet = framed(apid("reply_apid"), &answer);
+        let packet = framed(apid("reply_apid"), &counted(&answer));
         let decoded = decode(&xtce, &packet);
         assert_eq!(decoded.container, "pingPacket");
         for (name, text) in &fields {
@@ -249,8 +251,10 @@ fn a_ping_encodes_as_its_text() {
         // And round again: the vehicle's answer, as Yamcs reads it.
         let answered = sent.saturating_add(Duration::from_millis(1));
         let answer = ping::reply(body, answered).expect("an answer");
-        let decoded =
-            decode(&xtce, &framed(apid("reply_apid"), answer.as_bytes()));
+        let decoded = decode(
+            &xtce,
+            &framed(apid("reply_apid"), &counted(answer.as_bytes())),
+        );
         for (name, said) in [
             ("ReplyCount", &count_text),
             ("ReplySentSeconds", &seconds),
@@ -282,13 +286,13 @@ fn added_nodes_decode_into_their_own_containers() {
         if link.source == "ping" {
             let at = Duration::new(1_793_562_467, 1);
             let (answer, fields) = answer_and_fields(2, at, at);
-            let decoded = decode(&xtce, &framed(apid, &answer));
+            let decoded = decode(&xtce, &framed(apid, &counted(&answer)));
             assert_eq!(decoded.container, "pingPacket");
             assert_eq!(decoded.bytes["ReplyCount"], fields[1].1.as_bytes());
             continue;
         }
         let data = format!("{} says hello", link.source).into_bytes();
-        let decoded = decode(&xtce, &framed(apid, &data));
+        let decoded = decode(&xtce, &framed(apid, &counted(&data)));
         assert_eq!(decoded.container, format!("{}Packet", link.source));
         assert_eq!(decoded.integers["CcsdsApid"], u64::from(apid));
         assert_eq!(decoded.bytes[link.source.as_str()], data);

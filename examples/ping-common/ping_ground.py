@@ -44,7 +44,7 @@ import time
 from dataclasses import dataclass
 
 from tcslib.beacon import NO_BEACON_MESSAGE
-from tcslibgs import ping
+from tcslibgs import count, ping
 
 NANOS = 1_000_000_000
 
@@ -149,10 +149,17 @@ class Pinger:
         """
         self._down.settimeout(timeout)
         try:
-            datagram, _ = self._down.recvfrom(ping.REPLY_BYTES + 1)
+            datagram, _ = self._down.recvfrom(
+                count.MOST_GROUP_BYTES + ping.REPLY_BYTES + 1)
         except socket.timeout:
             return False
-        self.answered(datagram, self._clock())
+        # An answer is a string, sent after the count of its bytes.
+        try:
+            datum = count.uncounted(datagram)
+        except ValueError as why:
+            self._not_an_answer(why)
+            return True
+        self.answered(datum, self._clock())
         return True
 
     def answered(self, datagram, at):
@@ -170,15 +177,7 @@ class Pinger:
         try:
             pong = ping.read_reply(datagram)
         except ValueError as why:
-            # Shown, because something arrived and an operator should see
-            # what; timed, never, because it answers nothing.
-            self._exchange = Exchange(
-                sent=self._exchange.sent,
-                sent_at=self._exchange.sent_at,
-                received=f"not an answer: {why}",
-                received_at=self._exchange.received_at,
-                answered_at=self._exchange.answered_at,
-            )
+            self._not_an_answer(why)
             return
         latest = pong.ping.count == self._count
         self._exchange = Exchange(
@@ -187,6 +186,22 @@ class Pinger:
             received=text,
             received_at=at if latest else self._exchange.received_at,
             answered_at=pong.answered if latest else self._exchange.answered_at,
+        )
+
+    def _not_an_answer(self, why):
+        """Shows what arrived that is not an answer: shown, because
+        something arrived and an operator should see what; timed, never,
+        because it answers nothing.
+
+        Args:
+            why: Why it is not one.
+        """
+        self._exchange = Exchange(
+            sent=self._exchange.sent,
+            sent_at=self._exchange.sent_at,
+            received=f"not an answer: {why}",
+            received_at=self._exchange.received_at,
+            answered_at=self._exchange.answered_at,
         )
 
     def close(self):

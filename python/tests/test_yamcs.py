@@ -258,22 +258,30 @@ class MdbTest(unittest.TestCase):
                 assigned[command.get("name")] = int(
                     assignment.get("argumentValue"))
         self.assertEqual(assigned, {"Connect": 0x101, "m": 0x200})
-        # The data of a node with no document is its parameter, what
-        # follows the header whole.
+        # The data of a node with no document is its parameter, of the
+        # type the configuration's own XTCE gives it: bytes for one that
+        # states none, after bytes_length, the count of them.
         parameter, = self.find(root, ".//x:Parameter[@name='n']")
-        self.assertEqual(parameter.get("parameterTypeRef"),
-                         generated.BODY_TYPE)
+        self.assertEqual(parameter.get("parameterTypeRef"), "bytes")
+        container, = self.find(root, ".//x:SequenceContainer"
+                                     "[@name='nPacket']")
+        self.assertEqual([entry.get("parameterRef") for entry
+                          in self.find(container, "./x:EntryList/*")],
+                         [generated.BYTES_LENGTH, "n"])
         self.assertEqual(self.find(root, ".//x:Parameter[@name='p']"), [])
 
     def test_a_ping_nodes_answer_is_laid_out_by_its_document(self):
+        # After its count: a ping's answer is a string, which goes after
+        # the 32-bit count of its bytes, as XTCE encodes it.
         root = generated.mdb(yamcs(self.directory.name)).getroot()
         container, = self.find(root, ".//x:SequenceContainer"
                                      "[@name='pPacket']")
         self.assertEqual([entry.get("parameterRef") for entry
                           in self.find(container, "./x:EntryList/*")],
-                         ["ReplyPrefix", "ReplyCount", "ReplySentSeconds",
-                          "ReplySentNanoseconds", "ReplySpace",
-                          "ReplyAnsweredSeconds", "ReplyAnsweredNanoseconds"])
+                         [generated.COUNT, "ReplyPrefix", "ReplyCount",
+                          "ReplySentSeconds", "ReplySentNanoseconds",
+                          "ReplySpace", "ReplyAnsweredSeconds",
+                          "ReplyAnsweredNanoseconds"])
         # Each parameter and type is the document's, copied once.
         count, = self.find(root, ".//x:Parameter[@name='ReplyCount']")
         self.assertEqual(count.get("parameterTypeRef"), "PingCountType")

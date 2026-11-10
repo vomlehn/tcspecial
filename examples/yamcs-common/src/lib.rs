@@ -943,3 +943,24 @@ pub fn framed(apid: u16, data: &[u8]) -> Vec<u8> {
     let mut room = vec![0u8; HEADER_BYTES + data.len()];
     sender.frame(&mut room, data).expect("framed").to_vec()
 }
+
+/// A string or bytes as the vehicle sends it under Yamcs, before it is
+/// framed: after the 32-bit count of its bytes, as XTCE encodes it.
+///
+/// # Arguments
+///
+/// * `data` - The datum.
+///
+/// # Returns
+///
+/// The count and the datum.
+pub fn counted(data: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    tcslibgs::link_type::counted(
+        data,
+        tcslibgs::link_type::Count::Xtce,
+        &mut out,
+    )
+    .expect("counted");
+    out
+}

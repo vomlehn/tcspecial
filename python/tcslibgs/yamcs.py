@@ -38,8 +38,11 @@ configuration's own XTCE gives it -- the file ``tcsverify --xtce`` writes
 beside the configuration -- copied from there as a node's document is: a
 value as a number in its unit, read from its four bytes, a decision as a
 boolean, read from its one byte, a whole number as an integer as wide as
-its type. A string, bytes or a structure is binary, whole: all of what
-follows the header, whose length the header gives. A gateway node's command
+its type, a string or bytes after the 32-bit count of its bytes it is sent
+after, as XTCE encodes it. A structure is binary, whole: all of what
+follows the header, whose length the header gives. A source whose document
+lays out a string's fields has those fields after the string's count,
+:data:`COUNT`. A gateway node's command
 takes its data whole, as a binary argument. Only the standard library is
 used.
 """
@@ -51,7 +54,7 @@ from pathlib import Path
 
 from . import interface
 from .configuration import HostPort
-from .form import DATUM, form_of, own_xtce
+from .form import COUNTED, DATUM, form_of, own_xtce, type_of
 
 #: The XTCE namespace Yamcs 5 reads: XTCE 1.2.
 NAMESPACE = "http://www.omg.org/spec/XTCE/20180204"
@@ -83,7 +86,8 @@ COPIED = frozenset({
     "StringArgumentType", "IntegerArgumentType", "BinaryArgumentType",
     "StringDataEncoding", "IntegerDataEncoding", "BinaryDataEncoding",
     "SizeInBits", "Fixed", "FixedValue", "Variable", "TerminationChar",
-    "LeadingSize", "UnitSet", "Unit", "DefaultCalibrator",
+    "LeadingSize", "DynamicValue", "ParameterInstanceRef",
+    "LinearAdjustment", "ValidRange", "UnitSet", "Unit", "DefaultCalibrator",
     "PolynomialCalibrator", "Term", "AncillaryDataSet", "AncillaryData"})
 
 #: A name XTCE allows: its ``NameType``, no space, period, slash, colon or
@@ -97,9 +101,18 @@ RESTRICTED = {"beacon": "BeaconPacket", "commands": "AnswerPacket"}
 #: The template's command the command links' APID is assigned to.
 CONNECT = "Connect"
 
-#: The binary parameter type a node's data is read as where its type
-#: has no width of its own: what follows the header, whole.
+#: The binary parameter type a node's data is read as where it is a
+#: structure: what follows the header, whole.
 BODY_TYPE = "PacketBodyType"
+
+#: The template's parameter that is the 32-bit count before a string whose
+#: fields a node's interface document lays out: a string or bytes is sent
+#: after one, where it goes as Yamcs decodes it, by XTCE.
+COUNT = "DatumCount"
+
+#: The parameter the configuration's own XTCE counts every ``bytes`` by,
+#: as ``types.xtce`` does.
+BYTES_LENGTH = "bytes_length"
 
 #: The simulated world's ambient temperature, which nothing on the link
 #: carries: a local parameter, which the ground station sets from the
@@ -167,6 +180,9 @@ class Telemetry:
     #: The configuration's own XTCE, which gives its parameter's type, or
     #: ``None`` where its document lays it out.
     own: Path = None
+    #: Whether it is a string or bytes, which is sent after a 32-bit count
+    #: of its bytes: see :data:`COUNT`.
+    counted: bool = False
 
     @property
     def container(self):
@@ -258,9 +274,10 @@ def telemetry(config):
         document = interface.node_document(config.node(use.node).node_type)
         form = DATUM if document else form_of(config, use.node)
         own = None if document else own_xtce(config)
+        counted = type_of(config, use.node) in COUNTED
         links.append(Telemetry(name, use.node, use.apid, ground,
                                use.carries, use.gateway, document, form,
-                               own))
+                               own, counted))
     return links
 
 
@@ -844,31 +861,39 @@ def _comment(parent, text):
     parent.append(ET.Comment(f" {text} "))
 
 
-def _own_type(names, copier, link):
-    """The parameter type a source's data is read as, where no document
-    lays it out: its type in the configuration's own XTCE, copied into the
-    wrapper the first time it is needed, or :data:`BODY_TYPE` for a type
-    with no width of its own.
+def _own_entries(copier, link):
+    """The parameters a source's data is read as, where no document lays it
+    out, with their types: as the configuration's own XTCE states them,
+    copied into the wrapper the first time each is needed, or one of
+    :data:`BODY_TYPE` for a structure.
 
     Args:
-        names:  The :class:`_Names` the wrapper holds.
-        copier: The :class:`_Copier` that copies a document's types.
+        copier: The :class:`_Copier` that copies a document's types and
+                parameters.
         link:   The :class:`Telemetry`.
 
     Returns:
-        The type's name.
+        Each parameter of what follows the header, in order: a parameter
+        copied from the document by its name, and the source's own, named
+        :attr:`Telemetry.name`, with its type's name.
 
     Raises:
-        ValueError: As :meth:`Document.find` and :meth:`_Copier.type`.
+        ValueError: As :meth:`Document.find`, :meth:`_Copier.type` and
+                    :meth:`_Copier.parameter`.
         OSError: The configuration's own XTCE cannot be read.
     """
-    if link.form.kind == "Datum":
-        return BODY_TYPE
     own = Document(link.own)
     name = own.find("parameter", link.source,
                     own.path.name).get("parameterTypeRef")
+    if link.form.kind == "Datum" and not link.counted:
+        return [(link.name, BODY_TYPE)]
     copier.type(own, "parameter type", name)
-    return name
+    entries = []
+    if name == "bytes":
+        copier.parameter(own, BYTES_LENGTH)
+        entries.append((BYTES_LENGTH, None))
+    entries.append((link.name, name))
+    return entries
 
 
 def _downlink(root, names, copier, link):
@@ -889,17 +914,21 @@ def _downlink(root, names, copier, link):
                       "container sets")
     names.take("container", link.container, link.source)
     if link.document is None:
-        kind = _own_type(names, copier, link)
-        names.take("parameter", link.name, link.source)
-        _child(_one(root, "./x:TelemetryMetaData/x:ParameterSet",
-                    "parameter sets"),
-               "Parameter", name=link.name, parameterTypeRef=kind)
-        held = [link.name]
+        held = []
+        for parameter, kind in _own_entries(copier, link):
+            if kind is not None:
+                names.take("parameter", parameter, link.source)
+                _child(_one(root, "./x:TelemetryMetaData/x:ParameterSet",
+                            "parameter sets"),
+                       "Parameter", name=parameter, parameterTypeRef=kind)
+            held.append(parameter)
     else:
         document = Document(link.document)
         name, held = document.container()
         for parameter in held:
             copier.parameter(document, parameter)
+        if link.counted:
+            held = [COUNT] + held
         _comment(containers, f"{link.source}: {name}, from "
                              f"{document.path.name}")
     container = _child(containers, "SequenceContainer", name=link.container)

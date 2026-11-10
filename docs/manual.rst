@@ -5046,6 +5046,15 @@ a container of its own, ``<node>_packet``; the types are copied from
 one file, and adds to it how its gateway frames what it sends: the Yamcs
 ground programs build Yamcs's mission database on it.
 
+A string or bytes is sent the ground after a count of its bytes. Under
+Yamcs, which decodes what it is sent by XTCE, the count is the 32 bits the
+document states. Everywhere else it is in groups of seven bits, least
+significant first, each in a byte whose top bit says another follows: one
+byte for a datum shorter than 128 bytes, two for the longest. A ground
+program reading through tcslib -- tcsmoc, the C library, the F´ bridge -- is
+given each datum without its count; one reading a link's socket itself
+takes the count off, as ``python/tcslibgs/count.py`` does.
+
 Nobody writes it by hand. tcsverify writes it from the configuration, and
 writes the same from either spelling:
 

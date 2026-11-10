@@ -5,7 +5,11 @@
 //! parameter named for the node, of the type its `world-out` sends, in a
 //! container of its own, `<node>_packet`. The types are copied from
 //! `tcslibgs/xtce/types.xtce` as it states them, and a structure is an
-//! aggregate of them, so a ground station is given one file. How each
+//! aggregate of them, so a ground station is given one file. A string or
+//! bytes is sent after a count of its bytes: in XTCE's encoding, which this
+//! states and which is what Yamcs is sent, a 32-bit count, as `types.xtce`
+//! states it; where the ground reads what it is sent by no XTCE, the same
+//! count in groups of seven bits ([`crate::link_type::Count`]). How each
 //! gateway frames what it sends -- a CCSDS header and an APID under Yamcs, a
 //! port of its own over a radio -- is the ground station's to add.
 //!
@@ -92,11 +96,12 @@ fn head(out: &mut String, name: &str) {
 <!-- What the vehicle sends the ground, flying the configuration
      {name}: each node whose data reaches it, as a parameter named
      for the node, of the type the node sends, in a container of its own.
-     The types are tcslibgs/xtce/types.xtce's, copied. A string or bytes
-     is all of what carries it, and no count is sent before it: its
-     length, and bytes_length, are what the ground is given by how it is
-     framed. How each gateway frames what it sends is the ground
-     station's to add.
+     The types are tcslibgs/xtce/types.xtce's, copied: a string or bytes
+     after a 32-bit count of its bytes, as each is sent where the ground
+     decodes it by XTCE (under Yamcs). Where no XTCE decodes it, the count
+     is sent in groups of seven bits instead, least significant first, each
+     in a byte whose top bit says another follows. How each gateway frames
+     what it sends is the ground station's to add.
 
      Written by tcsverify, asked for it by its xtce option, from the
      configuration and types.xtce, and not to be edited: see \"The
@@ -176,8 +181,7 @@ fn parameter_types(
 }
 
 /// Writes a parameter for each source, and `bytes_length` where a source
-/// sends bytes: the length `types.xtce` sizes every `bytes` by, which is
-/// in no container, because no count is sent before a datum.
+/// sends bytes: the count `types.xtce` sizes every `bytes` by.
 ///
 /// # Arguments
 ///
@@ -219,7 +223,8 @@ fn parameters(out: &mut String, sources: &BTreeMap<String, LinkType>) {
     let _ = writeln!(out, "{level}</ParameterSet>");
 }
 
-/// Writes a container for each source, holding its parameter.
+/// Writes a container for each source, holding its parameter, after
+/// `bytes_length` for bytes: a string's count is its type's own.
 ///
 /// # Arguments
 ///
@@ -228,7 +233,7 @@ fn parameters(out: &mut String, sources: &BTreeMap<String, LinkType>) {
 fn containers(out: &mut String, sources: &BTreeMap<String, LinkType>) {
     let level = INDENT.repeat(2);
     let _ = writeln!(out, "{level}<ContainerSet>");
-    for source in sources.keys() {
+    for (source, kind) in sources {
         let inner = INDENT.repeat(3);
         let _ = writeln!(
             out,
@@ -236,6 +241,13 @@ fn containers(out: &mut String, sources: &BTreeMap<String, LinkType>) {
             container_name(source)
         );
         let _ = writeln!(out, "{inner}{INDENT}<EntryList>");
+        if *kind == LinkType::Basic(Basic::Bytes) {
+            let _ = writeln!(
+                out,
+                "{inner}{INDENT}{INDENT}<ParameterRefEntry \
+                 parameterRef=\"{BYTES_LENGTH}\"/>"
+            );
+        }
         let _ = writeln!(
             out,
             "{inner}{INDENT}{INDENT}<ParameterRefEntry \

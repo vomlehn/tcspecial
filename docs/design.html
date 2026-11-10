@@ -1464,10 +1464,24 @@ the document is to say so is not yet settled.</dd>
 <dd>It says nothing of framing. A gateway frames what it sends as its kind
 does -- a port of each source's own over a radio, a CCSDS header and an
 APID under Yamcs, a message ID on a bus -- and that is the ground
-station's to add. A string or bytes is all of what carries it, with no
-count before it: its length is what the framing gives. <tt class="docutils literal">types.xtce</tt>
-sizes <tt class="docutils literal">bytes</tt> by a parameter, <tt class="docutils literal">bytes_length</tt>, which the document
-states and puts in no container.</dd>
+station's to add.</dd>
+<dt>Requirement</dt>
+<dd>A string or bytes, whose type gives it no width, is sent the ground
+after a count of its bytes, so that it reads the same however it is
+framed (<tt class="docutils literal"><span class="pre">tcslibgs::link_type::Count</span></tt>). Where the ground decodes what it
+is sent by XTCE -- under Yamcs -- the count is XTCE's, 32 bits, as
+<tt class="docutils literal">types.xtce</tt> states it and the document copies: a string's own
+leading size, and <tt class="docutils literal">bytes_length</tt> before bytes. Everywhere else -- over
+a radio, <tt class="docutils literal">payload_telemetry</tt>, to the F´ bridge, on a cFS bus -- it is
+in groups of seven bits, least significant first, each in a byte whose
+top bit says another follows (unsigned LEB128), in as few bytes as hold
+it: one byte for a datum below 128 bytes, two for any there is. A count
+in more bytes than it needs, or that does not say how many bytes follow
+it, is refused. A datum of a type with a width of its own is sent with
+no count, and between nodes nothing is counted. Ground programs that
+read through <tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver</span></tt> are given each datum
+without its count; Python reading a link itself takes it off with
+<tt class="docutils literal">python/tcslibgs/count.py</tt>.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal">tcsverify <span class="pre">--xtce</span></tt> writes it from the configuration and
 <tt class="docutils literal">types.xtce</tt>, and nobody writes it by hand: everything it says is said

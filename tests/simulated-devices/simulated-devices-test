@@ -108,7 +108,8 @@ def payloads(run):
 
     chip, why = gpio_sim()
     if chip:
-        made.append(("gpio", "gpio", [f'path: "{chip}"', 'lines: "0"']))
+        made.append(("gpio", "gpio", [f'path: "{chip}"', 'lines: "0"',
+                                      'state_interval: "500 ms"']))
     else:
         left_out.append(f"gpio: {why}")
 
@@ -336,12 +337,23 @@ def judged(made, got, lorem):
     Returns:
         A list of (name, passed, what was seen).
     """
+    from tcslibgs import count  # the tree's own, as main() finds it
+
     verdicts = []
     for name, kind, _ in made:
         data = got[name]
         size = sum(len(datum) for datum in data)
         seen = f"{len(data)} datagrams, {size} bytes"
         passed = bool(data)
+        # Every payload here but the GPIO lines states no type, so sends
+        # bytes, each datum after the count of its bytes in groups of seven
+        # bits.
+        if passed and kind != "gpio":
+            try:
+                data = [count.uncounted(datum) for datum in data]
+            except ValueError as why:
+                passed = False
+                seen += f", a count that is wrong: {why}"
         if passed and kind == "device-file":
             text = b"".join(data)
             # What arrived before CONNECT was taken is not sent, so the data
@@ -350,9 +362,10 @@ def judged(made, got, lorem):
             seen += ", part of tcssim's text" if passed else \
                 ", not tcssim's text"
         if passed and kind == "gpio":
-            passed = all(len(datum) % 16 == 0 for datum in data)
-            seen += ", in 16-byte records" if passed else \
-                ", not in 16-byte records"
+            # One line's level, as the u8 a set of up to eight lines is.
+            passed = all(len(datum) == 1 and datum[0] <= 1 for datum in data)
+            seen += ", each a u8 of one line" if passed else \
+                ", not each a u8 of one line"
         verdicts.append((name, passed, seen))
     return verdicts
 

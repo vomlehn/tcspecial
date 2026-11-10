@@ -36,6 +36,7 @@ use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry::{Reaches, Telemetered};
 use tcslibgs::graph::Graph;
+use tcslibgs::link_type::Count;
 
 use std::sync::Arc;
 
@@ -1004,7 +1005,8 @@ pub fn open_ground_link(
                      opened"
                 )
             })?;
-            return Ok(Box::new(BusDownlink::of(bus.publisher(), *msgid)));
+            let port = Box::new(BusDownlink::of(bus.publisher(), *msgid));
+            return Ok(counted_if(link, port));
         }
     };
     let (reader, writer) =
@@ -1022,12 +1024,119 @@ pub fn open_ground_link(
         ),
         None => writer,
     };
-    Ok(Box::new(EndpointPort::of(
-        what,
-        reader,
-        writer,
-        Use::Driven,
-    )))
+    let port: Box<dyn Port> =
+        Box::new(EndpointPort::of(what, reader, writer, Use::Driven));
+    Ok(counted_if(link, port))
+}
+
+/// Puts a link to the ground behind a count of each datum's bytes, where
+/// its source sends a string or bytes: see [`Counted`].
+///
+/// # Arguments
+///
+/// * `link` - The link, which says what its source sends.
+/// * `port` - The link opened.
+///
+/// # Returns
+///
+/// The port, counting where it must.
+fn counted_if(link: &Telemetered, port: Box<dyn Port>) -> Box<dyn Port> {
+    match link.count() {
+        Some(count) => Box::new(Counted::of(port, count)),
+        None => port,
+    }
+}
+
+/// A link to the ground whose source sends a string or bytes, each sent
+/// after a count of its bytes: a type of no width of its own carries its
+/// length with it, so that what the ground is told reads the same however
+/// the gateway frames it. Under Yamcs the count is 32 bits, as the
+/// configuration's own XTCE states it; elsewhere it is in groups of seven
+/// bits, one byte for most (`tcslibgs::link_type::Count`). Between nodes
+/// nothing is counted.
+///
+/// The datum is written behind its count into a buffer made once, as large
+/// as the largest datum, so nothing is allocated as data moves.
+pub struct Counted {
+    /// The link itself, which sends what it is given.
+    inner: Box<dyn Port>,
+    /// Where each datum is written behind its count.
+    buffer: Vec<u8>,
+    /// How the count is written.
+    count: Count,
+}
+
+impl Counted {
+    /// Counts each datum a link to the ground is given.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - The link.
+    /// * `count` - How the count is written.
+    ///
+    /// # Returns
+    ///
+    /// The link, counting.
+    pub fn of(inner: Box<dyn Port>, count: Count) -> Counted {
+        Counted {
+            inner,
+            count,
+            buffer: Vec::with_capacity(
+                tcslibgs::link_type::COUNT_BYTES + tcslibgs::types::DATUM_BYTES,
+            ),
+        }
+    }
+}
+
+impl Port for Counted {
+    fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.inner.take(buffer)
+    }
+
+    fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
+        self.inner.take_unasked(buffer)
+    }
+
+    fn strangers(&mut self) -> u64 {
+        self.inner.strangers()
+    }
+
+    fn ask(&mut self) -> Result<(), String> {
+        self.inner.ask()
+    }
+
+    fn give(
+        &mut self,
+        arriving: Arriving<'_>,
+        data: &[u8],
+    ) -> Result<(), String> {
+        tcslibgs::link_type::counted(data, self.count, &mut self.buffer)?;
+        self.inner.give(arriving, &self.buffer)
+    }
+
+    fn accepts(&self) -> bool {
+        self.inner.accepts()
+    }
+
+    fn holds(&self) -> bool {
+        self.inner.holds()
+    }
+
+    fn produces(&self) -> bool {
+        self.inner.produces()
+    }
+
+    fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
+        self.inner.set(attribute, value)
+    }
+
+    fn flush(&mut self) -> Result<(), String> {
+        self.inner.flush()
+    }
+
+    fn ready(&self) -> bool {
+        self.inner.ready()
+    }
 }
 
 /// A link to the ground that sends nothing until the ground has matched
@@ -3073,7 +3182,12 @@ vehicle:
         let pong = answered(&mut system).expect("an answer");
         let data = read_header(&pong, PacketType::Telemetry, 0x201)
             .expect("framed telemetry");
-        assert!(data.starts_with(b"ping #2 1760900000.000000001 "));
+        // An answer is a string: under Yamcs, after the 32-bit count of its
+        // bytes, as XTCE encodes it.
+        let start = tcslibgs::link_type::uncounted(data, Count::Xtce)
+            .expect("counted as XTCE counts it");
+        assert_eq!(start, tcslibgs::link_type::COUNT_BYTES);
+        assert!(data[start..].starts_with(b"ping #2 1760900000.000000001 "));
         assert_eq!(&pong[2..4], &[0xC0, 0x00], "the downlink's first");
     }
 

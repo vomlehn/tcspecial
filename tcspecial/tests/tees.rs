@@ -175,9 +175,11 @@ fn a_tee_sends_each_datum_both_ways() {
     let up: SocketAddr =
         format!("127.0.0.1:{uplink}").parse().expect("an address");
     assert_eq!(until_heard(&ground, up, b"on", &heater), b"on");
+    // To the ground the tee's bytes go after the count of them, in groups
+    // of seven bits; to the heater, a payload, as they are.
     assert_eq!(
         heard(&echoed).as_deref(),
-        Some(&b"on"[..]),
+        Some(&b"\x02on"[..]),
         "the command should come back to the ground as payload data"
     );
 
@@ -186,5 +188,8 @@ fn a_tee_sends_each_datum_both_ways() {
     let thermometer = bound();
     let to: SocketAddr =
         format!("127.0.0.1:{sensor}").parse().expect("an address");
-    assert_eq!(until_heard(&thermometer, to, b"293.15", &read), b"293.15");
+    assert_eq!(
+        until_heard(&thermometer, to, b"293.15", &read),
+        b"\x06293.15"
+    );
 }

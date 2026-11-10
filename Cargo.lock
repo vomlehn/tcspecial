@@ -2651,6 +2651,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
+name = "leb128"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c83bff1d572d6b9aeef67ddfc8448e4a3737909cb28e81f97c791b9018703e52"
+
+[[package]]
 name = "libc"
 version = "0.2.190"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4434,6 +4440,7 @@ version = "0.1.0"
 dependencies = [
  "tcsapp",
  "tcslib",
+ "tcslibgs",
  "tempfile",
 ]
 
@@ -4892,6 +4899,7 @@ dependencies = [
 name = "tcslibgs"
 version = "0.1.0"
 dependencies = [
+ "leb128",
  "libc",
  "md5",
  "quick-xml 0.42.0",

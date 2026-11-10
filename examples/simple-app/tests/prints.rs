@@ -12,6 +12,27 @@ use std::net::UdpSocket;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
+/// A word as tcspecial sends it the ground: the lorem payload's data is
+/// bytes, sent after the count of them, in groups of seven bits.
+///
+/// # Arguments
+///
+/// * `word` - The word.
+///
+/// # Returns
+///
+/// The datagram.
+fn sent(word: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    tcslibgs::link_type::counted(
+        word,
+        tcslibgs::link_type::Count::Groups,
+        &mut out,
+    )
+    .expect("counted");
+    out
+}
+
 /// A configuration whose gateway node takes `lorem`'s words on a port nothing
 /// holds, and that port: `lorem` sorts after `gateway-1`, the only other
 /// node, so it is device id 1 and its port is the base plus one.
@@ -126,11 +147,14 @@ fn the_words_are_written_out_as_one_line() {
     let first = simple_app::line(1).expect("a paragraph has a first line");
     for word in first.words() {
         vehicle
-            .send_to(word.as_bytes(), ("127.0.0.1", port))
+            .send_to(&sent(word.as_bytes()), ("127.0.0.1", port))
             .expect("a word goes to the ground");
     }
     vehicle
-        .send_to(simple_app::TERMINATOR.as_bytes(), ("127.0.0.1", port))
+        .send_to(
+            &sent(simple_app::TERMINATOR.as_bytes()),
+            ("127.0.0.1", port),
+        )
         .expect("the end of the line goes to the ground");
 
     // One space between the words, none before the first, and the line ended:
@@ -163,7 +187,10 @@ fn a_datum_that_is_only_the_terminator_ends_it() {
         UdpSocket::bind("127.0.0.1:0").expect("the vehicle's own socket");
 
     vehicle
-        .send_to(simple_app::TERMINATOR.as_bytes(), ("127.0.0.1", port))
+        .send_to(
+            &sent(simple_app::TERMINATOR.as_bytes()),
+            ("127.0.0.1", port),
+        )
         .expect("the end of a line nobody sent");
 
     assert_eq!(printed(&mut ground), simple_app::TERMINATOR);
@@ -292,11 +319,14 @@ payloads:
     let first = simple_app::line(1).expect("a first line");
     for word in first.words() {
         vehicle
-            .send_to(word.as_bytes(), ("127.0.0.1", port))
+            .send_to(&sent(word.as_bytes()), ("127.0.0.1", port))
             .expect("a word");
     }
     vehicle
-        .send_to(simple_app::TERMINATOR.as_bytes(), ("127.0.0.1", port))
+        .send_to(
+            &sent(simple_app::TERMINATOR.as_bytes()),
+            ("127.0.0.1", port),
+        )
         .expect("the end of the line");
     assert_eq!(
         printed(&mut ground),

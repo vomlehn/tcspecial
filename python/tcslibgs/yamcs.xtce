@@ -47,6 +47,9 @@
       <IntegerParameterType name="U16Type" signed="false">
         <IntegerDataEncoding sizeInBits="16"/>
       </IntegerParameterType>
+      <IntegerParameterType name="U32Type" signed="false">
+        <IntegerDataEncoding sizeInBits="32"/>
+      </IntegerParameterType>
       <!-- Every octet after the header, whose count is the header's
            length field plus one: the beacon read again whole, and the
            data of a node whose layout no XTCE states. -->
@@ -69,6 +72,9 @@
       <Parameter name="CcsdsSeqFlags" parameterTypeRef="U2Type"/>
       <Parameter name="CcsdsSeqCount" parameterTypeRef="U14Type"/>
       <Parameter name="CcsdsLength" parameterTypeRef="U16Type"/>
+      <!-- The 32-bit count of the bytes a string comes after, where a
+           node's interface document lays out the string's own fields. -->
+      <Parameter name="DatumCount" parameterTypeRef="U32Type"/>
       <!-- The first octet after an answer's header, which says whether it
            is one of the fixed commands' answers or another's. -->
       <Parameter name="AnswerOpcode" parameterTypeRef="U8Type"/>

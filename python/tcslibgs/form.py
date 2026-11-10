@@ -167,21 +167,18 @@ def own_xtce(config):
     return Path(config.path).with_suffix(".xtce")
 
 
-def form_of(config, source):
-    """Finds the form of what a node sends the ground, as the
-    configuration's own XTCE says it: ``Form::of``, for a node that reaches
-    the ground.
+def type_of(config, source):
+    """Finds the type a node sends the ground, as the configuration's own
+    XTCE names it.
 
     Args:
         config: The :class:`tcslibgs.configuration.Configuration`.
         source: The node's name.
 
     Returns:
-        A value's :class:`Form`, with its unit, for a parameter of a value
-        type; :data:`DECISION` for a ``boolean``; a ``Whole`` form for a
-        whole number -- a sensor's reading, what a set of GPIO lines is;
-        :data:`DATUM` for a string, bytes or a structure, and for a node
-        that does not reach the ground, which the document does not name.
+        The type's name -- ``kelvin``, ``u8``, ``string``, ``bytes``, or a
+        structure's -- or ``None`` for a node that does not reach the
+        ground, which the document does not name.
 
     Raises:
         ValueError: The document is not there, does not read, or gives the
@@ -204,18 +201,50 @@ def form_of(config, source):
         if parameter.get("name") == source:
             said = parameter.get("parameterTypeRef")
     if said is None:
-        return DATUM
+        return None
     if not any(kind.get("name") == said for kind in root.iterfind(
             "./x:TelemetryMetaData/x:ParameterTypeSet/*", x)):
         raise ValueError(f'{path}: "{source}" is of the type "{said}", '
                          "which the document does not have")
+    return said
+
+
+def form_of(config, source):
+    """Finds the form of what a node sends the ground, as the
+    configuration's own XTCE says it: ``Form::of``, for a node that reaches
+    the ground.
+
+    Args:
+        config: The :class:`tcslibgs.configuration.Configuration`.
+        source: The node's name.
+
+    Returns:
+        A value's :class:`Form`, with its unit, for a parameter of a value
+        type; :data:`DECISION` for a ``boolean``; a ``Whole`` form for a
+        whole number -- a sensor's reading, what a set of GPIO lines is;
+        :data:`DATUM` for a string, bytes or a structure, and for a node
+        that does not reach the ground, which the document does not name.
+
+    Raises:
+        ValueError: As :func:`type_of`.
+        OSError: As :func:`type_of`.
+    """
+    said = type_of(config, source)
+    if said is None:
+        return DATUM
     if said in WHOLE:
         return Form("Whole", whole=said)
     if said == "boolean":
         return DECISION
     if any(type_name(unit) == said for unit in UNITS):
-        return Form("Value", unit_of_type_name(said, f'{path}: "{source}"'))
+        return Form("Value", unit_of_type_name(said, f'{own_xtce(config)}: '
+                                                      f'"{source}"'))
     return DATUM
+
+
+#: The types sent the ground after a count of their bytes:
+#: ``LinkType::is_counted``.
+COUNTED = ("string", "bytes")
 
 
 #: The whole numbers' names: ``link_type::Basic``'s.

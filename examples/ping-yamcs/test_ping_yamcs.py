@@ -369,7 +369,10 @@ class YamcsPingerTest(unittest.TestCase):
         held = [entry.get("parameterRef") for entry in root.iterfind(
             ".//x:SequenceContainer[@name='pingPacket']/x:EntryList/*",
             namespace)]
-        self.assertEqual([name for name in held
+        # After the 32-bit count of the answer's bytes, which the string
+        # is sent after under Yamcs.
+        self.assertEqual(held[0], generated.COUNT)
+        self.assertEqual([name for name in held[1:]
                           if name not in ("ReplyPrefix", "ReplySpace")],
                          list(ping_yamcs.REPLY_PARAMETERS.values()))
         self.assertEqual(list(ping_yamcs.REPLY_PARAMETERS),

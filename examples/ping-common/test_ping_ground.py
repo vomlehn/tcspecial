@@ -18,7 +18,7 @@ sys.path.insert(0, str(HERE.parents[1] / "python"))
 sys.path.insert(0, str(HERE))
 
 from ping_ground import Pinger, interval, precise_time  # noqa: E402
-from tcslibgs import ping  # noqa: E402
+from tcslibgs import count, ping  # noqa: E402
 from tcslibgs.configuration import HostPort  # noqa: E402
 
 SECOND = 1_000_000_000
@@ -129,7 +129,9 @@ class PingerTest(unittest.TestCase):
     def test_an_answer_arrives_on_the_downlink(self):
         message = self.pinger.ping().encode()
         port = self.pinger._down.getsockname()[1]
-        self.vehicle.sendto(ping.reply(message, AT + 1), ("127.0.0.1", port))
+        # A string, which the vehicle sends after the count of its bytes.
+        self.vehicle.sendto(count.counted(ping.reply(message, AT + 1)),
+                            ("127.0.0.1", port))
         self.assertTrue(self.pinger.receive(timeout=2))
         self.assertIsNotNone(self.pinger.exchange().received_at)
         self.assertFalse(self.pinger.receive(timeout=0.01), "nothing more came")
@@ -204,7 +206,8 @@ class WindowTest(unittest.TestCase):
                 button.invoke()
                 message = vehicle.recvfrom(256)[0]
                 vehicle.sendto(
-                    ping.reply(message, ping.now()), ("127.0.0.1", down)
+                    count.counted(ping.reply(message, ping.now())),
+                    ("127.0.0.1", down)
                 )
                 window.after(600, read)
 

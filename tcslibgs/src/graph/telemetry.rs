@@ -57,8 +57,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::link_types::{self, carries};
 use super::parameters::{ci_config_of, flatten};
-use super::{Destination, Graph};
+use super::{Destination, Graph, Node};
+use crate::link_type::{Basic, Count, LinkType};
 use crate::types::{
     host_port_of, msgid_of, Links, MsgIdRange, NetworkConfig, NetworkProtocol,
 };
@@ -106,9 +108,31 @@ pub struct Telemetered {
     /// `payload_telemetry` in a configuration that answers to Yamcs -- or
     /// `None` for a link whose packets carry no header.
     pub apid: Option<u16>,
+    /// The type its source sends at its `world-out`: bytes for a source
+    /// that states none it can be held to. A string or bytes is sent after
+    /// a count of its bytes ([`LinkType::is_counted`]).
+    pub carries: LinkType,
 }
 
 impl Telemetered {
+    /// How the count before each datum is written, where its source sends
+    /// a string or bytes: as XTCE encodes it under Yamcs, whose packets the
+    /// ground decodes by XTCE, and in groups of seven bits everywhere else.
+    ///
+    /// # Returns
+    ///
+    /// The count, or `None` for a source of a type with a width of its own,
+    /// which is sent with no count.
+    pub fn count(&self) -> Option<Count> {
+        if !self.carries.is_counted() {
+            None
+        } else if self.apid.is_some() {
+            Some(Count::Xtce)
+        } else {
+            Some(Count::Groups)
+        }
+    }
+
     /// tcspecial's end of a link over UDP.
     ///
     /// # Returns
@@ -253,6 +277,23 @@ pub fn payload_link_name(payload: &str) -> String {
     format!("{payload} telemetry")
 }
 
+/// Says what a source sends the ground.
+///
+/// # Arguments
+///
+/// * `node` - The source, where it is in the configuration.
+///
+/// # Returns
+///
+/// The type it sends at its `world-out`, or bytes where it states none it
+/// can be held to: what is wrong with its type is the check's to say.
+fn sent_by(node: Option<&Node>) -> LinkType {
+    match node.map(|node| carries(node, "world-out")) {
+        Some(Ok(link_types::Carries::Only(kind))) => kind,
+        _ => LinkType::Basic(Basic::Bytes),
+    }
+}
+
 /// Names every node whose data reaches the ground, as [`of`] counts them,
 /// without asking where it arrives: each drawn into a gateway node, and,
 /// where the configuration has a `tcspecial` section, each payload nothing
@@ -384,6 +425,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 via: Via::Gateway(to.clone()),
                 reaches,
                 apid,
+                carries: sent_by(graph.node(&source)),
             });
         }
     }
@@ -444,6 +486,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 via: Via::PayloadTelemetry,
                 reaches,
                 apid,
+                carries: sent_by(Some(node)),
             });
         }
     }

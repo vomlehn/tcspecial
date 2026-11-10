@@ -311,6 +311,127 @@ impl LinkType {
 /// The most a string or bytes may hold: `tcslibgs::types::DATUM_BYTES`.
 const MOST_BYTES: usize = crate::types::DATUM_BYTES;
 
+/// How many bytes the count is that a string or bytes is sent after where
+/// it is XTCE-encoded: a 32-bit count of its bytes, most significant first,
+/// as `types.xtce` states it.
+pub const COUNT_BYTES: usize = 4;
+
+impl LinkType {
+    /// Says whether a datum of this type is sent the ground after a count
+    /// of its bytes: a string's or bytes', whose length its type does not
+    /// give. Between nodes nothing is counted, a datum's length being the
+    /// delivery's.
+    ///
+    /// # Returns
+    ///
+    /// True for a string and bytes.
+    pub fn is_counted(&self) -> bool {
+        matches!(self, LinkType::Basic(Basic::String | Basic::Bytes))
+    }
+}
+
+/// How a string's or bytes' count is written, as it is sent the ground.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Count {
+    /// As XTCE encodes it, where the ground decodes what it is sent by
+    /// XTCE: 32 bits, most significant first ([`COUNT_BYTES`]).
+    Xtce,
+    /// In groups of seven bits, least significant first, each in a byte
+    /// whose top bit says another follows: unsigned LEB128, in as few bytes
+    /// as hold it -- one for a count below 128, two for any datum there is.
+    /// Where the ground reads what it is sent by no XTCE.
+    Groups,
+}
+
+/// Writes a string or bytes as it is sent the ground: the count of its
+/// bytes, and them.
+///
+/// # Arguments
+///
+/// * `data`  - The datum.
+/// * `count` - How the count is written.
+/// * `out`   - Where it is written, emptied first; it allocates nothing
+///             where it has room.
+///
+/// # Errors
+///
+/// A message for a datum too long for its count.
+pub fn counted(
+    data: &[u8],
+    count: Count,
+    out: &mut Vec<u8>,
+) -> Result<(), String> {
+    let length = u32::try_from(data.len())
+        .map_err(|_| format!("{} bytes are too many to count", data.len()))?;
+    out.clear();
+    match count {
+        Count::Xtce => out.extend_from_slice(&length.to_be_bytes()),
+        Count::Groups => {
+            leb128::write::unsigned(out, u64::from(length))
+                .map_err(|why| format!("the count: {why}"))?;
+        }
+    }
+    out.extend_from_slice(data);
+    Ok(())
+}
+
+/// Reads a string or bytes as the ground is sent it: the count of its bytes,
+/// and them.
+///
+/// # Arguments
+///
+/// * `packet` - What arrived.
+/// * `count`  - How the count is written.
+///
+/// # Returns
+///
+/// Where the datum starts in `packet`, after its count, and so the datum is
+/// the rest.
+///
+/// # Errors
+///
+/// A message where there is no count, it is written in more bytes than it
+/// needs, or it does not say how many bytes follow it.
+pub fn uncounted(packet: &[u8], count: Count) -> Result<usize, String> {
+    let (length, start) = match count {
+        Count::Xtce => {
+            let (said, _) =
+                packet.split_first_chunk::<COUNT_BYTES>().ok_or_else(|| {
+                    format!(
+                        "{} bytes arrived, and a string or bytes is sent \
+                         after a {COUNT_BYTES}-byte count",
+                        packet.len()
+                    )
+                })?;
+            (u64::from(u32::from_be_bytes(*said)), COUNT_BYTES)
+        }
+        Count::Groups => {
+            let mut rest = packet;
+            let length = leb128::read::unsigned(&mut rest).map_err(|why| {
+                format!("the count before a string or bytes: {why}")
+            })?;
+            let start = packet.len() - rest.len();
+            // A count in more bytes than it needs ends in a group of
+            // nought, which the shortest never does but where it is the
+            // count nought, one byte.
+            if start > 1 && packet[start - 1] == 0 {
+                return Err(format!(
+                    "the count {length} is written in {start} bytes, and \
+                     it is written in as few as hold it"
+                ));
+            }
+            (length, start)
+        }
+    };
+    let follow = packet.len() - start;
+    if length != follow as u64 {
+        return Err(format!(
+            "the count says {length} bytes and {follow} follow it"
+        ));
+    }
+    Ok(start)
+}
+
 /// Says whether these bytes are a datum of one of `types.xtce`'s types: see
 /// [`LinkType::accepts`].
 ///
@@ -369,6 +490,37 @@ impl fmt::Display for LinkType {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A string or bytes is counted to the ground either way and read back,
+    /// and a count that does not say what follows, or says it in more bytes
+    /// than it needs, is refused.
+    #[test]
+    fn a_count_is_written_and_read_back() {
+        assert!(LinkType::of("bytes").expect("a type").is_counted());
+        assert!(LinkType::of("string").expect("a type").is_counted());
+        assert!(!LinkType::of("u32").expect("a type").is_counted());
+        let mut out = Vec::new();
+        counted(b"ping", Count::Xtce, &mut out).expect("counted");
+        assert_eq!(out, b"\0\0\0\x04ping");
+        assert_eq!(uncounted(&out, Count::Xtce), Ok(4));
+        counted(b"ping", Count::Groups, &mut out).expect("counted");
+        assert_eq!(out, b"\x04ping");
+        assert_eq!(uncounted(&out, Count::Groups), Ok(1));
+        let long = vec![7u8; 300];
+        counted(&long, Count::Groups, &mut out).expect("counted");
+        // 300 is 0b10_0101100: 44 with the top bit set, then 2.
+        assert_eq!(&out[..2], [0xac, 0x02]);
+        assert_eq!(uncounted(&out, Count::Groups), Ok(2));
+        assert!(uncounted(b"\0\0\0\x05ping", Count::Xtce).is_err());
+        assert!(uncounted(b"\0\0", Count::Xtce).is_err());
+        assert!(uncounted(b"\x05ping", Count::Groups).is_err());
+        assert!(uncounted(b"\x84\x00ping", Count::Groups).is_err());
+        assert!(uncounted(b"\x80", Count::Groups).is_err());
+        assert!(uncounted(b"", Count::Groups).is_err());
+        counted(b"", Count::Groups, &mut out).expect("counted");
+        assert_eq!(out, b"\0");
+        assert_eq!(uncounted(&out, Count::Groups), Ok(1));
+    }
 
     /// Every type's name reads back as that type.
     #[test]

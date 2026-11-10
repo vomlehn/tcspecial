@@ -522,10 +522,12 @@ fn a_can_payload_is_flown_over_a_virtual_bus() {
     // A status frame, sent until one reaches the ground: frames sent before
     // tcspecial had joined the bus reach nobody.
     let reading = [0xCA, 0xFE, 0x00, 0x2A];
+    // Bytes, which reach the ground after the count of them, in groups of
+    // seven bits.
     heard_while(
         &ground,
         || status.send(STATUS_ID, &reading),
-        |datum| datum == reading,
+        |datum| datum[..1] == [4] && datum[1..] == reading,
     );
 
     // A command, sent up until it is on the bus as a frame carrying the
@@ -877,7 +879,14 @@ fn an_iio_payload_is_flown_on_a_dummy_sensor() {
     let ground = flown.ground_of("sensor");
 
     // Nothing to poke: the kernel's trigger fills the buffer on its own.
-    let got = heard_while(&ground, || {}, |datum| !datum.is_empty());
+    let heard = heard_while(&ground, || {}, |datum| !datum.is_empty());
+    // Bytes, after the count of them, in groups of seven bits.
+    let start = tcslibgs::link_type::uncounted(
+        &heard,
+        tcslibgs::link_type::Count::Groups,
+    )
+    .expect("counted");
+    let got = &heard[start..];
     assert_eq!(
         got.len() % sensor.scan_bytes,
         0,

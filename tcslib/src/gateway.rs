@@ -22,6 +22,7 @@ use std::time::{Duration, Instant};
 
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::Graph;
+use tcslibgs::link_type::{uncounted, Count};
 
 use crate::matched::Matched;
 
@@ -37,7 +38,8 @@ pub const DATUM_BYTES: usize = 65_536;
 pub struct Received {
     /// The node drawn into the gateway node that produced this.
     pub source: String,
-    /// What it produced, exactly as it was sent.
+    /// What it produced, exactly as it was sent, without the count a string
+    /// or bytes is sent the ground after.
     pub data: Vec<u8>,
 }
 
@@ -58,6 +60,9 @@ pub struct GatewayReceiver {
     /// Each source and the socket its data arrives at, in the order the
     /// configuration draws them.
     ports: Vec<(String, UdpSocket)>,
+    /// How each source's datum is counted, in the same order: `None` for
+    /// one of a type with a width of its own, which is sent with no count.
+    counts: Vec<Option<Count>>,
     /// What a receive waits on, one for each port and in the same order:
     /// made once, when the node is opened.
     fds: Vec<libc::pollfd>,
@@ -200,7 +205,9 @@ impl GatewayReceiver {
         links: Vec<Telemetered>,
     ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
+        let mut counts = Vec::new();
         for link in links {
+            counts.push(link.count());
             // A link on a software bus has no ground socket of its own: the
             // bus's peer sends what is published under its message ID to a
             // socket it makes for it, as tcspecial would over UDP.
@@ -239,6 +246,7 @@ impl GatewayReceiver {
         Ok(GatewayReceiver {
             name: name.to_string(),
             ports,
+            counts,
             fds,
             next: 0,
             gate: None,
@@ -339,13 +347,15 @@ impl GatewayReceiver {
     /// # Returns
     ///
     /// Which source sent the datum, how long it is and whether it is held,
-    /// or `None` where the wait ran out with nothing arrived.
+    /// or `None` where the wait ran out with nothing arrived. A string or
+    /// bytes is put without the count it was sent after.
     ///
     /// # Errors
     ///
     /// A message where waiting or reading fails. A datum longer than `out`
     /// is refused, saying how long it was, rather than cut short: a buffer
-    /// of [`DATUM_BYTES`] holds any.
+    /// of [`DATUM_BYTES`] holds any. So is a string or bytes whose count
+    /// does not say how long it is.
     pub fn receive_into(
         &mut self,
         wait: Option<Duration>,
@@ -359,32 +369,68 @@ impl GatewayReceiver {
             let Some(arrival) = self.next_arrival(left, out)? else {
                 return Ok(None);
             };
-            match self.gate.as_ref() {
+            if let Some(matched) = self.gate.as_ref() {
                 // Not matched: dropped and counted, and the wait goes on for
                 // as long as it was asked to.
-                Some(matched) if !matched.for_listening() => {
+                if !matched.for_listening() {
                     matched.mismatched(1);
                     continue;
                 }
-                Some(matched) if arrival.length > out.len() => {
-                    matched.malformed();
+            }
+            let read = self.read_out(arrival, out);
+            if let Some(matched) = self.gate.as_ref() {
+                match read {
+                    Ok(_) => matched.processed(),
+                    Err(_) => matched.malformed(),
                 }
-                Some(matched) => matched.processed(),
-                None => {}
             }
-            if arrival.length > out.len() {
-                let (source, _) = &self.ports[arrival.source];
-                return Err(format!(
-                    "\"{}\": \"{source}\" sent {} bytes, which is more \
-                     than the {} there was room for: receive into a buffer of \
-                     DATUM_BYTES",
-                    self.name,
-                    arrival.length,
-                    out.len()
-                ));
-            }
-            return Ok(Some(arrival));
+            return read.map(Some);
         }
+    }
+
+    /// Takes a datagram as its source sent it to the datum it carries: the
+    /// whole of it, or for a string or bytes what follows its count, moved
+    /// to the start of `out`.
+    ///
+    /// # Arguments
+    ///
+    /// * `arrival` - Where the datagram was put.
+    /// * `out`     - The datagram, from its start.
+    ///
+    /// # Returns
+    ///
+    /// Where the datum is.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the source where the datagram was cut short, or a
+    /// count does not say how long the datum is.
+    fn read_out(
+        &self,
+        arrival: Arrival,
+        out: &mut [u8],
+    ) -> Result<Arrival, String> {
+        let (source, _) = &self.ports[arrival.source];
+        if arrival.length > out.len() {
+            return Err(format!(
+                "\"{}\": \"{source}\" sent {} bytes, which is more than \
+                 the {} there was room for: receive into a buffer of \
+                 DATUM_BYTES",
+                self.name,
+                arrival.length,
+                out.len()
+            ));
+        }
+        let Some(count) = self.counts[arrival.source] else {
+            return Ok(arrival);
+        };
+        let start = uncounted(&out[..arrival.length], count)
+            .map_err(|why| format!("\"{}\": \"{source}\": {why}", self.name))?;
+        out.copy_within(start..arrival.length, 0);
+        Ok(Arrival {
+            source: arrival.source,
+            length: arrival.length - start,
+        })
     }
 
     /// The next datagram to arrive at any of this node's sockets, waiting up
@@ -499,6 +545,41 @@ impl Drop for GatewayReceiver {
 mod tests {
     use super::*;
 
+    /// A datum as tcspecial sends it the ground from an untyped source,
+    /// whose data is bytes: after the count of its bytes, in groups of seven
+    /// bits.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The datum.
+    ///
+    /// # Returns
+    ///
+    /// The datagram.
+    fn sent(data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        tcslibgs::link_type::counted(data, Count::Groups, &mut out)
+            .expect("counted");
+        out
+    }
+
+    /// A datum whose count does not say how long it is is refused, naming
+    /// its source, and nothing is put.
+    #[test]
+    fn a_datum_whose_count_is_wrong_is_refused() {
+        let port = a_free_port();
+        let mut gateway =
+            GatewayReceiver::open(&graph(port), "ground").expect("it opens");
+        UdpSocket::bind("127.0.0.1:0")
+            .expect("the vehicle's socket")
+            .send_to(b"\x09from a", ("127.0.0.1", port))
+            .expect("sent");
+        let why = gateway
+            .receive(Some(Duration::from_secs(5)))
+            .expect_err("a count of nine before six bytes");
+        assert!(why.contains("\"a\"") && why.contains("count"), "{why}");
+    }
+
     /// Finds a port nothing holds, for a base that puts a source's port on
     /// it.
     ///
@@ -567,10 +648,10 @@ payloads:
         let vehicle =
             UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
         vehicle
-            .send_to(b"from a", ("127.0.0.1", port))
+            .send_to(&sent(b"from a"), ("127.0.0.1", port))
             .expect("sent");
         vehicle
-            .send_to(b"from b", ("127.0.0.1", port + 1))
+            .send_to(&sent(b"from b"), ("127.0.0.1", port + 1))
             .expect("sent");
 
         let mut got = Vec::new();
@@ -627,7 +708,7 @@ payloads:
 
         UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket")
-            .send_to(b"from a", ("127.0.0.1", port))
+            .send_to(&sent(b"from a"), ("127.0.0.1", port))
             .expect("sent");
         let received = gateway
             .receive(Some(Duration::from_secs(5)))
@@ -656,7 +737,9 @@ payloads:
         let vehicle =
             UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
         let send = |what: &[u8]| {
-            vehicle.send_to(what, ("127.0.0.1", port)).expect("sent");
+            vehicle
+                .send_to(&sent(what), ("127.0.0.1", port))
+                .expect("sent");
         };
         let mut datum = vec![0u8; DATUM_BYTES];
         let wait = Some(Duration::from_millis(200));
@@ -726,7 +809,7 @@ payloads:
         let vehicle =
             UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
         vehicle
-            .send_to(b"reading", ("127.0.0.1", port))
+            .send_to(&sent(b"reading"), ("127.0.0.1", port))
             .expect("sent");
         let received = ground
             .receive(Some(Duration::from_secs(5)))

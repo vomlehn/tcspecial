@@ -205,7 +205,10 @@ class TypedParameterTest(unittest.TestCase):
                              "/x:PolynomialCalibrator/x:Term", x)
             self.assertEqual(float(term.get("coefficient")), coefficient)
         self.assertEqual(self.local(types["t"]), "BooleanParameterType")
-        self.assertEqual(types["s"].get("name"), generated.BODY_TYPE)
+        # A sensor that states no type sends bytes, after the count of them
+        # it is sent the ground after, as XTCE encodes it.
+        self.assertEqual(types["s"].get("name"), "bytes")
+        self.assertEqual(self.local(types["s"]), "BinaryParameterType")
 
     def test_a_value_type_is_types_xtces(self):
         with tempfile.TemporaryDirectory() as directory:

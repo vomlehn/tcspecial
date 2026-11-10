@@ -924,10 +924,25 @@ Requirement
     It says nothing of framing. A gateway frames what it sends as its kind
     does -- a port of each source's own over a radio, a CCSDS header and an
     APID under Yamcs, a message ID on a bus -- and that is the ground
-    station's to add. A string or bytes is all of what carries it, with no
-    count before it: its length is what the framing gives. ``types.xtce``
-    sizes ``bytes`` by a parameter, ``bytes_length``, which the document
-    states and puts in no container.
+    station's to add.
+
+Requirement
+    A string or bytes, whose type gives it no width, is sent the ground
+    after a count of its bytes, so that it reads the same however it is
+    framed (``tcslibgs::link_type::Count``). Where the ground decodes what it
+    is sent by XTCE -- under Yamcs -- the count is XTCE's, 32 bits, as
+    ``types.xtce`` states it and the document copies: a string's own
+    leading size, and ``bytes_length`` before bytes. Everywhere else -- over
+    a radio, ``payload_telemetry``, to the F´ bridge, on a cFS bus -- it is
+    in groups of seven bits, least significant first, each in a byte whose
+    top bit says another follows (unsigned LEB128), in as few bytes as hold
+    it: one byte for a datum below 128 bytes, two for any there is. A count
+    in more bytes than it needs, or that does not say how many bytes follow
+    it, is refused. A datum of a type with a width of its own is sent with
+    no count, and between nodes nothing is counted. Ground programs that
+    read through ``tcslib::gateway::GatewayReceiver`` are given each datum
+    without its count; Python reading a link itself takes it off with
+    ``python/tcslibgs/count.py``.
 
 Requirement
     ``tcsverify --xtce`` writes it from the configuration and

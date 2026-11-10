@@ -370,9 +370,9 @@ ul.auto-toc {
 in the design. What a node type declares about its terminals, which is
 what this guide says, is settled and built, and so is the check of every
 datum against its type as it is delivered. The stages still to come
-change how some nodes read and write -- a decision, for one, is still
-the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> -- not what a type declares. Where the code and
-the design differ, the code is what is described here.</p>
+change how some nodes read and write -- a <tt class="docutils literal">process</tt>'s text, an app's
+packets, the bridges' channels -- not what a type declares. Where the
+code and the design differ, the code is what is described here.</p>
 </div>
 <div class="contents local topic" id="table-of-contents">
 <p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
@@ -497,12 +497,20 @@ only where the part's bytes are not the type's own layout -- <tt class="docutils
 or <tt class="docutils literal">u24_be</tt> read as a <tt class="docutils literal">u32</tt>. An app states <tt class="docutils literal"><span class="pre">world-in-type</span></tt>,
 <tt class="docutils literal"><span class="pre">world-out-type</span></tt>, <tt class="docutils literal"><span class="pre">moc-in-type</span></tt> and <tt class="docutils literal"><span class="pre">moc-out-type</span></tt>, by the
 terminals its kind has. A computation states <tt class="docutils literal"><span class="pre">type-in</span></tt> and
-<tt class="docutils literal"><span class="pre">type-out</span></tt>; a vote, which passes one type through, states
-<tt class="docutils literal">carries</tt>, as an optional <tt class="docutils literal">carries</tt> on a tee does.</dd>
+<tt class="docutils literal"><span class="pre">type-out</span></tt>: a thermostat's <tt class="docutils literal"><span class="pre">type-out</span></tt>, its decision, is a
+<tt class="docutils literal">boolean</tt> or a whole number such as <tt class="docutils literal">u8</tt>. A vote, which passes one
+type through, states <tt class="docutils literal">carries</tt>, as an optional <tt class="docutils literal">carries</tt> on a tee
+does.</dd>
 <dt>Fixed by the type</dt>
-<dd><tt class="docutils literal">ping</tt> carries <tt class="docutils literal">string</tt>; a GPIO node carries the narrowest unsigned
-integer with a bit for each of its lines, which its <tt class="docutils literal">lines</tt> decide;
-<tt class="docutils literal">to_kelvin</tt> sends <tt class="docutils literal">kelvin</tt>.</dd>
+<dd><tt class="docutils literal">ping</tt> carries <tt class="docutils literal">string</tt>, and <tt class="docutils literal">to_kelvin</tt> sends <tt class="docutils literal">kelvin</tt>. A GPIO
+node carries the narrowest unsigned whole number, <tt class="docutils literal">u8</tt> to <tt class="docutils literal">u64</tt>,
+with a bit for each of its <tt class="docutils literal">lines</tt>, bit 0 the first listed: a
+<tt class="docutils literal">gpio_out</tt> or <tt class="docutils literal">gpio_inout</tt> is driven with that number, a bit
+beyond its lines refused, and a <tt class="docutils literal">gpio_inout</tt> reports what it was last
+driven with and a <tt class="docutils literal">gpio_in</tt> its lines' levels, as that number, every
+<tt class="docutils literal">state_interval</tt>, which a <tt class="docutils literal">gpio_in</tt> must state, and a <tt class="docutils literal">gpio_in</tt>
+also whenever a datum arrives at its <tt class="docutils literal"><span class="pre">world-in</span></tt>. Since the width
+comes from the lines, a GPIO node may not state <tt class="docutils literal">read_size</tt>.</dd>
 <dt>Any type</dt>
 <dd>A gateway, a log and the null types take whatever arrives, since they
 pass it on or keep it without looking at it.</dd>

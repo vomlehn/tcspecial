@@ -6,9 +6,9 @@ Writing Node Types
    in the design. What a node type declares about its terminals, which is
    what this guide says, is settled and built, and so is the check of every
    datum against its type as it is delivered. The stages still to come
-   change how some nodes read and write -- a decision, for one, is still
-   the text ``1`` or ``0`` -- not what a type declares. Where the code and
-   the design differ, the code is what is described here.
+   change how some nodes read and write -- a ``process``'s text, an app's
+   packets, the bridges' channels -- not what a type declares. Where the
+   code and the design differ, the code is what is described here.
 
 .. contents:: Table of Contents
    :depth: 2
@@ -122,13 +122,21 @@ Stated by the configuration
     or ``u24_be`` read as a ``u32``. An app states ``world-in-type``,
     ``world-out-type``, ``moc-in-type`` and ``moc-out-type``, by the
     terminals its kind has. A computation states ``type-in`` and
-    ``type-out``; a vote, which passes one type through, states
-    ``carries``, as an optional ``carries`` on a tee does.
+    ``type-out``: a thermostat's ``type-out``, its decision, is a
+    ``boolean`` or a whole number such as ``u8``. A vote, which passes one
+    type through, states ``carries``, as an optional ``carries`` on a tee
+    does.
 
 Fixed by the type
-    ``ping`` carries ``string``; a GPIO node carries the narrowest unsigned
-    integer with a bit for each of its lines, which its ``lines`` decide;
-    ``to_kelvin`` sends ``kelvin``.
+    ``ping`` carries ``string``, and ``to_kelvin`` sends ``kelvin``. A GPIO
+    node carries the narrowest unsigned whole number, ``u8`` to ``u64``,
+    with a bit for each of its ``lines``, bit 0 the first listed: a
+    ``gpio_out`` or ``gpio_inout`` is driven with that number, a bit
+    beyond its lines refused, and a ``gpio_inout`` reports what it was last
+    driven with and a ``gpio_in`` its lines' levels, as that number, every
+    ``state_interval``, which a ``gpio_in`` must state, and a ``gpio_in``
+    also whenever a datum arrives at its ``world-in``. Since the width
+    comes from the lines, a GPIO node may not state ``read_size``.
 
 Any type
     A gateway, a log and the null types take whatever arrives, since they

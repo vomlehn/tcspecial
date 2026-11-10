@@ -849,7 +849,7 @@ mod tests {
             voter.sets.get("function").map(String::as_str),
             Some("vote")
         );
-        assert_eq!(voter.attributes.len(), 3);
+        assert_eq!(voter.attributes.len(), 4);
         assert_eq!(voter.attributes[0].name, "inputs");
         assert!(voter.attributes[0].required);
         assert!(
@@ -873,7 +873,10 @@ mod tests {
         );
         let asked: Vec<&str> =
             process.attributes.iter().map(|a| a.name.as_str()).collect();
-        assert_eq!(asked, vec!["executable", "timeout", "restart", "unit"]);
+        assert_eq!(
+            asked,
+            vec!["executable", "timeout", "restart", "type-in", "type-out"]
+        );
         assert!(process.attributes.iter().all(|a| a.required));
 
         // And a node with nothing to be told says nothing.
@@ -1226,7 +1229,8 @@ mod tests {
                 ("function".to_string(), true),
                 ("inputs".to_string(), true),
                 ("algorithm".to_string(), true),
-                ("age".to_string(), false)
+                ("age".to_string(), false),
+                ("carries".to_string(), true)
             ]
         );
 

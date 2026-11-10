@@ -50,6 +50,7 @@ pub mod exports;
 pub mod fprime;
 pub mod grouped;
 pub mod interface;
+pub mod link_types;
 pub mod mirror;
 pub mod parameters;
 pub mod reach;

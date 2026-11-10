@@ -2191,14 +2191,15 @@ vehicle:
         fabric.hold("heaters_1", first_port);
         fabric.hold("heaters_2", second_port);
 
-        // Three raw readings, each in its own part's format, all of them
-        // cold: 289.15, 289.15 and 287.3188 kelvin. The vote over them is
+        // Three readings, each as its sensor's type lays it out -- temp_3's
+        // part sends three bytes, which its port makes the four of a u32 --
+        // all of them cold: 289.15, 289.15 and 287.3188 kelvin. The vote over them is
         // 289.15, the middle of the three, which is more than two degrees
         // below the setpoint of 293.15.
         let mut moved = Moved::default();
         moved.add(fabric.deliver("temp_1", &[0x01, 0x00]));
         moved.add(fabric.deliver("temp_2", &[0x01, 0x00]));
-        moved.add(fabric.deliver("temp_3", &[0x00, 0x10, 0x00]));
+        moved.add(fabric.deliver("temp_3", &[0x00, 0x00, 0x10, 0x00]));
         assert!(moved.all_delivered(), "{:?}", moved.refused);
 
         // What the ground saw: three temperatures, the two voted out of them
@@ -2324,7 +2325,7 @@ vehicle:
         for _ in 0..2 {
             fabric.deliver("temp_1", &[0x01, 0x00]);
             fabric.deliver("temp_2", &[0x01, 0x00]);
-            fabric.deliver("temp_3", &[0x00, 0x10, 0x00]);
+            fabric.deliver("temp_3", &[0x00, 0x00, 0x10, 0x00]);
         }
 
         assert_eq!(

@@ -53,6 +53,7 @@ use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::terminals::Stream;
 use tcslibgs::graph::Node;
 use tcslibgs::node::app;
+use tcslibgs::node::vehicle::compute::Format;
 use tcslibgs::unit::Unit;
 use tcslibgs::{EndpointConfig, TcsError, TcsResult};
 
@@ -204,6 +205,11 @@ pub struct EndpointPort {
     ///
     /// See [`EndpointPort::is_a_device`] and [`Port::holds`].
     holds: bool,
+    /// How the part lays out the number it is read as, where that is not
+    /// the number's own layout.
+    ///
+    /// See [`EndpointPort::laid_out_as`].
+    laid_out: Option<Format>,
 }
 
 impl EndpointPort {
@@ -333,7 +339,55 @@ impl EndpointPort {
             framer: None,
             abandon: Abandon::nothing(),
             holds: false,
+            laid_out: None,
         }
+    }
+
+    /// Lays each reading out as its type's own, from how the part lays it.
+    ///
+    /// A part that sends a number least significant byte first, or in three
+    /// bytes, states so as its `format`, and every node after it sees the
+    /// number as its type lays it out -- most significant byte first, as wide
+    /// as the type -- so that one layout is read for one type. See "Typed
+    /// links" in `docs/design.rst`.
+    pub fn laid_out_as(mut self, format: Format) -> EndpointPort {
+        self.laid_out = Some(format);
+        self
+    }
+
+    /// Lays a reading out as its type's own, in place, where this port says
+    /// how the part lays it.
+    ///
+    /// # Arguments
+    ///
+    /// * `buffer` - The reading, at its start, with room for four bytes.
+    /// * `taken`  - What was taken into it.
+    ///
+    /// # Returns
+    ///
+    /// What was taken, with the length of the reading as laid out.
+    ///
+    /// # Errors
+    ///
+    /// A message naming the node when the reading is not as long as its
+    /// format says.
+    fn standard(
+        &self,
+        buffer: &mut [u8],
+        taken: Taken,
+    ) -> Result<Taken, String> {
+        let Some(format) = self.laid_out else {
+            return Ok(taken);
+        };
+        if taken.bytes == 0 {
+            return Ok(taken);
+        }
+        let mut out = [0u8; 4];
+        let bytes = format
+            .to_standard(&buffer[..taken.bytes], &mut out)
+            .map_err(|why| format!("{}: {why}", self.what))?;
+        buffer[..bytes].copy_from_slice(&out[..bytes]);
+        Ok(Taken { bytes, ..taken })
     }
 
     /// Says that this port is a device, which a re-asserted decision is sent
@@ -424,6 +478,13 @@ impl EndpointPort {
 
         if let Some(size) = reach.read_size {
             port = port.reading(size as usize);
+        }
+        if tcslibgs::graph::link_types::is_device(node) {
+            if let Some(format) =
+                tcslibgs::graph::link_types::part_format(node)?
+            {
+                port = port.laid_out_as(format);
+            }
         }
         if let Some(rule) = reach.stream {
             port = port.framed_by(rule);
@@ -927,6 +988,7 @@ impl Port for EndpointPort {
     /// [`crate::endpoint::EndpointReadable::stream`].
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         let taken = self.take_unstreamed(buffer)?;
+        let taken = self.standard(buffer, taken)?;
         Ok(Taken {
             stream: self.reader.stream(),
             ..taken
@@ -935,6 +997,7 @@ impl Port for EndpointPort {
 
     fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         let taken = self.take_unasked_unstreamed(buffer)?;
+        let taken = self.standard(buffer, taken)?;
         Ok(Taken {
             stream: self.reader.stream(),
             ..taken

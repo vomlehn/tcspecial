@@ -2660,7 +2660,7 @@ vehicle:
                     reading: &[0x01, 0x00],
                 }) as Box<dyn Port>),
                 "spi" => Ok(Box::new(Steady {
-                    reading: &[0x00, 0x10, 0x00],
+                    reading: &[0x00, 0x00, 0x10, 0x00],
                 }) as Box<dyn Port>),
                 "gpio_in" | "gpio_out" | "gpio_inout" | "gateway_radio" => {
                     Ok(Box::new(Sink {
@@ -2753,7 +2753,7 @@ vehicle:
             &[
                 ("temp_1", &[0x01, 0x00]),
                 ("temp_2", &[0x01, 0x00]),
-                ("temp_3", &[0x00, 0x10, 0x00]),
+                ("temp_3", &[0x00, 0x00, 0x10, 0x00]),
             ],
         );
 
@@ -3224,7 +3224,7 @@ vehicle:
         let readings = [
             ("temp_1", &[0x01, 0x00][..]),
             ("temp_2", &[0x01, 0x00][..]),
-            ("temp_3", &[0x00, 0x10, 0x00][..]),
+            ("temp_3", &[0x00, 0x00, 0x10, 0x00][..]),
         ];
         let mut vehicle = vehicle(start, &readings);
         vehicle.system.pass(start);
@@ -3301,7 +3301,7 @@ vehicle:
             &[
                 ("temp_1", &[0x01, 0x00]),
                 ("temp_2", &[0x01, 0x00]),
-                ("temp_3", &[0x00, 0x10, 0x00]),
+                ("temp_3", &[0x00, 0x00, 0x10, 0x00]),
             ],
         );
 

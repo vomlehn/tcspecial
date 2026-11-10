@@ -799,6 +799,25 @@ fn take(
                     .map_err(|why| format!("\"{what}\": {why}"))?,
             );
         }
+        // What a set of lines carries is the number its lines need, which
+        // nothing states: see `crate::graph::link_types`.
+        "world-out-type" | "moc-in-type" | "format"
+            if matches!(
+                kind,
+                DHType::GpioIn | DHType::GpioOut | DHType::GpioInout
+            ) =>
+        {
+            return Err(format!(
+                "\"{what}\" is {} {} node, which carries the unsigned whole \
+                 number its lines need -- u8 for up to eight -- so it states \
+                 no {attribute}: take it out",
+                kind.article(),
+                node.node_type
+            ))
+        }
+        // The types a device sends and is driven with, and how its part lays
+        // its bytes out, which `crate::graph::link_types` reads and checks.
+        "world-out-type" | "moc-in-type" | "format" => {}
         // Where a datagram payload that speaks first sends from, which is
         // checked once the protocol is known: see `sends_from_of`.
         "sends_from" => said.sends_from = Some(value.clone()),

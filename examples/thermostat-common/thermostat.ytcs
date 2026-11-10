@@ -29,6 +29,7 @@ vehicle:
       # outvoted rather than stopping the vehicle from deciding anything.
       - compute: consensus_temp
         algorithm: "median"
+        carries: "kelvin"
         function: "vote"
         world-out:
           - gateway.consensus_temp
@@ -41,6 +42,8 @@ vehicle:
         function: "thermostat"
         half_band: "2.0"
         setpoint: "293.15"
+        type-in: "kelvin"
+        type-out: "u8"
         # asserted below the setpoint, unasserted above it. Two heaters, because
         # one failing must not leave the mass with no way to be warmed: either
         # alone holds the band while the orbit is warm, and both together hold
@@ -55,28 +58,28 @@ vehicle:
       # the parts differ in format and scale, so each has a conversion of
       # its own.
       - compute: to_k1
-        format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
+        type-in: "i16"
         world-out:
           - consensus_temp.in0
           - gateway.to_k1
         world-in: [temp_1]
       - compute: to_k2
-        format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
+        type-in: "i16"
         world-out:
           - consensus_temp.in1
           - gateway.to_k2
         world-in: [temp_2]
       - compute: to_k3
-        format: "u24_be"
         function: "to_kelvin"
         offset: "255.37"
         scale: "0.0078"
+        type-in: "u32"
         world-out:
           - consensus_temp.in2
           - gateway.to_k3
@@ -124,6 +127,7 @@ payloads:
         path: "/dev/i2c-1"
         read_size: "2"
         sim_address: "127.0.0.1:5201"
+        world-out-type: "i16"
         world-out:
           - to_k1.temp_1
       # The second of the trio; the same part as temp_1, on the same bus.
@@ -133,6 +137,7 @@ payloads:
         path: "/dev/i2c-1"
         read_size: "2"
         sim_address: "127.0.0.1:5202"
+        world-out-type: "i16"
         world-out:
           - to_k2.temp_2
   - type spi_tmass:
@@ -140,12 +145,14 @@ payloads:
       # unsigned, its own scale and so its own conversion, so that no one
       # bus and no one part number can take the whole trio out.
       - payload: temp_3
+        format: "u24_be"
         group: "zone_temps"
         max_speed: "1000000"
         path: "/dev/spidev0.0"
         read_size: "3"
         spi_mode: "0"
         sim_address: "127.0.0.1:5203"
+        world-out-type: "u32"
         world-out:
           - to_k3.temp_3
 

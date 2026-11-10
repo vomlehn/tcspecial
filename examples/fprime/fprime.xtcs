@@ -81,6 +81,7 @@
                 <address>127.0.0.1</address>
                 <port>9002</port>
                 <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
                 <world-out>fsw.thermometer</world-out>
                 <world-out>zone_temp.thermometer</world-out>
             </payload>
@@ -97,16 +98,18 @@
                 <function>thermostat</function>
                 <half_band>0.5</half_band>
                 <setpoint>284.15</setpoint>
+                <type-in>kelvin</type-in>
+                <type-out>boolean</type-out>
                 <world-out>fsw.heater_wanted</world-out>
                 <world-in>zone_temp</world-in>
             </compute>
             <!-- The thermometer's readings made a value, a temperature in
                  kelvin, which the bridge's channel for it holds as one. -->
             <compute name="zone_temp">
-                <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <type-in>i16</type-in>
                 <world-out>fsw.zone_temp</world-out>
                 <world-out>heater_wanted.zone_temp</world-out>
                 <world-in>thermometer</world-in>

@@ -9,10 +9,10 @@ payload-source: true
 gateway-sink: true
 gateway-source: true
 attributes:
-  - name: format
+  - name: type-in
     required: true
     about: >
-      "How the bytes are laid out: i16_be, u16_le and the rest."
+      The whole number its sensor sends: u8, i8, u16, i16, u32 or i32.
   - name: scale
     required: true
     about: >

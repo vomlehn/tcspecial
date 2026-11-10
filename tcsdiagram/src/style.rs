@@ -1419,6 +1419,9 @@ impl NodeType {
                 ("timeout", false),
                 ("init", false),
                 ("sim_address", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::SpiTmass => &[
                 ("path", true),
@@ -1435,6 +1438,9 @@ impl NodeType {
                 ("cs_active", false),
                 ("init", false),
                 ("sim_address", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::I2c => &[
                 ("path", true),
@@ -1450,6 +1456,9 @@ impl NodeType {
                 ("retries", false),
                 ("timeout", false),
                 ("init", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::Spi => &[
                 ("path", true),
@@ -1466,6 +1475,9 @@ impl NodeType {
                 ("cs_active", false),
                 ("init", false),
                 ("sim_address", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::Serial => &[
                 ("path", true),
@@ -1483,6 +1495,9 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             // An interface, not a path: see tcslibgs::node::payload::hdlc. The
             // standard and the clock are required because a line carries no
@@ -1504,6 +1519,9 @@ impl NodeType {
                 ("poll_interval", false),
                 ("init", false),
                 ("sim_address", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::Can => &[
                 ("interface", true),
@@ -1516,6 +1534,9 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::Iio => &[
                 ("path", true),
@@ -1525,6 +1546,9 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("sim_address", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::Rpmsg => &[
                 ("path", true),
@@ -1536,6 +1560,9 @@ impl NodeType {
                 ("poll_interval", false),
                 ("init", false),
                 ("sim_address", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::Network => &[
                 ("protocol", true),
@@ -1558,6 +1585,9 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             NodeType::DeviceFile => &[
                 ("path", true),
@@ -1567,6 +1597,9 @@ impl NodeType {
                 ("read_delay", false),
                 ("poll_interval", false),
                 ("init", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("format", false),
             ],
             // A set of discrete lines is neither asked nor polled: it is
             // watched, by its edges or by a report of what it is, which is
@@ -1612,15 +1645,17 @@ impl NodeType {
             // with no description behind it had nowhere to type its setpoint.
             NodeType::Compute => &[
                 ("function", true),
-                // to_kelvin
-                ("format", false),
+                // what it takes and sends: see "Typed links" in the design
+                ("type-in", false),
+                ("type-out", false),
+                // to_kelvin, to_value
                 ("scale", false),
                 ("offset", false),
-                ("unit", false),
                 // vote
                 ("inputs", false),
                 ("algorithm", false),
                 ("age", false),
+                ("carries", false),
                 // thermostat
                 ("setpoint", false),
                 ("half_band", false),
@@ -1629,14 +1664,15 @@ impl NodeType {
                 ("timeout", false),
                 ("restart", false),
             ],
-            // Nothing at all. A null node drops what arrives and a tee sends
-            // it on both ways: a name and a type are the whole of what there
-            // is to say, and the configuration check refuses any attribute
-            // written on one.
-            NodeType::NullGateway
-            | NodeType::NullPayload
-            | NodeType::TeeGateway
-            | NodeType::TeePayload => &[],
+            // Nothing at all. A null node drops what arrives: a name and a
+            // type are the whole of what there is to say, and the
+            // configuration check refuses any attribute written on one.
+            NodeType::NullGateway | NodeType::NullPayload => &[],
+            // A tee sends what arrives on both ways, and says only the type
+            // it carries, which is bytes where it says nothing.
+            NodeType::TeeGateway | NodeType::TeePayload => {
+                &[("carries", false)]
+            }
             // Nothing either, for the same reason: what a ping node does is
             // fixed by the format of a ping, and the check refuses an
             // attribute on one as it does on a null node.
@@ -3069,21 +3105,27 @@ mod tests {
     fn every_type_states_what_it_requires() {
         for t in NodeType::ALL {
             let attributes = t.attributes();
-            // The null nodes, the tees and a ping node are the types with
-            // nothing to say: one drops what arrives, one sends it on both
-            // ways and the last answers pings, so a name and a type are the
-            // whole of any of them, and the configuration check refuses any
-            // attribute written on one. Every other type that said nothing
-            // would be a node that means nothing.
+            // The null nodes and a ping node are the types with nothing to
+            // say: one drops what arrives and the other answers pings, so a
+            // name and a type are the whole of either, and the configuration
+            // check refuses any attribute written on one. Every other type
+            // that said nothing would be a node that means nothing.
             if matches!(
                 t,
-                NodeType::NullGateway
-                    | NodeType::NullPayload
-                    | NodeType::TeeGateway
-                    | NodeType::TeePayload
-                    | NodeType::Ping
+                NodeType::NullGateway | NodeType::NullPayload | NodeType::Ping
             ) {
                 assert!(attributes.is_empty(), "{} says nothing", t.spelling());
+                continue;
+            }
+            // A tee says only the type it carries, which may be left to be
+            // bytes: see "Typed links" in the design.
+            if matches!(t, NodeType::TeeGateway | NodeType::TeePayload) {
+                assert_eq!(
+                    attributes,
+                    &[("carries", false)],
+                    "{}",
+                    t.spelling()
+                );
                 continue;
             }
             assert!(!attributes.is_empty(), "{} says nothing", t.spelling());

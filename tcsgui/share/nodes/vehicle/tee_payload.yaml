@@ -11,3 +11,8 @@ about: Sends a payload's data on as payload data and again as gateway data.
 payload-sink: true
 payload-source: true
 gateway-source: true
+attributes:
+  - name: carries
+    required: false
+    about: >
+      The type it takes and sends on both ways: bytes where unstated.

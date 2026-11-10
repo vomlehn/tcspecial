@@ -226,21 +226,45 @@ impl Kind {
     /// Each attribute's name, with whether it is required.
     pub fn attributes(self) -> &'static [(&'static str, bool)] {
         match self {
-            Kind::PayloadVeh | Kind::Pl => &[
+            // Each terminal's type, which is `bytes` where it is not stated:
+            // see `crate::graph::link_types`.
+            Kind::PayloadVeh => &[
                 ("executable", true),
                 ("app-payload-arg", true),
                 ("restart", false),
+                ("world-in-type", false),
+                ("moc-out-type", false),
+            ],
+            Kind::Pl => &[
+                ("executable", true),
+                ("app-payload-arg", true),
+                ("restart", false),
+                ("world-out-type", false),
             ],
             Kind::GatewayVeh => &[
                 ("executable", true),
                 ("app-gateway-arg", true),
                 ("restart", false),
+                ("moc-in-type", false),
+                ("world-out-type", false),
             ],
-            Kind::AllVeh | Kind::AllPl => &[
+            Kind::AllVeh => &[
                 ("executable", true),
                 ("app-payload-arg", true),
                 ("app-gateway-arg", true),
                 ("restart", false),
+                ("world-in-type", false),
+                ("world-out-type", false),
+                ("moc-in-type", false),
+                ("moc-out-type", false),
+            ],
+            Kind::AllPl => &[
+                ("executable", true),
+                ("app-payload-arg", true),
+                ("app-gateway-arg", true),
+                ("restart", false),
+                ("moc-in-type", false),
+                ("world-out-type", false),
             ],
         }
     }

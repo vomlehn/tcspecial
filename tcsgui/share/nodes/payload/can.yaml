@@ -75,3 +75,19 @@ attributes:
       quotes, bytes in brackets, or both one after another. A heater that must
       start off, a register to set before the part reads sensibly. A write that
       fails stops the node from starting.
+  - name: world-out-type
+    required: false
+    about: >
+      The type it sends: a whole number such as i16 or u32, a structure
+      of them (x: i16, y: i16), or bytes, which is what it sends where
+      unstated.
+  - name: moc-in-type
+    required: false
+    about: >
+      The type it is driven with: u8, a value such as ratio, or bytes,
+      which is what it takes where unstated.
+  - name: format
+    required: false
+    about: >
+      How its part lays out the number it sends, where that is not the
+      type's own layout: i16_le, or u24_be for a u32.

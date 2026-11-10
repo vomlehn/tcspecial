@@ -498,7 +498,7 @@ pub fn driven(attachment: &Option<Attachment>, which: &str, data: &[u8]) {
 ///
 /// # Returns
 ///
-/// The sensor's bytes, two or three of them as the format says.
+/// The sensor's bytes, as many as the format says.
 pub fn encode(reading: &ToValueParams, value: f64) -> Vec<u8> {
     let counts = ((value - reading.offset) / reading.scale).round();
     match reading.format {
@@ -517,6 +517,19 @@ pub fn encode(reading: &ToValueParams, value: f64) -> Vec<u8> {
         Format::U24Be => {
             let held = counts.clamp(0.0, 0xFF_FFFF as f64) as u32;
             held.to_be_bytes()[1..].to_vec()
+        }
+        Format::U8 => vec![counts.clamp(0.0, u8::MAX as f64) as u8],
+        Format::I8 => {
+            let held = counts.clamp(i8::MIN as f64, i8::MAX as f64) as i8;
+            held.to_be_bytes().to_vec()
+        }
+        Format::I32Be => {
+            let held = counts.clamp(i32::MIN as f64, i32::MAX as f64) as i32;
+            held.to_be_bytes().to_vec()
+        }
+        Format::U32Be => {
+            let held = counts.clamp(0.0, u32::MAX as f64) as u32;
+            held.to_be_bytes().to_vec()
         }
     }
 }

@@ -11,10 +11,10 @@ payload-source: true
 gateway-sink: true
 gateway-source: true
 attributes:
-  - name: format
+  - name: type-in
     required: true
     about: >
-      "How the bytes are laid out: i16_be, u16_le and the rest."
+      The whole number its sensor sends: u8, i8, u16, i16, u32 or i32.
   - name: scale
     required: true
     about: >
@@ -23,8 +23,9 @@ attributes:
   - name: offset
     required: true
     about: What is added after scaling, in the unit.
-  - name: unit
+  - name: type-out
     required: true
     about: >
-      What the value is a number of: K, V, A, W, m, m/s, N, kg/s, or ratio
-      for a fraction of a whole.
+      The value type it sends: kelvin, volt, ampere, watt, metre, metre_per_second, newton,
+      kilogram_per_second or ratio for a
+      fraction of a whole.

@@ -58,6 +58,7 @@
                  stopping the vehicle from deciding anything. -->
             <compute name="ambient">
                 <algorithm>median</algorithm>
+                <carries>kelvin</carries>
                 <function>vote</function>
                 <world-out>gateway.ambient</world-out>
                 <world-out>thermostat.ambient</world-out>
@@ -66,30 +67,30 @@
                 <world-in>in2</world-in>
             </compute>
             <compute name="temp1">
-                <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <type-in>i16</type-in>
                 <world-out>ambient.in0</world-out>
                 <world-out>gateway.temp1</world-out>
                 <world-out>housekeeping.temp1</world-out>
                 <world-in>temp_1</world-in>
             </compute>
             <compute name="temp2">
-                <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <type-in>i16</type-in>
                 <world-out>ambient.in1</world-out>
                 <world-out>gateway.temp2</world-out>
                 <world-out>housekeeping.temp2</world-out>
                 <world-in>temp_2</world-in>
             </compute>
             <compute name="temp3">
-                <format>u24_be</format>
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
+                <type-in>u32</type-in>
                 <world-out>ambient.in2</world-out>
                 <world-out>gateway.temp3</world-out>
                 <world-out>housekeeping.temp3</world-out>
@@ -102,6 +103,8 @@
                 <function>thermostat</function>
                 <half_band>2.0</half_band>
                 <setpoint>293.15</setpoint>
+                <type-in>kelvin</type-in>
+                <type-out>u8</type-out>
                 <!-- asserted below the setpoint, unasserted above it. Two
                      heaters, because one failing must not leave the mass
                      with no way to be warmed: either alone holds the band
@@ -151,6 +154,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
+                <world-out-type>i16</world-out-type>
                 <world-out>temp1.temp_1</world-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1, on the
@@ -160,6 +164,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
+                <world-out-type>i16</world-out-type>
                 <world-out>temp2.temp_2</world-out>
             </payload>
         </type>
@@ -169,11 +174,13 @@
                  so that no one bus and no one part number can take the
                  whole trio out. -->
             <payload name="temp_3">
+                <format>u24_be</format>
                 <group>zone_temps</group>
                 <max_speed>1000000</max_speed>
                 <path>/dev/spidev0.0</path>
                 <read_size>3</read_size>
                 <spi_mode>0</spi_mode>
+                <world-out-type>u32</world-out-type>
                 <world-out>temp3.temp_3</world-out>
             </payload>
         </type>

@@ -3,7 +3,8 @@
 tcslibgs/xtce/types.xtce, which are the one statement of the units: see
 `make unit-table` in tcslibgs/.
 
-Each value type gives one unit: its name the enum variant, its short
+Each value type gives one unit: its name the type a configuration names
+and the enum variant, its short
 description the variant's comment, its unit set the symbol a file writes,
 its calibrator's coefficient the size of a step, and its tcspecial.name and
 tcspecial.step ancillary data what the unit and its step are called in a
@@ -21,8 +22,8 @@ X = {"x": "http://www.omg.org/spec/XTCE/20250214"}
 def variant(name):
     """Makes a Rust enum variant of a type's name.
 
-    Arguments:
-        name    The type's name, in words joined by underscores.
+    Args:
+        name: The type's name, in words joined by underscores.
 
     Returns:
         The words capitalised and run together: metre_per_second is
@@ -34,10 +35,10 @@ def variant(name):
 def steps(coefficient, name):
     """Says how many of a unit's steps make one of it.
 
-    Arguments:
-        coefficient The calibrator's coefficient, as the document writes
-                    it: what one step is, in the unit.
-        name        The type's name, for a complaint.
+    Args:
+        coefficient: The calibrator's coefficient, as the document writes
+                     it: what one step is, in the unit.
+        name:        The type's name, for a complaint.
 
     Returns:
         The number of steps, as Rust writes a power of ten: 1e6.
@@ -53,12 +54,12 @@ def steps(coefficient, name):
 def units(document):
     """Reads the units out of the document.
 
-    Arguments:
-        document    The path of types.xtce.
+    Args:
+        document: The path of types.xtce.
 
     Returns:
-        A list of (variant, description, symbol, name, steps, step), one per
-        value type, in the order the document states them.
+        A list of (variant, description, symbol, name, steps, step, type
+        name), one per value type, in the order the document states them.
     """
     found = []
     for kind in ET.parse(document).getroot().iterfind(
@@ -76,15 +77,15 @@ def units(document):
         found.append((variant(name), kind.get("shortDescription", ""),
                       symbol.text, said["tcspecial.name"],
                       steps(term.get("coefficient"), name),
-                      said["tcspecial.step"]))
+                      said["tcspecial.step"], name))
     return found
 
 
 def rust(found):
     """Writes the table as Rust.
 
-    Arguments:
-        found   The units, as units() reads them.
+    Args:
+        found: The units, as units() reads them.
 
     Returns:
         The text of unit_table.rs.
@@ -96,7 +97,7 @@ def rust(found):
              "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, "
              "Ord)]",
              "pub enum Unit {"]
-    for name, description, _, _, _, _ in found:
+    for name, description, *_ in found:
         lines += [f"    /// {description}", f"    {name},"]
     lines += ["}", "",
               "impl Unit {",
@@ -106,9 +107,10 @@ def rust(found):
     lines += ["    ];", "}", "",
               "/// The table, one row per value type.",
               f"const TABLE: [Row; {len(found)}] = ["]
-    for name, _, symbol, said, count, step in found:
+    for name, _, symbol, said, count, step, kind in found:
         lines += ["    Row {",
                   f"        unit: Unit::{name},",
+                  f"        type_name: \"{kind}\",",
                   f"        symbol: \"{symbol}\",",
                   f"        name: \"{said}\",",
                   f"        per_unit: {count},",

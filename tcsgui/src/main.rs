@@ -14921,7 +14921,8 @@ mod tests {
                 "function".to_string(),
                 "inputs".to_string(),
                 "algorithm".to_string(),
-                "age".to_string()
+                "age".to_string(),
+                "carries".to_string()
             ]
         );
 

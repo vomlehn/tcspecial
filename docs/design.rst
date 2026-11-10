@@ -607,10 +607,15 @@ Typed links
    **Partly built.** This section is the design the links between nodes
    are being moved to, agreed before any of it was written. Built so far:
    ``types.xtce``, the Rust generated from it, the unit table generated
-   from it, and its place in the interface digest. Where the rest of this
-   section and the rest of this document disagree, the rest says what runs
-   today, and `What typed links replace`_ lists the passages it will
-   change.
+   from it, and its place in the interface digest; and every terminal's
+   type, stated as `Every terminal carries one type`_ says, with each link
+   checked at both ends -- ``tcslibgs::graph::link_types`` -- and a
+   device's reading laid out as its type's own as it is read. What travels
+   between nodes is still bytes: the type's own layout of each datum, a
+   decision still the text ``1`` or ``0`` whatever its ``type-out``. Where
+   the rest of this section and the rest of this document disagree, the
+   rest says what runs today, and `What typed links replace`_ lists the
+   passages it will change.
 
 What travels a link has been bytes, and what the bytes meant was each
 node's own business: a conversion knew its sensor's two bytes were a signed
@@ -908,11 +913,9 @@ What typed links replace
 These passages describe the untyped links and change as typed links are
 built:
 
-* `Compute elements`_: a value's unit is worked out from the graph by
-  ``tcslibgs::graph::units``; under typed links each node states it, and
-  that module goes. A decision is the text ``1`` or ``0``; it becomes the
-  ``type-out`` of the thermostat that makes it, and ``from_decision`` reads
-  text only where a ``process`` writes it.
+* `Compute elements`_: a decision is the text ``1`` or ``0``; it becomes
+  the ``type-out`` of the thermostat that makes it, and ``from_decision``
+  reads text only where a ``process`` writes it.
 * `App nodes`_: a packet's bytes are the program's business; they become
   its terminal's type, encoded.
 * `GPIO Payloads: Discrete Lines`_: the ``edge`` attribute, the sixteen-byte
@@ -2397,11 +2400,12 @@ not a conversion.
 
 A value has a unit -- a temperature in kelvin, a bus in volts, an altitude in
 metres -- and the unit is never on the link. The configuration says it, as it
-says which nodes send values at all: a conversion states it (``to_kelvin`` is
-in kelvin, ``to_value`` names its own), a ``process`` states it, its program's
-answers being its own business, and a ``vote`` is in its inputs' unit, which
-must be one. ``tcslibgs::graph::units`` works it out, once, for every node,
-and everything that reads a value back asks it: the vehicle, decoding what
+says which nodes send values at all: each node states the value type it
+sends and takes (see `Typed links`_) -- ``to_kelvin`` is in kelvin,
+``to_value`` and ``process`` state their ``type-out``, a ``vote`` what it
+``carries`` -- and nothing is worked out from what feeds a node.
+``tcslibgs::graph::units`` reads it, and everything that reads a value back
+asks it: the vehicle, decoding what
 arrives at a vote or a thermostat, and the ground, showing a reading with its
 unit. Not a byte is spent on it, and a link, a log or a configuration from
 before there were units reads the same, a kelvin being counted as it always
@@ -6405,38 +6409,42 @@ addresses are its own. What is here is checked as it stands, with a
 
    vehicle:
      - type compute:
-         - { compute: temp1, function: to_kelvin, format: i16_be,
+         - { compute: temp1, function: to_kelvin, type-in: i16,
              scale: "0.0625", offset: "273.15", world-in: [temp_1],
              world-out: [gateway.temp1, ambient.in0] }
-         - { compute: temp2, function: to_kelvin, format: i16_be,
+         - { compute: temp2, function: to_kelvin, type-in: i16,
              scale: "0.0625", offset: "273.15", world-in: [temp_2],
              world-out: [gateway.temp2, ambient.in1] }
-         - { compute: temp3, function: to_kelvin, format: u24_be,
+         - { compute: temp3, function: to_kelvin, type-in: u32,
              scale: "0.0078", offset: "255.37", world-in: [temp_3],
              world-out: [gateway.temp3, ambient.in2] }
 
          - { compute: thermostat, function: thermostat,
-             setpoint: "293.15", half_band: "2.0", world-in: [ambient],
+             setpoint: "293.15", half_band: "2.0", type-in: kelvin,
+             type-out: u8, world-in: [ambient],
              world-out: [gateway.thermostat],
              moc-out: [heaters_1.thermostat, heaters_2.thermostat] }
          - { compute: ambient, function: vote, algorithm: median,
-             world-in: [in0, in1, in2],
+             carries: kelvin, world-in: [in0, in1, in2],
              world-out: [gateway.ambient, thermostat.ambient] }
 
    payloads:
      - type gpio_out:
          - { payload: heaters_1, path: "/dev/gpiochip0",
              lines: "3,4,5", moc-in: [thermostat] }
-         - { payload: heaters_2, direction: output, path: "/dev/gpiochip0",
+         - { payload: heaters_2, path: "/dev/gpiochip0",
              lines: "6,7,8", moc-in: [thermostat] }
      - type i2c:
          - { payload: temp_1, group: zone_temps, path: "/dev/i2c-1",
-             address: "0x48", read_size: "2", world-out: [temp1.temp_1] }
+             address: "0x48", read_size: "2", world-out-type: i16,
+             world-out: [temp1.temp_1] }
          - { payload: temp_2, group: zone_temps, path: "/dev/i2c-1",
-             address: "0x49", read_size: "2", world-out: [temp2.temp_2] }
+             address: "0x49", read_size: "2", world-out-type: i16,
+             world-out: [temp2.temp_2] }
      - type spi:
          - { payload: temp_3, group: zone_temps, path: "/dev/spidev0.0",
              max_speed: "1000000", spi_mode: "0", read_size: "3",
+             format: u24_be, world-out-type: u32,
              world-out: [temp3.temp_3] }
 
    commands:

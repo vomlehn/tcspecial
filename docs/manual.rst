@@ -2009,14 +2009,21 @@ otherwise produces a payload that looks configured and is not:
   outside the range is every reading of that part outside it. A ``scale`` is
   not held to this -- it is units per count, not a value, and what it may be
   depends on counts no file states.
-* **A value in the wrong unit, or no value at all**. Every node feeding a
-  ``vote``, a ``thermostat`` or a ``process`` must send values, and in one
-  unit: ``to_kelvin`` sends kelvin, ``to_value`` the ``unit`` it names (``K``,
-  ``V``, ``A``, ``W``, ``m``, ``m/s``, ``N``, ``kg/s`` or ``ratio``), a
-  ``process`` the ``unit`` it must state, and a vote its inputs'. A vote
-  between a temperature and a voltage is refused naming both, and a
-  thermostat reading a sensor's own bytes is told to put a conversion between
-  them.
+* **A link whose two ends carry different types**. Every terminal of a node
+  carries one type -- one of ``tcslibgs/xtce/types.xtce``'s, ``u8`` to
+  ``i64``, ``boolean``, a value type such as ``kelvin`` or
+  ``metre_per_second``, ``string`` or ``bytes``, or a structure of them --
+  and a link is refused unless the types at its two ends are the same.
+  ``to_kelvin`` sends ``kelvin``; ``to_value`` and ``process`` send their
+  ``type-out``; a ``vote`` takes and sends what it ``carries``; a
+  ``thermostat`` takes its ``type-in`` and sends its ``type-out``; a
+  conversion takes the whole number its ``type-in`` names; a device sends
+  its ``world-out-type`` and is driven with its ``moc-in-type``, ``bytes``
+  where it states neither; and a set of GPIO lines carries the narrowest
+  unsigned whole number with a bit per line. Nothing is worked out from what
+  feeds a node, so a vote over a temperature and a voltage is refused at the
+  link that brings the voltage, naming both types. A null node, a log and a
+  gateway node take any type. See "Typed links" in the design.
 * **Two nodes wanting the same thing**. Two at one address cannot both be
   started; two on one device file, serial line or SPI peripheral is worse,
   each taking part of the one stream and reporting it as though it were the
@@ -2071,6 +2078,7 @@ which is what a panel in the MOC shows.
            group: "zone_temps"
            path: "/dev/i2c-1"
            read_size: "2"
+           world-out-type: "i16"
            world-out:
              - temp1.temp_1
 
@@ -2079,16 +2087,19 @@ which is what a panel in the MOC shows.
            group: "zone_temps"
            path: "/dev/i2c-1"
            read_size: "2"
+           world-out-type: "i16"
            world-out:
              - temp2.temp_2
 
      - type spi:
          - payload: temp_3
+           format: "u24_be"
            group: "zone_temps"
            max_speed: "1000000"
            path: "/dev/spidev0.0"
            read_size: "3"
            spi_mode: "0"
+           world-out-type: "u32"
            world-out:
              - temp3.temp_3
 

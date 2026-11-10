@@ -268,9 +268,21 @@
       <xs:element name="algorithm" type="xs:string"/>
       <!-- A vote's: how old a reading may be and still be voted on. -->
       <xs:element name="age" type="xs:string"/>
-      <!-- The unit a to_value conversion's or a process computation's values
-           are in: K, V, A, W, m, m/s, N, kg/s or ratio. -->
+      <!-- No longer read: a to_value conversion and a process computation
+           state their type-out instead. -->
       <xs:element name="unit" type="xs:string"/>
+      <!-- The type a link carries, one of tcslibgs/xtce/types.xtce's or a
+           structure of them (name: type, name: type): see "Typed links" in
+           docs/design.rst. What a vote or a tee carries in and out; what a
+           conversion, thermostat or process takes and sends; and what a
+           device or an app carries at each terminal. -->
+      <xs:element name="carries" type="xs:string"/>
+      <xs:element name="type-in" type="xs:string"/>
+      <xs:element name="type-out" type="xs:string"/>
+      <xs:element name="world-in-type" type="xs:string"/>
+      <xs:element name="world-out-type" type="xs:string"/>
+      <xs:element name="moc-in-type" type="xs:string"/>
+      <xs:element name="moc-out-type" type="xs:string"/>
       <!-- The program this node runs: an app node's application, or the
            program a `process` computation runs on what arrives. Executed with
            a leading `~` and `$HOME` expanded as a shell would expand them, to

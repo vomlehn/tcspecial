@@ -51,11 +51,11 @@
                  significant first: charging is more than nought,
                  discharging less. -->
             <compute name="battery_amps">
-                <format>i16_be</format>
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.001</scale>
-                <unit>A</unit>
+                <type-in>i16</type-in>
+                <type-out>ampere</type-out>
                 <world-out>charge.battery_amps</world-out>
                 <world-out>gateway.battery_amps</world-out>
                 <world-in>shunt</world-in>
@@ -63,11 +63,11 @@
             <!-- The power monitor's two bytes are millivolts, unsigned, most
                  significant first: up to 65 volts, which is twice the bus. -->
             <compute name="bus_volts">
-                <format>u16_be</format>
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.001</scale>
-                <unit>V</unit>
+                <type-in>u16</type-in>
+                <type-out>volt</type-out>
                 <world-out>gateway.bus_volts</world-out>
                 <world-in>monitor</world-in>
             </compute>
@@ -81,7 +81,8 @@
                 <executable>examples/battery/charge.py</executable>
                 <function>process</function>
                 <timeout>1 s</timeout>
-                <unit>ratio</unit>
+                <type-in>ampere</type-in>
+                <type-out>ratio</type-out>
                 <world-out>gateway.charge</world-out>
                 <world-out>shedding.charge</world-out>
                 <world-in>battery_amps</world-in>
@@ -93,6 +94,8 @@
                 <function>thermostat</function>
                 <half_band>0.1</half_band>
                 <setpoint>0.4</setpoint>
+                <type-in>ratio</type-in>
+                <type-out>u8</type-out>
                 <moc-out>science.shedding</moc-out>
                 <world-out>gateway.shedding</world-out>
                 <world-in>charge</world-in>
@@ -105,6 +108,7 @@
                  decides: 1 to shed it, 0 to restore it. -->
             <payload name="science">
                 <address>127.0.0.1</address>
+                <moc-in-type>u8</moc-in-type>
                 <port>5302</port>
                 <protocol>udp</protocol>
                 <moc-in>shedding</moc-in>
@@ -115,6 +119,7 @@
                 <address>127.0.0.1</address>
                 <port>5301</port>
                 <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
                 <world-out>battery_amps.shunt</world-out>
             </payload>
         </type>
@@ -130,6 +135,7 @@
                 <stop_bits>1</stop_bits>
                 <trigger>"V?\r"</trigger>
                 <trigger_interval>500 ms</trigger_interval>
+                <world-out-type>u16</world-out-type>
                 <world-out>bus_volts.monitor</world-out>
             </payload>
         </type>

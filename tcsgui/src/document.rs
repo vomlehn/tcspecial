@@ -4304,6 +4304,7 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "temp_1", "address", "0x48");
     set(&mut document, "temp_1", "group", "zone_temps");
     set(&mut document, "temp_1", "read_size", "2");
+    set(&mut document, "temp_1", "world-out-type", "i16");
     note(
         &mut document,
         "temp_1",
@@ -4317,6 +4318,7 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "temp_2", "address", "0x49");
     set(&mut document, "temp_2", "group", "zone_temps");
     set(&mut document, "temp_2", "read_size", "2");
+    set(&mut document, "temp_2", "world-out-type", "i16");
     note(
         &mut document,
         "temp_2",
@@ -4329,6 +4331,9 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "temp_3", "spi_mode", "0");
     set(&mut document, "temp_3", "group", "zone_temps");
     set(&mut document, "temp_3", "read_size", "3");
+    // Three bytes, which the vehicle reads as the u32 the node sends.
+    set(&mut document, "temp_3", "world-out-type", "u32");
+    set(&mut document, "temp_3", "format", "u24_be");
     note(
         &mut document,
         "temp_3",
@@ -4337,14 +4342,14 @@ pub fn thermostat_example() -> Document {
          one bus and no one part number can take the whole trio out.",
     );
 
-    for (name, at, format, scale, offset) in [
-        ("temp1", (242, 34), "i16_be", "0.0625", "273.15"),
-        ("temp2", (242, 166), "i16_be", "0.0625", "273.15"),
-        ("temp3", (242, 280), "u24_be", "0.0078", "255.37"),
+    for (name, at, takes, scale, offset) in [
+        ("temp1", (242, 34), "i16", "0.0625", "273.15"),
+        ("temp2", (242, 166), "i16", "0.0625", "273.15"),
+        ("temp3", (242, 280), "u32", "0.0078", "255.37"),
     ] {
         place(&mut document, name, "compute", at);
         set(&mut document, name, "function", "to_kelvin");
-        set(&mut document, name, "format", format);
+        set(&mut document, name, "type-in", takes);
         set(&mut document, name, "scale", scale);
         set(&mut document, name, "offset", offset);
     }
@@ -4353,6 +4358,7 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "ambient", "function", "vote");
     set(&mut document, "ambient", "algorithm", "median");
     set(&mut document, "ambient", "inputs", "in0,in1,in2");
+    set(&mut document, "ambient", "carries", "kelvin");
     note(
         &mut document,
         "ambient",
@@ -4368,6 +4374,8 @@ pub fn thermostat_example() -> Document {
     set(&mut document, "thermostat", "function", "thermostat");
     set(&mut document, "thermostat", "setpoint", "293.15");
     set(&mut document, "thermostat", "half_band", "2.0");
+    set(&mut document, "thermostat", "type-in", "kelvin");
+    set(&mut document, "thermostat", "type-out", "u8");
     note(
         &mut document,
         "thermostat",

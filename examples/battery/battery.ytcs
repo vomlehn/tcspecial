@@ -41,11 +41,11 @@ vehicle:
       # The shunt's two bytes are milliamperes, signed, most significant
       # first: charging is more than nought, discharging less.
       - compute: battery_amps
-        format: "i16_be"
         function: "to_value"
         offset: "0"
         scale: "0.001"
-        unit: "A"
+        type-in: "i16"
+        type-out: "ampere"
         world-out:
           - charge.battery_amps
           - gateway.battery_amps
@@ -53,11 +53,11 @@ vehicle:
       # The power monitor's two bytes are millivolts, unsigned, most
       # significant first: up to 65 volts, which is twice the bus.
       - compute: bus_volts
-        format: "u16_be"
         function: "to_value"
         offset: "0"
         scale: "0.001"
-        unit: "V"
+        type-in: "u16"
+        type-out: "volt"
         world-out:
           - gateway.bus_volts
         world-in: [monitor]
@@ -72,7 +72,8 @@ vehicle:
         executable: "examples/battery/charge.py"
         function: "process"
         timeout: "1 s"
-        unit: "ratio"
+        type-in: "ampere"
+        type-out: "ratio"
         world-out:
           - gateway.charge
           - shedding.charge
@@ -85,6 +86,8 @@ vehicle:
         function: "thermostat"
         half_band: "0.1"
         setpoint: "0.4"
+        type-in: "ratio"
+        type-out: "u8"
         moc-out:
           - science.shedding
         world-out:
@@ -100,6 +103,7 @@ payloads:
       # -- 1 to shed it, 0 to restore it.
       - payload: science
         address: "127.0.0.1"
+        moc-in-type: "u8"
         port: "5302"
         protocol: "udp"
         moc-in: [shedding]
@@ -109,6 +113,7 @@ payloads:
         address: "127.0.0.1"
         port: "5301"
         protocol: "udp"
+        world-out-type: "i16"
         world-out:
           - battery_amps.shunt
   - type serial:
@@ -123,6 +128,7 @@ payloads:
         stop_bits: "1"
         trigger: '"V?\r"'
         trigger_interval: "500 ms"
+        world-out-type: "u16"
         world-out:
           - bus_volts.monitor
 

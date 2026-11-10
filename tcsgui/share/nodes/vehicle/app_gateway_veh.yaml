@@ -38,3 +38,11 @@ attributes:
       Whether it is started again when it stops: true or false. A node that
       says nothing is a node left stopped, which is the answer a part of a
       control path wants.
+  - name: moc-in-type
+    required: false
+    about: >
+      The type its moc-in takes, as a packet of it: bytes where unstated.
+  - name: world-out-type
+    required: false
+    about: >
+      The type its world-out sends, as a packet of it: bytes where unstated.

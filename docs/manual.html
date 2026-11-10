@@ -2354,14 +2354,21 @@ heaters would be driven on and held there for the whole flight; an offset
 outside the range is every reading of that part outside it. A <tt class="docutils literal">scale</tt> is
 not held to this -- it is units per count, not a value, and what it may be
 depends on counts no file states.</li>
-<li><strong>A value in the wrong unit, or no value at all</strong>. Every node feeding a
-<tt class="docutils literal">vote</tt>, a <tt class="docutils literal">thermostat</tt> or a <tt class="docutils literal">process</tt> must send values, and in one
-unit: <tt class="docutils literal">to_kelvin</tt> sends kelvin, <tt class="docutils literal">to_value</tt> the <tt class="docutils literal">unit</tt> it names (<tt class="docutils literal">K</tt>,
-<tt class="docutils literal">V</tt>, <tt class="docutils literal">A</tt>, <tt class="docutils literal">W</tt>, <tt class="docutils literal">m</tt>, <tt class="docutils literal">m/s</tt>, <tt class="docutils literal">N</tt>, <tt class="docutils literal">kg/s</tt> or <tt class="docutils literal">ratio</tt>), a
-<tt class="docutils literal">process</tt> the <tt class="docutils literal">unit</tt> it must state, and a vote its inputs'. A vote
-between a temperature and a voltage is refused naming both, and a
-thermostat reading a sensor's own bytes is told to put a conversion between
-them.</li>
+<li><strong>A link whose two ends carry different types</strong>. Every terminal of a node
+carries one type -- one of <tt class="docutils literal">tcslibgs/xtce/types.xtce</tt>'s, <tt class="docutils literal">u8</tt> to
+<tt class="docutils literal">i64</tt>, <tt class="docutils literal">boolean</tt>, a value type such as <tt class="docutils literal">kelvin</tt> or
+<tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">string</tt> or <tt class="docutils literal">bytes</tt>, or a structure of them --
+and a link is refused unless the types at its two ends are the same.
+<tt class="docutils literal">to_kelvin</tt> sends <tt class="docutils literal">kelvin</tt>; <tt class="docutils literal">to_value</tt> and <tt class="docutils literal">process</tt> send their
+<tt class="docutils literal"><span class="pre">type-out</span></tt>; a <tt class="docutils literal">vote</tt> takes and sends what it <tt class="docutils literal">carries</tt>; a
+<tt class="docutils literal">thermostat</tt> takes its <tt class="docutils literal"><span class="pre">type-in</span></tt> and sends its <tt class="docutils literal"><span class="pre">type-out</span></tt>; a
+conversion takes the whole number its <tt class="docutils literal"><span class="pre">type-in</span></tt> names; a device sends
+its <tt class="docutils literal"><span class="pre">world-out-type</span></tt> and is driven with its <tt class="docutils literal"><span class="pre">moc-in-type</span></tt>, <tt class="docutils literal">bytes</tt>
+where it states neither; and a set of GPIO lines carries the narrowest
+unsigned whole number with a bit per line. Nothing is worked out from what
+feeds a node, so a vote over a temperature and a voltage is refused at the
+link that brings the voltage, naming both types. A null node, a log and a
+gateway node take any type. See &quot;Typed links&quot; in the design.</li>
 <li><strong>Two nodes wanting the same thing</strong>. Two at one address cannot both be
 started; two on one device file, serial line or SPI peripheral is worse,
 each taking part of the one stream and reporting it as though it were the
@@ -2414,6 +2421,7 @@ which is what a panel in the MOC shows.</p>
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
+        </span><span class="name tag">world-out-type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;i16&quot;</span><span class="whitespace">
         </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="literal scalar plain">temp1.temp_1</span><span class="whitespace">
 
@@ -2422,16 +2430,19 @@ which is what a panel in the MOC shows.</p>
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/i2c-1&quot;</span><span class="whitespace">
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2&quot;</span><span class="whitespace">
+        </span><span class="name tag">world-out-type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;i16&quot;</span><span class="whitespace">
         </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="literal scalar plain">temp2.temp_2</span><span class="whitespace">
 
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
+        </span><span class="name tag">format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;u24_be&quot;</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;zone_temps&quot;</span><span class="whitespace">
         </span><span class="name tag">max_speed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;1000000&quot;</span><span class="whitespace">
         </span><span class="name tag">path</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;/dev/spidev0.0&quot;</span><span class="whitespace">
         </span><span class="name tag">read_size</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;3&quot;</span><span class="whitespace">
         </span><span class="name tag">spi_mode</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0&quot;</span><span class="whitespace">
+        </span><span class="name tag">world-out-type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;u32&quot;</span><span class="whitespace">
         </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="literal scalar plain">temp3.temp_3</span>
 </pre>

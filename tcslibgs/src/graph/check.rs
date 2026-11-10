@@ -1613,6 +1613,13 @@ impl Graph {
             problems.push(Problem::BadCompute { node, why });
         }
 
+        // What each terminal carries, and whether the two ends of each link
+        // carry the same type: see `link_types`, and "Typed links" in the
+        // design.
+        for (node, why) in super::link_types::problems(self) {
+            problems.push(Problem::BadNode { node, why });
+        }
+
         // A `null-` node, a `tee-` node and a `ping` node say nothing about
         // themselves.
         //
@@ -1641,6 +1648,12 @@ impl Graph {
                 _ => continue,
             };
             for attribute in node.attributes.keys() {
+                // A tee states the type it passes on, which is the one thing
+                // it has to be told: see `link_types`.
+                if attribute == "carries" && node.node_type.starts_with("tee-")
+                {
+                    continue;
+                }
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
                     why: format!(
@@ -2277,13 +2290,17 @@ mod tests {
     fn node(name: &str, node_type: &str) -> Node {
         let mut attributes = BTreeMap::new();
         let minimum: &[(&str, &str)] = match node_type {
-            "i2c" | "i2c_tmass" => {
-                &[("path", "/dev/i2c-1"), ("address", "0x48")]
-            }
+            // A sensor sends a whole number, which a conversion takes.
+            "i2c" | "i2c_tmass" => &[
+                ("path", "/dev/i2c-1"),
+                ("address", "0x48"),
+                ("world-out-type", "i16"),
+            ],
             "spi" | "spi_tmass" => &[
                 ("path", "/dev/spidev0.0"),
                 ("max_speed", "1000000"),
                 ("spi_mode", "0"),
+                ("world-out-type", "i16"),
             ],
             "serial" => &[
                 ("path", "/dev/ttyS0"),
@@ -2343,7 +2360,7 @@ mod tests {
             ],
             "compute" => &[
                 ("function", "to_kelvin"),
-                ("format", "i16_be"),
+                ("type-in", "i16"),
                 ("scale", "1.0"),
                 ("offset", "0.0"),
             ],
@@ -3122,6 +3139,8 @@ mod tests {
             // Written to, so each says what asks it for a reading.
             one.attributes
                 .insert("trigger".to_string(), Scalar::of("[55]"));
+            // And sending what the apps take, which is bytes.
+            one.attributes.remove("world-out-type");
         }
 
         let sound = graph(
@@ -3771,12 +3790,21 @@ mod tests {
     /// A link with several destinations is the "T", and is not a fault.
     #[test]
     fn one_link_may_reach_several_places() {
+        // A thermostat, which takes the kelvin the conversion sends.
+        let mut m = node("m", "compute");
+        m.attributes.clear();
+        for (attribute, value) in [
+            ("function", "thermostat"),
+            ("setpoint", "293.15"),
+            ("half_band", "1"),
+            ("type-in", "kelvin"),
+            ("type-out", "u8"),
+        ] {
+            m.attributes
+                .insert(attribute.to_string(), Scalar::of(value));
+        }
         let g = graph(
-            vec![
-                node("k", "compute"),
-                node("gateway", "gateway_radio"),
-                node("m", "compute"),
-            ],
+            vec![node("k", "compute"), node("gateway", "gateway_radio"), m],
             vec![link("k", &["gateway", "m.in0"])],
         );
         assert_eq!(g.check(), Vec::new(), "a fan-out was refused");
@@ -4259,7 +4287,7 @@ mod tests {
             kelvin.attributes.clear();
             for (attribute, value) in [
                 ("function", "to_kelvin"),
-                ("format", "i16_be"),
+                ("type-in", "i16"),
                 ("scale", "0.0625"),
                 ("offset", "273.15"),
             ] {
@@ -4276,8 +4304,12 @@ mod tests {
 
         // A thermostat with no band, which used to pass here and be refused
         // when the vehicle started.
-        let problems =
-            computation(&[("function", "thermostat"), ("setpoint", "293.15")]);
+        let problems = computation(&[
+            ("function", "thermostat"),
+            ("setpoint", "293.15"),
+            ("type-in", "kelvin"),
+            ("type-out", "u8"),
+        ]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,
@@ -4288,8 +4320,12 @@ mod tests {
         );
 
         // A program with no deadline.
-        let problems =
-            computation(&[("function", "process"), ("executable", "/bin/cat")]);
+        let problems = computation(&[
+            ("function", "process"),
+            ("executable", "/bin/cat"),
+            ("type-in", "kelvin"),
+            ("type-out", "kelvin"),
+        ]);
         assert!(
             problems.iter().any(|p| matches!(
                 p,
@@ -4303,6 +4339,8 @@ mod tests {
             ("function", "thermostat"),
             ("setpoint", "293.15"),
             ("half_band", "2.0"),
+            ("type-in", "kelvin"),
+            ("type-out", "u8"),
         ]);
         assert!(
             !problems
@@ -4330,12 +4368,15 @@ mod tests {
                 .insert("algorithm".to_string(), Scalar::of("median"));
             average
                 .attributes
+                .insert("carries".to_string(), Scalar::of("kelvin"));
+            average
+                .attributes
                 .insert("inputs".to_string(), Scalar::of(declared));
             let g = graph(
                 vec![
-                    node("a", "i2c"),
-                    node("b", "i2c"),
-                    node("c", "i2c"),
+                    node("a", "compute"),
+                    node("b", "compute"),
+                    node("c", "compute"),
                     average,
                 ],
                 links,

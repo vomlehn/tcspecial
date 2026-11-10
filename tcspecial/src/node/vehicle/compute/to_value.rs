@@ -208,21 +208,21 @@ mod tests {
                     ("scale", "1"),
                     ("offset", "0"),
                 ],
-                "how they are laid out",
+                "type-in is not set",
             ),
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "f32_be"),
+                    ("type-in", "f32"),
                     ("scale", "1"),
                     ("offset", "0"),
                 ],
-                "i16_be",
+                "is not a type",
             ),
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "0"),
                     ("offset", "273.15"),
                 ],
@@ -231,7 +231,7 @@ mod tests {
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "1"),
                 ],
                 "offset",

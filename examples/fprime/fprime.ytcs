@@ -70,6 +70,7 @@ payloads:
         address: "127.0.0.1"
         port: "9002"
         protocol: "udp"
+        world-out-type: "i16"
         world-out:
           - fsw.thermometer
           - zone_temp.thermometer
@@ -84,16 +85,18 @@ vehicle:
         function: "thermostat"
         half_band: "0.5"
         setpoint: "284.15"
+        type-in: "kelvin"
+        type-out: "boolean"
         world-out:
           - fsw.heater_wanted
         world-in: [zone_temp]
       # The thermometer's readings made a value, a temperature in kelvin, which
       # the bridge's channel for it holds as one.
       - compute: zone_temp
-        format: "i16_be"
         function: "to_kelvin"
         offset: "273.15"
         scale: "0.0625"
+        type-in: "i16"
         world-out:
           - fsw.zone_temp
           - heater_wanted.zone_temp

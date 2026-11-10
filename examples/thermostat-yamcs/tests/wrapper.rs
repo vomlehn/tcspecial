@@ -173,8 +173,8 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
     assert_eq!(decoded.refers[0].1, HEADER_BYTES * 8);
 }
 
-/// A copy of the example whose readings are `to_value` conversions in a
-/// unit, and whose vote is so in that unit too.
+/// A copy of the example whose readings are `to_value` conversions to a
+/// unit's value type, and whose vote carries that type too.
 ///
 /// The readings are in the file the example includes, so that is copied
 /// with them changed, into a `thermostat-common` beside the copy of the
@@ -191,13 +191,18 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
 fn in_unit(dir: &Path, unit: Unit) -> PathBuf {
     let common = here().join("../thermostat-common/thermostat.xtcs");
     let said = std::fs::read_to_string(&common).expect("the common file reads");
-    let changed = said.replace(
-        "<function>to_kelvin</function>",
-        &format!(
-            "<function>to_value</function><unit>{}</unit>",
-            unit.symbol()
-        ),
-    );
+    let changed = said
+        .replace(
+            "<function>to_kelvin</function>",
+            &format!(
+                "<function>to_value</function><type-out>{}</type-out>",
+                unit.type_name()
+            ),
+        )
+        .replace(
+            "<carries>kelvin</carries>",
+            &format!("<carries>{}</carries>", unit.type_name()),
+        );
     assert_ne!(said, changed, "the readings are to_kelvin conversions");
     let at = dir.join(format!("{unit:?}"));
     for sub in ["thermostat-yamcs", "thermostat-common"] {

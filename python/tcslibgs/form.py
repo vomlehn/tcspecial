@@ -8,8 +8,9 @@ some nodes: a compute node says, by its function, what it sends.
 
 * A value -- four bytes of a signed count of its unit's steps, most
   significant first (``compute::from_value``) -- is a number in the unit
-  the graph gives it: ``to_kelvin`` is in kelvin, ``to_value`` and
-  ``process`` state their own, and a ``vote`` is in its inputs' one unit.
+  its node states: ``to_kelvin`` is in kelvin, ``to_value`` and
+  ``process`` state their ``type-out``, and a ``vote`` what it ``carries``,
+  each a value type's name, ``kelvin`` or ``metre_per_second``.
 * A decision -- the text ``1`` or ``0`` (``compute::from_decision``) -- is
   on or off: what a ``thermostat`` sends.
 * A set of GPIO lines read for their levels on an interval, and watched for
@@ -82,6 +83,45 @@ def unit_of_symbol(said, what):
     every = ", ".join(unit.symbol for unit in UNITS)
     raise ValueError(f'{what}: "{said}" is not a unit this knows. There are '
                      f"{every}")
+
+
+def unit_of_type_name(said, what):
+    """Reads the value type a configuration names: ``Unit::of_type_name``.
+
+    Args:
+        said: The type's name: ``kelvin``, ``metre_per_second``.
+        what: What states it, for the complaint.
+
+    Returns:
+        The :class:`Unit`.
+
+    Raises:
+        ValueError: It is no value type there is.
+    """
+    for unit in UNITS:
+        if type_name(unit) == said.strip():
+            return unit
+    every = ", ".join(type_name(unit) for unit in UNITS)
+    raise ValueError(f'{what}: "{said}" is not a value type. There are '
+                     f"{every}")
+
+
+def type_name(unit):
+    """Names a unit's value type as a configuration does: its Rust name in
+    lower case with an underscore between its words.
+
+    Args:
+        unit: The :class:`Unit`.
+
+    Returns:
+        Its value type's name: ``kelvin``, ``metre_per_second``.
+    """
+    words = []
+    for letter in unit.variant:
+        if letter.isupper() and words:
+            words.append("_")
+        words.append(letter.lower())
+    return "".join(words)
 
 
 #: What a computation's function produces: ``compute::produces``.
@@ -201,13 +241,13 @@ def _function(config, name):
 
 
 def _unit(config, name, asking):
-    """The unit a node of values sends them in: ``units::unit_of``.
+    """The unit a node of values sends them in: ``units::unit_of``, which
+    is the value type the node states.
 
     Args:
         config: The configuration.
         name:   The node's name.
-        asking: The votes whose units are being worked out further up, so
-                that a loop of votes ends.
+        asking: Unused: nothing is worked out from what feeds a node.
 
     Returns:
         The :class:`Unit`.
@@ -219,40 +259,9 @@ def _unit(config, name, asking):
     where = f'{config.path}: "{name}" ({function})'
     if function == "to_kelvin":
         return UNITS[0]
-    if function in ("to_value", "process"):
-        said = config.node(name).attributes.get("unit")
-        if said is None:
-            raise ValueError(f"{where}: unit is not set, and a {function} "
-                             "says what its values are a number of")
-        return unit_of_symbol(said, where)
-    if function != "vote" or name in asking:
-        raise ValueError(f"{where}: sends no values, and a vote's inputs "
-                         "are values")
-    units = set()
-    for source in _feeding(config, name):
-        units.add(_unit(config, source, asking + [name]))
-    if len(units) != 1:
-        raise ValueError(f"{where}: its inputs' values are in "
-                         f"{len(units)} units, and a vote is between "
-                         "values of one")
-    return units.pop()
-
-
-def _feeding(config, name):
-    """The nodes whose links arrive at a node.
-
-    Args:
-        config: The configuration.
-        name:   The node fed.
-
-    Returns:
-        Each node that has a link to it, once, in the configuration's order.
-    """
-    found = []
-    for node in config.nodes:
-        for targets in node.links.values():
-            # A destination may name the node's input after a point.
-            if (any(target.split(".", 1)[0] == name for target in targets)
-                    and node.name not in found):
-                found.append(node.name)
-    return found
+    attribute = "carries" if function == "vote" else "type-out"
+    said = config.node(name).attributes.get(attribute)
+    if said is None:
+        raise ValueError(f"{where}: {attribute} is not set, and a {function} "
+                         "states the value type it sends")
+    return unit_of_type_name(str(said), where)

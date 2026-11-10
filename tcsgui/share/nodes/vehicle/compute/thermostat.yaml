@@ -20,3 +20,14 @@ attributes:
       How far from the setpoint the decision changes, each way: it switches
       off this far above and on this far below. More than nought, a band of
       nothing being a bare comparison that cycles a relay on a wobble.
+  - name: type-in
+    required: true
+    about: >
+      The value type it reads, which its setpoint and half_band are in:
+      kelvin, volt, ampere, watt, metre, metre_per_second, newton,
+      kilogram_per_second or ratio.
+  - name: type-out
+    required: true
+    about: >
+      What it sends its decision as: boolean, or a whole number such as the
+      u8 a one-line GPIO switch takes, 1 when asserted and 0 when not.

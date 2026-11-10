@@ -1,22 +1,21 @@
 //! What unit each node's values are in, as the configuration says.
 //!
-//! The unit of a value is never on the link -- see [`crate::unit`] -- so it
-//! is worked out here, once, from the graph, for everything that reads a
-//! value back: the vehicle, which decodes what arrives at a vote or a
-//! thermostat, and the ground, which shows a reading with its unit. A node
-//! says its unit only where nothing else can:
+//! The unit of a value is never on the link -- see [`crate::unit`] -- and it
+//! is not worked out from what feeds a node either: every node states the
+//! type of each of its terminals, and a value type is a unit (see
+//! [`crate::graph::link_types`]). This is where the vehicle, which decodes
+//! what arrives at a vote or a thermostat, and the ground, which shows a
+//! reading with its unit, ask for it:
 //!
-//! * a conversion states it: `to_kelvin` is in kelvin, `to_value` names its
-//!   own;
-//! * a `process` states it, being a program whose answers are its own
-//!   business;
-//! * a `vote` is in its inputs' unit, which must be one.
-//!
-//! A `thermostat` reads values and sends decisions; its setpoint and band
-//! are in the unit of what it reads, and whether they fit is checked here
-//! too, since that node alone cannot know the unit.
+//! * a conversion's is its output's: `to_kelvin` is in kelvin, `to_value`
+//!   states its `type-out`;
+//! * a `process`'s is its `type-out`, a vote's what it `carries`;
+//! * a `thermostat` reads values of its `type-in` and sends decisions, and
+//!   its setpoint and band are in the unit of its `type-in`, which is
+//!   checked here.
 
-use super::{Destination, Graph};
+use super::link_types::{sends_unit, takes_unit};
+use super::Graph;
 use crate::node::vehicle::compute::{
     params_of, value_count, Computation, ThermostatParams,
 };
@@ -32,57 +31,9 @@ use crate::unit::Unit;
 /// # Returns
 ///
 /// The unit, or `None` for a node that does not send values -- a sensor's
-/// own bytes, a decision, a log -- or a vote whose inputs do not agree,
-/// which [`problems`] reports.
+/// own numbers, a decision, a log -- or that is not in the configuration.
 pub fn unit_of(graph: &Graph, node: &str) -> Option<Unit> {
-    unit_seen(graph, node, &mut Vec::new())
-}
-
-/// [`unit_of`], with the nodes already being asked about, so that a loop of
-/// votes feeding each other ends rather than recursing for ever.
-///
-/// # Arguments
-///
-/// * `graph`  - The configuration.
-/// * `node`   - The node's name.
-/// * `asking` - The nodes whose units are being worked out further up.
-///
-/// # Returns
-///
-/// The unit, or `None` as [`unit_of`] says, and for a node already being
-/// asked about.
-fn unit_seen<'a>(
-    graph: &'a Graph,
-    node: &'a str,
-    asking: &mut Vec<&'a str>,
-) -> Option<Unit> {
-    if asking.contains(&node) {
-        return None;
-    }
-    let found = graph.node(node)?;
-    if found.node_type != "compute" {
-        return None;
-    }
-    match params_of(&found.name, &found.attributes).ok()? {
-        Computation::ToKelvin(params) | Computation::ToValue(params) => {
-            Some(params.unit)
-        }
-        Computation::Process(params) => Some(params.unit),
-        Computation::Thermostat(_) => None,
-        Computation::Vote(_) => {
-            asking.push(node);
-            let units = sources_units(graph, node, asking);
-            asking.pop();
-            match units.as_slice() {
-                [(_, Some(first)), rest @ ..]
-                    if rest.iter().all(|(_, unit)| *unit == Some(*first)) =>
-                {
-                    Some(*first)
-                }
-                _ => None,
-            }
-        }
-    }
+    graph.node(node).and_then(sends_unit)
 }
 
 /// Says what unit the values arriving at a node are in.
@@ -94,64 +45,19 @@ fn unit_seen<'a>(
 ///
 /// # Returns
 ///
-/// The one unit every node feeding it sends values in, or `None` where
-/// nothing feeds it, something feeding it does not send values, or what
-/// feeds it disagrees -- each of which [`problems`] reports where it matters.
+/// The unit of the value type the node takes, at its `world-in` or, for a
+/// device the vehicle drives, its `moc-in`; `None` where it takes no values.
 pub fn input_unit(graph: &Graph, node: &str) -> Option<Unit> {
-    let units = sources_units(graph, node, &mut Vec::new());
-    let (_, first) = units.first()?;
-    let first = (*first)?;
-    units
-        .iter()
-        .all(|(_, unit)| *unit == Some(first))
-        .then_some(first)
+    graph.node(node).and_then(takes_unit)
 }
 
-/// The unit each node feeding this one sends values in, by name.
+/// Everything wrong with the units of a configuration's computations: a
+/// thermostat's setpoint and band must fit the unit of what it reads, which
+/// is the range check that unit's values are held to.
 ///
-/// # Arguments
-///
-/// * `graph`  - The configuration.
-/// * `node`   - The node fed.
-/// * `asking` - The nodes whose units are being worked out further up.
-///
-/// # Returns
-///
-/// Each node feeding it, once, with the unit it sends values in, or `None`
-/// for one that sends none.
-fn sources_units<'a>(
-    graph: &'a Graph,
-    node: &str,
-    asking: &mut Vec<&'a str>,
-) -> Vec<(&'a str, Option<Unit>)> {
-    let mut found: Vec<(&'a str, Option<Unit>)> = Vec::new();
-    for link in &graph.links {
-        let arrives = link
-            .to
-            .each()
-            .iter()
-            .any(|to| Destination::parse(to).node == node);
-        if !arrives {
-            continue;
-        }
-        let from = link.from.split('.').next().unwrap_or(&link.from);
-        if found.iter().any(|(name, _)| *name == from) {
-            continue;
-        }
-        let unit = unit_seen(graph, from, asking);
-        found.push((from, unit));
-    }
-    found
-}
-
-/// Everything wrong with the units of a configuration's computations.
-///
-/// A vote, a thermostat and a program read what arrives as values, so every
-/// node feeding one must send values, and in one unit: a vote between a
-/// temperature and a voltage, or a thermostat reading a sensor's raw bytes,
-/// is a configuration whose arithmetic is meaningless however well it runs.
-/// And a thermostat's setpoint and band must fit its input's unit, which is
-/// the range check that unit's values are held to.
+/// That what reaches a vote, a thermostat or a program is a value, and in
+/// one unit, is the links' to check, and they do: see
+/// [`crate::graph::link_types`].
 ///
 /// # Arguments
 ///
@@ -163,55 +69,13 @@ fn sources_units<'a>(
 pub fn problems(graph: &Graph) -> Vec<(String, String)> {
     let mut problems = Vec::new();
     for node in graph.nodes.iter().filter(|n| n.node_type == "compute") {
-        let Ok(what) = params_of(&node.name, &node.attributes) else {
-            // Refused already, with the reason, by the computations' check.
+        let Ok(Computation::Thermostat(params)) =
+            params_of(&node.name, &node.attributes)
+        else {
             continue;
         };
-        let reads = match what {
-            Computation::Vote(_) => "votes on",
-            Computation::Thermostat(_) => "decides on",
-            Computation::Process(_) => "hands its program",
-            Computation::ToKelvin(_) | Computation::ToValue(_) => continue,
-        };
-        let units = sources_units(graph, &node.name, &mut Vec::new());
-        let mut sent: Option<(&str, Unit)> = None;
-        let mut agree = true;
-        for (source, unit) in &units {
-            let Some(unit) = unit else {
-                problems.push((
-                    node.name.clone(),
-                    format!(
-                        "it {reads} what \"{source}\" sends, which is not a \
-                         value: put a conversion -- to_kelvin or to_value -- \
-                         between them"
-                    ),
-                ));
-                agree = false;
-                continue;
-            };
-            match sent {
-                None => sent = Some((source, *unit)),
-                Some((first, theirs)) if theirs != *unit => {
-                    problems.push((
-                        node.name.clone(),
-                        format!(
-                            "it {reads} values in {} from \"{first}\" and in \
-                             {} from \"{source}\": what arrives at one node \
-                             must be in one unit",
-                            theirs.name(),
-                            unit.name()
-                        ),
-                    ));
-                    agree = false;
-                }
-                Some(_) => {}
-            }
-        }
-
-        if let (Computation::Thermostat(params), Some((_, unit)), true) =
-            (&what, sent, agree)
-        {
-            band_fits(&node.name, params, unit, &mut problems);
+        if let Some(unit) = takes_unit(node) {
+            band_fits(&node.name, &params, unit, &mut problems);
         }
     }
     problems
@@ -260,20 +124,6 @@ mod tests {
             .expect("the example reads")
     }
 
-    /// A conversion's unit is its own, a vote's its inputs', and a decision
-    /// or a sensor's bytes have none.
-    #[test]
-    fn each_node_sends_the_unit_the_configuration_says() {
-        let graph = thermostat();
-        assert_eq!(unit_of(&graph, "to_k1"), Some(Unit::Kelvin));
-        assert_eq!(unit_of(&graph, "consensus_temp"), Some(Unit::Kelvin));
-        assert_eq!(unit_of(&graph, "thermostat"), None);
-        assert_eq!(unit_of(&graph, "temp_1"), None);
-        assert_eq!(unit_of(&graph, "nobody"), None);
-        assert_eq!(input_unit(&graph, "thermostat"), Some(Unit::Kelvin));
-        assert!(problems(&graph).is_empty(), "{:?}", problems(&graph));
-    }
-
     /// Changes one node's attribute in a configuration.
     ///
     /// # Arguments
@@ -292,39 +142,32 @@ mod tests {
             .insert(attribute.to_string(), crate::Scalar::of(value));
     }
 
-    /// A vote between two units is refused, naming both and their sources,
-    /// and is in no unit.
+    /// A conversion's unit is its own, a vote's what it carries, and a decision
+    /// or a sensor's numbers have none.
     #[test]
-    fn a_vote_between_two_units_is_refused() {
+    fn each_node_sends_the_unit_the_configuration_says() {
+        let graph = thermostat();
+        assert_eq!(unit_of(&graph, "to_k1"), Some(Unit::Kelvin));
+        assert_eq!(unit_of(&graph, "consensus_temp"), Some(Unit::Kelvin));
+        assert_eq!(unit_of(&graph, "thermostat"), None);
+        assert_eq!(unit_of(&graph, "temp_1"), None);
+        assert_eq!(unit_of(&graph, "nobody"), None);
+        assert_eq!(input_unit(&graph, "thermostat"), Some(Unit::Kelvin));
+        assert!(problems(&graph).is_empty(), "{:?}", problems(&graph));
+    }
+
+    /// A vote is in the unit it states, whatever feeds it: that what feeds
+    /// it agrees is the links' to check.
+    #[test]
+    fn a_vote_is_in_the_unit_it_states() {
         let mut graph = thermostat();
-        with(&mut graph, "to_k3", "function", "to_value");
-        with(&mut graph, "to_k3", "unit", "V");
-        assert_eq!(unit_of(&graph, "consensus_temp"), None);
-        let found = problems(&graph);
+        with(&mut graph, "consensus_temp", "carries", "volt");
+        assert_eq!(unit_of(&graph, "consensus_temp"), Some(Unit::Volt));
+        let found = super::super::link_types::problems(&graph);
         assert!(
             found.iter().any(|(node, why)| node == "consensus_temp"
                 && why.contains("kelvin")
-                && why.contains("volts")
-                && why.contains("to_k3")),
-            "{found:?}"
-        );
-    }
-
-    /// A thermostat reading a sensor's own bytes is refused, told to put a
-    /// conversion between them.
-    #[test]
-    fn a_thermostat_reading_bytes_is_refused() {
-        let mut graph = thermostat();
-        for link in &mut graph.links {
-            if link.from.starts_with("consensus_temp") {
-                link.from = "temp_1".to_string();
-            }
-        }
-        let found = problems(&graph);
-        assert!(
-            found.iter().any(|(node, why)| node == "thermostat"
-                && why.contains("temp_1")
-                && why.contains("not a value")),
+                && why.contains("volt")),
             "{found:?}"
         );
     }

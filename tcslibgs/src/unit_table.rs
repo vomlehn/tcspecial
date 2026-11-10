@@ -43,6 +43,7 @@ impl Unit {
 const TABLE: [Row; 9] = [
     Row {
         unit: Unit::Kelvin,
+        type_name: "kelvin",
         symbol: "K",
         name: "kelvin",
         per_unit: 1e6,
@@ -50,6 +51,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::Volt,
+        type_name: "volt",
         symbol: "V",
         name: "volts",
         per_unit: 1e6,
@@ -57,6 +59,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::Ampere,
+        type_name: "ampere",
         symbol: "A",
         name: "amperes",
         per_unit: 1e6,
@@ -64,6 +67,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::Watt,
+        type_name: "watt",
         symbol: "W",
         name: "watts",
         per_unit: 1e3,
@@ -71,6 +75,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::Metre,
+        type_name: "metre",
         symbol: "m",
         name: "metres",
         per_unit: 1e3,
@@ -78,6 +83,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::MetrePerSecond,
+        type_name: "metre_per_second",
         symbol: "m/s",
         name: "metres a second",
         per_unit: 1e6,
@@ -85,6 +91,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::Newton,
+        type_name: "newton",
         symbol: "N",
         name: "newtons",
         per_unit: 1e3,
@@ -92,6 +99,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::KilogramPerSecond,
+        type_name: "kilogram_per_second",
         symbol: "kg/s",
         name: "kilograms a second",
         per_unit: 1e6,
@@ -99,6 +107,7 @@ const TABLE: [Row; 9] = [
     },
     Row {
         unit: Unit::Ratio,
+        type_name: "ratio",
         symbol: "ratio",
         name: "a ratio",
         per_unit: 1e6,

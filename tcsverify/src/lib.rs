@@ -1383,9 +1383,11 @@ mod tests {
         assert!(report.findings[0].message.contains("nothing converts"));
     }
 
-    /// A simulated payload driving a value is reported at its entry where what
-    /// reaches it is in another unit: guidance answering newtons to an engine
-    /// whose throttle is a ratio.
+    /// A payload driven with a value of another type than it takes is
+    /// reported at the link: guidance answering newtons to an engine whose
+    /// throttle is a ratio. The two ends of the link state their types, so it
+    /// is the configuration that is wrong, and the simulator file is not
+    /// asked.
     #[test]
     fn a_value_driven_in_the_wrong_unit_is_reported() {
         let root =
@@ -1404,18 +1406,22 @@ mod tests {
             .is_empty());
 
         let text = std::fs::read_to_string(&yaml).expect("read");
-        std::fs::write(&yaml, text.replace("unit: \"ratio\"", "unit: \"N\""))
-            .expect("written");
+        std::fs::write(
+            &yaml,
+            text.replace("type-out: \"ratio\"", "type-out: \"newton\""),
+        )
+        .expect("written");
         let report = verify(&yaml, Some(&sim), Limits::EVERYTHING);
         assert_eq!(report.findings.len(), 1, "{:?}", report.said());
         let found = &report.findings[0];
-        let line = 1 + std::fs::read_to_string(&sim)
-            .expect("read")
-            .lines()
-            .position(|l| l.trim() == "- payload: engine")
-            .expect("the engine's entry");
-        assert_eq!((found.file.clone(), found.line), (sim, line));
-        assert!(found.message.contains("newtons"), "{}", found.message);
+        assert_eq!(found.file, yaml);
+        assert!(
+            found.message.contains("newton")
+                && found.message.contains("ratio")
+                && found.message.contains("engine"),
+            "{}",
+            found.message
+        );
     }
 
     /// Two spellings of one configuration: each checked, nothing different.

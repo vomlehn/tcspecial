@@ -20,11 +20,13 @@
 
 use std::fmt;
 
-/// One row of the table: a unit, how a file writes it, what it is called in
+/// One row of the table: a unit, the name of its value type, how a file
+/// writes it, what it is called in
 /// a sentence, how many of its steps are in one of it, and what a step is
 /// called.
 struct Row {
     unit: Unit,
+    type_name: &'static str,
     symbol: &'static str,
     name: &'static str,
     per_unit: f64,
@@ -44,6 +46,28 @@ impl Unit {
             .iter()
             .find(|row| row.unit == self)
             .expect("every unit has a row: see the test")
+    }
+
+    /// Names this unit's value type, as a configuration names a link's
+    /// type: `kelvin`, `volt`, `metre_per_second`.
+    pub fn type_name(self) -> &'static str {
+        self.row().type_name
+    }
+
+    /// Finds the unit whose value type has this name.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The type's name, as a configuration wrote it.
+    ///
+    /// # Returns
+    ///
+    /// The unit, or `None` for a name that is no value type's.
+    pub fn of_type_name(said: &str) -> Option<Unit> {
+        TABLE
+            .iter()
+            .find(|row| row.type_name == said)
+            .map(|row| row.unit)
     }
 
     /// Says how a file writes this unit: `K`, `V`, `m/s`.

@@ -48,6 +48,9 @@ pub mod link;
 /// The ordinary commands' and answers' packing code, which tcs-xtce
 /// generated from `xtce/link.xtce`: used through [`link`].
 mod link_packet;
+/// The type a link between two nodes carries: see "Typed links" in
+/// `docs/design.rst`.
+pub mod link_type;
 pub mod node;
 pub mod parameters;
 /// The ping's and its answer's packing code, which tcs-xtce generated from

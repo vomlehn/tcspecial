@@ -41,11 +41,11 @@ vehicle:
       # The radar's two bytes are centimetres, unsigned, most significant
       # first: up to 655 metres, which is above where the descent starts.
       - compute: altitude
-        format: "u16_be"
         function: "to_value"
         offset: "0"
         scale: "0.01"
-        unit: "m"
+        type-in: "u16"
+        type-out: "metre"
         world-out:
           - gateway.altitude
           - guidance.altitude
@@ -53,11 +53,11 @@ vehicle:
       # The velocimeter's two bytes are centimetres a second, signed: up is
       # more than nought, so a descent is less.
       - compute: descent_rate
-        format: "i16_be"
         function: "to_value"
         offset: "0"
         scale: "0.01"
-        unit: "m/s"
+        type-in: "i16"
+        type-out: "metre_per_second"
         world-out:
           - gateway.descent_rate
         world-in: [doppler]
@@ -70,7 +70,8 @@ vehicle:
         executable: "examples/descent/guidance.py"
         function: "process"
         timeout: "1 s"
-        unit: "ratio"
+        type-in: "metre"
+        type-out: "ratio"
         moc-out:
           - engine.guidance
         world-out:
@@ -86,11 +87,13 @@ payloads:
         address: "127.0.0.1"
         port: "5402"
         protocol: "udp"
+        world-out-type: "i16"
         world-out:
           - descent_rate.doppler
       # The engine's throttle, driven by what guidance answers.
       - payload: engine
         address: "127.0.0.1"
+        moc-in-type: "ratio"
         port: "5404"
         protocol: "udp"
         moc-in: [guidance]
@@ -99,6 +102,7 @@ payloads:
         address: "127.0.0.1"
         port: "5401"
         protocol: "udp"
+        world-out-type: "u16"
         world-out:
           - altitude.radar
       # The switch on a landing leg, whose 1 is the ground's word that the

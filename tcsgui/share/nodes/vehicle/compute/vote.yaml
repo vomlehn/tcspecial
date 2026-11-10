@@ -31,3 +31,8 @@ attributes:
       2 s. One older is left out, and a vote left with fewer than a majority
       of current readings produces nothing and says so on each arrival.
       Unstated is no limit: a reading stands until its input sends another.
+  - name: carries
+    required: true
+    about: >
+      The value type it takes at every input and sends: kelvin, volt, ampere, watt, metre, metre_per_second, newton,
+      kilogram_per_second or ratio.

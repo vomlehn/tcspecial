@@ -32,11 +32,11 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 /// feeds.
 ///
 /// A simulated sensor joined to a terminal of the physics model has to send
-/// bytes the vehicle will read back as what the terminal says, and what
-/// those bytes are is not the sensor's own business: the payload says
-/// `read_size` and nothing else, and the format, the scale and the offset
-/// are on the conversion -- `to_kelvin` or `to_value` -- its readings go to.
-/// So the encoding is taken from there.
+/// bytes the vehicle will read back as what the terminal says. How the part
+/// lays a number out is the sensor's own -- its `format`, or failing that its
+/// `world-out-type`'s own layout -- and the scale and the offset are on the
+/// conversion -- `to_kelvin` or `to_value` -- its readings go to. So the
+/// layout is taken from the one and the arithmetic from the other.
 ///
 /// Taken rather than stated again in the simulator file. The two files are
 /// joined by name and nothing else, and a scale written in both is a scale
@@ -101,7 +101,10 @@ pub fn reading_of(
             unit.name(),
             params.unit.name()
         )),
-        [(_, params)] => Ok(*params),
+        [(_, params)] => Ok(crate::node::vehicle::compute::ToValueParams {
+            format: laid_out(graph, payload).unwrap_or(params.format),
+            ..*params
+        }),
         [] => Err(format!(
             "\"{payload}\" reports {}, and nothing converts its readings: a \
              simulated sensor sends the bytes a to_kelvin or to_value node \
@@ -120,6 +123,36 @@ pub fn reading_of(
                 named.join(", ")
             ))
         }
+    }
+}
+
+/// Says how a sensor lays out its readings, where it says.
+///
+/// # Arguments
+///
+/// * `graph`   - The configuration.
+/// * `payload` - The sensor's name.
+///
+/// # Returns
+///
+/// Its `format`, or its `world-out-type`'s own layout, or `None` where it
+/// states neither, or a type no conversion reads.
+fn laid_out(
+    graph: &Graph,
+    payload: &str,
+) -> Option<crate::node::vehicle::compute::Format> {
+    use crate::graph::link_types::{carries, part_format, Carries};
+    use crate::link_type::LinkType;
+
+    let node = graph.node(payload)?;
+    if let Ok(Some(format)) = part_format(node) {
+        return Some(format);
+    }
+    match carries(node, "world-out") {
+        Ok(Carries::Only(LinkType::Basic(basic))) => {
+            crate::node::vehicle::compute::Format::standard(basic)
+        }
+        _ => None,
     }
 }
 

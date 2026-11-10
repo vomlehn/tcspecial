@@ -32,8 +32,13 @@
         <about>Whether it is started again when it stops: true or false.</about>
     </attributes>
     <attributes>
-        <name>unit</name>
+        <name>type-in</name>
         <required>true</required>
-        <about>What its answers are numbers of: K, V, A, W, m, m/s, N, kg/s, or ratio.</about>
+        <about>The value type it is handed: kelvin, volt, ampere, watt, metre, metre_per_second, newton, kilogram_per_second or ratio.</about>
+    </attributes>
+    <attributes>
+        <name>type-out</name>
+        <required>true</required>
+        <about>The value type its answers are, as type-in lists them.</about>
     </attributes>
 </node>

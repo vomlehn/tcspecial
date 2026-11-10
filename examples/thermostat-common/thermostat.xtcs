@@ -37,6 +37,7 @@
                  stopping the vehicle from deciding anything. -->
             <compute name="consensus_temp">
                 <algorithm>median</algorithm>
+                <carries>kelvin</carries>
                 <function>vote</function>
                 <world-out>gateway.consensus_temp</world-out>
                 <world-out>thermostat.consensus_temp</world-out>
@@ -51,6 +52,8 @@
                 <function>thermostat</function>
                 <half_band>2.0</half_band>
                 <setpoint>293.15</setpoint>
+                <type-in>kelvin</type-in>
+                <type-out>u8</type-out>
                 <!-- asserted below the setpoint, unasserted above it. Two heaters, because
                      one failing must not leave the mass with no way to be warmed: either
                      alone holds the band while the orbit is warm, and both together hold
@@ -65,28 +68,28 @@
                  node: the parts differ in format and scale, so each has a
                  conversion of its own. -->
             <compute name="to_k1">
-                <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <type-in>i16</type-in>
                 <world-out>consensus_temp.in0</world-out>
                 <world-out>gateway.to_k1</world-out>
                 <world-in>temp_1</world-in>
             </compute>
             <compute name="to_k2">
-                <format>i16_be</format>
                 <function>to_kelvin</function>
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
+                <type-in>i16</type-in>
                 <world-out>consensus_temp.in1</world-out>
                 <world-out>gateway.to_k2</world-out>
                 <world-in>temp_2</world-in>
             </compute>
             <compute name="to_k3">
-                <format>u24_be</format>
                 <function>to_kelvin</function>
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
+                <type-in>u32</type-in>
                 <world-out>consensus_temp.in2</world-out>
                 <world-out>gateway.to_k3</world-out>
                 <world-in>temp_3</world-in>
@@ -136,6 +139,7 @@
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
                 <sim_address>127.0.0.1:5201</sim_address>
+                <world-out-type>i16</world-out-type>
                 <world-out>to_k1.temp_1</world-out>
             </payload>
             <!-- The second of the trio; the same part as temp_1, on the same bus. -->
@@ -145,6 +149,7 @@
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
                 <sim_address>127.0.0.1:5202</sim_address>
+                <world-out-type>i16</world-out-type>
                 <world-out>to_k2.temp_2</world-out>
             </payload>
         </type>
@@ -153,12 +158,14 @@
                  unsigned, its own scale and so its own conversion, so that no one
                  bus and no one part number can take the whole trio out. -->
             <payload name="temp_3">
+                <format>u24_be</format>
                 <group>zone_temps</group>
                 <max_speed>1000000</max_speed>
                 <path>/dev/spidev0.0</path>
                 <read_size>3</read_size>
                 <sim_address>127.0.0.1:5203</sim_address>
                 <spi_mode>0</spi_mode>
+                <world-out-type>u32</world-out-type>
                 <world-out>to_k3.temp_3</world-out>
             </payload>
         </type>

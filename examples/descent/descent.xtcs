@@ -51,11 +51,11 @@
                  significant first: up to 655 metres, which is above where
                  the descent starts. -->
             <compute name="altitude">
-                <format>u16_be</format>
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.01</scale>
-                <unit>m</unit>
+                <type-in>u16</type-in>
+                <type-out>metre</type-out>
                 <world-out>gateway.altitude</world-out>
                 <world-out>guidance.altitude</world-out>
                 <world-in>radar</world-in>
@@ -63,11 +63,11 @@
             <!-- The velocimeter's two bytes are centimetres a second,
                  signed: up is more than nought, so a descent is less. -->
             <compute name="descent_rate">
-                <format>i16_be</format>
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.01</scale>
-                <unit>m/s</unit>
+                <type-in>i16</type-in>
+                <type-out>metre_per_second</type-out>
                 <world-out>gateway.descent_rate</world-out>
                 <world-in>doppler</world-in>
             </compute>
@@ -81,7 +81,8 @@
                 <executable>examples/descent/guidance.py</executable>
                 <function>process</function>
                 <timeout>1 s</timeout>
-                <unit>ratio</unit>
+                <type-in>metre</type-in>
+                <type-out>ratio</type-out>
                 <moc-out>engine.guidance</moc-out>
                 <world-out>gateway.guidance</world-out>
                 <world-in>altitude</world-in>
@@ -95,11 +96,13 @@
                 <address>127.0.0.1</address>
                 <port>5402</port>
                 <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
                 <world-out>descent_rate.doppler</world-out>
             </payload>
             <!-- The engine's throttle, driven by what guidance answers. -->
             <payload name="engine">
                 <address>127.0.0.1</address>
+                <moc-in-type>ratio</moc-in-type>
                 <port>5404</port>
                 <protocol>udp</protocol>
                 <moc-in>guidance</moc-in>
@@ -109,6 +112,7 @@
                 <address>127.0.0.1</address>
                 <port>5401</port>
                 <protocol>udp</protocol>
+                <world-out-type>u16</world-out-type>
                 <world-out>altitude.radar</world-out>
             </payload>
             <!-- The switch on a landing leg, whose 1 is the ground's word

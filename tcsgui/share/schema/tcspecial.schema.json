@@ -608,7 +608,70 @@
           ]
         },
         "unit": {
-          "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+          "description": "No longer read: a `to_value` conversion and a `process` computation state their `type-out` instead.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "carries": {
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/design.rst.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "type-in": {
+          "description": "For a conversion, a `thermostat` or a `process`: the type it takes.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "type-out": {
+          "description": "For a `to_value`, a `thermostat` or a `process`: the type it sends.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "world-in-type": {
+          "description": "For an app: the type its world-in takes. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "world-out-type": {
+          "description": "For a device or an app: the type its world-out sends. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "moc-in-type": {
+          "description": "For a device or an app: the type its moc-in takes. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "moc-out-type": {
+          "description": "For an app: the type its moc-out sends. `bytes` where unstated.",
           "type": [
             "string",
             "number",
@@ -1213,7 +1276,70 @@
           ]
         },
         "unit": {
-          "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+          "description": "No longer read: a `to_value` conversion and a `process` computation state their `type-out` instead.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "carries": {
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/design.rst.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "type-in": {
+          "description": "For a conversion, a `thermostat` or a `process`: the type it takes.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "type-out": {
+          "description": "For a `to_value`, a `thermostat` or a `process`: the type it sends.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "world-in-type": {
+          "description": "For an app: the type its world-in takes. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "world-out-type": {
+          "description": "For a device or an app: the type its world-out sends. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "moc-in-type": {
+          "description": "For a device or an app: the type its moc-in takes. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "moc-out-type": {
+          "description": "For an app: the type its moc-out sends. `bytes` where unstated.",
           "type": [
             "string",
             "number",
@@ -1842,7 +1968,70 @@
           ]
         },
         "unit": {
-          "description": "The unit the node's values are in: K, V, A, W, m, m/s, N, kg/s or ratio. Required of a `to_value` conversion and of a `process` computation, whose answers are numbers of it.",
+          "description": "No longer read: a `to_value` conversion and a `process` computation state their `type-out` instead.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "carries": {
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/design.rst.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "type-in": {
+          "description": "For a conversion, a `thermostat` or a `process`: the type it takes.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "type-out": {
+          "description": "For a `to_value`, a `thermostat` or a `process`: the type it sends.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "world-in-type": {
+          "description": "For an app: the type its world-in takes. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "world-out-type": {
+          "description": "For a device or an app: the type its world-out sends. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "moc-in-type": {
+          "description": "For a device or an app: the type its moc-in takes. `bytes` where unstated.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "moc-out-type": {
+          "description": "For an app: the type its moc-out sends. `bytes` where unstated.",
           "type": [
             "string",
             "number",

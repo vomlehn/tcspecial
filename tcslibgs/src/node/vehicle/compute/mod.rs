@@ -25,6 +25,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::link_type::{Basic, LinkType};
 use crate::unit::Unit;
 use crate::Scalar;
 
@@ -410,13 +411,21 @@ pub fn from_text(text: &str, unit: Unit, what: &str) -> Result<f64, String> {
     Ok(number)
 }
 
-/// How a sensor's bytes are laid out.
+/// How a whole number's bytes are laid out.
 ///
 /// What a part puts on a bus is a number in its own units and its own order,
-/// and the datasheet is the only statement of which. Four so far, which are
-/// the four the parts this has met use.
+/// and the datasheet is the only statement of which. A device states it as
+/// its `format` where its bytes are not its type's own layout -- most
+/// significant byte first, as wide as the type -- and the vehicle lays them
+/// out that way as it reads them, so that every node after it sees one
+/// layout for each type: see "Typed links" in `docs/design.rst`. A
+/// conversion reads that layout of its `type-in`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Format {
+    /// One byte, unsigned.
+    U8,
+    /// One byte, signed.
+    I8,
     /// Two bytes, signed, most significant first.
     I16Be,
     /// Two bytes, unsigned, most significant first.
@@ -425,6 +434,10 @@ pub enum Format {
     U24Be,
     /// Two bytes, signed, least significant first.
     I16Le,
+    /// Four bytes, signed, most significant first.
+    I32Be,
+    /// Four bytes, unsigned, most significant first.
+    U32Be,
 }
 
 impl Format {
@@ -443,13 +456,17 @@ impl Format {
     /// A message listing the formats, for a name that is none of them.
     pub fn of(name: &str) -> Result<Format, String> {
         match name {
+            "u8" => Ok(Format::U8),
+            "i8" => Ok(Format::I8),
             "i16_be" => Ok(Format::I16Be),
             "u16_be" => Ok(Format::U16Be),
             "u24_be" => Ok(Format::U24Be),
             "i16_le" => Ok(Format::I16Le),
+            "i32_be" => Ok(Format::I32Be),
+            "u32_be" => Ok(Format::U32Be),
             other => Err(format!(
-                "format: \"{other}\" is not one this knows. There are i16_be, \
-                 u16_be, u24_be and i16_le"
+                "format: \"{other}\" is not one this knows. There are u8, \
+                 i8, i16_be, u16_be, u24_be, i16_le, i32_be and u32_be"
             )),
         }
     }
@@ -461,9 +478,80 @@ impl Format {
     /// The reading's width in bytes.
     pub fn width(self) -> usize {
         match self {
+            Format::U8 | Format::I8 => 1,
             Format::U24Be => 3,
+            Format::I32Be | Format::U32Be => 4,
             _ => 2,
         }
+    }
+
+    /// Says which type a number laid out this way is.
+    ///
+    /// # Returns
+    ///
+    /// The whole number it is: a `u24_be` reading is a `u32`, the narrowest
+    /// type with room for it.
+    pub fn basic(self) -> Basic {
+        match self {
+            Format::U8 => Basic::U8,
+            Format::I8 => Basic::I8,
+            Format::I16Be | Format::I16Le => Basic::I16,
+            Format::U16Be => Basic::U16,
+            Format::U24Be | Format::U32Be => Basic::U32,
+            Format::I32Be => Basic::I32,
+        }
+    }
+
+    /// Finds a type's own layout: most significant byte first, as wide as the
+    /// type.
+    ///
+    /// # Arguments
+    ///
+    /// * `basic` - The type.
+    ///
+    /// # Returns
+    ///
+    /// Its layout, or `None` for a type that is not a whole number of at
+    /// most 32 bits, which no conversion reads.
+    pub fn standard(basic: Basic) -> Option<Format> {
+        match basic {
+            Basic::U8 => Some(Format::U8),
+            Basic::I8 => Some(Format::I8),
+            Basic::I16 => Some(Format::I16Be),
+            Basic::U16 => Some(Format::U16Be),
+            Basic::I32 => Some(Format::I32Be),
+            Basic::U32 => Some(Format::U32Be),
+            _ => None,
+        }
+    }
+
+    /// Lays a reading of this format out as its type's own layout, as the
+    /// vehicle does where it reads a device.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The reading, as the part laid it out.
+    /// * `out`  - Where its type's layout is written: at least four bytes.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes of `out` were written.
+    ///
+    /// # Errors
+    ///
+    /// A message when `data` is not exactly this format's width.
+    pub fn to_standard(
+        self,
+        data: &[u8],
+        out: &mut [u8],
+    ) -> Result<usize, String> {
+        let counts = self.counts(data)? as i64;
+        let width = Format::standard(self.basic())
+            .expect("a format's type has a layout")
+            .width();
+        let bytes = counts.to_be_bytes();
+        out[..width].copy_from_slice(&bytes[8 - width..]);
+        Ok(width)
     }
 
     /// Reads the number of counts these bytes hold.
@@ -500,6 +588,14 @@ impl Format {
         }
 
         Ok(match self {
+            Format::U8 => data[0] as f64,
+            Format::I8 => data[0] as i8 as f64,
+            Format::I32Be => {
+                i32::from_be_bytes([data[0], data[1], data[2], data[3]]) as f64
+            }
+            Format::U32Be => {
+                u32::from_be_bytes([data[0], data[1], data[2], data[3]]) as f64
+            }
             Format::I16Be => i16::from_be_bytes([data[0], data[1]]) as f64,
             Format::U16Be => u16::from_be_bytes([data[0], data[1]]) as f64,
             Format::I16Le => i16::from_le_bytes([data[0], data[1]]) as f64,
@@ -696,13 +792,22 @@ pub fn functions() -> &'static str {
 /// The attributes it takes, or `None` for a name that is not a computation.
 pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
     match function {
-        "to_kelvin" => Some(&["function", "format", "scale", "offset"]),
-        "to_value" => Some(&["function", "format", "scale", "offset", "unit"]),
-        "vote" => Some(&["function", "inputs", "algorithm", "age"]),
-        "thermostat" => Some(&["function", "setpoint", "half_band"]),
-        "process" => {
-            Some(&["function", "executable", "timeout", "restart", "unit"])
+        "to_kelvin" => Some(&["function", "type-in", "scale", "offset"]),
+        "to_value" => {
+            Some(&["function", "type-in", "scale", "offset", "type-out"])
         }
+        "vote" => Some(&["function", "inputs", "algorithm", "age", "carries"]),
+        "thermostat" => {
+            Some(&["function", "setpoint", "half_band", "type-in", "type-out"])
+        }
+        "process" => Some(&[
+            "function",
+            "executable",
+            "timeout",
+            "restart",
+            "type-in",
+            "type-out",
+        ]),
         _ => None,
     }
 }
@@ -791,28 +896,24 @@ pub fn params_of(
             let unit = if function == "to_kelvin" {
                 Unit::Kelvin
             } else {
-                let said = attributes.get("unit").ok_or_else(|| {
-                    named(
-                        "unit is not set: a to_value says what its value is \
-                         a number of -- K, V, A, m -- there being no way to \
-                         tell from a part's counts"
-                            .to_string(),
-                    )
-                })?;
-                Unit::of(said.as_str())
-                    .map_err(|why| named(format!("unit: {why}")))?
+                value_type(attributes, "type-out").map_err(named)?
             };
 
-            let format = attributes
-                .get("format")
+            // What it reads is the whole number its sensor sends, laid out
+            // as that type's own: the sensor's `format` is the sensor's.
+            let format =
+                match stated_type(attributes, "type-in").map_err(named)? {
+                    LinkType::Basic(basic) => Format::standard(basic),
+                    LinkType::Structure(_) => None,
+                }
                 .ok_or_else(|| {
                     named(
-                        "format is not set: a sensor's bytes cannot be read \
-                         without knowing how they are laid out"
-                            .to_string(),
-                    )
-                })
-                .and_then(|f| Format::of(f.as_str()).map_err(named))?;
+                    "type-in: a conversion reads a whole number of at most \
+                     32 bits -- u8, i8, u16, i16, u32 or i32 -- the type its \
+                     sensor sends"
+                        .to_string(),
+                )
+                })?;
 
             let scale = number(attributes, "scale").map_err(named)?;
             if scale == 0.0 {
@@ -899,6 +1000,8 @@ pub fn params_of(
                 })
                 .transpose()?;
 
+            value_type(attributes, "carries").map_err(named)?;
+
             Ok(Computation::Vote(VoteParams {
                 inputs,
                 algorithm,
@@ -919,6 +1022,18 @@ pub fn params_of(
                      is a bare comparison, which cycles a relay on a wobble"
                         .to_string(),
                 ));
+            }
+
+            value_type(attributes, "type-in").map_err(named)?;
+            match stated_type(attributes, "type-out").map_err(named)? {
+                LinkType::Basic(basic)
+                    if basic == Basic::Boolean || basic.is_whole() => {}
+                other => {
+                    return Err(named(format!(
+                        "type-out is {other}, and a thermostat sends its \
+                         decision as a boolean or as a whole number, 1 or 0"
+                    )))
+                }
             }
 
             Ok(Computation::Thermostat(ThermostatParams {
@@ -963,16 +1078,8 @@ pub fn params_of(
                 Restart::of(attributes.get("restart").map(Scalar::as_str))
                     .map_err(named)?;
 
-            let unit = attributes.get("unit").ok_or_else(|| {
-                named(
-                    "unit is not set: a process says what its program's \
-                     answers are numbers of -- K, V, A, m -- which nothing \
-                     but the program knows"
-                        .to_string(),
-                )
-            })?;
-            let unit = Unit::of(unit.as_str())
-                .map_err(|why| named(format!("unit: {why}")))?;
+            value_type(attributes, "type-in").map_err(named)?;
+            let unit = value_type(attributes, "type-out").map_err(named)?;
 
             Ok(Computation::Process(ProcessParams {
                 executable,
@@ -987,6 +1094,73 @@ pub fn params_of(
             "\"{what}\": there is no computation called \"{other}\""
         )),
     }
+}
+
+/// Reads a type an attribute states: see [`crate::link_type`].
+///
+/// Required, because a type is what the link to or from the node is checked
+/// against, and nothing is inferred.
+///
+/// # Arguments
+///
+/// * `attributes` - The node's attributes.
+/// * `name`       - The attribute's name: `carries`, `type-in` or
+///                  `type-out`.
+///
+/// # Returns
+///
+/// The type.
+///
+/// # Errors
+///
+/// A message when the attribute is not set or names no type.
+pub fn stated_type(
+    attributes: &BTreeMap<String, Scalar>,
+    name: &str,
+) -> Result<LinkType, String> {
+    let said = attributes.get(name).ok_or_else(|| {
+        format!(
+            "{name} is not set: each end of a link states the type it \
+             carries, and this one names the type it {}",
+            match name {
+                "type-out" => "sends",
+                "carries" => "takes and sends",
+                _ => "takes",
+            }
+        )
+    })?;
+    LinkType::of(said.as_str()).map_err(|why| format!("{name}: {why}"))
+}
+
+/// Reads a value type an attribute states: one of the units' types.
+///
+/// # Arguments
+///
+/// * `attributes` - The node's attributes.
+/// * `name`       - The attribute's name.
+///
+/// # Returns
+///
+/// The value type's unit.
+///
+/// # Errors
+///
+/// A message when the attribute is not set, names no type, or names one
+/// that is not a value in a unit.
+pub fn value_type(
+    attributes: &BTreeMap<String, Scalar>,
+    name: &str,
+) -> Result<Unit, String> {
+    let stated = stated_type(attributes, name)?;
+    stated.unit().ok_or_else(|| {
+        let units: Vec<&str> =
+            Unit::ALL.iter().map(|unit| unit.type_name()).collect();
+        format!(
+            "{name} is {stated}, and this computation works on values in a \
+             unit: one of {}",
+            units.join(", ")
+        )
+    })
 }
 
 /// Reads a number an attribute says.
@@ -1309,7 +1483,46 @@ mod tests {
     /// # Returns
     ///
     /// The attributes, by name.
+    /// Makes a node's attributes, with the types a vote, a thermostat or a
+    /// program states where the test does not state them: what each is
+    /// told besides is what these tests are about.
+    ///
+    /// # Arguments
+    ///
+    /// * `pairs` - Each attribute and its value.
+    ///
+    /// # Returns
+    ///
+    /// The attributes.
     fn attributes(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
+        let mut said = bare(pairs);
+        let function = said
+            .get("function")
+            .map(|f| f.as_str().to_string())
+            .unwrap_or_default();
+        let types: &[(&str, &str)] = match function.as_str() {
+            "vote" => &[("carries", "kelvin")],
+            "thermostat" => &[("type-in", "kelvin"), ("type-out", "u8")],
+            "process" => &[("type-in", "kelvin"), ("type-out", "kelvin")],
+            _ => &[],
+        };
+        for (name, value) in types {
+            said.entry(name.to_string())
+                .or_insert_with(|| Scalar::of(*value));
+        }
+        said
+    }
+
+    /// Makes a node's attributes as the pairs say and no others.
+    ///
+    /// # Arguments
+    ///
+    /// * `pairs` - Each attribute and its value.
+    ///
+    /// # Returns
+    ///
+    /// The attributes.
+    fn bare(pairs: &[(&str, &str)]) -> BTreeMap<String, Scalar> {
         pairs
             .iter()
             .map(|(k, v)| (k.to_string(), Scalar::of(*v)))
@@ -1343,7 +1556,7 @@ mod tests {
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "0.0625"),
                     ("offset", "-2500"),
                 ],
@@ -1352,10 +1565,10 @@ mod tests {
             (
                 vec![
                     ("function", "to_value"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "0.0625"),
                     ("offset", "-2500"),
-                    ("unit", "K"),
+                    ("type-out", "kelvin"),
                 ],
                 "offset",
             ),
@@ -1381,47 +1594,56 @@ mod tests {
         // it may be depends on counts no file states.
         params(&[
             ("function", "to_kelvin"),
-            ("format", "i16_be"),
+            ("type-in", "i16"),
             ("scale", "100000"),
             ("offset", "0"),
         ]);
     }
 
-    /// A to_value states its unit and makes values in it; one that states
-    /// none, or one that is not a unit, is refused, saying what to write.
-    /// A to_kelvin is one in kelvin, and a process states its unit too.
+    /// A to_value states the value type it sends and makes values in its
+    /// unit; one that states none, or one that is not a value type, is
+    /// refused, saying what to write. A to_kelvin is one in kelvin, and a
+    /// process states its type-out too.
     #[test]
     fn a_conversion_states_its_unit() {
-        let conversion = |unit: Option<&str>| {
+        let conversion = |kind: Option<&str>| {
             let mut pairs = vec![
                 ("function", "to_value"),
-                ("format", "u16_be"),
+                ("type-in", "u16"),
                 ("scale", "0.001"),
                 ("offset", "0"),
             ];
-            if let Some(unit) = unit {
-                pairs.push(("unit", unit));
+            if let Some(kind) = kind {
+                pairs.push(("type-out", kind));
             }
             params_of("bus", &attributes(&pairs))
         };
-        match conversion(Some("V")) {
+        match conversion(Some("volt")) {
             Ok(Computation::ToValue(params)) => {
-                assert_eq!(params.unit, Unit::Volt)
+                assert_eq!(params.unit, Unit::Volt);
+                assert_eq!(params.format, Format::U16Be);
             }
             other => panic!("{other:?}"),
         }
-        let why = conversion(None).expect_err("no unit");
-        assert!(why.contains("unit is not set"), "{why}");
-        let why = conversion(Some("furlong")).expect_err("not a unit");
-        assert!(why.contains("furlong") && why.contains("m/s"), "{why}");
+        let why = conversion(None).expect_err("no type-out");
+        assert!(why.contains("type-out is not set"), "{why}");
+        let why = conversion(Some("furlong")).expect_err("not a type");
+        assert!(why.contains("furlong") && why.contains("kelvin"), "{why}");
+        let why = conversion(Some("u8")).expect_err("not a value");
+        assert!(why.contains("u8") && why.contains("unit"), "{why}");
         assert_eq!(produces("to_value"), Some(Produces::Value));
 
-        let why = refused(&[
-            ("function", "process"),
-            ("executable", "/bin/cat"),
-            ("timeout", "1 s"),
-        ]);
-        assert!(why.contains("unit is not set"), "{why}");
+        let why = params_of(
+            "node",
+            &bare(&[
+                ("function", "process"),
+                ("executable", "/bin/cat"),
+                ("timeout", "1 s"),
+                ("type-in", "kelvin"),
+            ]),
+        )
+        .expect_err("no type-out");
+        assert!(why.contains("type-out is not set"), "{why}");
     }
 
     /// A value is counted in its unit's steps, so the same four bytes are a
@@ -1443,7 +1665,7 @@ mod tests {
         assert_eq!(
             params(&[
                 ("function", "to_kelvin"),
-                ("format", "i16_be"),
+                ("type-in", "i16"),
                 ("scale", "0.0625"),
                 ("offset", "273.15"),
             ]),
@@ -1489,7 +1711,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/opt/flight/attitude"),
                 ("timeout", "500 ms"),
-                ("unit", "ratio"),
+                ("type-out", "ratio"),
             ]),
             Computation::Process(ProcessParams {
                 executable: "/opt/flight/attitude".to_string(),
@@ -1534,12 +1756,12 @@ mod tests {
                     ("scale", "1"),
                     ("offset", "0"),
                 ],
-                "format",
+                "type-in",
             ),
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("offset", "0"),
                 ],
                 "scale",
@@ -1547,7 +1769,7 @@ mod tests {
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "1"),
                 ],
                 "offset",
@@ -1583,16 +1805,16 @@ mod tests {
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "f32_be"),
+                    ("type-in", "f32"),
                     ("scale", "1"),
                     ("offset", "0"),
                 ],
-                "u24_be",
+                "is not a type",
             ),
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "0"),
                     ("offset", "0"),
                 ],
@@ -1601,7 +1823,7 @@ mod tests {
             (
                 vec![
                     ("function", "to_kelvin"),
-                    ("format", "i16_be"),
+                    ("type-in", "i16"),
                     ("scale", "fast"),
                     ("offset", "0"),
                 ],
@@ -1735,7 +1957,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/bin/cat"),
                 ("timeout", "1 s"),
-                ("unit", "K"),
+                ("type-out", "kelvin"),
             ])
             .restart,
             Restart::Never
@@ -1745,7 +1967,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/bin/cat"),
                 ("timeout", "1 s"),
-                ("unit", "K"),
+                ("type-out", "kelvin"),
                 ("restart", "false"),
             ])
             .restart,
@@ -1756,7 +1978,7 @@ mod tests {
                 ("function", "process"),
                 ("executable", "/bin/cat"),
                 ("timeout", "1 s"),
-                ("unit", "K"),
+                ("type-out", "kelvin"),
                 ("restart", "true"),
             ])
             .restart,

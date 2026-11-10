@@ -49,9 +49,11 @@ use nix::poll::{poll, PollFd, PollFlags};
 
 use tcsapp::parent::ReadInto;
 use tcslibgs::graph::interface::speaks_first;
+use tcslibgs::graph::link_types;
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::terminals::Stream;
 use tcslibgs::graph::Node;
+use tcslibgs::link_type::LinkType;
 use tcslibgs::node::app;
 use tcslibgs::node::vehicle::compute::Format;
 use tcslibgs::unit::Unit;
@@ -1479,6 +1481,10 @@ pub struct AppPort {
     /// `node::vehicle::compute::process` keeps for a program that has
     /// stopped.
     ended: Option<String>,
+    /// The type of what it writes groundward, by its `world-out`, and
+    /// vehicleward, by its `moc-out`: each packet is held to it as it is
+    /// read. See "Typed links" in the design.
+    sends: [LinkType; 2],
 }
 
 /// The program, as whichever kind of app node it is.
@@ -1527,11 +1533,19 @@ impl AppPort {
             app::Kind::Pl => Program::Pl(AppPl::of(&params)?),
             app::Kind::AllPl => Program::AllPl(AppAllPl::of(&params)?),
         };
+        let sends = |terminal: &str| match link_types::carries(node, terminal) {
+            Ok(link_types::Carries::Only(kind)) => Ok(kind),
+            Ok(link_types::Carries::Any) => {
+                Ok(LinkType::Basic(tcslibgs::link_type::Basic::Bytes))
+            }
+            Err(why) => Err(why),
+        };
         Ok(AppPort {
             what: node.name.clone(),
             program,
             last: None,
             ended: None,
+            sends: [sends("world-out")?, sends("moc-out")?],
         })
     }
 
@@ -1637,6 +1651,16 @@ impl Port for AppPort {
                 Ok(ReadInto::Nothing) => {}
                 Ok(ReadInto::Packet(len)) => {
                     self.last = Some(*stream);
+                    // Its terminal's type, encoded as the type's own, or
+                    // refused: a program that wrote something else is not
+                    // read as though it had not. Allocates nothing for a
+                    // packet that is its type.
+                    let kind = match stream {
+                        Stream::Groundward => &self.sends[0],
+                        Stream::Vehicleward => &self.sends[1],
+                    };
+                    kind.accepts(&buffer[..len])
+                        .map_err(|why| format!("{}: {why}", self.what))?;
                     return Ok(Taken::on(len, *stream));
                 }
                 // A datum that will not fit is reported and not cut down:
@@ -3471,6 +3495,55 @@ mod tests {
                 "a payload's reading travels groundward"
             );
             assert_eq!(&buffer[..taken.bytes], b"READ");
+        }
+
+        /// What an app writes is held to its terminal's type: a packet that
+        /// is not one is refused, naming the node and the type, and one that
+        /// is goes on.
+        #[test]
+        fn an_apps_packet_is_its_terminals_type() {
+            let where_ = tempfile::tempdir().expect("a directory");
+            // Two packets of payload data: two bytes, then one.
+            let path = where_.path().join("reports");
+            let mut file = std::fs::File::create(&path).expect("a program");
+            write!(
+                file,
+                "#!/bin/sh\nprintf '\\002\\000\\000\\000\\001\\002' >&1\n\
+                 printf '\\001\\000\\000\\000\\007' >&1\n"
+            )
+            .expect("a program");
+            drop(file);
+            std::fs::set_permissions(
+                &path,
+                std::fs::Permissions::from_mode(0o755),
+            )
+            .expect("a program that can be run");
+
+            let mut bay = node("bay", "app_pl", &path);
+            bay.attributes.insert(
+                "world-out-type".to_string(),
+                tcslibgs::Scalar::of("u8"),
+            );
+            let mut port = crate::when_not_busy(|| AppPort::open(&bay))
+                .expect("it starts");
+
+            let mut buffer = [0u8; 64];
+            let until =
+                std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let refused = loop {
+                match port.take(&mut buffer) {
+                    Err(why) => break why,
+                    Ok(taken) => assert_eq!(taken.bytes, 0, "not a u8"),
+                }
+                assert!(std::time::Instant::now() < until, "nothing came");
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            };
+            assert!(
+                refused.contains("bay") && refused.contains("u8"),
+                "{refused}"
+            );
+            let taken = taken_soon(&mut port, &mut buffer);
+            assert_eq!(&buffer[..taken.bytes], &[7]);
         }
 
         /// And a payload nothing asks is read and never written to.

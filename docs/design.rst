@@ -618,9 +618,10 @@ Typed links
    a thermal mass's heater on where what it is driven with is not nought.
    A ``gpio_in`` reports its lines' levels as that number every
    ``state_interval``, and has no edges. A ``process`` exchanges any type
-   with a text form. Still to come: apps' packets, the F´ and cFS bridges'
-   channels of each type -- a whole number is still a ``Datum`` channel
-   there -- and each configuration's own XTCE. Where
+   with a text form, and each packet an app writes is held to its
+   terminal's type. Still to come: the F´ and cFS bridges' channels of each
+   type -- a whole number is still a ``Datum`` channel there -- and each
+   configuration's own XTCE. Where
    the rest of this section and the rest of this document disagree, the
    rest says what runs today, and `What typed links replace`_ lists the
    passages it will change.
@@ -939,8 +940,6 @@ What typed links replace
 These passages describe the untyped links and change as typed links are
 built:
 
-* `App nodes`_: a packet's bytes are the program's business; they become
-  its terminal's type, encoded.
 * `Gateways: what the vehicle answers to`_, F´: a source's channel is chosen
   by the kind of node it is.
 * The Yamcs mission database, written for the Yamcs gateway node, which the

@@ -1148,9 +1148,11 @@ are being moved to, agreed before any of it was written. Built so far:
 from it, and its place in the interface digest; and every terminal's
 type, stated as <a class="reference internal" href="#every-terminal-carries-one-type">Every terminal carries one type</a> says, with each link
 checked at both ends -- <tt class="docutils literal"><span class="pre">tcslibgs::graph::link_types</span></tt> -- and a
-device's reading laid out as its type's own as it is read. What travels
-between nodes is still bytes: the type's own layout of each datum, a
-decision still the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> whatever its <tt class="docutils literal"><span class="pre">type-out</span></tt>. Where
+device's reading laid out as its type's own as it is read; and every
+datum checked, as it is delivered, against the type the node it reaches
+takes (<a class="reference internal" href="#type-and-encoding">Type and encoding</a>). A decision is still the text <tt class="docutils literal">1</tt> or
+<tt class="docutils literal">0</tt> whatever its <tt class="docutils literal"><span class="pre">type-out</span></tt>, and GPIO lines are still driven and
+reported in that text. Where
 the rest of this section and the rest of this document disagree, the
 rest says what runs today, and <a class="reference internal" href="#what-typed-links-replace">What typed links replace</a> lists the
 passages it will change.</p>
@@ -1195,17 +1197,20 @@ either is a buffer of known size and holding one allocates nothing.</dd>
 is generated from it rather than written beside it. Adding a unit is
 adding a type to <tt class="docutils literal">types.xtce</tt>.</dd>
 <dt>Requirement</dt>
-<dd><p class="first">A <em>structure</em> is a list of named fields, each of one of the types above,
-written in the configuration of a node whose data are several things at
-once -- an inertial unit's three axes, a power monitor's volts and amps:</p>
+<dd><p class="first">A <em>structure</em> is a list of named fields, each of one of the types above
+but a string or bytes, written in the configuration of a node whose data
+are several things at once -- an inertial unit's three axes, a power
+monitor's volts and amps -- as its fields, <tt class="docutils literal">name: type</tt>, separated by
+commas:</p>
 <pre class="code yaml literal-block">
 <span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">imu</span><span class="whitespace">
-  </span><span class="name tag">format</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">x</span><span class="punctuation indicator">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">y</span><span class="punctuation indicator">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">z</span><span class="punctuation indicator">:</span><span class="whitespace"> </span><span class="name variable">i16_be</span><span class="punctuation indicator">]</span>
+  </span><span class="name tag">world-out-type</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;x:</span><span class="name variable"> </span><span class="literal string">i16,</span><span class="name variable"> </span><span class="literal string">y:</span><span class="name variable"> </span><span class="literal string">i16,</span><span class="name variable"> </span><span class="literal string">z:</span><span class="name variable"> </span><span class="literal string">i16&quot;</span>
 </pre>
 <p class="last">It is a structure because the node says so and not because a type in
 <tt class="docutils literal">types.xtce</tt> does, so a new part's layout needs no new build. A
-structure holds at most sixteen fields, so that a datum of one is of a
-size known before anything runs.</p>
+structure holds at most sixteen fields, each of a fixed width, so that a
+datum of one is of a size known before anything runs and where each field
+ends is known.</p>
 </dd>
 </dl>
 </div>
@@ -1233,19 +1238,22 @@ node type's to say, either outright or by an attribute of the node:</p>
 </tr>
 </thead>
 <tbody valign="top">
-<tr><td>a sensor (<tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, their <tt class="docutils literal">_tmass</tt> kinds, <tt class="docutils literal">serial</tt>,
-<tt class="docutils literal">network</tt>, <tt class="docutils literal">can</tt>)</td>
-<td>what the <tt class="docutils literal"><span class="pre">moc-in</span></tt> side asks it with, where it is asked</td>
-<td>the integer or structure its <tt class="docutils literal">format</tt> states</td>
+<tr><td>a device (<tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, their <tt class="docutils literal">_tmass</tt> kinds, <tt class="docutils literal">serial</tt>,
+<tt class="docutils literal">network</tt>, <tt class="docutils literal">can</tt> and the rest)</td>
+<td>its <tt class="docutils literal"><span class="pre">moc-in-type</span></tt>: what it is driven or asked with, <tt class="docutils literal">bytes</tt>
+where it states none</td>
+<td>its <tt class="docutils literal"><span class="pre">world-out-type</span></tt>: the whole number or structure it reads,
+<tt class="docutils literal">bytes</tt> where it states none, its <tt class="docutils literal">format</tt> saying how the
+part lays the number out where that is not the type's own way</td>
 </tr>
 <tr><td><tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt></td>
-<td>the integer its <tt class="docutils literal">format</tt> states</td>
+<td>the whole number its <tt class="docutils literal"><span class="pre">type-in</span></tt> names</td>
 <td>the value type its <tt class="docutils literal"><span class="pre">type-out</span></tt> names; <tt class="docutils literal">to_kelvin</tt>'s is
 <tt class="docutils literal">kelvin</tt></td>
 </tr>
 <tr><td><tt class="docutils literal">vote</tt></td>
-<td>its <tt class="docutils literal">type</tt>, at every input</td>
-<td>its <tt class="docutils literal">type</tt></td>
+<td>what it <tt class="docutils literal">carries</tt>, at every input</td>
+<td>what it <tt class="docutils literal">carries</tt></td>
 </tr>
 <tr><td><tt class="docutils literal">thermostat</tt></td>
 <td>its <tt class="docutils literal"><span class="pre">type-in</span></tt>, which its <tt class="docutils literal">setpoint</tt> and <tt class="docutils literal">half_band</tt> are in</td>
@@ -1264,14 +1272,14 @@ node type's to say, either outright or by an attribute of the node:</p>
 <td>the integer its lines need</td>
 </tr>
 <tr><td><tt class="docutils literal"><span class="pre">tee-payload</span></tt>, <tt class="docutils literal"><span class="pre">tee-gateway</span></tt></td>
-<td>its <tt class="docutils literal">type</tt></td>
-<td>its <tt class="docutils literal">type</tt>, at both sources</td>
+<td>what it <tt class="docutils literal">carries</tt>, <tt class="docutils literal">bytes</tt> where it states none</td>
+<td>the same, at both sources</td>
 </tr>
 <tr><td>app nodes</td>
 <td><tt class="docutils literal"><span class="pre">world-in-type</span></tt>, <tt class="docutils literal"><span class="pre">moc-in-type</span></tt>, as it has those terminals</td>
 <td><tt class="docutils literal"><span class="pre">world-out-type</span></tt>, <tt class="docutils literal"><span class="pre">moc-out-type</span></tt>, likewise</td>
 </tr>
-<tr><td><tt class="docutils literal"><span class="pre">null-payload</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt></td>
+<tr><td><tt class="docutils literal"><span class="pre">null-payload</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt>, <tt class="docutils literal">log</tt></td>
 <td>any type</td>
 <td>nothing</td>
 </tr>
@@ -1325,21 +1333,32 @@ changing what the vote is.</p>
 </div>
 <div class="section" id="type-and-encoding">
 <h3><a class="toc-backref" href="#toc-entry-13">Type and encoding</a></h3>
-<p>Between two nodes a datum is held, not encoded: the vehicle hands a vote a
-value in kelvin, and how many bytes in what order is no question until the
-datum leaves tcspecial.</p>
+<p>Between two nodes a datum is encoded one way for each type, and that way
+is the type's own: a whole number as wide as its type, most significant
+byte first; a boolean as one byte, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>; a value as its four
+bytes; a structure as its fields one after another; and a string or bytes
+as their contents alone, the datum's length being theirs. So the vehicle
+hands a vote four bytes that are a value in kelvin and nothing else, and
+checks they are before it does.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A link compares types as values -- a whole number of so many bits, true
-or false, a value in a unit, a structure of named fields -- and not as
-bytes. How a datum is written where it leaves tcspecial or arrives at it
+<dd>Every datum delivered to a node is checked against the type the node
+takes there before the node is given it -- its width, a boolean's being
+1 or 0, a string's being UTF-8 -- and one that is not that type is
+refused, counted and said, the node never seeing it. The check
+allocates nothing for a datum that passes it.</dd>
+<dt>Requirement</dt>
+<dd>A link compares types -- a whole number of so many bits, true or false,
+a value in a unit, a structure of named fields -- and not encodings. How a datum is written where it leaves tcspecial or arrives at it
 is the business of the node at that edge, and of nothing else.</dd>
 <dt>Requirement</dt>
 <dd><p class="first">The node at each edge chooses its encoding, from those its type knows,
-by an attribute as <tt class="docutils literal">format</tt> does now:</p>
+by an attribute as <tt class="docutils literal">format</tt> does:</p>
 <ul class="last simple">
 <li>a device: the bytes its part sends or wants, which its <tt class="docutils literal">format</tt>
-says, <tt class="docutils literal">i16_be</tt> and the rest (see <a class="reference internal" href="#compute-elements">Compute elements</a>);</li>
+says where they are not the type's own -- <tt class="docutils literal">i16_le</tt>, or <tt class="docutils literal">u24_be</tt>
+for a <tt class="docutils literal">u32</tt> -- and which the vehicle lays out as the type's own as
+it reads them;</li>
 <li>the gateway node: what the ground receives, as each source's
 parameter in the configuration's own XTCE says (see <a class="reference internal" href="#the-configuration-s-own-xtce">The
 configuration's own XTCE</a>);</li>

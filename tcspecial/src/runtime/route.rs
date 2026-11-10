@@ -27,10 +27,12 @@
 
 use std::collections::BTreeMap;
 
+use tcslibgs::graph::link_types::{self, Carries};
 use tcslibgs::graph::telemetry::{self, Telemetered, Via};
 use tcslibgs::graph::terminals::{self, Stream};
 use tcslibgs::graph::units;
 use tcslibgs::graph::{Destination, Graph, Link};
+use tcslibgs::link_type::LinkType;
 use tcslibgs::unit::Unit;
 
 /// What a command from the ground sets.
@@ -72,6 +74,40 @@ pub struct Delivery {
     /// `None` for a delivery that is not a line anyone drew -- a payload
     /// nothing touches, to its link over `payload_telemetry`.
     pub line: Option<usize>,
+    /// The type the node it goes to takes there, which every datum
+    /// delivered is checked against: see "Typed links" in the design.
+    ///
+    /// `None` where it takes any type -- a null node, a log, a link to the
+    /// ground -- and for a delivery no line was drawn for.
+    pub takes: Option<LinkType>,
+}
+
+/// Says what type a node takes at the end of a link that carries a stream.
+///
+/// # Arguments
+///
+/// * `graph`  - The configuration.
+/// * `node`   - The node the link reaches.
+/// * `stream` - The stream the link carries, which says the terminal it
+///              arrives at: `world-in` for the groundward one, `moc-in` for
+///              the other, and `world-in` where nothing settles it.
+///
+/// # Returns
+///
+/// The type, or `None` where the node takes any, or is not there.
+fn takes_at(
+    graph: &Graph,
+    node: &str,
+    stream: Option<Stream>,
+) -> Option<LinkType> {
+    let terminal = match stream {
+        Some(Stream::Vehicleward) => "moc-in",
+        _ => "world-in",
+    };
+    match link_types::carries(graph.node(node)?, terminal) {
+        Ok(Carries::Only(kind)) => Some(kind),
+        _ => None,
+    }
 }
 
 /// Says which stream a link carries, where the configuration settles it.
@@ -248,12 +284,14 @@ impl Routes {
                     .cloned()
                     .unwrap_or_else(|| node.clone());
 
+                let takes = takes_at(graph, &node, stream);
                 routes.deliveries.entry(from.clone()).or_default().push(
                     Delivery {
                         to,
                         input: input.clone(),
                         stream,
                         line: Some(line),
+                        takes,
                     },
                 );
                 line += 1;
@@ -281,6 +319,7 @@ impl Routes {
                     // other stream is what the ground sent it.
                     stream: Some(Stream::Groundward),
                     line: None,
+                    takes: None,
                 });
         }
 

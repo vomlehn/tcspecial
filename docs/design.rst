@@ -610,9 +610,11 @@ Typed links
    from it, and its place in the interface digest; and every terminal's
    type, stated as `Every terminal carries one type`_ says, with each link
    checked at both ends -- ``tcslibgs::graph::link_types`` -- and a
-   device's reading laid out as its type's own as it is read. What travels
-   between nodes is still bytes: the type's own layout of each datum, a
-   decision still the text ``1`` or ``0`` whatever its ``type-out``. Where
+   device's reading laid out as its type's own as it is read; and every
+   datum checked, as it is delivered, against the type the node it reaches
+   takes (`Type and encoding`_). A decision is still the text ``1`` or
+   ``0`` whatever its ``type-out``, and GPIO lines are still driven and
+   reported in that text. Where
    the rest of this section and the rest of this document disagree, the
    rest says what runs today, and `What typed links replace`_ lists the
    passages it will change.
@@ -663,19 +665,22 @@ Requirement
     adding a type to ``types.xtce``.
 
 Requirement
-    A *structure* is a list of named fields, each of one of the types above,
-    written in the configuration of a node whose data are several things at
-    once -- an inertial unit's three axes, a power monitor's volts and amps:
+    A *structure* is a list of named fields, each of one of the types above
+    but a string or bytes, written in the configuration of a node whose data
+    are several things at once -- an inertial unit's three axes, a power
+    monitor's volts and amps -- as its fields, ``name: type``, separated by
+    commas:
 
     .. code-block:: yaml
 
        - payload: imu
-         format: [x: i16_be, y: i16_be, z: i16_be]
+         world-out-type: "x: i16, y: i16, z: i16"
 
     It is a structure because the node says so and not because a type in
     ``types.xtce`` does, so a new part's layout needs no new build. A
-    structure holds at most sixteen fields, so that a datum of one is of a
-    size known before anything runs.
+    structure holds at most sixteen fields, each of a fixed width, so that a
+    datum of one is of a size known before anything runs and where each field
+    ends is known.
 
 Every terminal carries one type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -697,17 +702,20 @@ Requirement
        * - node type
          - takes
          - sends
-       * - a sensor (``i2c``, ``spi``, their ``_tmass`` kinds, ``serial``,
-           ``network``, ``can``)
-         - what the ``moc-in`` side asks it with, where it is asked
-         - the integer or structure its ``format`` states
+       * - a device (``i2c``, ``spi``, their ``_tmass`` kinds, ``serial``,
+           ``network``, ``can`` and the rest)
+         - its ``moc-in-type``: what it is driven or asked with, ``bytes``
+           where it states none
+         - its ``world-out-type``: the whole number or structure it reads,
+           ``bytes`` where it states none, its ``format`` saying how the
+           part lays the number out where that is not the type's own way
        * - ``to_kelvin``, ``to_value``
-         - the integer its ``format`` states
+         - the whole number its ``type-in`` names
          - the value type its ``type-out`` names; ``to_kelvin``'s is
            ``kelvin``
        * - ``vote``
-         - its ``type``, at every input
-         - its ``type``
+         - what it ``carries``, at every input
+         - what it ``carries``
        * - ``thermostat``
          - its ``type-in``, which its ``setpoint`` and ``half_band`` are in
          - its ``type-out``
@@ -721,12 +729,12 @@ Requirement
          - anything, as a request for a report
          - the integer its lines need
        * - ``tee-payload``, ``tee-gateway``
-         - its ``type``
-         - its ``type``, at both sources
+         - what it ``carries``, ``bytes`` where it states none
+         - the same, at both sources
        * - app nodes
          - ``world-in-type``, ``moc-in-type``, as it has those terminals
          - ``world-out-type``, ``moc-out-type``, likewise
-       * - ``null-payload``, ``null-gateway``
+       * - ``null-payload``, ``null-gateway``, ``log``
          - any type
          - nothing
        * - a gateway node
@@ -779,22 +787,34 @@ changing what the vote is.
 Type and encoding
 ~~~~~~~~~~~~~~~~~
 
-Between two nodes a datum is held, not encoded: the vehicle hands a vote a
-value in kelvin, and how many bytes in what order is no question until the
-datum leaves tcspecial.
+Between two nodes a datum is encoded one way for each type, and that way
+is the type's own: a whole number as wide as its type, most significant
+byte first; a boolean as one byte, ``1`` or ``0``; a value as its four
+bytes; a structure as its fields one after another; and a string or bytes
+as their contents alone, the datum's length being theirs. So the vehicle
+hands a vote four bytes that are a value in kelvin and nothing else, and
+checks they are before it does.
 
 Requirement
-    A link compares types as values -- a whole number of so many bits, true
-    or false, a value in a unit, a structure of named fields -- and not as
-    bytes. How a datum is written where it leaves tcspecial or arrives at it
+    Every datum delivered to a node is checked against the type the node
+    takes there before the node is given it -- its width, a boolean's being
+    1 or 0, a string's being UTF-8 -- and one that is not that type is
+    refused, counted and said, the node never seeing it. The check
+    allocates nothing for a datum that passes it.
+
+Requirement
+    A link compares types -- a whole number of so many bits, true or false,
+    a value in a unit, a structure of named fields -- and not encodings. How a datum is written where it leaves tcspecial or arrives at it
     is the business of the node at that edge, and of nothing else.
 
 Requirement
     The node at each edge chooses its encoding, from those its type knows,
-    by an attribute as ``format`` does now:
+    by an attribute as ``format`` does:
 
     * a device: the bytes its part sends or wants, which its ``format``
-      says, ``i16_be`` and the rest (see `Compute elements`_);
+      says where they are not the type's own -- ``i16_le``, or ``u24_be``
+      for a ``u32`` -- and which the vehicle lays out as the type's own as
+      it reads them;
     * the gateway node: what the ground receives, as each source's
       parameter in the configuration's own XTCE says (see `The
       configuration's own XTCE`_);

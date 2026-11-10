@@ -72,6 +72,10 @@ impl Basic {
     }
 
     /// Names this type as a configuration writes it.
+    ///
+    /// # Returns
+    ///
+    /// The name: `u8`, `boolean`, `kelvin`.
     pub fn name(self) -> &'static str {
         match self {
             Basic::Boolean => "boolean",
@@ -127,7 +131,27 @@ impl Basic {
         }
     }
 
+    /// Says how many bytes a datum of this type is, where every datum of it
+    /// is as long as every other.
+    ///
+    /// # Returns
+    ///
+    /// The width, or `None` for a string or bytes, whose length is the
+    /// datum's own.
+    pub fn width(self) -> Option<usize> {
+        match self {
+            Basic::Boolean => Some(1),
+            Basic::Value(_) => Some(4),
+            Basic::String | Basic::Bytes => None,
+            whole => whole.bits().map(|bits| bits as usize / 8),
+        }
+    }
+
     /// Lists every type's name, for a complaint.
+    ///
+    /// # Returns
+    ///
+    /// The names, separated by commas, in the order `types.xtce` gives them.
     pub fn every_name() -> String {
         let mut names: Vec<&str> =
             WHOLE.iter().map(|(_, name)| *name).collect();
@@ -207,6 +231,13 @@ impl LinkType {
                     Basic::every_name()
                 ));
             };
+            if basic.width().is_none() {
+                return Err(format!(
+                    "field \"{name}\" is of {kind}, whose length is its own: \
+                     a structure's fields are each of a fixed width, so that \
+                     where one ends is known"
+                ));
+            }
             fields.push((name.to_string(), basic));
         }
         if fields.len() > MOST_FIELDS {
@@ -219,6 +250,51 @@ impl LinkType {
         Ok(LinkType::Structure(fields))
     }
 
+    /// Says whether these bytes are a datum of this type, as it travels
+    /// between two nodes: its own layout, most significant byte first, and
+    /// for a string or bytes its contents alone, the datum's length being
+    /// theirs. Allocates nothing unless it refuses.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The datum.
+    ///
+    /// # Returns
+    ///
+    /// Nothing, where they are one.
+    ///
+    /// # Errors
+    ///
+    /// A message saying what the datum should have been: a width it is not,
+    /// a boolean that is neither 1 nor 0, text that is not UTF-8, or more
+    /// than a string or bytes may hold.
+    pub fn accepts(&self, data: &[u8]) -> Result<(), String> {
+        let fields: &[(String, Basic)] = match self {
+            LinkType::Structure(fields) => fields,
+            LinkType::Basic(basic) => {
+                return basic_accepts(*basic, data);
+            }
+        };
+        let width: usize = fields
+            .iter()
+            .map(|(_, basic)| basic.width().unwrap_or(0))
+            .sum();
+        if data.len() != width {
+            return Err(format!(
+                "a {self} is {width} bytes and {} arrived",
+                data.len()
+            ));
+        }
+        let mut at = 0;
+        for (name, basic) in fields {
+            let wide = basic.width().unwrap_or(0);
+            basic_accepts(*basic, &data[at..at + wide])
+                .map_err(|why| format!("field {name}: {why}"))?;
+            at += wide;
+        }
+        Ok(())
+    }
+
     /// Says what unit a datum of this type is in.
     ///
     /// # Returns
@@ -229,6 +305,49 @@ impl LinkType {
             LinkType::Basic(Basic::Value(unit)) => Some(*unit),
             _ => None,
         }
+    }
+}
+
+/// The most a string or bytes may hold: `tcslibgs::types::DATUM_BYTES`.
+const MOST_BYTES: usize = crate::types::DATUM_BYTES;
+
+/// Says whether these bytes are a datum of one of `types.xtce`'s types: see
+/// [`LinkType::accepts`].
+///
+/// # Arguments
+///
+/// * `basic` - The type.
+/// * `data`  - The datum.
+///
+/// # Returns
+///
+/// Nothing, where they are one.
+///
+/// # Errors
+///
+/// A message saying what the datum should have been.
+fn basic_accepts(basic: Basic, data: &[u8]) -> Result<(), String> {
+    match basic.width() {
+        Some(width) if data.len() != width => Err(format!(
+            "a {} is {width} bytes and {} arrived",
+            basic.name(),
+            data.len()
+        )),
+        Some(_) if basic == Basic::Boolean && data[0] > 1 => {
+            Err(format!("a boolean is 1 or 0 and {} arrived", data[0]))
+        }
+        Some(_) => Ok(()),
+        None if data.len() > MOST_BYTES => Err(format!(
+            "{} hold at most {MOST_BYTES} bytes and {} arrived",
+            basic.name(),
+            data.len()
+        )),
+        None if basic == Basic::String
+            && std::str::from_utf8(data).is_err() =>
+        {
+            Err("a string is UTF-8 text, and what arrived is not".to_string())
+        }
+        None => Ok(()),
     }
 }
 
@@ -273,6 +392,26 @@ mod tests {
         let many: Vec<String> =
             (0..=MOST_FIELDS).map(|n| format!("f{n}: u8")).collect();
         LinkType::of(&many.join(", ")).expect_err("seventeen fields");
+    }
+
+    /// A datum is its type's width, a boolean is 1 or 0, and a structure is
+    /// its fields one after another.
+    #[test]
+    fn a_datum_is_its_types_layout() {
+        let of = |said: &str| LinkType::of(said).expect(said);
+        assert!(of("u16").accepts(&[1, 2]).is_ok());
+        assert!(of("u16").accepts(&[1, 2, 3]).is_err());
+        assert!(of("kelvin").accepts(&[0, 0, 0, 1]).is_ok());
+        assert!(of("boolean").accepts(&[1]).is_ok());
+        assert!(of("boolean").accepts(&[2]).is_err());
+        assert!(of("string").accepts(b"ping #1").is_ok());
+        assert!(of("string").accepts(&[0xff]).is_err());
+        assert!(of("bytes").accepts(&[0xff; 4096]).is_ok());
+        assert!(of("bytes").accepts(&[0xff; 4097]).is_err());
+        let imu = of("x: i16, y: i16, on: boolean");
+        assert!(imu.accepts(&[0, 1, 0, 2, 1]).is_ok());
+        assert!(imu.accepts(&[0, 1, 0, 2, 7]).is_err());
+        LinkType::of("x: i16, name: string").expect_err("no strings");
     }
 
     /// A set of lines is the narrowest whole number with room for them.

@@ -58,6 +58,7 @@ use std::sync::{
 use std::thread::JoinHandle;
 
 use tcslibgs::graph::terminals::Stream;
+use tcslibgs::link_type::LinkType;
 
 use super::node_state::Outcome;
 use super::route::{Delivery, Routes};
@@ -1725,6 +1726,7 @@ fn deliver_to(
                     node,
                     arriving,
                     &origin[..passing.len],
+                    delivery.takes.as_ref(),
                     name,
                     &*watch,
                     moved,
@@ -1741,6 +1743,7 @@ fn deliver_to(
                         node,
                         arriving,
                         &results[item][..passing.len],
+                        delivery.takes.as_ref(),
                         name,
                         &*watch,
                         moved,
@@ -1802,6 +1805,8 @@ fn deliver_to(
 /// * `node`     - The node to hand it to.
 /// * `arriving` - Which named input it fills and which stream it is on.
 /// * `bytes`    - The datum.
+/// * `takes`    - The type the node takes there, which the datum must be,
+///                or `None` where it takes any.
 /// * `name`     - What the configuration calls the node, for the counts.
 /// * `watch`    - What is told what the node was given, or that it refused.
 /// * `moved`    - The account the delivery, or the refusal and its reason,
@@ -1814,10 +1819,18 @@ fn give(
     node: &mut Box<dyn Port>,
     arriving: Arriving<'_>,
     bytes: &[u8],
+    takes: Option<&LinkType>,
     name: &str,
     watch: &dyn Watch,
     moved: &mut Moved,
 ) -> bool {
+    // A datum that is not the type the node takes is refused before it is
+    // handed over, so that no node reads bytes as something they are not.
+    if let Some(Err(why)) = takes.map(|kind| kind.accepts(bytes)) {
+        watch.gave(name, Outcome::Failed);
+        moved.refused.push((name.to_string(), why));
+        return false;
+    }
     match node.give(arriving, bytes) {
         Ok(()) => {
             watch.gave(name, Outcome::Moved(bytes.len()));
@@ -2129,17 +2142,20 @@ vehicle:
         fabric.hold("gateway", gateway_port);
         fabric.hold("housekeeping", log_port);
 
-        fabric.deliver("temp1", &[1]);
-        fabric.deliver("temp2", &[2]);
-        fabric.deliver("temp3", &[3]);
+        // Each a value in kelvin, which is what the vote carries: four
+        // bytes.
+        fabric.deliver("temp1", &[0, 0, 0, 1]);
+        fabric.deliver("temp2", &[0, 0, 0, 2]);
+        fabric.deliver("temp3", &[0, 0, 0, 3]);
 
         let given = mean.lock().expect("the record");
+        let value = |n: u8| vec![0, 0, 0, n];
         assert_eq!(
             given.given,
             vec![
-                (Some("in0".to_string()), Some(Stream::Groundward), vec![1]),
-                (Some("in1".to_string()), Some(Stream::Groundward), vec![2]),
-                (Some("in2".to_string()), Some(Stream::Groundward), vec![3]),
+                (Some("in0".to_string()), Some(Stream::Groundward), value(1)),
+                (Some("in1".to_string()), Some(Stream::Groundward), value(2)),
+                (Some("in2".to_string()), Some(Stream::Groundward), value(3)),
             ]
         );
         // And the ground and the log got all three as well, which are the
@@ -2364,15 +2380,16 @@ vehicle:
         let (gateway, gateway_port) = recorder();
         fabric.hold("gateway", gateway_port);
 
-        // Three bytes where the part's format is two: a bus that returned
-        // something else, or a sensor read wrongly.
+        // Three bytes where the sensor's type is two: a bus that returned
+        // something else, or a sensor read wrongly. Refused before the
+        // conversion sees it, as not the type it takes.
         let moved = fabric.deliver("temp_1", &[0x01, 0x00, 0x00]);
 
         assert_eq!(moved.refused.len(), 1, "{:?}", moved.refused);
         assert_eq!(moved.refused[0].0, "temp1");
         assert!(
-            moved.refused[0].1.contains("to_kelvin"),
-            "the complaint should name the computation: {}",
+            moved.refused[0].1.contains("i16"),
+            "the complaint should say what the conversion takes: {}",
             moved.refused[0].1
         );
         // Nothing reached the ground along that branch, and nothing was lost
@@ -2736,7 +2753,7 @@ vehicle:
         fabric.hold("ambient", mean_port);
         fabric.hold("housekeeping", log_port);
 
-        let moved = fabric.deliver("temp1", &[9]);
+        let moved = fabric.deliver("temp1", &[0, 0, 0, 9]);
 
         assert_eq!(
             moved.delivered, 2,
@@ -2831,9 +2848,13 @@ vehicle:
             ("temp_2", "temp2"),
             ("temp_3", "temp3"),
         ] {
+            // A reading of the type each converter takes: two bytes, or
+            // four for temp_3's u32.
             let (record, port) = recorder();
-            record.lock().expect("the record").to_say =
-                vec![vec![sensors.len() as u8]];
+            let width = if sensor == "temp_3" { 4 } else { 2 };
+            let mut reading = vec![0; width];
+            reading[width - 1] = sensors.len() as u8;
+            record.lock().expect("the record").to_say = vec![reading];
             fabric.hold(sensor, port);
             let (got, got_port) = recorder();
             fabric.hold(converter, got_port);
@@ -2848,9 +2869,12 @@ vehicle:
 
         assert_eq!(moved.delivered, 3, "{:?}", moved.refused);
         for (n, got) in sensors.iter().enumerate() {
+            let width = if n == 2 { 4 } else { 2 };
+            let mut reading = vec![0; width];
+            reading[width - 1] = n as u8;
             assert_eq!(
                 got.lock().expect("the record").given,
-                vec![(None, Some(Stream::Groundward), vec![n as u8])],
+                vec![(None, Some(Stream::Groundward), reading)],
                 "converter {n} got the wrong reading"
             );
         }

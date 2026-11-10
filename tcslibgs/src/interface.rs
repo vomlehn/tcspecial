@@ -8,8 +8,9 @@
 //!
 //! The vehicle says which interface it speaks in every beacon, from
 //! [`InterfaceDigest::of_this_build`]: the digest of `tcslibgs/xtce/link.xtce`
-//! this build was generated from, which states every command but the fixed
-//! ones. The fixed commands are in `tcslibgs/xtce/fixed.xtce`, and the beacon
+//! and `tcslibgs/xtce/types.xtce` together, which this build was generated
+//! from: the first states every command but the fixed ones, the second
+//! every type a link between nodes can carry. The fixed commands are in `tcslibgs/xtce/fixed.xtce`, and the beacon
 //! in `tcslibgs/xtce/beacon.xtce`, which are not part of the interface: no
 //! change to the interface can touch them. A
 //! configuration names the interface it was written for as the `tcspecial`
@@ -157,7 +158,8 @@ mod tests {
     use super::*;
 
     /// Lists the documents this build's interface is stated in:
-    /// `tcslibgs/xtce/link.xtce`, as `make interface-digest` takes it. Not
+    /// `tcslibgs/xtce/link.xtce` and `tcslibgs/xtce/types.xtce`, as `make
+    /// interface-digest` takes them. Not
     /// `fixed.xtce` or `beacon.xtce`, which no change to the interface may
     /// touch.
     ///
@@ -165,7 +167,8 @@ mod tests {
     ///
     /// Their paths.
     fn documents() -> Vec<std::path::PathBuf> {
-        vec![Path::new(env!("CARGO_MANIFEST_DIR")).join("xtce/link.xtce")]
+        let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+        vec![here.join("xtce/link.xtce"), here.join("xtce/types.xtce")]
     }
 
     /// The constant is the digest of the documents as they are now, so a
@@ -176,7 +179,8 @@ mod tests {
         assert_eq!(
             InterfaceDigest::of_files(&documents()).expect("they read"),
             InterfaceDigest::of_this_build(),
-            "tcslibgs/xtce/link.xtce has changed: run `make interface-digest` \
+            "tcslibgs/xtce/link.xtce or types.xtce has changed: run `make \
+             interface-digest` \
              in tcslibgs/ and commit what it writes, and give every \
              configuration the new digest as its interface"
         );

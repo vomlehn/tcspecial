@@ -1142,10 +1142,13 @@ flew would be the worst of both checks.</dd>
 <h2><a class="toc-backref" href="#toc-entry-9">Typed links</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>Not built yet.</strong> This section is the design the links between nodes
-are being moved to, agreed before any of it is written. Where it and the
-rest of this document disagree, the rest says what runs today, and
-<a class="reference internal" href="#what-typed-links-replace">What typed links replace</a> lists the passages it will change.</p>
+<p class="last"><strong>Partly built.</strong> This section is the design the links between nodes
+are being moved to, agreed before any of it was written. Built so far:
+<tt class="docutils literal">types.xtce</tt>, the Rust generated from it, the unit table generated
+from it, and its place in the interface digest. Where the rest of this
+section and the rest of this document disagree, the rest says what runs
+today, and <a class="reference internal" href="#what-typed-links-replace">What typed links replace</a> lists the passages it will
+change.</p>
 </div>
 <p>What travels a link has been bytes, and what the bytes meant was each
 node's own business: a conversion knew its sensor's two bytes were a signed
@@ -1173,9 +1176,9 @@ lines, what a thermostat drives a heater's switch with.</dd>
 <dt><tt class="docutils literal">boolean</tt></dt>
 <dd>True or false, where something wants to be told one and nothing else.</dd>
 <dt>One value type for each unit</dt>
-<dd><tt class="docutils literal">kelvin</tt>, <tt class="docutils literal">volts</tt>, <tt class="docutils literal">amperes</tt>, <tt class="docutils literal">watts</tt>, <tt class="docutils literal">metres</tt>,
-<tt class="docutils literal">metres_per_second</tt>, <tt class="docutils literal">newtons</tt>, <tt class="docutils literal">kilograms_per_second</tt> and
-<tt class="docutils literal">ratio</tt>: a value as it is today, a 32-bit signed count of the unit's
+<dd><tt class="docutils literal">kelvin</tt>, <tt class="docutils literal">volt</tt>, <tt class="docutils literal">ampere</tt>, <tt class="docutils literal">watt</tt>, <tt class="docutils literal">metre</tt>,
+<tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">newton</tt>, <tt class="docutils literal">kilogram_per_second</tt> and
+<tt class="docutils literal">ratio</tt>, each named as one of its unit is: a value as it is today, a 32-bit signed count of the unit's
 step (see <a class="reference internal" href="#compute-elements">Compute elements</a>), stated as an integer encoding with the
 calibrator that makes it the unit and the unit's symbol in its unit set.</dd>
 <dt>Bounded strings and bounded bytes</dt>
@@ -1455,7 +1458,6 @@ its terminal's type, encoded.</li>
 records, and lines driven by the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>.</li>
 <li><a class="reference internal" href="#gateways-what-the-vehicle-answers-to">Gateways: what the vehicle answers to</a>, F´: a source's channel is chosen
 by the kind of node it is.</li>
-<li><a class="reference internal" href="#the-way-in-and-the-interface">The way in, and the interface</a>: the interface is <tt class="docutils literal">link.xtce</tt> alone.</li>
 <li>The Yamcs mission database, written for the Yamcs gateway node, which the
 configuration's own XTCE replaces.</li>
 </ul>
@@ -1472,7 +1474,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;ad9aac4dd5a6d88dd5e78824ba8a83ac&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c4d65b8e01d6d67e37dac523e739f09a&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">
@@ -7498,8 +7500,8 @@ goes on the command link, and the beacon on a link of its own.</p>
 <dd>The <em>interface digest</em> of an interface is the tcs-xtce digest of its set
 of XTCE documents, which state the commands and answers and not the
 beacon -- for the interface today, the documents in <tt class="docutils literal">tcslibgs/xtce/</tt>,
-which is <tt class="docutils literal">link.xtce</tt> alone, as <tt class="docutils literal">make <span class="pre">interface-digest</span></tt> there takes
-them. It is the MD5 of what the documents mean, which leaves out
+which are <tt class="docutils literal">link.xtce</tt> and <tt class="docutils literal">types.xtce</tt>, as <tt class="docutils literal">make <span class="pre">interface-digest</span></tt>
+there takes them. It is the MD5 of what the documents mean, which leaves out
 comments, whitespace, attribute order and the order of the members of a
 set, and which tcs-xtce computes identically in Rust, C/C++ and Python.
 Two programs speak the same interface when, and only when, their digests

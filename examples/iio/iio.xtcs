@@ -14,7 +14,7 @@
             <send>0.0.0.0:3540</send>
         </beacon>
         <gateway>radio</gateway>
-        <interface>ad9aac4dd5a6d88dd5e78824ba8a83ac</interface>
+        <interface>c4d65b8e01d6d67e37dac523e739f09a</interface>
         <log>
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>

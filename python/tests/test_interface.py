@@ -41,12 +41,13 @@ def section(said):
 
 
 class InterfaceTest(unittest.TestCase):
-    def test_the_interface_is_link_xml_alone(self):
+    def test_the_interface_is_link_and_types(self):
         # Not fixed.xtce or beacon.xtce beside it: no change to the interface
         # may touch the fixed commands or the beacon.
         self.assertEqual(
             interface.of_this_tree(),
-            interface.of_files([interface.DOCUMENTS / "link.xtce"]),
+            interface.of_files([interface.DOCUMENTS / "link.xtce",
+                                interface.DOCUMENTS / "types.xtce"]),
         )
         self.assertNotEqual(
             interface.of_this_tree(),

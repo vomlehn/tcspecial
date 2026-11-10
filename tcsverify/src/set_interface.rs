@@ -2,7 +2,8 @@
 //!
 //! A configuration names the interface it is written for as its `tcspecial`
 //! section's `interface`, and every program refuses one that is not its
-//! build's. So a change to `tcslibgs/xtce/link.xtce` -- a new interface --
+//! build's. So a change to `tcslibgs/xtce/link.xtce` or `types.xtce` -- a
+//! new interface --
 //! leaves every configuration to be given the new digest. This does it to a
 //! file as it stands: the one value is rewritten, or the attribute added
 //! where the section has none, and every other byte of the file -- its

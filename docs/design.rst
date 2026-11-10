@@ -604,10 +604,13 @@ Typed links
 -----------
 
 .. note::
-   **Not built yet.** This section is the design the links between nodes
-   are being moved to, agreed before any of it is written. Where it and the
-   rest of this document disagree, the rest says what runs today, and
-   `What typed links replace`_ lists the passages it will change.
+   **Partly built.** This section is the design the links between nodes
+   are being moved to, agreed before any of it was written. Built so far:
+   ``types.xtce``, the Rust generated from it, the unit table generated
+   from it, and its place in the interface digest. Where the rest of this
+   section and the rest of this document disagree, the rest says what runs
+   today, and `What typed links replace`_ lists the passages it will
+   change.
 
 What travels a link has been bytes, and what the bytes meant was each
 node's own business: a conversion knew its sensor's two bytes were a signed
@@ -638,9 +641,9 @@ The types are few, because what a vehicle's nodes hand each other is:
     True or false, where something wants to be told one and nothing else.
 
 One value type for each unit
-    ``kelvin``, ``volts``, ``amperes``, ``watts``, ``metres``,
-    ``metres_per_second``, ``newtons``, ``kilograms_per_second`` and
-    ``ratio``: a value as it is today, a 32-bit signed count of the unit's
+    ``kelvin``, ``volt``, ``ampere``, ``watt``, ``metre``,
+    ``metre_per_second``, ``newton``, ``kilogram_per_second`` and
+    ``ratio``, each named as one of its unit is: a value as it is today, a 32-bit signed count of the unit's
     step (see `Compute elements`_), stated as an integer encoding with the
     calibrator that makes it the unit and the unit's symbol in its unit set.
 
@@ -916,7 +919,6 @@ built:
   records, and lines driven by the text ``1`` or ``0``.
 * `Gateways: what the vehicle answers to`_, F´: a source's channel is chosen
   by the kind of node it is.
-* `The way in, and the interface`_: the interface is ``link.xtce`` alone.
 * The Yamcs mission database, written for the Yamcs gateway node, which the
   configuration's own XTCE replaces.
 
@@ -935,7 +937,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+     interface: "c4d65b8e01d6d67e37dac523e739f09a"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -7337,8 +7339,8 @@ Requirement
     The *interface digest* of an interface is the tcs-xtce digest of its set
     of XTCE documents, which state the commands and answers and not the
     beacon -- for the interface today, the documents in ``tcslibgs/xtce/``,
-    which is ``link.xtce`` alone, as ``make interface-digest`` there takes
-    them. It is the MD5 of what the documents mean, which leaves out
+    which are ``link.xtce`` and ``types.xtce``, as ``make interface-digest``
+    there takes them. It is the MD5 of what the documents mean, which leaves out
     comments, whitespace, attribute order and the order of the members of a
     set, and which tcs-xtce computes identically in Rust, C/C++ and Python.
     Two programs speak the same interface when, and only when, their digests

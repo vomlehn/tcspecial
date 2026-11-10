@@ -5001,7 +5001,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "ad9aac4dd5a6d88dd5e78824ba8a83ac"
+     interface: "c4d65b8e01d6d67e37dac523e739f09a"
 
 It is the digest of the ``tcslibgs/xtce/link.xtce`` a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -5016,7 +5016,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --interface-digest
-   ad9aac4dd5a6d88dd5e78824ba8a83ac
+   c4d65b8e01d6d67e37dac523e739f09a
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -5027,8 +5027,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
-   vehicle.xtcs: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
+   vehicle.ytcs: interface set to c4d65b8e01d6d67e37dac523e739f09a, from 0123...
+   vehicle.xtcs: interface is c4d65b8e01d6d67e37dac523e739f09a already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

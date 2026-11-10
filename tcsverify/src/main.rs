@@ -105,8 +105,8 @@ configuration.
   --interface-digest print the digest of the interface this build speaks,
                      the 32 lower-case hex digits a configuration's
                      tcspecial section gives as its interface, and exit.
-                     It is the digest of the tcslibgs/xtce/link.xtce the
-                     build was made from, which every beacon carries, and
+                     It is the digest of the tcslibgs/xtce/link.xtce and
+                     types.xtce the build was made from, which every beacon carries, and
                      a configuration naming another is refused by this
                      build's tcsverify, tcspecial and ground programs
   --ambient          with one payload simulator file and nothing else:
@@ -125,8 +125,8 @@ configuration.
                      its tcspecial section's interface, in place, every
                      other byte of the file left as it was, and say for
                      each what was changed; a file that names it already
-                     is not written. For when tcslibgs/xtce/link.xtce has
-                     changed and every configuration is to follow it
+                     is not written. For when tcslibgs/xtce/link.xtce or
+                     types.xtce has changed and every configuration is to follow it
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found

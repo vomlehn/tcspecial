@@ -5037,7 +5037,7 @@ configurations yet.</p>
 for, and every configuration states it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;ad9aac4dd5a6d88dd5e78824ba8a83ac&quot;</span>
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c4d65b8e01d6d67e37dac523e739f09a&quot;</span>
 </pre>
 <p>It is the digest of the <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt> a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -5049,7 +5049,7 @@ each command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcsverify --interface-digest
-ad9aac4dd5a6d88dd5e78824ba8a83ac
+c4d65b8e01d6d67e37dac523e739f09a
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.</p>
@@ -5057,8 +5057,8 @@ sends, so a person with only a packet capture can read it there too.</p>
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-vehicle.ytcs: interface set to ad9aac4dd5a6d88dd5e78824ba8a83ac, from 0123...
-vehicle.xtcs: interface is ad9aac4dd5a6d88dd5e78824ba8a83ac already
+vehicle.ytcs: interface set to c4d65b8e01d6d67e37dac523e739f09a, from 0123...
+vehicle.xtcs: interface is c4d65b8e01d6d67e37dac523e739f09a already
 </pre>
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

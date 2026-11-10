@@ -40,7 +40,8 @@ pub mod graph;
 /// that says which of them a program speaks.
 pub mod interface;
 /// The digest of this build's interface, which `make interface-digest`
-/// generated from `xtce/link.xtce`: used through [`interface`].
+/// generated from `xtce/link.xtce` and `xtce/types.xtce`: used through
+/// [`interface`].
 mod interface_digest;
 /// Commands and answers, as they go on the link.
 pub mod link;
@@ -81,6 +82,10 @@ pub mod store;
 pub mod telemetry;
 pub mod trigger;
 pub mod types;
+/// The codec of each type a link between nodes can carry, which tcs-xtce
+/// generated from `xtce/types.xtce`: see "Typed links" in
+/// `docs/design.rst`.
+pub mod types_packet;
 /// The units a value may be in, and how finely each is carried.
 pub mod unit;
 pub mod verify;

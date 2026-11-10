@@ -14,33 +14,11 @@
 //! before there were other units, so a link, a log or a configuration from
 //! then reads the same.
 //!
-//! This is the one table of them. Adding a unit is a line here.
+//! The table of them is generated from the value types of
+//! `tcslibgs/xtce/types.xtce`, into `unit_table.rs`, by `make unit-table`:
+//! adding a unit is adding a type there.
 
 use std::fmt;
-
-/// A unit a value may be in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Unit {
-    /// Temperature.
-    Kelvin,
-    /// Potential: a bus or a cell.
-    Volt,
-    /// Current: a load, a source, a bus.
-    Ampere,
-    /// Power.
-    Watt,
-    /// Length: an altitude, a distance.
-    Metre,
-    /// Speed.
-    MetrePerSecond,
-    /// Force: a thrust.
-    Newton,
-    /// A flow of mass: what an engine burns.
-    KilogramPerSecond,
-    /// A number with no unit: a state of charge, a throttle setting, as a
-    /// fraction of the whole.
-    Ratio,
-}
 
 /// One row of the table: a unit, how a file writes it, what it is called in
 /// a sentence, how many of its steps are in one of it, and what a step is
@@ -53,90 +31,9 @@ struct Row {
     step: &'static str,
 }
 
-/// The table. A step of a millionth for most, so that a reading is never
-/// rounded by being carried; of a thousandth where a millionth would leave
-/// too little range -- an altitude in micro-metres reaches only 2 km, a
-/// thrust in micro-newtons only 2 kN.
-const TABLE: [Row; 9] = [
-    Row {
-        unit: Unit::Kelvin,
-        symbol: "K",
-        name: "kelvin",
-        per_unit: 1e6,
-        step: "micro-kelvin",
-    },
-    Row {
-        unit: Unit::Volt,
-        symbol: "V",
-        name: "volts",
-        per_unit: 1e6,
-        step: "micro-volts",
-    },
-    Row {
-        unit: Unit::Ampere,
-        symbol: "A",
-        name: "amperes",
-        per_unit: 1e6,
-        step: "micro-amperes",
-    },
-    Row {
-        unit: Unit::Watt,
-        symbol: "W",
-        name: "watts",
-        per_unit: 1e3,
-        step: "milliwatts",
-    },
-    Row {
-        unit: Unit::Metre,
-        symbol: "m",
-        name: "metres",
-        per_unit: 1e3,
-        step: "millimetres",
-    },
-    Row {
-        unit: Unit::MetrePerSecond,
-        symbol: "m/s",
-        name: "metres a second",
-        per_unit: 1e6,
-        step: "micro-metres a second",
-    },
-    Row {
-        unit: Unit::Newton,
-        symbol: "N",
-        name: "newtons",
-        per_unit: 1e3,
-        step: "millinewtons",
-    },
-    Row {
-        unit: Unit::KilogramPerSecond,
-        symbol: "kg/s",
-        name: "kilograms a second",
-        per_unit: 1e6,
-        step: "milligrams a second",
-    },
-    Row {
-        unit: Unit::Ratio,
-        symbol: "ratio",
-        name: "a ratio",
-        per_unit: 1e6,
-        step: "millionths",
-    },
-];
+include!("unit_table.rs");
 
 impl Unit {
-    /// Every unit, in the table's order.
-    pub const ALL: [Unit; 9] = [
-        Unit::Kelvin,
-        Unit::Volt,
-        Unit::Ampere,
-        Unit::Watt,
-        Unit::Metre,
-        Unit::MetrePerSecond,
-        Unit::Newton,
-        Unit::KilogramPerSecond,
-        Unit::Ratio,
-    ];
-
     /// Finds this unit's row of the table.
     ///
     /// # Returns
@@ -221,6 +118,29 @@ impl fmt::Display for Unit {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The table is what `unit-table.py` writes from `xtce/types.xtce` as
+    /// it is now, so a unit changed there without `make unit-table` is
+    /// caught here and not by a value read in the wrong unit.
+    #[test]
+    fn the_table_is_written_from_the_types() {
+        let here = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let dir = tempfile::tempdir().expect("a directory");
+        let written = dir.path().join("unit_table.rs");
+        let ran = std::process::Command::new("python3")
+            .arg(here.join("unit-table.py"))
+            .arg(here.join("xtce/types.xtce"))
+            .arg(&written)
+            .status()
+            .expect("python3 runs unit-table.py");
+        assert!(ran.success());
+        assert_eq!(
+            std::fs::read_to_string(&written).expect("it wrote"),
+            include_str!("unit_table.rs"),
+            "tcslibgs/xtce/types.xtce has changed: run `make unit-table` in \
+             tcslibgs/ and commit what it writes"
+        );
+    }
 
     /// Every unit has one row, its symbol reads back as it, and no two
     /// share a symbol.

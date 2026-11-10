@@ -1,0 +1,779 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
+<title>Writing Node Types</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 9511 2024-01-13 09:50:07Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+Despite the name, some widely supported CSS2 features are used.
+
+See https://docutils.sourceforge.io/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: gray; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic, pre.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="writing-node-types">
+<h1 class="title">Writing Node Types</h1>
+
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Links between nodes are being given types, in stages: see &quot;Typed links&quot;
+in the design. What a node type declares about its terminals, which is
+what this guide says, is settled and built. Data between nodes is still
+carried as bytes, and the stages that change that change how a node
+reads and writes, not what its type declares. Where the code and the
+design differ, the code is what is described here.</p>
+</div>
+<div class="contents local topic" id="table-of-contents">
+<p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
+<ul class="simple">
+<li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a></li>
+<li><a class="reference internal" href="#the-kinds-of-node-type" id="toc-entry-2">The Kinds of Node Type</a></li>
+<li><a class="reference internal" href="#three-modules-of-one-name" id="toc-entry-3">Three Modules of One Name</a></li>
+<li><a class="reference internal" href="#terminals-and-what-they-carry" id="toc-entry-4">Terminals and What They Carry</a></li>
+<li><a class="reference internal" href="#adding-a-payload-type" id="toc-entry-5">Adding a Payload Type</a><ul>
+<li><a class="reference internal" href="#in-tcslibgs" id="toc-entry-6">In <tt class="docutils literal">tcslibgs</tt></a></li>
+<li><a class="reference internal" href="#in-tcspecial" id="toc-entry-7">In <tt class="docutils literal">tcspecial</tt></a></li>
+<li><a class="reference internal" href="#in-tcssim" id="toc-entry-8">In <tt class="docutils literal">tcssim</tt></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#adding-a-vehicle-type" id="toc-entry-9">Adding a Vehicle Type</a></li>
+<li><a class="reference internal" href="#adding-a-compute-function" id="toc-entry-10">Adding a Compute Function</a></li>
+<li><a class="reference internal" href="#adding-a-gateway-type" id="toc-entry-11">Adding a Gateway Type</a></li>
+<li><a class="reference internal" href="#the-editor-and-the-schemas" id="toc-entry-12">The Editor and the Schemas</a></li>
+<li><a class="reference internal" href="#drawing-it" id="toc-entry-13">Drawing It</a></li>
+<li><a class="reference internal" href="#documenting-it" id="toc-entry-14">Documenting It</a></li>
+<li><a class="reference internal" href="#testing-it" id="toc-entry-15">Testing It</a></li>
+<li><a class="reference internal" href="#a-checklist" id="toc-entry-16">A Checklist</a></li>
+</ul>
+</div>
+<div class="section" id="introduction">
+<h1><a class="toc-backref" href="#toc-entry-1">Introduction</a></h1>
+<p>A node is anything in a configuration's graph: a payload reached over an
+interface, a computation aboard, a log, an app, a gateway. Each has a type,
+the word after <tt class="docutils literal">type</tt> in the configuration, and this guide says how to add
+a new one: which files it lives in, what it must declare, which lists it must
+be added to, and how to know it is finished.</p>
+<p>It is written for someone changing tcspecial itself. A user who wants a new
+kind of payload without changing tcspecial should first look at the app node
+types in the manual, which run a program of one's own as a node.</p>
+<p>The order of the qualities that decides tcspecial's designs decides a node
+type's too: <strong>reliability</strong>, then <strong>ease of use</strong>, then <strong>maintainability</strong>,
+then <strong>flexibility</strong>. A configuration the new type refuses when it is loaded
+is better than one it fails on in flight, and a type that does one thing
+with fixed, checked attributes is better than one that adapts.</p>
+</div>
+<div class="section" id="the-kinds-of-node-type">
+<h1><a class="toc-backref" href="#toc-entry-2">The Kinds of Node Type</a></h1>
+<p>Which kind a new type is decides how much there is to do.</p>
+<dl class="docutils">
+<dt>Payload types</dt>
+<dd>A device the vehicle reaches over an interface: <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>,
+<tt class="docutils literal">can</tt>, <tt class="docutils literal">network</tt>, <tt class="docutils literal">gpio_in</tt> and so on. These are the most work,
+since the flight software opens the device, the simulator plays it, and
+the vehicle judges whether what it found is simulated, a dummy or real.
+Most of this guide is about them.</dd>
+<dt>Vehicle types</dt>
+<dd>Nodes that run aboard and reach no device: <tt class="docutils literal">log</tt>, <tt class="docutils literal">ping</tt>, the
+<tt class="docutils literal"><span class="pre">tee-*</span></tt> and <tt class="docutils literal"><span class="pre">null-*</span></tt> types. Fewer places, but each is matched by
+name, so the compiler does not point at the ones that were missed.</dd>
+<dt>Compute functions</dt>
+<dd>Not a node type. <tt class="docutils literal">compute</tt> is the type and its <tt class="docutils literal">function</tt> chooses
+what it does: <tt class="docutils literal">vote</tt>, <tt class="docutils literal">thermostat</tt>, <tt class="docutils literal">to_kelvin</tt>. Adding a
+function is the smallest of these jobs: see <a class="reference internal" href="#adding-a-compute-function">Adding a Compute
+Function</a>.</dd>
+<dt>Gateway types</dt>
+<dd>The side of the graph that commands the vehicle and takes its data:
+<tt class="docutils literal">gateway_radio</tt>, <tt class="docutils literal">gateway_fprime</tt>, <tt class="docutils literal">gateway_cfs</tt>,
+<tt class="docutils literal">gateway_yamcs</tt>. A gateway is a network endpoint, opened as a
+<tt class="docutils literal">network</tt> payload is, so it has no node module of its own in any
+crate.</dd>
+<dt>App types</dt>
+<dd>A program of one's own, run as a node: <tt class="docutils literal">app_payload_veh</tt>,
+<tt class="docutils literal">app_gateway_veh</tt>, <tt class="docutils literal">app_all_veh</tt>, <tt class="docutils literal">app_pl</tt> and <tt class="docutils literal">app_all_pl</tt>.
+They are named stream-then-side, and a new one follows that rule.</dd>
+</dl>
+</div>
+<div class="section" id="three-modules-of-one-name">
+<h1><a class="toc-backref" href="#toc-entry-3">Three Modules of One Name</a></h1>
+<p>A payload type is three modules with the same name, one in each of three
+crates:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal"><span class="pre">tcslibgs::node</span></tt></dt>
+<dd>Its attributes, and every rule about what a configuration may say about
+it. tcslibgs is shared by the ground and the vehicle, so a rule written
+here is the one tcspecial, tcssim, tcsmoc, tcsgui and tcsverify all
+apply, and they all report it alike. A rule about what a configuration
+may say belongs here and nowhere else.</dd>
+<dt><tt class="docutils literal"><span class="pre">tcspecial::node</span></tt></dt>
+<dd>The flight side: opening the device, reading and writing it.</dd>
+<dt><tt class="docutils literal"><span class="pre">tcssim::node</span></tt></dt>
+<dd>The simulator's simulated device, which plays the payload on a desk.</dd>
+</dl>
+<p>Payloads are under <tt class="docutils literal"><span class="pre">node/payload/&lt;type&gt;/mod.rs</span></tt> in each crate, and vehicle
+types under <tt class="docutils literal">node/vehicle/</tt>. A type that is another type's device under a
+name of its own, as <tt class="docutils literal">i2c_tmass</tt> is an I<sup>2</sup>C device, may have
+modules that say so and little else, reusing the other type's code.</p>
+</div>
+<div class="section" id="terminals-and-what-they-carry">
+<h1><a class="toc-backref" href="#toc-entry-4">Terminals and What They Carry</a></h1>
+<p>Every node has up to four terminals, named for the way data travels:
+<tt class="docutils literal"><span class="pre">world-in</span></tt> and <tt class="docutils literal"><span class="pre">world-out</span></tt> carry a payload's readings towards the
+ground, and <tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt> carry what the ground sends back. A
+new type says which of the four it has, in <tt class="docutils literal">terminals_of</tt> in
+<tt class="docutils literal">tcslibgs/src/graph/terminals.rs</tt>, by returning one of the <tt class="docutils literal">Terminals</tt>
+constants there or a new one. A type whose terminals are its own business,
+as a computation's named inputs are, returns <tt class="docutils literal">None</tt>.</p>
+<p>Each terminal carries one type, and both ends of every link state it: a link
+whose ends disagree is refused as the configuration is loaded, saying which
+attribute to change. Nothing is inferred and nothing is converted between
+nodes. The types are stated once, in <tt class="docutils literal">tcslibgs/xtce/types.xtce</tt>, and named
+in <tt class="docutils literal">tcslibgs/src/link_type.rs</tt>: the integers <tt class="docutils literal">u8</tt> to <tt class="docutils literal">i64</tt>,
+<tt class="docutils literal">boolean</tt>, the quantities (<tt class="docutils literal">kelvin</tt>, <tt class="docutils literal">volt</tt>, <tt class="docutils literal">ampere</tt>, <tt class="docutils literal">watt</tt>,
+<tt class="docutils literal">metre</tt>, <tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">newton</tt>, <tt class="docutils literal">kilogram_per_second</tt>,
+<tt class="docutils literal">ratio</tt>), <tt class="docutils literal">string</tt>, <tt class="docutils literal">bytes</tt>, and structures of up to sixteen named
+fields, <tt class="docutils literal">&quot;x: i16, y: i16&quot;</tt>. A new node type adds no type there.</p>
+<p>What a node type carries is decided in one function, <tt class="docutils literal">carries</tt> in
+<tt class="docutils literal">tcslibgs/src/graph/link_types.rs</tt>, which takes a node and a terminal and
+says what that terminal carries. There are four ways a type can answer:</p>
+<dl class="docutils">
+<dt>Stated by the configuration</dt>
+<dd>A device states what it sends as <tt class="docutils literal"><span class="pre">world-out-type</span></tt> and what it takes
+as <tt class="docutils literal"><span class="pre">moc-in-type</span></tt>, each <tt class="docutils literal">bytes</tt> when it is left out, and <tt class="docutils literal">format</tt>
+only where the part's bytes are not the type's own layout -- <tt class="docutils literal">i16_le</tt>,
+or <tt class="docutils literal">u24_be</tt> read as a <tt class="docutils literal">u32</tt>. An app states <tt class="docutils literal"><span class="pre">world-in-type</span></tt>,
+<tt class="docutils literal"><span class="pre">world-out-type</span></tt>, <tt class="docutils literal"><span class="pre">moc-in-type</span></tt> and <tt class="docutils literal"><span class="pre">moc-out-type</span></tt>, by the
+terminals its kind has. A computation states <tt class="docutils literal"><span class="pre">type-in</span></tt> and
+<tt class="docutils literal"><span class="pre">type-out</span></tt>; a vote, which passes one type through, states
+<tt class="docutils literal">carries</tt>, as an optional <tt class="docutils literal">carries</tt> on a tee does.</dd>
+<dt>Fixed by the type</dt>
+<dd><tt class="docutils literal">ping</tt> carries <tt class="docutils literal">string</tt>; a GPIO node carries the narrowest unsigned
+integer with a bit for each of its lines, which its <tt class="docutils literal">lines</tt> decide;
+<tt class="docutils literal">to_kelvin</tt> sends <tt class="docutils literal">kelvin</tt>.</dd>
+<dt>Any type</dt>
+<dd>A gateway, a log and the null types take whatever arrives, since they
+pass it on or keep it without looking at it.</dd>
+<dt>The default</dt>
+<dd>A payload with no branch of its own is a device, and gets the device
+rule: <tt class="docutils literal"><span class="pre">world-out-type</span></tt>, <tt class="docutils literal"><span class="pre">moc-in-type</span></tt> and <tt class="docutils literal">format</tt>. A new device
+needs nothing in <tt class="docutils literal">carries</tt>.</dd>
+</dl>
+<p>A vehicle type with no branch of its own also falls through to the device
+rule, which is almost never right and is not refused, so a new vehicle type
+must have its branch. The attributes a type's terminals are stated by are in
+<tt class="docutils literal">TYPE_ATTRIBUTES</tt> in the same file, and its <tt class="docutils literal">problems</tt> is what the
+configuration check calls to hold every link to the rule.</p>
+</div>
+<div class="section" id="adding-a-payload-type">
+<h1><a class="toc-backref" href="#toc-entry-5">Adding a Payload Type</a></h1>
+<div class="section" id="in-tcslibgs">
+<h2><a class="toc-backref" href="#toc-entry-6">In <tt class="docutils literal">tcslibgs</tt></a></h2>
+<p>The module, <tt class="docutils literal"><span class="pre">tcslibgs/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, registered with a
+<tt class="docutils literal">pub mod</tt> in <tt class="docutils literal">node/payload/mod.rs</tt>, holds:</p>
+<ul class="simple">
+<li><tt class="docutils literal">pub const TYPE</tt>, the type's spelling;</li>
+<li>a <tt class="docutils literal">Params</tt> struct of its attributes;</li>
+<li><tt class="docutils literal">group_kind_of</tt>, which checks the attributes it was given and turns them
+into the endpoint the vehicle opens. Its errors name the attribute and say
+what to write instead;</li>
+<li><tt class="docutils literal">judged</tt>, which looks at what is at the node's endpoint and says whether
+it is a simulated device (tcssim's), a dummy device (the kernel's) or a
+real one. The judgement is made from what is there, never from a file,
+and <tt class="docutils literal"><span class="pre">--simulate</span></tt> decides which are allowed;</li>
+<li>its tests.</li>
+</ul>
+<p>The type is then made known to the rest of tcslibgs:</p>
+<dl class="docutils">
+<dt><tt class="docutils literal">src/types.rs</tt></dt>
+<dd>A <tt class="docutils literal">DHType</tt> variant, added to <tt class="docutils literal"><span class="pre">DHType::ALL</span></tt> with the array's length
+changed, and to <tt class="docutils literal">spelling</tt>, <tt class="docutils literal">article</tt> and <tt class="docutils literal">spellings</tt>; an
+<tt class="docutils literal">EndpointConfig</tt> variant, in <tt class="docutils literal">kind</tt> and <tt class="docutils literal">as_kind</tt>; and an arm in
+<tt class="docutils literal">kind_of_terms</tt>. <tt class="docutils literal">spellings</tt> is a hand-written string, so read it
+after the change.</dd>
+<dt><tt class="docutils literal">src/endpoint_config.rs</tt></dt>
+<dd>Only for an interface tcspecial has not opened before: a <tt class="docutils literal">GroupKind</tt>,
+an arm in <tt class="docutils literal">endpoint_of</tt>, and any new terms in <tt class="docutils literal">LinkTerms</tt>.</dd>
+<dt><tt class="docutils literal">src/graph/terminals.rs</tt></dt>
+<dd>An arm in <tt class="docutils literal">terminals_of</tt>.</dd>
+<dt><tt class="docutils literal">src/graph/link_types.rs</tt></dt>
+<dd>A branch in <tt class="docutils literal">carries</tt> if the type's terminals are fixed or take any
+type. Nothing for an ordinary device.</dd>
+<dt><tt class="docutils literal">src/graph/reach.rs</tt></dt>
+<dd><tt class="docutils literal">kind_of</tt>, <tt class="docutils literal">locators</tt>, <tt class="docutils literal">put_term</tt> for new attributes, and
+<tt class="docutils literal">cannot_be_asked</tt> and <tt class="docutils literal">cannot_be_written</tt> where they apply. If the
+type may give <tt class="docutils literal">sim_address</tt>, <tt class="docutils literal">simulated_over_udp</tt> and the refusal
+text that lists the types that may.</dd>
+<dt><tt class="docutils literal">src/graph/built.rs</tt></dt>
+<dd><tt class="docutils literal">OPTIONAL_TYPES</tt>, with its length, in the order tcspecial's <tt class="docutils literal">BUILT</tt>
+follows.</dd>
+<dt><tt class="docutils literal">src/graph/interface.rs</tt></dt>
+<dd><tt class="docutils literal">sends</tt>, if the type sends nothing until it is read, and its test.</dd>
+<dt><tt class="docutils literal">src/graph/check.rs</tt></dt>
+<dd><tt class="docutils literal">claims_of</tt>, which says what the node holds that no other node may,
+and the minimum attributes the tests' <tt class="docutils literal">node</tt> gives it.</dd>
+<dt><tt class="docutils literal">src/simulate.rs</tt></dt>
+<dd><tt class="docutils literal">judged_at</tt>, and <tt class="docutils literal">tcssim_makes</tt> if the kernel makes a dummy device
+for it.</dd>
+<dt><tt class="docutils literal">src/sim_config.rs</tt> and <tt class="docutils literal">src/parameters.rs</tt></dt>
+<dd><tt class="docutils literal">simulable</tt>, and <tt class="docutils literal">endpoint_parameters</tt>, the text of its panel.</dd>
+</dl>
+<p>Several of these are lists written by hand that repeat <tt class="docutils literal">DHType</tt>:
+<tt class="docutils literal">spellings</tt>, <tt class="docutils literal"><span class="pre">reach::kind_of</span></tt>, <tt class="docutils literal"><span class="pre">interface::sends</span></tt>, <tt class="docutils literal">tcssim_makes</tt>
+and the <tt class="docutils literal">sim_address</tt> texts. A <tt class="docutils literal">match</tt> on <tt class="docutils literal">DHType</tt> or
+<tt class="docutils literal">EndpointConfig</tt> that misses the new variant is a compile error, but these
+are not, so go through them by name.</p>
+</div>
+<div class="section" id="in-tcspecial">
+<h2><a class="toc-backref" href="#toc-entry-7">In <tt class="docutils literal">tcspecial</tt></a></h2>
+<p>The module, <tt class="docutils literal"><span class="pre">tcspecial/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds an endpoint
+for the device, conventionally <tt class="docutils literal">XEndpoint</tt> with <tt class="docutils literal">new</tt> and
+<tt class="docutils literal">try_clone</tt>, implementing the traits in <tt class="docutils literal">tcspecial/src/endpoint.rs</tt>:
+<tt class="docutils literal">EndpointWaitable</tt> (the file descriptor to wait on, and what to do when it
+is ready), <tt class="docutils literal">EndpointReadable</tt> and <tt class="docutils literal">EndpointWritable</tt>. <tt class="docutils literal">node/payload/can</tt>
+is a complete one to read.</p>
+<p>The endpoint is called from the main loop for as long as tcspecial runs, so
+it allocates nothing there: every buffer it reads or writes into is made
+when it opens, or passed in. Where an allocation in the loop cannot be
+avoided, a comment at that line says so and why.</p>
+<p>Each payload type is a Cargo feature, so that a vehicle is built with only
+the types it flies. In <tt class="docutils literal">tcspecial/Cargo.toml</tt>, add the type to the
+<tt class="docutils literal">default</tt> features and give it a line of its own, naming any type it is
+built on: <tt class="docutils literal">i2c_tmass = [&quot;i2c&quot;]</tt>. In <tt class="docutils literal">node/payload/mod.rs</tt>, add the
+module under <tt class="docutils literal">#[cfg(feature = <span class="pre">&quot;&lt;type&gt;&quot;)]</span></tt>, add the type to <tt class="docutils literal">BUILT</tt> in
+<tt class="docutils literal">OPTIONAL_TYPES</tt>'s order, add a <tt class="docutils literal">compile_error!</tt> for any platform it
+cannot be built for, and add it to the feature list of
+<tt class="docutils literal">every_type_is_built_by_default</tt>. In <tt class="docutils literal">endpoint.rs</tt>, add a gated <tt class="docutils literal">use</tt>
+and an arm in both <tt class="docutils literal">bind_endpoint_pair</tt> and <tt class="docutils literal">hearing_endpoint_pair</tt>.</p>
+<p><tt class="docutils literal">tcspecial <span class="pre">--types</span></tt> prints <tt class="docutils literal">BUILT</tt>, and <tt class="docutils literal">make check</tt> builds tcspecial
+once for each type with that type's feature alone. So every <tt class="docutils literal">use</tt> and
+every arm for the type must be gated by its feature, or that build fails.</p>
+</div>
+<div class="section" id="in-tcssim">
+<h2><a class="toc-backref" href="#toc-entry-8">In <tt class="docutils literal">tcssim</tt></a></h2>
+<p>The module, <tt class="docutils literal"><span class="pre">tcssim/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds a function
+<tt class="docutils literal">run_&lt;type&gt;_node</tt>, which plays the device: it answers as the device would,
+from the simulator file's settings and, for a sensor joined to the physics
+model, from the world. There is no trait. <tt class="docutils literal">tcssim/src/payload.rs</tt> runs it
+from <tt class="docutils literal">run_kind</tt>, by a <tt class="docutils literal">PayloadProtocol</tt> variant, and
+<tt class="docutils literal">tcssim/src/endpoint.rs</tt> maps the node's endpoint and <tt class="docutils literal">sim_address</tt> to
+that protocol in <tt class="docutils literal">payload_config_attached</tt>, and describes it in
+<tt class="docutils literal">endpoint_description</tt>.</p>
+<p>A simulated device must behave as the real one does where tcspecial can
+tell: the same bytes, the same timing within reason, the same errors. One
+that is easier to talk to than the real part hides the bugs it is there to
+find.</p>
+</div>
+</div>
+<div class="section" id="adding-a-vehicle-type">
+<h1><a class="toc-backref" href="#toc-entry-9">Adding a Vehicle Type</a></h1>
+<p>A vehicle type has no device, so it has no Cargo feature, no endpoint, no
+judgement and no simulated device. Instead:</p>
+<ul class="simple">
+<li>in tcslibgs, its module in <tt class="docutils literal">node/vehicle/</tt> with <tt class="docutils literal">params_of</tt> and its
+checks, registered in <tt class="docutils literal">node/vehicle/mod.rs</tt>; its name in
+<tt class="docutils literal">VEHICLE_TYPES</tt> in <tt class="docutils literal">src/graph/mod.rs</tt>; its attribute rules in
+<tt class="docutils literal">graph/check.rs</tt>; its terminals in <tt class="docutils literal">terminals_of</tt>; and its branch in
+<tt class="docutils literal">carries</tt>, which it must have;</li>
+<li>in tcspecial, its module in <tt class="docutils literal">node/vehicle/</tt>, implementing <tt class="docutils literal">Port</tt>
+(<tt class="docutils literal">src/runtime/fabric.rs</tt>), and arms in <tt class="docutils literal">open</tt>, <tt class="docutils literal">described</tt> and
+<tt class="docutils literal">is_polled</tt> in <tt class="docutils literal">src/runtime/system.rs</tt>, which match the type by name.</li>
+</ul>
+<p><tt class="docutils literal">types_in</tt> in <tt class="docutils literal">tcslibgs/src/graph/mod.rs</tt> is the one statement of which
+types each section of a configuration takes, built from <tt class="docutils literal"><span class="pre">DHType::ALL</span></tt>, the
+app kinds, the gateway kinds and <tt class="docutils literal">VEHICLE_TYPES</tt>, and the schema tests
+hold the schemas to it.</p>
+</div>
+<div class="section" id="adding-a-compute-function">
+<h1><a class="toc-backref" href="#toc-entry-10">Adding a Compute Function</a></h1>
+<p>A function is the <tt class="docutils literal">compute</tt> type's <tt class="docutils literal">function</tt>. In tcspecial it is a file,
+<tt class="docutils literal"><span class="pre">src/node/vehicle/compute/&lt;function&gt;.rs</span></tt>, implementing <tt class="docutils literal">Function</tt>:
+<tt class="docutils literal">give</tt>, which takes a datum at one of its inputs and may produce one;
+<tt class="docutils literal">set</tt>, for an attribute the ground may change, which refuses by default;
+<tt class="docutils literal">held</tt>, what it last produced, <tt class="docutils literal">None</tt> by default; and <tt class="docutils literal">name</tt>. It is
+registered with a <tt class="docutils literal">pub mod</tt> and an arm in <tt class="docutils literal">make</tt>. Like an endpoint, it
+runs in the main loop and allocates nothing there.</p>
+<p>In tcslibgs, <tt class="docutils literal">node/vehicle/compute/mod.rs</tt> holds the function's
+<tt class="docutils literal">Computation</tt> variant and <tt class="docutils literal">function</tt>, <tt class="docutils literal">functions</tt> (a hand-written
+list), <tt class="docutils literal">attributes_of</tt>, <tt class="docutils literal">params_of</tt> with its <tt class="docutils literal">Params</tt>, and
+<tt class="docutils literal">produces</tt>. Its terminals' types come from <tt class="docutils literal">carries</tt>, which gives a
+function <tt class="docutils literal"><span class="pre">type-in</span></tt> and <tt class="docutils literal"><span class="pre">type-out</span></tt>, both required, unless it has a branch
+of its own as <tt class="docutils literal">vote</tt> and <tt class="docutils literal">to_kelvin</tt> have.</p>
+<p>tcsgui offers a function as a node of its own, from
+<tt class="docutils literal"><span class="pre">tcsgui/share/nodes/vehicle/compute/&lt;function&gt;.yaml</span></tt> with
+<tt class="docutils literal">sets: {function: &lt;function&gt;}</tt>. The Python ground's <tt class="docutils literal">form.py</tt> lists
+which functions produce values and which decisions, in <tt class="docutils literal">VALUE_FUNCTIONS</tt>
+and <tt class="docutils literal">DECISION_FUNCTIONS</tt>.</p>
+</div>
+<div class="section" id="adding-a-gateway-type">
+<h1><a class="toc-backref" href="#toc-entry-11">Adding a Gateway Type</a></h1>
+<p>A gateway type is a <tt class="docutils literal">GatewayKind</tt> in <tt class="docutils literal">tcslibgs/src/gateway.rs</tt>, in
+<tt class="docutils literal">ALL</tt>, <tt class="docutils literal">name</tt>, <tt class="docutils literal">is_built</tt>, <tt class="docutils literal">on_bus</tt>, <tt class="docutils literal">framed</tt> and <tt class="docutils literal">node_type</tt>.
+The Python ground lists gateway types by hand, in <tt class="docutils literal">GATEWAY_BASES</tt> and
+<tt class="docutils literal">ON_BUS</tt> in <tt class="docutils literal">python/tcslibgs/configuration.py</tt>. Its description in tcsgui
+is at the top of <tt class="docutils literal">tcsgui/share/nodes/</tt>, and since it has no node module,
+it is one of the exemptions in <tt class="docutils literal">every_description_has_its_rust</tt> in
+<tt class="docutils literal">tcsgui/src/nodes.rs</tt>.</p>
+</div>
+<div class="section" id="the-editor-and-the-schemas">
+<h1><a class="toc-backref" href="#toc-entry-12">The Editor and the Schemas</a></h1>
+<p>A node type is offered in tcsgui's palette from a description,
+<tt class="docutils literal"><span class="pre">tcsgui/share/nodes/&lt;family&gt;/&lt;type&gt;.yaml</span></tt>: its <tt class="docutils literal">node</tt> and <tt class="docutils literal">type</tt>, an
+<tt class="docutils literal">about</tt> sentence, which terminals it has, and its <tt class="docutils literal">attributes</tt>, each with
+<tt class="docutils literal">name</tt>, <tt class="docutils literal">required</tt>, an optional <tt class="docutils literal">kind</tt> and its own <tt class="docutils literal">about</tt>. The
+terminal flags are still spelled by their old names, <tt class="docutils literal"><span class="pre">payload-sink</span></tt>,
+<tt class="docutils literal"><span class="pre">payload-source</span></tt>, <tt class="docutils literal"><span class="pre">gateway-sink</span></tt> and <tt class="docutils literal"><span class="pre">gateway-source</span></tt>, which
+<tt class="docutils literal">tcsgui/src/nodes.rs</tt> reads as <tt class="docutils literal"><span class="pre">world-in</span></tt>, <tt class="docutils literal"><span class="pre">world-out</span></tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>
+and <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Attributes that state a terminal's type, such as
+<tt class="docutils literal"><span class="pre">world-out-type</span></tt>, are listed as any other attribute is. The description
+is checked against <tt class="docutils literal">share/schema/node.schema.json</tt> and <tt class="docutils literal">node.xsd</tt>, and
+its path is added to the sorted list in <tt class="docutils literal">the_shipped_descriptions_read</tt>.</p>
+<p>A configuration is written in YAML or XML, and the two spellings must say
+the same thing. So a new type goes into both configuration schemas,
+<tt class="docutils literal">tcsgui/share/schema/tcspecial.schema.json</tt> and <tt class="docutils literal">tcspecial.xsd</tt>: its name
+in the section's type list, and each new attribute in the JSON node
+definitions and the XSD's <tt class="docutils literal">nodeWords</tt>. A payload type also goes into both
+simulator schemas, <tt class="docutils literal"><span class="pre">tcspecial-sim.schema.json</span></tt> and <tt class="docutils literal"><span class="pre">tcspecial-sim.xsd</span></tt>.
+The Python ground reads its type lists from the JSON schema, so it follows.</p>
+</div>
+<div class="section" id="drawing-it">
+<h1><a class="toc-backref" href="#toc-entry-13">Drawing It</a></h1>
+<p>How a type is drawn is in <tt class="docutils literal">tcsdiagram/src/style.rs</tt>: a <tt class="docutils literal">NodeType</tt>
+variant, in <tt class="docutils literal">ALL</tt> with its length, <tt class="docutils literal">spelling</tt>, <tt class="docutils literal">family</tt>,
+<tt class="docutils literal">is_payload</tt>, <tt class="docutils literal">attributes</tt> (which must be the description's, in the
+same order and with the same <tt class="docutils literal">required</tt>), and <tt class="docutils literal">appearance</tt>, its edge,
+weight, size and face. Its colour is the pane's next one, given by
+<tt class="docutils literal">came_later</tt> in <tt class="docutils literal">look.rs</tt>, which puts the new type after every existing
+one so that no colour already in use moves.</p>
+<p>Colour is never the only thing that tells two node types apart, for readers
+who do not see it. A test in <tt class="docutils literal">style.rs</tt> holds every pair of types to two
+differences that are not colour, and <tt class="docutils literal">no_two_types_look_the_same</tt> holds
+them to looking different at all.
+The payload edges and weights are nearly all taken, so a new payload type
+may need a new <tt class="docutils literal">Edge</tt>, as the <tt class="docutils literal">_tmass</tt> types needed <tt class="docutils literal">DashDotted</tt>.</p>
+</div>
+<div class="section" id="documenting-it">
+<h1><a class="toc-backref" href="#toc-entry-14">Documenting It</a></h1>
+<p>A type is not finished until it is documented, and a requirement in
+<tt class="docutils literal">design.rst</tt> that the code does not meet is a bug in one or the other:</p>
+<ul class="simple">
+<li><tt class="docutils literal">docs/design.rst</tt>: a row in the table under &quot;Every terminal carries one
+type&quot;, the type's requirements where its kind's are, its feature in
+&quot;Which Node Types Are Built&quot;, and, for a payload, the judgement table and
+the <tt class="docutils literal">sim_address</tt> requirement;</li>
+<li><tt class="docutils literal">docs/manual.rst</tt>: a section for the type, with a <tt class="docutils literal">Keywords</tt> line,
+its attributes and an example; the simulator's list of types; and the
+list of features under &quot;Building tcspecial for a vehicle&quot;. Every
+configuration example in the manual is verified by a test, so an example
+that does not load fails it;</li>
+<li><tt class="docutils literal">CLAUDE.md</tt>, if the type may give <tt class="docutils literal">sim_address</tt>;</li>
+<li><tt class="docutils literal">examples/README.md</tt>, and both spellings of an example, if one uses it.</li>
+</ul>
+<p>Each RST and Markdown page is turned into HTML by <tt class="docutils literal">make</tt> in its directory,
+and the HTML is committed with it; <tt class="docutils literal">make <span class="pre">html-check</span></tt> fails while a page
+is out of date.</p>
+</div>
+<div class="section" id="testing-it">
+<h1><a class="toc-backref" href="#toc-entry-15">Testing It</a></h1>
+<p>Each module has its tests beside it, in all three crates. A test for a fix
+should fail without the fix: check that it does.</p>
+<p>Many tests enumerate every type, and a new type that was missed somewhere
+fails one of them: the schema tests in <tt class="docutils literal">tcsgui/tests/schema.rs</tt>, which
+hold the schemas to <tt class="docutils literal">types_in</tt> and <tt class="docutils literal"><span class="pre">DHType::ALL</span></tt>; the description tests
+in <tt class="docutils literal">tcsgui/src/nodes.rs</tt>; the drawing tests in <tt class="docutils literal">tcsdiagram</tt>;
+<tt class="docutils literal">the_features_are_the_optional_types</tt> and <tt class="docutils literal">tcspecial/tests/types.rs</tt>;
+and <tt class="docutils literal">tcsverify/tests/examples.rs</tt>. No test holds <tt class="docutils literal"><span class="pre">NodeType::ALL</span></tt> to
+<tt class="docutils literal">types_in</tt>, so a type missing from the drawing is caught only through the
+description tests.</p>
+<p>Before a new type is committed:</p>
+<pre class="literal-block">
+cargo fmt --all
+cargo test --workspace --exclude ping_example
+cargo clippy --workspace --all-targets
+make check
+make html-check
+</pre>
+<p><tt class="docutils literal">make check</tt> builds each node type alone, compares the two spellings of
+every shipped configuration, and checks the HTML.</p>
+</div>
+<div class="section" id="a-checklist">
+<h1><a class="toc-backref" href="#toc-entry-16">A Checklist</a></h1>
+<p>For a payload type <tt class="docutils literal">foo</tt>:</p>
+<ol class="arabic simple">
+<li>tcslibgs: <tt class="docutils literal">node/payload/foo/mod.rs</tt>, with <tt class="docutils literal">TYPE</tt>, its <tt class="docutils literal">Params</tt>,
+<tt class="docutils literal">group_kind_of</tt>, <tt class="docutils literal">judged</tt> and tests, and <tt class="docutils literal">pub mod foo</tt>.</li>
+<li><tt class="docutils literal">types.rs</tt>: <tt class="docutils literal">DHType</tt> and <tt class="docutils literal">ALL</tt>, <tt class="docutils literal">spelling</tt>, <tt class="docutils literal">article</tt>,
+<tt class="docutils literal">spellings</tt>, <tt class="docutils literal">EndpointConfig</tt>, <tt class="docutils literal">kind</tt>, <tt class="docutils literal">as_kind</tt>,
+<tt class="docutils literal">kind_of_terms</tt>; and <tt class="docutils literal">endpoint_config.rs</tt> for a new interface.</li>
+<li><tt class="docutils literal">graph/terminals.rs</tt>, and <tt class="docutils literal">graph/link_types.rs</tt> if its types are
+fixed or any.</li>
+<li><tt class="docutils literal">graph/reach.rs</tt>, <tt class="docutils literal">graph/built.rs</tt>, <tt class="docutils literal">graph/interface.rs</tt>,
+<tt class="docutils literal">graph/check.rs</tt>, <tt class="docutils literal">simulate.rs</tt>, <tt class="docutils literal">sim_config.rs</tt> and
+<tt class="docutils literal">parameters.rs</tt>.</li>
+<li>tcspecial: the endpoint, the feature in <tt class="docutils literal">Cargo.toml</tt>, <tt class="docutils literal">BUILT</tt> and
+the rest of <tt class="docutils literal">node/payload/mod.rs</tt>, and both dispatchers in
+<tt class="docutils literal">endpoint.rs</tt>, every one gated by the feature.</li>
+<li>tcssim: <tt class="docutils literal">run_foo_node</tt>, <tt class="docutils literal">PayloadProtocol</tt> and <tt class="docutils literal">run_kind</tt>, and
+<tt class="docutils literal">endpoint.rs</tt>.</li>
+<li>tcsgui: the description, its place in the list of descriptions, both
+configuration schemas and both simulator schemas.</li>
+<li>tcsdiagram: <tt class="docutils literal">NodeType</tt> and its <tt class="docutils literal">appearance</tt>, two ways unlike every
+other type that are not colour.</li>
+<li>The design, the manual, <tt class="docutils literal">CLAUDE.md</tt> and the examples, and their HTML.</li>
+<li>The checks above.</li>
+</ol>
+<p>For a vehicle type, leave out the device, the feature, the endpoint, the
+judgement and the simulator, and add its <tt class="docutils literal">VEHICLE_TYPES</tt> entry, its
+<tt class="docutils literal">carries</tt> branch, its <tt class="docutils literal">Port</tt> and its arms in <tt class="docutils literal">runtime/system.rs</tt>.</p>
+</div>
+</div>
+</body>
+</html>

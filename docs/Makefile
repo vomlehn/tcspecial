@@ -1,7 +1,7 @@
 O = ../OUT
 
 .PHONY: all
-all:	design.html manual.html third-party.html
+all:	design.html manual.html third-party.html node-types.html
 
 # The message-flow figures of "In-flight data across a restart" and "The
 # restart and the beacon, in time", drawn by
@@ -22,6 +22,9 @@ manual.html: manual.rst
 third-party.html: third-party.rst
 	rst2html third-party.rst third-party.html
 
+node-types.html: node-types.rst
+	rst2html node-types.rst node-types.html
+
 .PHONY: clean
 clean:
-	rm -f design.html manual.html third-party.html
+	rm -f design.html manual.html third-party.html node-types.html

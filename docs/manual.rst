@@ -6455,3 +6455,10 @@ See Also
     System (cFS) and JPL's F´ (F Prime). Work in progress.
 
 .. __: https://vomlehn.github.io/tcspecial/docs/third-party.html
+
+`Writing node types`__
+    How to add a node type to TCSpecial: the modules it is written in, what
+    it declares about the data its terminals carry, the lists it must be
+    added to, and how to know it is finished.
+
+.. __: https://vomlehn.github.io/tcspecial/docs/node-types.html

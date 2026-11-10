@@ -366,13 +366,11 @@ ul.auto-toc {
 
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">Links between nodes are being given types, in stages: see &quot;Typed links&quot;
-in the design. What a node type declares about its terminals, which is
-what this guide says, is settled and built, and so is the check of every
-datum against its type as it is delivered. The stages still to come
-change how some nodes read and write -- a <tt class="docutils literal">process</tt>'s text, an app's
-packets, the bridges' channels -- not what a type declares. Where the
-code and the design differ, the code is what is described here.</p>
+<p class="last">Links between nodes carry types: see &quot;Typed links&quot; in the design. All
+of it that a node type declares or relies on is built. What is still to
+come, the commands for the attributes command bindings set, changes
+nothing here. Where the code and the design differ, the code is what is
+described here.</p>
 </div>
 <div class="contents local topic" id="table-of-contents">
 <p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
@@ -540,6 +538,14 @@ one that is not refused, counted and said. So a node may rely on what it is
 given being its type, and needs no check of its own for that. A device's
 own bytes are not a type's encoding; <tt class="docutils literal">format</tt> says how to read them, and
 the node at the edge turns them into the type it sends.</p>
+<p>Only towards the ground is anything added: a string or bytes, which has no
+width of its own, is sent the ground after a count of its bytes, chosen for
+each source by <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> in <tt class="docutils literal">tcslibgs/src/graph/telemetry.rs</tt>
+and written by <tt class="docutils literal">counted</tt> in <tt class="docutils literal">tcslibgs/src/link_type.rs</tt>. A node never
+writes the count itself. Each configuration's own XTCE, which
+<tt class="docutils literal">tcsverify <span class="pre">--xtce</span></tt> writes, says what each node sends the ground, and it
+takes that from <tt class="docutils literal">carries</tt>, so a new type that answers <tt class="docutils literal">carries</tt> needs
+nothing more there.</p>
 </div>
 <div class="section" id="adding-a-payload-type">
 <h1><a class="toc-backref" href="#toc-entry-6">Adding a Payload Type</a></h1>
@@ -674,17 +680,22 @@ runs in the main loop and allocates nothing there.</p>
 list), <tt class="docutils literal">attributes_of</tt>, <tt class="docutils literal">params_of</tt> with its <tt class="docutils literal">Params</tt>, and
 <tt class="docutils literal">produces</tt>. Its terminals' types come from <tt class="docutils literal">carries</tt>, which gives a
 function <tt class="docutils literal"><span class="pre">type-in</span></tt> and <tt class="docutils literal"><span class="pre">type-out</span></tt>, both required, unless it has a branch
-of its own as <tt class="docutils literal">vote</tt> and <tt class="docutils literal">to_kelvin</tt> have.</p>
+of its own as <tt class="docutils literal">vote</tt> and <tt class="docutils literal">to_kelvin</tt> have. A function that narrows
+which types it takes, as <tt class="docutils literal">process</tt> takes only types with a text form
+(<tt class="docutils literal">tcslibgs/src/link_text.rs</tt>), refuses the others in <tt class="docutils literal">params_of</tt>,
+naming the attribute and the types it may be.</p>
 <p>tcsgui offers a function as a node of its own, from
 <tt class="docutils literal"><span class="pre">tcsgui/share/nodes/vehicle/compute/&lt;function&gt;.yaml</span></tt> with
-<tt class="docutils literal">sets: {function: &lt;function&gt;}</tt>. The Python ground's <tt class="docutils literal">form.py</tt> lists
-which functions produce values and which decisions, in <tt class="docutils literal">VALUE_FUNCTIONS</tt>
-and <tt class="docutils literal">DECISION_FUNCTIONS</tt>.</p>
+<tt class="docutils literal">sets: {function: &lt;function&gt;}</tt>. The Python ground needs nothing for it:
+how it shows what a node sends follows from the type, in <tt class="docutils literal">form.py</tt>.</p>
 </div>
 <div class="section" id="adding-a-gateway-type">
 <h1><a class="toc-backref" href="#toc-entry-12">Adding a Gateway Type</a></h1>
 <p>A gateway type is a <tt class="docutils literal">GatewayKind</tt> in <tt class="docutils literal">tcslibgs/src/gateway.rs</tt>, in
 <tt class="docutils literal">ALL</tt>, <tt class="docutils literal">name</tt>, <tt class="docutils literal">is_built</tt>, <tt class="docutils literal">on_bus</tt>, <tt class="docutils literal">framed</tt> and <tt class="docutils literal">node_type</tt>.
+If its ground decodes what it is sent by XTCE, as Yamcs does, the count
+before a string or bytes must be XTCE's, so <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> must
+give it <tt class="docutils literal"><span class="pre">Count::Xtce</span></tt>.
 The Python ground lists gateway types by hand, in <tt class="docutils literal">GATEWAY_BASES</tt> and
 <tt class="docutils literal">ON_BUS</tt> in <tt class="docutils literal">python/tcslibgs/configuration.py</tt>. Its description in tcsgui
 is at the top of <tt class="docutils literal">tcsgui/share/nodes/</tt>, and since it has no node module,

@@ -2,13 +2,11 @@
 Writing Node Types
 ===================
 .. note::
-   Links between nodes are being given types, in stages: see "Typed links"
-   in the design. What a node type declares about its terminals, which is
-   what this guide says, is settled and built, and so is the check of every
-   datum against its type as it is delivered. The stages still to come
-   change how some nodes read and write -- a ``process``'s text, an app's
-   packets, the bridges' channels -- not what a type declares. Where the
-   code and the design differ, the code is what is described here.
+   Links between nodes carry types: see "Typed links" in the design. All
+   of it that a node type declares or relies on is built. What is still to
+   come, the commands for the attributes command bindings set, changes
+   nothing here. Where the code and the design differ, the code is what is
+   described here.
 
 .. contents:: Table of Contents
    :depth: 2
@@ -170,6 +168,15 @@ given being its type, and needs no check of its own for that. A device's
 own bytes are not a type's encoding; ``format`` says how to read them, and
 the node at the edge turns them into the type it sends.
 
+Only towards the ground is anything added: a string or bytes, which has no
+width of its own, is sent the ground after a count of its bytes, chosen for
+each source by ``Telemetered::count`` in ``tcslibgs/src/graph/telemetry.rs``
+and written by ``counted`` in ``tcslibgs/src/link_type.rs``. A node never
+writes the count itself. Each configuration's own XTCE, which
+``tcsverify --xtce`` writes, says what each node sends the ground, and it
+takes that from ``carries``, so a new type that answers ``carries`` needs
+nothing more there.
+
 Adding a Payload Type
 =====================
 In ``tcslibgs``
@@ -316,18 +323,23 @@ In tcslibgs, ``node/vehicle/compute/mod.rs`` holds the function's
 list), ``attributes_of``, ``params_of`` with its ``Params``, and
 ``produces``. Its terminals' types come from ``carries``, which gives a
 function ``type-in`` and ``type-out``, both required, unless it has a branch
-of its own as ``vote`` and ``to_kelvin`` have.
+of its own as ``vote`` and ``to_kelvin`` have. A function that narrows
+which types it takes, as ``process`` takes only types with a text form
+(``tcslibgs/src/link_text.rs``), refuses the others in ``params_of``,
+naming the attribute and the types it may be.
 
 tcsgui offers a function as a node of its own, from
 ``tcsgui/share/nodes/vehicle/compute/<function>.yaml`` with
-``sets: {function: <function>}``. The Python ground's ``form.py`` lists
-which functions produce values and which decisions, in ``VALUE_FUNCTIONS``
-and ``DECISION_FUNCTIONS``.
+``sets: {function: <function>}``. The Python ground needs nothing for it:
+how it shows what a node sends follows from the type, in ``form.py``.
 
 Adding a Gateway Type
 =====================
 A gateway type is a ``GatewayKind`` in ``tcslibgs/src/gateway.rs``, in
 ``ALL``, ``name``, ``is_built``, ``on_bus``, ``framed`` and ``node_type``.
+If its ground decodes what it is sent by XTCE, as Yamcs does, the count
+before a string or bytes must be XTCE's, so ``Telemetered::count`` must
+give it ``Count::Xtce``.
 The Python ground lists gateway types by hand, in ``GATEWAY_BASES`` and
 ``ON_BUS`` in ``python/tcslibgs/configuration.py``. Its description in tcsgui
 is at the top of ``tcsgui/share/nodes/``, and since it has no node module,

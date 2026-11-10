@@ -600,6 +600,330 @@ Requirement
     configuration that passed the ground check and stopped delivering when it
     flew would be the worst of both checks.
 
+Typed links
+-----------
+
+.. note::
+   **Not built yet.** This section is the design the links between nodes
+   are being moved to, agreed before any of it is written. Where it and the
+   rest of this document disagree, the rest says what runs today, and
+   `What typed links replace`_ lists the passages it will change.
+
+What travels a link has been bytes, and what the bytes meant was each
+node's own business: a conversion knew its sensor's two bytes were a signed
+count, a vote knew four bytes were a value, a heater's line knew a ``1``
+when it saw one. Nothing between them knew, so a link from a thermostat to a
+vote was a configuration that loaded and then refused every datum it
+carried, and the ground learnt what a source sent from the code that sent
+it. A link now carries a *type*, stated in XTCE, and both nodes it joins
+say what it is.
+
+Types
+~~~~~
+
+Requirement
+    Every type a link can carry is stated once, in
+    ``tcslibgs/xtce/types.xtce``, and the Rust that holds and checks a datum
+    of each is what tcs-xtce generates from it, committed beside the code
+    generated from ``link.xtce``. No node type has a document of types of its
+    own: what any terminal carries is one of these, or built from them.
+
+The types are few, because what a vehicle's nodes hand each other is:
+
+``u8``, ``u16``, ``u32``, ``u64``, ``i8``, ``i16``, ``i32``, ``i64``
+    Whole numbers. A sensor's reading as it came off the part, a set of GPIO
+    lines, what a thermostat drives a heater's switch with.
+
+``boolean``
+    True or false, where something wants to be told one and nothing else.
+
+One value type for each unit
+    ``kelvin``, ``volts``, ``amperes``, ``watts``, ``metres``,
+    ``metres_per_second``, ``newtons``, ``kilograms_per_second`` and
+    ``ratio``: a value as it is today, a 32-bit signed count of the unit's
+    step (see `Compute elements`_), stated as an integer encoding with the
+    calibrator that makes it the unit and the unit's symbol in its unit set.
+
+Bounded strings and bounded bytes
+    Text and opaque data, each with the most it may hold, so that a datum of
+    either is a buffer of known size and holding one allocates nothing.
+
+Requirement
+    ``types.xtce`` is the one table of units: the list in
+    ``tcslibgs/src/unit.rs`` -- each unit's symbol, its name and its step --
+    is generated from it rather than written beside it. Adding a unit is
+    adding a type to ``types.xtce``.
+
+Requirement
+    A *structure* is a list of named fields, each of one of the types above,
+    written in the configuration of a node whose data are several things at
+    once -- an inertial unit's three axes, a power monitor's volts and amps:
+
+    .. code-block:: yaml
+
+       - payload: imu
+         format: [x: i16_be, y: i16_be, z: i16_be]
+
+    It is a structure because the node says so and not because a type in
+    ``types.xtce`` does, so a new part's layout needs no new build. A
+    structure holds at most sixteen fields, so that a datum of one is of a
+    size known before anything runs.
+
+Every terminal carries one type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The type belongs to the terminal and not to the node, because a node's two
+ends are often different things: a thermostat reads a temperature, is set a
+temperature, and drives a switch with a number.
+
+Requirement
+    Each terminal of a node carries one type: its ``world-in``,
+    ``world-out``, ``moc-in`` and ``moc-out``, each named input such as a
+    vote's ``in0``, and each attribute a command can set. Which type is the
+    node type's to say, either outright or by an attribute of the node:
+
+    .. list-table::
+       :header-rows: 1
+       :widths: 22 39 39
+
+       * - node type
+         - takes
+         - sends
+       * - a sensor (``i2c``, ``spi``, their ``_tmass`` kinds, ``serial``,
+           ``network``, ``can``)
+         - what the ``moc-in`` side asks it with, where it is asked
+         - the integer or structure its ``format`` states
+       * - ``to_kelvin``, ``to_value``
+         - the integer its ``format`` states
+         - the value type its ``type-out`` names; ``to_kelvin``'s is
+           ``kelvin``
+       * - ``vote``
+         - its ``type``, at every input
+         - its ``type``
+       * - ``thermostat``
+         - its ``type-in``, which its ``setpoint`` and ``half_band`` are in
+         - its ``type-out``
+       * - ``process``
+         - its ``type-in``
+         - its ``type-out``
+       * - ``gpio_out``, ``gpio_inout``
+         - the integer its lines need
+         - the same integer, reported
+       * - ``gpio_in``
+         - anything, as a request for a report
+         - the integer its lines need
+       * - ``tee-payload``, ``tee-gateway``
+         - its ``type``
+         - its ``type``, at both sources
+       * - app nodes
+         - ``world-in-type``, ``moc-in-type``, as it has those terminals
+         - ``world-out-type``, ``moc-out-type``, likewise
+       * - ``null-payload``, ``null-gateway``
+         - any type
+         - nothing
+       * - a gateway node
+         - any type, at ``world-in``
+         - at ``moc-out``, the type of whatever each link reaches
+
+Requirement
+    A computation turns what it decides into its own output type, and
+    nothing between nodes does it for it. A thermostat decides on or off and
+    sends its ``type-out``: ``1`` or ``0`` of the switch's integer where it
+    drives a heater, true or false where it sends a ``boolean``. There is no
+    node whose only work is to change one type into another.
+
+A link's type is stated at both ends
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A link has no type of its own to state: it has the types its two terminals
+carry, and the two must be the same.
+
+Requirement
+    A link is valid only where the type its source terminal sends is the
+    type its sink terminal takes, the same type exactly. A ``u8`` is not a
+    ``u16``, a ``boolean`` is not a ``u8`` that holds ``0`` or ``1``, and a
+    value in kelvin is not one in volts. A link that joins two others is
+    refused when the configuration is read, naming the link, its two nodes
+    and the two types.
+
+Requirement
+    Nothing is inferred. A node that could take any type -- a vote, a tee, a
+    thermostat, a program -- says which in its configuration, and the link
+    into it is checked against what it said, not against what is upstream.
+    So a link is judged by its two ends alone: the order links are written
+    in cannot matter, a loop of nodes needs no rule of its own, and a
+    refusal names one link.
+
+Requirement
+    A node that takes any type takes what it is given, and that is a
+    statement of what it is rather than a type left out: a null node
+    discards what arrives whatever it is, and a gateway node's ``world-in``
+    takes every source drawn into it, each of its own type, each to a port
+    of its own (`Terminals: where a link is attached`_). What reaches the
+    ground from a source is the source's type.
+
+The cost is a type written where it could have been worked out: a vote over
+three conversions to kelvin says ``type: kelvin``, which its inputs already
+said. It is written anyway, for the reason a function's parameters are: a
+link drawn to the wrong vote is refused where it is drawn, rather than
+changing what the vote is.
+
+Type and encoding
+~~~~~~~~~~~~~~~~~
+
+Between two nodes a datum is held, not encoded: the vehicle hands a vote a
+value in kelvin, and how many bytes in what order is no question until the
+datum leaves tcspecial.
+
+Requirement
+    A link compares types as values -- a whole number of so many bits, true
+    or false, a value in a unit, a structure of named fields -- and not as
+    bytes. How a datum is written where it leaves tcspecial or arrives at it
+    is the business of the node at that edge, and of nothing else.
+
+Requirement
+    The node at each edge chooses its encoding, from those its type knows,
+    by an attribute as ``format`` does now:
+
+    * a device: the bytes its part sends or wants, which its ``format``
+      says, ``i16_be`` and the rest (see `Compute elements`_);
+    * the gateway node: what the ground receives, as each source's
+      parameter in the configuration's own XTCE says (see `The
+      configuration's own XTCE`_);
+    * an app node: the XTCE encoding of each terminal's type (see `App
+      nodes`_);
+    * a ``process``: a line of text (see `App nodes`_).
+
+Requirement
+    A datum that cannot be read as the type its edge expects is refused and
+    counted, never guessed at: two bytes where a ``u32`` was due, a line a
+    program wrote that is not a number, a ``u8`` from the ground with a bit
+    set outside the lines it drives.
+
+GPIO lines
+~~~~~~~~~~
+
+Requirement
+    The lines of a GPIO node are one unsigned integer, the narrowest of
+    ``u8``, ``u16``, ``u32`` and ``u64`` that holds as many bits as the node
+    has lines. Bit 0 is the first line the node lists, bit 1 the next, and so
+    on; a set of one line is a ``u8`` whose bit 0 is that line.
+
+Requirement
+    Only the bits the node has lines for may be set. A ``gpio_out`` or
+    ``gpio_inout`` sent a number with any other bit set refuses it, counts
+    it and leaves its lines as they were: the bit names no line, so driving
+    from it would be guessing what was meant.
+
+Requirement
+    Nothing between nodes reads the integer as on or off. It travels as a
+    number, to the switch, to the ground, to the simulator; the one place it
+    is compared with nought is a heater in tcssim's ``thermal_mass``, which
+    is on when the integer it is driven with is not nought.
+
+Requirement
+    A ``gpio_in`` sends the levels of its lines, as that integer, every
+    ``state_interval``, and nothing else. It sends no record of an edge:
+    what the ground and the vehicle want of a watched line is what it is,
+    and a line that changes and changes back within one interval goes
+    unseen, which is the interval's to decide. Its ``edge`` attribute and
+    the sixteen-byte records it asked for are gone.
+
+Programs at the edge
+~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    A ``process`` still reads a line per arrival and answers a line, and
+    each type has one way of being written as text: a value in decimal in
+    its unit, as now; an integer in decimal; a ``boolean`` as ``1`` or
+    ``0``; a structure as its fields, ``name=value``, separated by spaces --
+    ``x=0.12 y=-0.40 z=9.81``. tcspecial converts at the pipe both ways, and
+    an answer that is not its ``type-out`` written so is refused and counted.
+
+Requirement
+    An app node's packets are still four bytes of length and then the
+    packet, and each packet is the XTCE encoding of the type its terminal
+    carries -- the bytes the ground is sent for that type. A packet an app
+    writes that does not decode as its terminal's type is refused and
+    counted. ``tcsapp`` reads and writes a terminal's type through the code
+    tcs-xtce generates from it, and a program in C, C++ or Python uses that
+    language's.
+
+Requirement
+    Each terminal of an app carries one type, so an app that drives two
+    things of different types is two app nodes. A packet that said which of
+    several types it is would need a tag the program wrote and a link check
+    that took any of several, and nothing yet needs that.
+
+Requirement
+    The F´ and cFS bridges write each source to a channel of the source's
+    type, from the type its terminal states rather than from what kind of
+    node it is: an ``F64`` in its unit for a value, ``U8`` to ``U64`` and
+    their signed kinds for an integer, a ``bool`` for a ``boolean``.
+
+The configuration's own XTCE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Requirement
+    Each configuration has an XTCE document of its own, beside it, named
+    for it -- ``examples/thermostat/thermostat.xtce`` -- which states what
+    the vehicle sends the ground and takes from it. Each node that reports
+    to a gateway node is a parameter, named for the node, of the type its
+    ``world-out`` sends, in a container of its own; each attribute a command
+    binding sets is an argument of a command of that attribute's type. The
+    types it uses are copied into it from ``types.xtce``, so that a ground
+    station is given one file.
+
+Requirement
+    ``tcsverify`` writes it from the configuration and ``types.xtce``, and
+    nobody writes it by hand: everything it says is said there already. It
+    is committed beside the configuration, and ``make check`` fails when it
+    is not what ``tcsverify`` would write, so that the ground's interface and
+    the vehicle's configuration are reviewed together. It replaces the
+    mission database generated for Yamcs today.
+
+Requirement
+    It is the ground's, and it does not go on the vehicle (`What goes on the
+    vehicle`_). It needs no digest of its own: what it says is fixed by the
+    configuration, which the configuration's checksum covers, and by
+    ``types.xtce``, which the interface digest covers.
+
+Requirement
+    ``types.xtce`` is part of the interface: the interface digest is of
+    ``link.xtce`` and ``types.xtce`` together. A vehicle and a ground built
+    from different statements of what a ``kelvin`` is are two interfaces, and
+    refuse each other as two interfaces do.
+
+The ping node's ``ping.xtce`` stays what it is, `A node type's interface
+document`_: it states the fields inside the bounded string a ping and its
+answer are, for ground stations that read XTCE, and the link carries the
+string.
+
+What typed links replace
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+These passages describe the untyped links and change as typed links are
+built:
+
+* `Compute elements`_: a value's unit is worked out from the graph by
+  ``tcslibgs::graph::units``; under typed links each node states it, and
+  that module goes. A decision is the text ``1`` or ``0``; it becomes the
+  ``type-out`` of the thermostat that makes it, and ``from_decision`` reads
+  text only where a ``process`` writes it.
+* `App nodes`_: a packet's bytes are the program's business; they become
+  its terminal's type, encoded.
+* `GPIO Payloads: Discrete Lines`_: the ``edge`` attribute, the sixteen-byte
+  records, and lines driven by the text ``1`` or ``0``.
+* `Gateways: what the vehicle answers to`_, F´: a source's channel is chosen
+  by the kind of node it is.
+* `The way in, and the interface`_: the interface is ``link.xtce`` alone.
+* The Yamcs mission database, written for the Yamcs gateway node, which the
+  configuration's own XTCE replaces.
+
+Logs are left as they are. A log node takes any number of sources and
+records their bytes, and how logging is to work is to be designed again;
+until it is, a log node accepts any type, as a null node does.
+
 What tcspecial itself is configured with
 ----------------------------------------
 

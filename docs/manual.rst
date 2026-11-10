@@ -895,7 +895,7 @@ time it is read, in one of two orders:
      - The least time between reads of a payload nothing asks: a floor
      - Only without ``trigger``, only in no group, and only on a part that originates nothing: I\ :superscript:`2`\ C, SPI or a device file
    * - ``state_interval``
-     - How often a GPIO input's levels are reported, beside its edges
+     - How often a GPIO input's levels are reported
      - GPIO inputs
 
 A payload in a group states neither ``trigger_interval`` nor
@@ -1363,8 +1363,8 @@ source for world data, when what goes through them is moc data both ways.
                   as a length of time: 50 us. Default none, applied by the
                   kernel, watched lines only
    state_interval how often to report what the watched lines are, or what
-                  a gpio_inout's lines were last told. Default none;
-                  required of a gpio_inout
+                  a gpio_inout's lines were last told. Required of a
+                  gpio_in and a gpio_inout
    init           what driven lines start at, as a trigger is written:
                   '"0"'. gpio_out and gpio_inout only
    sim_address    where tcssim answers for the lines over UDP when they
@@ -1372,58 +1372,25 @@ source for world data, when what goes through them is moc data both ways.
                   127.0.0.1:5204. Optional; used under --simulate=some or
                   all instead of the chip, and not under none
 
-**How lines are watched.** Two different questions, and a set of lines may ask
-either or both:
-
-.. code-block:: text
-
-   edge             when a line changes, say so
-   state_interval   every so often, say what the lines are
-
-So there are four ways to write it, and each is what it looks like:
-
-.. code-block:: text
-
-   lines: 3, 4                            changes, both edges (the default)
-   lines: 3, 4   edge: rising             changes, one edge
-   lines: 3, 4   state_interval: 5 s      what they are, every five seconds
-   lines: 3, 4   state_interval: 5 s      both: changes as they happen, and
-                                          what they are every five seconds
-
-   lines: 3, 4   edge: none               refused: nothing would be sent
-
-Edges are what a record is made of, so they are the default and a file that
-says nothing about watching gets them. The report exists for two things edges
-cannot do: a line that has not changed since the vehicle started tells the
-ground nothing about itself, and the kernel's queue of events is finite, so a
-burst can leave the ground holding a value that is wrong. A report every so
-often ends both: after one interval at most, what the ground has is what the
-lines are. A datum arriving at ``world-in`` asks for one at once, whatever
-the datum says.
-
-Asking for neither takes saying ``edge: none`` with no ``state_interval``, and
-that is refused -- lines watched for no changes and reported at no interval
-would send nothing at all.
+**How lines are watched.** A ``gpio_in`` reports what its lines are every
+``state_interval``, which it has to state: one unsigned whole number, the
+narrowest of ``u8``, ``u16``, ``u32`` and ``u64`` with a bit for each line, bit
+0 the first line the node lists. The first report is due as the node opens,
+and a datum arriving at ``world-in`` asks for one at once, whatever the datum
+says. A line that changes and changes back within one interval goes unseen;
+the interval is how fine the configuration looks. There are no edges: a file
+that states ``edge`` is refused and told to take it out.
 
 The watching terms are refused outright on a ``gpio_out`` rather than
-ignored: an edge, a debounce or a report of a line nothing reads is a file
+ignored: a bias, a debounce or a report of a line nothing reads is a file
 saying something it does not mean, and the usual cause is a set of lines
 turned into a ``gpio_out`` with its other words left as they were. A
 ``gpio_inout`` takes ``state_interval`` alone of them, for its report.
 
-This is the one type whose payload data is made rather than carried. A line
-has no bytes: it is high or low, and what the ground wants is when it changed.
-So each change becomes a record of sixteen bytes -- eight of time in
-microseconds since the epoch, four of line offset, four of the value it became
--- and a read takes whole records only, so a ``read_size`` must be a whole
-number of them. One that is not is refused where the file is read: room left
-unfilled on every read, or, smaller than a record, a node that would never
-deliver anything.
-
-A report makes the same record, one per watched line: this line, this value,
-this time. The ground reads the two alike, which is the point of their being
-the same record; the only difference is that a change carries the time of the
-change and a report carries the time it was looked at.
+This is the one type whose payload data is made rather than carried: a line
+has no bytes, it is high or low, and a set of lines is that one number. It
+states no ``read_size``, its width being its lines', and one that states one
+is refused.
 
 Two payloads may watch one chip and may not watch one line: the kernel gives a
 line to one request at a time, so the second handler's start would fail.
@@ -1446,9 +1413,9 @@ temperature crosses the other threshold. What goes on out of ``moc-out`` is
 the transitions only, as a log and a ground link are sent them, so a reader
 still sees when the heaters actually switched.
 
-A GPIO payload cannot be triggered: watched lines report on their edges and
-their ``state_interval`` and are asked by what arrives at ``world-in``, and
-driven lines are set by what arrives at ``moc-in``.
+A GPIO payload cannot be triggered: watched lines report on their
+``state_interval`` and are asked by what arrives at ``world-in``, and driven
+lines are set by what arrives at ``moc-in``.
 
 The simulator moves lines through the kernel's ``gpio-sim``, which it finds
 rather than makes: loading the module and making a chip need root, and tcssim
@@ -1467,15 +1434,15 @@ there, by the same rules. One datagram is one state of the lines, an ASCII
 lines 4 and 5 with 4 asserted -- both ways: what the vehicle drives its lines
 to, and what watched lines are, which tcssim sends whenever they change.
 tcspecial says hello with an empty datagram, so that tcssim knows where to
-answer, and makes of each change the record an edge on a chip would be,
-keeping to the node's ``edge``. Everything else -- reports, ``state_interval``,
-what is passed on by ``moc-out`` -- is as it is on a chip. Under ``none``, the
+answer, and keeps the last state tcssim sent as what the lines are.
+Everything else -- reports, ``state_interval``, what is passed on by
+``moc-out`` -- is as it is on a chip. Under ``none``, the
 flight setting, the chip is opened.
 
 ``tcspecial/tests/kernel-dummies.rs`` flies `The gpio example`_ on such a
-chip, pulling and reading its lines itself rather than through tcssim: each
-pull of the switch's line reaches the ground as a record, and a ``1`` or
-``0`` from the ground is what the lamp's line becomes. ``sudo
+chip, pulling and reading its lines itself rather than through tcssim: the
+switch's line reaches the ground in its reports as bit 0 of a ``u8``, and the
+``u8`` 1 or 0 from the ground is what the lamp's line becomes. ``sudo
 bin/mk-kernel-dummies gpio`` makes the chip and gives it, and its lines'
 pulls, to the user who ran it; see `Making the Kernel's Dummy Devices`_.
 
@@ -3354,11 +3321,11 @@ The gpio example
 
 Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. ``switch`` watches line 0
-for both edges: each becomes a sixteen-byte record -- when, which line, and
-what it became -- that goes by its ``world-out`` to ``moc`` and down to
-the MOC at ``127.0.0.1:3722``. ``lamp`` drives line 1: what the ground sends
-up to ``127.0.0.1:3620`` leaves ``moc`` by its ``moc-out`` for it, the
-text ``1`` lighting the lamp and ``0`` putting it out.
+and twice a second reports it, as the ``u8`` the line is bit 0 of, by its
+``world-out`` to ``moc`` and down to the MOC at ``127.0.0.1:3722``. ``lamp``
+drives line 1: what the ground sends up to ``127.0.0.1:3620`` leaves ``moc``
+by its ``moc-out`` for it, the ``u8`` 1 lighting the lamp and 0 putting it
+out.
 
 The chip is one of the kernel's ``gpio-sim``, which ``sudo
 bin/mk-kernel-dummies`` makes. The configuration names ``/dev/gpiochip1``,

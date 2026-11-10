@@ -509,14 +509,6 @@
             "null"
           ]
         },
-        "edge": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
         "bias": {
           "type": [
             "string",
@@ -526,7 +518,7 @@
           ]
         },
         "state_interval": {
-          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
+          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s: one whole number with a bit for each line, the first line listed bit 0. Required of a gpio_in, and of a gpio_inout, which reports what its lines were last told.",
           "type": [
             "string",
             "number",
@@ -1177,14 +1169,6 @@
             "null"
           ]
         },
-        "edge": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
         "bias": {
           "type": [
             "string",
@@ -1194,7 +1178,7 @@
           ]
         },
         "state_interval": {
-          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
+          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s: one whole number with a bit for each line, the first line listed bit 0. Required of a gpio_in, and of a gpio_inout, which reports what its lines were last told.",
           "type": [
             "string",
             "number",
@@ -1869,14 +1853,6 @@
             "null"
           ]
         },
-        "edge": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
         "bias": {
           "type": [
             "string",
@@ -1886,7 +1862,7 @@
           ]
         },
         "state_interval": {
-          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s. Events say when a line changed and this says what the lines are, so a payload may ask for either or both. It exists for the two things edges cannot do: a line that has not changed since the vehicle started tells the ground nothing, and the kernel's event queue is finite, so a burst can leave the ground holding a value that is wrong. Inputs only.",
+          "description": "How often to report what a set of discrete lines is, as a length of time: 5 s: one whole number with a bit for each line, the first line listed bit 0. Required of a gpio_in, and of a gpio_inout, which reports what its lines were last told.",
           "type": [
             "string",
             "number",

@@ -250,7 +250,6 @@ pub(crate) fn endpoint_of(
                 path: path.clone(),
                 inputs: gpio.inputs.clone(),
                 outputs: gpio.outputs.clone(),
-                edge: gpio.edge,
                 bias: gpio.bias,
                 debounce: gpio.debounce,
                 state_interval: gpio.state_interval,

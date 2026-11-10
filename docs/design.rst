@@ -616,8 +616,9 @@ Typed links
    ``type-out``, a ``boolean`` or a whole number; GPIO lines driven and
    reported as one unsigned whole number, a bit outside them refused; and
    a thermal mass's heater on where what it is driven with is not nought.
-   Still to come: a ``gpio_in``'s levels in place of its edge records, a
-   ``process``'s text forms, apps' packets, the F´ and cFS bridges'
+   A ``gpio_in`` reports its lines' levels as that number every
+   ``state_interval``, and has no edges. Still to come: a ``process``'s text
+   forms, apps' packets, the F´ and cFS bridges'
    channels of each type -- a whole number is still a ``Datum`` channel
    there -- and each configuration's own XTCE. Where
    the rest of this section and the rest of this document disagree, the
@@ -940,8 +941,6 @@ built:
 
 * `App nodes`_: a packet's bytes are the program's business; they become
   its terminal's type, encoded.
-* `GPIO Payloads: Discrete Lines`_: the ``edge`` attribute and the
-  sixteen-byte records.
 * `Gateways: what the vehicle answers to`_, F´: a source's channel is chosen
   by the kind of node it is.
 * The Yamcs mission database, written for the Yamcs gateway node, which the
@@ -9537,8 +9536,8 @@ Griffin are "Astrobotic".
        Corporation, Alta Data Technologies
      - Chang'e
    * - Time at the tone (a timing signal and the time it marks)
-     - not supported: the edge can be watched as ``gpio_in``, but nothing
-       sets a clock or stamps data by it
+     - not supported: the line's level can be reported as ``gpio_in``, but
+       nothing sets a clock or stamps data by it
      - built in: the PPS subsystem, ``pps-gpio``
      - Astrobotic
    * - Analog telemetry channels
@@ -10364,10 +10363,10 @@ GPIO Payloads: Discrete Lines
 Experimental`_.
 
 Not every payload is a stream of data. A deployment switch, an arming line, a
-thermostat's output: each is one wire that is high or low, and what the ground
-wants to know is when it changed. Linux offers those through a chip's
-character device, where a program asks for a set of lines with edge detection
-and then reads events.
+thermostat's output: each is one wire that is high or low. Linux offers those
+through a chip's character device, where a program asks for a set of lines
+and reads or sets their values together. A set of lines is one unsigned whole
+number, a bit for each line: see `GPIO lines`_.
 
 The rules are in ``tcslibgs::node::payload::gpio``, the endpoint in
 ``tcspecial::node::payload::gpio`` and the simulation in
@@ -10394,9 +10393,10 @@ Requirement
     file in the other old words is.
 
 Requirement
-    Each states a ``path`` and its ``lines``. A ``gpio_in`` may state the
-    ``edge``, the ``bias``, a ``debounce`` and a ``state_interval``, and a
-    ``gpio_inout`` must state the ``state_interval`` it reports on. Offsets
+    Each states a ``path`` and its ``lines``. A ``gpio_in`` must state the
+    ``state_interval`` it reports on and may state the ``bias`` and a
+    ``debounce``, and a ``gpio_inout`` must state the ``state_interval`` it
+    reports on. Offsets
     are separated by commas or spaces and written in decimal or hexadecimal,
     because a file written for a board copies them out of a schematic in
     whichever form the schematic used.
@@ -10420,67 +10420,39 @@ Requirement
     through three numbers made as the node opens, so that nothing is
     allocated as data passes.
 
-Two ways of watching, and a set of lines may ask for either or both
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What a set of lines reports
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``edge`` says *when a line changed*; ``state_interval`` says *what the lines
-are*, every so often. They answer different questions, so a payload may ask
-for one, the other, or both:
-
-.. code-block:: text
-
-   edge: both                         changes, which is the default
-   edge: rising                       changes, one way only
-   state_interval: 5 s                what they are, every five seconds
-   edge: both, state_interval: 5 s    both
-   edge: none                         refused: nothing would be sent
+A ``gpio_in`` reports *what its lines are*, every ``state_interval``, as one
+whole number with a bit for each; and nothing else. It used to report *when
+a line changed*, as records of the kernel's edge events, and that is gone:
+what the ground and the vehicle want of a watched line is what it is.
 
 Requirement
-    Edges are the default. A payload that says nothing about watching is
-    watched for both of them, which is what every file written before the
-    report existed asked for and still means.
+    A file that states ``edge`` is refused, told that a set of lines reports
+    its levels every ``state_interval`` and to take ``edge`` out. A line that
+    changes and changes back within one interval goes unseen, and the
+    interval is how a configuration says how fine it looks.
 
 Requirement
     A report is made with one ioctl on the line request the payload already
     holds -- ``GPIO_V2_LINE_GET_VALUES_IOCTL`` -- and not with a second
     request. The kernel gives a line to one request at a time, so a second
-    request for the same lines is a payload that could not start.
-
-Requirement
-    A report makes the same sixteen-byte record an event does, one per line.
-    The ground reads the two alike, which is the point: both say that this
-    line had this value at this time. The difference is whose time it is --
-    an event carries the moment the line changed, a report the moment the
-    vehicle looked -- and anything measuring how long an edge took to arrive
-    reads the events.
-
-Requirement
-    The report exists for the two things edges cannot do. A line that has not
-    changed since the vehicle started tells the ground nothing about itself;
-    and the kernel's event queue is finite, so a burst can leave the ground
-    holding a value that is wrong with no way to know it. A report every so
-    often ends both: after one interval at most, what the ground has is what
-    the lines are.
+    request for the same lines is a payload that could not start. The lines
+    are asked for with no edge detection, so there is nothing else to read.
 
 Requirement
     The report's clock runs from when a report was due and not from when it
     was made, and a report missed by more than an interval is not made up
     for. What the ground wants is what the lines are now, so a vehicle that
-    was busy sends one report late rather than several together.
-
-Requirement
-    A payload that asks for neither is refused: ``edge: none`` with no
-    ``state_interval`` is a set of lines watched for no changes and reported
-    at no interval, which would send nothing at all. Saying it takes writing
-    ``edge: none``, so it is not a thing a file does by leaving something
-    out.
+    was busy sends one report late rather than several together. The first
+    is due as the node opens.
 
 Requirement
     ``poll_interval`` is not a GPIO word. It is the least time between reads
     of a descriptor whose data appears because the vehicle reads -- see
-    `How a node is driven`_ -- and a line request is read when there are
-    events in it. What a set of lines states instead is ``state_interval``,
-    which is a cadence and says so.
+    `How a node is driven`_. What a set of lines states instead is
+    ``state_interval``, which is a cadence and says so.
 
 Requirement
     A payload names at least one line, names none of them twice, and names no
@@ -10490,18 +10462,9 @@ Requirement
 
 Requirement
     This is the one type whose payload data is made rather than carried, so
-    its shape is settled here: each event becomes a record of sixteen bytes
-    -- eight of time, four of line offset, four of value. The time is a
-    timestamp as every other time here is: microseconds since the UNIX epoch,
-    most significant byte first, and all ones for a clock that could not be
-    read. A line's change and a telemetry response can then be read against
-    each other, which is the whole reason the field is a time since the epoch
-    at all; the kernel's own timestamp is nanoseconds on a monotonic clock,
-    which says nothing to a ground station.
-
-Requirement
-    A ``packet_size`` that is not a whole number of records is refused. A
-    packet that was part of a record would be a reading nobody could use.
+    its shape is settled here: one unsigned whole number, as `GPIO lines`_
+    says. A set of lines states no ``read_size``, its width being its lines',
+    and one that states one is refused.
 
 Requirement
     A chip is shared and a line is not. Several payloads commonly watch lines
@@ -10510,17 +10473,17 @@ Requirement
     handlers of which the second could not start.
 
 Requirement
-    ``edge``, ``bias``, ``debounce`` and ``state_interval`` are refused on a
+    ``bias``, ``debounce`` and ``state_interval`` are refused on a
     ``gpio_out``, and all but ``state_interval`` on a ``gpio_inout``, rather
-    than ignored. They are about watching a line, an
-    output has no edges to report and nothing to debounce, and a file that
+    than ignored. They are about watching a line, an output has nothing to
+    hold or debounce, and a file that
     states one of them for driven lines is saying something it does not mean
     -- commonly a set of lines turned into a ``gpio_out`` with its other
     terms left as they were. The refusal names the term that was missed.
 
 Requirement
-    A GPIO payload cannot be triggered. Watched lines report on their edges
-    and their ``state_interval`` and are asked by what arrives at
+    A GPIO payload cannot be triggered. Watched lines report on their
+    ``state_interval`` and are asked by what arrives at
     ``world-in``; driven lines are set by what arrives at ``moc-in``. A
     trigger would be one of those arriving on a clock, and a heater driven
     because a timer went off is the worst of them.
@@ -10546,13 +10509,6 @@ Requirement
     the name beside the line.
 
 Requirement
-    The line request's descriptor is read without waiting. A read gathers
-    every event that is waiting, so a blocking descriptor would have it wait
-    for the next one after collecting the last -- a conduit stopped until a
-    line happened to change again, holding the events it had already
-    gathered.
-
-Requirement
     The kernel's structures are declared in the endpoint and their sizes
     asserted against the kernel's own. ``libc`` has no GPIO character-device
     definitions, and a structure of the wrong size is an ioctl that reads past
@@ -10575,8 +10531,8 @@ Requirement
 Requirement
     The packet and segment sizes and the faults mean nothing to a simulated
     set of discretes, and it says so rather than appearing to obey them. There
-    are no bytes to size, drop, corrupt or truncate: what it produces is an
-    edge on each of its lines every packet interval.
+    are no bytes to size, drop, corrupt or truncate: what it produces is its
+    lines pulled the other way every packet interval.
 
 rpmsg Payloads: Another Core
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

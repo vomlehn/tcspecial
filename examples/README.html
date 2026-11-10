@@ -700,10 +700,10 @@ each command the ground sends goes to it as one frame with identifier
 </tr>
 <tr>
 <td><code>gpio</code></td>
-<td>Two lines of a GPIO chip: each edge of a switch on line 0, a
-<code>gpio_in</code>, goes to the ground as a sixteen-byte record, and a
-1 or 0 from the ground drives a lamp on line 1, a
-<code>gpio_out</code>.</td>
+<td>Two lines of a GPIO chip: a switch on line 0, a
+<code>gpio_in</code>, reports its level to the ground twice a second as
+a <code>u8</code>, and a <code>u8</code> 1 or 0 from the ground drives a
+lamp on line 1, a <code>gpio_out</code>.</td>
 </tr>
 <tr>
 <td><code>iio</code></td>
@@ -726,8 +726,8 @@ nothing else changes.</p>
 lamp a <code>gpio_out</code>, whose line is driven: see “A GPIO Payload”
 in the manual. The chip is one of the kernel’s <code>gpio-sim</code>,
 whose lines exist in memory: a line’s <code>pull</code> file sets what
-an input is pulled to, which the kernel reports to tcspecial as an edge,
-and its <code>value</code> file says what an output is driven to. tcssim
+an input is pulled to, which tcspecial reads as the line’s level, and
+its <code>value</code> file says what an output is driven to. tcssim
 pulls the switch’s line the other way every second and counts the lamp’s
 changes. The configuration names <code>/dev/gpiochip1</code>, which is
 what the simulated chip is on a host with one chip of its own; the

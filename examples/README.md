@@ -407,7 +407,7 @@ Nothing either does survives a reboot.
 | Directory | Description |
 |---|---|
 | `can` | A motor controller on the CAN bus `vcan0`, as two payloads: its status frames, identifier 0x123, go to the ground, and each command the ground sends goes to it as one frame with identifier 0x124. |
-| `gpio` | Two lines of a GPIO chip: each edge of a switch on line 0, a `gpio_in`, goes to the ground as a sixteen-byte record, and a 1 or 0 from the ground drives a lamp on line 1, a `gpio_out`. |
+| `gpio` | Two lines of a GPIO chip: a switch on line 0, a `gpio_in`, reports its level to the ground twice a second as a `u8`, and a `u8` 1 or 0 from the ground drives a lamp on line 1, a `gpio_out`. |
 | `iio` | Experimental. A sensor's sample buffer, read through the kernel's IIO subsystem, its whole sample sets going to the ground. Nothing goes up: a buffer is read and never written. |
 
 ### can
@@ -427,9 +427,8 @@ make run-can
 The switch is a `gpio_in`, whose line is watched, and the lamp a `gpio_out`,
 whose line is driven: see "A GPIO Payload" in the manual. The chip is one of
 the kernel's `gpio-sim`, whose lines exist in memory: a
-line's `pull` file sets what an input is pulled to, which the kernel reports
-to tcspecial as an edge, and its `value` file says what an output is driven
-to. tcssim pulls the switch's line the other way every second and counts the
+line's `pull` file sets what an input is pulled to, which tcspecial reads as
+the line's level, and its `value` file says what an output is driven to. tcssim pulls the switch's line the other way every second and counts the
 lamp's changes. The configuration names `/dev/gpiochip1`, which is what the
 simulated chip is on a host with one chip of its own; the number is given as
 chips appear, so write the one `bin/mk-kernel-dummies` printed.

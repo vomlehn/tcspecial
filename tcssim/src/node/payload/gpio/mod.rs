@@ -52,9 +52,21 @@ use crate::payload::{
 /// [`tcslibgs::node::payload::gpio::simulated_chips`].
 const SIM_DEVICES: &str = tcslibgs::node::payload::gpio::SIM_DEVICES;
 
-/// How many bytes one line event takes as device data, which is what this
-/// counts as having sent.
-const EVENT_BYTES: u64 = tcslibgs::node::payload::gpio::EVENT_BYTES as u64;
+/// How many bytes a set of lines is counted as having sent or been sent:
+/// the whole number with a bit for each line the vehicle reads it as.
+///
+/// # Arguments
+///
+/// * `count` - How many lines.
+///
+/// # Returns
+///
+/// That number's width.
+fn lines_bytes(count: usize) -> u64 {
+    tcslibgs::link_type::Basic::lines(count)
+        .width()
+        .expect("a set of lines is a whole number") as u64
+}
 
 /// A simulated chip's line, as a path to write a pull to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -195,9 +207,9 @@ pub fn run_gpio_node(
 
             if moved > 0 {
                 let mut guard = stats.lock().unwrap();
-                // One event per line moved, and an event is its own size:
-                // what this device produces is not bytes a file chose.
-                guard.bytes_sent += moved * EVENT_BYTES;
+                // What the vehicle reads of the lines is one number of their
+                // width: what this device produces is not bytes a file chose.
+                guard.bytes_sent += lines_bytes(lines.len());
                 guard.a_packet_has_gone(pull.as_bytes());
             }
         }
@@ -324,12 +336,9 @@ pub fn run_gpio_udp_node(
                     tcslibgs::node::payload::gpio::state_said(count, now);
                 match socket.send_to(&state, to) {
                     Ok(_) => {
-                        let changed = said.map_or(count as u64, |was| {
-                            u64::from((was ^ now).count_ones())
-                        });
                         said = Some(now);
                         let mut guard = stats.lock().unwrap();
-                        guard.bytes_sent += changed * EVENT_BYTES;
+                        guard.bytes_sent += lines_bytes(count);
                         guard.a_packet_has_gone(&state);
                     }
                     Err(e) => eprintln!(
@@ -383,7 +392,7 @@ fn took_a_drive(
         *driven = Some(now);
         let mut guard = stats.lock().unwrap();
         guard.a_packet_has_come(datagram);
-        guard.bytes_recv += count as u64 * EVENT_BYTES;
+        guard.bytes_recv += lines_bytes(count);
     }
 }
 
@@ -442,7 +451,7 @@ fn pull_to_the_world(
             }
             if moved > 0 {
                 let mut guard = stats.lock().unwrap();
-                guard.bytes_sent += moved * EVENT_BYTES;
+                guard.bytes_sent += lines_bytes(lines.len());
                 guard.a_packet_has_gone(b"pulled");
             }
         }
@@ -508,7 +517,7 @@ fn watch_driven_lines(
             );
             let mut guard = stats.lock().unwrap();
             guard.a_packet_has_come(&now);
-            guard.bytes_recv += lines.len() as u64 * EVENT_BYTES;
+            guard.bytes_recv += lines_bytes(lines.len());
         }
         first = false;
         was.copy_from_slice(&now);

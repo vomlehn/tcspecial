@@ -71,7 +71,6 @@ use slint::{
 };
 use tcslibgs::graph::units::{input_unit, unit_of};
 use tcslibgs::graph::Graph;
-use tcslibgs::node::payload::gpio::EVENT_BYTES;
 use tcslibgs::node::vehicle::compute::{from_value, params_of, Computation};
 use tcslibgs::unit::Unit;
 
@@ -356,8 +355,8 @@ struct LineSet {
     /// The place in [`Plot::switches`] of its first line's strip; the rest
     /// follow it, in its node's order.
     first: usize,
-    /// Its lines' offsets on the chip, in its node's order, which is how a
-    /// record says which line it is of.
+    /// Its lines' offsets on the chip, in its node's order, which is the
+    /// order of their bits.
     offsets: Vec<u32>,
 }
 
@@ -567,23 +566,21 @@ impl Plot {
             .map(Plotted::Switch)
     }
 
-    /// Keeps what a GPIO payload says one of its lines is, where it is a
+    /// Keeps what a GPIO payload says its lines are, each where it is a
     /// change. Allocates nothing.
     ///
     /// # Arguments
     ///
-    /// * `set`    - Its place in the plot's line sets.
-    /// * `offset` - The line's offset on the chip, as its record says it.
-    /// * `at`     - When it arrived.
-    /// * `on`     - Whether the line is high.
-    pub fn line(&mut self, set: usize, offset: u32, at: Instant, on: bool) {
+    /// * `set`  - Its place in the plot's line sets.
+    /// * `at`   - When it arrived.
+    /// * `bits` - The lines, a bit for each by its place in the node.
+    pub fn lines(&mut self, set: usize, at: Instant, bits: u64) {
         let Some(set) = self.line_sets.get(set) else {
             return;
         };
-        // A record of a line the node does not name is the vehicle's
-        // mistake, and is not drawn as one it does.
-        if let Some(n) = set.offsets.iter().position(|&o| o == offset) {
-            self.decision(set.first + n, at, on);
+        let (first, count) = (set.first, set.offsets.len());
+        for n in 0..count {
+            self.decision(first + n, at, bits & (1 << n) != 0);
         }
     }
 
@@ -1343,27 +1340,17 @@ pub fn take(plot: &Mutex<Plot>, plotted: Plotted, data: &[u8], at: Instant) {
                 plot.decision(i, at, data.iter().any(|&byte| byte != 0));
             }
         }
-        // One record for each line reported, each the time, the line's
-        // offset and what it is, as `tcslibgs::node::payload::gpio` lays
-        // them out; a datum that is not whole records is not plotted.
+        // What the lines are, one whole number with a bit for each, most
+        // significant byte first; more than its eight bytes, or none, is not
+        // plotted.
         Plotted::Lines(k) => {
-            let (records, rest) = data.as_chunks::<EVENT_BYTES>();
-            if records.is_empty() || !rest.is_empty() {
+            if data.is_empty() || data.len() > 8 {
                 return;
             }
-            let Ok(mut plot) = plot.lock() else {
-                return;
-            };
-            for record in records {
-                let word = |at: usize| {
-                    u32::from_be_bytes([
-                        record[at],
-                        record[at + 1],
-                        record[at + 2],
-                        record[at + 3],
-                    ])
-                };
-                plot.line(k, word(8), at, word(12) != 0);
+            let mut bytes = [0u8; 8];
+            bytes[8 - data.len()..].copy_from_slice(data);
+            if let Ok(mut plot) = plot.lock() {
+                plot.lines(k, at, u64::from_be_bytes(bytes));
             }
         }
     }
@@ -1649,28 +1636,19 @@ pub(crate) mod tests {
         assert!(drawn.panels[0].paths.iter().all(String::is_empty));
     }
 
-    /// A GPIO payload's records, one for each line, each set that line's
-    /// strip; a record of a line the node does not name, or a datum that is
-    /// not whole records, changes nothing. And a plot of switches alone, as
-    /// the gpio example's is, is drawn once one has been heard.
+    /// A GPIO payload's lines, one number with a bit for each, set each
+    /// line's strip; a datum longer than a whole number, or none, changes
+    /// nothing. And a plot of switches alone, as the gpio example's is, is
+    /// drawn once one has been heard.
     #[test]
-    fn each_lines_record_sets_its_strip() {
+    fn each_lines_bit_sets_its_strip() {
         let graph = example("gpio");
         let plot = Mutex::new(Plot::of(&graph, reaching(&graph)).unwrap());
-        let record = |line: u32, on: u32| {
-            let mut record = [0u8; EVENT_BYTES];
-            record[8..12].copy_from_slice(&line.to_be_bytes());
-            record[12..].copy_from_slice(&on.to_be_bytes());
-            record
-        };
         let t0 = Instant::now();
-        // The switch, line 0, high; then a line it does not name, and a
-        // record and a piece.
-        take(&plot, Plotted::Lines(0), &record(0, 1), t0);
-        take(&plot, Plotted::Lines(0), &record(7, 0), t0);
-        let mut ragged = record(0, 0).to_vec();
-        ragged.extend(&record(0, 0)[..4]);
-        take(&plot, Plotted::Lines(0), &ragged, t0);
+        // The switch, line 0, high; then nothing, and too much.
+        take(&plot, Plotted::Lines(0), &[1], t0);
+        take(&plot, Plotted::Lines(0), &[], t0);
+        take(&plot, Plotted::Lines(0), &[0; 9], t0);
         let mut drawn = Drawn::default();
         plot.lock().unwrap().draw(
             t0 + Duration::from_secs(1),

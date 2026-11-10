@@ -72,7 +72,7 @@ from tcslib.yamcs_ground import (  # noqa: E402
     write_yamcs, yamcs_home)
 from tcslibgs import configuration  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
-from tcslibgs.form import DECISION, UNITS, Form  # noqa: E402
+from tcslibgs.form import UNITS, Form  # noqa: E402
 
 #: The forms a switch's data take: a decision, sent as a boolean, or the
 #: whole number a switch's lines were told.
@@ -215,15 +215,6 @@ class Setup:
                       if link.gateway == self.gateway]
         self.sources = []
         for link in self.links:
-            if link.form.kind == "Lines":
-                # Each line is a source of its own, on or off as it is high
-                # or low: a line sensing a heater is the heater's state.
-                self.sources += [
-                    Source(f"{link.source} line {offset}",
-                           generated.qualified(f"{link.name}_line{offset}"),
-                           DECISION)
-                    for offset in link.form.lines]
-                continue
             self.sources.append(Source(link.source,
                                        generated.qualified(link.name),
                                        link.form, self._drives(link)))

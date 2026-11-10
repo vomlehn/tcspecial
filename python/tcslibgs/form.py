@@ -128,22 +128,17 @@ def type_name(unit):
 @dataclass(frozen=True)
 class Form:
     """What a node sends: ``Datum``, ``Value`` (with its :class:`Unit`),
-    ``Decision``, ``Whole`` (with its type's name) or ``Lines`` (with its
-    lines' offsets), as ``fprime::Form`` names them."""
+    ``Decision`` or ``Whole`` (with its type's name), as ``fprime::Form``
+    names them."""
 
     kind: str
     unit: Unit = None
-    #: For ``Lines``: the offsets of the lines, lowest first, which is the
-    #: order their records come in.
-    lines: tuple = ()
     #: For ``Whole``: the type's name, ``u8`` to ``i64``.
     whole: str = None
 
     def __str__(self):
         """The form as the Rust's ``Debug`` writes it: ``Datum``,
-        ``Value(Kelvin)``, ``Decision``, ``Whole(U8)``, ``Lines(2)``."""
-        if self.kind == "Lines":
-            return f"Lines({len(self.lines)})"
+        ``Value(Kelvin)``, ``Decision``, ``Whole(U8)``."""
         if self.kind == "Whole":
             return f"Whole({self.whole.upper()})"
         if self.unit is None:
@@ -164,24 +159,19 @@ def form_of(config, source):
         source: The node's name.
 
     Returns:
-        A value's :class:`Form`, with its unit, for a compute node whose
-        function makes values; :data:`DECISION` for one whose function
-        makes decisions; a ``Lines`` form for a GPIO payload read for its
-        lines' levels, as :func:`_lines_form` says; :data:`DATUM` for every
-        other node, and for one that is not there.
+        What the node states it sends at its ``world-out``: a value's
+        :class:`Form`, with its unit; :data:`DECISION` for a ``boolean``; a
+        ``Whole`` form for a whole number -- a sensor's reading, what a set
+        of GPIO lines is; :data:`DATUM` for every other node, and for one
+        that is not there or states no type.
 
     Raises:
-        ValueError: A node of values does not say its unit, says one that
-                    is not a unit, or is a vote whose inputs' units do not
-                    agree: a configuration tcsverify refuses, whose data
-                    is not to be read as anything.
+        ValueError: A node states a value type that is none.
     """
     names = {node.name for node in config.nodes}
     if source not in names:
         return DATUM
     node = config.node(source)
-    if node.node_type == "gpio_in":
-        return _lines_form(node)
     said = _sends(node)
     if said in WHOLE:
         return Form("Whole", whole=said)
@@ -228,7 +218,7 @@ def _sends(node):
         return said.get("carries", "bytes")
     if kind == "ping":
         return "string"
-    if kind in ("gpio_out", "gpio_inout"):
+    if kind in ("gpio_in", "gpio_out", "gpio_inout"):
         count = len(said.get("lines", "").replace(",", " ").split())
         return next(name for name, most in (("u8", 8), ("u16", 16),
                                             ("u32", 32), ("u64", 64))
@@ -240,33 +230,3 @@ def _sends(node):
     if "format" in said and not kind.startswith("app_"):
         return FORMAT_TYPES.get(said["format"])
     return "bytes"
-
-
-#: The bytes of one line's record: ``gpio::EVENT_BYTES``.
-LINE_RECORD_BYTES = 16
-
-
-def _lines_form(node):
-    """The form of a GPIO payload's data: ``Form::of``'s rule for one.
-
-    Its watched lines' levels where it reads them on an interval and
-    watches them for no edge, every datum then holding a record of every
-    watched line; its bytes where it watches for edges, a datum of which may
-    hold the one line that changed, or where it watches none.
-
-    Args:
-        node: The node.
-
-    Returns:
-        A ``Lines`` :class:`Form`, or :data:`DATUM`.
-    """
-    said = {name: str(value).strip()
-            for name, value in node.attributes.items()}
-    levels = (node.node_type == "gpio_in"
-              and said.get("edge") == "none"
-              and bool(said.get("state_interval")))
-    if not levels:
-        return DATUM
-    offsets = sorted(int(word, 0) for word in
-                     said.get("lines", "").replace(",", " ").split())
-    return Form("Lines", lines=tuple(offsets))

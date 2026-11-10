@@ -214,18 +214,6 @@ fn endpoint_parameters(out: &mut String, endpoint: &EndpointConfig) {
                     offsets(&gpio.outputs)
                 );
             }
-            let _ = writeln!(
-                out,
-                "  edge             {}",
-                match gpio.edge {
-                    crate::LineEdge::Rising => "rising",
-                    crate::LineEdge::Falling => "falling",
-                    crate::LineEdge::Both => "both",
-                    crate::LineEdge::None =>
-                        "none, so what they are is reported \
-                                              rather than when they change",
-                }
-            );
             if let Some(every) = gpio.state_interval {
                 let _ = writeln!(
                     out,

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
 
-description: "Discrete lines of a GPIO chip: a switch's edges to the ground,
+description: "Discrete lines of a GPIO chip: a switch's level to the ground,
   and the ground's 1 or 0 driving a lamp"
 
 tcspecial:
@@ -52,17 +52,16 @@ payloads:
   # host with one chip of its own; bin/mk-kernel-dummies makes that chip and
   # prints the number it was given, which is the path to write here.
   - type gpio_in:
-      # A switch on line 0. Each time it changes, the kernel's edge becomes a
-      # sixteen-byte record -- when, which line, and what it became -- and the
-      # record goes to the ground.
+      # A switch on line 0. Twice a second what it is goes to the ground, as
+      # the u8 its one line is bit 0 of.
       - payload: switch
-        edge: "both"
         lines: "0"
         path: "/dev/gpiochip1"
+        state_interval: "500 ms"
         world-out:
           - moc.switch
   - type gpio_out:
-      # A lamp on line 1, driven by what the ground sends: the text 1 to light
+      # A lamp on line 1, driven by what the ground sends: the u8 1 to light
       # it, 0 to put it out, and anything else refused.
       - payload: lamp
         lines: "1"

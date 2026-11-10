@@ -922,9 +922,9 @@ fn cannot_be_asked(endpoint: &EndpointConfig) -> Option<&'static str> {
     match endpoint {
         EndpointConfig::Gpio(_) => Some(
             "a set of discrete lines has no trigger: watched lines report on \
-             their own edges and state_interval, and are asked for a report \
-             by a line into their world-in; driven lines are set by what \
-             arrives at their moc-in",
+             their own state_interval, and are asked for a report by a line \
+             into their world-in; driven lines are set by what arrives at \
+             their moc-in",
         ),
         EndpointConfig::Iio(_) => Some(
             "a sensor's sample buffer is read and not written: what an IIO \
@@ -977,11 +977,8 @@ fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
 /// `can_fd: true`; an rpmsg message carries what `max_message_bytes` says,
 /// and 496 where it says nothing -- 512-byte buffers less the 16-byte header.
 /// A set of discrete lines is the other way round: what it delivers is made
-/// rather than carried, as records of
-/// [`crate::node::payload::gpio::EVENT_BYTES`], and a read takes whole ones
-/// only. A `read_size` that is not a whole number of them is room left
-/// unfilled on every read -- and one smaller than a record is a node that
-/// can never deliver anything, with nothing to say why.
+/// rather than carried, one whole number as wide as its lines need, so it
+/// states no `read_size` at all.
 ///
 /// Every other interface is a stream or a register and has nothing to say
 /// here: where one read ends is the `stream` rule's business.
@@ -999,34 +996,18 @@ fn cannot_be_written(endpoint: &EndpointConfig) -> Option<&'static str> {
 /// # Errors
 ///
 /// A message if `size` is more than a CAN frame or an rpmsg message carries,
-/// or is not a whole number of a set of lines' event records.
+/// or is stated for a set of lines.
 fn fits_one_read(
     what: &str,
     size: u32,
     endpoint: &EndpointConfig,
 ) -> Result<(), String> {
     if let EndpointConfig::Gpio(_) = endpoint {
-        let record = crate::node::payload::gpio::EVENT_BYTES as u32;
-        if size.is_multiple_of(record) {
-            return Ok(());
-        }
-        let whole = (size / record).max(1) * record;
-        return Err(if size < record {
-            format!(
-                "\"{what}\": read_size is {size}, and a set of lines is read \
-                 in records of {record} bytes, whole ones only: a read of \
-                 {size} could never hold one, so the node would never deliver \
-                 anything. Say {record}, or a multiple of it"
-            )
-        } else {
-            format!(
-                "\"{what}\": read_size is {size}, and a set of lines is read \
-                 in records of {record} bytes, whole ones only: {} of every \
-                 read would never be filled. Say {whole}, or another multiple \
-                 of {record}",
-                size % record
-            )
-        });
+        return Err(format!(
+            "\"{what}\": read_size is {size}, and a set of lines is read as \
+             one whole number as wide as its lines need: it states no \
+             read_size, so take it out"
+        ));
     }
     let (room, carries) = match endpoint {
         EndpointConfig::Can(can) => (
@@ -2012,6 +1993,7 @@ mod tests {
             &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "0"),
+                ("state_interval", "1 s"),
                 ("trigger", "[55]"),
             ],
         ))
@@ -2081,7 +2063,12 @@ mod tests {
         let said = reach_of(&node(
             "switches",
             "gpio_in",
-            &[("path", "/dev/gpiochip0"), ("lines", "0"), ("init", "[01]")],
+            &[
+                ("path", "/dev/gpiochip0"),
+                ("lines", "0"),
+                ("state_interval", "1 s"),
+                ("init", "[01]"),
+            ],
         ))
         .expect_err("watched lines are not written");
         assert!(
@@ -2114,28 +2101,24 @@ mod tests {
         assert!(said.contains("init") && !said.contains("trigger"), "{said}");
     }
 
-    /// A set of lines is read in whole records, so a read_size that is not a
-    /// whole number of them is refused -- one smaller than a record being a
-    /// node that would never deliver anything -- and one that is, is not.
+    /// A set of lines is read as one whole number as wide as its lines need,
+    /// so it states no read_size: one is refused, saying so.
     #[test]
-    fn a_set_of_lines_is_read_in_whole_records() {
-        let lines = |size: &str| {
-            reached(
-                "gpio_in",
-                &[
-                    ("path", "/dev/gpiochip0"),
-                    ("lines", "3"),
-                    ("read_size", size),
-                ],
-            )
+    fn a_set_of_lines_states_no_read_size() {
+        let lines = |size: Option<&str>| {
+            let mut terms = vec![
+                ("path", "/dev/gpiochip0"),
+                ("lines", "3"),
+                ("state_interval", "1 s"),
+            ];
+            if let Some(size) = size {
+                terms.push(("read_size", size));
+            }
+            reached("gpio_in", &terms)
         };
-        lines("16").expect("one record");
-        lines("64").expect("four records");
-
-        let short = lines("10").expect_err("less than a record");
-        assert!(short.contains("never deliver anything"), "{short}");
-        let ragged = lines("20").expect_err("a record and a piece");
-        assert!(ragged.contains("Say 16"), "{ragged}");
+        lines(None).expect("a set of lines");
+        let said = lines(Some("16")).expect_err("a read_size");
+        assert!(said.contains("states no read_size"), "{said}");
     }
 
     /// A read larger than the interface carries at once is refused.
@@ -2647,7 +2630,7 @@ mod tests {
             &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "3, 7"),
-                ("edge", "rising"),
+                ("state_interval", "1 s"),
                 ("bias", "pull_up"),
                 ("debounce", "5000 us"),
             ],
@@ -2657,7 +2640,7 @@ mod tests {
             EndpointConfig::Gpio(gpio) => {
                 assert_eq!(gpio.path, "/dev/gpiochip0");
                 assert_eq!(gpio.inputs, vec![3, 7]);
-                assert_eq!(gpio.edge, crate::LineEdge::Rising);
+                assert_eq!(gpio.state_interval, Some(Duration::from_secs(1)));
                 assert_eq!(gpio.bias, crate::Bias::PullUp);
                 assert_eq!(gpio.debounce, Some(Duration::from_micros(5_000)));
             }

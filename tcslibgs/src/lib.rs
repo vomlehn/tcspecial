@@ -111,7 +111,7 @@ pub use link::{
     AnswerPacker, CommandPacker, LinkError, ANSWER_BYTES, COMMAND_BYTES,
 };
 pub use node::payload::can::CanParams;
-pub use node::payload::gpio::{Bias, Edge as LineEdge, GpioParams};
+pub use node::payload::gpio::{Bias, GpioParams};
 pub use node::payload::hdlc::{
     ClockType, Encoding, FrameCheck, HdlcParams, Standard,
 };

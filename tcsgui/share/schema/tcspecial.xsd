@@ -250,13 +250,12 @@
       <xs:element name="max_message_bytes" type="xs:string"/>
       <!-- Discrete lines. -->
       <xs:element name="lines" type="xs:string"/>
-      <xs:element name="edge" type="xs:string"/>
       <xs:element name="bias" type="xs:string"/>
       <xs:element name="debounce" type="xs:string"/>
-      <!-- How often a set of discrete lines reports what it is. Events say
-           when a line changed and this says what the lines are: a payload may
-           ask for either or both, and `edge: none` with no state_interval is
-           refused because nothing would be sent. Inputs only. -->
+      <!-- How often a set of discrete lines reports what it is: one whole
+           number with a bit for each line, the first line listed bit 0.
+           Required of a gpio_in, and of a gpio_inout, which reports what its
+           lines were last told. -->
       <xs:element name="state_interval" type="xs:string"/>
       <!-- A computation, and what each of them is told. -->
       <xs:element name="function" type="xs:string"/>

@@ -1609,15 +1609,14 @@ impl NodeType {
             NodeType::GpioIn => &[
                 ("path", true),
                 ("lines", true),
-                ("edge", false),
+                ("state_interval", true),
                 ("bias", false),
                 ("debounce", false),
                 ("group", false),
-                ("state_interval", false),
                 ("sim_address", false),
             ],
             // Driven lines say which, and what they start at, and nothing
-            // about watching: an output has no edges.
+            // about watching: an output has nothing to hold or debounce.
             NodeType::GpioOut => &[
                 ("path", true),
                 ("lines", true),

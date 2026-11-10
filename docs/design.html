@@ -522,7 +522,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#link-terms" id="toc-entry-115">Link Terms</a><ul>
 <li><a class="reference internal" href="#what-is-supported-and-what-is-experimental" id="toc-entry-116">What Is Supported and What Is Experimental</a></li>
 <li><a class="reference internal" href="#gpio-payloads-discrete-lines" id="toc-entry-117">GPIO Payloads: Discrete Lines</a></li>
-<li><a class="reference internal" href="#two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both" id="toc-entry-118">Two ways of watching, and a set of lines may ask for either or both</a></li>
+<li><a class="reference internal" href="#what-a-set-of-lines-reports" id="toc-entry-118">What a set of lines reports</a></li>
 <li><a class="reference internal" href="#rpmsg-payloads-another-core" id="toc-entry-119">rpmsg Payloads: Another Core</a></li>
 <li><a class="reference internal" href="#iio-payloads-a-sensor-s-buffer" id="toc-entry-120">IIO Payloads: a Sensor's Buffer</a></li>
 <li><a class="reference internal" href="#can-payloads-a-bus-of-peers" id="toc-entry-121">CAN Payloads: a Bus of Peers</a></li>
@@ -1154,8 +1154,9 @@ takes (<a class="reference internal" href="#type-and-encoding">Type and encoding
 <tt class="docutils literal"><span class="pre">type-out</span></tt>, a <tt class="docutils literal">boolean</tt> or a whole number; GPIO lines driven and
 reported as one unsigned whole number, a bit outside them refused; and
 a thermal mass's heater on where what it is driven with is not nought.
-Still to come: a <tt class="docutils literal">gpio_in</tt>'s levels in place of its edge records, a
-<tt class="docutils literal">process</tt>'s text forms, apps' packets, the F´ and cFS bridges'
+A <tt class="docutils literal">gpio_in</tt> reports its lines' levels as that number every
+<tt class="docutils literal">state_interval</tt>, and has no edges. Still to come: a <tt class="docutils literal">process</tt>'s text
+forms, apps' packets, the F´ and cFS bridges'
 channels of each type -- a whole number is still a <tt class="docutils literal">Datum</tt> channel
 there -- and each configuration's own XTCE. Where
 the rest of this section and the rest of this document disagree, the
@@ -1478,8 +1479,6 @@ built:</p>
 <ul class="simple">
 <li><a class="reference internal" href="#app-nodes">App nodes</a>: a packet's bytes are the program's business; they become
 its terminal's type, encoded.</li>
-<li><a class="reference internal" href="#gpio-payloads-discrete-lines">GPIO Payloads: Discrete Lines</a>: the <tt class="docutils literal">edge</tt> attribute and the
-sixteen-byte records.</li>
 <li><a class="reference internal" href="#gateways-what-the-vehicle-answers-to">Gateways: what the vehicle answers to</a>, F´: a source's channel is chosen
 by the kind of node it is.</li>
 <li>The Yamcs mission database, written for the Yamcs gateway node, which the
@@ -9714,8 +9713,8 @@ Corporation, Alta Data Technologies</td>
 <td>Chang'e</td>
 </tr>
 <tr><td>Time at the tone (a timing signal and the time it marks)</td>
-<td>not supported: the edge can be watched as <tt class="docutils literal">gpio_in</tt>, but nothing
-sets a clock or stamps data by it</td>
+<td>not supported: the line's level can be reported as <tt class="docutils literal">gpio_in</tt>, but
+nothing sets a clock or stamps data by it</td>
 <td>built in: the PPS subsystem, <tt class="docutils literal"><span class="pre">pps-gpio</span></tt></td>
 <td>Astrobotic</td>
 </tr>
@@ -10489,10 +10488,10 @@ against. They may change, where the supported types will not.</p>
 <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>: see <a class="reference internal" href="#what-is-supported-and-what-is-experimental">What Is Supported and What Is
 Experimental</a>.</p>
 <p>Not every payload is a stream of data. A deployment switch, an arming line, a
-thermostat's output: each is one wire that is high or low, and what the ground
-wants to know is when it changed. Linux offers those through a chip's
-character device, where a program asks for a set of lines with edge detection
-and then reads events.</p>
+thermostat's output: each is one wire that is high or low. Linux offers those
+through a chip's character device, where a program asks for a set of lines
+and reads or sets their values together. A set of lines is one unsigned whole
+number, a bit for each line: see <a class="reference internal" href="#gpio-lines">GPIO lines</a>.</p>
 <p>The rules are in <tt class="docutils literal"><span class="pre">tcslibgs::node::payload::gpio</span></tt>, the endpoint in
 <tt class="docutils literal"><span class="pre">tcspecial::node::payload::gpio</span></tt> and the simulation in
 <tt class="docutils literal"><span class="pre">tcssim::node::payload::gpio</span></tt>: one module in each for three node types.</p>
@@ -10516,9 +10515,10 @@ a heater that forgot to say <tt class="docutils literal">output</tt> read as a f
 types and to take <tt class="docutils literal">direction</tt> out (<cite>tcslibgs::graph::renamed</cite>), as a
 file in the other old words is.</dd>
 <dt>Requirement</dt>
-<dd>Each states a <tt class="docutils literal">path</tt> and its <tt class="docutils literal">lines</tt>. A <tt class="docutils literal">gpio_in</tt> may state the
-<tt class="docutils literal">edge</tt>, the <tt class="docutils literal">bias</tt>, a <tt class="docutils literal">debounce</tt> and a <tt class="docutils literal">state_interval</tt>, and a
-<tt class="docutils literal">gpio_inout</tt> must state the <tt class="docutils literal">state_interval</tt> it reports on. Offsets
+<dd>Each states a <tt class="docutils literal">path</tt> and its <tt class="docutils literal">lines</tt>. A <tt class="docutils literal">gpio_in</tt> must state the
+<tt class="docutils literal">state_interval</tt> it reports on and may state the <tt class="docutils literal">bias</tt> and a
+<tt class="docutils literal">debounce</tt>, and a <tt class="docutils literal">gpio_inout</tt> must state the <tt class="docutils literal">state_interval</tt> it
+reports on. Offsets
 are separated by commas or spaces and written in decimal or hexadecimal,
 because a file written for a board copies them out of a schematic in
 whichever form the schematic used.</dd>
@@ -10541,59 +10541,35 @@ through three numbers made as the node opens, so that nothing is
 allocated as data passes.</dd>
 </dl>
 </div>
-<div class="section" id="two-ways-of-watching-and-a-set-of-lines-may-ask-for-either-or-both">
-<h3><a class="toc-backref" href="#toc-entry-118">Two ways of watching, and a set of lines may ask for either or both</a></h3>
-<p><tt class="docutils literal">edge</tt> says <em>when a line changed</em>; <tt class="docutils literal">state_interval</tt> says <em>what the lines
-are</em>, every so often. They answer different questions, so a payload may ask
-for one, the other, or both:</p>
-<pre class="code text literal-block">
-edge: both                         changes, which is the default
-edge: rising                       changes, one way only
-state_interval: 5 s                what they are, every five seconds
-edge: both, state_interval: 5 s    both
-edge: none                         refused: nothing would be sent
-</pre>
+<div class="section" id="what-a-set-of-lines-reports">
+<h3><a class="toc-backref" href="#toc-entry-118">What a set of lines reports</a></h3>
+<p>A <tt class="docutils literal">gpio_in</tt> reports <em>what its lines are</em>, every <tt class="docutils literal">state_interval</tt>, as one
+whole number with a bit for each; and nothing else. It used to report <em>when
+a line changed</em>, as records of the kernel's edge events, and that is gone:
+what the ground and the vehicle want of a watched line is what it is.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>Edges are the default. A payload that says nothing about watching is
-watched for both of them, which is what every file written before the
-report existed asked for and still means.</dd>
+<dd>A file that states <tt class="docutils literal">edge</tt> is refused, told that a set of lines reports
+its levels every <tt class="docutils literal">state_interval</tt> and to take <tt class="docutils literal">edge</tt> out. A line that
+changes and changes back within one interval goes unseen, and the
+interval is how a configuration says how fine it looks.</dd>
 <dt>Requirement</dt>
 <dd>A report is made with one ioctl on the line request the payload already
 holds -- <tt class="docutils literal">GPIO_V2_LINE_GET_VALUES_IOCTL</tt> -- and not with a second
 request. The kernel gives a line to one request at a time, so a second
-request for the same lines is a payload that could not start.</dd>
-<dt>Requirement</dt>
-<dd>A report makes the same sixteen-byte record an event does, one per line.
-The ground reads the two alike, which is the point: both say that this
-line had this value at this time. The difference is whose time it is --
-an event carries the moment the line changed, a report the moment the
-vehicle looked -- and anything measuring how long an edge took to arrive
-reads the events.</dd>
-<dt>Requirement</dt>
-<dd>The report exists for the two things edges cannot do. A line that has not
-changed since the vehicle started tells the ground nothing about itself;
-and the kernel's event queue is finite, so a burst can leave the ground
-holding a value that is wrong with no way to know it. A report every so
-often ends both: after one interval at most, what the ground has is what
-the lines are.</dd>
+request for the same lines is a payload that could not start. The lines
+are asked for with no edge detection, so there is nothing else to read.</dd>
 <dt>Requirement</dt>
 <dd>The report's clock runs from when a report was due and not from when it
 was made, and a report missed by more than an interval is not made up
 for. What the ground wants is what the lines are now, so a vehicle that
-was busy sends one report late rather than several together.</dd>
-<dt>Requirement</dt>
-<dd>A payload that asks for neither is refused: <tt class="docutils literal">edge: none</tt> with no
-<tt class="docutils literal">state_interval</tt> is a set of lines watched for no changes and reported
-at no interval, which would send nothing at all. Saying it takes writing
-<tt class="docutils literal">edge: none</tt>, so it is not a thing a file does by leaving something
-out.</dd>
+was busy sends one report late rather than several together. The first
+is due as the node opens.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal">poll_interval</tt> is not a GPIO word. It is the least time between reads
 of a descriptor whose data appears because the vehicle reads -- see
-<a class="reference internal" href="#how-a-node-is-driven">How a node is driven</a> -- and a line request is read when there are
-events in it. What a set of lines states instead is <tt class="docutils literal">state_interval</tt>,
-which is a cadence and says so.</dd>
+<a class="reference internal" href="#how-a-node-is-driven">How a node is driven</a>. What a set of lines states instead is
+<tt class="docutils literal">state_interval</tt>, which is a cadence and says so.</dd>
 <dt>Requirement</dt>
 <dd>A payload names at least one line, names none of them twice, and names no
 more than the kernel's limit of 64 on one request. A payload watching no
@@ -10601,33 +10577,25 @@ lines has nothing to report, and one watching a line twice would report
 every change of it twice.</dd>
 <dt>Requirement</dt>
 <dd>This is the one type whose payload data is made rather than carried, so
-its shape is settled here: each event becomes a record of sixteen bytes
--- eight of time, four of line offset, four of value. The time is a
-timestamp as every other time here is: microseconds since the UNIX epoch,
-most significant byte first, and all ones for a clock that could not be
-read. A line's change and a telemetry response can then be read against
-each other, which is the whole reason the field is a time since the epoch
-at all; the kernel's own timestamp is nanoseconds on a monotonic clock,
-which says nothing to a ground station.</dd>
-<dt>Requirement</dt>
-<dd>A <tt class="docutils literal">packet_size</tt> that is not a whole number of records is refused. A
-packet that was part of a record would be a reading nobody could use.</dd>
+its shape is settled here: one unsigned whole number, as <a class="reference internal" href="#gpio-lines">GPIO lines</a>
+says. A set of lines states no <tt class="docutils literal">read_size</tt>, its width being its lines',
+and one that states one is refused.</dd>
 <dt>Requirement</dt>
 <dd>A chip is shared and a line is not. Several payloads commonly watch lines
 of one chip, as several devices sit on one bus, and the kernel gives a
 line to one request at a time -- so two payloads naming one line are two
 handlers of which the second could not start.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">edge</tt>, <tt class="docutils literal">bias</tt>, <tt class="docutils literal">debounce</tt> and <tt class="docutils literal">state_interval</tt> are refused on a
+<dd><tt class="docutils literal">bias</tt>, <tt class="docutils literal">debounce</tt> and <tt class="docutils literal">state_interval</tt> are refused on a
 <tt class="docutils literal">gpio_out</tt>, and all but <tt class="docutils literal">state_interval</tt> on a <tt class="docutils literal">gpio_inout</tt>, rather
-than ignored. They are about watching a line, an
-output has no edges to report and nothing to debounce, and a file that
+than ignored. They are about watching a line, an output has nothing to
+hold or debounce, and a file that
 states one of them for driven lines is saying something it does not mean
 -- commonly a set of lines turned into a <tt class="docutils literal">gpio_out</tt> with its other
 terms left as they were. The refusal names the term that was missed.</dd>
 <dt>Requirement</dt>
-<dd>A GPIO payload cannot be triggered. Watched lines report on their edges
-and their <tt class="docutils literal">state_interval</tt> and are asked by what arrives at
+<dd>A GPIO payload cannot be triggered. Watched lines report on their
+<tt class="docutils literal">state_interval</tt> and are asked by what arrives at
 <tt class="docutils literal"><span class="pre">world-in</span></tt>; driven lines are set by what arrives at <tt class="docutils literal"><span class="pre">moc-in</span></tt>. A
 trigger would be one of those arriving on a clock, and a heater driven
 because a timer went off is the worst of them.</dd>
@@ -10649,12 +10617,6 @@ a call that says nothing.</dd>
 unnamed is the hardest type of conflict to find, and <tt class="docutils literal">gpioinfo</tt> shows
 the name beside the line.</dd>
 <dt>Requirement</dt>
-<dd>The line request's descriptor is read without waiting. A read gathers
-every event that is waiting, so a blocking descriptor would have it wait
-for the next one after collecting the last -- a conduit stopped until a
-line happened to change again, holding the events it had already
-gathered.</dd>
-<dt>Requirement</dt>
 <dd>The kernel's structures are declared in the endpoint and their sizes
 asserted against the kernel's own. <tt class="docutils literal">libc</tt> has no GPIO character-device
 definitions, and a structure of the wrong size is an ioctl that reads past
@@ -10674,8 +10636,8 @@ identity.</dd>
 <dt>Requirement</dt>
 <dd>The packet and segment sizes and the faults mean nothing to a simulated
 set of discretes, and it says so rather than appearing to obey them. There
-are no bytes to size, drop, corrupt or truncate: what it produces is an
-edge on each of its lines every packet interval.</dd>
+are no bytes to size, drop, corrupt or truncate: what it produces is its
+lines pulled the other way every packet interval.</dd>
 </dl>
 </div>
 <div class="section" id="rpmsg-payloads-another-core">

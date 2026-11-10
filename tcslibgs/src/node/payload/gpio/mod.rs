@@ -1,4 +1,4 @@
-//! GPIO payloads: discrete lines, as events.
+//! GPIO payloads: discrete lines, as one whole number.
 //!
 //! **Supported**, as flown against the kernel's simulated chip, `gpio-sim`, by
 //! `tcspecial/tests/kernel-dummies.rs`; nothing has been run against hardware.
@@ -6,24 +6,23 @@
 //!
 //! A payload is not always a stream of data. A deployment switch, an arming
 //! line, a thermostat's output, a payload's own "I am alive" line: each is one
-//! wire that is high or low, and what the ground wants to know is when it
-//! changed. Linux offers those through a GPIO chip's character device, where a
-//! program asks for a set of lines with edge detection and then reads events.
+//! wire that is high or low. Linux offers those through a GPIO chip's
+//! character device, where a program asks for a set of lines and reads or
+//! sets their values together.
 //!
-//! So this is the one kind whose payload data is made rather than carried. A
-//! conduit moves bytes, and a line's change is not bytes, so each event
-//! becomes a record of a fixed size: when it happened, which line, and what it
-//! became. The size is [`EVENT_BYTES`], and a payload's `read_size` must be
-//! a whole number of them -- a read takes whole records only, so one smaller
-//! than a record would never deliver anything. `graph::reach` holds a node
-//! to it.
+//! So this is the one kind whose payload data is made rather than carried: a
+//! set of lines is one unsigned whole number, the narrowest of `u8`, `u16`,
+//! `u32` and `u64` with a bit for each line, bit 0 the first line the node
+//! lists. It is what a set of lines is driven with and what it reports, every
+//! `state_interval`: see "Typed links" in the design. It states no
+//! `read_size`, its width being its lines'.
 //!
 //! Three node types, one for each thing a set of lines can be to the graph,
 //! told apart by the terminals each has -- see [`Kind`]:
 //!
-//! * `gpio_in`, lines watched. Their events and reports are world data,
-//!   leaving by `world-out` towards the ground; what arrives at `world-in`
-//!   asks for a report of what the lines are now.
+//! * `gpio_in`, lines watched. What they are is world data, leaving by
+//!   `world-out` towards the ground every `state_interval`; what arrives at
+//!   `world-in` asks for a report of what the lines are now.
 //! * `gpio_out`, lines driven. What arrives at `moc-in` sets them -- a
 //!   thermostat's decision, a command -- and is passed on out of
 //!   `moc-out`, towards whatever the lines drive.
@@ -47,17 +46,6 @@ use crate::endpoint_config::{
     bad, parse_u32, reject_foreign_fields, reject_stream, require,
     EndpointConfigResult, GroupKind, LinkTerms, Scalar,
 };
-
-/// How many bytes one line event takes as payload data.
-///
-/// Sixteen: the time as eight, the line's offset as four, and what it became
-/// as four. The time is a [`crate::Timestamp`] -- microseconds since the
-/// epoch, most significant byte first -- which is what every other time in
-/// this project is, so a line's change and a telemetry response can be read
-/// against each other; the offset is there because one
-/// payload may watch several lines, and without it an event says only that
-/// something moved.
-pub const EVENT_BYTES: usize = 16;
 
 /// Says a state of a node's lines as a datagram, as tcspecial and tcssim
 /// send one another simulated lines' states over UDP: an ASCII `1` or `0` for
@@ -122,25 +110,6 @@ pub fn state_read(count: usize, datagram: &[u8]) -> Result<u64, String> {
 /// The greatest number of lines one request may name, which is the kernel's
 /// own limit on a line request.
 pub const MOST_LINES: usize = 64;
-
-/// Which changes of a line are worth an event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Edge {
-    /// Low to high only.
-    Rising,
-    /// High to low only.
-    Falling,
-    /// Both, which is the default: a discrete that is read for its state is
-    /// read for both of the states it has.
-    Both,
-    /// None: the lines are not watched for changes at all.
-    ///
-    /// For a set of lines read for what they are rather than for when they
-    /// changed, which is `state_interval` and nothing else. The kernel is
-    /// asked for the lines with no edge detection, so there are no events to
-    /// read and the levels are taken when the report is due.
-    None,
-}
 
 /// What holds a line that nothing is driving.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -229,8 +198,6 @@ pub struct GpioParams {
     pub inputs: Vec<u32>,
     /// And of the lines driven, lowest first. None for a `gpio_in`.
     pub outputs: Vec<u32>,
-    /// Which changes of a watched line are events.
-    pub edge: Edge,
     /// What holds the lines.
     pub bias: Bias,
     /// How long a line must be steady before a change counts, where the file
@@ -342,9 +309,11 @@ pub fn lines_of(
 /// Reads what a GPIO node says about its lines, and what it must say.
 ///
 /// Each type states its `lines` -- a `gpio_in`'s watched, a `gpio_out`'s and
-/// a `gpio_inout`'s driven. A `gpio_in` may state the watching terms,
-/// `edge`, `bias`, `debounce` and `state_interval`, and a `gpio_inout` must
-/// state the `state_interval` it reports on.
+/// a `gpio_inout`'s driven. A `gpio_in` must state the `state_interval` it
+/// reports its lines' levels on and may state their `bias` and `debounce`,
+/// and a `gpio_inout` must state the `state_interval` it reports on. There
+/// is no `edge`: what a set of lines sends is what its lines are, as one
+/// whole number, on a beat (see "Typed links" in the design).
 ///
 /// # Arguments
 ///
@@ -358,9 +327,9 @@ pub fn lines_of(
 ///
 /// # Errors
 ///
-/// A term that does not belong to the type, `direction`, a `stream`, missing
-/// or bad lines, a value that does not read, and watched lines watched for no
-/// edge and reported at no interval.
+/// A term that does not belong to the type, `direction`, `edge`, a
+/// `stream`, missing or bad lines, a value that does not read, and lines
+/// that report at no interval.
 pub(crate) fn group_kind_of(
     name: &str,
     kind: Kind,
@@ -388,7 +357,20 @@ pub(crate) fn group_kind_of(
         ));
     }
 
-    const WATCHING: [&str; 4] = ["edge", "bias", "debounce", "state_interval"];
+    // What a gpio_in sent once: a record of each change of a line. It sends
+    // what its lines are, as one number, every state_interval, so a file
+    // asking for edges is told so rather than that the word is foreign.
+    if g.edge.is_some() {
+        return Err(bad(
+            name,
+            "edge is gone: a set of lines sends what its lines are, as one \
+             whole number with a bit for each, every state_interval, and \
+             nothing when one changes in between. Take edge out, and give \
+             a state_interval",
+        ));
+    }
+
+    const WATCHING: [&str; 3] = ["bias", "debounce", "state_interval"];
     let allowed: Vec<&str> = match kind {
         Kind::In => ["lines"].into_iter().chain(WATCHING).collect(),
         Kind::Out => vec!["lines"],
@@ -400,7 +382,6 @@ pub(crate) fn group_kind_of(
     // gpio_out with the rest of its words left as they were.
     if !kind.watches() {
         for (term, given) in [
-            ("edge", g.edge.is_some()),
             ("bias", g.bias.is_some()),
             ("debounce", g.debounce.is_some()),
             (
@@ -413,8 +394,8 @@ pub(crate) fn group_kind_of(
                     name,
                     &format!(
                         "{term} is about watching a line, and a {type_name} \
-                         drives its lines: an output has no edges to report \
-                         and nothing to debounce"
+                         drives its lines: an output has nothing to hold or \
+                         debounce"
                     ),
                 ));
             }
@@ -432,24 +413,6 @@ pub(crate) fn group_kind_of(
     let (inputs, outputs) = match kind {
         Kind::In => (lines, Vec::new()),
         Kind::Out | Kind::Inout => (Vec::new(), lines),
-    };
-
-    let edge = match g.edge.as_ref() {
-        Some(stated) => match stated.as_str().to_ascii_lowercase().as_str() {
-            "rising" => Edge::Rising,
-            "falling" => Edge::Falling,
-            "both" => Edge::Both,
-            "none" => Edge::None,
-            other => {
-                return Err(bad(
-                    name,
-                    &format!(
-                    "edge: \"{other}\" is not rising, falling, both or none"
-                ),
-                ))
-            }
-        },
-        None => Edge::Both,
     };
 
     let bias = match g.bias.as_ref() {
@@ -479,13 +442,9 @@ pub(crate) fn group_kind_of(
         None => None,
     };
 
-    // Lines that are watched are watched somehow. Edges are the default, so
-    // the only way to ask for neither is to say so -- `edge: none` with no
-    // report -- and that is a node that would send nothing at all: the
-    // configuration asked for the lines and then asked for nothing about
-    // them.
-    // And lines that report what they were told report it on a beat, which
-    // is the only thing that sends anything from them groundward.
+    // Lines that report report on a beat, which is the only thing that sends
+    // anything from them groundward: what a gpio_in's lines are, and what a
+    // gpio_inout's were told.
     if kind.reports() && state_interval.is_none() {
         return Err(bad(
             name,
@@ -494,12 +453,11 @@ pub(crate) fn group_kind_of(
         ));
     }
 
-    if kind.watches() && edge == Edge::None && state_interval.is_none() {
+    if kind.watches() && state_interval.is_none() {
         return Err(bad(
             name,
-            "these lines are watched for no edges and reported at no interval, \
-             so nothing about them would ever be sent: say an edge, or a \
-             state_interval, or both",
+            "a gpio_in reports what its lines are every state_interval, and \
+             says none: say how often, as 1 s",
         ));
     }
 
@@ -507,7 +465,6 @@ pub(crate) fn group_kind_of(
         kind,
         inputs,
         outputs,
-        edge,
         bias,
         debounce,
         state_interval,
@@ -755,71 +712,70 @@ mod tests {
     ///
     /// If the terms are refused, or are not GPIO lines.
     fn params(kind: Kind, stated: &[(&str, &str)]) -> GpioParams {
-        match group_kind_of("discretes", kind, terms(stated)).expect("lines") {
+        // A gpio_in reports on a beat, which these tests are seldom about.
+        let mut stated = stated.to_vec();
+        if kind == Kind::In
+            && !stated.iter().any(|(f, _)| *f == "state_interval")
+        {
+            stated.push(("state_interval", "1 s"));
+        }
+        match group_kind_of("discretes", kind, terms(&stated)).expect("lines") {
             GroupKind::Gpio(gpio) => gpio,
             other => panic!("expected GPIO lines, got {other:?}"),
         }
     }
 
-    /// A payload watches the lines it names, both edges, nothing holding
-    /// them.
+    /// A payload watches the lines it names, nothing holding them, and
+    /// reports them on its beat.
     #[test]
     fn a_payload_watches_the_lines_it_names() {
         assert_eq!(
-            params(Kind::In, &[("lines", "0, 1, 5")]),
+            params(
+                Kind::In,
+                &[("lines", "0, 1, 5"), ("state_interval", "1 s")]
+            ),
             GpioParams {
                 kind: Kind::In,
                 inputs: vec![0, 1, 5],
                 outputs: Vec::new(),
-                edge: Edge::Both,
                 bias: Bias::None,
                 debounce: None,
-                state_interval: None,
+                state_interval: Some(Duration::from_secs(1)),
             }
         );
     }
 
-    /// A set of lines says how it is watched: by its edges, by a report of
-    /// what it is, or by both.
-    ///
-    /// Edges are the default, so a payload that says nothing gets them and
-    /// every file written before the report existed still means what it
-    /// meant. Asking for neither takes saying so, and is refused: lines
-    /// watched for no edges and reported at no interval would send nothing.
+    /// A set of lines watched reports what it is every `state_interval`,
+    /// which it has to say, and nothing else: a file asking for edges is
+    /// told they are gone.
     #[test]
-    fn lines_are_watched_by_edges_or_by_report_or_by_both() {
-        // The default, unchanged: edges, and no report.
-        let said = params(Kind::In, &[("lines", "0")]);
-        assert_eq!(said.edge, Edge::Both);
-        assert_eq!(said.state_interval, None);
-
-        // A report and no edges, which is a set of lines read for what they
-        // are rather than for when they changed.
-        let said = params(
-            Kind::In,
-            &[("lines", "0"), ("edge", "none"), ("state_interval", "5 s")],
-        );
-        assert_eq!(said.edge, Edge::None);
+    fn lines_are_reported_on_a_beat() {
+        let said =
+            params(Kind::In, &[("lines", "0"), ("state_interval", "5 s")]);
         assert_eq!(said.state_interval, Some(Duration::from_secs(5)));
 
-        // And both, which is edges with a refresh behind them.
-        let said =
-            params(Kind::In, &[("lines", "0"), ("state_interval", "1 s")]);
-        assert_eq!(said.edge, Edge::Both);
-        assert_eq!(said.state_interval, Some(Duration::from_secs(1)));
+        let why =
+            group_kind_of("discretes", Kind::In, terms(&[("lines", "0")]))
+                .expect_err("lines never reported");
+        assert!(format!("{why}").contains("state_interval"), "{why}");
 
-        // Neither is refused, and the complaint says both ways out.
-        let why = group_kind_of(
-            "discretes",
-            Kind::In,
-            terms(&[("lines", "0"), ("edge", "none")]),
-        )
-        .expect_err("lines nobody watches");
-        let why = format!("{why}");
-        assert!(
-            why.contains("state_interval") && why.contains("edge"),
-            "{why}"
-        );
+        for edge in ["both", "none", "rising"] {
+            let why = group_kind_of(
+                "discretes",
+                Kind::In,
+                terms(&[
+                    ("lines", "0"),
+                    ("edge", edge),
+                    ("state_interval", "1 s"),
+                ]),
+            )
+            .expect_err("an edge");
+            let why = format!("{why}");
+            assert!(
+                why.contains("edge is gone") && why.contains("state_interval"),
+                "{why}"
+            );
+        }
 
         // A report of no time at all is refused by the grammar itself: a
         // length of time is never nought, here or anywhere else.
@@ -831,8 +787,7 @@ mod tests {
         .expect_err("a report every no time");
         assert!(format!("{why}").contains("no interval at all"), "{why}");
 
-        // And a driven line says nothing about reports, as it says nothing
-        // about edges.
+        // And a driven line says nothing about reports.
         let why = group_kind_of(
             "discretes",
             Kind::Out,
@@ -894,31 +849,33 @@ mod tests {
         );
     }
 
-    /// The edge, the bias and the debounce are read, and a word that is
-    /// neither is refused.
+    /// The bias and the debounce are read, and a word that is neither is
+    /// refused.
     #[test]
     fn what_a_payload_may_say_about_its_lines() {
         let said = params(
             Kind::In,
             &[
                 ("lines", "2"),
-                ("edge", "falling"),
                 ("bias", "pull_up"),
                 ("debounce", "5 ms"),
+                ("state_interval", "1 s"),
             ],
         );
-        assert_eq!(said.edge, Edge::Falling);
         assert_eq!(said.bias, Bias::PullUp);
         assert_eq!(said.debounce, Some(Duration::from_micros(5_000)));
 
-        for (field, value, expected) in [
-            ("edge", "sideways", "rising, falling, both or none"),
-            ("bias", "pull_sideways", "none, pull_up or pull_down"),
-        ] {
+        for (field, value, expected) in
+            [("bias", "pull_sideways", "none, pull_up or pull_down")]
+        {
             let said = group_kind_of(
                 "discretes",
                 Kind::In,
-                terms(&[("lines", "0"), (field, value)]),
+                terms(&[
+                    ("lines", "0"),
+                    (field, value),
+                    ("state_interval", "1 s"),
+                ]),
             )
             .expect_err("a word that is not a value");
             assert!(
@@ -930,7 +887,11 @@ mod tests {
         let said = group_kind_of(
             "discretes",
             Kind::In,
-            terms(&[("lines", "0"), ("debounce", "0 s")]),
+            terms(&[
+                ("lines", "0"),
+                ("debounce", "0 s"),
+                ("state_interval", "1 s"),
+            ]),
         )
         .expect_err("no debouncing at all");
         assert!(
@@ -1023,11 +984,7 @@ mod tests {
     /// they were, and the one that was missed is the one worth naming.
     #[test]
     fn a_driven_line_says_nothing_about_watching() {
-        for (term, value) in [
-            ("edge", "rising"),
-            ("bias", "pull_up"),
-            ("debounce", "5 ms"),
-        ] {
+        for (term, value) in [("bias", "pull_up"), ("debounce", "5 ms")] {
             let said = group_kind_of(
                 "heaters",
                 Kind::Out,
@@ -1048,17 +1005,10 @@ mod tests {
                 kind: Kind::Out,
                 inputs: Vec::new(),
                 outputs: vec![17, 18, 19],
-                edge: Edge::Both,
                 bias: Bias::None,
                 debounce: None,
                 state_interval: None,
             }
         );
-    }
-
-    /// An event is sixteen bytes: a time, a line and a value.
-    #[test]
-    fn an_event_is_a_time_a_line_and_a_value() {
-        assert_eq!(EVENT_BYTES, 8 + 4 + 4);
     }
 }

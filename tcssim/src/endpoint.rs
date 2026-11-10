@@ -468,7 +468,6 @@ mod tests {
             path: "/dev/gpiochip1".to_string(),
             inputs: Vec::new(),
             outputs: vec![4],
-            edge: tcslibgs::LineEdge::None,
             bias: tcslibgs::Bias::None,
             debounce: None,
             state_interval: Some(std::time::Duration::from_secs(1)),

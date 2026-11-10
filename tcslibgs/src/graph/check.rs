@@ -2311,10 +2311,8 @@ mod tests {
             "can" => &[("interface", "can0"), ("can_id", "0x100")],
             "iio" => &[("path", "/dev/iio:device0")],
             "rpmsg" => &[("path", "/dev/rpmsg0"), ("service", "telemetry")],
-            "gpio_in" | "gpio_out" => {
-                &[("path", "/dev/gpiochip0"), ("lines", "3,4,5")]
-            }
-            "gpio_inout" => &[
+            "gpio_out" => &[("path", "/dev/gpiochip0"), ("lines", "3,4,5")],
+            "gpio_in" | "gpio_inout" => &[
                 ("path", "/dev/gpiochip0"),
                 ("lines", "3,4,5"),
                 ("state_interval", "1 s"),

@@ -4793,7 +4793,6 @@ physics:
                 path: "/dev/gpiochip1".to_string(),
                 inputs: lines,
                 outputs: Vec::new(),
-                edge: crate::LineEdge::None,
                 bias: crate::Bias::None,
                 debounce: None,
                 state_interval: Some(Duration::from_secs(1)),

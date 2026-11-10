@@ -21,11 +21,12 @@ attributes:
   - name: lines
     required: true
     about: Which lines of that chip it watches, comma separated.
-  - name: edge
-    required: false
+  - name: state_interval
+    required: true
+    kind: interval
     about: >
-      Which edge of a watched line is an event: rising, falling, both or
-      none.
+      How often to report what the watched lines are: 5 s. Each report is one
+      whole number with a bit for each line, the first line listed bit 0.
   - name: bias
     required: false
     about: >
@@ -35,20 +36,12 @@ attributes:
     required: false
     kind: interval
     about: >
-      How long a watched line must hold its level to count as an event, as a
+      How long a watched line must hold its level to count as a change, as a
       length of time: 50 us, 2 ms.
   - name: group
     required: false
     about: >
       The payload group it belongs to, where it is in one.
-  - name: state_interval
-    required: false
-    kind: interval
-    about: >
-      How often to report what the watched lines are: 5 s. Edges say when a
-      line changed and this says what it is now, so a set of lines may ask
-      for either or both -- and a line that has not changed since the vehicle
-      started tells the ground nothing until this is stated.
   - name: sim_address
     required: false
     about: >

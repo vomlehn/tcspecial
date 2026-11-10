@@ -122,21 +122,15 @@ pub const OWN_CHANNELS: &[Own] = &[
 /// What a source's channel holds: what the configuration says the source's
 /// data are.
 ///
-/// It says one thing of a datum's type, and only of some nodes: a compute
-/// node says, by its function, what it sends. A value -- four bytes of a
+/// It is the type the source states it sends -- see "Typed links" in the
+/// design, and [`crate::graph::link_types`]. A value -- four bytes of a
 /// signed count of its unit's steps, see
-/// [`crate::node::vehicle::compute::from_value`] -- is a number in the unit
-/// the graph gives it, see [`crate::graph::units`]; a decision -- the text
-/// `1` or `0`, see [`crate::node::vehicle::compute::from_decision`] -- is on
-/// or off. A set of GPIO lines read for their levels on an interval, with no
-/// edges, sends a record for each of its lines every time, in the order its
-/// node names them -- see [`crate::node::payload::gpio::EVENT_BYTES`] -- so
-/// what it sends is its lines' levels. Of every other node it says nothing.
-/// A sensor's `format` is
-/// written on the conversion that reads it, not on the sensor, and says how
-/// that one reader takes the bytes. So a value's channel is a number with
-/// its unit, a decision's is a `bool`, and every other channel is the bytes
-/// as they came.
+/// [`crate::node::vehicle::compute::from_value`] -- is a number in its unit;
+/// a decision -- a `boolean`, the one byte 1 or 0, see
+/// [`crate::node::vehicle::compute::from_decision`] -- is on or off; a whole
+/// number -- a sensor's reading, what a set of lines is -- is a number. So a
+/// value's channel is a number with its unit, a decision's is a `bool`, and
+/// every other channel is the bytes as they came.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     /// The bytes, as a `Datum`: the length and the first of them.
@@ -152,11 +146,6 @@ pub enum Form {
     /// as what a switch takes. F´'s channel for it is the bytes, as a
     /// `Datum`, until the bridge writes one of its own type.
     Whole(Basic),
-    /// The levels of this many GPIO lines, a record each, in the order the
-    /// node names them, every datum. F´'s channel for it is the bytes, as a
-    /// `Datum`: a ground that reads lines -- Yamcs, tcsmoc's plot -- reads
-    /// them out of the records.
-    Lines(usize),
 }
 
 impl Form {
@@ -171,33 +160,14 @@ impl Form {
     ///
     /// What the source states it sends at its `world-out`, as `link_types`
     /// reads it: [`Form::Value`] for a value type, [`Form::Decision`] for a
-    /// `boolean`, [`Form::Whole`] for a whole number -- a `gpio_inout`
-    /// reports what its lines were told as one -- and [`Form::Datum`] for
+    /// `boolean`, [`Form::Whole`] for a whole number -- what a set of GPIO
+    /// lines is, or a `gpio_inout`'s were told -- and [`Form::Datum`] for
     /// every other, and for a node that is not there or whose type cannot be
-    /// read, which `Graph::check` refuses. A `gpio_in`, which sends records
-    /// of its lines, is [`Form::Lines`] where it reads their levels on an
-    /// interval and watches for no edge, and [`Form::Datum`] where it
-    /// watches for edges, whose datum may hold the one line that changed.
+    /// read, which `Graph::check` refuses.
     pub fn of(graph: &Graph, source: &str) -> Form {
         let Some(node) = graph.node(source) else {
             return Form::Datum;
         };
-        if let Ok(crate::graph::reach::Reach {
-            endpoint: crate::EndpointConfig::Gpio(gpio),
-            ..
-        }) = crate::graph::reach::reach_of(node)
-        {
-            if gpio.kind == crate::node::payload::gpio::Kind::In {
-                let levels = !gpio.inputs.is_empty()
-                    && gpio.edge == crate::LineEdge::None
-                    && gpio.state_interval.is_some();
-                return if levels {
-                    Form::Lines(gpio.inputs.len())
-                } else {
-                    Form::Datum
-                };
-            }
-        }
         match link_types::carries(node, "world-out") {
             Ok(Carries::Only(LinkType::Basic(basic))) => match basic {
                 Basic::Value(unit) => Form::Value(unit),
@@ -216,7 +186,7 @@ impl Form {
     /// `Datum`, the component's own struct, `F64` or `bool`.
     pub fn fpp_type(self) -> &'static str {
         match self {
-            Form::Datum | Form::Lines(_) | Form::Whole(_) => "Datum",
+            Form::Datum | Form::Whole(_) => "Datum",
             Form::Value(_) => "F64",
             Form::Decision => "bool",
         }
@@ -235,9 +205,6 @@ impl Form {
             Form::Decision => "a decision, true for on".to_string(),
             Form::Whole(basic) => {
                 format!("a whole number, a {}, as bytes", basic.name())
-            }
-            Form::Lines(count) => {
-                format!("the levels of {count} lines, a record each, as bytes")
             }
         }
     }
@@ -687,7 +654,7 @@ impl Model {
                 cpp_string(&channel.name)
             );
             let _ = match form {
-                Form::Datum | Form::Lines(_) | Form::Whole(_) => writeln!(
+                Form::Datum | Form::Whole(_) => writeln!(
                     out,
                     "\t\tthis->tlmWrite_{}(this->asDatum(datum));",
                     channel.name
@@ -1059,7 +1026,7 @@ mod tests {
             Form::of(&thermostat, "gpio-out-tmass1"),
             Form::Whole(Basic::U8)
         );
-        assert_eq!(Form::Lines(2).fpp_type(), "Datum");
+        assert_eq!(Form::Whole(Basic::U8).fpp_type(), "Datum");
         assert_eq!(Form::of(&thermostat, "nobody"), Form::Datum);
         assert_eq!(Form::Value(Unit::Volt).fpp_type(), "F64");
         assert_eq!(Form::Datum.fpp_type(), "Datum");

@@ -643,8 +643,8 @@ fn a_gpio_payload_is_flown_on_a_simulated_chip() {
         Err(why) => return skipped(&why),
     };
 
-    // Low before tcspecial asks for the line, so that the first pull up is
-    // an edge.
+    // Low before tcspecial asks for the line, so that a report of it high
+    // is one of the pull up.
     chip.pull(false);
 
     let flown = Flown::fly(
@@ -654,10 +654,10 @@ fn a_gpio_payload_is_flown_on_a_simulated_chip() {
     );
     let ground = flown.ground_of("switch");
 
-    // The line is pulled up and down until a record of it going up arrives:
-    // edges made before tcspecial had the line, or before the ground had
-    // connected, reach nobody. Every record on the way is held to the form
-    // the type promises.
+    // The line is pulled up and down until a report of it high arrives:
+    // reports made before the ground had connected reach nobody. Every
+    // report on the way is held to the form the type promises: the u8 the
+    // switch's one line is bit 0 of.
     let mut high = false;
     heard_while(
         &ground,
@@ -666,20 +666,9 @@ fn a_gpio_payload_is_flown_on_a_simulated_chip() {
             chip.pull(high);
         },
         |datum| {
-            assert_eq!(
-                datum.len() % 16,
-                0,
-                "a GPIO payload's data is in sixteen-byte records: {datum:?}"
-            );
-            datum.chunks(16).any(|record| {
-                let offset =
-                    u32::from_be_bytes(record[8..12].try_into().unwrap());
-                let value =
-                    u32::from_be_bytes(record[12..16].try_into().unwrap());
-                assert_eq!(offset, 0, "the record names the switch's line");
-                assert!(value <= 1, "a line becomes 1 or 0, not {value}");
-                value == 1
-            })
+            assert_eq!(datum.len(), 1, "a line's report is a u8: {datum:?}");
+            assert!(datum[0] <= 1, "one line is bit 0 alone, not {datum:?}");
+            datum[0] == 1
         },
     );
     chip.pull(false);
@@ -690,10 +679,9 @@ fn a_gpio_payload_is_flown_on_a_simulated_chip() {
     flown.command_until(&[0], || chip.lamp() == "0");
 }
 
-/// A GPIO payload read for what its lines are, with no edges to wake it,
-/// reports them every `state_interval` all the same: the gpio example's
-/// switch, watched for no edge and reported every fifth of a second, is
-/// heard high and then low with the line held still between.
+/// A GPIO payload reports what its lines are every `state_interval`, with
+/// nothing to wake it: the gpio example's switch, reported every fifth of a
+/// second, is heard high and then low with the line held still between.
 #[test]
 fn a_gpio_payload_read_for_its_state_reports_it_on_its_interval() {
     let _chip = CHIP.lock().unwrap_or_else(|held| held.into_inner());
@@ -708,24 +696,15 @@ fn a_gpio_payload_read_for_its_state_reports_it_on_its_interval() {
         20,
         ("\"/dev/gpiochip1\"", &format!("\"{}\"", chip.device), 2),
         &[(
-            "        edge: \"both\"\n",
-            "        edge: \"none\"\n        state_interval: \"200 ms\"\n",
+            "        state_interval: \"500 ms\"\n",
+            "        state_interval: \"200 ms\"\n",
         )],
     );
     let ground = flown.ground_of("switch");
 
     for level in [1u32, 0] {
         chip.pull(level == 1);
-        heard_while(
-            &ground,
-            || {},
-            |datum| {
-                datum.chunks(16).any(|record| {
-                    u32::from_be_bytes(record[12..16].try_into().unwrap())
-                        == level
-                })
-            },
-        );
+        heard_while(&ground, || {}, |datum| datum == [level as u8]);
     }
 }
 

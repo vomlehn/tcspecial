@@ -1,26 +1,20 @@
-//! The GPIO endpoint: discrete lines, as events a conduit can carry.
+//! The GPIO endpoint: discrete lines, as one whole number a conduit can
+//! carry.
 //!
 //! **Supported.** Run against the kernel's simulated chip, by
 //! `tests/kernel-dummies.rs`, and against no hardware.
 //!
 //! This is the one endpoint whose device data does not exist until it is
 //! made. Every other kind carries bytes somebody sent; a discrete line has no
-//! bytes at all -- it is high or low, and what is worth telling the ground is
-//! when it changed. So the handler asks the chip for the configured lines with
-//! edge detection, and each event the kernel reports becomes a record of
-//! [`EVENT_BYTES`] bytes: when it happened, which line, and what it became.
-//!
-//! The time is a [`Timestamp`] -- microseconds since the UNIX epoch, eight
-//! bytes, most significant first -- which is what every other time in this
-//! project is, so a line's change and a telemetry response can be read
-//! against each other. The kernel's own timestamp is
-//! nanoseconds on a monotonic clock, which says nothing to a ground station;
-//! it is converted here, once, where the event is made.
+//! bytes at all -- it is high or low. So what a set of lines is, is one
+//! unsigned whole number, the narrowest of `u8`, `u16`, `u32` and `u64` with
+//! a bit for each line, bit 0 the first line the node lists, most
+//! significant byte first: see "Typed links" in the design.
 //!
 //! Whether the lines are watched or driven is the node's type -- see
-//! `tcslibgs::node::payload::gpio::Kind`. Watched lines report: their events
-//! and their levels go out groundward, by `world-out`, and a datum arriving
-//! at `world-in` asks for their levels now. Driven lines are set: what
+//! `tcslibgs::node::payload::gpio::Kind`. Watched lines report: what they
+//! are goes out groundward, by `world-out`, every `state_interval`, and a
+//! datum arriving at `world-in` asks for it now. Driven lines are set: what
 //! arrives at `moc-in` is the value they are driven to, and a value that
 //! changes them is passed on vehicleward, by `moc-out`, to whatever they
 //! drive. A `gpio_inout`'s driven lines also report, groundward by
@@ -35,9 +29,9 @@
 //!
 //! In a run that simulates them, a node that gives a `sim_address` has its
 //! lines answered for by tcssim over UDP rather than by a chip: see
-//! [`UdpLines`]. Everything above is the same either way -- the records, the
-//! reports, what is passed on -- and only where a level comes from and where
-//! a drive goes differ.
+//! [`UdpLines`]. Everything above is the same either way -- the reports,
+//! what is passed on -- and only where a level comes from and where a drive
+//! goes differ.
 //!
 //! The kernel's structures are declared here, unlike the CAN endpoint's:
 //! `libc` has no GPIO character-device definitions. Their sizes are asserted
@@ -46,20 +40,19 @@
 //! would notice.
 
 use std::fs::{File, OpenOptions};
-use std::io::{ErrorKind, Read};
-use std::mem;
+use std::io::ErrorKind;
 use std::net::{SocketAddr, UdpSocket};
 use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use nix::poll::PollFlags;
 use tcslibgs::{
     graph::terminals::Stream,
     link_type::Basic,
-    node::payload::gpio::{state_read, state_said, EVENT_BYTES},
-    Bias, GpioConfig, LineEdge, TcsError, TcsResult, Timestamp,
+    node::payload::gpio::{state_read, state_said},
+    Bias, GpioConfig, TcsError, TcsResult,
 };
 
 use crate::endpoint::{
@@ -79,8 +72,6 @@ const GPIO_V2_GET_LINE_IOCTL: libc::c_ulong = 0xc250_b407;
 /// Line flags, from `enum gpio_v2_line_flag`.
 const GPIO_V2_LINE_FLAG_INPUT: u64 = 1 << 2;
 const GPIO_V2_LINE_FLAG_OUTPUT: u64 = 1 << 3;
-const GPIO_V2_LINE_FLAG_EDGE_RISING: u64 = 1 << 4;
-const GPIO_V2_LINE_FLAG_EDGE_FALLING: u64 = 1 << 5;
 const GPIO_V2_LINE_FLAG_BIAS_PULL_UP: u64 = 1 << 8;
 const GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN: u64 = 1 << 9;
 
@@ -109,9 +100,6 @@ struct LineValues {
 
 /// `GPIO_V2_LINE_ATTR_ID_DEBOUNCE`.
 const GPIO_V2_LINE_ATTR_ID_DEBOUNCE: u32 = 3;
-
-/// What an event says happened, from `enum gpio_v2_line_event_id`.
-const GPIO_V2_LINE_EVENT_RISING_EDGE: u32 = 1;
 
 /// `struct gpio_v2_line_attribute`, whose union this uses as a debounce
 /// period: a `u32` in a field eight bytes wide.
@@ -179,18 +167,6 @@ impl Default for LineRequest {
     }
 }
 
-/// `struct gpio_v2_line_event`.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-struct LineEvent {
-    timestamp_ns: u64,
-    id: u32,
-    offset: u32,
-    seqno: u32,
-    line_seqno: u32,
-    padding: [u32; 6],
-}
-
 /// What the two halves of one request tell each other.
 ///
 /// Atomics, because the halves are read and written on whichever thread the
@@ -238,18 +214,14 @@ enum Lines {
 /// nothing, says where to answer.
 ///
 /// What the kernel does for a chip is done here from the levels tcssim sends,
-/// so that what goes out is what a chip's would be: an event for each edge the
-/// node asks for, as the same record, and the levels when a report is due. The
-/// first state tcssim sends is what the lines are, not a change, as a chip's
-/// lines have no event for being what they were when asked for.
+/// so that what goes out is what a chip's would be: the levels when a report
+/// is due.
 struct UdpLines {
     /// Connected to the `sim_address`, so that nothing else's datagrams are
     /// taken for the lines'.
     socket: UdpSocket,
     /// Where tcssim answers, for what a complaint says.
     at: SocketAddr,
-    /// Which changes of a watched line are events.
-    edge: LineEdge,
     /// The levels tcssim last sent, which both halves of the node read.
     seen: Arc<Seen>,
 }
@@ -360,32 +332,6 @@ fn levels_of(what: &str, fd: RawFd, mask: u64) -> TcsResult<u64> {
     Ok(values.bits)
 }
 
-/// Gives one line's level as the bytes a conduit carries.
-///
-/// The record an event becomes -- the time, the line, the value -- said of a
-/// line that has not changed: what it is now, observed now. Both kinds say
-/// "this line had this value at this time", which is what a ground station
-/// plots; the difference is that an event's time is the kernel's for the edge
-/// and this one's is when the vehicle looked.
-///
-/// # Arguments
-///
-/// * `offset` - The line's offset on the chip.
-/// * `high`   - Whether the line is asserted.
-/// * `now`    - When the vehicle looked.
-///
-/// # Returns
-///
-/// The record: the time as a [`Timestamp`], the offset and the value (1 or
-/// 0) as a 32-bit word, each most significant byte first.
-fn level_record(offset: u32, high: bool, now: SystemTime) -> [u8; EVENT_BYTES] {
-    let mut record = [0u8; EVENT_BYTES];
-    record[..8].copy_from_slice(&Timestamp::at(now).to_be_bytes());
-    record[8..12].copy_from_slice(&offset.to_be_bytes());
-    record[12..].copy_from_slice(&u32::from(high).to_be_bytes());
-    record
-}
-
 impl UdpLines {
     /// Reaches tcssim's lines at a node's `sim_address`, and says where to
     /// answer.
@@ -394,7 +340,6 @@ impl UdpLines {
     ///
     /// * `what` - The handler, for what a complaint says.
     /// * `at`   - The `sim_address`.
-    /// * `edge` - Which changes of a watched line are events.
     ///
     /// # Returns
     ///
@@ -404,7 +349,7 @@ impl UdpLines {
     ///
     /// `TcsError::Endpoint` if the socket cannot be made, connected or made
     /// non-blocking.
-    fn open(what: &str, at: SocketAddr, edge: LineEdge) -> TcsResult<Self> {
+    fn open(what: &str, at: SocketAddr) -> TcsResult<Self> {
         let failed = |e: std::io::Error| {
             TcsError::Endpoint(format!(
                 "{what}: cannot reach the simulated lines at {at}: {e}"
@@ -416,7 +361,6 @@ impl UdpLines {
         let lines = Self {
             socket,
             at,
-            edge,
             seen: Arc::new(Seen::default()),
         };
         lines.hello();
@@ -437,7 +381,6 @@ impl UdpLines {
         Ok(Self {
             socket: self.socket.try_clone()?,
             at: self.at,
-            edge: self.edge,
             seen: Arc::clone(&self.seen),
         })
     }
@@ -491,36 +434,20 @@ impl UdpLines {
         Ok(())
     }
 
-    /// Takes what tcssim has sent, as records of the edges the node asks for,
-    /// while the buffer has room for every watched line's.
+    /// Takes what tcssim has sent: the latest is what the lines are.
     ///
     /// # Arguments
     ///
-    /// * `what`    - The handler, for what a complaint says.
-    /// * `offsets` - Every line of the request, in its order.
-    /// * `watched` - The watched lines, a bit for each by its place.
-    /// * `buffer`  - Where the records go.
-    /// * `filled`  - How much of `buffer` is already used.
-    ///
-    /// # Returns
-    ///
-    /// How much of `buffer` is used afterwards.
+    /// * `what`  - The handler, for what a complaint says.
+    /// * `count` - How many lines the request has.
     ///
     /// # Errors
     ///
     /// `TcsError::Endpoint` for a datagram that is not a state of the lines;
     /// `TcsError::Io` for a socket that fails.
-    fn edges(
-        &self,
-        what: &str,
-        offsets: &[u32],
-        watched: u64,
-        buffer: &mut [u8],
-        mut filled: usize,
-    ) -> TcsResult<usize> {
-        let most = EVENT_BYTES * watched.count_ones() as usize;
+    fn take(&self, what: &str, count: usize) -> TcsResult<()> {
         let mut datagram = [0u8; GPIO_V2_LINES_MAX + 1];
-        while filled + most <= buffer.len() {
+        loop {
             let n = match self.socket.recv(&mut datagram) {
                 Ok(n) => n,
                 // Nothing yet, or tcssim not there yet: the hello was
@@ -531,42 +458,16 @@ impl UdpLines {
                         ErrorKind::WouldBlock | ErrorKind::ConnectionRefused
                     ) =>
                 {
-                    break
+                    return Ok(())
                 }
                 Err(e) => return Err(TcsError::Io(e)),
             };
-            let now =
-                state_read(offsets.len(), &datagram[..n]).map_err(|why| {
-                    TcsError::Endpoint(format!(
-                        "{what}: {} sent {why}",
-                        self.at
-                    ))
-                })?;
-            let was = self.seen.levels.swap(now, Ordering::AcqRel);
-            if !self.seen.known.swap(true, Ordering::AcqRel) {
-                continue;
-            }
-            let at = SystemTime::now();
-            for (place, offset) in offsets.iter().enumerate() {
-                let bit = 1u64 << place;
-                if watched & bit == 0 || (was ^ now) & bit == 0 {
-                    continue;
-                }
-                let high = now & bit != 0;
-                let wanted = match self.edge {
-                    LineEdge::Both => true,
-                    LineEdge::Rising => high,
-                    LineEdge::Falling => !high,
-                    LineEdge::None => false,
-                };
-                if wanted {
-                    buffer[filled..filled + EVENT_BYTES]
-                        .copy_from_slice(&level_record(*offset, high, at));
-                    filled += EVENT_BYTES;
-                }
-            }
+            let now = state_read(count, &datagram[..n]).map_err(|why| {
+                TcsError::Endpoint(format!("{what}: {} sent {why}", self.at))
+            })?;
+            self.seen.levels.store(now, Ordering::Release);
+            self.seen.known.store(true, Ordering::Release);
         }
-        Ok(filled)
     }
 }
 
@@ -632,7 +533,7 @@ impl GpioEndpoint {
         let offsets = config.lines();
         let request = request_for(what, config, &offsets)?;
         let lines = match config.sim_address {
-            Some(at) => Lines::Udp(UdpLines::open(what, at, config.edge)?),
+            Some(at) => Lines::Udp(UdpLines::open(what, at)?),
             None => {
                 let chip = OpenOptions::new()
                     .read(true)
@@ -797,29 +698,21 @@ fn request_for(
     }
 
     // Driven lines ask for none of the watching terms, which the
-    // configuration refuses to state for them: an output has no edges to
-    // report and nothing to debounce.
+    // configuration refuses to state for them: an output has nothing to hold
+    // or debounce.
     if config.inputs.is_empty() {
         request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT;
         return Ok(request);
     }
 
-    let edges = match config.edge {
-        LineEdge::Rising => GPIO_V2_LINE_FLAG_EDGE_RISING,
-        LineEdge::Falling => GPIO_V2_LINE_FLAG_EDGE_FALLING,
-        LineEdge::Both => {
-            GPIO_V2_LINE_FLAG_EDGE_RISING | GPIO_V2_LINE_FLAG_EDGE_FALLING
-        }
-        // Asked for as a plain input: there are no events to read, and what
-        // the lines are is taken when the report is due.
-        LineEdge::None => 0,
-    };
     let bias = match config.bias {
         Bias::None => 0,
         Bias::PullUp => GPIO_V2_LINE_FLAG_BIAS_PULL_UP,
         Bias::PullDown => GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN,
     };
-    request.config.flags = GPIO_V2_LINE_FLAG_INPUT | edges | bias;
+    // Asked for as a plain input, with no edge detection: what the lines
+    // are is taken when a report is due, and nothing else is read.
+    request.config.flags = GPIO_V2_LINE_FLAG_INPUT | bias;
 
     // The debounce the kernel does, where the file asked for one, applied to
     // every line of the request: a bit per line.
@@ -1016,43 +909,6 @@ fn values_for(driven: u64, wanted: u64) -> LineValues {
     }
 }
 
-/// Gives one event as the bytes a conduit carries: the time, the line, the
-/// value.
-///
-/// Most significant byte first, as everything this software puts on the
-/// network is unless the protocol it goes in says otherwise. That is the
-/// order a [`Timestamp`] goes on the wire in, so the eight bytes of time
-/// here are the eight bytes of time in a telemetry response.
-///
-/// # Arguments
-///
-/// * `event` - The event the kernel reported.
-/// * `now`   - The time to give it, in place of the kernel's monotonic
-///             one.
-///
-/// # Returns
-///
-/// The record: the time, the line's offset, and 1 for a rising edge or 0
-/// for a falling one.
-fn record_of(event: &LineEvent, now: SystemTime) -> [u8; EVENT_BYTES] {
-    let mut record = [0u8; EVENT_BYTES];
-
-    // The kernel's timestamp is nanoseconds on a monotonic clock, which says
-    // nothing to a ground station: what goes out is a Timestamp, which is
-    // what every other time in this project is, so a line's change and a
-    // telemetry response can be read against each other.
-    let value: u32 = if event.id == GPIO_V2_LINE_EVENT_RISING_EDGE {
-        1
-    } else {
-        0
-    };
-
-    record[..8].copy_from_slice(&Timestamp::at(now).to_be_bytes());
-    record[8..12].copy_from_slice(&event.offset.to_be_bytes());
-    record[12..].copy_from_slice(&value.to_be_bytes());
-    record
-}
-
 impl EndpointWaitable for GpioEndpoint {
     fn io_fd(&self) -> RawFd {
         self.lines.fd()
@@ -1117,12 +973,14 @@ impl EndpointReadable for GpioEndpoint {
             return Ok(0);
         }
 
-        let mut filled = 0;
+        // What tcssim has said of simulated lines, taken whether or not a
+        // report is due, so that what is reported is the latest.
+        if let Lines::Udp(udp) = &self.lines {
+            udp.take(&self.what, count)?;
+        }
 
-        // What the lines are, where the configuration asks for it and the
-        // report is due, or a datum at world-in has asked for it. Before the
-        // events rather than after, so that a report and the edges that
-        // followed it go out in the order they happened.
+        // What the lines are, where the report is due by the clock or a
+        // datum at world-in has asked for it.
         //
         // The clock runs from when the report was due: a vehicle busy enough
         // to be late with one is a vehicle that should not then be late with
@@ -1130,80 +988,18 @@ impl EndpointReadable for GpioEndpoint {
         // which a long pause would do -- is not made up for; what the ground
         // wants is what the lines are now. One asked for leaves the clock as
         // it was.
-        if self.report_due() {
-            self.shared.asked.store(false, Ordering::Release);
-            let bits = match &self.lines {
-                Lines::Chip { request, .. } => {
-                    levels_of(&self.what, request.as_raw_fd(), self.watched)?
-                }
-                Lines::Udp(udp) => udp.levels(self.watched),
-            };
-            let at = SystemTime::now();
-            for (n, offset) in self.offsets.iter().enumerate() {
-                if self.watched & (1u64 << n) == 0 {
-                    continue;
-                }
-                if filled + EVENT_BYTES > buffer.len() {
-                    break;
-                }
-                let high = bits & (1u64 << n) != 0;
-                buffer[filled..filled + EVENT_BYTES]
-                    .copy_from_slice(&level_record(*offset, high, at));
-                filled += EVENT_BYTES;
-            }
-            self.wind();
+        if !self.report_due() || buffer.len() < 8 {
+            return Ok(0);
         }
-
-        let request = match &mut self.lines {
-            Lines::Chip { request, .. } => request,
-            Lines::Udp(udp) => {
-                return udp.edges(
-                    &self.what,
-                    &self.offsets,
-                    self.watched,
-                    buffer,
-                    filled,
-                )
+        self.shared.asked.store(false, Ordering::Release);
+        let bits = match &self.lines {
+            Lines::Chip { request, .. } => {
+                levels_of(&self.what, request.as_raw_fd(), self.watched)?
             }
+            Lines::Udp(udp) => udp.levels(self.watched),
         };
-        while filled + EVENT_BYTES <= buffer.len() {
-            let mut event = LineEvent::default();
-            // SAFETY: a buffer of exactly the structure's size, which is what
-            // the kernel writes for one event.
-            let slot = unsafe {
-                std::slice::from_raw_parts_mut(
-                    &mut event as *mut LineEvent as *mut u8,
-                    mem::size_of::<LineEvent>(),
-                )
-            };
-
-            match request.read(slot) {
-                Ok(0) => break,
-                Ok(n) if n < mem::size_of::<LineEvent>() => {
-                    // Part of an event is not an event. Nothing to report:
-                    // the kernel does not do this, and a conduit counts what
-                    // it moved.
-                    break;
-                }
-                Ok(_) => {
-                    let record = record_of(&event, SystemTime::now());
-                    buffer[filled..filled + EVENT_BYTES]
-                        .copy_from_slice(&record);
-                    filled += EVENT_BYTES;
-                }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    break
-                }
-                Err(e) => {
-                    if filled > 0 {
-                        break;
-                    }
-                    return Err(TcsError::Io(e));
-                }
-            }
-        }
-
-        Ok(filled)
+        self.wind();
+        Ok(lines_said(count, bits, buffer))
     }
 }
 
@@ -1275,12 +1071,12 @@ impl EndpointWritable for GpioEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::UNIX_EPOCH;
+    use std::mem;
 
     /// Every structure is the size the kernel's own is.
     ///
     /// Measured from `linux/gpio.h` on the machine this was written on: 16,
-    /// 24, 272, 592 and 48 bytes. A structure of the wrong size is an ioctl
+    /// 24, 272, 592 and 16 bytes. A structure of the wrong size is an ioctl
     /// that reads or writes past what it was handed, and nothing else in a
     /// test would notice.
     #[test]
@@ -1289,12 +1085,10 @@ mod tests {
         assert_eq!(mem::size_of::<ConfigAttribute>(), 24);
         assert_eq!(mem::size_of::<LineConfig>(), 272);
         assert_eq!(mem::size_of::<LineRequest>(), 592);
-        assert_eq!(mem::size_of::<LineEvent>(), 48);
         assert_eq!(mem::size_of::<LineValues>(), 16);
 
         // And the alignment the kernel's 64-bit fields need.
         assert_eq!(mem::align_of::<LineRequest>(), 8);
-        assert_eq!(mem::align_of::<LineEvent>(), 8);
         assert_eq!(mem::align_of::<LineValues>(), 8);
     }
 
@@ -1303,21 +1097,19 @@ mod tests {
     /// # Arguments
     ///
     /// * `lines` - The offsets.
-    /// * `edge`  - Which edges are events.
     ///
     /// # Returns
     ///
-    /// The lines' configuration, on `/dev/gpiochip0`.
-    fn watched(lines: Vec<u32>, edge: LineEdge) -> GpioConfig {
+    /// The lines' configuration, on `/dev/gpiochip0`, reported every minute.
+    fn watched(lines: Vec<u32>) -> GpioConfig {
         GpioConfig {
             kind: tcslibgs::node::payload::gpio::Kind::In,
             path: "/dev/gpiochip0".to_string(),
             inputs: lines,
             outputs: Vec::new(),
-            edge,
             bias: Bias::None,
             debounce: None,
-            state_interval: None,
+            state_interval: Some(Duration::from_secs(60)),
             sim_address: None,
         }
     }
@@ -1391,14 +1183,14 @@ mod tests {
         }
     }
 
-    /// A request asks for the lines the file named, as inputs, with the edges
-    /// and the bias it asked for.
+    /// A request asks for the lines the file named, as inputs, with the bias
+    /// it asked for and no edge detection.
     #[test]
     fn a_request_asks_for_what_the_file_said() {
         let config = GpioConfig {
             bias: Bias::PullUp,
             debounce: Some(Duration::from_micros(5_000)),
-            ..watched(vec![3, 7, 11], LineEdge::Falling)
+            ..watched(vec![3, 7, 11])
         };
 
         let request = request_for("discretes", &config, &config.lines())
@@ -1413,9 +1205,7 @@ mod tests {
 
         assert_eq!(
             request.config.flags,
-            GPIO_V2_LINE_FLAG_INPUT
-                | GPIO_V2_LINE_FLAG_EDGE_FALLING
-                | GPIO_V2_LINE_FLAG_BIAS_PULL_UP
+            GPIO_V2_LINE_FLAG_INPUT | GPIO_V2_LINE_FLAG_BIAS_PULL_UP
         );
 
         // The debounce, applied to every line of the request: a bit per line.
@@ -1437,68 +1227,12 @@ mod tests {
         assert_eq!(String::from_utf8_lossy(&consumer), "discretes");
     }
 
-    /// Both edges where the file asked for both, and no attributes where it
-    /// asked for no debouncing.
-    #[test]
-    fn both_edges_and_no_debounce_is_the_plain_case() {
-        let config = watched(vec![0], LineEdge::Both);
-        let request = request_for("discretes", &config, &config.lines())
-            .expect("a request");
-
-        assert_eq!(
-            request.config.flags,
-            GPIO_V2_LINE_FLAG_INPUT
-                | GPIO_V2_LINE_FLAG_EDGE_RISING
-                | GPIO_V2_LINE_FLAG_EDGE_FALLING
-        );
-        assert_eq!(request.config.num_attrs, 0);
-    }
-
-    /// An event becomes a record a ground station can read: a time, the
-    /// line, and what it became.
-    #[test]
-    fn an_event_becomes_a_record() {
-        let rising = LineEvent {
-            timestamp_ns: 123_456_789,
-            id: GPIO_V2_LINE_EVENT_RISING_EDGE,
-            offset: 7,
-            ..LineEvent::default()
-        };
-        let at =
-            UNIX_EPOCH + std::time::Duration::from_millis(1_700_000_000_123);
-
-        let record = record_of(&rising, at);
-        assert_eq!(record.len(), EVENT_BYTES);
-        assert_eq!(
-            Timestamp::from_be_bytes(record[..8].try_into().unwrap()),
-            Timestamp {
-                micros: 1_700_000_000_123_000
-            },
-            "the time is a Timestamp, not the kernel's own clock"
-        );
-        assert_eq!(u32::from_be_bytes(record[8..12].try_into().unwrap()), 7);
-        assert_eq!(
-            u32::from_be_bytes(record[12..].try_into().unwrap()),
-            1,
-            "a rising edge is a line that became high"
-        );
-
-        // And a falling edge is the same record with the other value.
-        let falling = LineEvent {
-            id: 2,
-            offset: 7,
-            ..rising
-        };
-        let record = record_of(&falling, at);
-        assert_eq!(u32::from_be_bytes(record[12..].try_into().unwrap()), 0);
-    }
-
     /// A chip that is not there is reported.
     #[test]
     fn a_chip_that_is_not_there_is_reported() {
         let config = GpioConfig {
             path: "/dev/gpiochip-nonesuch".to_string(),
-            ..watched(vec![0], LineEdge::Both)
+            ..watched(vec![0])
         };
         let said = match GpioEndpoint::new("discretes", &config) {
             Err(e) => format!("{e}"),
@@ -1523,60 +1257,31 @@ mod tests {
         close(end);
     }
 
-    /// Several events waiting become several records in one read, on the
-    /// stream world data goes by.
+    /// A report gives what the lines are as one number, a bit for each by
+    /// its place, on the stream world data goes by -- here asked for, as a
+    /// datum at world-in asks.
     ///
-    /// Against a pipe in place of the request's descriptor, which is what
-    /// the kernel's end of it looks like from here: whole events, one after
-    /// another.
+    /// Against a pipe in place of the request's descriptor, which the kernel
+    /// refuses a values ioctl on: the refusal names the chip, which is as far
+    /// as a test without a chip can see.
     #[test]
-    fn every_event_waiting_becomes_a_record() {
+    fn a_report_is_asked_of_the_chip() {
         let (mut endpoint, end) = on_a_pipe("discretes", vec![3], 0b1, 0);
-
-        // Two events, as the kernel would write them.
-        for (id, offset) in [(GPIO_V2_LINE_EVENT_RISING_EDGE, 3u32), (2, 3)] {
-            let event = LineEvent {
-                timestamp_ns: 1,
-                id,
-                offset,
-                ..LineEvent::default()
-            };
-            // SAFETY: writing the structure's own bytes, of its own size.
-            let wrote = unsafe {
-                libc::write(
-                    end,
-                    &event as *const LineEvent as *const libc::c_void,
-                    mem::size_of::<LineEvent>(),
-                )
-            };
-            assert_eq!(wrote as usize, mem::size_of::<LineEvent>());
-        }
-
+        endpoint.shared.asked.store(true, Ordering::Release);
         let mut buffer = [0u8; 64];
-        let got = endpoint.read(&mut buffer).expect("the events are read");
-        assert_eq!(got, 2 * EVENT_BYTES, "two events, two records");
-        assert_eq!(endpoint.stream(), Some(Stream::Groundward));
-
-        // The first is the rising edge and the second the falling one, in the
-        // order they happened.
-        assert_eq!(u32::from_be_bytes(buffer[8..12].try_into().unwrap()), 3);
-        assert_eq!(u32::from_be_bytes(buffer[12..16].try_into().unwrap()), 1);
-        assert_eq!(
-            u32::from_be_bytes(
-                buffer[EVENT_BYTES + 12..EVENT_BYTES + 16]
-                    .try_into()
-                    .unwrap()
-            ),
-            0
-        );
+        let said = match endpoint.read(&mut buffer) {
+            Err(e) => format!("{e}"),
+            Ok(n) => panic!("a pipe gave the lines' values, {n} bytes"),
+        };
+        assert!(said.contains("discretes"), "{said}");
         close(end);
     }
 
     /// A driven set of lines asks for the output flag and nothing else.
     ///
     /// None of the watching terms, which the configuration refuses to state
-    /// for an output: an edge reported from a line this node drives would be
-    /// this node hearing its own voice.
+    /// for an output: a line this node drives has nothing to hold or
+    /// debounce.
     #[test]
     fn driven_lines_ask_only_to_be_driven() {
         let config = GpioConfig {
@@ -1586,7 +1291,6 @@ mod tests {
             outputs: vec![17, 18, 19],
             // What the parser leaves here for a gpio_out, and what must not
             // reach the request.
-            edge: LineEdge::Both,
             bias: Bias::None,
             debounce: None,
             state_interval: None,
@@ -1796,66 +1500,40 @@ mod tests {
         Vec::new()
     }
 
-    /// Simulated watched lines say hello, take tcssim's first state as what
-    /// they are rather than as a change, and make a record of each edge after
-    /// it, as a chip's would; a datagram that is not a state is refused.
+    /// Simulated watched lines say hello, keep the last state tcssim sends,
+    /// and report it as one number when asked or when the report is due; a
+    /// datagram that is not a state is refused.
     #[test]
-    fn simulated_watched_lines_make_the_records_a_chip_would() {
-        let (tcssim, config) = simulated(watched(vec![3, 7], LineEdge::Both));
+    fn simulated_watched_lines_report_what_tcssim_last_said() {
+        let (tcssim, config) = simulated(watched(vec![3, 7]));
         let mut endpoint = GpioEndpoint::new("switches", &config)
             .expect("the lines are reached");
         let mut hello = [0u8; 8];
         let (n, vehicle) = tcssim.recv_from(&mut hello).expect("a hello");
         assert_eq!(n, 0, "the hello is empty");
 
+        // The first report is due as the node opens: the latest state, line
+        // 3 high -- bit 0 of a u8 -- and not the one before it.
         tcssim.send_to(b"00", vehicle).expect("sent");
         tcssim.send_to(b"10", vehicle).expect("sent");
-        let read = read_some(&mut endpoint);
-        assert_eq!(read.len(), EVENT_BYTES, "one edge, not the first state");
-        assert_eq!(&read[8..12], &3u32.to_be_bytes());
-        assert_eq!(&read[12..], &1u32.to_be_bytes());
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(read_some(&mut endpoint), vec![0b01]);
+        assert_eq!(endpoint.stream(), Some(Stream::Groundward));
 
-        // Both lines change: line 3 falls and line 7 rises.
+        // Then nothing until the next is due or one is asked for.
+        let mut buffer = [0u8; 16];
+        assert_eq!(endpoint.read(&mut buffer).expect("nothing due"), 0);
+
+        // Line 3 falls and line 7 rises: bit 1.
         tcssim.send_to(b"01", vehicle).expect("sent");
-        let read = read_some(&mut endpoint);
-        assert_eq!(read.len(), 2 * EVENT_BYTES);
-        assert_eq!(&read[8..16], &[0, 0, 0, 3, 0, 0, 0, 0]);
-        assert_eq!(&read[24..32], &[0, 0, 0, 7, 0, 0, 0, 1]);
+        std::thread::sleep(Duration::from_millis(50));
+        endpoint.shared.asked.store(true, Ordering::Release);
+        assert_eq!(read_some(&mut endpoint), vec![0b10]);
 
         tcssim.send_to(b"2", vehicle).expect("sent");
         std::thread::sleep(Duration::from_millis(50));
-        let mut buffer = [0u8; 256];
         let refused = endpoint.read(&mut buffer).expect_err("not a state");
         assert!(refused.to_string().contains("not a 1 or a 0"), "{refused}");
-    }
-
-    /// Simulated lines watched for rising edges make records of those alone,
-    /// and a report gives the levels tcssim last said.
-    #[test]
-    fn simulated_lines_keep_to_their_edges_and_report_their_levels() {
-        let (tcssim, config) = simulated(watched(vec![5], LineEdge::Rising));
-        let mut endpoint = GpioEndpoint::new("switch", &config)
-            .expect("the lines are reached");
-        let (_, vehicle) = tcssim.recv_from(&mut [0u8; 8]).expect("a hello");
-
-        for state in [b"0", b"1", b"0", b"1"] {
-            tcssim.send_to(state, vehicle).expect("sent");
-        }
-        let mut records = Vec::new();
-        let until = Instant::now() + Duration::from_millis(300);
-        while Instant::now() < until {
-            records.extend(read_some(&mut endpoint));
-        }
-        assert_eq!(records.len(), 2 * EVENT_BYTES, "the two rises alone");
-        assert!(records
-            .chunks(EVENT_BYTES)
-            .all(|r| r[12..] == 1u32.to_be_bytes()));
-
-        // Asked, as a datum at world-in asks: the level now.
-        endpoint.shared.asked.store(true, Ordering::Release);
-        let report = read_some(&mut endpoint);
-        assert_eq!(report.len(), EVENT_BYTES);
-        assert_eq!(&report[8..], &[0, 0, 0, 5, 0, 0, 0, 1]);
     }
 
     /// Simulated driven lines send tcssim what they are driven to, one
@@ -1867,7 +1545,6 @@ mod tests {
             path: "/dev/gpiochip1".to_string(),
             inputs: Vec::new(),
             outputs: vec![4, 5],
-            edge: LineEdge::None,
             bias: Bias::None,
             debounce: None,
             state_interval: Some(Duration::from_secs(60)),

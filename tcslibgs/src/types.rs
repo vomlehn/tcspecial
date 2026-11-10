@@ -1161,23 +1161,14 @@ pub struct GpioConfig {
     pub inputs: Vec<u32>,
     /// And of the lines driven. None for a `gpio_in`.
     pub outputs: Vec<u32>,
-    /// Which changes of a line are events. Only meaningful on lines that are
-    /// watched, and refused on lines that are driven.
-    pub edge: crate::LineEdge,
     /// What holds a line nothing is driving.
     pub bias: crate::Bias,
     /// How long a line must be steady before a change counts, where the file
     /// asks for it.
     pub debounce: Option<Duration>,
-    /// How often the current level of every line is reported, where the file
-    /// asks for it.
-    ///
-    /// Events say when a line changed; this says what it is now. A ground
-    /// station that connected after the last edge knows nothing about a line
-    /// until it changes again, and the kernel's event queue is finite, so a
-    /// flood can leave the ground holding a value that is simply wrong. A
-    /// report every so often closes both: after one interval at most, what
-    /// the ground has is the truth.
+    /// How often what the lines are is reported -- what a `gpio_in`'s are,
+    /// and what a `gpio_inout`'s were last told -- as one whole number with a
+    /// bit per line: required of both, and `None` for a `gpio_out`.
     pub state_interval: Option<Duration>,
     /// Where tcssim answers for the lines over UDP, in a run that simulates
     /// them; `None` where the chip is opened, which is always under the

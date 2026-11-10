@@ -14,8 +14,8 @@ tcssim:
 # user who ran that.
 simulated_payloads:
   - type gpio_in:
-      # The switch is pulled the other way every second, so that its line has an
-      # edge, and the ground a record, a second.
+      # The switch is pulled the other way every second, so that what the
+      # ground is told of it changes every other report.
       - payload: switch
         packet_interval: 1 s
         simulate: true

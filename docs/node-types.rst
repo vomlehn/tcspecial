@@ -4,10 +4,11 @@ Writing Node Types
 .. note::
    Links between nodes are being given types, in stages: see "Typed links"
    in the design. What a node type declares about its terminals, which is
-   what this guide says, is settled and built. Data between nodes is still
-   carried as bytes, and the stages that change that change how a node
-   reads and writes, not what its type declares. Where the code and the
-   design differ, the code is what is described here.
+   what this guide says, is settled and built, and so is the check of every
+   datum against its type as it is delivered. The stages still to come
+   change how some nodes read and write -- a decision, for one, is still
+   the text ``1`` or ``0`` -- not what a type declares. Where the code and
+   the design differ, the code is what is described here.
 
 .. contents:: Table of Contents
    :depth: 2
@@ -106,7 +107,9 @@ in ``tcslibgs/src/link_type.rs``: the integers ``u8`` to ``i64``,
 ``boolean``, the quantities (``kelvin``, ``volt``, ``ampere``, ``watt``,
 ``metre``, ``metre_per_second``, ``newton``, ``kilogram_per_second``,
 ``ratio``), ``string``, ``bytes``, and structures of up to sixteen named
-fields, ``"x: i16, y: i16"``. A new node type adds no type there.
+fields, ``"x: i16, y: i16"``. A structure's fields are of fixed width, so a
+``string`` or ``bytes`` field in one is refused. A new node type adds no
+type there.
 
 What a node type carries is decided in one function, ``carries`` in
 ``tcslibgs/src/graph/link_types.rs``, which takes a node and a terminal and
@@ -141,6 +144,23 @@ rule, which is almost never right and is not refused, so a new vehicle type
 must have its branch. The attributes a type's terminals are stated by are in
 ``TYPE_ATTRIBUTES`` in the same file, and its ``problems`` is what the
 configuration check calls to hold every link to the rule.
+
+What a Node Hands On
+====================
+Between two nodes a datum is its type's own encoding, and only that: a whole
+number as wide as its type, most significant byte first; a boolean as one
+byte, ``1`` or ``0``; a value as its four bytes; a structure as its fields
+one after another; a string or bytes as their contents alone. What a node
+produces at a terminal is that encoding of the type the terminal carries,
+with nothing before it or after it.
+
+Every datum delivered to a node is checked against the type the node takes
+there before the node is given it -- its width, a boolean's being ``1`` or
+``0``, a string's being UTF-8, and no datum longer than 4096 bytes -- and
+one that is not refused, counted and said. So a node may rely on what it is
+given being its type, and needs no check of its own for that. A device's
+own bytes are not a type's encoding; ``format`` says how to read them, and
+the node at the edge turns them into the type it sends.
 
 Adding a Payload Type
 =====================

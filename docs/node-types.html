@@ -368,10 +368,11 @@ ul.auto-toc {
 <p class="first admonition-title">Note</p>
 <p class="last">Links between nodes are being given types, in stages: see &quot;Typed links&quot;
 in the design. What a node type declares about its terminals, which is
-what this guide says, is settled and built. Data between nodes is still
-carried as bytes, and the stages that change that change how a node
-reads and writes, not what its type declares. Where the code and the
-design differ, the code is what is described here.</p>
+what this guide says, is settled and built, and so is the check of every
+datum against its type as it is delivered. The stages still to come
+change how some nodes read and write -- a decision, for one, is still
+the text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> -- not what a type declares. Where the code and
+the design differ, the code is what is described here.</p>
 </div>
 <div class="contents local topic" id="table-of-contents">
 <p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
@@ -380,20 +381,21 @@ design differ, the code is what is described here.</p>
 <li><a class="reference internal" href="#the-kinds-of-node-type" id="toc-entry-2">The Kinds of Node Type</a></li>
 <li><a class="reference internal" href="#three-modules-of-one-name" id="toc-entry-3">Three Modules of One Name</a></li>
 <li><a class="reference internal" href="#terminals-and-what-they-carry" id="toc-entry-4">Terminals and What They Carry</a></li>
-<li><a class="reference internal" href="#adding-a-payload-type" id="toc-entry-5">Adding a Payload Type</a><ul>
-<li><a class="reference internal" href="#in-tcslibgs" id="toc-entry-6">In <tt class="docutils literal">tcslibgs</tt></a></li>
-<li><a class="reference internal" href="#in-tcspecial" id="toc-entry-7">In <tt class="docutils literal">tcspecial</tt></a></li>
-<li><a class="reference internal" href="#in-tcssim" id="toc-entry-8">In <tt class="docutils literal">tcssim</tt></a></li>
+<li><a class="reference internal" href="#what-a-node-hands-on" id="toc-entry-5">What a Node Hands On</a></li>
+<li><a class="reference internal" href="#adding-a-payload-type" id="toc-entry-6">Adding a Payload Type</a><ul>
+<li><a class="reference internal" href="#in-tcslibgs" id="toc-entry-7">In <tt class="docutils literal">tcslibgs</tt></a></li>
+<li><a class="reference internal" href="#in-tcspecial" id="toc-entry-8">In <tt class="docutils literal">tcspecial</tt></a></li>
+<li><a class="reference internal" href="#in-tcssim" id="toc-entry-9">In <tt class="docutils literal">tcssim</tt></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#adding-a-vehicle-type" id="toc-entry-9">Adding a Vehicle Type</a></li>
-<li><a class="reference internal" href="#adding-a-compute-function" id="toc-entry-10">Adding a Compute Function</a></li>
-<li><a class="reference internal" href="#adding-a-gateway-type" id="toc-entry-11">Adding a Gateway Type</a></li>
-<li><a class="reference internal" href="#the-editor-and-the-schemas" id="toc-entry-12">The Editor and the Schemas</a></li>
-<li><a class="reference internal" href="#drawing-it" id="toc-entry-13">Drawing It</a></li>
-<li><a class="reference internal" href="#documenting-it" id="toc-entry-14">Documenting It</a></li>
-<li><a class="reference internal" href="#testing-it" id="toc-entry-15">Testing It</a></li>
-<li><a class="reference internal" href="#a-checklist" id="toc-entry-16">A Checklist</a></li>
+<li><a class="reference internal" href="#adding-a-vehicle-type" id="toc-entry-10">Adding a Vehicle Type</a></li>
+<li><a class="reference internal" href="#adding-a-compute-function" id="toc-entry-11">Adding a Compute Function</a></li>
+<li><a class="reference internal" href="#adding-a-gateway-type" id="toc-entry-12">Adding a Gateway Type</a></li>
+<li><a class="reference internal" href="#the-editor-and-the-schemas" id="toc-entry-13">The Editor and the Schemas</a></li>
+<li><a class="reference internal" href="#drawing-it" id="toc-entry-14">Drawing It</a></li>
+<li><a class="reference internal" href="#documenting-it" id="toc-entry-15">Documenting It</a></li>
+<li><a class="reference internal" href="#testing-it" id="toc-entry-16">Testing It</a></li>
+<li><a class="reference internal" href="#a-checklist" id="toc-entry-17">A Checklist</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -481,7 +483,9 @@ in <tt class="docutils literal">tcslibgs/src/link_type.rs</tt>: the integers <tt
 <tt class="docutils literal">boolean</tt>, the quantities (<tt class="docutils literal">kelvin</tt>, <tt class="docutils literal">volt</tt>, <tt class="docutils literal">ampere</tt>, <tt class="docutils literal">watt</tt>,
 <tt class="docutils literal">metre</tt>, <tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">newton</tt>, <tt class="docutils literal">kilogram_per_second</tt>,
 <tt class="docutils literal">ratio</tt>), <tt class="docutils literal">string</tt>, <tt class="docutils literal">bytes</tt>, and structures of up to sixteen named
-fields, <tt class="docutils literal">&quot;x: i16, y: i16&quot;</tt>. A new node type adds no type there.</p>
+fields, <tt class="docutils literal">&quot;x: i16, y: i16&quot;</tt>. A structure's fields are of fixed width, so a
+<tt class="docutils literal">string</tt> or <tt class="docutils literal">bytes</tt> field in one is refused. A new node type adds no
+type there.</p>
 <p>What a node type carries is decided in one function, <tt class="docutils literal">carries</tt> in
 <tt class="docutils literal">tcslibgs/src/graph/link_types.rs</tt>, which takes a node and a terminal and
 says what that terminal carries. There are four ways a type can answer:</p>
@@ -513,10 +517,26 @@ must have its branch. The attributes a type's terminals are stated by are in
 <tt class="docutils literal">TYPE_ATTRIBUTES</tt> in the same file, and its <tt class="docutils literal">problems</tt> is what the
 configuration check calls to hold every link to the rule.</p>
 </div>
+<div class="section" id="what-a-node-hands-on">
+<h1><a class="toc-backref" href="#toc-entry-5">What a Node Hands On</a></h1>
+<p>Between two nodes a datum is its type's own encoding, and only that: a whole
+number as wide as its type, most significant byte first; a boolean as one
+byte, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>; a value as its four bytes; a structure as its fields
+one after another; a string or bytes as their contents alone. What a node
+produces at a terminal is that encoding of the type the terminal carries,
+with nothing before it or after it.</p>
+<p>Every datum delivered to a node is checked against the type the node takes
+there before the node is given it -- its width, a boolean's being <tt class="docutils literal">1</tt> or
+<tt class="docutils literal">0</tt>, a string's being UTF-8, and no datum longer than 4096 bytes -- and
+one that is not refused, counted and said. So a node may rely on what it is
+given being its type, and needs no check of its own for that. A device's
+own bytes are not a type's encoding; <tt class="docutils literal">format</tt> says how to read them, and
+the node at the edge turns them into the type it sends.</p>
+</div>
 <div class="section" id="adding-a-payload-type">
-<h1><a class="toc-backref" href="#toc-entry-5">Adding a Payload Type</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-6">Adding a Payload Type</a></h1>
 <div class="section" id="in-tcslibgs">
-<h2><a class="toc-backref" href="#toc-entry-6">In <tt class="docutils literal">tcslibgs</tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-7">In <tt class="docutils literal">tcslibgs</tt></a></h2>
 <p>The module, <tt class="docutils literal"><span class="pre">tcslibgs/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, registered with a
 <tt class="docutils literal">pub mod</tt> in <tt class="docutils literal">node/payload/mod.rs</tt>, holds:</p>
 <ul class="simple">
@@ -573,7 +593,7 @@ and the <tt class="docutils literal">sim_address</tt> texts. A <tt class="docuti
 are not, so go through them by name.</p>
 </div>
 <div class="section" id="in-tcspecial">
-<h2><a class="toc-backref" href="#toc-entry-7">In <tt class="docutils literal">tcspecial</tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-8">In <tt class="docutils literal">tcspecial</tt></a></h2>
 <p>The module, <tt class="docutils literal"><span class="pre">tcspecial/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds an endpoint
 for the device, conventionally <tt class="docutils literal">XEndpoint</tt> with <tt class="docutils literal">new</tt> and
 <tt class="docutils literal">try_clone</tt>, implementing the traits in <tt class="docutils literal">tcspecial/src/endpoint.rs</tt>:
@@ -598,7 +618,7 @@ once for each type with that type's feature alone. So every <tt class="docutils 
 every arm for the type must be gated by its feature, or that build fails.</p>
 </div>
 <div class="section" id="in-tcssim">
-<h2><a class="toc-backref" href="#toc-entry-8">In <tt class="docutils literal">tcssim</tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-9">In <tt class="docutils literal">tcssim</tt></a></h2>
 <p>The module, <tt class="docutils literal"><span class="pre">tcssim/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds a function
 <tt class="docutils literal">run_&lt;type&gt;_node</tt>, which plays the device: it answers as the device would,
 from the simulator file's settings and, for a sensor joined to the physics
@@ -614,7 +634,7 @@ find.</p>
 </div>
 </div>
 <div class="section" id="adding-a-vehicle-type">
-<h1><a class="toc-backref" href="#toc-entry-9">Adding a Vehicle Type</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-10">Adding a Vehicle Type</a></h1>
 <p>A vehicle type has no device, so it has no Cargo feature, no endpoint, no
 judgement and no simulated device. Instead:</p>
 <ul class="simple">
@@ -633,7 +653,7 @@ app kinds, the gateway kinds and <tt class="docutils literal">VEHICLE_TYPES</tt>
 hold the schemas to it.</p>
 </div>
 <div class="section" id="adding-a-compute-function">
-<h1><a class="toc-backref" href="#toc-entry-10">Adding a Compute Function</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-11">Adding a Compute Function</a></h1>
 <p>A function is the <tt class="docutils literal">compute</tt> type's <tt class="docutils literal">function</tt>. In tcspecial it is a file,
 <tt class="docutils literal"><span class="pre">src/node/vehicle/compute/&lt;function&gt;.rs</span></tt>, implementing <tt class="docutils literal">Function</tt>:
 <tt class="docutils literal">give</tt>, which takes a datum at one of its inputs and may produce one;
@@ -654,7 +674,7 @@ which functions produce values and which decisions, in <tt class="docutils liter
 and <tt class="docutils literal">DECISION_FUNCTIONS</tt>.</p>
 </div>
 <div class="section" id="adding-a-gateway-type">
-<h1><a class="toc-backref" href="#toc-entry-11">Adding a Gateway Type</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-12">Adding a Gateway Type</a></h1>
 <p>A gateway type is a <tt class="docutils literal">GatewayKind</tt> in <tt class="docutils literal">tcslibgs/src/gateway.rs</tt>, in
 <tt class="docutils literal">ALL</tt>, <tt class="docutils literal">name</tt>, <tt class="docutils literal">is_built</tt>, <tt class="docutils literal">on_bus</tt>, <tt class="docutils literal">framed</tt> and <tt class="docutils literal">node_type</tt>.
 The Python ground lists gateway types by hand, in <tt class="docutils literal">GATEWAY_BASES</tt> and
@@ -664,7 +684,7 @@ it is one of the exemptions in <tt class="docutils literal">every_description_ha
 <tt class="docutils literal">tcsgui/src/nodes.rs</tt>.</p>
 </div>
 <div class="section" id="the-editor-and-the-schemas">
-<h1><a class="toc-backref" href="#toc-entry-12">The Editor and the Schemas</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-13">The Editor and the Schemas</a></h1>
 <p>A node type is offered in tcsgui's palette from a description,
 <tt class="docutils literal"><span class="pre">tcsgui/share/nodes/&lt;family&gt;/&lt;type&gt;.yaml</span></tt>: its <tt class="docutils literal">node</tt> and <tt class="docutils literal">type</tt>, an
 <tt class="docutils literal">about</tt> sentence, which terminals it has, and its <tt class="docutils literal">attributes</tt>, each with
@@ -685,7 +705,7 @@ simulator schemas, <tt class="docutils literal"><span class="pre">tcspecial-sim.
 The Python ground reads its type lists from the JSON schema, so it follows.</p>
 </div>
 <div class="section" id="drawing-it">
-<h1><a class="toc-backref" href="#toc-entry-13">Drawing It</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-14">Drawing It</a></h1>
 <p>How a type is drawn is in <tt class="docutils literal">tcsdiagram/src/style.rs</tt>: a <tt class="docutils literal">NodeType</tt>
 variant, in <tt class="docutils literal">ALL</tt> with its length, <tt class="docutils literal">spelling</tt>, <tt class="docutils literal">family</tt>,
 <tt class="docutils literal">is_payload</tt>, <tt class="docutils literal">attributes</tt> (which must be the description's, in the
@@ -701,7 +721,7 @@ The payload edges and weights are nearly all taken, so a new payload type
 may need a new <tt class="docutils literal">Edge</tt>, as the <tt class="docutils literal">_tmass</tt> types needed <tt class="docutils literal">DashDotted</tt>.</p>
 </div>
 <div class="section" id="documenting-it">
-<h1><a class="toc-backref" href="#toc-entry-14">Documenting It</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-15">Documenting It</a></h1>
 <p>A type is not finished until it is documented, and a requirement in
 <tt class="docutils literal">design.rst</tt> that the code does not meet is a bug in one or the other:</p>
 <ul class="simple">
@@ -722,7 +742,7 @@ and the HTML is committed with it; <tt class="docutils literal">make <span class
 is out of date.</p>
 </div>
 <div class="section" id="testing-it">
-<h1><a class="toc-backref" href="#toc-entry-15">Testing It</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-16">Testing It</a></h1>
 <p>Each module has its tests beside it, in all three crates. A test for a fix
 should fail without the fix: check that it does.</p>
 <p>Many tests enumerate every type, and a new type that was missed somewhere
@@ -745,7 +765,7 @@ make html-check
 every shipped configuration, and checks the HTML.</p>
 </div>
 <div class="section" id="a-checklist">
-<h1><a class="toc-backref" href="#toc-entry-16">A Checklist</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-17">A Checklist</a></h1>
 <p>For a payload type <tt class="docutils literal">foo</tt>:</p>
 <ol class="arabic simple">
 <li>tcslibgs: <tt class="docutils literal">node/payload/foo/mod.rs</tt>, with <tt class="docutils literal">TYPE</tt>, its <tt class="docutils literal">Params</tt>,

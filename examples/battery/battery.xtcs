@@ -58,7 +58,6 @@
                 <unit>A</unit>
                 <world-out>charge.battery_amps</world-out>
                 <world-out>gateway.battery_amps</world-out>
-                <world-out>housekeeping.battery_amps</world-out>
                 <world-in>shunt</world-in>
             </compute>
             <!-- The power monitor's two bytes are millivolts, unsigned, most
@@ -70,7 +69,6 @@
                 <scale>0.001</scale>
                 <unit>V</unit>
                 <world-out>gateway.bus_volts</world-out>
-                <world-out>housekeeping.bus_volts</world-out>
                 <world-in>monitor</world-in>
             </compute>
             <!-- The battery's state of charge, which nothing aboard
@@ -85,7 +83,6 @@
                 <timeout>1 s</timeout>
                 <unit>ratio</unit>
                 <world-out>gateway.charge</world-out>
-                <world-out>housekeeping.charge</world-out>
                 <world-out>shedding.charge</world-out>
                 <world-in>battery_amps</world-in>
             </compute>
@@ -98,18 +95,7 @@
                 <setpoint>0.4</setpoint>
                 <moc-out>science.shedding</moc-out>
                 <world-out>gateway.shedding</world-out>
-                <world-out>housekeeping.shedding</world-out>
                 <world-in>charge</world-in>
-            </compute>
-        </type>
-        <type name="log">
-            <compute name="housekeeping">
-                <directory>/tmp/telemetry</directory>
-                <format>variable_ts_rc</format>
-                <world-in>battery_amps</world-in>
-                <world-in>bus_volts</world-in>
-                <world-in>charge</world-in>
-                <world-in>shedding</world-in>
             </compute>
         </type>
     </vehicle>

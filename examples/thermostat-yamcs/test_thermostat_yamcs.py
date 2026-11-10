@@ -70,15 +70,14 @@ class SetupTest(unittest.TestCase):
     def test_the_example_says_its_apids_and_ports(self):
         setup = thermostat_yamcs.Setup(options())
         # consensus_temp 0, gateway 1, gpio-out-tmass1 and 2 2 and 3,
-        # housekeeping 4, temp_1 to temp_3 5 to 7, thermostat 8, to_k1 to
-        # to_k3 9 to 11.
+        # temp_1 to temp_3 4 to 6, thermostat 7, to_k1 to to_k3 8 to 10.
         self.assertEqual([(link.source, link.apid, link.ground.port)
                           for link in setup.links],
                          [("consensus_temp", 0x400, 17700),
                           ("gpio-out-tmass1", 0x402, 17702),
                           ("gpio-out-tmass2", 0x403, 17703),
-                          ("to_k1", 0x409, 17709), ("to_k2", 0x40a, 17710),
-                          ("to_k3", 0x40b, 17711)])
+                          ("to_k1", 0x408, 17708), ("to_k2", 0x409, 17709),
+                          ("to_k3", 0x40a, 17710)])
         self.assertEqual(setup.config.beacon_apid(), 0x110)
         self.assertEqual(setup.config.command_apid(), 0x111)
         self.assertEqual(setup.beacon.recv.port, 17510)
@@ -174,8 +173,8 @@ class MdbTest(unittest.TestCase):
                          {"consensus_tempPacket": 0x400,
                           "gpio-out-tmass1Packet": 0x402,
                           "gpio-out-tmass2Packet": 0x403,
-                          "to_k1Packet": 0x409, "to_k2Packet": 0x40a,
-                          "to_k3Packet": 0x40b})
+                          "to_k1Packet": 0x408, "to_k2Packet": 0x409,
+                          "to_k3Packet": 0x40a})
 
     def test_no_line_is_wider_than_80_columns(self):
         config = configuration.load(HERE / "thermostat-yamcs.xtcs")
@@ -195,8 +194,8 @@ class MdbTest(unittest.TestCase):
                           ("consensus_temp-downlink", 17700),
                           ("gpio-out-tmass1-downlink", 17702),
                           ("gpio-out-tmass2-downlink", 17703),
-                          ("to_k1-downlink", 17709), ("to_k2-downlink", 17710),
-                          ("to_k3-downlink", 17711)])
+                          ("to_k1-downlink", 17708), ("to_k2-downlink", 17709),
+                          ("to_k3-downlink", 17710)])
 
 
 class FakeYamcs:

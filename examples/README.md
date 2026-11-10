@@ -486,8 +486,7 @@ take the zone's temperature with it. `thermostat` holds that to a setpoint,
 line of its own, `gpio-out-tmass1` and `gpio-out-tmass2`, which go on and off
 together. Each switch is a `gpio_inout`: it drives its line, and every second
 sends the ground the last value it was told, so the ground follows the
-heaters on a beat. The ground commands the setpoint, and `housekeeping` logs
-the decisions in `/tmp/telemetry`.
+heaters on a beat. The ground commands the setpoint.
 
 The sensors are temperature sensors on the zone, in
 `thermostat-common/thermostat.ytcs` with the rest of the vehicle: `temp_1` and
@@ -566,7 +565,7 @@ ground carries a CCSDS primary header:
 | what Yamcs sends the gateway node | up | its `apid_base`, 0x400 |
 | `consensus_temp` | down | `apid_base` plus its device id, 0x400 |
 | `gpio-out-tmass1`, `gpio-out-tmass2` | down | 0x402 and 0x403 |
-| `to_k1`, `to_k2`, `to_k3` | down | 0x409 to 0x40b |
+| `to_k1`, `to_k2`, `to_k3` | down | 0x408 to 0x40a |
 
 `thermostat_yamcs.py` writes Yamcs's configuration with
 `python/tcslib/yamcs_ground.py`, as `ping_yamcs.py` does, its mission

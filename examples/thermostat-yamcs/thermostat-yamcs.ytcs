@@ -55,9 +55,9 @@ gateways:
   - type gateway_yamcs:
       # Yamcs's end of the link. Each reading drawn into this node comes
       # down to Yamcs at ground_base plus its source's device id -- to_k3 is
-      # the last of the twelve names, here and in the file this one
-      # includes, device id 11, so 17711 -- as telemetry of APID apid_base
-      # plus that device id, 0x40b. What Yamcs sends up to address:port goes
+      # the last of the eleven names, here and in the file this one
+      # includes, device id 10, so 17710 -- as telemetry of APID apid_base
+      # plus that device id, 0x40a. What Yamcs sends up to address:port goes
       # as a telecommand of APID apid_base.
       - gateway: gateway
         address: "127.0.0.1"

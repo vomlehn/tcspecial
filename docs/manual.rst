@@ -2329,7 +2329,7 @@ Each reading is converted to kelvin by its own ``to_kelvin`` node,
 ``to_k1``, ``to_k2`` or ``to_k3``, and each converted reading goes two ways:
 to the ground through the gateway node -- at its ``ground_base``,
 ``127.0.0.1:5100``, plus each source's device id, so ``to_k1``, ``to_k2`` and
-``to_k3``, ids 9 to 11, arrive on ports 5109 to 5111 -- and into
+``to_k3``, ids 8 to 10, arrive on ports 5108 to 5110 -- and into
 ``consensus_temp`` as the input ``in0``, ``in1`` or ``in2``.
 
 ``consensus_temp`` is a ``vote``: one temperature out of the three by the
@@ -2349,8 +2349,8 @@ cold -- it says 296 and the heaters stay off, where a mean would have said
 The voted temperature goes to the ground, on port 5100, and to ``thermostat``:
 a thermostat holding the zone at its ``setpoint``, 293.15 K, with a
 ``half_band`` of 2.0, so the heaters switch two degrees either side of it and
-the setpoint is in the middle of its own band. Its decision is logged, and
-drives two heaters, each switched by a GPIO line of its own,
+the setpoint is in the middle of its own band. Its decision drives two
+heaters, each switched by a GPIO line of its own,
 ``gpio-out-tmass1`` on line 4 and ``gpio-out-tmass2`` on line 5, which go on
 and off together. Two of them, because one failing must not leave the zone
 with no way to be warmed: either alone holds the band while the orbit is
@@ -2370,8 +2370,7 @@ nor reports.
 
 The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
-missing is corrected on the next sample. What is logged is the transitions
-alone.
+missing is corrected on the next sample.
 
 No payload here has a telemetry link of its own: the sensors' readings reach
 the ground through their conversions, and the heaters' switches are drawn
@@ -2467,9 +2466,8 @@ what would charge it is shunted.
 ``science``, sheds the science instrument; above half it is unasserted and
 the instrument comes back. The band is wide so that an eclipse sheds the load
 once rather than at every reading near the edge. Every value and decision goes
-to the ground, on ports 5100 to 5102 and 5107, and to the log
-``housekeeping``, and the ground may set the setpoint through the command
-binding.
+to the ground, on ports 5100 to 5102 and 5106, and the ground may set the
+setpoint through the command binding.
 
 The physics model, in the world of ``battery-sim.yaml``, is the power system as its parts:
 a ``sun``, a ``solar_array`` of seven amperes, two ``load`` components of two
@@ -2517,10 +2515,10 @@ ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.
 
 ``doppler``, a Doppler velocimeter, sends the velocity five times a second,
-which ``descent_rate`` makes metres a second, for the ground and the log.
+which ``descent_rate`` makes metres a second, for the ground.
 Guidance does not take it: a process takes values in one unit, and guidance
 takes metres. ``touchdown`` is a switch on a landing leg, sending ``1`` on
-the ground and ``0`` off it, straight to the ground and the log.
+the ground and ``0`` off it, straight to the ground.
 
 The physics model, in the world of ``descent-sim.yaml``, is an ``engine`` of four and a
 half kilonewtons with a hundred kilograms of fuel, and a ``body`` of a tonne
@@ -2897,7 +2895,7 @@ its answer are on ``0x111``, and each source drawn into the gateway node
 comes down as telemetry of its ``apid_base``, ``0x400``, plus the source's
 device id -- ``consensus_temp`` on ``0x400``, ``gpio-out-tmass1`` and
 ``gpio-out-tmass2`` on ``0x402`` and ``0x403``, and ``to_k1`` to ``to_k3`` on
-``0x409`` to ``0x40b``.
+``0x408`` to ``0x40a``.
 
 The mission database gives each of them a parameter of the type the
 configuration says its data are (see `What the vehicle answers to`_): the

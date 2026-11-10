@@ -825,8 +825,7 @@ own, <code>gpio-out-tmass1</code> and <code>gpio-out-tmass2</code>,
 which go on and off together. Each switch is a <code>gpio_inout</code>:
 it drives its line, and every second sends the ground the last value it
 was told, so the ground follows the heaters on a beat. The ground
-commands the setpoint, and <code>housekeeping</code> logs the decisions
-in <code>/tmp/telemetry</code>.</p>
+commands the setpoint.</p>
 <p>The sensors are temperature sensors on the zone, in
 <code>thermostat-common/thermostat.ytcs</code> with the rest of the
 vehicle: <code>temp_1</code> and <code>temp_2</code> on an I2C bus, of
@@ -930,7 +929,7 @@ and from the ground carries a CCSDS primary header:</p>
 <tr>
 <td><code>to_k1</code>, <code>to_k2</code>, <code>to_k3</code></td>
 <td>down</td>
-<td>0x409 to 0x40b</td>
+<td>0x408 to 0x40a</td>
 </tr>
 </tbody>
 </table>

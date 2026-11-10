@@ -49,7 +49,6 @@ vehicle:
         world-out:
           - gateway.altitude
           - guidance.altitude
-          - housekeeping.altitude
         world-in: [radar]
       # The velocimeter's two bytes are centimetres a second, signed: up is
       # more than nought, so a descent is less.
@@ -61,7 +60,6 @@ vehicle:
         unit: "m/s"
         world-out:
           - gateway.descent_rate
-          - housekeeping.descent_rate
         world-in: [doppler]
       # The throttle, from the altitude: a program, flying a descent that
       # slows as the ground nears and cutting the engine half a metre up. A
@@ -77,13 +75,7 @@ vehicle:
           - engine.guidance
         world-out:
           - gateway.guidance
-          - housekeeping.guidance
         world-in: [altitude]
-  - type log:
-      - compute: housekeeping
-        directory: "/tmp/telemetry"
-        format: "variable_ts_rc"
-        world-in: [altitude, descent_rate, guidance, touchdown]
 
 payloads:
   # Every payload is the far end of a UDP socket, which tcssim plays, so
@@ -110,11 +102,10 @@ payloads:
         world-out:
           - altitude.radar
       # The switch on a landing leg, whose 1 is the ground's word that the
-      # lander is down: straight to the ground and to the log.
+      # lander is down: straight to the ground.
       - payload: touchdown
         address: "127.0.0.1"
         port: "5403"
         protocol: "udp"
         world-out:
           - gateway.touchdown
-          - housekeeping.touchdown

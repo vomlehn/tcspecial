@@ -58,7 +58,6 @@
                 <unit>m</unit>
                 <world-out>gateway.altitude</world-out>
                 <world-out>guidance.altitude</world-out>
-                <world-out>housekeeping.altitude</world-out>
                 <world-in>radar</world-in>
             </compute>
             <!-- The velocimeter's two bytes are centimetres a second,
@@ -70,7 +69,6 @@
                 <scale>0.01</scale>
                 <unit>m/s</unit>
                 <world-out>gateway.descent_rate</world-out>
-                <world-out>housekeeping.descent_rate</world-out>
                 <world-in>doppler</world-in>
             </compute>
             <!-- The throttle, from the altitude: a program, flying a
@@ -86,18 +84,7 @@
                 <unit>ratio</unit>
                 <moc-out>engine.guidance</moc-out>
                 <world-out>gateway.guidance</world-out>
-                <world-out>housekeeping.guidance</world-out>
                 <world-in>altitude</world-in>
-            </compute>
-        </type>
-        <type name="log">
-            <compute name="housekeeping">
-                <directory>/tmp/telemetry</directory>
-                <format>variable_ts_rc</format>
-                <world-in>altitude</world-in>
-                <world-in>descent_rate</world-in>
-                <world-in>guidance</world-in>
-                <world-in>touchdown</world-in>
             </compute>
         </type>
     </vehicle>
@@ -125,14 +112,12 @@
                 <world-out>altitude.radar</world-out>
             </payload>
             <!-- The switch on a landing leg, whose 1 is the ground's word
-                 that the lander is down: straight to the ground and to the
-                 log. -->
+                 that the lander is down: straight to the ground. -->
             <payload name="touchdown">
                 <address>127.0.0.1</address>
                 <port>5403</port>
                 <protocol>udp</protocol>
                 <world-out>gateway.touchdown</world-out>
-                <world-out>housekeeping.touchdown</world-out>
             </payload>
         </type>
     </payloads>

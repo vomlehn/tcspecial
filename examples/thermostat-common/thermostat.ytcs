@@ -2,7 +2,7 @@
 
 # The vehicle the two thermostat examples share, which each includes:
 # the three sensors, the three conversions and the vote between them,
-# the thermostat and its log, the heaters' switches, the group the
+# the thermostat, the heaters' switches, the group the
 # sensors are read in, and the setpoint the ground may set. What
 # differs between the two is in each example's own file: the tcspecial
 # section and the gateway node. The gateway node is called
@@ -45,13 +45,11 @@ vehicle:
         # one failing must not leave the mass with no way to be warmed: either
         # alone holds the band while the orbit is warm, and both together hold
         # it in the cold too, each switched through a line of its own. What it
-        # decides goes to the heaters and the log, and the ground is told it by
+        # decides goes to the heaters, and the ground is told it by
         # the heaters' switches, each reporting what it was last told.
         moc-out:
           - gpio-out-tmass1.thermostat
           - gpio-out-tmass2.thermostat
-        world-out:
-          - housekeeping.thermostat
         world-in: [consensus_temp]
       # Each sensor's reading, to kelvin, for the vote and the gateway node:
       # the parts differ in format and scale, so each has a conversion of
@@ -83,11 +81,6 @@ vehicle:
           - consensus_temp.in2
           - gateway.to_k3
         world-in: [temp_3]
-  - type log:
-      - compute: housekeeping
-        directory: "/tmp/telemetry"
-        format: "variable_ts_rc"
-        world-in: [thermostat]
 
 payloads:
   # The heaters' switches, on the thermal mass: lines 4 and 5 of
@@ -165,7 +158,6 @@ tcsgui:
     - { node: consensus_temp, x: 525, y: 204 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }
     - { node: gpio-out-tmass2, x: 34, y: 469 }
-    - { node: housekeeping, x: 469, y: 450 }
     - { node: temp_1, x: 53, y: 72 }
     - { node: temp_2, x: 34, y: 166 }
     - { node: temp_3, x: 53, y: 280 }

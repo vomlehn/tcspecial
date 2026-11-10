@@ -4,7 +4,7 @@
     xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
     <!-- The vehicle the two thermostat examples share, which each includes:
          the three sensors, the three conversions and the vote between them,
-         the thermostat and its log, the heaters' switches, the group the
+         the thermostat, the heaters' switches, the group the
          sensors are read in, and the setpoint the ground may set. What
          differs between the two is in each example's own file: the tcspecial
          section and the gateway node. The gateway node is called
@@ -55,11 +55,10 @@
                      one failing must not leave the mass with no way to be warmed: either
                      alone holds the band while the orbit is warm, and both together hold
                      it in the cold too, each switched through a line of its own. What it
-                     decides goes to the heaters and the log, and the ground is told it by
+                     decides goes to the heaters, and the ground is told it by
                      the heaters' switches, each reporting what it was last told. -->
                 <moc-out>gpio-out-tmass1.thermostat</moc-out>
                 <moc-out>gpio-out-tmass2.thermostat</moc-out>
-                <world-out>housekeeping.thermostat</world-out>
                 <world-in>consensus_temp</world-in>
             </compute>
             <!-- Each sensor's reading, to kelvin, for the vote and the gateway
@@ -91,13 +90,6 @@
                 <world-out>consensus_temp.in2</world-out>
                 <world-out>gateway.to_k3</world-out>
                 <world-in>temp_3</world-in>
-            </compute>
-        </type>
-        <type name="log">
-            <compute name="housekeeping">
-                <directory>/tmp/telemetry</directory>
-                <format>variable_ts_rc</format>
-                <world-in>thermostat</world-in>
             </compute>
         </type>
     </vehicle>
@@ -181,7 +173,6 @@
             <node name="consensus_temp" x="525" y="204"/>
             <node name="gpio-out-tmass1" x="34" y="393"/>
             <node name="gpio-out-tmass2" x="34" y="469"/>
-            <node name="housekeeping" x="469" y="450"/>
             <node name="temp_1" x="53" y="72"/>
             <node name="temp_2" x="34" y="166"/>
             <node name="temp_3" x="53" y="280"/>

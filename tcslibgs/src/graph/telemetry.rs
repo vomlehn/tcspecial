@@ -933,9 +933,9 @@ mod tests {
         assert_eq!(ids["gateway"], 1);
         assert_eq!(ids["gpio-out-tmass1"], 2);
         assert_eq!(ids["gpio-out-tmass2"], 3);
-        assert_eq!(ids["temp_1"], 5);
-        assert_eq!(ids["thermostat"], 8);
-        assert_eq!(ids["to_k1"], 9);
+        assert_eq!(ids["temp_1"], 4);
+        assert_eq!(ids["thermostat"], 7);
+        assert_eq!(ids["to_k1"], 8);
     }
 
     /// The order the nodes are in means nothing: shuffled, they have the
@@ -964,9 +964,9 @@ mod tests {
                 // decision.
                 ("gpio-out-tmass1", 2, "127.0.0.1", 5102),
                 ("gpio-out-tmass2", 3, "127.0.0.1", 5103),
-                ("to_k1", 9, "127.0.0.1", 5109),
-                ("to_k2", 10, "127.0.0.1", 5110),
-                ("to_k3", 11, "127.0.0.1", 5111),
+                ("to_k1", 8, "127.0.0.1", 5108),
+                ("to_k2", 9, "127.0.0.1", 5109),
+                ("to_k3", 10, "127.0.0.1", 5110),
             ]
         );
         assert!(links
@@ -998,8 +998,8 @@ mod tests {
     #[test]
     fn two_sources_on_one_port_are_refused() {
         let mut graph = example("thermostat");
-        // temp_2, id 6, unlinked: 6100 + 6 = 6106; a gateway base of 6097
-        // puts to_k1, id 9, on the same port.
+        // temp_2, id 5, unlinked: 6100 + 5 = 6105; a gateway base of 6097
+        // puts to_k1, id 8, on the same port.
         graph.links.retain(|link| link.origin().node != "temp_2");
         let gateway = graph
             .nodes
@@ -1010,10 +1010,10 @@ mod tests {
             "ground_base".to_string(),
             crate::Scalar::of("127.0.0.1:6097"),
         );
-        let refused = of(&graph).expect_err("two sources on 6106");
+        let refused = of(&graph).expect_err("two sources on 6105");
         assert!(refused.why.contains("to_k1"), "{}", refused.why);
         assert!(refused.why.contains("temp_2"), "{}", refused.why);
-        assert!(refused.why.contains("6106"), "{}", refused.why);
+        assert!(refused.why.contains("6105"), "{}", refused.why);
     }
 
     /// A base with no room for the ids counted from it is refused.

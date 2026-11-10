@@ -2646,7 +2646,7 @@ theirs, so that no one part number can take the whole trio out.</p>
 <tt class="docutils literal">to_k1</tt>, <tt class="docutils literal">to_k2</tt> or <tt class="docutils literal">to_k3</tt>, and each converted reading goes two ways:
 to the ground through the gateway node -- at its <tt class="docutils literal">ground_base</tt>,
 <tt class="docutils literal">127.0.0.1:5100</tt>, plus each source's device id, so <tt class="docutils literal">to_k1</tt>, <tt class="docutils literal">to_k2</tt> and
-<tt class="docutils literal">to_k3</tt>, ids 9 to 11, arrive on ports 5109 to 5111 -- and into
+<tt class="docutils literal">to_k3</tt>, ids 8 to 10, arrive on ports 5108 to 5110 -- and into
 <tt class="docutils literal">consensus_temp</tt> as the input <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> or <tt class="docutils literal">in2</tt>.</p>
 <p><tt class="docutils literal">consensus_temp</tt> is a <tt class="docutils literal">vote</tt>: one temperature out of the three by the
 algorithm it names, <tt class="docutils literal">median</tt>, which takes the middle reading. A mean would be the wrong
@@ -2664,8 +2664,8 @@ cold -- it says 296 and the heaters stay off, where a mean would have said
 <p>The voted temperature goes to the ground, on port 5100, and to <tt class="docutils literal">thermostat</tt>:
 a thermostat holding the zone at its <tt class="docutils literal">setpoint</tt>, 293.15 K, with a
 <tt class="docutils literal">half_band</tt> of 2.0, so the heaters switch two degrees either side of it and
-the setpoint is in the middle of its own band. Its decision is logged, and
-drives two heaters, each switched by a GPIO line of its own,
+the setpoint is in the middle of its own band. Its decision drives two
+heaters, each switched by a GPIO line of its own,
 <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> on line 4 and <tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on line 5, which go on
 and off together. Two of them, because one failing must not leave the zone
 with no way to be warmed: either alone holds the band while the orbit is
@@ -2683,8 +2683,7 @@ temperature. Disabled from the ground, like any node, a switch neither drives
 nor reports.</p>
 <p>The decision is asserted on every sample rather than only when it changes, so
 the heaters are held at what the vehicle last decided and a decision that went
-missing is corrected on the next sample. What is logged is the transitions
-alone.</p>
+missing is corrected on the next sample.</p>
 <p>No payload here has a telemetry link of its own: the sensors' readings reach
 the ground through their conversions, and the heaters' switches are drawn
 into the gateway node. Tcssim counts each decision the vehicle drives the
@@ -2770,9 +2769,8 @@ what would charge it is shunted.</p>
 <tt class="docutils literal">science</tt>, sheds the science instrument; above half it is unasserted and
 the instrument comes back. The band is wide so that an eclipse sheds the load
 once rather than at every reading near the edge. Every value and decision goes
-to the ground, on ports 5100 to 5102 and 5107, and to the log
-<tt class="docutils literal">housekeeping</tt>, and the ground may set the setpoint through the command
-binding.</p>
+to the ground, on ports 5100 to 5102 and 5106, and the ground may set the
+setpoint through the command binding.</p>
 <p>The physics model, in the world of <tt class="docutils literal"><span class="pre">battery-sim.yaml</span></tt>, is the power system as its parts:
 a <tt class="docutils literal">sun</tt>, a <tt class="docutils literal">solar_array</tt> of seven amperes, two <tt class="docutils literal">load</tt> components of two
 amperes each -- <tt class="docutils literal">avionics</tt>, never shed, and <tt class="docutils literal">science</tt> -- a <tt class="docutils literal">bus</tt> and a
@@ -2814,10 +2812,10 @@ driven with a value: four bytes of millionths, read by tcssim as the
 ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.</p>
 <p><tt class="docutils literal">doppler</tt>, a Doppler velocimeter, sends the velocity five times a second,
-which <tt class="docutils literal">descent_rate</tt> makes metres a second, for the ground and the log.
+which <tt class="docutils literal">descent_rate</tt> makes metres a second, for the ground.
 Guidance does not take it: a process takes values in one unit, and guidance
 takes metres. <tt class="docutils literal">touchdown</tt> is a switch on a landing leg, sending <tt class="docutils literal">1</tt> on
-the ground and <tt class="docutils literal">0</tt> off it, straight to the ground and the log.</p>
+the ground and <tt class="docutils literal">0</tt> off it, straight to the ground.</p>
 <p>The physics model, in the world of <tt class="docutils literal"><span class="pre">descent-sim.yaml</span></tt>, is an <tt class="docutils literal">engine</tt> of four and a
 half kilonewtons with a hundred kilograms of fuel, and a <tt class="docutils literal">body</tt> of a tonne
 and a half, five hundred metres up and falling at twenty metres a second in
@@ -3155,7 +3153,7 @@ its answer are on <tt class="docutils literal">0x111</tt>, and each source drawn
 comes down as telemetry of its <tt class="docutils literal">apid_base</tt>, <tt class="docutils literal">0x400</tt>, plus the source's
 device id -- <tt class="docutils literal">consensus_temp</tt> on <tt class="docutils literal">0x400</tt>, <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> and
 <tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt> on <tt class="docutils literal">0x402</tt> and <tt class="docutils literal">0x403</tt>, and <tt class="docutils literal">to_k1</tt> to <tt class="docutils literal">to_k3</tt> on
-<tt class="docutils literal">0x409</tt> to <tt class="docutils literal">0x40b</tt>.</p>
+<tt class="docutils literal">0x408</tt> to <tt class="docutils literal">0x40a</tt>.</p>
 <p>The mission database gives each of them a parameter of the type the
 configuration says its data are (see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>): the
 conversions and the vote are temperatures in kelvin, and each heater's

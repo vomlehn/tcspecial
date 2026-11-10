@@ -49,7 +49,6 @@ vehicle:
         world-out:
           - charge.battery_amps
           - gateway.battery_amps
-          - housekeeping.battery_amps
         world-in: [shunt]
       # The power monitor's two bytes are millivolts, unsigned, most
       # significant first: up to 65 volts, which is twice the bus.
@@ -61,7 +60,6 @@ vehicle:
         unit: "V"
         world-out:
           - gateway.bus_volts
-          - housekeeping.bus_volts
         world-in: [monitor]
       # The battery's state of charge, which nothing aboard measures: a
       # program counts the charge in and out from the shunt's readings,
@@ -77,7 +75,6 @@ vehicle:
         unit: "ratio"
         world-out:
           - gateway.charge
-          - housekeeping.charge
           - shedding.charge
         world-in: [battery_amps]
       # Sheds the science load when the charge runs low: asserted below the
@@ -92,13 +89,7 @@ vehicle:
           - science.shedding
         world-out:
           - gateway.shedding
-          - housekeeping.shedding
         world-in: [charge]
-  - type log:
-      - compute: housekeeping
-        directory: "/tmp/telemetry"
-        format: "variable_ts_rc"
-        world-in: [battery_amps, bus_volts, charge, shedding]
 
 payloads:
   # Every payload is the far end of a UDP socket or a serial line, which

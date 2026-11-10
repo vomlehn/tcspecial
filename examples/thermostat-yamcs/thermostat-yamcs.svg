@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1000" viewBox="0 0 1300 1000" role="img" aria-labelledby="title desc">
   <title id="title">The thermostat-yamcs example</title>
-  <desc id="desc">The thermostat example&#8217;s vehicle, with Yamcs as its ground station. Three temperature sensors of one place on the thermal mass, temp_1, temp_2 and temp_3, read together once a second as the group zone_temps, are the thermostat example&#8217;s: temp_1 and temp_2 i2c_tmass sensors on the I2C bus /dev/i2c-1, at addresses 0x48 and 0x49, and temp_3 a spi_tmass sensor on the SPI bus /dev/spidev0.0, each reached on a desk over UDP at its sim_address, 127.0.0.1:5201 to 5203, where tcssim answers with the zone&#8217;s temperature. Each reading is converted to kelvin by to_k1, to_k2 and to_k3, and each goes to the gateway node and to consensus_temp as input in0, in1 or in2. consensus_temp votes over the three, by the median, and its value goes to the gateway node and to thermostat, a thermostat holding 293.15 K within a half-band of 2.0, whose decision is logged and drives the two heaters, each through a GPIO line of its own, gpio-out-tmass1 on line 4 and gpio-out-tmass2 on line 5. The thermostat&#8217;s decision does not go to the ground: each heater&#8217;s switch is a gpio_inout node, which drives its line and every second sends the ground the last value it was told, so the ground follows the heaters on a beat. The lines are on /dev/gpiochip1; on a desk tcssim answers for them over UDP at their sim_address, 127.0.0.1:5204 and 5205. The gateway node is a gateway_yamcs node: tcspecial puts a CCSDS primary header on what each of consensus_temp, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2 and to_k3 produces and sends it to Yamcs at the gateway node&#8217;s ground_base, 127.0.0.1:17700, plus the source&#8217;s device id, as telemetry of APID apid_base, 0x400, plus that device id: 17700 and 0x400 for consensus_temp, 17702 and 17703 and 0x402 and 0x403 for the heaters&#8217; switches, 17709 to 17711 and 0x409 to 0x40b for the conversions. Yamcs&#8217;s mission database, generated from the configuration, reads each conversion&#8217;s and the vote&#8217;s data as a temperature in kelvin and each switch&#8217;s as on or off, and thermostat_yamcs.py reads them back over Yamcs&#8217;s REST API and shows them. The ground sets the thermostat&#8217;s setpoint through a command binding on the gateway node, which tcspecial binds at 127.0.0.1:17600.</desc>
+  <desc id="desc">The thermostat example&#8217;s vehicle, with Yamcs as its ground station. Three temperature sensors of one place on the thermal mass, temp_1, temp_2 and temp_3, read together once a second as the group zone_temps, are the thermostat example&#8217;s: temp_1 and temp_2 i2c_tmass sensors on the I2C bus /dev/i2c-1, at addresses 0x48 and 0x49, and temp_3 a spi_tmass sensor on the SPI bus /dev/spidev0.0, each reached on a desk over UDP at its sim_address, 127.0.0.1:5201 to 5203, where tcssim answers with the zone&#8217;s temperature. Each reading is converted to kelvin by to_k1, to_k2 and to_k3, and each goes to the gateway node and to consensus_temp as input in0, in1 or in2. consensus_temp votes over the three, by the median, and its value goes to the gateway node and to thermostat, a thermostat holding 293.15 K within a half-band of 2.0, whose decision drives the two heaters, each through a GPIO line of its own, gpio-out-tmass1 on line 4 and gpio-out-tmass2 on line 5. The thermostat&#8217;s decision does not go to the ground: each heater&#8217;s switch is a gpio_inout node, which drives its line and every second sends the ground the last value it was told, so the ground follows the heaters on a beat. The lines are on /dev/gpiochip1; on a desk tcssim answers for them over UDP at their sim_address, 127.0.0.1:5204 and 5205. The gateway node is a gateway_yamcs node: tcspecial puts a CCSDS primary header on what each of consensus_temp, gpio-out-tmass1, gpio-out-tmass2, to_k1, to_k2 and to_k3 produces and sends it to Yamcs at the gateway node&#8217;s ground_base, 127.0.0.1:17700, plus the source&#8217;s device id, as telemetry of APID apid_base, 0x400, plus that device id: 17700 and 0x400 for consensus_temp, 17702 and 17703 and 0x402 and 0x403 for the heaters&#8217; switches, 17708 to 17710 and 0x408 to 0x40a for the conversions. Yamcs&#8217;s mission database, generated from the configuration, reads each conversion&#8217;s and the vote&#8217;s data as a temperature in kelvin and each switch&#8217;s as on or off, and thermostat_yamcs.py reads them back over Yamcs&#8217;s REST API and shows them. The ground sets the thermostat&#8217;s setpoint through a command binding on the gateway node, which tcspecial binds at 127.0.0.1:17600.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -88,11 +88,6 @@
   <text class="port" x="546" y="236">in0</text>
   <text class="port" x="546" y="261">in1</text>
   <text class="port" x="546" y="286">in2</text>
-  <!-- The log -->
-  <rect class="vehicle" x="540" y="470" width="170" height="74" rx="10"/>
-  <text class="name" x="554" y="494">housekeeping</text>
-  <text class="kind" x="554" y="514">log</text>
-  <text class="detail" x="554" y="532">/tmp/telemetry</text>
   <!-- The thermostat -->
   <rect class="vehicle" x="780" y="340" width="188" height="74" rx="10"/>
   <text class="name" x="794" y="364">thermostat</text>
@@ -127,8 +122,6 @@
   <!-- The mean to the ground link and to the thermostat -->
   <path class="groundward" d="M710,240 C745,240 745,161 780,161 L1026,161" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M710,280 C745,280 745,377 776,377" marker-end="url(#arrow-blue)"/>
-  <!-- The thermostat's decision, logged -->
-  <path class="groundward" d="M780,400 C745,400 745,527 714,527" marker-end="url(#arrow-blue)"/>
   <!-- The thermostat drives both heaters, each through a line of its own:
        one decision, two circuits -->
   <path class="vehicleward" d="M865,414 L865,717 L234,717" marker-end="url(#arrow-orange)"/>
@@ -142,9 +135,9 @@
   <text class="label" x="600" y="656">what the first heater was told</text>
   <text class="label" x="600" y="756">and the second</text>
   <!-- Each source's port on the ground: ground_base plus its device id -->
-  <text class="portno" x="972" y="113">17709</text>
-  <text class="portno" x="972" y="128">17710</text>
-  <text class="portno" x="972" y="143">17711</text>
+  <text class="portno" x="972" y="113">17708</text>
+  <text class="portno" x="972" y="128">17709</text>
+  <text class="portno" x="972" y="143">17710</text>
   <text class="portno" x="972" y="158">17700</text>
   <text class="portno" x="1012" y="236">17702</text>
   <text class="portno" x="1078" y="236">17703</text>

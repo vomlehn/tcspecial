@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
   <title id="title">The battery example</title>
-  <desc id="desc">A spacecraft's power bus. monitor, a power monitor on the serial line /tmp/tcs-battery-monitor, is asked for the bus voltage twice a second with the trigger "V?\r" and answers two bytes of millivolts, which bus_volts makes a value in volts. shunt, the shunt in the battery's lead, the far end of a UDP socket at 127.0.0.1:5301, sends the battery's current twice a second, which battery_amps makes a value in amperes. charge, a program, counts the current into a state of charge, a ratio; shedding, a thermostat around 0.4 with a half band of 0.1, sheds the science load by driving science, at 127.0.0.1:5302, below the band and restores it above. Every value and decision goes to the gateway node on the ground and to the log housekeeping. tcssim simulates the three payloads, joined to a physics model of a sun, a solar array, two loads, a bus and a battery. tcspecial sends what each of bus_volts, battery_amps, charge and shedding produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5101, 5100, 5102 and 5107. The ground sets shedding's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
+  <desc id="desc">A spacecraft's power bus. monitor, a power monitor on the serial line /tmp/tcs-battery-monitor, is asked for the bus voltage twice a second with the trigger "V?\r" and answers two bytes of millivolts, which bus_volts makes a value in volts. shunt, the shunt in the battery's lead, the far end of a UDP socket at 127.0.0.1:5301, sends the battery's current twice a second, which battery_amps makes a value in amperes. charge, a program, counts the current into a state of charge, a ratio; shedding, a thermostat around 0.4 with a half band of 0.1, sheds the science load by driving science, at 127.0.0.1:5302, below the band and restores it above. Every value and decision goes to the gateway node on the ground. tcssim simulates the three payloads, joined to a physics model of a sun, a solar array, two loads, a bus and a battery. tcspecial sends what each of bus_volts, battery_amps, charge and shedding produces as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus the source's device id: ports 5101, 5100, 5102 and 5106. The ground sets shedding's setpoint through a command binding on the gateway node, sent to 127.0.0.1:5000.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -79,12 +79,6 @@
   <text class="kind" x="554" y="264">compute, process</text>
   <text class="detail" x="554" y="282">charge.py, ratio</text>
 
-  <!-- The log -->
-  <rect class="vehicle" x="540" y="470" width="170" height="74" rx="10"/>
-  <text class="name" x="554" y="494">housekeeping</text>
-  <text class="kind" x="554" y="514">log</text>
-  <text class="detail" x="554" y="532">/tmp/telemetry</text>
-
   <!-- The load shedding -->
   <rect class="vehicle" x="780" y="340" width="170" height="74" rx="10"/>
   <text class="name" x="794" y="364">shedding</text>
@@ -122,12 +116,6 @@
   <path class="groundward" d="M470,257 L536,257" marker-end="url(#arrow-blue)"/>
   <path class="groundward" d="M710,270 C745,270 745,377 776,377" marker-end="url(#arrow-blue)"/>
 
-  <!-- Each into the log -->
-  <path class="groundward" d="M470,158 C498,158 498,484 536,484" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M470,278 C494,278 494,500 536,500" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M625,294 L625,466" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M780,400 C745,400 745,527 714,527" marker-end="url(#arrow-blue)"/>
-
   <!-- The shedding drives the science load's switch -->
   <path class="vehicleward" d="M865,414 L865,606 L145,606 L145,578" marker-end="url(#arrow-orange)"/>
   <text class="label" x="560" y="598">gateway-out: shed below the band</text>
@@ -136,7 +124,7 @@
   <text class="portno" x="985" y="113">5101</text>
   <text class="portno" x="985" y="128">5100</text>
   <text class="portno" x="985" y="143">5102</text>
-  <text class="portno" x="985" y="173">5107</text>
+  <text class="portno" x="985" y="173">5106</text>
 
   <!-- The ground sets the setpoint -->
   <path class="command" d="M1030,180 L900,180 L900,336" marker-end="url(#arrow-orange)"/>

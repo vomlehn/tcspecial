@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
   <title id="title">The descent example</title>
-  <desc id="desc">A lander's terminal descent. radar, a radar altimeter at the far end of a UDP socket at 127.0.0.1:5401, sends the altitude ten times a second, which altitude makes a value in metres. doppler, a Doppler velocimeter at 127.0.0.1:5402, sends the velocity five times a second, which descent_rate makes a value in metres a second. guidance, a program, flies a descent from the altitude alone and answers a throttle, a ratio, which goes by its gateway-out link to engine, at 127.0.0.1:5404, the engine's throttle. touchdown, a switch on a landing leg at 127.0.0.1:5403, says 1 when the lander is on the ground. Every value, and the switch, goes to the gateway node on the ground and to the log housekeeping. tcssim simulates the four payloads, joined to a physics model of an engine and the body it brakes. tcspecial sends what altitude, descent_rate, guidance and touchdown produce as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus each source's device id.</desc>
+  <desc id="desc">A lander's terminal descent. radar, a radar altimeter at the far end of a UDP socket at 127.0.0.1:5401, sends the altitude ten times a second, which altitude makes a value in metres. doppler, a Doppler velocimeter at 127.0.0.1:5402, sends the velocity five times a second, which descent_rate makes a value in metres a second. guidance, a program, flies a descent from the altitude alone and answers a throttle, a ratio, which goes by its gateway-out link to engine, at 127.0.0.1:5404, the engine's throttle. touchdown, a switch on a landing leg at 127.0.0.1:5403, says 1 when the lander is on the ground. Every value, and the switch, goes to the gateway node on the ground. tcssim simulates the four payloads, joined to a physics model of an engine and the body it brakes. tcspecial sends what altitude, descent_rate, guidance and touchdown produce as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus each source's device id.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -83,12 +83,6 @@
   <text class="kind" x="794" y="344">compute, process</text>
   <text class="detail" x="794" y="362">guidance.py, ratio</text>
 
-  <!-- The log -->
-  <rect class="vehicle" x="540" y="470" width="170" height="74" rx="10"/>
-  <text class="name" x="554" y="494">housekeeping</text>
-  <text class="kind" x="554" y="514">log</text>
-  <text class="detail" x="554" y="532">/tmp/telemetry</text>
-
   <!-- The ground -->
   <rect class="groundside" x="1010" y="52" width="270" height="580" rx="16"/>
   <text class="heading" x="1028" y="78">MOC</text>
@@ -119,12 +113,6 @@
   <!-- The altitude into guidance -->
   <path class="groundward" d="M470,158 C620,158 620,337 776,337" marker-end="url(#arrow-blue)"/>
 
-  <!-- Each into the log -->
-  <path class="groundward" d="M470,166 C510,166 510,484 536,484" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M470,278 C494,278 494,500 536,500" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M780,360 C745,360 745,527 714,527" marker-end="url(#arrow-blue)"/>
-  <path class="groundward" d="M230,400 C258,400 258,516 536,516" marker-end="url(#arrow-blue)"/>
-
   <!-- Guidance throttles the engine -->
   <path class="vehicleward" d="M865,374 L865,606 L145,606 L145,578" marker-end="url(#arrow-orange)"/>
   <text class="label" x="560" y="598">gateway-out: the throttle, a ratio</text>
@@ -133,7 +121,7 @@
   <text class="portno" x="985" y="113">5100</text>
   <text class="portno" x="985" y="128">5101</text>
   <text class="portno" x="985" y="143">5105</text>
-  <text class="portno" x="985" y="158">5108</text>
+  <text class="portno" x="985" y="158">5107</text>
 
   <!-- The ground software gets the data with a function call -->
   <path class="call" d="M1145,192 L1145,426" marker-end="url(#arrow-call)"/>

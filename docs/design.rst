@@ -9734,8 +9734,9 @@ Requirement
     before anything is read or opened, saying that the window is only in a
     build with the feature and how to make one. The feature is not a default
     and is never in a build that flies: it brings a window toolkit into the
-    flight software, and a build that has it says so as a warning every time
-    it starts, window or not.
+    flight software, whose licence, Slint's royalty-free one, does not
+    cover embedded systems; and a build that has it says so as a warning
+    every time it starts, window or not.
 
 Requirement
     ``--visual`` is refused under ``--simulate=none``, in every build and before

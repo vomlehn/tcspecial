@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.5.0
+TCS_HELPERS_REQUIRED := 0.6.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcslibgs/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -774,6 +774,15 @@ PACKAGES := tcspecial tcspecial-ground tcspecial-test
 INSTALL_CRATES := tcspecial tcsverify tcsgui tcslib-c tcsmoc tcssim \
 		  $(FLIGHT_LIBEXEC)
 
+# The crates each package's programs and libraries are built from, whose
+# dependencies its THIRD-PARTY-NOTICES lists: every crate compiled into a
+# program has licence notices that must go with it, which tcs-helpers'
+# third-party-notices.py gathers. segsend is a program of the tcspecial
+# crate's.
+FLIGHT_CRATES := tcspecial tcsverify $(FLIGHT_LIBEXEC)
+GROUND_CRATES := tcsgui tcslib-c
+TEST_CRATES := tcsmoc tcssim tcspecial
+
 # Where cargo puts a release build.
 RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
 
@@ -895,6 +904,9 @@ install-tcspecial: tcs-helpers
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)
+	$(THIRD_PARTY_NOTICES) . \
+		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/THIRD-PARTY-NOTICES \
+		tcspecial $(FLIGHT_CRATES)
 	install -m 644 $(DOCS_DIR)/*.html $(DOCS_DIR)/*.svg \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs
 	for file in $(EXAMPLE_FILES); do \
@@ -988,6 +1000,9 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground
+	$(THIRD_PARTY_NOTICES) . \
+		$(DESTDIR)$(DOCDIR)/tcspecial-ground/THIRD-PARTY-NOTICES \
+		tcspecial-ground $(GROUND_CRATES)
 	install -m 644 tcslib-c/README.html \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-c
 	install -m 644 python/README.md \
@@ -1027,6 +1042,9 @@ install-tcspecial-test: tcs-helpers
 	$(call install_links,tcspecial-test,$(TEST_BIN))
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/tcspecial-test
+	$(THIRD_PARTY_NOTICES) . \
+		$(DESTDIR)$(DOCDIR)/tcspecial-test/THIRD-PARTY-NOTICES \
+		tcspecial-test $(TEST_CRATES)
 	if [ "$(HOOKS)" = 1 ]; then \
 		set -e; \
 		install -d -m 755 $(DESTDIR)$(PROFILEDIR); \

@@ -5436,7 +5436,9 @@ vehicle; see <a class="reference internal" href="#checking-a-set-without-running
 <div class="section" id="watching-tcspecial-work">
 <h2><a class="toc-backref" href="#toc-entry-75">Watching tcspecial work</a></h2>
 <p>A tcspecial built with the <tt class="docutils literal">visual</tt> feature can show what it is doing. Never
-build a tcspecial that flies this way: the feature is for a vehicle on a desk.</p>
+build a tcspecial that flies this way: the feature is for a vehicle on a desk,
+and the window toolkit it brings in, Slint, is licensed to TCS for desktop
+programs, not for embedded systems.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>build<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--features<span class="whitespace"> </span>visual<span class="whitespace">
 </span><span class="generic prompt">$ </span>target/debug/tcspecial<span class="whitespace"> </span>--visual<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span><span class="literal string escape">\

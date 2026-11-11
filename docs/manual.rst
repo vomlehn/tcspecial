@@ -5461,7 +5461,9 @@ Watching tcspecial work
 -----------------------
 
 A tcspecial built with the ``visual`` feature can show what it is doing. Never
-build a tcspecial that flies this way: the feature is for a vehicle on a desk.
+build a tcspecial that flies this way: the feature is for a vehicle on a desk,
+and the window toolkit it brings in, Slint, is licensed to TCS for desktop
+programs, not for embedded systems.
 
 .. code-block:: console
 

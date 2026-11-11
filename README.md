@@ -206,8 +206,8 @@ See also
   [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html): the libraries a ground station is
   built on, and what the ground and the vehicle share.
 
-* [Third-party software](https://vomlehn.github.io/tcspecial/docs/third-party.html): what tcspecial is built
-  with, and under which licenses.
+* [Third-party integration](https://vomlehn.github.io/tcspecial/docs/third-party.html): how tcspecial would
+  work with cFS and F´.
 
 License
 =======
@@ -218,6 +218,20 @@ or <http://www.apache.org/licenses/LICENSE-2.0>) or the MIT license
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+Each package lists the Rust crates compiled into its programs and
+libraries, with their licences and the notices those require, in
+`/opt/tcs/share/doc/<package>/THIRD-PARTY-NOTICES`.
+
+The graphical programs -- tcsgui, tcsmoc, tcssim and tcspecial's visual
+window -- are built with [Slint](https://slint.dev), under its
+royalty-free licence for desktop applications, which asks for this
+attribution:
+
+[![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png)](https://slint.dev)
+
+That licence does not cover embedded systems, which is one more reason the
+visual window is never in a tcspecial that flies.
 
 Mandatory Note About the Name
 =============================

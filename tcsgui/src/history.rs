@@ -32,6 +32,16 @@
 //! Rust releases, and a hash that changes with the toolchain would orphan
 //! every history on the disk without saying so.
 //!
+//! # What it holds
+//!
+//! The journal -- every edit, and where the window stood in them -- and what
+//! the files on the disk hold of it ([`OnDisk`]): how far into the journal
+//! they go, and a digest of each as the editor last wrote it. Written after
+//! every edit, whether or not the files are -- Autosave off, or a write that
+//! failed -- so that the next session can put back what they lack, and can
+//! tell a file something else has changed since, onto which nothing is put
+//! back and from which nothing is undone. See `Editor::recover`.
+//!
 //! # How long
 //!
 //! Deleted on a clean exit, which is what every other editor does: the history
@@ -75,6 +85,78 @@ pub struct Kept {
     /// The configuration this is the history of, absolute.
     pub configuration: PathBuf,
     pub journal: Journal,
+    /// What the files on the disk hold of it: see [`OnDisk`]. A history
+    /// written before there was this says nothing, and is read as one that
+    /// cannot be held to the files.
+    #[serde(default, skip_serializing_if = "OnDisk::says_nothing")]
+    pub on_disk: OnDisk,
+}
+
+/// What the files on the disk hold of a history, as the editor last wrote
+/// them.
+///
+/// What crash recovery is judged by. The files hold the edits before
+/// `saved`; those after it, up to the journal's cursor, were made and not
+/// written -- autosave off, or a write that failed -- and the next session
+/// puts them back. And the files must be as the editor left them, which each
+/// one's digest says: a file changed since by anything else is one the
+/// history no longer describes, and putting edits back onto it, or undoing
+/// them, would be acting on a document nobody drew.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnDisk {
+    /// How far into the journal the files reflect: the cursor as it was when
+    /// they were last written.
+    pub saved: usize,
+    /// Each file the configuration is written as, with an MD5 digest of what
+    /// it held when last written or read, in hexadecimal; none for a file
+    /// that was not there.
+    pub files: Vec<(PathBuf, Option<String>)>,
+}
+
+impl OnDisk {
+    /// Says whether this holds the history to no file at all: what a
+    /// history written before there was this reads as, and what is then
+    /// written back as it was.
+    ///
+    /// # Returns
+    ///
+    /// True where it names no file and stands at the start.
+    pub fn says_nothing(&self) -> bool {
+        self.saved == 0 && self.files.is_empty()
+    }
+
+    /// Digests each of these files as it is on the disk now.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - The files.
+    ///
+    /// # Returns
+    ///
+    /// Each, with its digest, or none where it cannot be read.
+    pub fn digests_of(paths: &[PathBuf]) -> Vec<(PathBuf, Option<String>)> {
+        paths
+            .iter()
+            .map(|path| {
+                let digest =
+                    std::fs::read(path).ok().map(|bytes| digest_of(&bytes));
+                (path.clone(), digest)
+            })
+            .collect()
+    }
+}
+
+/// An MD5 digest of what a file holds, as [`OnDisk`] keeps it.
+///
+/// # Arguments
+///
+/// * `bytes` - What the file holds.
+///
+/// # Returns
+///
+/// The digest, in lower-case hexadecimal.
+pub fn digest_of(bytes: &[u8]) -> String {
+    format!("{:x}", md5::compute(bytes))
 }
 
 /// Where tcsgui keeps what it remembers between sessions.
@@ -320,6 +402,7 @@ fn digest(path: &Path) -> u64 {
 /// worth naming -- a digest collision, or a file somebody copied in -- and the
 /// answer is the same as for a damaged one: the work is open and correct, and
 /// what is lost is the undo.
+#[cfg(test)]
 pub fn read(configuration: &Path) -> Option<Journal> {
     read_in(&state_dir()?, configuration)
 }
@@ -334,11 +417,39 @@ pub fn read(configuration: &Path) -> Option<Journal> {
 /// # Returns
 ///
 /// The journal, or `None` if there is no history for this configuration.
+#[cfg(test)]
 pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
+    kept_in(directory, configuration).map(|kept| kept.journal)
+}
+
+/// Reads this configuration's history whole, with what the files held of it.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration whose history is wanted.
+///
+/// # Returns
+///
+/// The history, or `None` as for [`read`].
+pub fn kept(configuration: &Path) -> Option<Kept> {
+    kept_in(&state_dir()?, configuration)
+}
+
+/// The same, in a directory given rather than found.
+///
+/// # Arguments
+///
+/// * `directory`     - The state directory.
+/// * `configuration` - The configuration whose history is wanted.
+///
+/// # Returns
+///
+/// The history, or `None` as for [`read`].
+pub fn kept_in(directory: &Path, configuration: &Path) -> Option<Kept> {
     let text =
         std::fs::read_to_string(journal_in(directory, configuration)).ok()?;
     let kept: Kept = serde_norway::from_str(&text).ok()?;
-    (kept.configuration == absolute(configuration)).then_some(kept.journal)
+    (kept.configuration == absolute(configuration)).then_some(kept)
 }
 
 /// Writes this configuration's history, or says what stopped it.
@@ -350,11 +461,16 @@ pub fn read_in(directory: &Path, configuration: &Path) -> Option<Journal> {
 ///
 /// * `configuration` - The configuration the history is of.
 /// * `journal`       - The history.
+/// * `on_disk`       - What the files hold of it.
 ///
 /// # Errors
 ///
 /// A message if there is no state directory, or as for [`write_in`].
-pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
+pub fn write(
+    configuration: &Path,
+    journal: &Journal,
+    on_disk: &OnDisk,
+) -> Result<(), String> {
     let Some(directory) = state_dir() else {
         return Err(
             "there is nowhere to keep a history: neither XDG_STATE_HOME \
@@ -362,7 +478,7 @@ pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
                 .to_string(),
         );
     };
-    write_in(&directory, configuration, journal)
+    write_in(&directory, configuration, journal, on_disk)
 }
 
 /// The same, in a directory given rather than found.
@@ -372,6 +488,7 @@ pub fn write(configuration: &Path, journal: &Journal) -> Result<(), String> {
 /// * `directory`     - The state directory, made if it is not there.
 /// * `configuration` - The configuration the history is of.
 /// * `journal`       - The history.
+/// * `on_disk`       - What the files hold of it.
 ///
 /// # Errors
 ///
@@ -381,6 +498,7 @@ pub fn write_in(
     directory: &Path,
     configuration: &Path,
     journal: &Journal,
+    on_disk: &OnDisk,
 ) -> Result<(), String> {
     let path = journal_in(directory, configuration);
     if let Some(parent) = path.parent() {
@@ -391,6 +509,7 @@ pub fn write_in(
     let kept = Kept {
         configuration: absolute(configuration),
         journal: journal.clone(),
+        on_disk: on_disk.clone(),
     };
     let text = serde_norway::to_string(&kept).map_err(|why| why.to_string())?;
     crate::save::write_atomically(&path, text.as_bytes())
@@ -583,7 +702,8 @@ mod tests {
         std::fs::create_dir_all(one.parent().unwrap())
             .expect("the vehicle's own");
         std::fs::write(&one, "").expect("a configuration");
-        write_in(&state, &one, &journal).expect("the history is written");
+        write_in(&state, &one, &journal, &OnDisk::default())
+            .expect("the history is written");
         assert!(named.exists(), "{named:?}");
         assert_eq!(read_in(&state, &one).map(|kept| kept.depth()), Some(1));
 
@@ -593,6 +713,7 @@ mod tests {
         let elsewhere = Kept {
             configuration: two.clone(),
             journal: journal.clone(),
+            on_disk: OnDisk::default(),
         };
         std::fs::write(&named, serde_norway::to_string(&elsewhere).unwrap())
             .expect("a file of somebody else's");
@@ -600,7 +721,8 @@ mod tests {
             read_in(&state, &one).is_none(),
             "a history belongs to one configuration"
         );
-        write_in(&state, &one, &journal).expect("written again");
+        write_in(&state, &one, &journal, &OnDisk::default())
+            .expect("written again");
 
         // A clean exit throws it away.
         forget_in(&state, &one);
@@ -609,7 +731,8 @@ mod tests {
         // Pruned when the configuration is gone, whatever its age: nothing
         // else would ever notice, a configuration being free to be deleted or
         // renamed by anything at all.
-        write_in(&state, &one, &journal).expect("written again");
+        write_in(&state, &one, &journal, &OnDisk::default())
+            .expect("written again");
         std::fs::remove_file(&one).expect("the configuration goes");
         assert_eq!(prune_in(&state, SystemTime::now()), 1);
         assert!(!named.exists());
@@ -617,7 +740,8 @@ mod tests {
         // And pruned when it is old: a crash a fortnight ago is not an undo
         // anybody is waiting for.
         std::fs::write(&one, "").expect("a configuration again");
-        write_in(&state, &one, &journal).expect("written again");
+        write_in(&state, &one, &journal, &OnDisk::default())
+            .expect("written again");
         let fortnight =
             SystemTime::now() + Duration::from_secs(14 * 24 * 60 * 60);
         assert_eq!(prune_in(&state, fortnight), 1);
@@ -626,7 +750,8 @@ mod tests {
         // A young one whose configuration is there is left alone. That is the
         // history of a session that ended badly, and it is the one somebody
         // will want.
-        write_in(&state, &one, &journal).expect("written again");
+        write_in(&state, &one, &journal, &OnDisk::default())
+            .expect("written again");
         assert_eq!(prune_in(&state, SystemTime::now()), 0);
         assert!(named.exists());
 

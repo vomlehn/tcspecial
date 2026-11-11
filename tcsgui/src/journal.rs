@@ -10,11 +10,12 @@
 //! * **Depth** is the whole list. Configurations are small -- hundreds of
 //!   nodes at the most -- so there is no reason to forget anything, and a
 //!   bounded history is a promise to lose work that nobody asked for.
-//! * **Crash recovery** is the same list written to a file beside the
-//!   document. An editor that died after edit 40 comes back with 40 edits to
-//!   replay and a cursor to put back where it was, which is a stronger promise
-//!   than "the document was saved": the *history* was saved too, so undo still
-//!   reaches back past the crash.
+//! * **Crash recovery** is the same list written to a file after every edit,
+//!   with how far into it the configuration's files go. An editor that died
+//!   after edit 40, with the files written to edit 35, comes back with the
+//!   five edits the files lack put back and a cursor where it was, which is a
+//!   stronger promise than "the document was saved": the *history* was saved
+//!   too, so undo still reaches back past the crash. See `crate::history`.
 //!
 //! An edit is stored with everything needed to undo it, not merely to redo it.
 //! Setting an attribute records what it was as well as what it became; removing
@@ -976,6 +977,42 @@ impl Journal {
     pub fn redoable(&self) -> usize {
         self.done.len() - self.cursor
     }
+
+    /// How many edits the document reflects: where in the history it stands.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
+    /// The edits that take a document from one place in the history to
+    /// another: those between, in order, going forward, and their inverses,
+    /// last first, going back. What a session puts back after a crash, from
+    /// where the files stood to where the window did.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Where the document stands.
+    /// * `to`   - Where it is to stand.
+    ///
+    /// # Returns
+    ///
+    /// The edits to apply, none where the two are one; `None` where either
+    /// is past the end of the history.
+    pub fn between(&self, from: usize, to: usize) -> Option<Vec<Edit>> {
+        if from > self.done.len() || to > self.done.len() {
+            return None;
+        }
+        if from <= to {
+            Some(self.done[from..to].to_vec())
+        } else {
+            Some(
+                self.done[to..from]
+                    .iter()
+                    .rev()
+                    .map(Edit::inverse)
+                    .collect(),
+            )
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1004,6 +1041,40 @@ mod tests {
     /// The depth requirement, stated as a number large enough that a bounded
     /// history would fail it: a thousand edits is an afternoon's work and all
     /// of it must be reachable.
+    /// The edits between two places in the history: those after the first
+    /// going forward, their inverses last first going back, and nothing
+    /// for a place past the end.
+    #[test]
+    fn the_edits_between_two_places_go_either_way() {
+        let mut journal = Journal::new();
+        for name in ["a", "b", "c"] {
+            journal.record(Edit::RenameNode {
+                was: format!("{name}0"),
+                now: format!("{name}1"),
+            });
+        }
+        let renamed = |edits: Vec<Edit>| -> Vec<String> {
+            edits
+                .into_iter()
+                .map(|edit| match edit {
+                    Edit::RenameNode { now, .. } => now,
+                    other => panic!("{other:?}"),
+                })
+                .collect()
+        };
+        assert_eq!(
+            journal.between(1, 3).map(renamed),
+            Some(vec!["b1".to_string(), "c1".to_string()])
+        );
+        assert_eq!(
+            journal.between(3, 1).map(renamed),
+            Some(vec!["c0".to_string(), "b0".to_string()])
+        );
+        assert_eq!(journal.between(2, 2), Some(Vec::new()));
+        assert_eq!(journal.between(0, 4), None);
+        assert_eq!(journal.cursor(), 3);
+    }
+
     #[test]
     fn undo_reaches_the_start_of_a_long_session() {
         let mut journal = Journal::new();

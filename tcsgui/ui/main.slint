@@ -2029,6 +2029,10 @@ export component MainWindow inherits Window {
     in property <color> gateway-ground: white;
     in property <color> vehicle-ground: white;
     in property <color> payload-ground: white;
+    // Whether every edit is written as it is made: the File menu's
+    // Autosave, and the setting of that name.
+    in property <bool> autosave: true;
+    callback autosave-toggled(bool);
     in property <int> undo-depth: 0;
     in property <int> redo-depth: 0;
     in property <string> undo-label: "";
@@ -2131,9 +2135,10 @@ export component MainWindow inherits Window {
     MenuBar {
         Menu {
             title: "File";
-            // Saving needs no command -- every edit is written as it is made
-            // -- and there is one anyway, for the three things the ordinary
-            // case does not cover: retrying a write that failed once whatever
+            // Saving needs no command while Autosave is on -- every edit is
+            // written as it is made -- and there is one anyway, for when it
+            // is off, and for the three things the ordinary case does not
+            // cover: retrying a write that failed once whatever
             // stopped it is put right, rewriting a set of files left half new
             // by a failure between two of them, and answering somebody who
             // has been taught by every other program to save their work. Both
@@ -2150,6 +2155,18 @@ export component MainWindow inherits Window {
                 enabled: !root.inert && !Session.read-only;
                 title: "Save as...";
                 activated => { root.save-as-clicked(); }
+            }
+            // Whether every edit is written as it is made. Off, the files
+            // are written by Save and as the editor exits; the undo history
+            // is written after every edit either way, and what was not saved
+            // when the editor stopped is put back the next time it opens the
+            // configuration. Kept as a setting.
+            MenuItem {
+                enabled: !root.inert && !Session.read-only;
+                title: "Autosave";
+                checkable: true;
+                checked: root.autosave;
+                activated => { root.autosave-toggled(self.checked); }
             }
             MenuSeparator { }
             // The groups, which are not on the canvas either: a group is a set

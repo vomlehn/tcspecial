@@ -34,6 +34,7 @@ use std::path::{Path, PathBuf};
 
 use crate::document::{Document, Fault};
 use crate::faithful::Written;
+use crate::history::OnDisk;
 use crate::journal::{Edit, Journal};
 use crate::save::{write_atomically, SaveError};
 
@@ -44,10 +45,11 @@ pub struct Editor {
     path: PathBuf,
     /// Whether the document has changes the files do not have.
     ///
-    /// Normally false, and that is the point: every edit is written as it is
-    /// made, so the files are current. It goes true when a write fails -- a
-    /// full device, a directory gone read-only, a name whose extension says
-    /// nothing -- and stays true until one succeeds. What it is for is the
+    /// Normally false with autosave on, and that is the point: every edit is
+    /// written as it is made, so the files are current. It goes true when a
+    /// write fails -- a full device, a directory gone read-only, a name whose
+    /// extension says nothing -- and stays true until one succeeds; and with
+    /// autosave off, after every edit, until Save. What it is for is the
     /// Save button and the write on the way out, which are both "try that
     /// again now": the first when somebody has fixed whatever was wrong, the
     /// second so that a session is not left with work only in memory.
@@ -88,6 +90,14 @@ pub struct Editor {
     /// session has neither read nor written has nothing here, and is
     /// written as the editor writes it.
     written: BTreeMap<PathBuf, Written>,
+    /// Whether every edit is written to the files as it is made: the
+    /// settings' `autosave`. Off, an edit is written only by Save and as the
+    /// editor exits; the history is written after every edit either way.
+    autosave: bool,
+    /// What the files on the disk hold of the history, which is written
+    /// beside it: see [`OnDisk`]. Where they stand in it, and what each held
+    /// when the session last wrote or read it.
+    on_disk: OnDisk,
 }
 
 impl Editor {
@@ -112,7 +122,166 @@ impl Editor {
             simulator_path: None,
             read_only: false,
             written: BTreeMap::new(),
+            autosave: crate::settings::DEFAULT_AUTOSAVE,
+            on_disk: OnDisk::default(),
         }
+    }
+
+    /// Whether every edit is written to the files as it is made.
+    pub fn autosave(&self) -> bool {
+        self.autosave
+    }
+
+    /// Turns autosave on or off. On, with edits the files do not have, they
+    /// are written at once: what was waiting for Save is what autosave is
+    /// for.
+    ///
+    /// # Arguments
+    ///
+    /// * `on` - Whether every edit is to be written as it is made.
+    pub fn set_autosave(&mut self, on: bool) {
+        self.autosave = on;
+        if on && self.unsaved {
+            self.persist();
+        }
+    }
+
+    /// Puts the session's undo history back, and with it any edit that was
+    /// made and never reached the files: crash recovery.
+    ///
+    /// Called once every file of the session is open -- the configuration
+    /// and the simulator's -- because the history is of both. The history is
+    /// held to the files first: each must hold what the session that wrote
+    /// the history last wrote or read in it. One that does not was changed
+    /// by something else since, and the history no longer describes it, so
+    /// it is set aside, and the window says so; what is lost is the undo,
+    /// the files being as somebody left them. Held to them, the history is
+    /// the session's again, and the edits the files had not been given --
+    /// autosave was off, or a write failed, and then the editor stopped --
+    /// are put back at once, and written where autosave is on. The window
+    /// says how many.
+    ///
+    /// Nothing in a read-only session, which neither reads another
+    /// session's history into itself nor throws one away.
+    pub fn recover(&mut self) {
+        if self.read_only {
+            return;
+        }
+        let now = OnDisk {
+            saved: 0,
+            files: OnDisk::digests_of(&self.file_paths()),
+        };
+        // What the files are now, so that a history written from here holds
+        // to them until the session writes them.
+        self.on_disk = now.clone();
+        let Some(kept) = crate::history::kept(&self.path) else {
+            return;
+        };
+        let replay = kept
+            .journal
+            .between(kept.on_disk.saved, kept.journal.cursor())
+            .filter(|_| {
+                !kept.on_disk.files.is_empty()
+                    && kept.on_disk.files == now.files
+            });
+        let Some(replay) = replay else {
+            crate::history::forget(&self.path);
+            self.said = Some(format!(
+                "the undo history of {} was set aside: the configuration \
+                 was changed by something other than tcsgui after the history \
+                 was written, so the history no longer describes it",
+                self.path.display()
+            ));
+            return;
+        };
+        self.journal = kept.journal;
+        self.on_disk = kept.on_disk;
+        if replay.is_empty() {
+            return;
+        }
+        for edit in &replay {
+            self.document.apply(edit);
+        }
+        self.changed();
+        let count = replay.len();
+        let what = if count == 1 { "edit" } else { "edits" };
+        let saved = if self.unsaved {
+            "not saved yet"
+        } else {
+            "saved"
+        };
+        self.said = Some(format!(
+            "{count} {what} not saved when tcsgui last stopped put back, and \
+             {saved}"
+        ));
+    }
+
+    /// Every file the session writes the configuration as, the simulator's
+    /// among them where it is open.
+    ///
+    /// # Returns
+    ///
+    /// The files' paths; none where the document cannot say what its files
+    /// are, which a write then reports.
+    fn file_paths(&self) -> Vec<PathBuf> {
+        self.document
+            .files(&self.path)
+            .map(|files| files.into_iter().map(|(path, _)| path).collect())
+            .unwrap_or_default()
+    }
+
+    /// What follows a change to the document: the files written, where
+    /// autosave is on, and the history written either way, so that a crash
+    /// costs nothing the next session cannot put back.
+    fn changed(&mut self) {
+        if self.autosave {
+            self.persist();
+        } else {
+            // What the last command said is about that command.
+            self.said = None;
+            self.unsaved = true;
+            self.keep_history();
+        }
+    }
+
+    /// Writes the history, with what the files hold of it, and says in red
+    /// when it cannot be: what is lost is the undo, and the recovery of what
+    /// the files do not have yet.
+    fn keep_history(&mut self) {
+        if self.read_only {
+            return;
+        }
+        if let Err(why) =
+            crate::history::write(&self.path, &self.journal, &self.on_disk)
+        {
+            let saved = if self.unsaved {
+                "is not saved, and neither is its history"
+            } else {
+                "is saved, but its history is not"
+            };
+            self.trouble = Some(format!("the configuration {saved}: {why}"));
+        }
+    }
+
+    /// Takes what the files hold to be what this session last wrote to them,
+    /// where they stand in the history now.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - The files just written.
+    fn written_now(&mut self, paths: &[PathBuf]) {
+        self.on_disk = OnDisk {
+            saved: self.journal.cursor(),
+            files: paths
+                .iter()
+                .map(|path| {
+                    let digest = self.written.get(path).map(|written| {
+                        crate::history::digest_of(written.kept.as_bytes())
+                    });
+                    (path.clone(), digest)
+                })
+                .collect(),
+        };
     }
 
     /// Make this session one that looks and does not touch: no edit is made,
@@ -127,15 +296,14 @@ impl Editor {
         self.read_only = read_only;
     }
 
-    /// Opens a configuration: the document from the file, the history from
-    /// beside it.
+    /// Opens a configuration: the document from the file. The history is
+    /// read by [`Editor::recover`], once every file of the session is open.
     ///
     /// Two files and two different questions. *What is the configuration* is
-    /// answered by the file, always, because the file is current: every edit is
-    /// written as it is made, so the file already holds the result of every
-    /// edit the journal describes. *What can be taken back* is answered by the
-    /// journal, which is how undo reaches past the end of the last session and
-    /// past a crash.
+    /// answered by the file, which holds every edit the history says reached
+    /// it. *What can be taken back*, and what had not reached the file when a
+    /// session stopped, is answered by the history, which is held to the
+    /// files before it is believed: see `recover`.
     ///
     /// It used to replay the journal instead, onto an empty document, and
     /// return that -- which was right while the editor could not read a file at
@@ -144,18 +312,9 @@ impl Editor {
     /// written: a session that moved one node of a twelve-node graph left a
     /// journal holding one edit, and reopening the file rebuilt the document
     /// from that one edit. Eleven nodes and every link went missing, and the
-    /// next edit wrote the loss to disk.
-    ///
-    /// Replaying the journal *on top of* the file would be wrong in the other
-    /// direction: the file is written after every edit, so each edit would be
-    /// applied a second time and a session that added a node would reopen with
-    /// two of it.
-    ///
-    /// What the split costs is the one case where the two disagree: a process
-    /// that died between writing the document and writing the journal leaves
-    /// the journal one edit short, so that edit is in the configuration and
-    /// cannot be undone. That is the trade the write order was chosen for --
-    /// see the top of this file -- and losing one undo is the better failure.
+    /// next edit wrote the loss to disk. What is replayed now is only what the
+    /// history says the files do not have, onto the files it was written
+    /// beside.
     ///
     /// A file that is there and cannot be read is refused, and nothing is
     /// opened. It was opened as nothing, so that the editor could be used to
@@ -206,14 +365,8 @@ impl Editor {
         }
         editor.document = document;
 
-        // A journal that cannot be read costs the undo and not the work, so it
-        // is passed over in silence rather than reported: there is nothing the
-        // person at the keyboard can do about it, and the thing they came to
-        // edit is open and correct. See `crate::history`, which is where it
-        // lives and how long for.
-        if let Some(journal) = crate::history::read(path) {
-            editor.journal = journal;
-        }
+        // The history is read by `recover`, once every file of the session
+        // is open: it is held to all of them.
         Ok(editor)
     }
 
@@ -493,7 +646,11 @@ impl Editor {
         self.unsaved = false;
         self.said = Some(format!("saved as {}", to.display()));
 
-        if let Err(why) = crate::history::write(&self.path, &self.journal) {
+        let paths: Vec<PathBuf> = self.written.keys().cloned().collect();
+        self.written_now(&paths);
+        if let Err(why) =
+            crate::history::write(&self.path, &self.journal, &self.on_disk)
+        {
             self.trouble = Some(format!(
                 "the configuration is saved as {}, but its history is not: \
                  {why}",
@@ -522,7 +679,7 @@ impl Editor {
         }
         self.document.apply(&edit);
         self.journal.record(edit);
-        self.persist();
+        self.changed();
     }
 
     /// Renames the node in this position, as a repair rather than an edit.
@@ -592,7 +749,7 @@ impl Editor {
         match self.journal.undo() {
             Some(inverse) => {
                 self.document.apply(&inverse);
-                self.persist();
+                self.changed();
                 true
             }
             None => false,
@@ -612,7 +769,7 @@ impl Editor {
         match self.journal.redo() {
             Some(edit) => {
                 self.document.apply(&edit);
-                self.persist();
+                self.changed();
                 true
             }
             None => false,
@@ -649,9 +806,12 @@ impl Editor {
             Ok(files) => files,
             Err(why) => {
                 self.trouble = Some(why);
+                self.keep_unsaved_history();
                 return;
             }
         };
+        let paths: Vec<PathBuf> =
+            files.iter().map(|(path, _)| path.clone()).collect();
 
         // Each is written atomically, so none can be left half-written. What
         // cannot be promised across several files is that they all change
@@ -671,6 +831,7 @@ impl Editor {
             };
             if let Err(why) = write_atomically(&path, text.as_bytes()) {
                 self.trouble = Some(describe(&why));
+                self.keep_unsaved_history();
                 return;
             }
             self.written.insert(
@@ -684,15 +845,26 @@ impl Editor {
         // The configuration is on the disk. Whatever happens to the history
         // below, there is nothing left in the document that no file has.
         self.unsaved = false;
+        self.written_now(&paths);
 
-        if let Err(why) = crate::history::write(&self.path, &self.journal) {
-            // The configuration is safely written; what is lost is the ability
-            // to undo past a crash. Worth saying and not worth treating as a
-            // failed save.
-            self.trouble = Some(format!(
-                "the configuration is saved, but its history is not: {why}"
-            ));
-        }
+        // The configuration is safely written; what a history that cannot
+        // be is the ability to undo past a crash. Worth saying and not worth
+        // treating as a failed save.
+        self.keep_history();
+    }
+
+    /// Writes the history after a write of the files that failed, keeping
+    /// the reason the files were not written: the history is then the only
+    /// record of what they lack, which the next session puts back.
+    fn keep_unsaved_history(&mut self) {
+        let failed = self.trouble.take();
+        self.keep_history();
+        self.trouble = match (failed, self.trouble.take()) {
+            (Some(failed), Some(history)) => {
+                Some(format!("{failed}; {history}"))
+            }
+            (failed, history) => failed.or(history),
+        };
     }
 
     /// Holds what the editor writes for each of some files beside what each
@@ -1993,6 +2165,7 @@ tcsgui:
         let mut recovered =
             Editor::open(&path, crate::pane::default_dividers())
                 .expect("it opens");
+        recovered.recover();
         assert_eq!(
             recovered.document().nodes.len(),
             3,
@@ -2095,8 +2268,11 @@ tcsgui:
     /// The ordering the module comment argues for, checked rather than
     /// described: if the document write fails, the journal must not record the
     /// edit, or recovery would replay an edit the document already lacks.
+    /// An edit whose write failed, and then the editor stopped, is put back
+    /// the next time the configuration is opened, and written: the history
+    /// is written whether or not the files are, and says how far they go.
     #[test]
-    fn a_failed_document_write_does_not_leave_a_journal_ahead_of_it() {
+    fn an_edit_whose_write_failed_is_put_back_after_a_crash() {
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
@@ -2121,13 +2297,91 @@ tcsgui:
             std::fs::set_permissions(&locked, permissions).unwrap();
         }
 
-        // What a recovery would find: one node and one edit of history, which
-        // agree with each other. The second edit is lost, which is what a
-        // device that could not be written to costs.
-        let recovered = Editor::open(&path, crate::pane::default_dividers())
-            .expect("it opens");
+        // The file has the first node and the history both edits; the
+        // second is put back, and written now that it can be.
+        let mut recovered =
+            Editor::open(&path, crate::pane::default_dividers())
+                .expect("it opens");
         assert_eq!(recovered.document().nodes.len(), 1);
-        assert_eq!(recovered.undo_depth(), 1);
+        recovered.recover();
+        assert_eq!(recovered.document().nodes.len(), 2);
+        assert_eq!(recovered.undo_depth(), 2);
+        assert!(!recovered.unsaved(), "{:?}", recovered.trouble());
+        assert!(
+            recovered.said().is_some_and(|said| said.contains("1 edit")),
+            "{:?}",
+            recovered.said()
+        );
+        let again = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        assert_eq!(again.document().nodes.len(), 2, "and it is on the disk");
+    }
+
+    /// With autosave off an edit is not written, but its history is, and a
+    /// session that stopped then is put back where the window stood; turning
+    /// autosave on writes what was waiting.
+    #[test]
+    fn with_autosave_off_a_crash_costs_no_edit() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("graph.ytcs");
+        {
+            let mut editor = Editor::new(&path);
+            editor.edit(add("a", "i2c"));
+            editor.set_autosave(false);
+            editor.edit(add("b", "spi"));
+            editor.edit(add("c", "spi"));
+            assert!(editor.unsaved());
+            // And one undone, which is where the window stood.
+            assert!(editor.undo());
+            let on_disk = Editor::open(&path, crate::pane::default_dividers())
+                .expect("it opens");
+            assert_eq!(on_disk.document().nodes.len(), 1, "not written");
+            // And the process dies here.
+        }
+        let mut recovered =
+            Editor::open(&path, crate::pane::default_dividers())
+                .expect("it opens");
+        recovered.set_autosave(false);
+        recovered.recover();
+        assert_eq!(recovered.document().nodes.len(), 2);
+        assert_eq!(recovered.undo_depth(), 2);
+        assert_eq!(recovered.journal().redoable(), 1, "c can be redone");
+        assert!(recovered.unsaved(), "put back, and not written");
+        recovered.set_autosave(true);
+        assert!(!recovered.unsaved());
+        let written = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        assert_eq!(written.document().nodes.len(), 2);
+    }
+
+    /// A configuration changed by something else after its history was
+    /// written has its history set aside, and the window says so: the
+    /// history no longer describes the file.
+    #[test]
+    fn a_history_of_a_file_changed_since_is_set_aside() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("graph.ytcs");
+        {
+            let mut editor = Editor::new(&path);
+            editor.edit(add("a", "i2c"));
+            editor.edit(add("b", "spi"));
+        }
+        let text = std::fs::read_to_string(&path).expect("it reads");
+        std::fs::write(&path, format!("{text}\n# edited by hand\n"))
+            .expect("written");
+        let mut reopened = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        reopened.recover();
+        assert_eq!(reopened.undo_depth(), 0, "no undo onto another file");
+        assert_eq!(reopened.document().nodes.len(), 2, "the file as it is");
+        assert!(
+            reopened
+                .said()
+                .is_some_and(|said| said.contains("set aside")),
+            "{:?}",
+            reopened.said()
+        );
+        assert!(crate::history::kept(&path).is_none(), "and thrown away");
     }
 
     /// A subdiagram is written to a file of its own, beside the top diagram.
@@ -2235,8 +2489,10 @@ tcsgui:
         // And the history is beside it as it is for YAML, so undo reaches past
         // a crash whichever format the configuration is written in.
         editor.edit(add("temp_2", "i2c"));
-        let recovered = Editor::open(&path, crate::pane::default_dividers())
-            .expect("it opens");
+        let mut recovered =
+            Editor::open(&path, crate::pane::default_dividers())
+                .expect("it opens");
+        recovered.recover();
         assert_eq!(recovered.undo_depth(), 2);
         assert_eq!(recovered.document().nodes.len(), 2);
     }

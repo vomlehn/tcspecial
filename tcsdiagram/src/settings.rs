@@ -1,7 +1,10 @@
 //! What tcsgui remembers between sessions, in
 //! `$HOME/.tcsgui/preferences.xml`.
 //!
-//! Four settings, in two pairs. How much of the working pane the gateway
+//! The panes' and the lists' shares, and whether the editor writes the
+//! configuration after every edit -- `autosave` -- which is the editor's
+//! alone: tcspecial's visual window writes nothing. Of the shares, four
+//! are in two pairs. How much of the working pane the gateway
 //! working pane takes and how much the vehicle's takes, across; and how much of
 //! the selection column the gateway list takes and how much the vehicle's
 //! takes, down. Each set of panes is always in the same order -- payloads,
@@ -87,6 +90,10 @@ pub const DEFAULT_PHYSICS: i32 = 20;
 /// payload list keeping what is left.
 pub const DEFAULT_LIST_PHYSICS: i32 = 20;
 
+/// Whether the editor writes the configuration after every edit until
+/// somebody says otherwise: yes, which is what it has always done.
+pub const DEFAULT_AUTOSAVE: bool = true;
+
 /// What the editor remembers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Settings {
@@ -105,6 +112,11 @@ pub struct Settings {
     /// And how much of the selection column the physics list takes, at its
     /// top; the payload list takes what is left after it and the two above.
     pub list_physics_percent: i32,
+    /// Whether every edit is written to the configuration as it is made, or
+    /// only when Save is asked for and as the editor exits. Either way the
+    /// undo history is written after every edit, so a crash costs nothing
+    /// that the next session cannot replay.
+    pub autosave: bool,
 }
 
 impl Default for Settings {
@@ -116,6 +128,7 @@ impl Default for Settings {
             list_vehicle_percent: DEFAULT_LIST_VEHICLE,
             physics_percent: DEFAULT_PHYSICS,
             list_physics_percent: DEFAULT_LIST_PHYSICS,
+            autosave: DEFAULT_AUTOSAVE,
         }
     }
 }
@@ -370,6 +383,35 @@ fn settings_in(text: &str, whose: &str) -> Settings {
         list_vehicle_percent,
         physics_percent,
         list_physics_percent,
+        autosave: yes_or_no_in(text, whose, "autosave", DEFAULT_AUTOSAVE),
+    }
+}
+
+/// A setting that is on or off, as this text states it, or `default`.
+///
+/// # Arguments
+///
+/// * `text`    - The settings file's text.
+/// * `whose`   - What to call the file in a message on the error output.
+/// * `name`    - The element the setting is in.
+/// * `default` - What to use when the element is missing or says neither
+///               `true` nor `false`.
+///
+/// # Returns
+///
+/// The setting.
+fn yes_or_no_in(text: &str, whose: &str, name: &str, default: bool) -> bool {
+    match element(text, name) {
+        Some("true") => true,
+        Some("false") => false,
+        Some(said) => {
+            eprintln!(
+                "tcsgui: {whose} says {name} is \"{said}\", which is neither \
+                 true nor false; using {default}"
+            );
+            default
+        }
+        None => default,
     }
 }
 
@@ -431,6 +473,7 @@ pub fn written(settings: &Settings) -> String {
         list_vehicle_percent: list_vehicle,
         physics_percent: physics,
         list_physics_percent: list_physics,
+        autosave,
     } = *settings;
     format!(
         "\
@@ -467,6 +510,13 @@ pub fn written(settings: &Settings) -> String {
          its list, at the top of the selection column. -->
     <physics_pane_percent>{physics}</physics_pane_percent>
     <physics_list_percent>{list_physics}</physics_list_percent>
+
+    <!-- Whether every edit is written to the configuration as it is made:
+         true or false, as the File menu's Autosave says. Either way the
+         undo history is kept after every edit, and what was not saved when
+         the editor stopped is put back the next time the configuration is
+         opened; and the editor saves what is unsaved as it exits. -->
+    <autosave>{autosave}</autosave>
 </settings>
 ",
         rest = 100 - gateway - vehicle,
@@ -576,6 +626,7 @@ mod tests {
             list_vehicle_percent: 30,
             physics_percent: 17,
             list_physics_percent: 10,
+            autosave: false,
         });
         assert!(text.contains("15"), "{text}");
         assert!(text.contains("60"), "{text}");
@@ -584,6 +635,15 @@ mod tests {
         let settings = settings_in(&text, "a test");
         assert_eq!(settings.physics_percent, 17);
         assert_eq!(settings.list_physics_percent, 10);
+        assert!(!settings.autosave, "autosave read as written: {text}");
+        // A file written before there was the setting autosaves, as the
+        // editor always did; one that says neither true nor false, too.
+        for older in [
+            text.replace("<autosave>", "<was_autosave>"),
+            text.replace("<autosave>false", "<autosave>sometimes"),
+        ] {
+            assert!(settings_in(&older, "another file").autosave, "{older}");
+        }
         // And a file written before there was a Physics pane takes the
         // defaults for it.
         let older = text

@@ -4860,6 +4860,7 @@ dependencies = [
  "i-slint-backend-testing",
  "jsonschema",
  "libc",
+ "md5",
  "path-clean",
  "quick-xml 0.42.0",
  "rfd",

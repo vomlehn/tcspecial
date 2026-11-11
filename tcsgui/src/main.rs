@@ -287,6 +287,9 @@ struct Views {
     /// The physics list's share of the selection column, at its top, in per
     /// cent: kept beside `lists` and saved with it.
     physics_list: Rc<std::cell::Cell<i32>>,
+    /// Whether every edit is written as it is made, as the File menu's
+    /// Autosave says: kept beside the shares and saved with them.
+    autosave: Rc<std::cell::Cell<bool>>,
     /// The tcspecial parameters window, if one is open.
     ///
     /// One, like the group window and for the same reason: it is a form about
@@ -860,12 +863,18 @@ fn main() -> Result<(), slint::PlatformError> {
     // Before anything can be edited -- the seeding below included, which is
     // an edit like any other and so is not made.
     editor.borrow_mut().set_read_only(read_only());
+    editor.borrow_mut().set_autosave(settings.autosave);
     if let Some(simulator) = &simulator {
         editor
             .borrow_mut()
             .open_simulator(std::path::Path::new(simulator))
             .unwrap_or_else(|why| refused(why));
     }
+    // The undo history, and whatever a session that stopped badly had not
+    // written, once every file is open, the history being of them all: see
+    // `Editor::recover`. Before the seeding, which would be an edit on top
+    // of a document the history does not yet describe.
+    editor.borrow_mut().recover();
     seed(&mut editor.borrow_mut());
 
     let ui = MainWindow::new()?;
@@ -904,6 +913,7 @@ fn main() -> Result<(), slint::PlatformError> {
         physics_list: Rc::new(std::cell::Cell::new(
             settings.list_physics_percent,
         )),
+        autosave: Rc::new(std::cell::Cell::new(settings.autosave)),
         showing: Rc::new(RefCell::new(String::new())),
         errors: Rc::new(RefCell::new(Vec::new())),
         lit: Rc::new(RefCell::new(None)),
@@ -977,11 +987,12 @@ fn main() -> Result<(), slint::PlatformError> {
 
     // On the way out, anything the files do not have.
     //
-    // Normally there is nothing: every edit is written as it is made, so the
-    // configuration on disk is already the configuration in the window. What
-    // this catches is the session where a write failed -- a full device, a
-    // directory made read-only -- and was then put right without another edit
-    // being made. Leaving a session's work in a process that is ending is the
+    // With Autosave on there is normally nothing: every edit is written as it
+    // is made, so the configuration on disk is already the configuration in
+    // the window. What this catches then is the session where a write failed
+    // -- a full device, a directory made read-only -- and was then put right
+    // without another edit being made. With it off, it is every edit since
+    // the last Save, which the way out writes too. Leaving a session's work in a process that is ending is the
     // one way this editor could lose anything, so it is worth one more try
     // and one plain sentence either way.
     let mut kept = false;
@@ -1238,6 +1249,19 @@ fn wire(
         let views = views.clone();
         window.on_save_clicked(move || {
             editor.borrow_mut().save();
+            views.borrow().refresh(&editor.borrow());
+        });
+    }
+    {
+        // Autosave, from the File menu: on, and what was waiting is written
+        // at once; either way kept as a setting, and every window's menu says
+        // the same.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_autosave_toggled(move |on| {
+            editor.borrow_mut().set_autosave(on);
+            views.borrow().autosave.set(on);
+            remember(&views.borrow());
             views.borrow().refresh(&editor.borrow());
         });
     }
@@ -1960,6 +1984,7 @@ fn put(
         };
     ui.set_selected_physics(physics.into());
     ui.set_undo_depth(editor.undo_depth() as i32);
+    ui.set_autosave(editor.autosave());
     ui.set_redo_depth(editor.journal().redoable() as i32);
     ui.set_undo_label(label(editor.journal().next_undo()));
     ui.set_redo_label(label(editor.journal().next_redo()));
@@ -2511,6 +2536,7 @@ fn remember(views: &Views) {
         list_vehicle_percent,
         physics_percent: pane::physics_percent(dividers.physics),
         list_physics_percent: views.physics_list.get(),
+        autosave: views.autosave.get(),
     });
 }
 
@@ -13765,6 +13791,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14045,6 +14072,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14190,6 +14218,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14350,6 +14379,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14442,6 +14472,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14589,6 +14620,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14737,6 +14769,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -14863,6 +14896,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -15072,6 +15106,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -15415,6 +15450,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -15567,6 +15603,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -15672,6 +15709,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -15841,6 +15879,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -15926,6 +15965,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -16087,6 +16127,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -16370,6 +16411,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -16464,6 +16506,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
@@ -16601,6 +16644,7 @@ mod tests {
             physics_list: Rc::new(std::cell::Cell::new(
                 settings::DEFAULT_LIST_PHYSICS,
             )),
+            autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),

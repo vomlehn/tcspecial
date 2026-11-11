@@ -81,6 +81,7 @@ pub fn save(settings: Settings) {
         list_vehicle_percent,
         physics_percent: settings.physics_percent.clamp(LEAST, MOST),
         list_physics_percent,
+        autosave: settings.autosave,
     };
     if let Err(why) =
         crate::save::write_atomically(&path, written(&kept).as_bytes())

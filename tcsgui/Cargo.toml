@@ -42,6 +42,10 @@ rfd = { version = "0.17.2", default-features = false, features = [
 # included file a directory up from a new top file is in a directory that
 # need not be there yet, which the file system cannot resolve.
 path-clean = "1.0.1"
+# The digest of each file of the configuration the undo history is held to,
+# so that a history is not replayed or undone onto a file something else has
+# changed: see `history::OnDisk`. The version tcslibgs digests with.
+md5 = "0.8"
 
 [dev-dependencies]
 # Lays the window out headlessly, so a test can measure it rather than a

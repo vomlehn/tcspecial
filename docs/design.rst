@@ -6298,14 +6298,37 @@ to remember after every session. Only where the sibling is already there:
 writing one that is not would be the editor deciding somebody wants their
 configuration in two languages, which is not a thing to decide for them.
 
-Every edit is written as it is made, so saving is not something to remember.
-There is a Save button all the same. It writes every file of the session now, which covers the three things the ordinary case does not: retrying a write
-that failed once whatever stopped it has been put right, rewriting a set of
-files left half new by a failure between two of them, and answering somebody
-who has been taught by every other program to save their work. The way out of
-the program does the same for anything the files do not have, and says on the
-error output whether it got there -- leaving a session's work in a process that
-is ending is the one way this editor could lose anything.
+Every edit is written as it is made, so saving is not something to remember,
+while the File menu's Autosave is on, as it is until somebody turns it off.
+Off, an edit is written by Save, and by the way out of the program, and not
+before: for somebody who wants to try a change and keep it only if it works.
+Which it is is a setting, ``autosave`` in ``~/.tcsgui/preferences.xml``, and
+the window says it in the File menu. Turning it on writes at once whatever was
+waiting.
+
+There is a Save button all the same. It writes every file of the session now,
+which with Autosave on covers the three things the ordinary case does not:
+retrying a write that failed once whatever stopped it has been put right,
+rewriting a set of files left half new by a failure between two of them, and
+answering somebody who has been taught by every other program to save their
+work. The way out of the program does the same for anything the files do not
+have, and says on the error output whether it got there.
+
+The undo history is written after every edit, Autosave on or off, to the
+user's state directory (``tcsgui::history``), and with it how far into it the
+files go and a digest of each file as the editor last wrote it. That is crash
+recovery. When the editor opens a configuration whose history is there --
+which it is only when a session stopped without exiting, the history being
+deleted on a clean exit -- it holds the history to the files: each must be as
+that session left it. One changed by anything else since is a file the history
+no longer describes, so the history is set aside and the window says so; the
+file is as somebody left it, and what is lost is the undo. Held to them, the
+history is the session's again, so undo reaches back past the crash, and every
+edit it holds that the files do not -- made with Autosave off, or whose write
+failed, before the editor stopped -- is put back at once, without asking, and
+written where Autosave is on. The window says how many. A clean exit, which
+saves what is unsaved first, deletes the history; one whose last save failed
+keeps it, since it is then the only record of the work, and says where it is.
 
 Save as is for when the files cannot be written where they are -- a directory
 made read-only, a device that is full -- and for a copy. It asks in the

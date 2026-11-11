@@ -2968,16 +2968,34 @@ pub(crate) mod tests {
         let theirs = ConfigDigest([0x11u8; 16]);
 
         // A simulated vehicle that answers what it is sent and lists it:
-        // nothing but the one arm is to reach it.
+        // nothing but the one arm is to reach it. It keeps listening until
+        // told the test is done, not merely until it has heard nothing for
+        // a while: the arm comes only after three pop-ups have come and
+        // gone, which on a loaded machine can take longer than any wait.
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .set_read_timeout(Some(std::time::Duration::from_millis(100)))
             .expect("a timeout");
         let at = vehicle.local_addr().expect("where it is").to_string();
+        let done = Arc::new(AtomicBool::new(false));
+        let finished = done.clone();
         let asked = std::thread::spawn(move || {
             let mut buffer = [0u8; 256];
             let mut seen = Vec::new();
-            while let Ok((size, from)) = vehicle.recv_from(&mut buffer) {
+            loop {
+                let (size, from) = match vehicle.recv_from(&mut buffer) {
+                    Ok(heard) => heard,
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::WouldBlock
+                                | std::io::ErrorKind::TimedOut
+                        ) && !finished.load(Ordering::Relaxed) =>
+                    {
+                        continue
+                    }
+                    Err(_) => break,
+                };
                 let command =
                     Command::read(&buffer[..size]).expect("a command");
                 seen.push(command.cmd_type());
@@ -3095,6 +3113,7 @@ pub(crate) mod tests {
 
         link.lock().unwrap().disconnect();
         let _ = ui.hide();
+        done.store(true, Ordering::Relaxed);
         assert_eq!(
             asked.join().expect("the simulated vehicle"),
             vec![CommandType::RestartArm],

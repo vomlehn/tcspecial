@@ -118,7 +118,7 @@ impl Flown {
     ) -> Flown {
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../examples/{name}/{name}.ytcs"));
-        let mut text =
+        let text =
             std::fs::read_to_string(&example).expect("the example reads");
         let dir = tempfile::tempdir().expect("a directory");
         // tcspecial writes its log into a directory that is there, and does
@@ -126,83 +126,100 @@ impl Flown {
         std::fs::create_dir(dir.path().join("telemetry"))
             .expect("the log's directory");
 
+        // Every port is one found free and let go, for tcspecial to bind;
+        // another test can take one in between, and tcspecial then stops
+        // at once. That is the test's doing, not tcspecial's, so the
+        // ports are found afresh and it is flown again, a few times.
         let at = |port: u16| port + offset;
-        let (commands, take_at, uplink) =
-            (common::bound(), common::free(), common::free());
-        for (was, now) in [
-            (
-                format!("0.0.0.0:{}", at(3200)),
-                format!("127.0.0.1:{take_at}"),
-            ),
-            (
-                format!("127.0.0.1:{}", at(3210)),
-                format!("127.0.0.1:{}", common::port(&commands)),
-            ),
-            (
-                format!("0.0.0.0:{}", at(3300)),
-                format!("127.0.0.1:{}", common::free()),
-            ),
-            (
-                format!("127.0.0.1:{}", at(3310)),
-                format!("127.0.0.1:{}", common::free()),
-            ),
-            (
-                format!("0.0.0.0:{}", at(3400)),
-                format!("127.0.0.1:{}", common::free()),
-            ),
-            (
-                format!("127.0.0.1:{}", at(3410)),
-                format!("127.0.0.1:{}", common::free()),
-            ),
-            (
-                format!("0.0.0.0:{}", at(3500)),
-                format!("127.0.0.1:{}", common::free()),
-            ),
-            (
-                format!("127.0.0.1:{}", at(3510)),
-                format!("127.0.0.1:{}", common::free()),
-            ),
-            (format!("\"{}\"", at(3600)), format!("\"{uplink}\"")),
-            (
-                format!("\"127.0.0.1:{}\"", at(3700)),
-                format!("\"127.0.0.1:{}\"", common::free()),
-            ),
-            (
-                "/tmp/telemetry".to_string(),
-                dir.path().join("telemetry").display().to_string(),
-            ),
-            (
-                format!("/tmp/tcspecial-{name}.state"),
-                dir.path().join("tcspecial.state").display().to_string(),
-            ),
-        ] {
-            text = common::moved(&text, &was, &now);
-        }
-        let (was, now, times) = device;
-        text = common::moved_each(&text, was, now, times);
-        for (was, now) in changed {
-            text = common::moved(&text, was, now);
-        }
+        let mut tries = 0;
+        let (flying, graph, uplink) = loop {
+            tries += 1;
+            let mut written = text.clone();
+            let (commands, take_at, uplink) =
+                (common::bound(), common::free(), common::free());
+            for (was, now) in [
+                (
+                    format!("0.0.0.0:{}", at(3200)),
+                    format!("127.0.0.1:{take_at}"),
+                ),
+                (
+                    format!("127.0.0.1:{}", at(3210)),
+                    format!("127.0.0.1:{}", common::port(&commands)),
+                ),
+                (
+                    format!("0.0.0.0:{}", at(3300)),
+                    format!("127.0.0.1:{}", common::free()),
+                ),
+                (
+                    format!("127.0.0.1:{}", at(3310)),
+                    format!("127.0.0.1:{}", common::free()),
+                ),
+                (
+                    format!("0.0.0.0:{}", at(3400)),
+                    format!("127.0.0.1:{}", common::free()),
+                ),
+                (
+                    format!("127.0.0.1:{}", at(3410)),
+                    format!("127.0.0.1:{}", common::free()),
+                ),
+                (
+                    format!("0.0.0.0:{}", at(3500)),
+                    format!("127.0.0.1:{}", common::free()),
+                ),
+                (
+                    format!("127.0.0.1:{}", at(3510)),
+                    format!("127.0.0.1:{}", common::free()),
+                ),
+                (format!("\"{}\"", at(3600)), format!("\"{uplink}\"")),
+                (
+                    format!("\"127.0.0.1:{}\"", at(3700)),
+                    format!("\"127.0.0.1:{}\"", common::free()),
+                ),
+                (
+                    "/tmp/telemetry".to_string(),
+                    dir.path().join("telemetry").display().to_string(),
+                ),
+                (
+                    format!("/tmp/tcspecial-{name}.state"),
+                    dir.path().join("tcspecial.state").display().to_string(),
+                ),
+            ] {
+                written = common::moved(&written, &was, &now);
+            }
+            let (was, now, times) = device;
+            written = common::moved_each(&written, was, now, times);
+            for (was, now) in changed {
+                written = common::moved(&written, was, now);
+            }
 
-        let configuration = dir.path().join(format!("{name}.ytcs"));
-        std::fs::write(&configuration, &text).expect("written");
-        let graph = Graph::load(&configuration).expect("it reads");
+            let configuration = dir.path().join(format!("{name}.ytcs"));
+            std::fs::write(&configuration, &written).expect("written");
+            let graph = Graph::load(&configuration).expect("it reads");
 
-        let flying = common::Flying::logged(
-            &configuration,
-            &dir.path().join("tcspecial.log"),
-        );
+            let mut flying = common::Flying::logged(
+                &configuration,
+                &dir.path().join("tcspecial.log"),
+            );
 
-        // Nothing comes down until the ground has matched the start, with
-        // a CONNECT carrying the configuration's checksum.
-        let take: SocketAddr =
-            format!("127.0.0.1:{take_at}").parse().expect("an address");
-        common::connect(
-            &commands,
-            take,
-            1,
-            common::checksum_of(&configuration),
-        );
+            // Nothing comes down until the ground has matched the start,
+            // with a CONNECT carrying the configuration's checksum.
+            let take: SocketAddr =
+                format!("127.0.0.1:{take_at}").parse().expect("an address");
+            let answered = common::connect_unless(
+                &commands,
+                take,
+                1,
+                common::checksum_of(&configuration),
+                || flying.exited(),
+            );
+            if answered.is_some() {
+                break (flying, graph, uplink);
+            }
+            if tries < 5 && flying.lost_a_port() {
+                continue;
+            }
+            panic!("nothing answered a CONNECT at {take}");
+        };
 
         Flown {
             _flying: flying,

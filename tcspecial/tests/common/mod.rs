@@ -54,22 +54,49 @@ pub fn connect(
     sequence: u32,
     digest: ConfigDigest,
 ) -> Telemetry {
+    connect_unless(from, to, sequence, digest, || false)
+        .unwrap_or_else(|| panic!("nothing answered a CONNECT at {to}"))
+}
+
+/// Sends CONNECT as [`connect`] does, but gives up as soon as `gone` says
+/// there is no longer a tcspecial to answer.
+///
+/// # Arguments
+///
+/// * `from`     - Where the ground sends from, with a short read timeout.
+/// * `to`       - Where tcspecial takes commands.
+/// * `sequence` - The CONNECT's sequence number.
+/// * `digest`   - The checksum it carries.
+/// * `gone`     - Says whether tcspecial has exited; asked between sends.
+///
+/// # Returns
+///
+/// The answer, or `None` if tcspecial went, or nothing answered within 20
+/// seconds.
+#[allow(dead_code)]
+pub fn connect_unless(
+    from: &UdpSocket,
+    to: SocketAddr,
+    sequence: u32,
+    digest: ConfigDigest,
+    mut gone: impl FnMut() -> bool,
+) -> Option<Telemetry> {
     let command =
         Command::Connect(ConnectCommand::new(sequence, digest)).to_bytes();
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut buffer = [0u8; 65535];
-    while Instant::now() < deadline {
+    while Instant::now() < deadline && !gone() {
         from.send_to(&command, to).expect("sent");
         let wait = Instant::now() + Duration::from_millis(500);
         while Instant::now() < wait {
             if let Ok(got) = from.recv(&mut buffer) {
                 if let Ok(answer) = Telemetry::read(&buffer[..got]) {
-                    return answer;
+                    return Some(answer);
                 }
             }
         }
     }
-    panic!("nothing answered a CONNECT at {to}");
+    None
 }
 
 /// Binds a socket on a loopback port nothing holds.
@@ -157,6 +184,34 @@ impl Flying {
             child,
             log: Some(log.to_path_buf()),
         }
+    }
+}
+
+impl Flying {
+    /// Whether tcspecial has exited.
+    ///
+    /// # Returns
+    ///
+    /// `true` once it has, `false` while it runs.
+    #[allow(dead_code)]
+    pub fn exited(&mut self) -> bool {
+        matches!(self.child.try_wait(), Ok(Some(_)))
+    }
+
+    /// Whether tcspecial stopped because a port it was to bind was taken:
+    /// a port a test found free and handed it can be taken by another test
+    /// in between, which is no fault of tcspecial's.
+    ///
+    /// # Returns
+    ///
+    /// `true` if it has exited and its log says a port was taken.
+    #[allow(dead_code)]
+    pub fn lost_a_port(&mut self) -> bool {
+        let said = match &self.log {
+            Some(log) => std::fs::read_to_string(log).unwrap_or_default(),
+            None => return false,
+        };
+        self.exited() && said.contains("Address already in use")
     }
 }
 

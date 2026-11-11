@@ -156,6 +156,13 @@ fn write_basic(
         Basic::Boolean => {
             let _ = write!(out, "{}", data.first().copied().unwrap_or(0));
         }
+        Basic::Factor => {
+            let bytes: [u8; 8] = data.try_into().map_err(|_| {
+                format!("a factor is 8 bytes and {} arrived", data.len())
+            })?;
+            // The shortest text that reads back as the same number.
+            let _ = write!(out, "{}", f64::from_be_bytes(bytes));
+        }
         Basic::String | Basic::Bytes => {
             return Err(format!("a {} has no text form", basic.name()))
         }
@@ -212,6 +219,17 @@ fn read_basic(
                 }
             };
             Ok(1)
+        }
+        Basic::Factor => {
+            let number: f64 = said
+                .parse()
+                .ok()
+                .filter(|number: &f64| number.is_finite())
+                .ok_or_else(|| {
+                    format!("{what}: \"{said}\" is not a finite number")
+                })?;
+            out[..8].copy_from_slice(&number.to_be_bytes());
+            Ok(8)
         }
         Basic::String | Basic::Bytes => {
             Err(format!("{what}: a {} has no text form", basic.name()))
@@ -321,6 +339,10 @@ mod tests {
             .expect("a temperature")
             .to_vec();
         assert_eq!(round("kelvin", &kelvin), ("293.15".to_string(), kelvin));
+        let factor = 0.0625f64.to_be_bytes().to_vec();
+        assert_eq!(round("factor", &factor), ("0.0625".to_string(), factor));
+        let tiny = 1.5e-7f64.to_be_bytes().to_vec();
+        assert_eq!(round("factor", &tiny), ("0.00000015".to_string(), tiny));
         let (text, back) = round("x: i16, on: boolean", &[0, 3, 1]);
         assert_eq!((text.as_str(), back), ("x=3 on=1", vec![0, 3, 1]));
     }
@@ -335,6 +357,9 @@ mod tests {
             ("i8", "200"),
             ("boolean", "2"),
             ("u16", "many"),
+            ("factor", "inf"),
+            ("factor", "NaN"),
+            ("factor", "half"),
             ("x: i16, y: i16", "x=1"),
             ("x: i16, y: i16", "x=1 x=2 y=3"),
             ("x: i16, y: i16", "x=1 y=2 z=3"),

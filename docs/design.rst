@@ -664,6 +664,13 @@ One value type for each unit
     step (see `Compute elements`_), stated as an integer encoding with the
     calibrator that makes it the unit and the unit's symbol in its unit set.
 
+``factor``
+    A number in no unit to multiply by: a conversion's ``scale``, which the
+    ground may set. A 64-bit IEEE 754 float, sent as it is held, because a
+    scale is no count of any step -- an ADC's may be a ten-millionth of a
+    volt -- and a factor that is not a finite number is refused. It is the
+    one float on a link; no value is one.
+
 Bounded strings and bounded bytes
     Text and opaque data, each with the most it may hold, so that a datum of
     either is a buffer of known size and holding one allocates nothing.
@@ -1010,7 +1017,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "c7820f9bfe585feab72247ece0a2261d"
+     interface: "93b26cb0221440317c27e209657a5dcc"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -4100,10 +4107,13 @@ Requirement
     makes what the ground can change in flight something written down and
     checkable rather than whatever a computation happens to accept. The node
     must then accept the value, which is where a setpoint that is not of the
-    attribute's type, or a band of nought, is refused. Which attributes a
-    node takes, and as which type, is ``tcslibgs::graph::settings``'s, and a
-    binding naming one the node does not take is refused where the
-    configuration is read.
+    attribute's type, a band of nought, or a scale of nought is refused.
+    Two computations take settings: a thermostat its ``setpoint`` and
+    ``half_band``, in the unit it reads, and a conversion its ``offset``, in
+    the unit it sends, and its ``scale``, a ``factor``, so that a sensor can
+    be calibrated again in flight. Which attributes a node takes, and as
+    which type, is ``tcslibgs::graph::settings``'s, and a binding naming one
+    the node does not take is refused where the configuration is read.
 
 Requirement
     A device accepts no settings. A bus address or a set of line numbers is

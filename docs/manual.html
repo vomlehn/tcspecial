@@ -2686,7 +2686,10 @@ command, <tt class="docutils literal">set_thermostat_setpoint</tt>, for a ground
 An attribute no binding mentions is refused, which is the point of writing
 the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- <tt class="docutils literal">no command binding says the ground may set
-<span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.</p>
+<span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.
+A conversion's <tt class="docutils literal">scale</tt> and <tt class="docutils literal">offset</tt> may be bound the same way, so that a
+sensor can be calibrated again in flight: the scale is sent as a <tt class="docutils literal">factor</tt>,
+a 64-bit float, and the offset in the unit the conversion sends.</p>
 <p>The simulator file beside it, <tt class="docutils literal"><span class="pre">thermostat-sim.yaml</span></tt>, is a link to
 <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>, which thermostat-yamcs,
 the same vehicle with Yamcs as its ground station, links to too. Its world
@@ -5032,7 +5035,7 @@ configurations yet.</p>
 for, and every configuration states it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c7820f9bfe585feab72247ece0a2261d&quot;</span>
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;93b26cb0221440317c27e209657a5dcc&quot;</span>
 </pre>
 <p>It is the digest of the <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt> a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -5044,7 +5047,7 @@ each command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcsverify --interface-digest
-c7820f9bfe585feab72247ece0a2261d
+93b26cb0221440317c27e209657a5dcc
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.</p>
@@ -5052,8 +5055,8 @@ sends, so a person with only a packet capture can read it there too.</p>
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-vehicle.ytcs: interface set to c7820f9bfe585feab72247ece0a2261d, from 0123...
-vehicle.xtcs: interface is c7820f9bfe585feab72247ece0a2261d already
+vehicle.ytcs: interface set to 93b26cb0221440317c27e209657a5dcc, from 0123...
+vehicle.xtcs: interface is 93b26cb0221440317c27e209657a5dcc already
 </pre>
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

@@ -85,6 +85,7 @@ COPIED = frozenset({
     "FloatParameterType", "BooleanParameterType",
     "StringArgumentType", "IntegerArgumentType", "BinaryArgumentType",
     "StringDataEncoding", "IntegerDataEncoding", "BinaryDataEncoding",
+    "FloatDataEncoding",
     "SizeInBits", "Fixed", "FixedValue", "Variable", "TerminationChar",
     "LeadingSize", "DynamicValue", "ParameterInstanceRef",
     "LinearAdjustment", "ValidRange", "UnitSet", "Unit", "DefaultCalibrator",

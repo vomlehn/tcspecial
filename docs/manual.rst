@@ -2369,6 +2369,9 @@ An attribute no binding mentions is refused, which is the point of writing
 the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- ``no command binding says the ground may set
 "thermostat.half-band": it is spelled half_band`` -- beside the status.
+A conversion's ``scale`` and ``offset`` may be bound the same way, so that a
+sensor can be calibrated again in flight: the scale is sent as a ``factor``,
+a 64-bit float, and the offset in the unit the conversion sends.
 
 The simulator file beside it, ``thermostat-sim.yaml``, is a link to
 ``examples/thermostat-common/thermostat-sim.yaml``, which thermostat-yamcs,
@@ -4989,7 +4992,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "c7820f9bfe585feab72247ece0a2261d"
+     interface: "93b26cb0221440317c27e209657a5dcc"
 
 It is the digest of the ``tcslibgs/xtce/link.xtce`` a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -5004,7 +5007,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --interface-digest
-   c7820f9bfe585feab72247ece0a2261d
+   93b26cb0221440317c27e209657a5dcc
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -5015,8 +5018,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to c7820f9bfe585feab72247ece0a2261d, from 0123...
-   vehicle.xtcs: interface is c7820f9bfe585feab72247ece0a2261d already
+   vehicle.ytcs: interface set to 93b26cb0221440317c27e209657a5dcc, from 0123...
+   vehicle.xtcs: interface is 93b26cb0221440317c27e209657a5dcc already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

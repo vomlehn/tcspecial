@@ -53,7 +53,7 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  interface: \"93b26cb0221440317c27e209657a5dcc\"
   beacon: {{ default_interval: \"5 ms\", reset_interval: \"5 ms\", \
   recv: \"{}\", send: \"{}\" }}
   log: {{ directory: \"{}\", segment_size: \"512\" }}

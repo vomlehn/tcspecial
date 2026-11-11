@@ -216,6 +216,12 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
+      <!-- A number in no unit, sent as it is held: what a conversion
+           multiplies by. Not a value type, so no unit and no step. -->
+      <FloatParameterType name="factor" sizeInBits="64"
+          shortDescription="A number to multiply by: a conversion's scale.">
+        <FloatDataEncoding sizeInBits="64" encoding="IEEE754_1985"/>
+      </FloatParameterType>
       <!-- Text and opaque data, at most 4096 bytes, after a 32-bit count. -->
       <StringParameterType name="string">
         <StringDataEncoding encoding="UTF-8">
@@ -261,6 +267,7 @@
       <Parameter name="kilogram_per_second_datum"
           parameterTypeRef="kilogram_per_second"/>
       <Parameter name="ratio_datum" parameterTypeRef="ratio"/>
+      <Parameter name="factor_datum" parameterTypeRef="factor"/>
       <Parameter name="string_datum" parameterTypeRef="string"/>
       <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
       <Parameter name="bytes_datum" parameterTypeRef="bytes"/>
@@ -354,6 +361,11 @@
       <SequenceContainer name="ratio_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="ratio_datum"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="factor_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="factor_datum"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="string_packet">

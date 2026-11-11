@@ -8,8 +8,9 @@ and the enum variant, its short
 description the variant's comment, its unit set the symbol a file writes,
 its calibrator's coefficient the size of a step, and its tcspecial.name and
 tcspecial.step ancillary data what the unit and its step are called in a
-sentence. A value type is a FloatParameterType; nothing else in the
-document is a unit.
+sentence. A value type is a FloatParameterType sent as a count of its
+steps, an IntegerDataEncoding; nothing else in the document is a unit,
+and a FloatParameterType sent as a float, the factor, is not one.
 
 Arguments: the document, and the Rust file to write.
 """
@@ -65,6 +66,8 @@ def units(document):
     for kind in ET.parse(document).getroot().iterfind(
             ".//x:ParameterTypeSet/x:FloatParameterType", X):
         name = kind.get("name")
+        if kind.find("x:IntegerDataEncoding", X) is None:
+            continue
         said = {datum.get("name"): datum.text
                 for datum in kind.iterfind(".//x:AncillaryData", X)}
         term = kind.find(".//x:PolynomialCalibrator/x:Term", X)

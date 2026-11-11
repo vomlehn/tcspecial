@@ -25,6 +25,8 @@ use tcslibgs::{
 
 mod common;
 
+use common::moved_all;
+
 /// The example's spacecraft, and the two processors.
 const SPACECRAFT: u32 = 0x42;
 const OURS: u32 = 2;
@@ -69,26 +71,6 @@ impl Drop for Flying {
         let _ = self.0.kill();
         let _ = self.0.wait();
     }
-}
-
-/// Writes `was` as `now` in `text`, where it appears exactly once.
-///
-/// # Arguments
-///
-/// * `text` - The example's text.
-/// * `was`  - What the example says, which it must say once.
-/// * `now`  - What it is to say instead.
-///
-/// # Returns
-///
-/// The text, with `was` changed to `now`.
-fn moved(text: &str, was: &str, now: &str) -> String {
-    assert_eq!(
-        text.matches(was).count(),
-        1,
-        "the example should say {was} once"
-    );
-    text.replace(was, now)
 }
 
 /// The cFS end of the bus, played by the test.
@@ -267,23 +249,23 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     let socket = bound();
     let heater = bound();
     let thermometer = free();
-    let mut text = text;
-    for (was, now) in [
-        ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:2234", format!("127.0.0.1:{}", port(&socket))),
-        ("\"8601\"", format!("\"{}\"", port(&heater))),
-        ("\"8602\"", format!("\"{thermometer}\"")),
-        (
-            "/tmp/telemetry",
-            dir.path().join("telemetry").display().to_string(),
-        ),
-        (
-            "/tmp/tcspecial-cfs.state",
-            dir.path().join("state").display().to_string(),
-        ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    let text = moved_all(
+        &text,
+        [
+            ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
+            ("127.0.0.1:2234", format!("127.0.0.1:{}", port(&socket))),
+            ("\"8601\"", format!("\"{}\"", port(&heater))),
+            ("\"8602\"", format!("\"{thermometer}\"")),
+            (
+                "/tmp/telemetry",
+                dir.path().join("telemetry").display().to_string(),
+            ),
+            (
+                "/tmp/tcspecial-cfs.state",
+                dir.path().join("state").display().to_string(),
+            ),
+        ],
+    );
     let configuration = dir.path().join("cfs.ytcs");
     std::fs::write(&configuration, &text).expect("written");
     let ident = sbn::ident_of("3b339a5e0f686cef822a5d6ea95004222ab7af33")

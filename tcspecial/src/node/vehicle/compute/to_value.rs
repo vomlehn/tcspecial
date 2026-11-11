@@ -14,7 +14,7 @@
 use tcslibgs::node::vehicle::compute::{Format, ToValueParams};
 use tcslibgs::unit::Unit;
 
-use super::{Function, Out};
+use super::{from_value, Function, Out};
 
 /// Counts to a value: read, scale, offset, in a unit.
 #[derive(Debug)]
@@ -71,6 +71,47 @@ impl Function for ToValue {
         )?))
     }
 
+    /// The scale and the offset, which the ground may command to calibrate
+    /// a sensor again in flight.
+    ///
+    /// The scale is a `factor`, eight bytes of a 64-bit float, and the
+    /// offset a value of the type the conversion sends, as a reading is; see
+    /// `tcslibgs::graph::settings`. The configuration's rules hold here too:
+    /// a scale of nought, or one that is not a finite number, is refused.
+    /// Nothing is half applied, so a refused command leaves the conversion
+    /// running on what it had.
+    fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
+        match attribute {
+            "scale" => {
+                let bytes: [u8; 8] = value.try_into().map_err(|_| {
+                    format!(
+                        "scale: a factor is 8 bytes and {} arrived",
+                        value.len()
+                    )
+                })?;
+                let wanted = f64::from_be_bytes(bytes);
+                if !wanted.is_finite() || wanted == 0.0 {
+                    return Err(format!(
+                        "scale: {wanted} is refused: a scale is a finite \
+                         number, and nought would make every reading the same"
+                    ));
+                }
+                self.scale = wanted;
+            }
+            "offset" => {
+                self.offset = from_value(value, self.unit, attribute)?;
+            }
+            other => {
+                return Err(format!(
+                    "{} has nothing called \"{other}\" to set: there are \
+                     scale and offset",
+                    self.function
+                ))
+            }
+        }
+        Ok(())
+    }
+
     fn name(&self) -> &'static str {
         self.function
     }
@@ -107,6 +148,40 @@ mod tests {
             },
             "to_kelvin",
         )
+    }
+
+    /// The ground's scale and offset take effect on the next reading, and
+    /// what the configuration would refuse is refused, changing nothing.
+    #[test]
+    fn a_scale_and_an_offset_set_from_the_ground_are_used() {
+        let mut f = conversion(Format::I16Be, 0.0625, 273.15);
+        f.set("scale", &0.125f64.to_be_bytes()).expect("a scale");
+        let offset = tcslibgs::node::vehicle::compute::value_bytes(
+            300.0,
+            tcslibgs::unit::Unit::Kelvin,
+        )
+        .expect("an offset");
+        f.set("offset", &offset).expect("an offset");
+        let out = f
+            .give(None, &[0x00, 0x08])
+            .expect("a reading")
+            .expect("a value");
+        let got = from_value(&out, tcslibgs::unit::Unit::Kelvin, "out")
+            .expect("kelvin");
+        assert!((got - 301.0).abs() < 1e-6, "{got}");
+
+        for refused in [0.0, f64::NAN, f64::INFINITY] {
+            f.set("scale", &refused.to_be_bytes()).expect_err("refused");
+        }
+        f.set("scale", &[0; 4]).expect_err("not eight bytes");
+        f.set("format", &[0]).expect_err("not settable");
+        let out = f
+            .give(None, &[0x00, 0x08])
+            .expect("a reading")
+            .expect("a value");
+        let got = from_value(&out, tcslibgs::unit::Unit::Kelvin, "out")
+            .expect("kelvin");
+        assert!((got - 301.0).abs() < 1e-6, "unchanged: {got}");
     }
 
     /// A reading becomes the temperature its datasheet says.

@@ -1198,6 +1198,12 @@ lines, what a thermostat drives a heater's switch with.</dd>
 <tt class="docutils literal">ratio</tt>, each named as one of its unit is: a value as it is today, a 32-bit signed count of the unit's
 step (see <a class="reference internal" href="#compute-elements">Compute elements</a>), stated as an integer encoding with the
 calibrator that makes it the unit and the unit's symbol in its unit set.</dd>
+<dt><tt class="docutils literal">factor</tt></dt>
+<dd>A number in no unit to multiply by: a conversion's <tt class="docutils literal">scale</tt>, which the
+ground may set. A 64-bit IEEE 754 float, sent as it is held, because a
+scale is no count of any step -- an ADC's may be a ten-millionth of a
+volt -- and a factor that is not a finite number is refused. It is the
+one float on a link; no value is one.</dd>
 <dt>Bounded strings and bounded bytes</dt>
 <dd>Text and opaque data, each with the most it may hold, so that a datum of
 either is a buffer of known size and holding one allocates nothing.</dd>
@@ -1542,7 +1548,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c7820f9bfe585feab72247ece0a2261d&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;93b26cb0221440317c27e209657a5dcc&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">
@@ -4440,10 +4446,13 @@ may be set -- an attribute no binding mentions cannot be set, which is what
 makes what the ground can change in flight something written down and
 checkable rather than whatever a computation happens to accept. The node
 must then accept the value, which is where a setpoint that is not of the
-attribute's type, or a band of nought, is refused. Which attributes a
-node takes, and as which type, is <tt class="docutils literal"><span class="pre">tcslibgs::graph::settings</span></tt>'s, and a
-binding naming one the node does not take is refused where the
-configuration is read.</dd>
+attribute's type, a band of nought, or a scale of nought is refused.
+Two computations take settings: a thermostat its <tt class="docutils literal">setpoint</tt> and
+<tt class="docutils literal">half_band</tt>, in the unit it reads, and a conversion its <tt class="docutils literal">offset</tt>, in
+the unit it sends, and its <tt class="docutils literal">scale</tt>, a <tt class="docutils literal">factor</tt>, so that a sensor can
+be calibrated again in flight. Which attributes a node takes, and as
+which type, is <tt class="docutils literal"><span class="pre">tcslibgs::graph::settings</span></tt>'s, and a binding naming one
+the node does not take is refused where the configuration is read.</dd>
 <dt>Requirement</dt>
 <dd>A device accepts no settings. A bus address or a set of line numbers is
 what the configuration said, and a vehicle whose hardware could be

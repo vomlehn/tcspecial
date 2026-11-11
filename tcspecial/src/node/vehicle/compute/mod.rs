@@ -199,10 +199,11 @@ pub trait Function: Send {
     /// Sets one of this function's parameters, as a command from the ground
     /// does.
     ///
-    /// A setpoint arrives this way, and the value is text as everything on a
-    /// link is. Most functions take none: a vote has nothing to set, and a
-    /// conversion's scale is a property of the part rather than something the
-    /// ground changes -- so the default refuses, naming the function, and a
+    /// A setpoint arrives this way, and a conversion's scale and offset, so
+    /// that a sensor can be calibrated again in flight; each value is a datum
+    /// of the attribute's type, in its own encoding (see
+    /// `tcslibgs::graph::settings`). Other functions take none: a vote has
+    /// nothing to set -- so the default refuses, naming the function, and a
     /// function that does take settings says which.
     ///
     /// What a command may set is in the configuration as a binding, and the
@@ -213,7 +214,7 @@ pub trait Function: Send {
     /// # Arguments
     ///
     /// * `attribute` - The parameter's name.
-    /// * `_value`    - Its new value, as text.
+    /// * `_value`    - Its new value, in its type's encoding.
     ///
     /// # Returns
     ///

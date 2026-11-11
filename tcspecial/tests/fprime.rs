@@ -18,6 +18,8 @@ use tcslibgs::graph::Graph;
 
 mod common;
 
+use common::moved_all;
+
 /// Binds a socket on a loopback port nothing holds.
 ///
 /// # Returns
@@ -53,32 +55,6 @@ impl Drop for Flying {
         let _ = self.0.kill();
         let _ = self.0.wait();
     }
-}
-
-/// Writes `was` as `now` in `text`, where it appears exactly once: a
-/// socket the example stops naming is a test that no longer moves it, and
-/// would bind the example's own port.
-///
-/// # Arguments
-///
-/// * `text` - The example's configuration.
-/// * `was`  - What it says now, which must appear exactly once.
-/// * `now`  - What to say instead.
-///
-/// # Returns
-///
-/// `text` with the one `was` replaced by `now`.
-///
-/// # Panics
-///
-/// If `text` does not say `was` exactly once.
-fn moved(text: &str, was: &str, now: &str) -> String {
-    assert_eq!(
-        text.matches(was).count(),
-        1,
-        "the example should say {was} once"
-    );
-    text.replace(was, now)
 }
 
 /// Sends `datum` to `to` until something arrives at `at`, which is how
@@ -153,27 +129,27 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     // The ground's command link: where tcs_cmd.send says it sends from,
     // and where tcs_cmd.recv says tcspecial takes them.
     let (commands, take_at) = (bound(), free());
-    let mut text = text;
-    for (was, now) in [
-        ("\"9001\"", format!("\"{}\"", port(&heater))),
-        ("\"9002\"", format!("\"{thermometer}\"")),
-        ("\"9600\"", format!("\"{uplink}\"")),
-        ("127.0.0.1:9700", format!("127.0.0.1:{base}")),
-        ("127.0.0.1:9510", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9500", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9300", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:9310", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:9410", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9400", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9200", format!("127.0.0.1:{take_at}")),
-        ("127.0.0.1:9210", format!("127.0.0.1:{}", port(&commands))),
-        (
-            "/tmp/telemetry",
-            dir.path().join("telemetry").display().to_string(),
-        ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    let text = moved_all(
+        &text,
+        [
+            ("\"9001\"", format!("\"{}\"", port(&heater))),
+            ("\"9002\"", format!("\"{thermometer}\"")),
+            ("\"9600\"", format!("\"{uplink}\"")),
+            ("127.0.0.1:9700", format!("127.0.0.1:{base}")),
+            ("127.0.0.1:9510", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:9500", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:9300", format!("127.0.0.1:{}", free())),
+            ("127.0.0.1:9310", format!("127.0.0.1:{}", free())),
+            ("127.0.0.1:9410", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:9400", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:9200", format!("127.0.0.1:{take_at}")),
+            ("127.0.0.1:9210", format!("127.0.0.1:{}", port(&commands))),
+            (
+                "/tmp/telemetry",
+                dir.path().join("telemetry").display().to_string(),
+            ),
+        ],
+    );
     let configuration = dir.path().join("fprime.ytcs");
     std::fs::write(&configuration, &text).expect("written");
 

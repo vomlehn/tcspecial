@@ -6,18 +6,24 @@
 //! thermostat's `setpoint` as the value type its `type-in` is, four bytes of
 //! a count of the unit's steps -- and not as text. So a value the ground
 //! sends is held to its type as every datum on a link is, and refused by its
-//! width before anything reads it. Only a thermostat takes settings: its
-//! `setpoint` and its `half_band`, each in the unit of what it reads. A
-//! binding naming anything else is refused where the configuration is read.
+//! width before anything reads it. Two computations take settings: a
+//! thermostat its `setpoint` and its `half_band`, each in the unit of what it
+//! reads, and a conversion (`to_kelvin`, `to_value`) its `scale`, a `factor`,
+//! and its `offset`, in the unit of what it sends. A binding naming anything
+//! else is refused where the configuration is read.
 //! See "Typed links" in `docs/design.rst`.
 
 use super::{Destination, Graph, Node};
 use crate::link_text::read_text;
-use crate::link_type::LinkType;
-use crate::node::vehicle::compute::stated_type;
+use crate::link_type::{Basic, LinkType};
+use crate::node::vehicle::compute::{stated_type, value_type};
+use crate::unit::Unit;
 
 /// What a thermostat takes from the ground.
 const THERMOSTAT_SETS: [&str; 2] = ["setpoint", "half_band"];
+
+/// What a conversion takes from the ground.
+const CONVERSION_SETS: [&str; 2] = ["scale", "offset"];
 
 /// Says what type an attribute of a node is set from the ground as.
 ///
@@ -28,26 +34,45 @@ const THERMOSTAT_SETS: [&str; 2] = ["setpoint", "half_band"];
 ///
 /// # Returns
 ///
-/// Its type: for a thermostat's `setpoint` and `half_band`, its `type-in`.
+/// Its type: for a thermostat's `setpoint` and `half_band`, its `type-in`;
+/// for a conversion's `scale`, a `factor`, and for its `offset`, the value
+/// type it sends.
 ///
 /// # Errors
 ///
 /// A message naming the node where it takes no such setting, or the type it
 /// would be cannot be read.
 pub fn type_of(node: &Node, attribute: &str) -> Result<LinkType, String> {
-    let thermostat = node.node_type == "compute"
-        && node
-            .attributes
-            .get("function")
-            .is_some_and(|said| said.as_str() == "thermostat");
-    if thermostat && THERMOSTAT_SETS.contains(&attribute) {
-        return stated_type(&node.attributes, "type-in")
-            .map_err(|why| format!("\"{}\": {why}", node.name));
+    let function = (node.node_type == "compute")
+        .then(|| node.attributes.get("function"))
+        .flatten()
+        .map(|said| said.as_str());
+    let named = |why: String| format!("\"{}\": {why}", node.name);
+    match function {
+        Some("thermostat") if THERMOSTAT_SETS.contains(&attribute) => {
+            return stated_type(&node.attributes, "type-in").map_err(named);
+        }
+        Some("to_kelvin" | "to_value") if attribute == "scale" => {
+            return Ok(LinkType::Basic(Basic::Factor));
+        }
+        Some("to_kelvin") if attribute == "offset" => {
+            return Ok(LinkType::Basic(Basic::Value(Unit::Kelvin)));
+        }
+        Some("to_value") if attribute == "offset" => {
+            return value_type(&node.attributes, "type-out")
+                .map(|unit| LinkType::Basic(Basic::Value(unit)))
+                .map_err(named);
+        }
+        _ => {}
     }
-    let takes = if thermostat {
-        format!("a thermostat takes {}", THERMOSTAT_SETS.join(" and "))
-    } else {
-        "only a thermostat takes settings".to_string()
+    let takes = match function {
+        Some("thermostat") => {
+            format!("a thermostat takes {}", THERMOSTAT_SETS.join(" and "))
+        }
+        Some("to_kelvin" | "to_value") => {
+            format!("a conversion takes {}", CONVERSION_SETS.join(" and "))
+        }
+        _ => "only a thermostat and a conversion take settings".to_string(),
     };
     Err(format!(
         "\"{}\" has nothing called \"{attribute}\" the ground may set: \
@@ -173,17 +198,40 @@ mod tests {
         assert!(problems(&graph).is_empty(), "{:?}", problems(&graph));
     }
 
+    /// A conversion's scale is a factor, sent as its eight bytes, and its
+    /// offset the value type it sends: a to_kelvin's, kelvin.
+    #[test]
+    fn a_conversions_scale_is_a_factor_and_its_offset_its_value() {
+        let graph = thermostat();
+        assert_eq!(of(&graph, "to_k1", "scale"), LinkType::of("factor"));
+        assert_eq!(
+            encoded(&graph, "to_k1", "scale", "0.0625"),
+            Ok(0.0625f64.to_be_bytes().to_vec())
+        );
+        assert_eq!(of(&graph, "to_k1", "offset"), LinkType::of("kelvin"));
+        assert_eq!(
+            encoded(&graph, "to_k1", "offset", "273.15"),
+            Ok(273_150_000i32.to_be_bytes().to_vec())
+        );
+        let mut graph = graph;
+        graph.commands[0].sets = "to_k1.scale".to_string();
+        assert!(problems(&graph).is_empty(), "{:?}", problems(&graph));
+    }
+
     /// What no node takes, and text that is not a value, are refused.
     #[test]
     fn what_cannot_be_set_is_refused() {
         let graph = thermostat();
         let why = of(&graph, "thermostat", "type-out").expect_err("no");
         assert!(why.contains("setpoint and half_band"), "{why}");
-        let why = of(&graph, "to_k1", "scale").expect_err("no");
-        assert!(why.contains("only a thermostat"), "{why}");
+        let why = of(&graph, "to_k1", "type-in").expect_err("no");
+        assert!(why.contains("scale and offset"), "{why}");
+        let why = of(&graph, "consensus_temp", "age").expect_err("no");
+        assert!(why.contains("only a thermostat and a conversion"), "{why}");
         assert!(encoded(&graph, "thermostat", "setpoint", "warm").is_err());
+        assert!(encoded(&graph, "to_k1", "scale", "inf").is_err());
         let mut graph = graph;
-        graph.commands[0].sets = "to_k1.scale".to_string();
+        graph.commands[0].sets = "to_k1.type-in".to_string();
         let found = problems(&graph);
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].0, "to_k1");

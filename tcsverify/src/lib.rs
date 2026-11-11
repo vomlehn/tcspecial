@@ -1640,7 +1640,7 @@ mod tests {
 
     const SOUND_GRAPH: &str = "tcspecial:
   gateway: radio
-  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  interface: \"93b26cb0221440317c27e209657a5dcc\"
   state_file: /tmp/tcspecial-test.state
   tcs_cmd:
     recv: 0.0.0.0:4000
@@ -1989,7 +1989,7 @@ gateways:
     const GOOD: &str = "description: two payloads
 tcspecial:
   gateway: radio
-  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  interface: \"93b26cb0221440317c27e209657a5dcc\"
   state_file: /tmp/tcspecial-test.state
   beacon:
     default_interval: \"5 s\"

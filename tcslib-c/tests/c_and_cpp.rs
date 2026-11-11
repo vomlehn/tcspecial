@@ -201,7 +201,7 @@ fn against_a_vehicle(program: &Path) -> String {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  interface: \"93b26cb0221440317c27e209657a5dcc\"
   beacon:
     default_interval: \"5 s\"
     recv: \"127.0.0.1:{beacons}\"

@@ -137,55 +137,59 @@ impl Flown {
             let mut written = text.clone();
             let (commands, take_at, uplink) =
                 (common::bound(), common::free(), common::free());
-            for (was, now) in [
-                (
-                    format!("0.0.0.0:{}", at(3200)),
-                    format!("127.0.0.1:{take_at}"),
-                ),
-                (
-                    format!("127.0.0.1:{}", at(3210)),
-                    format!("127.0.0.1:{}", common::port(&commands)),
-                ),
-                (
-                    format!("0.0.0.0:{}", at(3300)),
-                    format!("127.0.0.1:{}", common::free()),
-                ),
-                (
-                    format!("127.0.0.1:{}", at(3310)),
-                    format!("127.0.0.1:{}", common::free()),
-                ),
-                (
-                    format!("0.0.0.0:{}", at(3400)),
-                    format!("127.0.0.1:{}", common::free()),
-                ),
-                (
-                    format!("127.0.0.1:{}", at(3410)),
-                    format!("127.0.0.1:{}", common::free()),
-                ),
-                (
-                    format!("0.0.0.0:{}", at(3500)),
-                    format!("127.0.0.1:{}", common::free()),
-                ),
-                (
-                    format!("127.0.0.1:{}", at(3510)),
-                    format!("127.0.0.1:{}", common::free()),
-                ),
-                (format!("\"{}\"", at(3600)), format!("\"{uplink}\"")),
-                (
-                    format!("\"127.0.0.1:{}\"", at(3700)),
-                    format!("\"127.0.0.1:{}\"", common::free()),
-                ),
-                (
-                    "/tmp/telemetry".to_string(),
-                    dir.path().join("telemetry").display().to_string(),
-                ),
-                (
-                    format!("/tmp/tcspecial-{name}.state"),
-                    dir.path().join("tcspecial.state").display().to_string(),
-                ),
-            ] {
-                written = common::moved(&written, &was, &now);
-            }
+            written = common::moved_all(
+                &written,
+                [
+                    (
+                        format!("0.0.0.0:{}", at(3200)),
+                        format!("127.0.0.1:{take_at}"),
+                    ),
+                    (
+                        format!("127.0.0.1:{}", at(3210)),
+                        format!("127.0.0.1:{}", common::port(&commands)),
+                    ),
+                    (
+                        format!("0.0.0.0:{}", at(3300)),
+                        format!("127.0.0.1:{}", common::free()),
+                    ),
+                    (
+                        format!("127.0.0.1:{}", at(3310)),
+                        format!("127.0.0.1:{}", common::free()),
+                    ),
+                    (
+                        format!("0.0.0.0:{}", at(3400)),
+                        format!("127.0.0.1:{}", common::free()),
+                    ),
+                    (
+                        format!("127.0.0.1:{}", at(3410)),
+                        format!("127.0.0.1:{}", common::free()),
+                    ),
+                    (
+                        format!("0.0.0.0:{}", at(3500)),
+                        format!("127.0.0.1:{}", common::free()),
+                    ),
+                    (
+                        format!("127.0.0.1:{}", at(3510)),
+                        format!("127.0.0.1:{}", common::free()),
+                    ),
+                    (format!("\"{}\"", at(3600)), format!("\"{uplink}\"")),
+                    (
+                        format!("\"127.0.0.1:{}\"", at(3700)),
+                        format!("\"127.0.0.1:{}\"", common::free()),
+                    ),
+                    (
+                        "/tmp/telemetry".to_string(),
+                        dir.path().join("telemetry").display().to_string(),
+                    ),
+                    (
+                        format!("/tmp/tcspecial-{name}.state"),
+                        dir.path()
+                            .join("tcspecial.state")
+                            .display()
+                            .to_string(),
+                    ),
+                ],
+            );
             let (was, now, times) = device;
             written = common::moved_each(&written, was, now, times);
             for (was, now) in changed {

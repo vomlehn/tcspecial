@@ -248,6 +248,47 @@ pub fn moved(text: &str, was: &str, now: &str) -> String {
     moved_each(text, was, now, 1)
 }
 
+/// Writes each `was` as its `now` in `text`, where each appears exactly
+/// once, as [`moved`] does.
+///
+/// Each is moved to a marker first, and only then each marker to where it
+/// goes: a port found free can begin with the digits of one moved after it,
+/// 33101 with 3310, which a second look would find twice.
+///
+/// # Arguments
+///
+/// * `text`  - The example's configuration.
+/// * `moves` - Each `was`, which must appear exactly once, and its `now`.
+///
+/// # Returns
+///
+/// `text` with every `was` replaced by its `now`.
+///
+/// # Panics
+///
+/// If `text` does not say a `was` exactly once.
+#[allow(dead_code)]
+pub fn moved_all<W, N>(
+    text: &str,
+    moves: impl IntoIterator<Item = (W, N)>,
+) -> String
+where
+    W: AsRef<str>,
+    N: AsRef<str>,
+{
+    let mut text = text.to_string();
+    let mut nows = Vec::new();
+    for (each, (was, now)) in moves.into_iter().enumerate() {
+        let marker = format!("\u{0}{each}\u{0}");
+        text = moved(&text, was.as_ref(), &marker);
+        nows.push((marker, now));
+    }
+    for (marker, now) in nows {
+        text = text.replace(&marker, now.as_ref());
+    }
+    text
+}
+
 /// Writes `was` as `now` in `text`, where it appears exactly `times` times:
 /// for what several nodes of an example name alike, such as the one bus two
 /// payloads are on.

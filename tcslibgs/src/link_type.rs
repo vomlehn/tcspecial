@@ -30,6 +30,9 @@ pub enum Basic {
     Boolean,
     /// A value in a unit: a 32-bit count of the unit's step.
     Value(Unit),
+    /// A number in no unit to multiply by, a conversion's scale: a 64-bit
+    /// IEEE 754 float, finite.
+    Factor,
     /// Text, at most 4096 bytes of it.
     String,
     /// Opaque data, at most 4096 bytes of it.
@@ -61,6 +64,7 @@ impl Basic {
     pub fn of(said: &str) -> Option<Basic> {
         match said {
             "boolean" => Some(Basic::Boolean),
+            "factor" => Some(Basic::Factor),
             "string" => Some(Basic::String),
             "bytes" => Some(Basic::Bytes),
             _ => WHOLE
@@ -79,6 +83,7 @@ impl Basic {
     pub fn name(self) -> &'static str {
         match self {
             Basic::Boolean => "boolean",
+            Basic::Factor => "factor",
             Basic::String => "string",
             Basic::Bytes => "bytes",
             Basic::Value(unit) => unit.type_name(),
@@ -142,6 +147,7 @@ impl Basic {
         match self {
             Basic::Boolean => Some(1),
             Basic::Value(_) => Some(4),
+            Basic::Factor => Some(8),
             Basic::String | Basic::Bytes => None,
             whole => whole.bits().map(|bits| bits as usize / 8),
         }
@@ -157,6 +163,7 @@ impl Basic {
             WHOLE.iter().map(|(_, name)| *name).collect();
         names.push("boolean");
         names.extend(Unit::ALL.iter().map(|unit| unit.type_name()));
+        names.push("factor");
         names.push("string");
         names.push("bytes");
         names.join(", ")
@@ -266,7 +273,7 @@ impl LinkType {
     /// # Errors
     ///
     /// A message saying what the datum should have been: a width it is not,
-    /// a boolean that is neither 1 nor 0, text that is not UTF-8, or more
+    /// a boolean that is neither 1 nor 0, a factor that is not a finite number, text that is not UTF-8, or more
     /// than a string or bytes may hold.
     pub fn accepts(&self, data: &[u8]) -> Result<(), String> {
         let fields: &[(String, Basic)] = match self {
@@ -432,6 +439,21 @@ pub fn uncounted(packet: &[u8], count: Count) -> Result<usize, String> {
     Ok(start)
 }
 
+/// Reads a factor's eight bytes, most significant first.
+///
+/// # Arguments
+///
+/// * `data` - The eight bytes.
+///
+/// # Returns
+///
+/// The number.
+fn factor_of(data: &[u8]) -> f64 {
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(data);
+    f64::from_be_bytes(bytes)
+}
+
 /// Says whether these bytes are a datum of one of `types.xtce`'s types: see
 /// [`LinkType::accepts`].
 ///
@@ -456,6 +478,12 @@ fn basic_accepts(basic: Basic, data: &[u8]) -> Result<(), String> {
         )),
         Some(_) if basic == Basic::Boolean && data[0] > 1 => {
             Err(format!("a boolean is 1 or 0 and {} arrived", data[0]))
+        }
+        Some(_) if basic == Basic::Factor && !factor_of(data).is_finite() => {
+            Err(format!(
+                "a factor is a finite number and {} arrived",
+                factor_of(data)
+            ))
         }
         Some(_) => Ok(()),
         None if data.len() > MOST_BYTES => Err(format!(
@@ -556,6 +584,9 @@ mod tests {
         assert!(of("kelvin").accepts(&[0, 0, 0, 1]).is_ok());
         assert!(of("boolean").accepts(&[1]).is_ok());
         assert!(of("boolean").accepts(&[2]).is_err());
+        assert!(of("factor").accepts(&0.0625f64.to_be_bytes()).is_ok());
+        assert!(of("factor").accepts(&f64::NAN.to_be_bytes()).is_err());
+        assert!(of("factor").accepts(&[0; 4]).is_err());
         assert!(of("string").accepts(b"ping #1").is_ok());
         assert!(of("string").accepts(&[0xff]).is_err());
         assert!(of("bytes").accepts(&[0xff; 4096]).is_ok());

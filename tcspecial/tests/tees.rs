@@ -17,7 +17,7 @@ use tcslibgs::graph::Graph;
 
 mod common;
 
-use common::{bound, free, moved, port};
+use common::{bound, free, moved_all, port};
 
 /// Sends `datum` to `to` until something arrives at `at`, which is how
 /// long tcspecial takes to start.
@@ -105,28 +105,28 @@ fn a_tee_sends_each_datum_both_ways() {
     // The ground's command link: where tcs_cmd.send says it sends from,
     // and where tcs_cmd.recv says tcspecial takes them.
     let (commands, take_at) = (bound(), free());
-    let mut text = text;
-    for (was, now) in [
-        ("\"8001\"", format!("\"{}\"", port(&heater))),
-        ("\"8002\"", format!("\"{sensor}\"")),
-        ("\"8003\"", format!("\"{}\"", free())),
-        ("\"8600\"", format!("\"{uplink}\"")),
-        ("127.0.0.1:8700", format!("127.0.0.1:{base}")),
-        ("127.0.0.1:8510", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8500", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8300", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:8310", format!("127.0.0.1:{}", free())),
-        ("127.0.0.1:8410", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8400", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8200", format!("127.0.0.1:{take_at}")),
-        ("127.0.0.1:8210", format!("127.0.0.1:{}", port(&commands))),
-        (
-            "/tmp/telemetry",
-            dir.path().join("telemetry").display().to_string(),
-        ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    let text = moved_all(
+        &text,
+        [
+            ("\"8001\"", format!("\"{}\"", port(&heater))),
+            ("\"8002\"", format!("\"{sensor}\"")),
+            ("\"8003\"", format!("\"{}\"", free())),
+            ("\"8600\"", format!("\"{uplink}\"")),
+            ("127.0.0.1:8700", format!("127.0.0.1:{base}")),
+            ("127.0.0.1:8510", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:8500", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:8300", format!("127.0.0.1:{}", free())),
+            ("127.0.0.1:8310", format!("127.0.0.1:{}", free())),
+            ("127.0.0.1:8410", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:8400", format!("127.0.0.1:{}", free())),
+            ("0.0.0.0:8200", format!("127.0.0.1:{take_at}")),
+            ("127.0.0.1:8210", format!("127.0.0.1:{}", port(&commands))),
+            (
+                "/tmp/telemetry",
+                dir.path().join("telemetry").display().to_string(),
+            ),
+        ],
+    );
     let configuration = dir.path().join("tees.ytcs");
     std::fs::write(&configuration, &text).expect("written");
 

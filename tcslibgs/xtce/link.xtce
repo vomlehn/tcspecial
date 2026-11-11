@@ -247,8 +247,14 @@
           <ValidRange minInclusive="0" maxInclusive="256"/>
         </ValidRangeSet>
       </IntegerArgumentType>
-      <!-- And the value, which is bytes and not text. -->
-      <BinaryArgumentType name="ValueArg">
+      <!-- And the value: a datum of the attribute's type, in that type's
+           own encoding as types.xtce states it, and not text. A
+           thermostat's setpoint is the value type its type-in is: four
+           bytes of a count of the unit's steps. Which type is the configuration's
+           to say: tcslibgs/src/graph/settings.rs, and each binding's command
+           in the configuration's own XTCE. -->
+      <BinaryArgumentType name="ValueArg"
+          shortDescription="An attribute's value, in its type's encoding.">
         <BinaryDataEncoding>
           <SizeInBits>
             <DynamicValue>

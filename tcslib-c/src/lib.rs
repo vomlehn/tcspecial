@@ -1941,6 +1941,79 @@ unsafe fn target_of(
     })
 }
 
+/// Writes a setting's value as SET_NODE carries it: a datum of the type the
+/// configuration sets the attribute as, in that type's own encoding, read
+/// from text as an operator types it -- a thermostat's setpoint, `293.15`, as
+/// four bytes of micro-kelvin. See `tcslibgs::graph::settings`.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `node`          - The node's name.
+/// * `attribute`     - The attribute's name.
+/// * `text`          - The value, as text.
+/// * `value`         - Where the value is written: room for
+///                     `TCS_VALUE_BYTES`.
+/// * `length`        - Where how many bytes it is is written.
+///
+/// # Returns
+///
+/// 0, or -1 where the node takes no such setting, the text is not a value of
+/// its type, or an argument is NULL.
+///
+/// # Safety
+///
+/// `configuration` NULL or one [`tcs_configuration_open`] gave and not yet
+/// closed; `node`, `attribute` and `text` NULL or NUL-terminated strings;
+/// `value` NULL or writable for `TCS_VALUE_BYTES`; `length` NULL or
+/// writable.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_configuration_setting(
+    configuration: *const tcs_configuration,
+    node: *const c_char,
+    attribute: *const c_char,
+    text: *const c_char,
+    value: *mut u8,
+    length: *mut usize,
+) -> c_int {
+    guard(-1, || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let node = text_of(node, "the node's name")?;
+        let attribute = text_of(attribute, "the attribute's name")?;
+        let text = text_of(text, "the value")?;
+        let out = out_of(length, "the length")?;
+        if value.is_null() {
+            return Err(fail("the value is NULL"));
+        }
+        // Allocates: a station turns what an operator typed into a value
+        // as it is typed, and not as data moves.
+        let encoded = tcslibgs::graph::settings::encoded(
+            &configuration.graph,
+            node,
+            attribute,
+            text,
+        )
+        .map_err(fail)?;
+        if encoded.len() > tcslibgs::VALUE_BYTES {
+            return Err(fail(format_args!(
+                "{} bytes are more than a SET_NODE carries",
+                encoded.len()
+            )));
+        }
+        // SAFETY: the caller gives room for TCS_VALUE_BYTES at `value`,
+        // which `encoded` is no longer than, and it is not NULL.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                encoded.as_ptr(),
+                value,
+                encoded.len(),
+            );
+        }
+        *out = encoded.len();
+        Ok(0)
+    })
+}
+
 /// Sends SET_NODE, to set an attribute of a node, and keeps the vehicle's
 /// reason for [`tcs_client_reason`].
 ///
@@ -1949,7 +2022,9 @@ unsafe fn target_of(
 /// * `client`    - The client.
 /// * `node`      - The node's id.
 /// * `attribute` - The attribute's name.
-/// * `value`     - The value's bytes.
+/// * `value`     - The value's bytes: a datum of the attribute's type, in
+///                 its own encoding, as [`tcs_configuration_setting`]
+///                 writes it from text.
 /// * `length`    - How many bytes `value` holds.
 /// * `status`    - Where what the vehicle answered is written.
 ///
@@ -2516,6 +2591,50 @@ mod tests {
             )
         };
         assert_eq!(said, -1, "not a unit");
+    }
+
+    /// A setting's value is written as its type: the thermostat's setpoint
+    /// as a kelvin, four bytes of micro-kelvin; and what the node does not
+    /// take, or text that is not a value, is refused.
+    #[test]
+    fn a_setting_is_written_as_its_type() {
+        use super::*;
+
+        let path = CString::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../examples/thermostat/thermostat.ytcs"
+        ))
+        .expect("a path");
+        // SAFETY: a NUL-terminated path that outlives the call.
+        let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
+        assert!(!configuration.is_null(), "the example opens");
+        let mut value = [0u8; tcslibgs::VALUE_BYTES];
+        let mut length = 0usize;
+        for (attribute, text, wanted) in [
+            (c"setpoint", c"293.15", 0),
+            (c"setpoint", c"warm", -1),
+            (c"type-out", c"1", -1),
+        ] {
+            // SAFETY: a live configuration, NUL-terminated strings, room for
+            // VALUE_BYTES and a writable length.
+            let said = unsafe {
+                tcs_configuration_setting(
+                    configuration,
+                    c"thermostat".as_ptr(),
+                    attribute.as_ptr(),
+                    text.as_ptr(),
+                    value.as_mut_ptr(),
+                    &mut length,
+                )
+            };
+            assert_eq!(said, wanted, "{attribute:?} {text:?}");
+        }
+        // SAFETY: made by tcs_configuration_open and not yet closed.
+        unsafe { tcs_configuration_close(configuration) };
+        let kelvin =
+            tcslibgs::node::vehicle::compute::value_bytes(293.15, Unit::Kelvin)
+                .expect("a temperature");
+        assert_eq!(&value[..length], kelvin);
     }
 
     /// Which nodes send values is the configuration's: in the thermostat

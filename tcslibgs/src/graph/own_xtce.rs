@@ -13,6 +13,13 @@
 //! gateway frames what it sends -- a CCSDS header and an APID under Yamcs, a
 //! port of its own over a radio -- is the ground station's to add.
 //!
+//! Each attribute a command binding sets is a command, `set_<node>_<attribute>`,
+//! laid out as the `SET_NODE` that sets it is, the whole of the datagram:
+//! the opcode, the sequence the ground gives it, the node's device id and
+//! the attribute's name, each fixed, and the value, an argument of the
+//! attribute's type copied from `types.xtce` (see
+//! [`crate::graph::settings`]).
+//!
 //! `tcsverify --xtce` writes it beside the configuration, and `make check`
 //! fails when one committed there is not what it would write: everything it
 //! says is said by the configuration and `types.xtce` already, and nobody
@@ -77,8 +84,181 @@ pub fn written(graph: &Graph, name: &str) -> Result<String, String> {
     parameters(&mut out, &sources);
     containers(&mut out, &sources);
     let _ = writeln!(out, "{INDENT}</TelemetryMetaData>");
+    commands(&mut out, graph)?;
     out.push_str("</SpaceSystem>\n");
     Ok(out)
+}
+
+/// The type a command's sequence is: what `link.xtce` sends it as.
+const SEQUENCE_TYPE: Basic = Basic::U32;
+
+/// Writes a command for each attribute a binding sets, where there is one.
+///
+/// # Arguments
+///
+/// * `out`   - Where they are written.
+/// * `graph` - The configuration.
+///
+/// # Errors
+///
+/// A message where `types.xtce` does not state a type to copy, or a setting
+/// is of a type with no width of its own, which a command here cannot lay
+/// out: no node takes one.
+fn commands(out: &mut String, graph: &Graph) -> Result<(), String> {
+    // Each attribute once, by its node and name: one bound from two
+    // gateway nodes is one thing the ground may set. One the node does not
+    // take is the configuration's check's to refuse.
+    let mut bound: BTreeMap<(String, String), Basic> = BTreeMap::new();
+    for binding in &graph.commands {
+        let target = binding.target();
+        let Some(attribute) = target.input else {
+            continue;
+        };
+        let Ok(kind) = super::settings::of(graph, &target.node, &attribute)
+        else {
+            continue;
+        };
+        let basic = match kind {
+            LinkType::Basic(basic) if basic.width().is_some() => basic,
+            other => {
+                return Err(format!(
+                    "\"{}.{attribute}\" is set as {other}, and a command here \
+                     lays out a value of a type with a width of its own",
+                    target.node
+                ))
+            }
+        };
+        bound.insert((target.node, attribute), basic);
+    }
+    if bound.is_empty() {
+        return Ok(());
+    }
+    let ids = telemetry::ids(graph);
+
+    let level = INDENT.repeat(2);
+    let inner = INDENT.repeat(3);
+    let _ = writeln!(out, "{INDENT}<CommandMetaData>");
+    let _ = writeln!(out, "{level}<ArgumentTypeSet>");
+    let mut used: Vec<Basic> = bound.values().copied().collect();
+    used.push(SEQUENCE_TYPE);
+    for (element, copied) in copied_types()? {
+        if used.iter().any(|basic| basic.name() == element) {
+            out.push_str(&as_argument_type(&copied));
+        }
+    }
+    let _ = writeln!(out, "{level}</ArgumentTypeSet>");
+    let _ = writeln!(out, "{level}<MetaCommandSet>");
+    let opcode = crate::CommandType::SetNode.to_u8();
+    for ((node, attribute), basic) in &bound {
+        let name = format!("set_{node}_{attribute}");
+        let id = ids.get(node).copied().unwrap_or_default();
+        let width = basic.width().expect("a width, checked above");
+        let mut said = format!("{:02X}", attribute.len());
+        for byte in attribute.bytes() {
+            let _ = write!(said, "{byte:02X}");
+        }
+        let entries = INDENT.repeat(6);
+        let _ = writeln!(out, "{inner}<MetaCommand name=\"{name}\">");
+        let _ = writeln!(out, "{inner}{INDENT}<ArgumentList>");
+        for (argument, kind) in
+            [("Sequence", SEQUENCE_TYPE.name()), ("Value", basic.name())]
+        {
+            let _ = writeln!(
+                out,
+                "{inner}{INDENT}{INDENT}<Argument name=\"{argument}\" \
+                 argumentTypeRef=\"{kind}\"/>"
+            );
+        }
+        let _ = writeln!(out, "{inner}{INDENT}</ArgumentList>");
+        let container = format!("{name}_packet");
+        if inner.len() + INDENT.len() + container.len() + 30 <= 80 {
+            let _ = writeln!(
+                out,
+                "{inner}{INDENT}<CommandContainer name=\"{container}\">"
+            );
+        } else {
+            let _ = writeln!(
+                out,
+                "{inner}{INDENT}<CommandContainer\n\
+                 {inner}{INDENT}{INDENT}{INDENT}name=\"{container}\">"
+            );
+        }
+        let _ = writeln!(out, "{inner}{INDENT}{INDENT}<EntryList>");
+        fixed(out, &entries, "Opcode", &format!("{opcode:02X}"), 8);
+        let _ = writeln!(
+            out,
+            "{entries}<ArgumentRefEntry argumentRef=\"Sequence\"/>"
+        );
+        fixed(out, &entries, "Node", &format!("{id:08X}"), 32);
+        fixed(out, &entries, "Attribute", &said, 8 * (1 + attribute.len()));
+        fixed(out, &entries, "ValueLength", &format!("{width:04X}"), 16);
+        let _ =
+            writeln!(out, "{entries}<ArgumentRefEntry argumentRef=\"Value\"/>");
+        let _ = writeln!(out, "{inner}{INDENT}{INDENT}</EntryList>");
+        let _ = writeln!(out, "{inner}{INDENT}</CommandContainer>");
+        let _ = writeln!(out, "{inner}</MetaCommand>");
+    }
+    let _ = writeln!(out, "{level}</MetaCommandSet>");
+    let _ = writeln!(out, "{INDENT}</CommandMetaData>");
+    Ok(())
+}
+
+/// Writes an entry of a command that is always the same bits.
+///
+/// # Arguments
+///
+/// * `out`   - Where it is written.
+/// * `at`    - Its indent.
+/// * `name`  - What it is.
+/// * `value` - Its bits, in hexadecimal.
+/// * `bits`  - How many there are.
+fn fixed(out: &mut String, at: &str, name: &str, value: &str, bits: usize) {
+    let one_line = format!(
+        "{at}<FixedValueEntry name=\"{name}\" binaryValue=\"{value}\" \
+         sizeInBits=\"{bits}\"/>"
+    );
+    if one_line.len() <= 80 {
+        let _ = writeln!(out, "{one_line}");
+    } else {
+        // An attribute's name may be long: its value goes on lines of its
+        // own, as a long value does in a hand-written file.
+        let _ = writeln!(
+            out,
+            "{at}<FixedValueEntry name=\"{name}\" sizeInBits=\"{bits}\"\n\
+             {at}{INDENT}{INDENT}binaryValue=\"{value}\"/>"
+        );
+    }
+}
+
+/// Turns one of `types.xtce`'s parameter types into the argument type of
+/// the same name: the same encoding, units and calibration, as a command's
+/// argument is a datum of the type a link carries.
+///
+/// # Arguments
+///
+/// * `copied` - The parameter type's element, as `types.xtce` writes it.
+///
+/// # Returns
+///
+/// The argument type's element.
+fn as_argument_type(copied: &str) -> String {
+    let mut out = String::with_capacity(copied.len());
+    for line in copied.lines() {
+        let trimmed = line.trim_start();
+        let changed = if trimmed.starts_with('<')
+            && trimmed
+                .split([' ', '>'])
+                .next()
+                .is_some_and(|tag| tag.ends_with("ParameterType"))
+        {
+            line.replacen("ParameterType", "ArgumentType", 1)
+        } else {
+            line.to_string()
+        };
+        out.push_str(&changed);
+        out.push('\n');
+    }
+    out
 }
 
 /// Writes the declaration, the comment that says what the document is, and
@@ -96,6 +276,8 @@ fn head(out: &mut String, name: &str) {
 <!-- What the vehicle sends the ground, flying the configuration
      {name}: each node whose data reaches it, as a parameter named
      for the node, of the type the node sends, in a container of its own.
+     Each attribute a command binding sets is a command, as the SET_NODE
+     that sets it goes, its value an argument of the attribute's type.
      The types are tcslibgs/xtce/types.xtce's, copied: a string or bytes
      after a 32-bit count of its bytes, as each is sent where the ground
      decodes it by XTCE (under Yamcs). Where no XTCE decodes it, the count
@@ -344,6 +526,77 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         Graph::load(root.join("examples/thermostat/thermostat.ytcs"))
             .expect("the example reads")
+    }
+
+    /// A binding's command is the SET_NODE that sets it, whole: its value an
+    /// argument of the type the thermostat's setpoint is, a kelvin.
+    #[test]
+    fn a_binding_is_its_set_node() {
+        let written = written(&thermostat(), "thermostat").expect("written");
+        assert!(
+            written.contains("<MetaCommand name=\"set_thermostat_setpoint\">"),
+            "{written}"
+        );
+        assert!(written.contains("<FloatArgumentType name=\"kelvin\""));
+        assert!(written.contains("<IntegerArgumentType name=\"u32\""));
+        // "setpoint", after its length, eight.
+        assert!(
+            written.contains("binaryValue=\"08736574706F696E74\""),
+            "{written}"
+        );
+        assert!(written.contains("binaryValue=\"0004\""), "{written}");
+    }
+
+    /// What a binding's command lays out, its fixed entries and its two
+    /// arguments in order, is the datagram tcslibgs packs for that SET_NODE.
+    #[test]
+    fn a_bindings_command_packs_as_its_set_node_does() {
+        let graph = thermostat();
+        let written = written(&graph, "thermostat").expect("written");
+        let command = written
+            .split("<MetaCommand name=\"set_thermostat_setpoint\">")
+            .nth(1)
+            .expect("the command");
+        let entries = command.split("</EntryList>").next().expect("entries");
+        let sequence = 5u32;
+        let value = crate::node::vehicle::compute::value_bytes(
+            293.15,
+            crate::unit::Unit::Kelvin,
+        )
+        .expect("a temperature");
+        let mut packed = Vec::new();
+        for entry in entries.split('<').skip(1) {
+            if entry.starts_with("ArgumentRefEntry argumentRef=\"Sequence\"") {
+                packed.extend_from_slice(&sequence.to_be_bytes());
+            } else if entry
+                .starts_with("ArgumentRefEntry argumentRef=\"Value\"")
+            {
+                packed.extend_from_slice(&value);
+            } else if entry.starts_with("FixedValueEntry") {
+                let hex = entry
+                    .split("binaryValue=\"")
+                    .nth(1)
+                    .and_then(|rest| rest.split('"').next())
+                    .expect("its bits");
+                for at in (0..hex.len()).step_by(2) {
+                    packed.push(
+                        u8::from_str_radix(&hex[at..at + 2], 16).expect("hex"),
+                    );
+                }
+            }
+        }
+        let id = telemetry::ids(&graph)["thermostat"];
+        let theirs = crate::Command::SetNode(
+            crate::SetNodeCommand::new(
+                sequence,
+                crate::NodeId::of(id),
+                "setpoint",
+                &value,
+            )
+            .expect("it fits"),
+        )
+        .to_bytes();
+        assert_eq!(packed, theirs);
     }
 
     /// Every type `types.xtce` states is found, by its name.

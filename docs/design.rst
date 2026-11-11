@@ -622,8 +622,9 @@ Typed links
    terminal's type. The F´ bridge writes each source to a channel of its
    type, and the cFS bridge publishes each datum as its type lays it out.
    Each configuration's own XTCE states what each node sends the ground,
-   and Yamcs's mission database takes its types from it. Still to come:
-   the commands for the attributes command bindings set. Where
+   and a command for each attribute a command binding sets, whose value a
+   ``SET_NODE`` carries as the attribute's type; Yamcs's mission database
+   takes its types from it. Where
    the rest of this section and the rest of this document disagree, the
    rest says what runs today, and `What typed links replace`_ lists the
    passages it will change.
@@ -915,10 +916,14 @@ Requirement
     station is given one file. ``tcslibgs::graph::own_xtce`` writes it.
 
 Requirement
-    Each attribute a command binding sets is to be an argument of a command
-    of that attribute's type. That part is not built: a ``SET_NODE``
-    carries its value as the text the configuration would write, and how
-    the document is to say so is not yet settled.
+    Each attribute a command binding sets is a command,
+    ``set_<node>_<attribute>``, laid out as the ``SET_NODE`` that sets it
+    is, the whole datagram: the opcode, the sequence the ground gives it,
+    the node's device id and the attribute's name, each fixed, the value's
+    length, fixed at its type's width, and the value, an argument of the
+    attribute's type, copied from ``types.xtce`` as an argument type. A
+    ``SET_NODE`` carries the value in that type's own encoding, so a ground
+    station that reads XTCE sends a setting from this document alone.
 
 Requirement
     It says nothing of framing. A gateway frames what it sends as its kind
@@ -1005,7 +1010,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "55ad11486347bc8efc163e1ba051e577"
+     interface: "c7820f9bfe585feab72247ece0a2261d"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -3430,7 +3435,16 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     when the file was read and then applied by nothing.
 
     Which node, by its id; which attribute, by the name the section spells;
-    and the value, as bytes. The attribute is text where the node is a number
+    and the value, a datum of the attribute's type in that type's own
+    encoding, as ``types.xtce`` states it: a thermostat's setpoint is the
+    value type its ``type-in`` is, four bytes of a count of the unit's
+    steps, and not the text an operator typed
+    (``tcslibgs::graph::settings``). A ground station turns what is typed
+    into the type as it is typed -- tcsmoc does, and the C library's
+    ``tcs_configuration_setting`` -- so text that is not a value of it is
+    refused on the ground and never sent, and the vehicle holds the value
+    to its type's width before anything reads it, as it holds every datum on
+    a link. The attribute is text where the node is a number
     because a node has a position in the configuration and an attribute has no
     such number of its own -- a binding's position in the ``commands`` section
     would be one, and would carry the node with it -- and a command that says
@@ -4085,8 +4099,11 @@ Requirement
     may be set -- an attribute no binding mentions cannot be set, which is what
     makes what the ground can change in flight something written down and
     checkable rather than whatever a computation happens to accept. The node
-    must then accept the value, which is where a setpoint that is not a number,
-    or a band of nought, is refused.
+    must then accept the value, which is where a setpoint that is not of the
+    attribute's type, or a band of nought, is refused. Which attributes a
+    node takes, and as which type, is ``tcslibgs::graph::settings``'s, and a
+    binding naming one the node does not take is refused where the
+    configuration is read.
 
 Requirement
     A device accepts no settings. A bus address or a set of line numbers is

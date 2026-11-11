@@ -2646,13 +2646,19 @@ vehicle:
         // The commands as they arrive, made before anything is counted.
         let datagrams: Vec<Vec<u8>> = (0..30)
             .map(|sequence| {
-                let value = if sequence % 2 == 0 { "280.0" } else { "300.0" };
+                // A setpoint is a kelvin, as the thermostat's type-in is.
+                let kelvin = if sequence % 2 == 0 { 280.0 } else { 300.0 };
+                let value = tcslibgs::node::vehicle::compute::value_bytes(
+                    kelvin,
+                    tcslibgs::unit::Unit::Kelvin,
+                )
+                .expect("a temperature");
                 Command::SetNode(
                     SetNodeCommand::new(
                         sequence,
                         NodeId::of(0),
                         "setpoint",
-                        value.as_bytes(),
+                        &value,
                     )
                     .expect("it fits"),
                 )
@@ -3248,8 +3254,13 @@ vehicle:
         let start = Instant::now();
         let mut vehicle = vehicle(start, &[]);
 
+        let kelvin = tcslibgs::node::vehicle::compute::value_bytes(
+            300.0,
+            tcslibgs::unit::Unit::Kelvin,
+        )
+        .expect("a temperature");
         assert_eq!(
-            vehicle.system.set("thermostat", "setpoint", b"300.0"),
+            vehicle.system.set("thermostat", "setpoint", &kelvin),
             Ok(())
         );
         assert!(vehicle
@@ -3364,7 +3375,15 @@ vehicle:
             let set = bench.ask(Work::Set {
                 node: "thermostat".into(),
                 attribute: tcslibgs::Attribute::of("setpoint").expect("a name"),
-                value: tcslibgs::Value::of(b"280.0").expect("a value"),
+                // A setpoint is a kelvin, as the thermostat's type-in is.
+                value: tcslibgs::Value::of(
+                    &tcslibgs::node::vehicle::compute::value_bytes(
+                        280.0,
+                        tcslibgs::unit::Unit::Kelvin,
+                    )
+                    .expect("a temperature"),
+                )
+                .expect("a value"),
             });
             // And an attribute the configuration does not bind, which must
             // come back refused rather than applied.

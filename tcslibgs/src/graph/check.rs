@@ -1620,6 +1620,12 @@ impl Graph {
             problems.push(Problem::BadNode { node, why });
         }
 
+        // What each command binding sets, which the node it names must take
+        // from the ground, as a type: see `settings`.
+        for (node, why) in super::settings::problems(self) {
+            problems.push(Problem::BadNode { node, why });
+        }
+
         // A `null-` node, a `tee-` node and a `ping` node say nothing about
         // themselves.
         //
@@ -2156,7 +2162,7 @@ mod tests {
         crate::graph::parameters::nest(
             &[
                 ("gateway", "radio"),
-                ("interface", "55ad11486347bc8efc163e1ba051e577"),
+                ("interface", "c7820f9bfe585feab72247ece0a2261d"),
                 ("tcs_cmd.recv", "0.0.0.0:4000"),
                 ("tcs_cmd.send", "127.0.0.1:4100"),
                 ("payload_telemetry.source_base", "0.0.0.0:6000"),
@@ -4219,11 +4225,31 @@ mod tests {
             vec![node("gateway", "gateway_radio"), node("t", "compute")],
             vec![link("t", &["gateway"])],
         );
+        // A thermostat, which is what takes a setpoint from the ground.
+        g.nodes[1].attributes.clear();
+        for (attribute, value) in [
+            ("function", "thermostat"),
+            ("setpoint", "293.15"),
+            ("half_band", "0.5"),
+            ("type-in", "kelvin"),
+            ("type-out", "boolean"),
+        ] {
+            g.nodes[1]
+                .attributes
+                .insert(attribute.to_string(), crate::Scalar::of(value));
+        }
         g.commands.push(CommandBinding {
             from: "gateway".to_string(),
             sets: "t.setpoint".to_string(),
         });
         assert_eq!(g.check(), Vec::new());
+
+        // Naming an attribute the node does not take from the ground.
+        g.commands[0].sets = "t.type-in".to_string();
+        assert!(g.check().iter().any(|p| matches!(
+            p,
+            Problem::BadNode { why, .. } if why.contains("setpoint and half_band")
+        )));
 
         // Naming no attribute.
         g.commands[0].sets = "t".to_string();

@@ -605,6 +605,25 @@ int tcs_client_restart(tcs_client *client, uint64_t key, const char *target,
 #define TCS_ATTRIBUTE_BYTES 64
 #define TCS_VALUE_BYTES 256
 
+/** Writes a setting's value as SET_NODE carries it: a datum of the type
+ * the configuration sets the attribute as, in that type's own encoding,
+ * read from text as an operator types it. A thermostat's setpoint, "293.15",
+ * is four bytes of micro-kelvin.
+ *
+ * @param configuration  The configuration.
+ * @param node           The node's name.
+ * @param attribute      The attribute's name.
+ * @param text           The value, as text.
+ * @param value          Where the value is written: room for
+ *                       TCS_VALUE_BYTES.
+ * @param length         Where how many bytes it is is written.
+ * @return               0, or -1 where the node takes no such setting or
+ *                       the text is not a value of its type. */
+int tcs_configuration_setting(const tcs_configuration *configuration,
+			      const char *node, const char *attribute,
+			      const char *text, uint8_t *value,
+			      size_t *length);
+
 /** Sends SET_NODE, to set an attribute of a node, which the configuration
  * must let the ground set. Where the vehicle refuses, tcs_client_reason()
  * says why.
@@ -612,7 +631,9 @@ int tcs_client_restart(tcs_client *client, uint64_t key, const char *target,
  * @param client     The client.
  * @param node       The node's id, from tcs_configuration_node_id().
  * @param attribute  The attribute's name, of at most TCS_ATTRIBUTE_BYTES.
- * @param value      The value's bytes; may be NULL where length is 0.
+ * @param value      The value's bytes, a datum of the attribute's type as
+ *                   tcs_configuration_setting() writes it; may be NULL
+ *                   where length is 0.
  * @param length     How many bytes value holds, at most TCS_VALUE_BYTES.
  * @param status     Where what the vehicle answered is written.
  * @return           0, or -1 on an error. */

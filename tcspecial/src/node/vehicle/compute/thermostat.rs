@@ -39,7 +39,7 @@ use tcslibgs::link_type::Basic;
 use tcslibgs::node::vehicle::compute::ThermostatParams;
 use tcslibgs::unit::Unit;
 
-use super::{from_text, from_value, Function, Out};
+use super::{from_value, Function, Out};
 
 /// What the heaters should be doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -192,14 +192,10 @@ impl Function for Thermostat {
     /// anything changes -- so a command that is refused leaves a thermostat
     /// running on what it had.
     fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
-        // Text, where a reading is four bytes of micro-kelvin: a command's
-        // value is what an operator typed, and it travels as the characters
-        // they typed rather than as a number the ground station assembled. See
-        // `super::from_text`.
-        let said = std::str::from_utf8(value).map_err(|_| {
-            format!("{attribute}: what the ground sent is not text")
-        })?;
-        let wanted = from_text(said, self.unit, attribute)?;
+        // A value of the thermostat's type-in, as a reading is: four bytes
+        // of a count of the unit's steps, its width checked before anything
+        // reads it. See `tcslibgs::graph::settings`.
+        let wanted = from_value(value, self.unit, attribute)?;
 
         match attribute {
             "setpoint" => self.set_setpoint(wanted),

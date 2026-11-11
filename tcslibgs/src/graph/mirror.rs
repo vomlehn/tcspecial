@@ -293,7 +293,7 @@ mod tests {
             format!(
                 "tcspecial:
   gateway: radio
-  interface: \"55ad11486347bc8efc163e1ba051e577\"
+  interface: \"c7820f9bfe585feab72247ece0a2261d\"
   state_file: /tmp/tcspecial-test.state
   tcs_cmd:
     recv: 0.0.0.0:4000

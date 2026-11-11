@@ -2360,8 +2360,13 @@ The command binding on the gateway node says the ground may set the
 thermostat's setpoint, and the running vehicle applies it: a ``SET_NODE``
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
-decides by it. An attribute no binding mentions is refused, which is the
-point of writing the bindings down, and the refusal says why: tcsmoc shows
+decides by it. The value goes as the setpoint's type, a kelvin -- the type of
+what the thermostat reads -- and not as text: tcsmoc turns what is typed in
+its panel into that, and refuses, without sending anything, text that is not
+a temperature. The example's own XTCE, ``thermostat.xtce``, has the
+command, ``set_thermostat_setpoint``, for a ground station that reads XTCE.
+An attribute no binding mentions is refused, which is the point of writing
+the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- ``no command binding says the ground may set
 "thermostat.half-band": it is spelled half_band`` -- beside the status.
 
@@ -4141,7 +4146,7 @@ There are three, because three kinds of machine take them:
    in ``/opt/tcs/bin``, beside tcspecial (see `Where the logs' segments
    go`_).
 ``tcspecial-ground``
-   What a ground station is built on. ``lib/libtcs.so.3`` and ``lib/libtcs.a``
+   What a ground station is built on. ``lib/libtcs.so.4`` and ``lib/libtcs.a``
    with ``include/tcs.h`` and ``lib/pkgconfig/tcs.pc``; the Python
    packages ``tcslibgs``, ``tcslib`` and ``tcsui`` in
    ``lib/python3/site-packages``; and ``bin/tcsgui`` with its descriptions
@@ -4183,8 +4188,8 @@ in Debian's machine-readable format, and ``changelog.Debian.gz``, both made
 as the package is built, from ``LICENSE-MIT`` and the version; and
 lintian's overrides, in ``/usr/share/lintian/overrides/<package>``. The
 ground package also has a trigger that has dpkg run ``ldconfig`` once
-``libtcs.so.3`` is installed or removed. The RPMs say the same in their own
-``License``, ``%changelog``, ``%post`` and ``%postun``. ``libtcs.so.3`` is
+``libtcs.so.4`` is installed or removed. The RPMs say the same in their own
+``License``, ``%changelog``, ``%post`` and ``%postun``. ``libtcs.so.4`` is
 not executable in the .deb, as Debian wants a shared library to be, and is
 in the RPM, where rpm reads what a library provides only from an executable
 file; otherwise the two hold the same files under ``/opt/tcs``.
@@ -4246,7 +4251,7 @@ was copied.
 
 Everything ``make install-files`` installs, and so everything in the
 packages, is
-stripped: the programs and ``libtcs.so.3`` with ``strip --strip-unneeded``,
+stripped: the programs and ``libtcs.so.4`` with ``strip --strip-unneeded``,
 which leaves what they need to be run and linked with, and ``libtcs.a``
 with ``strip --strip-debug``, which keeps the symbols a program linked with
 it needs. That takes a fifth to a quarter off what each package installs:
@@ -4341,7 +4346,7 @@ package's profile script puts it there -- a station includes
    $ cc  station.c   $(pkg-config --cflags --libs tcs)
    $ c++ station.cpp $(pkg-config --cflags --libs tcs)
 
-That links with ``libtcs.so.3``, which the loader finds through the ground
+That links with ``libtcs.so.4``, which the loader finds through the ground
 package's ``ld.so.conf.d`` file. The ``1`` is libtcs's ABI version, which is
 not the package's: it goes up only when a station built against the old
 ``tcs.h`` would not work with the new library, so an upgrade that keeps it
@@ -4984,7 +4989,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "55ad11486347bc8efc163e1ba051e577"
+     interface: "c7820f9bfe585feab72247ece0a2261d"
 
 It is the digest of the ``tcslibgs/xtce/link.xtce`` a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4999,7 +5004,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --interface-digest
-   55ad11486347bc8efc163e1ba051e577
+   c7820f9bfe585feab72247ece0a2261d
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -5010,8 +5015,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to 55ad11486347bc8efc163e1ba051e577, from 0123...
-   vehicle.xtcs: interface is 55ad11486347bc8efc163e1ba051e577 already
+   vehicle.ytcs: interface set to c7820f9bfe585feab72247ece0a2261d, from 0123...
+   vehicle.xtcs: interface is c7820f9bfe585feab72247ece0a2261d already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

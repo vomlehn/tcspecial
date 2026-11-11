@@ -2,6 +2,8 @@
 <!-- What the vehicle sends the ground, flying the configuration
      thermostat: each node whose data reaches it, as a parameter named
      for the node, of the type the node sends, in a container of its own.
+     Each attribute a command binding sets is a command, as the SET_NODE
+     that sets it goes, its value an argument of the attribute's type.
      The types are tcslibgs/xtce/types.xtce's, copied: a string or bytes
      after a 32-bit count of its bytes, as each is sent where the ground
      decodes it by XTCE (under Yamcs). Where no XTCE decodes it, the count
@@ -77,4 +79,49 @@
       </SequenceContainer>
     </ContainerSet>
   </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="u32" signed="false" sizeInBits="32">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <FloatArgumentType name="kelvin" sizeInBits="64"
+          shortDescription="Temperature.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">kelvin</AncillaryData>
+          <AncillaryData name="tcspecial.step">micro-kelvin</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>K</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <MetaCommand name="set_thermostat_setpoint">
+        <ArgumentList>
+          <Argument name="Sequence" argumentTypeRef="u32"/>
+          <Argument name="Value" argumentTypeRef="kelvin"/>
+        </ArgumentList>
+        <CommandContainer name="set_thermostat_setpoint_packet">
+          <EntryList>
+            <FixedValueEntry name="Opcode" binaryValue="32" sizeInBits="8"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+            <FixedValueEntry name="Node" sizeInBits="32"
+                binaryValue="00000007"/>
+            <FixedValueEntry name="Attribute" sizeInBits="72"
+                binaryValue="08736574706F696E74"/>
+            <FixedValueEntry name="ValueLength" sizeInBits="16"
+                binaryValue="0004"/>
+            <ArgumentRefEntry argumentRef="Value"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
 </SpaceSystem>

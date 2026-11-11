@@ -1146,19 +1146,25 @@ fn counted(counts: &tcslibgs::NodeCounts) -> String {
 /// * `agreed`    - Whether the vehicle has agreed which configuration it is
 ///                 flying; nothing is sent until it has.
 /// * `model`     - The panels.
+/// * `graph`     - The configuration, which says what type the attribute
+///                 is set as.
 /// * `row`       - The panel whose node is set; a row with none sends
 ///                 nothing.
 /// * `attribute` - The attribute's name, as typed.
-/// * `value`     - The value, as typed, sent as its bytes.
+/// * `value`     - The value, as typed, sent as a datum of the attribute's
+///                 type (see `tcslibgs::graph::settings`); text that is not
+///                 one is refused here and nothing is sent.
 ///
 /// # Panics
 ///
 /// If the lock on the link is poisoned.
+#[allow(clippy::too_many_arguments)]
 fn set_a_nodes_attribute(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
     agreed: &Agreed,
     model: &Rc<VecModel<DHInfo>>,
+    graph: &Graph,
     row: usize,
     attribute: &str,
     value: &str,
@@ -1176,6 +1182,20 @@ fn set_a_nodes_attribute(
         return;
     }
 
+    let encoded = match tcslibgs::graph::settings::encoded(
+        graph,
+        &name,
+        attribute.trim(),
+        value.trim(),
+    ) {
+        Ok(encoded) => encoded,
+        Err(why) => {
+            ui.set_last_response(SharedString::from(format!(
+                "SET_NODE {node} ({name}) not sent: {why}"
+            )));
+            return;
+        }
+    };
     if refused_unmatched(ui, link, tcslibgs::CommandType::SetNode) {
         return;
     }
@@ -1187,9 +1207,7 @@ fn set_a_nodes_attribute(
     let answer = {
         let mut guard = link.lock().unwrap();
         match guard.client() {
-            Some(client) => {
-                client.set_node(node, attribute.trim(), value.as_bytes())
-            }
+            Some(client) => client.set_node(node, attribute.trim(), &encoded),
             None => {
                 ui.set_last_response(SharedString::from(
                     crate::ci_link::NOT_CONNECTED,
@@ -1369,6 +1387,8 @@ fn command_a_node(
 /// * `model`    - The panels.
 /// * `declined` - The operator's last word about each panel's node.
 /// * `contact`  - Whether the spacecraft is being heard from.
+/// * `graph`    - The configuration, which says what type each setting is.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn command_buttons(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
@@ -1377,6 +1397,7 @@ pub(crate) fn command_buttons(
     model: &Rc<VecModel<DHInfo>>,
     declined: &crate::Declined,
     contact: &Arc<Mutex<tcslib::beacon::Contact>>,
+    graph: &Arc<Graph>,
 ) {
     // Connect and Disconnect, the one button whose meaning follows the
     // status. Connecting sends a CONNECT at once, because that is what makes
@@ -1768,6 +1789,7 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         let agreed = agreed.clone();
         let model = model.clone();
+        let graph = graph.clone();
         ui.on_set_dh(move |row, attribute, value| {
             if let Some(ui) = weak.upgrade() {
                 set_a_nodes_attribute(
@@ -1775,6 +1797,7 @@ pub(crate) fn command_buttons(
                     &link,
                     &agreed,
                     &model,
+                    &graph,
                     row as usize,
                     attribute.as_str(),
                     value.as_str(),
@@ -2680,7 +2703,16 @@ pub fn run(
         std::process::exit(0);
     };
 
-    command_buttons(&ui, &link, &agreed, digest, &model, &declined, &contact);
+    command_buttons(
+        &ui,
+        &link,
+        &agreed,
+        digest,
+        &model,
+        &declined,
+        &contact,
+        &Arc::new(graph.clone()),
+    );
 
     handle_quit(&ui, pm_tcssim.clone(), Some(pm_tcspecial.clone()));
     handle_close(&ui, pm_tcssim, Some(pm_tcspecial));
@@ -2869,6 +2901,7 @@ pub(crate) mod tests {
             &model,
             &declined,
             &contact,
+            &Arc::new(example("simple-app")),
         );
         assert!(
             ui.get_restart_target_shown().contains("this window's"),
@@ -2990,6 +3023,7 @@ pub(crate) mod tests {
             &model,
             &declined,
             &contact,
+            &Arc::new(example("simple-app")),
         );
         link.lock()
             .unwrap()
@@ -3771,10 +3805,12 @@ vehicle:
 
         // One panel, for a node whose id is 1, as the example's is -- and a
         // binding on it, so the popup has a field to press Set in. The
-        // example states none, so the test states one: what is being checked
-        // is the press and not the file.
+        // example states none, so the test states one, and calls the panel's
+        // node the thermostat, whose setpoint the thermostat example says is
+        // a kelvin: what is being checked is the press and not the file.
         let graph = example("simple-app");
-        let links = telemetry::of(&graph).expect("its links");
+        let mut links = telemetry::of(&graph).expect("its links");
+        links[0].source = "thermostat".to_string();
         let mut settable = settable_of(&graph);
         settable.insert(links[0].source.clone(), vec!["setpoint".to_string()]);
         let model: Rc<VecModel<DHInfo>> =
@@ -3813,6 +3849,7 @@ vehicle:
             &model,
             &declined,
             &contact,
+            &Arc::new(example("thermostat")),
         );
 
         // A panel starts at Unknown: nothing has been asked.
@@ -3884,7 +3921,7 @@ vehicle:
             "the answer should be shown: {said}"
         );
         assert!(
-            said.contains("lorem"),
+            said.contains("thermostat"),
             "and say which node it was about: {said}"
         );
         // The panel takes the answer, and the operator's word is kept.
@@ -3955,8 +3992,16 @@ vehicle:
         );
         assert_eq!(
             was_set.lock().expect("the record").clone(),
-            Some(("setpoint".to_string(), b"300.0".to_vec())),
-            "what was typed is what went out"
+            Some((
+                "setpoint".to_string(),
+                tcslibgs::node::vehicle::compute::value_bytes(
+                    300.0,
+                    Unit::Kelvin
+                )
+                .expect("a temperature")
+                .to_vec()
+            )),
+            "what was typed went out as the kelvin a setpoint is"
         );
 
         // And Query All, which is the one control whose answer the panels

@@ -23,7 +23,7 @@ tcspecial:
     leap_seconds: "37"
     scale: "tai"
   gateway: "cfs"
-  interface: "55ad11486347bc8efc163e1ba051e577"
+  interface: "c7820f9bfe585feab72247ece0a2261d"
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"

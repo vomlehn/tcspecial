@@ -294,7 +294,7 @@ c++ my_station.cpp -I tcslib-c/include target/debug/libtcs.a -lpthread -ldl -lm<
 c++ my_station.cpp $(pkg-config --cflags --libs tcs)</code></pre>
 <h3 id="the-abi-version">The ABI version</h3>
 <p><code>&lt;ABI&gt;</code> is the library’s ABI version, the one whole
-number in <code>abi-version</code>, now 3. It is the shared library’s
+number in <code>abi-version</code>, now 4. It is the shared library’s
 soname, <code>libtcs.so.&lt;ABI&gt;</code>, which a station linked with
 the library asks for at run time; <code>build.rs</code> sets the soname
 from the file, and the Makefile installs the library under the same
@@ -323,6 +323,11 @@ went.</p>
 another datum than it did, and
 <code>tcs_configuration_sends_decisions</code> answers yes only for a
 thermostat whose <code>type-out</code> is <code>boolean</code>.</p>
+<p>It went from 3 to 4 when a setting became typed: the value
+<code>tcs_client_set_node</code> carries is a datum of the attribute’s
+type in its own encoding – a setpoint as four bytes of micro-kelvin –
+where it was the text an operator typed, and
+<code>tcs_configuration_setting</code> writes it from that text.</p>
 <p><code>examples/ground.c</code> is a ground station in C, and
 <code>examples/ground.cpp</code> the same one in C++: each reads the
 configuration, waits for the first beacon, connects and pings, asks

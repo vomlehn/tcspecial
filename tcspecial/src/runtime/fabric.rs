@@ -2446,7 +2446,10 @@ vehicle:
         // The ground asks for a warmer zone. The decision is not taken on
         // the strength of the number -- the next reading decides -- so the
         // heaters are still untouched.
-        assert_eq!(fabric.set("thermostat", "setpoint", b"300.0"), Ok(()));
+        assert_eq!(
+            fabric.set("thermostat", "setpoint", &kelvin(300.0)),
+            Ok(())
+        );
         assert!(heaters.lock().expect("the record").given.is_empty());
 
         // And the same reading now calls for heat.
@@ -2629,14 +2632,16 @@ vehicle:
             "the refusal should give the spelling: {said}"
         );
 
-        // A value that is not a number is refused by the computation, which
-        // is the other half of what a command has to get past.
+        // A value that is not of the setting's type -- the text a setpoint
+        // once was, where it is a kelvin, four bytes -- is refused by the
+        // computation, which is the other half of what a command has to get
+        // past.
         let said = fabric
-            .set("thermostat", "setpoint", b"warm")
-            .expect_err("a setpoint that is not a number");
+            .set("thermostat", "setpoint", b"300.15")
+            .expect_err("a setpoint that is not a kelvin");
         assert!(
-            said.contains("thermostat") && said.contains("warm"),
-            "the refusal should name the node and the value: {said}"
+            said.contains("thermostat") && said.contains("6 arrived"),
+            "the refusal should name the node and what arrived: {said}"
         );
     }
 

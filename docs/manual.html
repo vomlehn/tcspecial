@@ -2678,8 +2678,13 @@ zone.heater_1</tt> -- by it.</p>
 thermostat's setpoint, and the running vehicle applies it: a <tt class="docutils literal">SET_NODE</tt>
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
-decides by it. An attribute no binding mentions is refused, which is the
-point of writing the bindings down, and the refusal says why: tcsmoc shows
+decides by it. The value goes as the setpoint's type, a kelvin -- the type of
+what the thermostat reads -- and not as text: tcsmoc turns what is typed in
+its panel into that, and refuses, without sending anything, text that is not
+a temperature. The example's own XTCE, <tt class="docutils literal">thermostat.xtce</tt>, has the
+command, <tt class="docutils literal">set_thermostat_setpoint</tt>, for a ground station that reads XTCE.
+An attribute no binding mentions is refused, which is the point of writing
+the bindings down, and the refusal says why: tcsmoc shows
 the reason the vehicle sends -- <tt class="docutils literal">no command binding says the ground may set
 <span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.</p>
 <p>The simulator file beside it, <tt class="docutils literal"><span class="pre">thermostat-sim.yaml</span></tt>, is a link to
@@ -4290,7 +4295,7 @@ and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keep
 in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a class="reference internal" href="#where-the-logs-segments-go">Where the logs' segments
 go</a>).</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt></dt>
-<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs.so.3</tt> and <tt class="docutils literal">lib/libtcs.a</tt>
+<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs.so.4</tt> and <tt class="docutils literal">lib/libtcs.a</tt>
 with <tt class="docutils literal">include/tcs.h</tt> and <tt class="docutils literal">lib/pkgconfig/tcs.pc</tt>; the Python
 packages <tt class="docutils literal">tcslibgs</tt>, <tt class="docutils literal">tcslib</tt> and <tt class="docutils literal">tcsui</tt> in
 <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; and <tt class="docutils literal">bin/tcsgui</tt> with its descriptions
@@ -4329,8 +4334,8 @@ in Debian's machine-readable format, and <tt class="docutils literal">changelog.
 as the package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and
 lintian's overrides, in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The
 ground package also has a trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once
-<tt class="docutils literal">libtcs.so.3</tt> is installed or removed. The RPMs say the same in their own
-<tt class="docutils literal">License</tt>, <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs.so.3</tt> is
+<tt class="docutils literal">libtcs.so.4</tt> is installed or removed. The RPMs say the same in their own
+<tt class="docutils literal">License</tt>, <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs.so.4</tt> is
 not executable in the .deb, as Debian wants a shared library to be, and is
 in the RPM, where rpm reads what a library provides only from an executable
 file; otherwise the two hold the same files under <tt class="docutils literal">/opt/tcs</tt>.</p>
@@ -4385,7 +4390,7 @@ was copied.</p>
 </pre>
 <p>Everything <tt class="docutils literal">make <span class="pre">install-files</span></tt> installs, and so everything in the
 packages, is
-stripped: the programs and <tt class="docutils literal">libtcs.so.3</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
+stripped: the programs and <tt class="docutils literal">libtcs.so.4</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
 which leaves what they need to be run and linked with, and <tt class="docutils literal">libtcs.a</tt>
 with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a program linked with
 it needs. That takes a fifth to a quarter off what each package installs:
@@ -4465,7 +4470,7 @@ package's profile script puts it there -- a station includes
 <span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span>
 </pre>
-<p>That links with <tt class="docutils literal">libtcs.so.3</tt>, which the loader finds through the ground
+<p>That links with <tt class="docutils literal">libtcs.so.4</tt>, which the loader finds through the ground
 package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">1</tt> is libtcs's ABI version, which is
 not the package's: it goes up only when a station built against the old
 <tt class="docutils literal">tcs.h</tt> would not work with the new library, so an upgrade that keeps it
@@ -5027,7 +5032,7 @@ configurations yet.</p>
 for, and every configuration states it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;55ad11486347bc8efc163e1ba051e577&quot;</span>
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c7820f9bfe585feab72247ece0a2261d&quot;</span>
 </pre>
 <p>It is the digest of the <tt class="docutils literal">tcslibgs/xtce/link.xtce</tt> a build was made from --
 the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -5039,7 +5044,7 @@ each command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcsverify --interface-digest
-55ad11486347bc8efc163e1ba051e577
+c7820f9bfe585feab72247ece0a2261d
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.</p>
@@ -5047,8 +5052,8 @@ sends, so a person with only a packet capture can read it there too.</p>
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
-vehicle.ytcs: interface set to 55ad11486347bc8efc163e1ba051e577, from 0123...
-vehicle.xtcs: interface is 55ad11486347bc8efc163e1ba051e577 already
+vehicle.ytcs: interface set to c7820f9bfe585feab72247ece0a2261d, from 0123...
+vehicle.xtcs: interface is c7820f9bfe585feab72247ece0a2261d already
 </pre>
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

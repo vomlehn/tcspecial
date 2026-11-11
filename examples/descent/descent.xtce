@@ -2,6 +2,8 @@
 <!-- What the vehicle sends the ground, flying the configuration
      descent: each node whose data reaches it, as a parameter named
      for the node, of the type the node sends, in a container of its own.
+     Each attribute a command binding sets is a command, as the SET_NODE
+     that sets it goes, its value an argument of the attribute's type.
      The types are tcslibgs/xtce/types.xtce's, copied: a string or bytes
      after a 32-bit count of its bytes, as each is sent where the ground
      decodes it by XTCE (under Yamcs). Where no XTCE decodes it, the count

@@ -160,7 +160,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"55ad11486347bc8efc163e1ba051e577\"
+  interface: \"c7820f9bfe585feab72247ece0a2261d\"
   beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", \
   recv: \"127.0.0.1:{}\", send: \"{}\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}

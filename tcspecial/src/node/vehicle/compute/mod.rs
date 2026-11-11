@@ -362,9 +362,7 @@ pub fn make(
 // checks on a desk. Named here because every computation in this tree calls
 // these by their short names, and because this is where a reader of the
 // arithmetic looks for them.
-pub(crate) use tcslibgs::node::vehicle::compute::{
-    from_text, from_value, value_bytes,
-};
+pub(crate) use tcslibgs::node::vehicle::compute::{from_value, value_bytes};
 // What the vehicle no longer makes as it runs -- a value as a `Vec` -- and the
 // tests still compare against.
 #[cfg(test)]

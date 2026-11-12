@@ -1106,11 +1106,13 @@ payload on that payload's own socket. On a space link these become virtual
 channels, which is where the priority between them is really decided; here they
 are sockets, which is what an IP network has to divide traffic with.
 
-``payload_command`` is where the payloads are commanded, and it has two bases
-for the reason ``payload_telemetry`` does: the link has two ends. A payload's
-socket on each side is that side's base plus the payload's own id, so four
-payloads based at 4300 and 4200 are commanded from 4300 to 4303 and take those
-commands on 4200 to 4203.
+``payload_command`` is where the nodes are commanded, and it has two
+addresses because the link has two ends: tcspecial takes node commands at
+``dest_base``, and the ground sends them from ``source_base``. Unlike
+``payload_telemetry``'s, each is the address itself, with nothing counted off
+it: one link carries the commands about every node, and the node a command is
+about is named in the command by its id (see `How a command names a node`_
+and `How many links, and what the thread does with one`_).
 
 Simple payloads -- a device or a socket that tcspecial reads or drives -- do
 not use payload commands. What a simple payload is configured with is in the
@@ -1118,13 +1120,15 @@ tcspecial configuration file, and it is not changed while tcspecial is
 running. At present only applications, the payloads and vehicle nodes that are
 programs of their own, use the ``payload_command`` values.
 
-One socket per payload rather than one for all of them, which is what
-``payload_interface`` was. That worked, and left two things undone. Nothing
-said which socket the ground sent from -- the MOC bound whatever port the
-system gave it -- so tcspecial could not be told what a payload command should
-come from, where every other link in this section is written down at both ends.
-And one socket is one queue: a command about a payload that takes its time to
-start was ahead of a command about one that would have answered at once.
+The link was once one socket per payload, each at its base plus the
+payload's id. A graph has many more nodes than payloads, though -- a
+thermostat of four sensors is eleven nodes -- and a socket apiece spends ports
+on computations and logs that nothing addresses from the ground, so one link
+serves them all, and a command that takes its time is kept from delaying
+another by the thread a node operation runs on, not by its socket. Before
+that, ``payload_interface`` was one socket for all of them that said nothing
+of where the ground sent from; ``source_base`` writes that end down, as every
+other link in this section is written down at both ends.
 
 ``payload_telemetry`` is where each payload's own data link is, and it has two
 bases because the link has two ends. tcspecial binds its end at
@@ -6399,7 +6403,8 @@ Requirement
     The ``tcspecial`` section's ``state_file``, required, is the path of the
     file in which tcspecial keeps what must survive a restart: whether the
     next start is one the ground commanded, and which configurations it
-    names, as `Starting, and the restart flag`_ says.
+    names and how many of its starts have been tried, as `Starting, and the
+    restart flag`_ says.
 
 Requirement
     An armed RESTART that is taken writes to the state file that
@@ -6411,9 +6416,13 @@ Requirement
     changes the beacons: every start begins with the restart flag set.
 
 Requirement
-    There is no generation number. Nothing in the state file counts starts:
-    a start is told by its beacons' restart flag and by their number going
-    back, and which configuration it runs by the checksum they carry. A
+    There is no generation number. Nothing in the state file counts every
+    start, as a generation did: a start is told by its beacons' restart flag
+    and by their number going back, and which configuration it runs by the
+    checksum they carry. What it does count is the trials of the
+    configuration a start is to run -- its starts that ended before a
+    matching CONNECT -- which `Starting, and the restart flag`_ gives up at
+    ``load_trials``. A
     state file written by a build that kept a generation holds a
     ``generation`` line, which is read and dropped, the start saying so in
     its log, and the file written again without it: a vehicle given a new
@@ -7903,8 +7912,8 @@ Requirement
     included file and whatever its kind, the first being 0. The ids are
     therefore a function of the names alone. Two ends whose digests agree
     have read the same names, so they agree about every id, and about every
-    port and identifier counted from one -- ``ground_base`` plus an id, a
-    ``payload_command`` ``dest_base`` plus an id, an F´ id.
+    port and identifier counted from one -- ``ground_base`` plus an id,
+    ``payload_telemetry``'s bases plus an id, an F´ id.
 
 Requirement
     Anywhere else an order would decide something -- which of two equally

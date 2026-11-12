@@ -50,8 +50,10 @@ tcspecial:
     processor_id: "2"
     release: "v7.0.1"
     spacecraft_id: "0x42"
-  # tcspecial counts its starts in this file, which must be on storage
-  # that survives a power cycle on a vehicle.
+  # tcspecial keeps in this file which configuration the next start is to run,
+  # the last one the ground confirmed, and how many starts of it have ended
+  # before a matching CONNECT, so on a vehicle it must be on storage that
+  # survives a power cycle.
   state_file: "/tmp/tcspecial-cfs.state"
   tcs_cmd:
     cmd_msgid: "0x4280"

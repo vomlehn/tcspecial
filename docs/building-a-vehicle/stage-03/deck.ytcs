@@ -21,9 +21,9 @@ tcspecial:
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"
-  # Commands to a payload are sent to tcspecial at dest_base plus the payload's
-  # device id, and the responses are read on the network interface source_base
-  # names.
+  # Commands to a node are sent from source_base to tcspecial at dest_base: one
+  # link for every node, each command naming its node by its device id, and its
+  # answer going back to source_base.
   #
   # Simple payloads, such as these, do not use payload commands: what a simple
   # payload is configured with is in this file, and it is not changed while
@@ -38,9 +38,11 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:6100"
     source_base: "0.0.0.0:6000"
-  # tcspecial counts its starts in this file, which must be on storage that
-  # survives a power cycle on a vehicle. Each stage of the guide has a file of
-  # its own, so that one stage's starts are not counted as another's.
+  # tcspecial keeps in this file which configuration the next start is to run,
+  # the last one the ground confirmed, and how many starts of it have ended
+  # before a matching CONNECT, so on a vehicle it must be on storage that
+  # survives a power cycle. Each stage of the guide has a file of its own, so
+  # that one stage's starts are not counted as another's.
   state_file: "/tmp/tcspecial-deck-stage-03.state"
   # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
   # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to

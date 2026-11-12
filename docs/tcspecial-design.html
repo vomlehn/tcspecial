@@ -1608,23 +1608,27 @@ ping it, arm it, restart it -- is taken on <tt class="docutils literal">tcs_cmd.
 payload on that payload's own socket. On a space link these become virtual
 channels, which is where the priority between them is really decided; here they
 are sockets, which is what an IP network has to divide traffic with.</p>
-<p><tt class="docutils literal">payload_command</tt> is where the payloads are commanded, and it has two bases
-for the reason <tt class="docutils literal">payload_telemetry</tt> does: the link has two ends. A payload's
-socket on each side is that side's base plus the payload's own id, so four
-payloads based at 4300 and 4200 are commanded from 4300 to 4303 and take those
-commands on 4200 to 4203.</p>
+<p><tt class="docutils literal">payload_command</tt> is where the nodes are commanded, and it has two
+addresses because the link has two ends: tcspecial takes node commands at
+<tt class="docutils literal">dest_base</tt>, and the ground sends them from <tt class="docutils literal">source_base</tt>. Unlike
+<tt class="docutils literal">payload_telemetry</tt>'s, each is the address itself, with nothing counted off
+it: one link carries the commands about every node, and the node a command is
+about is named in the command by its id (see <a class="reference internal" href="#how-a-command-names-a-node">How a command names a node</a>
+and <a class="reference internal" href="#how-many-links-and-what-the-thread-does-with-one">How many links, and what the thread does with one</a>).</p>
 <p>Simple payloads -- a device or a socket that tcspecial reads or drives -- do
 not use payload commands. What a simple payload is configured with is in the
 tcspecial configuration file, and it is not changed while tcspecial is
 running. At present only applications, the payloads and vehicle nodes that are
 programs of their own, use the <tt class="docutils literal">payload_command</tt> values.</p>
-<p>One socket per payload rather than one for all of them, which is what
-<tt class="docutils literal">payload_interface</tt> was. That worked, and left two things undone. Nothing
-said which socket the ground sent from -- the MOC bound whatever port the
-system gave it -- so tcspecial could not be told what a payload command should
-come from, where every other link in this section is written down at both ends.
-And one socket is one queue: a command about a payload that takes its time to
-start was ahead of a command about one that would have answered at once.</p>
+<p>The link was once one socket per payload, each at its base plus the
+payload's id. A graph has many more nodes than payloads, though -- a
+thermostat of four sensors is eleven nodes -- and a socket apiece spends ports
+on computations and logs that nothing addresses from the ground, so one link
+serves them all, and a command that takes its time is kept from delaying
+another by the thread a node operation runs on, not by its socket. Before
+that, <tt class="docutils literal">payload_interface</tt> was one socket for all of them that said nothing
+of where the ground sent from; <tt class="docutils literal">source_base</tt> writes that end down, as every
+other link in this section is written down at both ends.</p>
 <p><tt class="docutils literal">payload_telemetry</tt> is where each payload's own data link is, and it has two
 bases because the link has two ends. tcspecial binds its end at
 <tt class="docutils literal">payload_telemetry.source_base</tt> plus the payload's own id -- the position its
@@ -6676,7 +6680,8 @@ without a header</a>.</p>
 <dd>The <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt>, required, is the path of the
 file in which tcspecial keeps what must survive a restart: whether the
 next start is one the ground commanded, and which configurations it
-names, as <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> says.</dd>
+names and how many of its starts have been tried, as <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the
+restart flag</a> says.</dd>
 <dt>Requirement</dt>
 <dd>An armed RESTART that is taken writes to the state file that
 the next start is commanded, before it is answered. The start that
@@ -6686,9 +6691,13 @@ for a commanded one. A state file that is damaged says nothing of the
 next start, which is then taken for one nobody commanded. Neither
 changes the beacons: every start begins with the restart flag set.</dd>
 <dt>Requirement</dt>
-<dd>There is no generation number. Nothing in the state file counts starts:
-a start is told by its beacons' restart flag and by their number going
-back, and which configuration it runs by the checksum they carry. A
+<dd>There is no generation number. Nothing in the state file counts every
+start, as a generation did: a start is told by its beacons' restart flag
+and by their number going back, and which configuration it runs by the
+checksum they carry. What it does count is the trials of the
+configuration a start is to run -- its starts that ended before a
+matching CONNECT -- which <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> gives up at
+<tt class="docutils literal">load_trials</tt>. A
 state file written by a build that kept a generation holds a
 <tt class="docutils literal">generation</tt> line, which is read and dropped, the start saying so in
 its log, and the file written again without it: a vehicle given a new
@@ -8253,8 +8262,8 @@ position among the names of all the configuration's nodes, across every
 included file and whatever its kind, the first being 0. The ids are
 therefore a function of the names alone. Two ends whose digests agree
 have read the same names, so they agree about every id, and about every
-port and identifier counted from one -- <tt class="docutils literal">ground_base</tt> plus an id, a
-<tt class="docutils literal">payload_command</tt> <tt class="docutils literal">dest_base</tt> plus an id, an F´ id.</dd>
+port and identifier counted from one -- <tt class="docutils literal">ground_base</tt> plus an id,
+<tt class="docutils literal">payload_telemetry</tt>'s bases plus an id, an F´ id.</dd>
 <dt>Requirement</dt>
 <dd>Anywhere else an order would decide something -- which of two equally
 overdue reads goes first, which stream several destinations share, which

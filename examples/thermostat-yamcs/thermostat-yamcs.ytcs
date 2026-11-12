@@ -35,8 +35,10 @@ tcspecial:
     apid_base: "0x500"
     dest_base: "127.0.0.1:17410"
     source_base: "0.0.0.0:17400"
-  # tcspecial counts its starts in this file, which must be on storage
-  # that survives a power cycle on a vehicle.
+  # tcspecial keeps in this file which configuration the next start is to run,
+  # the last one the ground confirmed, and how many starts of it have ended
+  # before a matching CONNECT, so on a vehicle it must be on storage that
+  # survives a power cycle.
   state_file: "/tmp/tcspecial-thermostat-yamcs.state"
   # Yamcs sends its commands from a port the system chooses, and takes the
   # answers on the same socket, so the commands are taken from any port of

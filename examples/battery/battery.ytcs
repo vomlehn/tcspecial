@@ -21,8 +21,10 @@ tcspecial:
   payload_telemetry:
     dest_base: "127.0.0.1:6100"
     source_base: "0.0.0.0:6000"
-  # tcspecial counts its starts in this file, which must be on storage
-  # that survives a power cycle on a vehicle.
+  # tcspecial keeps in this file which configuration the next start is to run,
+  # the last one the ground confirmed, and how many starts of it have ended
+  # before a matching CONNECT, so on a vehicle it must be on storage that
+  # survives a power cycle.
   state_file: "/tmp/tcspecial-battery.state"
   tcs_cmd:
     recv: "0.0.0.0:4000"

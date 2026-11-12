@@ -422,6 +422,11 @@ runcomparexy:
 			$(TCSPECIAL_SIM_FILE) \
 	)
 
+# The stages of docs/building-a-vehicle.rst, each a directory holding
+# deck.ytcs, deck.xtcs and deck-sim.yaml. Its common directory holds the
+# files the later stages include, which are not stages.
+VEHICLE_GUIDE_STAGES = $(wildcard docs/building-a-vehicle/stage-*)
+
 # Every configuration shipped in both spellings, with the simulator file each
 # is checked beside: the thermostat fixture and the examples. A list of stems
 # and simulator files rather than a pattern, so that a configuration may be
@@ -438,17 +443,26 @@ SPELLINGS = \
 	examples/beacon/beacon:examples/beacon/beacon-sim.yaml \
 	examples/fprime/fprime:examples/fprime/fprime-sim.yaml \
 	examples/cfs/cfs:examples/cfs/cfs-sim.yaml \
-	example:example-sim.yaml
+	example:example-sim.yaml \
+	$(foreach stage,$(VEHICLE_GUIDE_STAGES), \
+		$(stage)/deck:$(stage)/deck-sim.yaml)
 
 # Every shipped configuration, both spellings: the examples, the thermostat
-# fixture and the top-level example, but not the simulator files, which
-# name no interface, nor the files in examples/*-common that two examples
-# include, which have no tcspecial section to name one in.
+# fixture, the top-level example and the stages of "Building a Vehicle", but
+# not the simulator files, which name no interface, nor the files in
+# examples/*-common and docs/building-a-vehicle/common that others include,
+# which have no tcspecial section to name one in.
 SHIPPED_CONFIGURATIONS = example.ytcs example.xtcs \
 	tests/manual/thermostat.ytcs tests/manual/thermostat.xtcs \
 	$(filter-out $(wildcard examples/*-common/*), \
 		$(wildcard examples/*/*.ytcs) \
-		$(wildcard examples/*/*.xtcs))
+		$(wildcard examples/*/*.xtcs)) \
+	$(VEHICLE_GUIDE_CONFIGURATIONS)
+
+# The stages' configurations, both spellings.
+VEHICLE_GUIDE_CONFIGURATIONS = \
+	$(foreach stage,$(VEHICLE_GUIDE_STAGES),$(stage)/deck.ytcs \
+		$(stage)/deck.xtcs)
 
 # Write this build's interface digest into every shipped configuration, in
 # place and changing nothing else, after tcslibgs/xtce/link.xtce changes:
@@ -462,8 +476,10 @@ set-interfaces:
 # Every shipped configuration's own XTCE, the file beside it of its name
 # with the extension .xtce: what the vehicle flying it sends the ground. One
 # for each configuration, its two spellings saying the same; written from
-# the YAML spelling, and from example.ytcs's.
-OWN_XTCE_CONFIGURATIONS = $(filter %.ytcs,$(SHIPPED_CONFIGURATIONS))
+# the YAML spelling, and from example.ytcs's. Not the stages of "Building a
+# Vehicle", which are teaching material and have no own XTCE beside them.
+OWN_XTCE_CONFIGURATIONS = $(filter %.ytcs, \
+	$(filter-out $(VEHICLE_GUIDE_CONFIGURATIONS),$(SHIPPED_CONFIGURATIONS)))
 
 # Write each one's own XTCE again, after a configuration or
 # tcslibgs/xtce/types.xtce changes: tcsverify --xtce, which says what it

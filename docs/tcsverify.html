@@ -368,7 +368,8 @@ ul.auto-toc {
 <p class="topic-title"><a class="reference internal" href="#top">Contents</a></p>
 <ul class="simple">
 <li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-2">See Also</a></li>
+<li><a class="reference internal" href="#summary" id="toc-entry-2">Summary</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-3">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -502,8 +503,140 @@ not joined to -- there would be nothing to join to, and a join against half of
 a set reports the other half as unsimulated -- and tcsverify says so rather
 than leaving it unsaid.</p>
 </div>
+<div class="section" id="summary">
+<h1><a class="toc-backref" href="#toc-entry-2">Summary</a></h1>
+<p><tt class="docutils literal"><span class="pre">--summary</span></tt>, with one configuration and its simulator file or alone,
+checks it as any run does and then prints what the vehicle uses of what
+must not clash or overflow, so that somebody assembling a vehicle from many
+nodes sees it in one place:</p>
+<ul class="simple">
+<li><strong>Addresses and ports</strong>: every socket the configuration states or
+implies, who binds it -- the vehicle, the ground, a payload, tcssim, or
+a software bus's far end -- and what it is. The <tt class="docutils literal">tcspecial</tt> section's
+links (<tt class="docutils literal">tcs_cmd</tt>, <tt class="docutils literal">payload_command</tt> and <tt class="docutils literal">beacon</tt>, or <tt class="docutils literal">sbn</tt> on a
+software bus); each gateway node's far end, its <tt class="docutils literal">ground_base</tt> or
+<tt class="docutils literal">bridge_base</tt> plus each source's device id, by source; each untouched
+payload's <tt class="docutils literal">payload_telemetry</tt> ports, plus its device id at both ends;
+each gateway node's and network payload's own address and port; and each
+<tt class="docutils literal">sim_address</tt>. <tt class="docutils literal">payload_command.dest_base</tt> is one socket, with
+nothing added to it: the node a command is about is in the command.</li>
+<li><strong>Device ids</strong>: every node's, which every counted port and ID is counted
+by -- its place among the configuration's nodes sorted by name.</li>
+<li><strong>Message IDs</strong>, where the configuration is on a cFS software bus: the
+<tt class="docutils literal">msgid_range</tt> allotted, and every ID in it, command or telemetry, and
+what it carries.</li>
+<li><strong>APIDs</strong>, where its packets are CCSDS Space Packets, under Yamcs.</li>
+<li><strong>Rates to the ground</strong>: for each source's link, how many data a second
+it carries, the bytes of each datum where its type gives them, and the
+bytes a second; the beacon's; and the total. A node read on a schedule --
+its group's <tt class="docutils literal">interval</tt>, its <tt class="docutils literal">trigger_interval</tt>, its <tt class="docutils literal">poll_interval</tt>
+(at most), or a set of lines' <tt class="docutils literal">state_interval</tt> -- sends as often as
+that. Any other node sends at most one datum for each that arrives at
+it, shown as <tt class="docutils literal">&lt;=</tt>; one with no schedule and nothing linked into it
+sends when it has something, which no file says, shown as <tt class="docutils literal">?</tt> and left
+out of the total, which says how many were. The bytes are the data's
+alone, not the packets', and a string or bytes has no size its type
+gives.</li>
+</ul>
+<p>The lists are each in an order no file can change -- by kind, then by
+gateway node and device id, then by name -- so two summaries can be
+compared with <tt class="docutils literal">diff</tt>. The summary of the thermostat example:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--<span class="whitespace"> </span>--summary<span class="whitespace"> </span>examples/thermostat/thermostat.ytcs<span class="whitespace">
+</span><span class="generic output">examples/thermostat/thermostat.ytcs: summary
+
+Addresses and ports
+  address         bound by  what
+  0.0.0.0:4000    vehicle   tcs_cmd.recv, where spacecraft commands are taken
+  127.0.0.1:4100  ground    tcs_cmd.send, where spacecraft commands come from
+  0.0.0.0:4200    vehicle   payload_command.dest_base, where node commands are taken
+  127.0.0.1:4300  ground    payload_command.source_base, where node commands come from
+  0.0.0.0:5550    vehicle   beacon.send, where beacons come from
+  127.0.0.1:5650  ground    beacon.recv, where beacons go
+  127.0.0.1:5100  ground    &quot;gateway&quot; ground_base plus device id 0: what &quot;consensus_temp&quot; sends
+  127.0.0.1:5102  ground    &quot;gateway&quot; ground_base plus device id 2: what &quot;gpio-out-tmass1&quot; sends
+  127.0.0.1:5103  ground    &quot;gateway&quot; ground_base plus device id 3: what &quot;gpio-out-tmass2&quot; sends
+  127.0.0.1:5108  ground    &quot;gateway&quot; ground_base plus device id 8: what &quot;to_k1&quot; sends
+  127.0.0.1:5109  ground    &quot;gateway&quot; ground_base plus device id 9: what &quot;to_k2&quot; sends
+  127.0.0.1:5110  ground    &quot;gateway&quot; ground_base plus device id 10: what &quot;to_k3&quot; sends
+  127.0.0.1:5000  vehicle   &quot;gateway&quot; address and port, where the ground sends to it
+  127.0.0.1:5204  tcssim    &quot;gpio-out-tmass1&quot; sim_address
+  127.0.0.1:5205  tcssim    &quot;gpio-out-tmass2&quot; sim_address
+  127.0.0.1:5201  tcssim    &quot;temp_1&quot; sim_address
+  127.0.0.1:5202  tcssim    &quot;temp_2&quot; sim_address
+  127.0.0.1:5203  tcssim    &quot;temp_3&quot; sim_address
+
+Device ids
+  id  node
+   0  consensus_temp
+   1  gateway
+   2  gpio-out-tmass1
+   3  gpio-out-tmass2
+   4  temp_1
+   5  temp_2
+   6  temp_3
+   7  thermostat
+   8  to_k1
+   9  to_k2
+  10  to_k3
+
+Message IDs
+  none: the configuration is not on a software bus
+
+APIDs
+  none: the configuration's packets carry no CCSDS header
+
+Rates to the ground
+  link                        data/s  bytes/datum  bytes/s  how
+  consensus_temp to gateway      &lt;=3            4     &lt;=12  one per datum from to_k1, to_k2, to_k3
+  gpio-out-tmass1 to gateway       1            1        1  state_interval 1 s
+  gpio-out-tmass2 to gateway       1            1        1  state_interval 1 s
+  to_k1 to gateway               &lt;=1            4      &lt;=4  one per datum from temp_1
+  to_k2 to gateway               &lt;=1            4      &lt;=4  one per datum from temp_2
+  to_k3 to gateway               &lt;=1            4      &lt;=4  one per datum from temp_3
+  beacon                         0.2            ?        ?  beacon.default_interval 5 s
+  total                        &lt;=8.2                  &lt;=26</span>
+</pre>
+<p>The cfs example's lists its message IDs instead, beginning:</p>
+<pre class="code console literal-block">
+<span class="generic output">Message IDs
+  msgid_range 0x4200 to 0x42ff
+  ID      carries    what
+  0x4200  telemetry  tcs_cmd.response_msgid
+  0x4201  telemetry  beacon.tlm_msgid
+  0x4210  telemetry  the answer message ID of &quot;fsw&quot;, payload_command.response_base plus its device id 0</span>
+</pre>
+<p>The summary says what is there; what is wrong with it is said with the
+other problems, above it, by the checks every run makes:</p>
+<ul class="simple">
+<li>Two sockets that are one -- one port of one protocol on one host,
+<tt class="docutils literal">localhost</tt>, <tt class="docutils literal">127.0.0.1</tt> and <tt class="docutils literal">::1</tt> being one host, or a port on
+every interface (<tt class="docutils literal">0.0.0.0</tt>) and the same port on this host -- are an
+<strong>error</strong>, naming both: whichever binds second would fail as it starts.
+Two nodes at one address was checked already, and so were
+<tt class="docutils literal">tcs_cmd.recv</tt> and <tt class="docutils literal">payload_command.dest_base</tt> written alike. The
+rest is new with the summary: any of the section's sockets, a source's
+port on the ground, an untouched payload's port aboard, a node's address
+and a <tt class="docutils literal">sim_address</tt>, against any other of them. A wildcard and a host
+named otherwise are not compared, since whether <tt class="docutils literal">10.0.0.5</tt> is this
+machine is the network's to say; and a sender given port <tt class="docutils literal">0</tt> claims no
+port.</li>
+<li>Two sources on one port of the ground, and a port counted past 65535
+from a base, were checked already, as were a message ID used twice,
+outside <tt class="docutils literal">msgid_range</tt> or of the wrong type for its use, and an APID
+used twice or past <tt class="docutils literal">0x7FF</tt>. Each is said about the node it is in, as a
+<strong>warning</strong> -- the kind every problem with a node's own attributes is --
+so it does not fail the run; the vehicle refuses it all the same. Said
+about the <tt class="docutils literal">tcspecial</tt> section, it is an error.</li>
+</ul>
+<p>A configuration that does not read has no summary: the run says so on
+stderr, after the problems that say why, and exits 1, as a digest that
+cannot be taken does. With two spellings and a simulator file there is
+none either -- the two say one thing -- and the command line is none of
+the shapes.</p>
+</div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-2">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-3">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="manual.html">The TCSpecial manuals</a></dt>
 <dd>What each of TCSpecial's manuals covers.</dd>

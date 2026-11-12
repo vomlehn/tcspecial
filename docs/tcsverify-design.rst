@@ -112,6 +112,41 @@ Requirement
     status 1.
 
 Requirement
+    ``--summary``, with one configuration and its simulator file if it has
+    one, checks it as any run does and then prints, after the problems,
+    what it uses of what must not clash or overflow: every address and
+    port it states or implies and who binds it, every node's device id,
+    every message ID and APID, and how many data and bytes a second each
+    link to the ground carries, with the beacon's and the total. Plain
+    text in aligned columns under a heading each, in orders no file can
+    change, so that two summaries can be compared with ``diff``. Every list
+    is ``tcslibgs``'s -- ``graph::sockets::of``, ``graph::telemetry::ids``,
+    ``msgids`` and ``apids``, ``graph::rates::of`` -- and tcsverify lays
+    them out and states none of them. A configuration that does not read
+    has no summary, which fails the run, as a digest not given does.
+
+Requirement
+    No two sockets a configuration states or implies are one socket:
+    one port of one protocol on one host, the names of this host being one
+    host, or a port on every interface and the same port on this host.
+    ``tcslibgs::graph::sockets::clashes`` is the rule, asked by
+    ``Graph::check``, and an error naming both: whichever binds second
+    would fail as it starts, aboard or on a desk. It leaves to their own
+    rules the pairs those hold apart already -- two nodes that want one
+    thing, two sources on one port of the ground -- so that one mistake is
+    one complaint. A wildcard and a host named otherwise are not compared:
+    whether that host is this machine is the network's to say, and
+    refusing it would refuse a vehicle whose payload is a box at that
+    address.
+
+    The rates are an estimate, ``tcslibgs::graph::rates``: a node read on
+    a schedule sends as its schedule says, any other at most one datum for
+    each that arrives at it, and one with no schedule and nothing linked
+    into it at a rate no file says. What it is for is a sum that shows
+    which sources are most of a link's load, and roughly how much that
+    is; it refuses nothing.
+
+Requirement
     ``--types=<types>`` checks a configuration as a tcspecial built with only
     those payload types would; see `Which Node Types Are Built <tcspecial-design.html#which-node-types-are-built>`__.
 

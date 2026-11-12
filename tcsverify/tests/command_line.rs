@@ -558,3 +558,142 @@ fn a_type_that_does_not_exist_fails_the_run() {
     );
     assert_eq!(status, 1);
 }
+
+/// Writes a configuration of network payloads, each at a port of this host
+/// and joined to nothing, so that each reports over `payload_telemetry`.
+///
+/// # Arguments
+///
+/// * `dir`   - The directory it is written in, as `ports.ytcs`.
+/// * `ports` - Each payload's name and port.
+///
+/// # Returns
+///
+/// The file's path.
+fn with_payloads_at(dir: &Path, ports: &[(&str, u16)]) -> PathBuf {
+    let whole = std::fs::read_to_string(with_errors(dir, 0)).expect("read");
+    let mut text = whole
+        .split("payloads:")
+        .next()
+        .expect("a section")
+        .to_string();
+    text.push_str("payloads:\n  - type network:\n");
+    for (name, port) in ports {
+        text.push_str(&format!(
+            "      - payload: {name}\n        address: \"127.0.0.1\"\n        \
+             port: \"{port}\"\n        protocol: \"udp\"\n"
+        ));
+    }
+    let path = dir.join("ports.ytcs");
+    std::fs::write(&path, text).expect("written");
+    path
+}
+
+/// `--summary` lists, after checking, the thermostat's gateway node's far
+/// end at its `ground_base` plus each source's device id, by source; and
+/// the rates each link carries, with the beacon's and the total.
+#[test]
+fn the_summary_lists_the_gateway_ports_by_source() {
+    let example = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../examples/thermostat/thermostat.ytcs");
+    let (lines, status) = run(&["--summary", example.to_str().expect("path")]);
+    assert_eq!(status, 0, "{lines:?}");
+    let graph = tcslibgs::graph::Graph::load(&example).expect("it loads");
+    let ids = tcslibgs::graph::telemetry::ids(&graph);
+    for source in ["consensus_temp", "to_k1", "to_k2", "to_k3"] {
+        let port = 5100 + ids[source];
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains(&format!("127.0.0.1:{port}"))
+                    && line.contains(&format!("what \"{source}\" sends"))),
+            "{source} at {port}: {lines:?}"
+        );
+    }
+    for heading in [
+        "Addresses and ports",
+        "Device ids",
+        "Message IDs",
+        "APIDs",
+        "Rates to the ground",
+    ] {
+        assert!(lines.iter().any(|l| l == heading), "{heading}: {lines:?}");
+    }
+    assert!(
+        lines.iter().any(|l| l.starts_with("  beacon ")),
+        "{lines:?}"
+    );
+    assert!(lines.iter().any(|l| l.starts_with("  total ")), "{lines:?}");
+
+    // One configuration, as a model is made of one.
+    let (_, status) = run(&["--summary", "a.xtcs", "a.ytcs", "a-sim.yaml"]);
+    assert_eq!(status, 2);
+}
+
+/// The cfs example's summary lists its message IDs, inside its allotment:
+/// the gateway node's cmd_msgid and what the thermometer sends to it.
+#[test]
+fn the_summary_lists_the_message_ids_on_a_bus() {
+    let example =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/cfs/cfs.ytcs");
+    let (lines, status) = run(&["--summary", example.to_str().expect("path")]);
+    assert_eq!(status, 0, "{lines:?}");
+    assert!(
+        lines.iter().any(|l| l == "  msgid_range 0x4200 to 0x42ff"),
+        "{lines:?}"
+    );
+    assert!(
+        lines.iter().any(
+            |l| l.contains("0x4281") && l.contains("cmd_msgid of \"fsw\"")
+        ),
+        "{lines:?}"
+    );
+    assert!(
+        lines.iter().any(|l| l.contains("0x4242")
+            && l.contains("what \"thermometer\" sends to \"fsw\"")),
+        "{lines:?}"
+    );
+}
+
+/// Two payloads on one port are an error, said with the summary, which
+/// fails the run: the rule is the existing one for two nodes that want one
+/// thing.
+#[test]
+fn two_payloads_on_one_port_fail_the_summary() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let file = with_payloads_at(dir.path(), &[("one", 7001), ("two", 7001)]);
+    let (lines, status) = run(&["--summary", file.to_str().expect("path")]);
+    assert!(
+        lines.iter().any(|l| l.contains(": error: ")
+            && l.contains("\"one\" and \"two\" both want localhost:7001")),
+        "{lines:?}"
+    );
+    assert!(
+        lines.iter().any(|l| l == "Addresses and ports"),
+        "{lines:?}"
+    );
+    assert_eq!(status, 1);
+}
+
+/// A payload at the port the vehicle takes commands on is one socket with
+/// it: an error, naming both, which fails the run. The rule is
+/// `tcslibgs::graph::sockets`'s, and without it this configuration passes.
+#[test]
+fn a_payload_on_the_command_port_fails_the_run() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let file = with_payloads_at(dir.path(), &[("one", 4000)]);
+    let (lines, status) = run(&[file.to_str().expect("path")]);
+    assert!(
+        lines.iter().any(|l| l.contains(": error: ")
+            && l.contains("tcs_cmd.recv")
+            && l.contains("\"one\" address and port")
+            && l.contains("one socket")),
+        "{lines:?}"
+    );
+    assert_eq!(status, 1);
+
+    // And moved to a port of its own, it passes.
+    let file = with_payloads_at(dir.path(), &[("one", 7001)]);
+    let (lines, status) = run(&[file.to_str().expect("path")]);
+    assert_eq!(status, 0, "{lines:?}");
+}

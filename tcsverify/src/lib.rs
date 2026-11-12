@@ -46,6 +46,7 @@ pub mod locate;
 pub mod own_xtce;
 pub mod set_interface;
 pub mod startup;
+pub mod summary;
 
 use locate::{Where, THE_FILE_ITSELF};
 

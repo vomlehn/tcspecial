@@ -158,6 +158,143 @@ not joined to -- there would be nothing to join to, and a join against half of
 a set reports the other half as unsimulated -- and tcsverify says so rather
 than leaving it unsaid.
 
+Summary
+=======
+
+``--summary``, with one configuration and its simulator file or alone,
+checks it as any run does and then prints what the vehicle uses of what
+must not clash or overflow, so that somebody assembling a vehicle from many
+nodes sees it in one place:
+
+* **Addresses and ports**: every socket the configuration states or
+  implies, who binds it -- the vehicle, the ground, a payload, tcssim, or
+  a software bus's far end -- and what it is. The ``tcspecial`` section's
+  links (``tcs_cmd``, ``payload_command`` and ``beacon``, or ``sbn`` on a
+  software bus); each gateway node's far end, its ``ground_base`` or
+  ``bridge_base`` plus each source's device id, by source; each untouched
+  payload's ``payload_telemetry`` ports, plus its device id at both ends;
+  each gateway node's and network payload's own address and port; and each
+  ``sim_address``. ``payload_command.dest_base`` is one socket, with
+  nothing added to it: the node a command is about is in the command.
+* **Device ids**: every node's, which every counted port and ID is counted
+  by -- its place among the configuration's nodes sorted by name.
+* **Message IDs**, where the configuration is on a cFS software bus: the
+  ``msgid_range`` allotted, and every ID in it, command or telemetry, and
+  what it carries.
+* **APIDs**, where its packets are CCSDS Space Packets, under Yamcs.
+* **Rates to the ground**: for each source's link, how many data a second
+  it carries, the bytes of each datum where its type gives them, and the
+  bytes a second; the beacon's; and the total. A node read on a schedule --
+  its group's ``interval``, its ``trigger_interval``, its ``poll_interval``
+  (at most), or a set of lines' ``state_interval`` -- sends as often as
+  that. Any other node sends at most one datum for each that arrives at
+  it, shown as ``<=``; one with no schedule and nothing linked into it
+  sends when it has something, which no file says, shown as ``?`` and left
+  out of the total, which says how many were. The bytes are the data's
+  alone, not the packets', and a string or bytes has no size its type
+  gives.
+
+The lists are each in an order no file can change -- by kind, then by
+gateway node and device id, then by name -- so two summaries can be
+compared with ``diff``. The summary of the thermostat example:
+
+.. code-block:: console
+
+   $ cargo run --bin tcsverify -- --summary examples/thermostat/thermostat.ytcs
+   examples/thermostat/thermostat.ytcs: summary
+
+   Addresses and ports
+     address         bound by  what
+     0.0.0.0:4000    vehicle   tcs_cmd.recv, where spacecraft commands are taken
+     127.0.0.1:4100  ground    tcs_cmd.send, where spacecraft commands come from
+     0.0.0.0:4200    vehicle   payload_command.dest_base, where node commands are taken
+     127.0.0.1:4300  ground    payload_command.source_base, where node commands come from
+     0.0.0.0:5550    vehicle   beacon.send, where beacons come from
+     127.0.0.1:5650  ground    beacon.recv, where beacons go
+     127.0.0.1:5100  ground    "gateway" ground_base plus device id 0: what "consensus_temp" sends
+     127.0.0.1:5102  ground    "gateway" ground_base plus device id 2: what "gpio-out-tmass1" sends
+     127.0.0.1:5103  ground    "gateway" ground_base plus device id 3: what "gpio-out-tmass2" sends
+     127.0.0.1:5108  ground    "gateway" ground_base plus device id 8: what "to_k1" sends
+     127.0.0.1:5109  ground    "gateway" ground_base plus device id 9: what "to_k2" sends
+     127.0.0.1:5110  ground    "gateway" ground_base plus device id 10: what "to_k3" sends
+     127.0.0.1:5000  vehicle   "gateway" address and port, where the ground sends to it
+     127.0.0.1:5204  tcssim    "gpio-out-tmass1" sim_address
+     127.0.0.1:5205  tcssim    "gpio-out-tmass2" sim_address
+     127.0.0.1:5201  tcssim    "temp_1" sim_address
+     127.0.0.1:5202  tcssim    "temp_2" sim_address
+     127.0.0.1:5203  tcssim    "temp_3" sim_address
+
+   Device ids
+     id  node
+      0  consensus_temp
+      1  gateway
+      2  gpio-out-tmass1
+      3  gpio-out-tmass2
+      4  temp_1
+      5  temp_2
+      6  temp_3
+      7  thermostat
+      8  to_k1
+      9  to_k2
+     10  to_k3
+
+   Message IDs
+     none: the configuration is not on a software bus
+
+   APIDs
+     none: the configuration's packets carry no CCSDS header
+
+   Rates to the ground
+     link                        data/s  bytes/datum  bytes/s  how
+     consensus_temp to gateway      <=3            4     <=12  one per datum from to_k1, to_k2, to_k3
+     gpio-out-tmass1 to gateway       1            1        1  state_interval 1 s
+     gpio-out-tmass2 to gateway       1            1        1  state_interval 1 s
+     to_k1 to gateway               <=1            4      <=4  one per datum from temp_1
+     to_k2 to gateway               <=1            4      <=4  one per datum from temp_2
+     to_k3 to gateway               <=1            4      <=4  one per datum from temp_3
+     beacon                         0.2            ?        ?  beacon.default_interval 5 s
+     total                        <=8.2                  <=26
+
+The cfs example's lists its message IDs instead, beginning:
+
+.. code-block:: console
+
+   Message IDs
+     msgid_range 0x4200 to 0x42ff
+     ID      carries    what
+     0x4200  telemetry  tcs_cmd.response_msgid
+     0x4201  telemetry  beacon.tlm_msgid
+     0x4210  telemetry  the answer message ID of "fsw", payload_command.response_base plus its device id 0
+
+The summary says what is there; what is wrong with it is said with the
+other problems, above it, by the checks every run makes:
+
+* Two sockets that are one -- one port of one protocol on one host,
+  ``localhost``, ``127.0.0.1`` and ``::1`` being one host, or a port on
+  every interface (``0.0.0.0``) and the same port on this host -- are an
+  **error**, naming both: whichever binds second would fail as it starts.
+  Two nodes at one address was checked already, and so were
+  ``tcs_cmd.recv`` and ``payload_command.dest_base`` written alike. The
+  rest is new with the summary: any of the section's sockets, a source's
+  port on the ground, an untouched payload's port aboard, a node's address
+  and a ``sim_address``, against any other of them. A wildcard and a host
+  named otherwise are not compared, since whether ``10.0.0.5`` is this
+  machine is the network's to say; and a sender given port ``0`` claims no
+  port.
+* Two sources on one port of the ground, and a port counted past 65535
+  from a base, were checked already, as were a message ID used twice,
+  outside ``msgid_range`` or of the wrong type for its use, and an APID
+  used twice or past ``0x7FF``. Each is said about the node it is in, as a
+  **warning** -- the kind every problem with a node's own attributes is --
+  so it does not fail the run; the vehicle refuses it all the same. Said
+  about the ``tcspecial`` section, it is an error.
+
+A configuration that does not read has no summary: the run says so on
+stderr, after the problems that say why, and exits 1, as a digest that
+cannot be taken does. With two spellings and a simulator file there is
+none either -- the two say one thing -- and the command line is none of
+the shapes.
+
 See Also
 ========
 

@@ -14,6 +14,7 @@
 //! tcsverify --xtce-check examples/*/*.ytcs
 //! tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 //! tcsverify --fprime-model=fprime/Tcs/TcsBridge/model fprime.ytcs
+//! tcsverify --summary examples/thermostat/thermostat.ytcs
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -106,6 +107,17 @@ configuration.
                      were written. A file that already says what would be
                      written is left alone. See \"F´: gateway_fprime\" in
                      docs/tcsverify-design.rst
+  --summary          with one configuration, and its payload simulator
+                     file if it has one: once it is checked, print what
+                     it uses of what must not clash or overflow -- every
+                     address and port it states or implies and who binds
+                     it, every node's device id, every message ID and
+                     APID, and how many data and bytes a second each
+                     link to the ground carries, with the beacon and the
+                     total -- in aligned columns, after the problems.
+                     Two sockets that are one, a counted port past 65535
+                     and a message ID or APID used twice or out of its
+                     range are problems, said with the others
   --interface-digest print the digest of the interface this build speaks,
                      the 32 lower-case hex digits a configuration's
                      tcspecial section gives as its interface, and exit.
@@ -145,8 +157,9 @@ configuration.
 
 Exit status: 0 no error was printed -- a run that stopped before it found
 one included, as --error-limit=0 always does, and warnings never fail a
-run -- 1 an error was printed, or a digest was asked for and the file
-could not be read to take one, 2 the command line was not one of these.";
+run -- 1 an error was printed, or a digest or a summary was asked for and
+the file could not be read to give it, 2 the command line was not one of
+these.";
 
 /// How many errors are printed before the run stops looking: every one
 /// unless asked.
@@ -192,6 +205,10 @@ const KEEP_FLAG: &str = "--keep=";
 /// the directory given: see `tcsverify::fprime_model`.
 const FPRIME_MODEL_FLAG: &str = "--fprime-model=";
 
+/// Prints what the configuration uses of what must not clash or overflow,
+/// once it is checked: see `tcsverify::summary`.
+const SUMMARY_FLAG: &str = "--summary";
+
 /// Asks for the interface digest of this build, alone on the command line.
 ///
 /// A shape of its own, with nothing beside it: it is a fact about this
@@ -200,17 +217,19 @@ const FPRIME_MODEL_FLAG: &str = "--fprime-model=";
 const INTERFACE_DIGEST_FLAG: &str = "--interface-digest";
 
 /// Reads the command line, checks the files it names and prints what it
-/// found, and each configuration's digest where `--digest` asks for it.
+/// found, each configuration's digest where `--digest` asks for it, and its
+/// summary where `--summary` does.
 ///
 /// # Returns
 ///
 /// The exit status `USAGE` describes: 0 when no error was printed, 1 when
-/// one was or a digest could not be taken, 2 when the command line is not
-/// one of its shapes or the output cannot be written.
+/// one was or a digest or a summary could not be given, 2 when the command
+/// line is not one of its shapes or the output cannot be written.
 fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
     let mut limits = tcsverify::Limits::EVERYTHING;
     let mut digest = false;
+    let mut summary = false;
     let mut keep: Option<PathBuf> = None;
     let mut fprime_model: Option<PathBuf> = None;
     let mut built: Vec<&str> = tcslibgs::graph::built::OPTIONAL_TYPES.to_vec();
@@ -257,6 +276,10 @@ fn main() -> ExitCode {
         }
         if said == DIGEST_FLAG {
             digest = true;
+            continue;
+        }
+        if said == SUMMARY_FLAG {
+            summary = true;
             continue;
         }
         if let Some(value) = said.strip_prefix(KEEP_FLAG) {
@@ -319,6 +342,16 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
+    // A summary is of one configuration, as a model is: a pair of
+    // spellings says one thing, and is compared rather than summed.
+    if summary && !matches!(files.len(), 1 | 2) {
+        eprintln!(
+            "tcsverify: {SUMMARY_FLAG} summarises one configuration, given \
+             with its payload simulator file or alone\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
+    }
+
     let report = match files.as_slice() {
         [payload] => tcsverify::verify_built(payload, None, limits, &built),
         [payload, sim] => {
@@ -349,7 +382,8 @@ fn main() -> ExitCode {
     // What was asked for comes before what was found: a digest is the answer
     // to a question, and the problems are what the files have to say for
     // themselves.
-    let mut digest_failed = false;
+    // Set where a digest or a summary was asked for and could not be given.
+    let mut unanswered = false;
     if digest {
         for path in configurations(&files) {
             match tcslibgs::config_digest::digest_of_file(path) {
@@ -373,7 +407,7 @@ fn main() -> ExitCode {
                         "tcsverify: {}: no digest: {why}",
                         path.display()
                     );
-                    digest_failed = true;
+                    unanswered = true;
                 }
             }
         }
@@ -405,7 +439,26 @@ fn main() -> ExitCode {
         );
     }
 
-    if digest_failed {
+    // After the problems, which say what is wrong with what it lists:
+    // a clash is said there, and the summary shows where it is.
+    if summary {
+        match tcsverify::summary::of(payload) {
+            Ok(text) => {
+                if let Err(e) = write!(out, "{text}") {
+                    eprintln!("tcsverify: cannot write the summary: {e}");
+                    return ExitCode::from(2);
+                }
+            }
+            // The reason it does not read is among the problems printed;
+            // a summary asked for and not given fails, as a digest does.
+            Err(why) => {
+                eprintln!("tcsverify: no summary: {why}");
+                unanswered = true;
+            }
+        }
+    }
+
+    if unanswered {
         return ExitCode::from(1);
     }
 

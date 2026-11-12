@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.7.0
+TCS_HELPERS_REQUIRED := 0.8.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcslibgs/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -777,6 +777,11 @@ FLIGHT_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
 GROUND_BIN := tcsgui
 TEST_BIN := tcsmoc tcssim segsend
 PACKAGES := tcspecial tcspecial-ground tcspecial-test
+# Its programs with windows are built with Slint, whose royalty-free
+# licence asks for its badge where they are downloaded: make
+# publish-release adds it to the notes of every release (see tcs-helpers'
+# README).
+RELEASE_ATTRIBUTION := slint
 
 # The crates those come from, built together by install-build.
 INSTALL_CRATES := tcspecial tcsverify tcsgui tcslib-c tcsmoc tcssim \
@@ -1146,12 +1151,12 @@ uninstall-files:
 LINKDIR ?= /usr/local/bin
 
 # The packaging targets -- install, uninstall, stage, deb, rpm, packages,
-# lint-packages, links and unlinks -- are tcs-helpers' packaging.mk's,
-# shared by the TCS projects; see it for what each does. Each of PACKAGES
-# is staged by its own install-<package>, from one release build, with the
-# configuration and state directories under /etc/opt/tcs and
-# /var/opt/tcs, and built from packaging/deb/<package> and
-# packaging/rpm/<package>.spec, which read the parts they share from
+# lint-packages, links, unlinks and publish-release -- are tcs-helpers'
+# packaging.mk's, shared by the TCS projects; see it for what each does.
+# Each of PACKAGES is staged by its own install-<package>, from one
+# release build, with the configuration and state directories under
+# /etc/opt/tcs and /var/opt/tcs, and built from packaging/deb/<package>
+# and packaging/rpm/<package>.spec, which read the parts they share from
 # packaging/rpm. Without a tcs-helpers checkout new enough to have
 # packaging.mk, the targets stop as the tcs-helpers target says.
 STAGE_TARGET = install-$$package
@@ -1183,6 +1188,8 @@ lint-packages: tcs-helpers
 links: tcs-helpers
 .PHONY: unlinks
 unlinks: tcs-helpers
+.PHONY: publish-release
+publish-release: tcs-helpers
 endif
 
 # Check code quality

@@ -246,6 +246,20 @@ the vehicle runs:
 
    Stage 4: the thermostat's decision travelling back to the heater.
 
+From here on tcsgui's toolbar says *2 concerns*. A concern is a shape that
+may be a mistake and may be meant, never something that stops the
+configuration being read or flown, and these two are meant:
+
+* ``"gateway": nothing is linked to its moc-out``. The ground reaches this
+  deck through the setpoint's command binding, not through a line out of the
+  gateway node, so nothing leaves its ``moc-out``.
+* ``"probe_heater": nothing is linked to its moc-out``. The heater is where
+  the commands stop: it switches its line, and there is nothing further down
+  for it to command.
+
+Each can be set aside in the concerns window, as the window says, if it is
+what was meant.
+
 *See:* "A GPIO Payload" in the tcspecial manual, and the `tcsmoc manual
 <tcsmoc.html>`__ for sending the setpoint.
 

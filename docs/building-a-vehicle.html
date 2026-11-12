@@ -703,6 +703,19 @@ commands:
 <img alt="tcsgui showing probe_thermostat fed by regolith_kelvin, with a line from its lower left back to probe_heater." src="shots/vehicle-stage-04.png" style="width: 100%;" />
 <p class="caption">Stage 4: the thermostat's decision travelling back to the heater.</p>
 </div>
+<p>From here on tcsgui's toolbar says <em>2 concerns</em>. A concern is a shape that
+may be a mistake and may be meant, never something that stops the
+configuration being read or flown, and these two are meant:</p>
+<ul class="simple">
+<li><tt class="docutils literal">&quot;gateway&quot;: nothing is linked to its <span class="pre">moc-out</span></tt>. The ground reaches this
+deck through the setpoint's command binding, not through a line out of the
+gateway node, so nothing leaves its <tt class="docutils literal"><span class="pre">moc-out</span></tt>.</li>
+<li><tt class="docutils literal">&quot;probe_heater&quot;: nothing is linked to its <span class="pre">moc-out</span></tt>. The heater is where
+the commands stop: it switches its line, and there is nothing further down
+for it to command.</li>
+</ul>
+<p>Each can be set aside in the concerns window, as the window says, if it is
+what was meant.</p>
 <p><em>See:</em> &quot;A GPIO Payload&quot; in the tcspecial manual, and the <a class="reference external" href="tcsmoc.html">tcsmoc manual</a> for sending the setpoint.</p>
 </div>
 <div class="section" id="stage-5-rates-and-groups">

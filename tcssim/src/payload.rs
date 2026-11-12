@@ -456,6 +456,54 @@ impl SimulatedPayload {
     }
 }
 
+/// What the payload's thread does, done by hand, for the screenshots the
+/// manual shows (see `crate::shots`): the same packet made the same way, with
+/// the device it would have gone over left out.
+#[cfg(test)]
+impl SimulatedPayload {
+    /// Takes one turn of a payload that sends on its own, as its thread
+    /// does once a packet interval: a packet made, faults and all, if one
+    /// is due, and counted as gone.
+    ///
+    /// # Arguments
+    ///
+    /// * `at`  - When the turn is taken, which the panel shows as the time
+    ///           the packet went, so that a picture says the same time
+    ///           whenever it is made.
+    /// * `rng` - Where the random faults come from.
+    pub fn take_a_turn(&self, at: tcslibgs::Timestamp, rng: &mut impl Rng) {
+        let pacing = Pacing::read(&self.config);
+        if !pacing.a_packet_is_due(self.config.triggered, 0) {
+            return;
+        }
+        let mut guard = self.stats.lock().unwrap();
+        let sent = guard.packets_sent;
+        if let Produce::Send(packet) =
+            a_packet(&self.config, &pacing, sent, rng)
+        {
+            guard.bytes_sent += packet.len() as u64;
+            guard.a_packet_has_gone(&packet);
+            guard.last_sent.time = Some(at);
+        }
+    }
+
+    /// Takes what the vehicle drove a part's lines to, as a heater's thread
+    /// does when its datagram arrives: the part it is joined to in the world
+    /// is driven by it.
+    ///
+    /// # Arguments
+    ///
+    /// * `lines` - What the lines were driven to, as the one number they
+    ///             are: 1 for a heater's on and 0 for its off.
+    pub fn take_a_drive(&self, lines: u64) {
+        crate::node::physics::driven(
+            &self.config.attachment,
+            &self.config.name,
+            &lines.to_be_bytes(),
+        );
+    }
+}
+
 impl Drop for SimulatedPayload {
     fn drop(&mut self) {
         self.stop();

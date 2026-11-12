@@ -122,6 +122,28 @@ middle when it is too long for the title bar. A read-only session says
 Under the menu bar is a bar of buttons and messages, and under that, side by
 side, the selection column on the left and the sheet on the right.
 
+.. figure:: shots/tcsgui-window.png
+   :width: 100%
+   :target: shots/tcsgui-window.png
+   :alt: The main window on the battery example, with eight numbered
+         markers. Along the top the menus File, Edit and View (1). Under
+         them the bar: the Undo and Redo arrows, greyed, the Save button,
+         Arrange, 2 concerns, 0 edits can be undone and saved (2). Down the
+         left the selection column, its lists headed Physics node types,
+         Payload node types, Vehicle node types and Gateway node types (3).
+         The rest is the sheet, divided into the Physics pane, with the
+         simulator's components such as battery and sun as hexagons (4);
+         the Payloads pane, with shunt, monitor and science as
+         parallelograms (5); the Vehicle pane, with battery_amps, bus_volts,
+         charge and shedding as rounded rectangles (6); and the Gateway
+         pane, with the gateway node as a plain rectangle (7). A divider
+         between two panes has a handle halfway down (8). Lines join the
+         nodes.
+
+   The battery example as it opens, with its simulator file: (1) the
+   menus, (2) the bar, (3) the selection column, (4) to (7) the Physics,
+   Payloads, Vehicle and Gateway panes, (8) a divider's handle.
+
 The sheet and its panes
 -----------------------
 
@@ -252,10 +274,10 @@ top and an input below it. The lines of the physics model are dashed, where a
 configuration's links are solid.
 
 **Red means something is wrong**, and nothing else on the sheet is red. A
-node with something wrong with it is drawn with its outline, its name and its
-terminals in red, and it is also counted and named in words on the bar's
-errors button. A node whose type this build does not know is drawn as a small
-open square, which no real type is.
+node with something wrong with it has its body drawn red, its outline, name
+and terminals left as they were, and it is also counted and named in words on
+the bar's errors button. A node whose type this build does not know is drawn
+as a small open square, which no real type is.
 
 A selected node, component or line is outlined in dark grey; a selected line
 is drawn over a wider line.
@@ -314,6 +336,25 @@ on Close, or when the window is closed -- not at each keystroke. A tick box
 is taken at once. A cleared field leaves the attribute out of the file, which
 is what an empty value means to the checking anyway.
 
+Going on from the example under `Drawing a line`_:
+
+#. .. figure:: shots/tcsgui-edit-1.png
+      :alt: log-1, marked 1, outlined in dark grey as selected, and beside
+            it a menu offering Edit and Delete.
+
+      Right-click ``log-1`` (1). It is selected and its menu opens.
+
+#. .. figure:: shots/tcsgui-edit-2.png
+      :alt: log-1's window: the name log-1 in a field with an x beside it,
+            the type log under it, the fields directory, marked with an
+            asterisk and holding /tmp/telemetry, and format, marked and
+            empty; a comment box; under About, Records what reaches it
+            rather than passing it on; and a Close button.
+
+      Choose **Edit**, and the node's window opens. ``directory`` and
+      ``format`` are marked ``*``, the configuration requiring them. A
+      directory has been typed and taken; ``format`` waits for an answer.
+
 Renaming
 --------
 
@@ -347,8 +388,9 @@ A line is drawn in three clicks:
 1. Click a terminal. The line is now in hand: a dashed line follows the
    pointer, and a box along the bottom of the sheet says what to click next.
 2. Click the node the line is to reach, anywhere on it. A menu headed with the
-   node's name offers what the line can become there -- the input of the same
-   stream, or each of a node's named inputs, ``in0``, ``in1`` and so on.
+   node's name offers what the line can become there -- the terminal of the
+   same stream at that end, or each of a node's named inputs, ``in0``,
+   ``in1`` and so on.
 3. Choose one.
 
 A line may be drawn from either end, from the data source or from the sink
@@ -363,6 +405,51 @@ nothing at all for the line offers no menu, and the line stays in hand while
 the box on the sheet says so. tcsgui will not draw a line from a node to
 itself, one that carries one stream into the other, one the configuration
 already has, or a second line into an input that does not merge.
+
+For example, to record the battery example's bus voltage in a log of its own:
+
+#. .. figure:: shots/tcsgui-place-1.png
+      :width: 100%
+      :alt: The vehicle list scrolled down to the heading Ends of the
+            graph, its log entry marked 1. On the sheet a new node, log-1,
+            in the upper right of the Vehicle pane. The bar's Undo button
+            reads add log "log-1", and a new button reads 2 errors.
+
+      Click ``log`` in the vehicle list, under *Ends of the graph* (1). A
+      node called ``log-1`` is placed as high in the Vehicle pane as it fits.
+      Nothing is joined to it and nothing is filled in yet, which
+      ``tcsverify`` reports, so the bar's errors button counts it (see
+      `Errors`_).
+
+#. .. figure:: shots/tcsgui-place-2.png
+      :width: 100%
+      :alt: log-1's upper left terminal marked 2, a short dashed line
+            running from it towards bus_volts, and along the bottom of the
+            sheet a box saying: A line from world-in is in hand: click a
+            node to join it. Escape, or a click on bare sheet, puts it down.
+
+      Click ``log-1``'s ``world-in`` terminal, in its upper left corner (2).
+      The line is in hand: a dashed line follows the pointer, and the box at
+      the foot of the sheet says what to do next.
+
+#. .. figure:: shots/tcsgui-place-3.png
+      :width: 100%
+      :alt: bus_volts marked 3, and over it a menu headed bus_volts
+            offering New line from world-out, and Cancel.
+
+      Click ``bus_volts``, anywhere on it (3). Its menu offers what the line
+      can be there: a new line from its ``world-out``.
+
+#. .. figure:: shots/tcsgui-place-4.png
+      :width: 100%
+      :alt: A line now runs from bus_volts's upper right terminal to
+            log-1's upper left, log-1 marked 4. The bar's Undo button reads
+            link "bus_volts" to "log-1", the errors button 1 error, and the
+            bar says 2 edits can be undone.
+
+      Choose it. The line is drawn (4) and written, and Undo names it. One
+      error is left: nothing of the log is filled in yet, which is done in
+      its window, next.
 
 Moving and removing a line
 --------------------------
@@ -488,7 +575,12 @@ Errors
 An **error** is something the vehicle would refuse: a value a rule refuses,
 two nodes of one name, two lines into one input, a line to a node that is not
 there. While there are any, the bar has a button saying how many --
-``3 errors`` -- whose menu lists them one a line. Choosing one goes to it:
+``3 errors`` -- whose menu lists them one a line. The menu lists everything
+``tcsverify`` says about the files, in its words, its warnings among them,
+and each but a node's own fault starts with the file and line it is about:
+so a node just placed, joined to nothing and with fields it requires left
+empty, is listed until it is joined and filled in, although it is not drawn
+red. Choosing one goes to it:
 
 * a node's error shows the node in the middle of its page, selected, with its
   window open;
@@ -511,9 +603,64 @@ this session only and is not written anywhere. Either way every node is on
 the sheet in its pane, so a configuration can be looked at before it is put
 right.
 
+.. figure:: shots/tcsgui-open-errors.png
+   :width: 100%
+   :alt: The main window greyed, and in front of it a box headed This
+         configuration has errors the vehicle would not fly with, saying
+         Some nodes have attribute values that are not valid. There are
+         other errors as well. Each is drawn in red. Choose one from the
+         errors button on the bar to go to it. Buttons Copy, Quit and
+         Ignore.
+
+   The battery example opened with the shunt's port changed to 99999 in
+   the file.
+
 An error made while you work is also said once in a small window, headed
 *Something is wrong with the configuration.*, that has to be acknowledged; it
-is said again only if it goes away and comes back.
+is said again only if it goes away and comes back. Its **Copy** button puts
+what it says on the clipboard.
+
+Here, in the battery example, a port that cannot be one is typed into the
+``shunt``'s window:
+
+#. .. figure:: shots/tcsgui-error-1.png
+      :alt: A window headed Something is wrong with the configuration.,
+            saying in red: "shunt": port 99999 is not a port -- a port is 1
+            to 65535, and 0 is "whichever one is free", which a
+            configuration cannot mean. Under it, in grey, it says the node
+            is drawn in red and nothing has been lost. Copy and OK buttons.
+
+      The value is taken, and the window says what is wrong with it. Press
+      **OK**.
+
+#. .. figure:: shots/tcsgui-error-2.png
+      :width: 100%
+      :alt: The bar, its Undo button reading set port of "shunt" and a new
+            button 2 errors; on the sheet the shunt, marked 2, is drawn red.
+
+      The ``shunt`` is drawn red (2), and the bar has a ``2 errors``
+      button: the port, and the simulator's file, which cannot simulate a
+      payload on that port.
+
+#. .. figure:: shots/tcsgui-error-3.png
+      :width: 100%
+      :alt: The 2 errors button pressed, marked 3, and under it a menu of
+            two lines: the shunt's port, and an error from line 97 of
+            battery-sim.yaml saying the shunt cannot be simulated.
+
+      Press the button (3): its menu lists the errors.
+
+#. .. figure:: shots/tcsgui-error-4.png
+      :width: 100%
+      :alt: The shunt's window: its name, its type network, the same
+            sentence about port 99999 in red italic, and its fields --
+            protocol udp, address 127.0.0.1, port 99999 and the rest --
+            with, beside them under the heading simulated payload, the
+            simulator's settings in italic.
+
+      Choose the first. The ``shunt`` is selected in the middle of the
+      sheet and its window opens, saying the same thing in red. Put the port
+      right there, or press Undo (see `Undo and redo`_).
 
 Concerns
 --------
@@ -557,6 +704,13 @@ writes at once whatever was waiting.
 
 The setting is kept as ``<autosave>`` in ``$HOME/.tcsgui/preferences.xml``,
 ``true`` or ``false``, and is on by default.
+
+.. figure:: shots/tcsgui-file-menu.png
+   :alt: The File menu open: Save, Save as..., Autosave with a tick beside
+         it, then Edit payload groups and Edit simulated payload groups,
+         then Exit.
+
+   The File menu, with Autosave on.
 
 Save and Save as
 ----------------
@@ -618,12 +772,24 @@ not, a window says *There are changes the files do not have.* and offers:
 * **Leave without saving**;
 * **Stay**.
 
-However tcsgui ends -- by Exit or by its windows being closed -- it then
-tries once more to write whatever the files do not have, and says on the
-error output whether it did. As the code stands this happens after **Leave
-without saving** too, so the edits are written all the same. If that last
-write fails, the error output says where the session's history is, since it
-is then the only copy of the work.
+and **Copy**, which puts what the window says on the clipboard.
+
+.. figure:: shots/tcsgui-leave.png
+   :alt: A window headed There are changes the files do not have., saying
+         that saving writes the configuration and, where this session was
+         given one, the simulator's file beside it. Buttons Stay, Copy,
+         Leave without saving, Save as and leave... and Save and leave.
+
+   File -> Exit with Autosave off and an edit not yet saved.
+
+**Leave without saving** lets the edits go: the files keep what they last
+had, and the history goes with the session, as it does on any tidy exit, so
+the edits are lost.
+
+However else tcsgui ends -- by Exit, or by its windows being closed -- it
+then tries once more to write whatever the files do not have, and says on the
+error output whether it did. If that last write fails, the error output says
+where the session's history is, since it is then the only copy of the work.
 
 Undo, redo and crash recovery
 =============================
@@ -638,6 +804,25 @@ deleting a node with its lines, arranging a page, writing a value to every
 payload of a group. Selecting, opening windows, moving a divider and zooming
 are not edits. Undo also covers placing the ground station a new
 configuration starts with.
+
+Going on from the example under `Errors`_:
+
+#. .. figure:: shots/tcsgui-undo-1.png
+      :width: 100%
+      :alt: The bar: an Undo button reading set port of "shunt", a greyed
+            Redo arrow, 2 errors, and 1 edits can be undone; the shunt
+            below, red and selected.
+
+      The last edit set the shunt's port, and the Undo button says so.
+
+#. .. figure:: shots/tcsgui-undo-2.png
+      :width: 100%
+      :alt: The bar: a greyed Undo arrow, a Redo button reading set port
+            of "shunt", no errors button, and 0 edits can be undone; the
+            shunt below no longer red.
+
+      Press it. The port is put back and written, the errors go, and
+      **Redo** offers to set it again.
 
 The history
 -----------
@@ -674,6 +859,32 @@ must still match the digest the history holds for it.
 
 A history written by an older tcsgui that kept no digests is discarded the
 same way.
+
+.. figure:: tcsgui-recovery.svg
+   :alt: A flow chart. tcsgui opens a configuration. Is there a history of
+         an earlier session on it? No: the session starts with an empty
+         history. Yes: does every file still match the digest the history
+         keeps for it? Yes, in a box with a solid border headed Recovered:
+         the history becomes this session's, Undo reaches back past the
+         crash, every edit the files do not have is put back at once and
+         written if Autosave is on, and the bar says how many. No, in a box
+         with a dashed border headed Discarded: a file was changed by
+         something else, or the history keeps no digests; the history is
+         thrown away and the bar says so, and the files are left as they
+         are.
+
+   What tcsgui does with an earlier session's history as it opens a
+   configuration.
+
+.. figure:: shots/tcsgui-recover.png
+   :width: 100%
+   :alt: The bar: an Undo button reading set offset of "bus_volts", 2
+         edits can be undone, and in green: 2 edits not saved when tcsgui
+         last stopped put back, and saved.
+
+   The battery example opened after a session that changed ``bus_volts``
+   twice with Autosave off and then stopped without saving. Both edits are
+   back, written, and can be undone.
 
 Read-only sessions
 ==================

@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="560" viewBox="0 0 1040 560" role="img" aria-labelledby="title desc">
+  <title id="title">TCSpecial in flight</title>
+  <desc id="desc">A vehicle runs tcspecial. On its left are its payloads, each on an interface of its own: temperature sensors on an I2C bus, a battery monitor on a SPI bus, an altimeter on a serial line, a motor controller on a CAN bus, heaters on GPIO lines, and a science program aboard reached through a socket. tcspecial reads and drives each through a device node, computes from what they read in compute nodes, keeps a record aboard, in a tcslog log, of what it sends to the ground, and sends it to the ground through a gateway node. The vehicle and the mission operations center talk over the space link: telemetry and beacons go down, commands go up. On the ground, Yamcs is the mission control system, and it uses tcslib, the TCS ground library, for its end of the link: tcslib sends commands and receives the telemetry, and its mission database is generated from the vehicle's configuration.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .title { font-size: 17px; font-weight: bold; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 14px; font-weight: bold; }
+      .kind { font-size: 12px; fill: #374151; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .payload { fill: #fdf1dd; stroke: #E69F00; stroke-width: 1.5; }
+      .vehicle { fill: #f7f9fc; stroke: #0072B2; stroke-width: 2; }
+      .soft { fill: #e3f0f9; stroke: #0072B2; stroke-width: 1.5; }
+      .node { fill: #ffffff; stroke: #0072B2; stroke-width: 1.2; }
+      .ground { fill: #f4faf7; stroke: #009E73; stroke-width: 2; stroke-dasharray: 8 4; }
+      .yamcs { fill: #ffffff; stroke: #009E73; stroke-width: 1.5; }
+      .lib { fill: #e2f4ec; stroke: #009E73; stroke-width: 1.5; }
+      .wire { stroke: #E69F00; stroke-width: 2; fill: none; }
+      .flow { stroke: #0072B2; stroke-width: 1.5; fill: none; marker-end: url(#blue); }
+      .down { stroke: #D55E00; stroke-width: 2.5; fill: none; marker-end: url(#red); }
+      .up { stroke: #009E73; stroke-width: 2.5; fill: none; stroke-dasharray: 9 5; marker-end: url(#green); }
+    </style>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0072B2"/></marker>
+    <marker id="red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#D55E00"/></marker>
+    <marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#009E73"/></marker>
+  </defs>
+  <rect width="1040" height="560" fill="#ffffff"/>
+
+  <!-- Payloads -->
+  <text class="heading" x="20" y="34">PAYLOADS</text>
+  <g>
+    <rect class="payload" x="20" y="50" width="190" height="56" rx="6"/>
+    <text class="label" x="32" y="73">Temperature sensors</text>
+    <text class="kind" x="32" y="93">I²C bus</text>
+    <rect class="payload" x="20" y="120" width="190" height="56" rx="6"/>
+    <text class="label" x="32" y="143">Battery monitor</text>
+    <text class="kind" x="32" y="163">SPI bus</text>
+    <rect class="payload" x="20" y="190" width="190" height="56" rx="6"/>
+    <text class="label" x="32" y="213">Altimeter</text>
+    <text class="kind" x="32" y="233">serial line</text>
+    <rect class="payload" x="20" y="260" width="190" height="56" rx="6"/>
+    <text class="label" x="32" y="283">Motor controller</text>
+    <text class="kind" x="32" y="303">CAN bus</text>
+    <rect class="payload" x="20" y="330" width="190" height="56" rx="6"/>
+    <text class="label" x="32" y="353">Heaters</text>
+    <text class="kind" x="32" y="373">GPIO lines</text>
+    <rect class="payload" x="20" y="400" width="190" height="56" rx="6"/>
+    <text class="label" x="32" y="423">Science program aboard</text>
+    <text class="kind" x="32" y="443">socket</text>
+  </g>
+  <path class="wire" d="M210,78 H270"/>
+  <path class="wire" d="M210,148 H270"/>
+  <path class="wire" d="M210,218 H270"/>
+  <path class="wire" d="M210,288 H270"/>
+  <path class="wire" d="M210,358 H270"/>
+  <path class="wire" d="M210,428 H270"/>
+
+  <!-- Vehicle -->
+  <rect class="vehicle" x="240" y="20" width="370" height="520" rx="12"/>
+  <text class="heading" x="256" y="44">VEHICLE</text>
+  <rect class="soft" x="262" y="56" width="328" height="412" rx="8"/>
+  <text class="name" x="276" y="80">tcspecial</text>
+  <text class="kind" x="364" y="80">flight software</text>
+
+  <rect class="node" x="276" y="94" width="104" height="356" rx="6"/>
+  <text class="label" x="288" y="116">device</text>
+  <text class="label" x="288" y="132">nodes</text>
+  <text class="kind" x="288" y="156">one for each</text>
+  <text class="kind" x="288" y="172">payload: read,</text>
+  <text class="kind" x="288" y="188">written, timed</text>
+
+  <rect class="node" x="404" y="160" width="76" height="120" rx="6"/>
+  <text class="label" x="414" y="182">compute</text>
+  <text class="label" x="414" y="198">nodes</text>
+  <text class="kind" x="414" y="222">vote,</text>
+  <text class="kind" x="414" y="238">thermostat,</text>
+  <text class="kind" x="414" y="254">to_kelvin</text>
+
+  <rect class="node" x="500" y="160" width="78" height="120" rx="6"/>
+  <text class="label" x="510" y="182">gateway</text>
+  <text class="label" x="510" y="198">node</text>
+  <text class="kind" x="510" y="222">to and</text>
+  <text class="kind" x="510" y="238">from the</text>
+  <text class="kind" x="510" y="254">ground</text>
+
+  <rect class="node" x="404" y="330" width="174" height="66" rx="6"/>
+  <text class="name" x="416" y="354">tcslog</text>
+  <text class="kind" x="416" y="374">keeps a record aboard of</text>
+  <text class="kind" x="416" y="389">what is sent to the ground</text>
+
+  <path class="flow" d="M380,220 H402"/>
+  <path class="flow" d="M480,220 H498"/>
+  <path class="flow" d="M380,150 C440,120 520,120 538,158"/>
+  <path class="flow" d="M539,282 V328"/>
+  <text class="kind" x="268" y="492">Each payload is a device node; what joins two</text>
+  <text class="kind" x="268" y="508">nodes is a link. Both come from the configuration.</text>
+
+  <!-- Ground -->
+  <rect class="ground" x="740" y="20" width="285" height="520" rx="12"/>
+  <text class="heading" x="756" y="44">MISSION OPERATIONS</text>
+  <text class="heading" x="756" y="62">CENTER (MOC)</text>
+  <rect class="yamcs" x="780" y="90" width="226" height="290" rx="8"/>
+  <text class="name" x="794" y="116">Yamcs</text>
+  <text class="kind" x="794" y="136">mission control system</text>
+  <rect class="lib" x="794" y="160" width="198" height="120" rx="6"/>
+  <text class="name" x="806" y="184">tcslib</text>
+  <text class="kind" x="806" y="204">the TCS ground library:</text>
+  <text class="kind" x="806" y="222">sends commands,</text>
+  <text class="kind" x="806" y="240">receives telemetry and</text>
+  <text class="kind" x="806" y="258">beacons</text>
+  <text class="kind" x="794" y="306">its mission database is</text>
+  <text class="kind" x="794" y="324">generated from the vehicle's</text>
+  <text class="kind" x="794" y="342">configuration</text>
+  <text class="kind" x="756" y="420">Key:</text>
+  <path class="down" d="M792,440 H840"/>
+  <text class="kind" x="850" y="444">solid: down to the ground</text>
+  <path class="up" d="M840,466 H792"/>
+  <text class="kind" x="850" y="470">dashed: up to the vehicle</text>
+  <!-- Space link -->
+  <path class="down" d="M580,200 H792"/>
+  <path class="up" d="M792,250 H582"/>
+  <text class="label" x="618" y="190">telemetry, beacons</text>
+  <text class="label" x="630" y="272">commands</text>
+  <text class="heading" x="636" y="232">SPACE LINK</text>
+
+</svg>

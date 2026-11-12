@@ -19,6 +19,10 @@ Work is under way on integrating TCSpecial, with its telemetry log
 [tcs-xtce](https://github.com/vomlehn/tcs-xtce), with NASA's core Flight System
 (cFS) and JPL's F´ (F Prime): see docs/third-party.rst.
 
+TCSpecial is the hub of the TCS software: tcs-xtce, tcslog, tcslog-tools
+and tcs-helpers are the libraries and tools it is built from and works
+with, and docs/manual.rst links to their documents.
+
 > **Note:** integration with cFS and F´ is a work in progress, and the plan
 > may change as it is. A vehicle can answer to an F´ flight computer through
 > the bridge component in fprime/ (`make fprime-test` tests it); none of the
@@ -27,9 +31,10 @@ Work is under way on integrating TCSpecial, with its telemetry log
 # To Run
 
 This is a pre-pre-pre-alpha release that mostly displays the GUI. There is a
-design document in docs/tcspecial-design.rst, a manual in docs/manual.rst, and a
-plan for integration with cFS and F´ in docs/third-party.rst. The docs/Makefile
-will build HTML pages of each for viewing.
+design document for each program, listed in docs/design.rst, a manual for
+each, listed in docs/manual.rst, and a plan for integration with cFS and F´
+in docs/third-party.rst. The docs/Makefile will build HTML pages of each for
+viewing.
 
 * Clone the source
 
@@ -110,7 +115,7 @@ quarter off what each package installs. `STRIP=0` keeps everything as cargo
 built it:
 `make packages STRIP=0`.
 
-See "Installing" in docs/manual.rst for where everything goes and why.
+See "Installing" in docs/tcspecial.rst for where everything goes and why.
 
 # Stuff
 
@@ -193,7 +198,8 @@ To Do
 See also
 ========
 * [The TCSpecial manuals](https://vomlehn.github.io/tcspecial/docs/manual.html):
-  what each program's manual covers.
+  what each program's manual covers, and the documents of the other TCS
+  projects, of which TCSpecial is the hub.
 * [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
   how to write a configuration, and how to run the flight software and the

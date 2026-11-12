@@ -16,6 +16,28 @@ started with tcspecial and tcsmoc, as Running the Programs, in `the tcspecial
 manual <tcspecial.html#running-the-programs>`__, describes, and tcspecial's
 ``--simulate`` says which payloads it stands in for.
 
+.. figure:: tcssim-between.svg
+   :alt: tcsmoc, tcspecial and tcssim side by side on the thermostat
+         example. tcsmoc starts the other two and asks tcssim, at its
+         tcssim.ready address, whether it is ready; it sends tcspecial
+         commands and takes its telemetry. tcssim has a panel for each
+         simulated payload: the sensors temp_1, temp_2 and temp_3, and the
+         heater switches gpio-out-tmass1 and gpio-out-tmass2. Arrow 1: the
+         sensors send readings to tcspecial over UDP at each payload's
+         sim_address. Arrow 2: tcspecial's thermostat sends the switches on
+         or off. Inside tcssim the switches drive the zone's heater inputs
+         in the physics model's world, and the sensors read the zone's
+         temperature. Arrow 3: the person at tcssim's window enables and
+         disables payloads and changes their sizes and intervals.
+
+   Where tcssim sits, in the thermostat example. tcspecial reaches each
+   simulated payload where it would reach the device -- here its
+   ``sim_address`` -- and cannot tell tcssim from the hardware. The sensors'
+   readings (1) come from the simulator's world, which the heater switches
+   tcspecial drives (2) warm, so what tcspecial reads follows from what it
+   decided. The window (3) is how a person changes what tcssim does while it
+   runs: see `Step by step`_.
+
 The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
@@ -634,6 +656,8 @@ as the node does aboard.
 Never name a thermostat with tcspecial running: its own thermostat switches
 the same heaters, and the two would fight.
 
+.. _fault injection:
+
 **Fault injection**
 
 A payload that always works exercises only the path where everything works.
@@ -780,7 +804,8 @@ Each panel shows, from the top:
 the name, the number and the status
   The number is the payload's place in the payload configuration, as tcsmoc's
   panels show it, so the two windows name the same payload the same way. The
-  status is red while the payload is not sending and black while it is.
+  status says ``Running`` while the payload is sending and ``Stopped``
+  while it is not, in black for the one and in bold red for the other.
 
 how the payload is reached
   The same description tcsmoc's panels carry for the handler at the other end
@@ -815,8 +840,13 @@ under `Seeing what was read <tcspecial.html#seeing-what-was-read>`__ -- and then
 ``Sent``
   When the last packet went, and the first few bytes of it. A part the
   vehicle drives sends nothing, and this line says what it is doing instead,
-  in words: ``heater_1: heating``, ``heater_1: off``, or ``heater_1:
-  disabled, so off`` -- see `Starting and stopping a payload <tcspecial.html#starting-and-stopping-a-payload>`__.
+  in words, naming the component of the physics model it is joined to:
+  ``heater_1: heating`` or ``heater_1: off`` for a switch joined to a
+  ``heater`` component's ``on``, ``zone: on`` or ``zone: off`` for one
+  joined to a thermal mass's own ``heater_1`` or ``heater_2``, as in the
+  thermostat example, and ``disabled, so off`` after the name for either
+  while its panel has it disabled -- see `Starting and stopping a payload
+  <tcspecial.html#starting-and-stopping-a-payload>`__.
 
 ``Recv``
   When the last packet arrived, and the first few bytes of it -- for a payload
@@ -834,11 +864,146 @@ under `Seeing what was read <tcspecial.html#seeing-what-was-read>`__ -- and then
   arrived half is there for a payload that answers requests, as the ``Recv``
   line is and for the same reason: a payload that sends of its own accord is
   never spoken to, so a count of what arrived could only ever read nought.
+  A part the vehicle drives sends nothing, so its count stays at nought;
+  what the vehicle sends it is counted, but not shown.
 
 The times and bytes are the simulator's own account of what it did, where
 tcsmoc's panels show the same transfers as the spacecraft reported them. Two
 panels disagreeing about one transfer is worth knowing about, which is why
 both are shown the same way.
+
+Step by step
+------------
+What the window shows as the commonest things are done with it, on the
+thermostat example (``examples/thermostat``), whose five panels are the
+three temperature sensors and the two heater switches of the figure in the
+`Introduction`_. The times are the simulated run's: it starts at 10:00:00,
+and each sensor sends a reading a second, its ``packet_interval``. The
+pictures are made by ``make screenshots-tcssim`` from the program's own
+window, drawn without opening it.
+
+**Enabling a sensor**
+
+#. .. figure:: shots/tcssim-open.png
+      :alt: The tcssim window on the thermostat example: the heading
+            Simulated Payloads, two rows of panels -- gpio-out-tmass1,
+            gpio-out-tmass2 and temp_1, then temp_2 and temp_3 -- each
+            Stopped, with an Enable button, and Quit All at the foot.
+
+      The window as it opens. Every payload is ``Stopped`` -- its simulated
+      device is made, so tcspecial finds it, but nothing goes over it -- and
+      each panel offers ``Enable``. The heater switches' first line says what
+      they are doing; the sensors' says ``Sent: --:--:--``, nothing having
+      gone yet.
+
+#. .. figure:: shots/tcssim-enable-2.png
+      :alt: The temp_1 panel, now Running in black, its button reading
+            Disable, its Sent line still --:--:-- and Pkts: 0 sent.
+
+      ``Enable`` pressed on ``temp_1``. The status is ``Running`` and the
+      button offers ``Disable``; no reading has gone yet.
+
+#. .. figure:: shots/tcssim-enable-3.png
+      :alt: The temp_1 panel three seconds later: Running, Sent: 10:00:03
+            followed by two bytes, and Pkts: 3 sent.
+
+      Three seconds on. ``Sent`` gives the time of the last reading and its
+      bytes -- the zone's temperature as the sensor reads it, in the encoding
+      tcspecial's conversion reads back -- and ``Pkts`` counts three.
+      ``Pkt``, ``Seg``, ``Pkt Int`` and ``Seg Int`` can be changed here while
+      it runs, and take effect on the next reading.
+
+**Switching a heater**
+
+#. .. figure:: shots/tcssim-heater-1.png
+      :alt: The gpio-out-tmass1 panel: Stopped in bold red, an Enable
+            button, and the line zone: disabled, so off.
+
+      The heater switch ``gpio-out-tmass1`` as it opens. It drives the
+      zone's ``heater_1``, so its line names the zone, and disabled -- its
+      button is its power -- it is off whatever it is sent.
+
+#. .. figure:: shots/tcssim-heater-2.png
+      :alt: The same panel after the vehicle has switched it on: still
+            Stopped, still zone: disabled, so off.
+
+      tcspecial's thermostat switches it on. Nothing changes on the panel or
+      in the zone: a disabled heater stays off. What it was sent is kept.
+
+#. .. figure:: shots/tcssim-heater-3.png
+      :alt: The same panel after Enable: Running in black, a Disable
+            button, and the line zone: on.
+
+      ``Enable`` pressed. The ``on`` it was sent is applied at once --
+      ``zone: on`` -- rather than at the thermostat's next decision, which
+      comes only when the decision changes.
+
+#. .. figure:: shots/tcssim-heater-4.png
+      :alt: The same panel after the vehicle has switched it off: Running,
+            and the line zone: off.
+
+      The thermostat switches it off, and the line says ``zone: off``. A
+      heater sends nothing, so its ``Pkts`` stays at nought throughout.
+
+**Sizes that cannot be sent**
+
+#. .. figure:: shots/tcssim-sizes-1.png
+      :alt: The temp_2 panel with a popup over it, outlined in red: temp_2:
+            these sizes cannot be sent. A segment of 2 bytes cannot be part
+            of a packet of 1: a segment is a piece of a packet. Raise the
+            packet size to 2 or more, or lower the segment size to 1 or
+            less. Behind it the Enable button is greyed out.
+
+      ``Pkt`` stepped down from 2 to 1 on ``temp_2``, leaving its 2-byte
+      segment larger than the packet. A popup says so at once, naming both
+      sizes and either way out, and ``Enable`` is greyed out.
+
+#. .. figure:: shots/tcssim-sizes-2.png
+      :alt: The temp_2 panel with Pkt and Seg both 2, no popup, and the
+            Enable button pressable again.
+
+      ``Pkt`` stepped back up to 2. The popup goes and ``Enable`` comes
+      back. Nothing is written to the files either way.
+
+**A fault taking effect**
+
+Faults are asked for in the simulator configuration, not in the window (see
+`Fault injection`_ above). Here the thermostat example's file has one line
+added to ``temp_3``'s entry:
+
+.. code-block:: yaml
+
+   simulated_payloads:
+     - type spi_tmass:
+         - payload: temp_3
+           silent_after: 3
+           accuracy: 0.25 K
+           group: zone_temps
+           lag: 6 s
+           noise: 0.02 K
+           offset: -0.3 K
+
+``temp_3``'s ``Configuration`` button then lists ``silent_after 3 packets``
+under ``faults``, at the foot of what the simulator configuration said.
+``temp_2``, which has no fault, and ``temp_3`` are enabled together:
+
+#. .. figure:: shots/tcssim-fault-1.png
+      :alt: The temp_2 and temp_3 panels side by side, both Running, both
+            Sent at 10:00:03 and both Pkts: 3 sent.
+
+      Three seconds on, ``temp_2`` and ``temp_3`` have each sent three
+      readings, and look alike.
+
+#. .. figure:: shots/tcssim-fault-2.png
+      :alt: The same two panels seven seconds later: temp_2 Sent at
+            10:00:10 with Pkts: 10 sent; temp_3 still Running but still
+            Sent at 10:00:03 with Pkts: 3 sent.
+
+      Seven seconds later ``temp_2`` has sent ten, the last at 10:00:10.
+      ``temp_3`` is still ``Running``, its link still open, but has sent
+      nothing since its third: its ``Sent`` time has stopped, which is the
+      sign a wedged instrument gives, and what tcspecial's handler for it
+      sees is readings that have stopped coming.
 
 See Also
 ========

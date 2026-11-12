@@ -42,6 +42,10 @@ mod nodes;
 mod read;
 mod save;
 mod settings;
+/// The screenshots in the manual: an ignored test, `make
+/// screenshots-tcsgui`.
+#[cfg(test)]
+mod shots;
 /// What the colours look like to a reader who cannot see all of them. Used by
 /// the palette's tests and by nothing at run time.
 #[cfg(test)]
@@ -884,111 +888,7 @@ fn main() -> Result<(), slint::PlatformError> {
     editor.borrow_mut().recover();
     seed(&mut editor.borrow_mut());
 
-    let ui = MainWindow::new()?;
-    session!(&ui);
-    furnish!(&ui, descriptions());
-    // The physics list and its pane's tint, which only the main window has:
-    // see `physics_palette`.
-    ui.set_physics_palette(physics_palette());
-    ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
-    ui.set_physics_list_percent(settings.list_physics_percent);
-    ui.on_titled(|base, path, width| title::titled(&base, &path, width).into());
-
-    let views = Rc::new(RefCell::new(Views {
-        top: ui.as_weak(),
-        open: BTreeMap::new(),
-        chosen: Rc::new(RefCell::new(BTreeMap::new())),
-        picked: Rc::new(RefCell::new(BTreeMap::new())),
-        drawing: Rc::new(RefCell::new(None)),
-        divider: divider.clone(),
-        lists: lists.clone(),
-        group: None,
-        parameters: None,
-        attributes: BTreeMap::new(),
-        leaving: None,
-        replacing: None,
-        concerns: None,
-        deleting: None,
-        names: None,
-        alert: None,
-        alerted: Rc::new(RefCell::new(String::new())),
-        faulted: Rc::new(RefCell::new(Default::default())),
-        sim_groups: None,
-        showing_sim_group: Rc::new(RefCell::new(String::new())),
-        physics: None,
-        showing_physics: Rc::new(RefCell::new(String::new())),
-        physics_list: Rc::new(std::cell::Cell::new(
-            settings.list_physics_percent,
-        )),
-        autosave: Rc::new(std::cell::Cell::new(settings.autosave)),
-        showing: Rc::new(RefCell::new(String::new())),
-        errors: Rc::new(RefCell::new(Vec::new())),
-        lit: Rc::new(RefCell::new(None)),
-    }));
-    alerting(&views);
-    // Which node the panel is showing, per window.
-    //
-    // Deliberately not in the document: what somebody is looking at is not
-    // something the vehicle flies, and an edit for it would make choosing a
-    // node undoable, which is not what undo is for.
-    let chosen: Rc<RefCell<BTreeMap<String, String>>> =
-        Rc::new(RefCell::new(BTreeMap::new()));
-
-    // Which node a link is being drawn from, while the gesture is running.
-    // Nothing is recorded until it finishes on another node, so a drag that
-    // ends nowhere leaves no trace.
-    let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
-
-    // What the file arrived with is counted as said before anything is drawn,
-    // so that the alert leaves it to the warning about it: see
-    // `warn_of_errors`, below. Drawing is what raises the alert, and the
-    // first drawing is the next line.
-    closing(&ui, &views);
-
-    // The main window first, so that whatever came up as the editor started
-    // is read over a drawing rather than instead of one. Nothing is painted
-    // until the event loop runs, which is after all of this, so it is shown
-    // before it is filled and is never seen empty.
-    //
-    // It takes no presses while any of that is up, and is inert from the
-    // start, until what came up is known: an alert said while it is inert is
-    // said in front of its drawing, inside it, which is what `Views::say`
-    // asks it. See `inert` in the markup, set again below.
-    ui.set_inert(true);
-    ui.show()?;
-
-    settled(&editor, &views);
-    views.borrow().refresh(&editor.borrow());
-
-    views.borrow_mut().chosen = chosen.clone();
-    // The same half-drawn gesture the handlers hold, so the canvas can leave
-    // the line being dragged off the drawing: see Views::drawing.
-    views.borrow_mut().drawing = drawing.clone();
-    wire(&ui, &editor, &views, &drawing, &chosen, &None);
-    wire_physics(&ui, &editor, &views, &None);
-
-    // And the warning about whatever is wrong with the file as it arrived,
-    // in front of the window that is already up: see `warn_of_errors`.
-    //
-    // The alert is told to keep quiet about those first, so that a file with
-    // errors does not open with two windows about them. What the alert is for
-    // after this is what goes wrong *while somebody works*: a fault they
-    // introduced, which is news, where the state the file arrived in is what
-    // the warning says.
-    warn_of_errors(&editor, &views);
-
-    // And the main window takes no presses while any of that is still being
-    // read: the question about the file's problems, the alert about a file
-    // that could not be read. The drawing is there to be looked at -- it is
-    // what the question is about -- and nothing in it can be edited behind a
-    // window asking about the state the file arrived in. Each of those
-    // windows gives the presses back as it goes: see `listen_when_read`.
-    let waiting = startup_waiting(&views, None);
-    ui.set_inert(waiting);
-    // And those windows in front of it for as long as it waits for them,
-    // whatever the window manager would have done with a window shown after
-    // another: see `on_top`.
-    on_top(&views, waiting);
+    let (ui, _views) = open_main(&editor, &settings, divider, lists)?;
     let outcome = slint::run_event_loop();
     let _ = ui.hide();
 
@@ -1045,6 +945,142 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     outcome
+}
+
+/// Makes, fills, wires and shows the main window on a session's editor, and
+/// raises whatever the files arrived with in front of it.
+///
+/// The whole of what `main` does between reading the files and running the
+/// event loop, apart from it so that the screenshots in the manual are taken
+/// of a window opened the way a person's is: see `shots`.
+///
+/// # Arguments
+///
+/// * `editor`   - The session's editor, its files read and seeded.
+/// * `settings` - The preferences read as the editor started.
+/// * `divider`  - Where the working panes are divided, shared by every
+///                window.
+/// * `lists`    - How the selection column is divided, shared likewise.
+///
+/// # Returns
+///
+/// The main window, shown, and the windows the session keeps.
+///
+/// # Errors
+///
+/// The toolkit's error when the main window cannot be made or shown.
+fn open_main(
+    editor: &Rc<RefCell<Editor>>,
+    settings: &settings::Settings,
+    divider: Rc<std::cell::Cell<Dividers>>,
+    lists: Rc<std::cell::Cell<(i32, i32)>>,
+) -> Result<(MainWindow, Rc<RefCell<Views>>), slint::PlatformError> {
+    let ui = MainWindow::new()?;
+    session!(&ui);
+    furnish!(&ui, descriptions());
+    // The physics list and its pane's tint, which only the main window has:
+    // see `physics_palette`.
+    ui.set_physics_palette(physics_palette());
+    ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+    ui.set_physics_list_percent(settings.list_physics_percent);
+    ui.on_titled(|base, path, width| title::titled(&base, &path, width).into());
+
+    let views = Rc::new(RefCell::new(Views {
+        top: ui.as_weak(),
+        open: BTreeMap::new(),
+        chosen: Rc::new(RefCell::new(BTreeMap::new())),
+        picked: Rc::new(RefCell::new(BTreeMap::new())),
+        drawing: Rc::new(RefCell::new(None)),
+        divider,
+        lists,
+        group: None,
+        parameters: None,
+        attributes: BTreeMap::new(),
+        leaving: None,
+        replacing: None,
+        concerns: None,
+        deleting: None,
+        names: None,
+        alert: None,
+        alerted: Rc::new(RefCell::new(String::new())),
+        faulted: Rc::new(RefCell::new(Default::default())),
+        sim_groups: None,
+        showing_sim_group: Rc::new(RefCell::new(String::new())),
+        physics: None,
+        showing_physics: Rc::new(RefCell::new(String::new())),
+        physics_list: Rc::new(std::cell::Cell::new(
+            settings.list_physics_percent,
+        )),
+        autosave: Rc::new(std::cell::Cell::new(settings.autosave)),
+        showing: Rc::new(RefCell::new(String::new())),
+        errors: Rc::new(RefCell::new(Vec::new())),
+        lit: Rc::new(RefCell::new(None)),
+    }));
+    alerting(&views);
+    // Which node the panel is showing, per window.
+    //
+    // Deliberately not in the document: what somebody is looking at is not
+    // something the vehicle flies, and an edit for it would make choosing a
+    // node undoable, which is not what undo is for.
+    let chosen: Rc<RefCell<BTreeMap<String, String>>> =
+        Rc::new(RefCell::new(BTreeMap::new()));
+
+    // Which node a link is being drawn from, while the gesture is running.
+    // Nothing is recorded until it finishes on another node, so a drag that
+    // ends nowhere leaves no trace.
+    let drawing: Rc<RefCell<Option<Drawing>>> = Rc::new(RefCell::new(None));
+
+    // What the file arrived with is counted as said before anything is drawn,
+    // so that the alert leaves it to the warning about it: see
+    // `warn_of_errors`, below. Drawing is what raises the alert, and the
+    // first drawing is the next line.
+    closing(&ui, &views);
+
+    // The main window first, so that whatever came up as the editor started
+    // is read over a drawing rather than instead of one. Nothing is painted
+    // until the event loop runs, which is after all of this, so it is shown
+    // before it is filled and is never seen empty.
+    //
+    // It takes no presses while any of that is up, and is inert from the
+    // start, until what came up is known: an alert said while it is inert is
+    // said in front of its drawing, inside it, which is what `Views::say`
+    // asks it. See `inert` in the markup, set again below.
+    ui.set_inert(true);
+    ui.show()?;
+
+    settled(editor, &views);
+    views.borrow().refresh(&editor.borrow());
+
+    views.borrow_mut().chosen = chosen.clone();
+    // The same half-drawn gesture the handlers hold, so the canvas can leave
+    // the line being dragged off the drawing: see Views::drawing.
+    views.borrow_mut().drawing = drawing.clone();
+    wire(&ui, editor, &views, &drawing, &chosen, &None);
+    wire_physics(&ui, editor, &views, &None);
+
+    // And the warning about whatever is wrong with the file as it arrived,
+    // in front of the window that is already up: see `warn_of_errors`.
+    //
+    // The alert is told to keep quiet about those first, so that a file with
+    // errors does not open with two windows about them. What the alert is for
+    // after this is what goes wrong *while somebody works*: a fault they
+    // introduced, which is news, where the state the file arrived in is what
+    // the warning says.
+    warn_of_errors(editor, &views);
+
+    // And the main window takes no presses while any of that is still being
+    // read: the question about the file's problems, the alert about a file
+    // that could not be read. The drawing is there to be looked at -- it is
+    // what the question is about -- and nothing in it can be edited behind a
+    // window asking about the state the file arrived in. Each of those
+    // windows gives the presses back as it goes: see `listen_when_read`.
+    let waiting = startup_waiting(&views, None);
+    ui.set_inert(waiting);
+    // And those windows in front of it for as long as it waits for them,
+    // whatever the window manager would have done with a window shown after
+    // another: see `on_top`.
+    on_top(&views, waiting);
+    Ok((ui, views))
 }
 
 /// Wire a window's callbacks to the one editor.

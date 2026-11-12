@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="520" viewBox="0 0 1040 520" role="img" aria-labelledby="title desc">
+  <title id="title">TCSpecial on a desktop</title>
+  <desc id="desc">The whole system on one desktop computer, with no vehicle and no hardware. make runmocy starts tcsmoc, and tcsmoc starts tcspecial and tcssim, all three on the same configuration. tcsmoc stands in for the mission operations center: it sends tcspecial commands and shows the telemetry and beacons it sends back, all through sockets on the loopback interface, 127.0.0.1. tcspecial is the same flight software that runs aboard a vehicle. tcssim stands in for the payloads: it simulates each device, on a physics model, behind a pseudo-terminal or a loopback sim_address, and tcspecial reads and drives them as it would the real devices. The kernel's dummy devices, such as i2c-stub and gpio-sim, can stand in for others. tcsmoc and tcssim each show a window.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12px; fill: #374151; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 12px; fill: #1f2937; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .desk { fill: #fafafa; stroke: #4b5563; stroke-width: 2; }
+      .moc { fill: #e2f4ec; stroke: #009E73; stroke-width: 1.5; stroke-dasharray: 8 4; }
+      .flight { fill: #e3f0f9; stroke: #0072B2; stroke-width: 2; }
+      .sim { fill: #fdf1dd; stroke: #E69F00; stroke-width: 1.5; stroke-dasharray: 2 3; }
+      .dev { fill: #ffffff; stroke: #E69F00; stroke-width: 1.2; }
+      .bar { fill: #d1d5db; }
+      .down { stroke: #D55E00; stroke-width: 2.5; fill: none; marker-end: url(#red); }
+      .up { stroke: #009E73; stroke-width: 2.5; fill: none; stroke-dasharray: 9 5; marker-end: url(#green); }
+      .io { stroke: #E69F00; stroke-width: 2.5; fill: none; marker-start: url(#orange-back); marker-end: url(#orange); }
+      .start { stroke: #4b5563; stroke-width: 1.5; fill: none; stroke-dasharray: 2 4; marker-end: url(#grey); }
+    </style>
+    <marker id="red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#D55E00"/></marker>
+    <marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#009E73"/></marker>
+    <marker id="orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#E69F00"/></marker>
+    <marker id="orange-back" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#E69F00"/></marker>
+    <marker id="grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/></marker>
+  </defs>
+  <rect width="1040" height="520" fill="#ffffff"/>
+
+  <rect class="desk" x="16" y="16" width="1008" height="488" rx="12"/>
+  <text class="heading" x="34" y="42">ONE DESKTOP: NO VEHICLE, NO HARDWARE</text>
+  <text class="code" x="34" y="66">$ make runmocy TCSPECIAL_CONFIG_FILE=examples/thermostat/thermostat</text>
+
+  <!-- tcsmoc -->
+  <rect class="moc" x="40" y="100" width="260" height="300" rx="8"/>
+  <rect class="bar" x="41" y="101" width="258" height="22" rx="7"/>
+  <text class="label" x="52" y="117">window</text>
+  <text class="name" x="56" y="150">tcsmoc</text>
+  <text class="kind" x="56" y="172">stands in for the mission</text>
+  <text class="kind" x="56" y="188">operations center</text>
+  <text class="kind" x="56" y="220">• sends commands</text>
+  <text class="kind" x="56" y="240">• shows telemetry and</text>
+  <text class="kind" x="68" y="256">beacons, in panels and plots</text>
+  <text class="kind" x="56" y="276">• starts tcspecial and tcssim</text>
+  <text class="kind" x="68" y="296">on the same configuration</text>
+
+  <!-- tcspecial -->
+  <rect class="flight" x="400" y="100" width="240" height="300" rx="8"/>
+  <text class="name" x="416" y="130">tcspecial</text>
+  <text class="kind" x="416" y="152">the flight software, the same</text>
+  <text class="kind" x="416" y="168">program that runs aboard</text>
+  <text class="kind" x="416" y="200">its device nodes read and</text>
+  <text class="kind" x="416" y="216">drive the simulated devices</text>
+  <text class="kind" x="416" y="232">as they would the real ones</text>
+  <text class="kind" x="416" y="264">no window</text>
+
+  <!-- tcssim -->
+  <rect class="sim" x="740" y="100" width="264" height="300" rx="8"/>
+  <rect class="bar" x="741" y="101" width="262" height="22" rx="7"/>
+  <text class="label" x="752" y="117">window</text>
+  <text class="name" x="756" y="150">tcssim</text>
+  <text class="kind" x="756" y="172">stands in for the payloads,</text>
+  <text class="kind" x="756" y="188">on a physics model</text>
+  <rect class="dev" x="756" y="206" width="232" height="50" rx="5"/>
+  <text class="label" x="768" y="226">pseudo-terminals</text>
+  <text class="kind" x="768" y="244">serial, SPI, rpmsg, IIO</text>
+  <rect class="dev" x="756" y="266" width="232" height="50" rx="5"/>
+  <text class="label" x="768" y="286">loopback sim_address</text>
+  <text class="kind" x="768" y="304">GPIO, HDLC, thermal-mass sensors</text>
+  <text class="kind" x="756" y="340">The kernel's dummy devices</text>
+  <text class="kind" x="756" y="356">(i2c-stub, gpio-sim, vcan,</text>
+  <text class="kind" x="756" y="372">iio_dummy) can stand in too.</text>
+
+  <!-- Connections -->
+  <path class="up" d="M300,190 H398"/>
+  <text class="label" x="312" y="180">commands</text>
+  <path class="down" d="M400,250 H302"/>
+  <text class="label" x="312" y="242">telemetry,</text>
+  <text class="label" x="312" y="270">beacons</text>
+  <text class="kind" x="312" y="300">sockets on</text>
+  <text class="code" x="312" y="316">127.0.0.1</text>
+
+  <path class="io" d="M644,236 H736"/>
+  <text class="label" x="650" y="224">reads and</text>
+  <text class="label" x="650" y="258">writes</text>
+
+  <path class="start" d="M170,400 V450 H520 V404"/>
+  <path class="start" d="M520,450 H872 V404"/>
+  <text class="kind" x="232" y="470">tcsmoc starts both (dotted)</text>
+
+  <text class="kind" x="560" y="470">Dashed: up, as to a vehicle. Solid: down, as to</text>
+  <text class="kind" x="560" y="486">the ground. Double-headed: both ways, as a device.</text>
+</svg>

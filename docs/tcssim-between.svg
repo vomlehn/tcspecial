@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="540" viewBox="0 0 820 540" role="img" aria-labelledby="title desc">
+  <title id="title">Where tcssim sits</title>
+  <desc id="desc">The thermostat example on a desk. tcsmoc starts tcspecial and tcssim and asks tcssim, at the address its simulator file gives as tcssim.ready, whether it has made its simulated payloads. tcsmoc sends tcspecial commands and receives its telemetry. tcssim has one panel for each simulated payload: three temperature sensors, temp_1, temp_2 and temp_3, and the two heater switches, gpio-out-tmass1 and gpio-out-tmass2, each reached by tcspecial at its sim_address, a loopback UDP address. The sensors send readings to tcspecial (arrow 1), which converts and votes them and has its thermostat send the heater switches on or off (arrow 2). Inside tcssim the switches drive the zone's two heater inputs in the physics model's world, and the sensors read the zone's temperature, so the readings follow from what the vehicle decided. The person at tcssim's window enables and disables payloads and changes their sizes and intervals (arrow 3). thermostat.ytcs is read by all three programs; thermostat-sim.yaml is tcssim's, and tcsmoc reads it to show what tcssim simulates.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12px; fill: #374151; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .code { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 12px; fill: #1f2937; }
+      .num { font-size: 12px; font-weight: bold; fill: #ffffff; }
+      .prog { fill: #fafafa; stroke: #4b5563; stroke-width: 2; }
+      .sim { fill: #fdf1dd; stroke: #E69F00; stroke-width: 2; }
+      .panel { fill: #ffffff; stroke: #E69F00; stroke-width: 1.2; }
+      .world { fill: #ffffff; stroke: #4b5563; stroke-width: 1.2; stroke-dasharray: 5 3; }
+      .node { fill: #ffffff; stroke: #4b5563; stroke-width: 1; }
+      .up { stroke: #0072B2; stroke-width: 2.5; fill: none; marker-end: url(#blue); }
+      .down { stroke: #D55E00; stroke-width: 2.5; fill: none; stroke-dasharray: 9 5; marker-end: url(#vermillion); }
+      .you { stroke: #009E73; stroke-width: 2.5; fill: none; stroke-dasharray: 10 4 2 4; marker-end: url(#green); }
+      .start { stroke: #4b5563; stroke-width: 1.5; fill: none; stroke-dasharray: 2 4; marker-end: url(#grey); }
+      .inner { stroke: #4b5563; stroke-width: 1.2; fill: none; marker-end: url(#grey); }
+    </style>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0072B2"/></marker>
+    <marker id="vermillion" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#D55E00"/></marker>
+    <marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#009E73"/></marker>
+    <marker id="grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4b5563"/></marker>
+  </defs>
+  <rect width="820" height="540" fill="#ffffff"/>
+
+  <!-- tcsmoc starts the other two, and asks tcssim whether it is ready -->
+  <path class="start" d="M105,100 V40 H700 V98"/>
+  <path class="start" d="M410,40 V98"/>
+  <text class="label" x="128" y="32">starts both, and asks tcssim whether it is ready, at tcssim.ready</text>
+
+  <!-- tcsmoc -->
+  <rect class="prog" x="20" y="100" width="170" height="150" rx="8"/>
+  <text class="name" x="36" y="128">tcsmoc</text>
+  <text class="kind" x="36" y="148">the MOC: commands</text>
+  <text class="kind" x="36" y="164">the vehicle and shows</text>
+  <text class="kind" x="36" y="180">its telemetry</text>
+
+  <!-- tcspecial -->
+  <rect class="prog" x="300" y="100" width="220" height="340" rx="8"/>
+  <text class="name" x="316" y="128">tcspecial</text>
+  <text class="kind" x="316" y="148">the vehicle</text>
+  <rect class="node" x="316" y="162" width="188" height="40" rx="4"/>
+  <text class="code" x="326" y="180">temp_1 temp_2 temp_3</text>
+  <text class="kind" x="326" y="196">the sensors' handlers</text>
+  <path class="inner" d="M410,202 V222"/>
+  <rect class="node" x="316" y="224" width="188" height="40" rx="4"/>
+  <text class="code" x="326" y="242">to_k1..3, consensus_temp</text>
+  <text class="kind" x="326" y="258">to kelvin, and the vote</text>
+  <path class="inner" d="M410,264 V284"/>
+  <rect class="node" x="316" y="286" width="188" height="40" rx="4"/>
+  <text class="code" x="326" y="304">thermostat</text>
+  <text class="kind" x="326" y="320">decides on or off</text>
+  <path class="inner" d="M410,326 V346"/>
+  <rect class="node" x="316" y="348" width="188" height="40" rx="4"/>
+  <text class="code" x="326" y="366">gpio-out-tmass1, 2</text>
+  <text class="kind" x="326" y="382">the heater switches</text>
+
+  <!-- tcsmoc and tcspecial -->
+  <path class="up" d="M300,150 H192"/>
+  <text class="label" x="204" y="142">telemetry</text>
+  <path class="down" d="M190,210 H298"/>
+  <text class="label" x="204" y="202">commands</text>
+
+  <!-- tcssim -->
+  <rect class="sim" x="600" y="100" width="200" height="340" rx="8"/>
+  <text class="name" x="616" y="128">tcssim</text>
+  <text class="kind" x="616" y="148">a panel per payload</text>
+  <rect class="panel" x="616" y="162" width="168" height="26" rx="3"/>
+  <text class="code" x="626" y="180">temp_1</text>
+  <rect class="panel" x="616" y="192" width="168" height="26" rx="3"/>
+  <text class="code" x="626" y="210">temp_2</text>
+  <rect class="panel" x="616" y="222" width="168" height="26" rx="3"/>
+  <text class="code" x="626" y="240">temp_3</text>
+  <rect class="panel" x="616" y="282" width="168" height="26" rx="3"/>
+  <text class="code" x="626" y="300">gpio-out-tmass1</text>
+  <rect class="panel" x="616" y="312" width="168" height="26" rx="3"/>
+  <text class="code" x="626" y="330">gpio-out-tmass2</text>
+  <rect class="world" x="616" y="356" width="168" height="72" rx="4"/>
+  <text class="label" x="626" y="374">the world:</text>
+  <text class="code" x="626" y="392">zone</text>
+  <text class="kind" x="666" y="392">thermal_mass</text>
+  <text class="kind" x="626" y="420">heater_1, heater_2 in</text>
+  <!-- inside tcssim: the switches drive the zone, the sensors read it -->
+  <path class="inner" d="M700,338 V354"/>
+  <path class="inner" d="M790,392 H794 V175 H786"/>
+  <path class="inner" d="M794,205 H786"/>
+  <path class="inner" d="M794,235 H786"/>
+  <text class="kind" x="742" y="268" transform="rotate(-90 790 268)">temperature</text>
+
+  <!-- tcspecial and tcssim -->
+  <path class="up" d="M614,205 H522"/>
+  <circle cx="540" cy="190" r="9" fill="#0072B2"/>
+  <text class="num" x="536" y="194">1</text>
+  <text class="label" x="554" y="194">readings</text>
+  <path class="down" d="M520,368 H560 V297 H614"/>
+  <circle cx="540" cy="352" r="9" fill="#D55E00"/>
+  <text class="num" x="536" y="356">2</text>
+  <text class="label" x="530" y="388">on / off</text>
+  <text class="kind" x="524" y="226" style="font-size: 11px">UDP, at</text>
+  <text class="kind" x="524" y="242" style="font-size: 11px">sim_address</text>
+
+  <!-- the person at tcssim's window -->
+  <path class="you" d="M700,486 V442"/>
+  <circle cx="680" cy="466" r="9" fill="#009E73"/>
+  <text class="num" x="676" y="470">3</text>
+  <text class="label" x="560" y="504">you, at its window: Enable and Disable,</text>
+  <text class="label" x="560" y="520">packet and segment sizes, intervals</text>
+
+  <!-- the files -->
+  <text class="label" x="20" y="480">Files read:</text>
+  <text class="code" x="20" y="500">thermostat.ytcs</text>
+  <text class="kind" x="150" y="500">by all three</text>
+  <text class="code" x="20" y="520">thermostat-sim.yaml</text>
+  <text class="kind" x="178" y="520">by tcssim; tcsmoc reads it to show</text>
+</svg>

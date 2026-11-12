@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-labelledby="title desc">
+  <title id="title">How tcsgui recovers an earlier session</title>
+  <desc id="desc">As tcsgui opens a configuration it looks for the undo history of an earlier session on it, which is there only when that session did not end cleanly. With no history, the session starts with an empty one. With one, every file of the configuration is held to the digest the history keeps for it. If every file matches, the history becomes this session's, so Undo reaches back past the crash, and every edit the files do not have is put back at once and written if Autosave is on; the bar says how many edits were put back. If any file has been changed by something else, or the history keeps no digests, the history is discarded and the bar says so; the files are left as they are.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; font-size: 13px; fill: #111827; }
+      .strong { font-weight: bold; }
+      .answer { font-size: 13px; font-weight: bold; fill: #1f2937; }
+      .step { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.5; }
+      .ask { fill: #e3f0f9; stroke: #0072B2; stroke-width: 2; }
+      .kept { fill: #e2f4ec; stroke: #009E73; stroke-width: 2.5; }
+      .lost { fill: #fbe7dc; stroke: #D55E00; stroke-width: 2.5; stroke-dasharray: 9 5; }
+      .flow { stroke: #374151; stroke-width: 1.8; fill: none; marker-end: url(#head); }
+    </style>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#374151"/></marker>
+  </defs>
+  <rect width="760" height="560" fill="#ffffff"/>
+
+  <!-- Start -->
+  <rect class="step" x="230" y="16" width="300" height="44" rx="22"/>
+  <text x="380" y="43" text-anchor="middle">tcsgui opens a configuration</text>
+  <path class="flow" d="M380,60 L380,88"/>
+
+  <!-- First question -->
+  <polygon class="ask" points="380,90 560,150 380,210 200,150"/>
+  <text x="380" y="140" text-anchor="middle">Is there a history of an</text>
+  <text x="380" y="158" text-anchor="middle">earlier session on it?</text>
+
+  <!-- No history -->
+  <path class="flow" d="M560,150 L612,150 L612,186"/>
+  <text class="answer" x="572" y="140">No</text>
+  <rect class="step" x="540" y="188" width="200" height="62" rx="6"/>
+  <text x="640" y="214" text-anchor="middle">The session starts with</text>
+  <text x="640" y="232" text-anchor="middle">an empty history.</text>
+
+  <!-- Second question -->
+  <path class="flow" d="M380,210 L380,248"/>
+  <text class="answer" x="390" y="234">Yes</text>
+  <polygon class="ask" points="380,250 590,320 380,390 170,320"/>
+  <text x="380" y="300" text-anchor="middle">Does every file still match</text>
+  <text x="380" y="318" text-anchor="middle">the digest the history</text>
+  <text x="380" y="336" text-anchor="middle">keeps for it?</text>
+
+  <!-- Kept -->
+  <path class="flow" d="M170,320 L110,320 L110,404"/>
+  <text class="answer" x="124" y="310">Yes</text>
+  <rect class="kept" x="16" y="406" width="330" height="138" rx="6"/>
+  <text class="strong" x="30" y="430">Recovered</text>
+  <text x="30" y="452">The history becomes this session's: Undo</text>
+  <text x="30" y="470">reaches back past the crash. Every edit the</text>
+  <text x="30" y="488">files do not have is put back at once, and</text>
+  <text x="30" y="506">written if Autosave is on. The bar says how</text>
+  <text x="30" y="524">many edits were put back.</text>
+
+  <!-- Discarded -->
+  <path class="flow" d="M590,320 L650,320 L650,404"/>
+  <text class="answer" x="556" y="310">No</text>
+  <rect class="lost" x="414" y="406" width="330" height="138" rx="6"/>
+  <text class="strong" x="428" y="430">Discarded</text>
+  <text x="428" y="452">A file was changed by something else, or</text>
+  <text x="428" y="470">the history keeps no digests. The history</text>
+  <text x="428" y="488">is thrown away and the bar says so. The</text>
+  <text x="428" y="506">files are left as they are: what is lost is</text>
+  <text x="428" y="524">the undo.</text>
+</svg>

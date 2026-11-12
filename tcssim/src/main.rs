@@ -65,6 +65,8 @@ mod node;
 mod payload;
 mod pty;
 mod ready;
+#[cfg(test)]
+mod shots;
 
 use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
@@ -237,6 +239,82 @@ fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
     info.packets_recv = i32::try_from(stats.packets_recv).unwrap_or(i32::MAX);
     (info.last_sent_time, info.last_sent_data) = sample_lines(&stats.last_sent);
     (info.last_recv_time, info.last_recv_data) = sample_lines(&stats.last_recv);
+}
+
+/// Has each panel's one button send its payload or silence it.
+///
+/// Which way a press goes is read back from the status the button's label
+/// came from, so what happens is what the label offered: see
+/// [`transfer_wanted`].
+///
+/// # Arguments
+///
+/// * `ui`       - The main window, whose presses are handled.
+/// * `payloads` - The simulated payloads, in the panels' order.
+/// * `model`    - The panels' rows, whose statuses are read and set.
+fn handle_transfer_button(
+    ui: &MainWindow,
+    payloads: Arc<Mutex<Vec<SimulatedPayload>>>,
+    model: Rc<VecModel<PayloadInfo>>,
+) {
+    ui.on_transfer_payload(move |row| {
+        let row = row as usize;
+
+        // The status the button's label came from, so what happens is
+        // what the label offered.
+        let showing = match model.row_data(row) {
+            Some(info) => info.status.to_string(),
+            None => return,
+        };
+
+        let mut guard = payloads.lock().unwrap();
+        let payload = match guard.get_mut(row) {
+            Some(payload) => payload,
+            None => return,
+        };
+
+        match transfer_wanted(&showing) {
+            Transfer::Send => {
+                payload.send(true);
+                update_row(&model, row, |info| {
+                    info.status = SharedString::from(RUNNING_STATUS);
+                });
+            }
+            Transfer::Silent => {
+                payload.send(false);
+                update_row(&model, row, |info| {
+                    info.status = SharedString::from(STOPPED_STATUS);
+                });
+            }
+        }
+        // Said at once rather than at the next refresh: a heater just
+        // disabled is off now.
+        let driving = SharedString::from(payload.driving_said());
+        update_row(&model, row, |info| info.driving = driving);
+    });
+}
+
+/// Puts what each payload has done since the last look into its panel:
+/// its traffic, and what a part the vehicle drives is doing. What the
+/// window's timer runs, every half second.
+///
+/// # Arguments
+///
+/// * `payloads` - The simulated payloads, in the panels' order.
+/// * `model`    - The panels' rows.
+fn show_progress(
+    payloads: &Mutex<Vec<SimulatedPayload>>,
+    model: &Rc<VecModel<PayloadInfo>>,
+) {
+    let guard = payloads.lock().unwrap();
+    for (row, payload) in guard.iter().enumerate() {
+        let stats = payload.stats();
+        let driving = SharedString::from(payload.driving_said());
+        update_row(model, row, |info| {
+            show_traffic(info, &stats);
+            info.driving = driving;
+        });
+    }
 }
 
 /// Turns a data handler and its settled simulator settings into the panel
@@ -1272,47 +1350,7 @@ fn main() {
     let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
         Arc::new(Mutex::new(made));
 
-    // The one button each panel has, which has its payload send or not.
-    {
-        let payloads = payloads.clone();
-        let model = model.clone();
-        ui.on_transfer_payload(move |row| {
-            let row = row as usize;
-
-            // The status the button's label came from, so what happens is
-            // what the label offered.
-            let showing = match model.row_data(row) {
-                Some(info) => info.status.to_string(),
-                None => return,
-            };
-
-            let mut guard = payloads.lock().unwrap();
-            let payload = match guard.get_mut(row) {
-                Some(payload) => payload,
-                None => return,
-            };
-
-            match transfer_wanted(&showing) {
-                Transfer::Send => {
-                    payload.send(true);
-                    update_row(&model, row, |info| {
-                        info.status = SharedString::from(RUNNING_STATUS);
-                    });
-                }
-                Transfer::Silent => {
-                    payload.send(false);
-                    update_row(&model, row, |info| {
-                        info.status = SharedString::from(STOPPED_STATUS);
-                    });
-                }
-            }
-            // Said at once rather than at the next refresh: a heater just
-            // disabled is off now.
-            let driving = SharedString::from(payload.driving_said());
-            update_row(&model, row, |info| info.driving = driving);
-        });
-    }
-
+    handle_transfer_button(&ui, payloads.clone(), model.clone());
     handle_config_edits(&ui, payloads.clone(), model.clone());
 
     // What the Quit button does, and a signal: every payload stopped, which
@@ -1345,17 +1383,7 @@ fn main() {
         timer.start(
             slint::TimerMode::Repeated,
             std::time::Duration::from_millis(500),
-            move || {
-                let guard = payloads.lock().unwrap();
-                for (row, payload) in guard.iter().enumerate() {
-                    let stats = payload.stats();
-                    let driving = SharedString::from(payload.driving_said());
-                    update_row(&model, row, |info| {
-                        show_traffic(info, &stats);
-                        info.driving = driving;
-                    });
-                }
-            },
+            move || show_progress(&payloads, &model),
         );
 
         // Keep timer alive

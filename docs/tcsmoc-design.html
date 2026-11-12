@@ -478,7 +478,7 @@ claiming anything is a panel claiming what nobody said: it claimed
 Stopped, and was commonly wrong, since the MOC attaches to a tcspecial
 that is already serving the set rather than starting a second one, and
 that one's handlers may have been moving data for hours. Enable, Disable
-and Query all are what ask.</dd>
+and Query, in the Command menu, are what ask.</dd>
 <dt>Requirement</dt>
 <dd>A panel's status is what a <tt class="docutils literal">START_NODE</tt> or <tt class="docutils literal">STOP_NODE</tt> was answered,
 and the beacons are what can take it away. Beacons stopping makes every
@@ -513,13 +513,13 @@ it.</dd>
 </dl>
 <p>Nothing is asked while the command link is down, and the question is not held
 until it comes up: the panels keep saying unknown until contact is made again
-or somebody presses Query all. Contact returning while the link is down is
+or somebody chooses Query. Contact returning while the link is down is
 rare -- the beacon and the link come back together -- and a question owed
 indefinitely is a question that goes out at a moment nobody chose.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd><p class="first">The ground does not ask about its payloads on a timer. It asks at the two
-moments above and when somebody presses Query all, and otherwise watches
+moments above and when somebody chooses Query, and otherwise watches
 what arrives.</p>
 <p>An enabled payload sends on its own -- that is what enabling it does --
 and every datagram it sends arrives on that payload's own telemetry
@@ -542,7 +542,7 @@ when a decision changes, which may be hours apart -- so an indicator that
 judged it would be an indicator whose colour means nothing, and one that
 never changes is worse than none.</dd>
 <dt>Requirement</dt>
-<dd>Query all still asks the spacecraft directly, and sets both the status and
+<dd>Query still asks the spacecraft directly, and sets both the status and
 the counters from what it answers. It is the one path by which the
 spacecraft's own account of a handler -- its state, its byte counters,
 the triggers it has sent -- reaches a panel, and somebody pressing it is

@@ -518,6 +518,14 @@ middle when it is too long for the title bar. A read-only session says
 <tt class="docutils literal"><span class="pre">(read-only)</span></tt> in the title.</p>
 <p>Under the menu bar is a bar of buttons and messages, and under that, side by
 side, the selection column on the left and the sheet on the right.</p>
+<div class="figure">
+<a class="reference external image-reference" href="shots/tcsgui-window.png">
+<img alt="The main window on the battery example, with eight numbered markers. Along the top the menus File, Edit and View (1). Under them the bar: the Undo and Redo arrows, greyed, the Save button, Arrange, 2 concerns, 0 edits can be undone and saved (2). Down the left the selection column, its lists headed Physics node types, Payload node types, Vehicle node types and Gateway node types (3). The rest is the sheet, divided into the Physics pane, with the simulator's components such as battery and sun as hexagons (4); the Payloads pane, with shunt, monitor and science as parallelograms (5); the Vehicle pane, with battery_amps, bus_volts, charge and shedding as rounded rectangles (6); and the Gateway pane, with the gateway node as a plain rectangle (7). A divider between two panes has a handle halfway down (8). Lines join the nodes." src="shots/tcsgui-window.png" style="width: 100%;" />
+</a>
+<p class="caption">The battery example as it opens, with its simulator file: (1) the
+menus, (2) the bar, (3) the selection column, (4) to (7) the Physics,
+Payloads, Vehicle and Gateway panes, (8) a divider's handle.</p>
+</div>
 <div class="section" id="the-sheet-and-its-panes">
 <h2><a class="toc-backref" href="#toc-entry-7">The sheet and its panes</a></h2>
 <p>The sheet is divided into working panes, each with its name in light grey
@@ -635,10 +643,10 @@ the middle. It has at most two terminals, both on its right: an output at the
 top and an input below it. The lines of the physics model are dashed, where a
 configuration's links are solid.</p>
 <p><strong>Red means something is wrong</strong>, and nothing else on the sheet is red. A
-node with something wrong with it is drawn with its outline, its name and its
-terminals in red, and it is also counted and named in words on the bar's
-errors button. A node whose type this build does not know is drawn as a small
-open square, which no real type is.</p>
+node with something wrong with it has its body drawn red, its outline, name
+and terminals left as they were, and it is also counted and named in words on
+the bar's errors button. A node whose type this build does not know is drawn
+as a small open square, which no real type is.</p>
 <p>A selected node, component or line is outlined in dark grey; a selected line
 is drawn over a wider line.</p>
 </div>
@@ -687,6 +695,21 @@ by side, and each stays open until its <strong>Close</strong> button is pressed.
 on Close, or when the window is closed -- not at each keystroke. A tick box
 is taken at once. A cleared field leaves the attribute out of the file, which
 is what an empty value means to the checking anyway.</p>
+<p>Going on from the example under <a class="reference internal" href="#drawing-a-line">Drawing a line</a>:</p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="log-1, marked 1, outlined in dark grey as selected, and beside it a menu offering Edit and Delete." src="shots/tcsgui-edit-1.png" />
+<p class="caption">Right-click <tt class="docutils literal"><span class="pre">log-1</span></tt> (1). It is selected and its menu opens.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="log-1's window: the name log-1 in a field with an x beside it, the type log under it, the fields directory, marked with an asterisk and holding /tmp/telemetry, and format, marked and empty; a comment box; under About, Records what reaches it rather than passing it on; and a Close button." src="shots/tcsgui-edit-2.png" />
+<p class="caption">Choose <strong>Edit</strong>, and the node's window opens. <tt class="docutils literal">directory</tt> and
+<tt class="docutils literal">format</tt> are marked <tt class="docutils literal">*</tt>, the configuration requiring them. A
+directory has been typed and taken; <tt class="docutils literal">format</tt> waits for an answer.</p>
+</div>
+</li>
+</ol>
 </div>
 <div class="section" id="renaming">
 <h2><a class="toc-backref" href="#toc-entry-16">Renaming</a></h2>
@@ -718,8 +741,9 @@ back, and nothing is recorded when there was nothing to move.</p>
 <li>Click a terminal. The line is now in hand: a dashed line follows the
 pointer, and a box along the bottom of the sheet says what to click next.</li>
 <li>Click the node the line is to reach, anywhere on it. A menu headed with the
-node's name offers what the line can become there -- the input of the same
-stream, or each of a node's named inputs, <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> and so on.</li>
+node's name offers what the line can become there -- the terminal of the
+same stream at that end, or each of a node's named inputs, <tt class="docutils literal">in0</tt>,
+<tt class="docutils literal">in1</tt> and so on.</li>
 <li>Choose one.</li>
 </ol>
 <p>A line may be drawn from either end, from the data source or from the sink
@@ -733,6 +757,38 @@ nothing at all for the line offers no menu, and the line stays in hand while
 the box on the sheet says so. tcsgui will not draw a line from a node to
 itself, one that carries one stream into the other, one the configuration
 already has, or a second line into an input that does not merge.</p>
+<p>For example, to record the battery example's bus voltage in a log of its own:</p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="The vehicle list scrolled down to the heading Ends of the graph, its log entry marked 1. On the sheet a new node, log-1, in the upper right of the Vehicle pane. The bar's Undo button reads add log &quot;log-1&quot;, and a new button reads 2 errors." src="shots/tcsgui-place-1.png" style="width: 100%;" />
+<p class="caption">Click <tt class="docutils literal">log</tt> in the vehicle list, under <em>Ends of the graph</em> (1). A
+node called <tt class="docutils literal"><span class="pre">log-1</span></tt> is placed as high in the Vehicle pane as it fits.
+Nothing is joined to it and nothing is filled in yet, which
+<tt class="docutils literal">tcsverify</tt> reports, so the bar's errors button counts it (see
+<a class="reference internal" href="#errors">Errors</a>).</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="log-1's upper left terminal marked 2, a short dashed line running from it towards bus_volts, and along the bottom of the sheet a box saying: A line from world-in is in hand: click a node to join it. Escape, or a click on bare sheet, puts it down." src="shots/tcsgui-place-2.png" style="width: 100%;" />
+<p class="caption">Click <tt class="docutils literal"><span class="pre">log-1</span></tt>'s <tt class="docutils literal"><span class="pre">world-in</span></tt> terminal, in its upper left corner (2).
+The line is in hand: a dashed line follows the pointer, and the box at
+the foot of the sheet says what to do next.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="bus_volts marked 3, and over it a menu headed bus_volts offering New line from world-out, and Cancel." src="shots/tcsgui-place-3.png" style="width: 100%;" />
+<p class="caption">Click <tt class="docutils literal">bus_volts</tt>, anywhere on it (3). Its menu offers what the line
+can be there: a new line from its <tt class="docutils literal"><span class="pre">world-out</span></tt>.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="A line now runs from bus_volts's upper right terminal to log-1's upper left, log-1 marked 4. The bar's Undo button reads link &quot;bus_volts&quot; to &quot;log-1&quot;, the errors button 1 error, and the bar says 2 edits can be undone." src="shots/tcsgui-place-4.png" style="width: 100%;" />
+<p class="caption">Choose it. The line is drawn (4) and written, and Undo names it. One
+error is left: nothing of the log is filled in yet, which is done in
+its window, next.</p>
+</div>
+</li>
+</ol>
 </div>
 <div class="section" id="moving-and-removing-a-line">
 <h2><a class="toc-backref" href="#toc-entry-20">Moving and removing a line</a></h2>
@@ -842,7 +898,12 @@ tcsmoc and tcssim say, in their words. There are three kinds of answer.</p>
 <p>An <strong>error</strong> is something the vehicle would refuse: a value a rule refuses,
 two nodes of one name, two lines into one input, a line to a node that is not
 there. While there are any, the bar has a button saying how many --
-<tt class="docutils literal">3 errors</tt> -- whose menu lists them one a line. Choosing one goes to it:</p>
+<tt class="docutils literal">3 errors</tt> -- whose menu lists them one a line. The menu lists everything
+<tt class="docutils literal">tcsverify</tt> says about the files, in its words, its warnings among them,
+and each but a node's own fault starts with the file and line it is about:
+so a node just placed, joined to nothing and with fields it requires left
+empty, is listed until it is joined and filled in, although it is not drawn
+red. Choosing one goes to it:</p>
 <ul class="simple">
 <li>a node's error shows the node in the middle of its page, selected, with its
 window open;</li>
@@ -863,9 +924,44 @@ leaves the errors standing and lets you work, and <strong>Quit</strong>. Ignorin
 this session only and is not written anywhere. Either way every node is on
 the sheet in its pane, so a configuration can be looked at before it is put
 right.</p>
+<div class="figure">
+<img alt="The main window greyed, and in front of it a box headed This configuration has errors the vehicle would not fly with, saying Some nodes have attribute values that are not valid. There are other errors as well. Each is drawn in red. Choose one from the errors button on the bar to go to it. Buttons Copy, Quit and Ignore." src="shots/tcsgui-open-errors.png" style="width: 100%;" />
+<p class="caption">The battery example opened with the shunt's port changed to 99999 in
+the file.</p>
+</div>
 <p>An error made while you work is also said once in a small window, headed
 <em>Something is wrong with the configuration.</em>, that has to be acknowledged; it
-is said again only if it goes away and comes back.</p>
+is said again only if it goes away and comes back. Its <strong>Copy</strong> button puts
+what it says on the clipboard.</p>
+<p>Here, in the battery example, a port that cannot be one is typed into the
+<tt class="docutils literal">shunt</tt>'s window:</p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="A window headed Something is wrong with the configuration., saying in red: &quot;shunt&quot;: port 99999 is not a port -- a port is 1 to 65535, and 0 is &quot;whichever one is free&quot;, which a configuration cannot mean. Under it, in grey, it says the node is drawn in red and nothing has been lost. Copy and OK buttons." src="shots/tcsgui-error-1.png" />
+<p class="caption">The value is taken, and the window says what is wrong with it. Press
+<strong>OK</strong>.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The bar, its Undo button reading set port of &quot;shunt&quot; and a new button 2 errors; on the sheet the shunt, marked 2, is drawn red." src="shots/tcsgui-error-2.png" style="width: 100%;" />
+<p class="caption">The <tt class="docutils literal">shunt</tt> is drawn red (2), and the bar has a <tt class="docutils literal">2 errors</tt>
+button: the port, and the simulator's file, which cannot simulate a
+payload on that port.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The 2 errors button pressed, marked 3, and under it a menu of two lines: the shunt's port, and an error from line 97 of battery-sim.yaml saying the shunt cannot be simulated." src="shots/tcsgui-error-3.png" style="width: 100%;" />
+<p class="caption">Press the button (3): its menu lists the errors.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The shunt's window: its name, its type network, the same sentence about port 99999 in red italic, and its fields -- protocol udp, address 127.0.0.1, port 99999 and the rest -- with, beside them under the heading simulated payload, the simulator's settings in italic." src="shots/tcsgui-error-4.png" style="width: 100%;" />
+<p class="caption">Choose the first. The <tt class="docutils literal">shunt</tt> is selected in the middle of the
+sheet and its window opens, saying the same thing in red. Put the port
+right there, or press Undo (see <a class="reference internal" href="#undo-and-redo">Undo and redo</a>).</p>
+</div>
+</li>
+</ol>
 </div>
 <div class="section" id="concerns">
 <h2><a class="toc-backref" href="#toc-entry-26">Concerns</a></h2>
@@ -904,6 +1000,10 @@ unsaved edit survive a crash (see <a class="reference internal" href="#crash-rec
 writes at once whatever was waiting.</p>
 <p>The setting is kept as <tt class="docutils literal">&lt;autosave&gt;</tt> in <tt class="docutils literal"><span class="pre">$HOME/.tcsgui/preferences.xml</span></tt>,
 <tt class="docutils literal">true</tt> or <tt class="docutils literal">false</tt>, and is on by default.</p>
+<div class="figure">
+<img alt="The File menu open: Save, Save as..., Autosave with a tick beside it, then Edit payload groups and Edit simulated payload groups, then Exit." src="shots/tcsgui-file-menu.png" />
+<p class="caption">The File menu, with Autosave on.</p>
+</div>
 </div>
 <div class="section" id="save-and-save-as">
 <h2><a class="toc-backref" href="#toc-entry-30">Save and Save as</a></h2>
@@ -957,12 +1057,18 @@ not, a window says <em>There are changes the files do not have.</em> and offers:
 <li><strong>Leave without saving</strong>;</li>
 <li><strong>Stay</strong>.</li>
 </ul>
-<p>However tcsgui ends -- by Exit or by its windows being closed -- it then
-tries once more to write whatever the files do not have, and says on the
-error output whether it did. As the code stands this happens after <strong>Leave
-without saving</strong> too, so the edits are written all the same. If that last
-write fails, the error output says where the session's history is, since it
-is then the only copy of the work.</p>
+<p>and <strong>Copy</strong>, which puts what the window says on the clipboard.</p>
+<div class="figure">
+<img alt="A window headed There are changes the files do not have., saying that saving writes the configuration and, where this session was given one, the simulator's file beside it. Buttons Stay, Copy, Leave without saving, Save as and leave... and Save and leave." src="shots/tcsgui-leave.png" />
+<p class="caption">File -&gt; Exit with Autosave off and an edit not yet saved.</p>
+</div>
+<p><strong>Leave without saving</strong> lets the edits go: the files keep what they last
+had, and the history goes with the session, as it does on any tidy exit, so
+the edits are lost.</p>
+<p>However else tcsgui ends -- by Exit, or by its windows being closed -- it
+then tries once more to write whatever the files do not have, and says on the
+error output whether it did. If that last write fails, the error output says
+where the session's history is, since it is then the only copy of the work.</p>
 </div>
 </div>
 <div class="section" id="undo-redo-and-crash-recovery">
@@ -976,6 +1082,20 @@ deleting a node with its lines, arranging a page, writing a value to every
 payload of a group. Selecting, opening windows, moving a divider and zooming
 are not edits. Undo also covers placing the ground station a new
 configuration starts with.</p>
+<p>Going on from the example under <a class="reference internal" href="#errors">Errors</a>:</p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="The bar: an Undo button reading set port of &quot;shunt&quot;, a greyed Redo arrow, 2 errors, and 1 edits can be undone; the shunt below, red and selected." src="shots/tcsgui-undo-1.png" style="width: 100%;" />
+<p class="caption">The last edit set the shunt's port, and the Undo button says so.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The bar: a greyed Undo arrow, a Redo button reading set port of &quot;shunt&quot;, no errors button, and 0 edits can be undone; the shunt below no longer red." src="shots/tcsgui-undo-2.png" style="width: 100%;" />
+<p class="caption">Press it. The port is put back and written, the errors go, and
+<strong>Redo</strong> offers to set it again.</p>
+</div>
+</li>
+</ol>
 </div>
 <div class="section" id="the-history">
 <h2><a class="toc-backref" href="#toc-entry-36">The history</a></h2>
@@ -1009,6 +1129,27 @@ left as they are; what is lost is the undo.</li>
 </ul>
 <p>A history written by an older tcsgui that kept no digests is discarded the
 same way.</p>
+<div class="figure">
+<object data="tcsgui-recovery.svg" type="image/svg+xml">A flow chart. tcsgui opens a configuration. Is there a history of
+an earlier session on it? No: the session starts with an empty
+history. Yes: does every file still match the digest the history
+keeps for it? Yes, in a box with a solid border headed Recovered:
+the history becomes this session's, Undo reaches back past the
+crash, every edit the files do not have is put back at once and
+written if Autosave is on, and the bar says how many. No, in a box
+with a dashed border headed Discarded: a file was changed by
+something else, or the history keeps no digests; the history is
+thrown away and the bar says so, and the files are left as they
+are.</object>
+<p class="caption">What tcsgui does with an earlier session's history as it opens a
+configuration.</p>
+</div>
+<div class="figure">
+<img alt="The bar: an Undo button reading set offset of &quot;bus_volts&quot;, 2 edits can be undone, and in green: 2 edits not saved when tcsgui last stopped put back, and saved." src="shots/tcsgui-recover.png" style="width: 100%;" />
+<p class="caption">The battery example opened after a session that changed <tt class="docutils literal">bus_volts</tt>
+twice with Autosave off and then stopped without saving. Both edits are
+back, written, and can be undone.</p>
+</div>
 </div>
 </div>
 <div class="section" id="read-only-sessions">

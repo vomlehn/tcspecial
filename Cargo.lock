@@ -4862,6 +4862,7 @@ dependencies = [
  "libc",
  "md5",
  "path-clean",
+ "png",
  "quick-xml 0.42.0",
  "rfd",
  "serde",
@@ -4927,6 +4928,7 @@ version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
  "libc",
+ "png",
  "serde",
  "slint",
  "slint-build",
@@ -4966,6 +4968,7 @@ version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
  "libc",
+ "png",
  "rand",
  "rand_distr",
  "serde",

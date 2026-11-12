@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="435" viewBox="0 0 940 435" role="img" aria-labelledby="title desc">
+<title id="title">Pinging the ping node</title>
+<desc id="desc">Matched for commanding, Send ping in the ping window sends ping 1 with the MOC&#x27;s time up through the gateway node to the ping node, which adds its own time and sends it back down to the ground&#x27;s port for it; the window shows the round trip and each way. Not matched, nothing goes up and a pop-up says why.</desc>
+<rect width="940" height="435" fill="#ffffff"/>
+<text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">Pinging the ping node</text>
+<line x1="40" y1="46" x2="110" y2="46" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<text x="120" y="50" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">[A] made with configuration A: solid line</text>
+<text x="40" y="68" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px">Arrowhead: read or acted on. Cross: dropped and counted, or not acted on. The words at each end say which.</text>
+<text x="300" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">Vehicle (tcspecial)</text>
+<line x1="300" y1="138" x2="300" y2="425" stroke="#000000" stroke-width="1.5"/>
+<text x="640" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">MOC (ground station)</text>
+<line x1="640" y1="138" x2="640" y2="425" stroke="#000000" stroke-width="1.5"/>
+<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, matched</tspan></text>
+<text x="652" y="154" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Using A, matched for commanding</tspan></text>
+<text x="652" y="199" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Send ping pressed in the ping window</tspan></text>
+<line x1="640" y1="225" x2="314" y2="255" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="300,255 310,250 310,260" fill="#0072B2"/>
+<text x="531.2" y="228.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] ping #1, the MOC&#x27;s time</text>
+<text x="288" y="259" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="288" dy="0">through the gateway node to the ping</tspan><tspan x="288" dy="14">node, which adds its own time</tspan></text>
+<line x1="300" y1="300" x2="626" y2="330" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
+<polygon points="640,330 630,325 630,335" fill="#0072B2"/>
+<text x="408.8" y="303.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] ping #1, both times</text>
+<text x="652" y="334" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">at ground_base plus the ping node&#x27;s</tspan><tspan x="652" dy="14">id: the round trip and each way</tspan><tspan x="652" dy="14">shown</tspan></text>
+<text x="652" y="379" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Not matched: nothing goes up, and a</tspan><tspan x="652" dy="14">pop-up says why</tspan></text>
+</svg>

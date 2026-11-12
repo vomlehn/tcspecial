@@ -196,8 +196,10 @@ help:
 		"bin/mk-kernel-dummies)"
 	@echo "  make check       - cargo check, clippy, a format check," \
 		"the spellings compared and an HTML check"
+	@echo "  make screenshots - Make the GUI manuals' screenshots" \
+		"again, drawn in memory"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
-		"behind its source"
+		"behind its source, or a link leads nowhere"
 	@echo "  make hooks       - Have git run tcs-helpers' pre-commit" \
 		"hook, which remakes"
 	@echo "                     the page of each document a commit" \
@@ -922,6 +924,9 @@ install-tcspecial: tcs-helpers
 		tcspecial $(FLIGHT_CRATES)
 	install -m 644 $(DOCS_DIR)/*.html $(DOCS_DIR)/*.svg \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs/shots
+	install -m 644 $(DOCS_DIR)/shots/*.png \
+		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs/shots
 	for file in $(EXAMPLE_FILES); do \
 		to=$(DESTDIR)$(EXAMPLEDIR)/$${file#examples/}; \
 		if [ -L $$file ]; then \
@@ -1310,6 +1315,48 @@ release: test
 docs:
 	make -C $(DOCS_DIR)
 
+# Make the tcssim manual's screenshots, docs/shots/tcssim-*.png, again: its
+# window, built by its own code on the thermostat example and drawn in memory
+# by Slint's software renderer, so that no window opens and nothing is bound
+# or sent. An ignored test, run alone because Slint takes one platform per
+# process; never part of make test, make check or make html-check.
+.PHONY: screenshots-tcssim
+screenshots-tcssim:
+	cd $(RUST) && cargo test -p tcssim --bin tcssim -- --ignored --exact \
+		shots::screenshots
+
+# Make the tcsgui manual's screenshots, docs/shots/tcsgui-*.png, again: its
+# windows, opened by its own code on copies of the battery example, driven
+# through the presses and callbacks a person's gestures reach, and drawn in
+# memory by Slint's software renderer, so that no window opens and nothing
+# under examples is written. An ignored test, run alone because Slint takes
+# one platform per process; never part of make test, make check or make
+# html-check, the fonts differing between machines.
+.PHONY: screenshots-tcsgui
+screenshots-tcsgui:
+	cd $(RUST) && cargo test -p tcsgui --bin tcsgui -- --ignored --exact \
+		shots::screenshots
+
+# Make the tcsmoc manual's screenshots, docs/shots/tcsmoc-*.png, again: its
+# windows, on the thermostat and ping examples, wired as it wires them, fed
+# real beacons, command answers and data by a simulated vehicle on loopback
+# ports of the test's own choosing, and drawn in memory by Slint's software
+# renderer, so that no window opens and no other program's ports are
+# touched. An ignored test, run alone because Slint takes one platform per
+# thread and one event-loop queue per process; about two minutes, most of
+# it the beacon indicator ageing. Never part of make test, make check or
+# make html-check.
+.PHONY: screenshots-tcsmoc
+screenshots-tcsmoc:
+	cd $(RUST) && cargo test -p tcsmoc --bin tcsmoc -- --ignored --exact \
+		vehicle::screenshots::screenshots
+
+# Make every manual's screenshots again, one program after another, each in
+# a process of its own; the pages that show them are made again by the
+# pre-commit hook when they are committed.
+.PHONY: screenshots
+screenshots: screenshots-tcsgui screenshots-tcsmoc screenshots-tcssim
+
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
 HTML_DIRS = $(DOCS_DIR) examples tcslib tcslib-c tcslibgs
@@ -1320,6 +1367,14 @@ HTML_DIRS = $(DOCS_DIR) examples tcslib tcslib-c tcslibgs
 .PHONY: html-check
 html-check: tcs-helpers
 	"$(TCS_HELPERS)/bin/html-pages" check $(HTML_DIRS)
+	$(MAKE) --no-print-directory link-check
+
+# Fail where a link in the docs pages leads to no file, or to no anchor in
+# one: manual.html links the other TCS projects' documents, in their
+# checkouts beside this one, which are checked when they are there.
+.PHONY: link-check
+link-check:
+	python3 $(DOCS_DIR)/check_links.py $(DOCS_DIR)/*.html
 
 # Have git run tcs-helpers' pre-commit hook in this checkout, which remakes
 # the page of each document a commit changes and adds it to the commit.

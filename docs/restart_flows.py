@@ -1,4 +1,6 @@
-"""Draws the message-flow diagrams of `In-flight data across a restart`.
+"""Draws the message-flow diagrams of `In-flight data across a restart`, and
+those of the tcsmoc manual, which show what goes up and comes down as an
+operator connects, commands a node and pings.
 
 Each diagram is a list of messages and notes, written below, from which an
 SVG is made, so that a change to what happens is a change to a list rather
@@ -410,6 +412,60 @@ LOST_BEACONS = [
         "commanding"),
 ]
 
+# The figures of the tcsmoc manual: what goes up and what comes down behind
+# what an operator presses, as its screenshots show it.
+
+MOC_CONNECT = [
+    note("vehicle", 0, "Starts, loading A; restart flag set; a beacon "
+         "every reset_interval"),
+    note("moc", 0, "Opened on A: link down, every panel Unknown"),
+    msg("down", "any", "beacon #1, restart", 1, 2, "indicator green; "
+        "Restarted\u2014connect; not matched, so data would be dropped"),
+    note("moc", 4, "The operator presses Connect"),
+    msg("up", "any", "CONNECT with A", 5, 6, "checksums match: flag "
+        "cleared; downlink opens; a beacon at once"),
+    msg("down", "any", "answer: running A", 6.5, 7.5, "Last Response: "
+        "tcspecial agrees"),
+    msg("down", "any", "beacon #2, normal", 7.6, 9, "matched for "
+        "commanding; asks what each node is doing"),
+    msg("up", "A", "QUERY_NODE, one per panel", 10.5, 11.5, "answered"),
+    msg("down", "A", "answers: running", 12, 13, "each panel Active"),
+    msg("down", "A", "datum, each node to its port", 14.5, 15.5, "read: "
+        "Last recv, From payload, Recv, and the plot"),
+]
+
+MOC_COMMAND = [
+    note("vehicle", 0, "Running A, matched"),
+    note("moc", 0, "Using A, matched"),
+    note("moc", 1.5, "Disable pressed on a panel"),
+    msg("up", "A", "STOP_NODE, the panel's node", 2.5, 3.5, "stops the "
+        "node and frees what it held"),
+    msg("down", "A", "answer: Success", 4, 5, "panel Stopped; Last "
+        "Response says so"),
+    note("moc", 6.5, "Enable pressed on it"),
+    msg("up", "A", "START_NODE, the same node", 7.5, 8.5, "does not "
+        "start it"),
+    msg("down", "A", "answer: Failure", 9, 10, "Last Response: refused; "
+        "the panel keeps Stopped"),
+    note("moc", 11.5, "Query chosen from the Command menu"),
+    msg("up", "A", "QUERY_NODE, one per panel", 12.5, 13.5, "answered "
+        "with each node's state and counts"),
+    msg("down", "A", "answers", 14, 15, "each panel's status; the counts "
+        "under its Configuration"),
+]
+
+MOC_PING = [
+    note("vehicle", 0, "Running A, matched"),
+    note("moc", 0, "Using A, matched for commanding"),
+    note("moc", 1.5, "Send ping pressed in the ping window"),
+    msg("up", "A", "ping #1, the MOC's time", 2.5, 3.5, "through the "
+        "gateway node to the ping node, which adds its own time"),
+    msg("down", "A", "ping #1, both times", 5, 6, "at ground_base plus "
+        "the ping node's id: the round trip and each way shown"),
+    note("moc", 7.5, "Not matched: nothing goes up, and a pop-up says "
+         "why"),
+]
+
 if __name__ == "__main__":
     draw("restart-commanded", "A commanded restart from A to B",
          "The vehicle runs configuration A and the station is matched with "
@@ -489,3 +545,32 @@ if __name__ == "__main__":
          "normal, makes the station matched for commanding. Nothing is "
          "stuck.",
          LOST_BEACONS)
+    draw("tcsmoc-connect", "Coming up: the first beacon, Connect, the match",
+         "The vehicle starts on configuration A with its restart flag set "
+         "and sends beacon 1; tcsmoc shows the indicator green and "
+         "Restarted, connect, and is not matched. The operator presses "
+         "Connect, which sends CONNECT with A. The checksums match, so the "
+         "vehicle clears the flag, opens the downlink, answers that it is "
+         "running A and sends beacon 2, normal, at once. tcsmoc says the "
+         "vehicle agrees, becomes matched for commanding with beacon 2, "
+         "and sends one QUERY_NODE per panel; the answers make each panel "
+         "Active. From then each node's data is read into its panel and "
+         "the plot.",
+         MOC_CONNECT)
+    draw("tcsmoc-command", "Commanding a node from its panel",
+         "With the two ends matched on A, Disable on a panel sends "
+         "STOP_NODE for that panel's node; the vehicle stops it and "
+         "answers Success, and the panel says Stopped. Enable sends "
+         "START_NODE; a vehicle that does not start the node answers "
+         "Failure, which Last Response shows, and the panel keeps Stopped. "
+         "Query, from the Command menu, sends one QUERY_NODE per panel, "
+         "and the answers set each panel's status and the counts its "
+         "Configuration shows.",
+         MOC_COMMAND)
+    draw("tcsmoc-ping", "Pinging the ping node",
+         "Matched for commanding, Send ping in the ping window sends ping "
+         "1 with the MOC's time up through the gateway node to the ping "
+         "node, which adds its own time and sends it back down to the "
+         "ground's port for it; the window shows the round trip and each "
+         "way. Not matched, nothing goes up and a pop-up says why.",
+         MOC_PING)

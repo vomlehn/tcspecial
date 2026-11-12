@@ -54,6 +54,9 @@ i-slint-backend-testing = "1.18"
 # Directories a test can fill and have cleaned up after it, which is what the
 # saving tests need: they write real files and then go looking at them.
 tempfile = "3.27.0"
+# Writes the screenshots in the manual: see `shots`. The version the window
+# toolkit already brings in.
+png = "0.18"
 # For the schema tests, which read the schemas' JSON and hold it against the
 # software's own lists. Only the tests: the editor reads no JSON.
 serde_json = "1.0"

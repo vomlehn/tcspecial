@@ -369,8 +369,11 @@ ul.auto-toc {
 <ul class="simple">
 <li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a></li>
 <li><a class="reference internal" href="#the-simulator-configuration" id="toc-entry-2">The Simulator Configuration</a></li>
-<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-3">The tcssim window</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-4">See Also</a></li>
+<li><a class="reference internal" href="#the-tcssim-window" id="toc-entry-3">The tcssim window</a><ul>
+<li><a class="reference internal" href="#step-by-step" id="toc-entry-4">Step by step</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-5">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -381,6 +384,27 @@ the packets, timings and errors its simulator configuration asks for. It is
 started with tcspecial and tcsmoc, as Running the Programs, in <a class="reference external" href="tcspecial.html#running-the-programs">the tcspecial
 manual</a>, describes, and tcspecial's
 <tt class="docutils literal"><span class="pre">--simulate</span></tt> says which payloads it stands in for.</p>
+<div class="figure">
+<object data="tcssim-between.svg" type="image/svg+xml">tcsmoc, tcspecial and tcssim side by side on the thermostat
+example. tcsmoc starts the other two and asks tcssim, at its
+tcssim.ready address, whether it is ready; it sends tcspecial
+commands and takes its telemetry. tcssim has a panel for each
+simulated payload: the sensors temp_1, temp_2 and temp_3, and the
+heater switches gpio-out-tmass1 and gpio-out-tmass2. Arrow 1: the
+sensors send readings to tcspecial over UDP at each payload's
+sim_address. Arrow 2: tcspecial's thermostat sends the switches on
+or off. Inside tcssim the switches drive the zone's heater inputs
+in the physics model's world, and the sensors read the zone's
+temperature. Arrow 3: the person at tcssim's window enables and
+disables payloads and changes their sizes and intervals.</object>
+<p class="caption">Where tcssim sits, in the thermostat example. tcspecial reaches each
+simulated payload where it would reach the device -- here its
+<tt class="docutils literal">sim_address</tt> -- and cannot tell tcssim from the hardware. The sensors'
+readings (1) come from the simulator's world, which the heater switches
+tcspecial drives (2) warm, so what tcspecial reads follows from what it
+decided. The window (3) is how a person changes what tcssim does while it
+runs: see <a class="reference internal" href="#step-by-step">Step by step</a>.</p>
+</div>
 </div>
 <div class="section" id="the-simulator-configuration">
 <h1><a class="toc-backref" href="#toc-entry-2">The Simulator Configuration</a></h1>
@@ -940,7 +964,7 @@ decided. The decision is asserted to each of its heaters on every reading,
 as the node does aboard.</p>
 <p>Never name a thermostat with tcspecial running: its own thermostat switches
 the same heaters, and the two would fight.</p>
-<p><strong>Fault injection</strong></p>
+<p id="fault-injection"><strong>Fault injection</strong></p>
 <p>A payload that always works exercises only the path where everything works.
 These settings have a simulated payload misbehave on purpose, so that a
 handler's counting, framing, timeouts and reconnection can be made to happen
@@ -1076,7 +1100,8 @@ once with status 1 and clears nothing.</p>
 <dt>the name, the number and the status</dt>
 <dd>The number is the payload's place in the payload configuration, as tcsmoc's
 panels show it, so the two windows name the same payload the same way. The
-status is red while the payload is not sending and black while it is.</dd>
+status says <tt class="docutils literal">Running</tt> while the payload is sending and <tt class="docutils literal">Stopped</tt>
+while it is not, in black for the one and in bold red for the other.</dd>
 <dt>how the payload is reached</dt>
 <dd>The same description tcsmoc's panels carry for the handler at the other end
 of the link.</dd>
@@ -1106,8 +1131,12 @@ under <a class="reference external" href="tcspecial.html#seeing-what-was-read">S
 <dt><tt class="docutils literal">Sent</tt></dt>
 <dd>When the last packet went, and the first few bytes of it. A part the
 vehicle drives sends nothing, and this line says what it is doing instead,
-in words: <tt class="docutils literal">heater_1: heating</tt>, <tt class="docutils literal">heater_1: off</tt>, or <tt class="docutils literal">heater_1:
-disabled, so off</tt> -- see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>.</dd>
+in words, naming the component of the physics model it is joined to:
+<tt class="docutils literal">heater_1: heating</tt> or <tt class="docutils literal">heater_1: off</tt> for a switch joined to a
+<tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt>, <tt class="docutils literal">zone: on</tt> or <tt class="docutils literal">zone: off</tt> for one
+joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or <tt class="docutils literal">heater_2</tt>, as in the
+thermostat example, and <tt class="docutils literal">disabled, so off</tt> after the name for either
+while its panel has it disabled -- see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>.</dd>
 <dt><tt class="docutils literal">Recv</tt></dt>
 <dd><p class="first">When the last packet arrived, and the first few bytes of it -- for a payload
 that answers requests. A payload that sends of its own accord is never
@@ -1122,15 +1151,134 @@ sent</tt> line is blank.</p>
 <dd>How many packets have gone and arrived since the payload started. The
 arrived half is there for a payload that answers requests, as the <tt class="docutils literal">Recv</tt>
 line is and for the same reason: a payload that sends of its own accord is
-never spoken to, so a count of what arrived could only ever read nought.</dd>
+never spoken to, so a count of what arrived could only ever read nought.
+A part the vehicle drives sends nothing, so its count stays at nought;
+what the vehicle sends it is counted, but not shown.</dd>
 </dl>
 <p>The times and bytes are the simulator's own account of what it did, where
 tcsmoc's panels show the same transfers as the spacecraft reported them. Two
 panels disagreeing about one transfer is worth knowing about, which is why
 both are shown the same way.</p>
+<div class="section" id="step-by-step">
+<h2><a class="toc-backref" href="#toc-entry-4">Step by step</a></h2>
+<p>What the window shows as the commonest things are done with it, on the
+thermostat example (<tt class="docutils literal">examples/thermostat</tt>), whose five panels are the
+three temperature sensors and the two heater switches of the figure in the
+<a class="reference internal" href="#introduction">Introduction</a>. The times are the simulated run's: it starts at 10:00:00,
+and each sensor sends a reading a second, its <tt class="docutils literal">packet_interval</tt>. The
+pictures are made by <tt class="docutils literal">make <span class="pre">screenshots-tcssim</span></tt> from the program's own
+window, drawn without opening it.</p>
+<p><strong>Enabling a sensor</strong></p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="The tcssim window on the thermostat example: the heading Simulated Payloads, two rows of panels -- gpio-out-tmass1, gpio-out-tmass2 and temp_1, then temp_2 and temp_3 -- each Stopped, with an Enable button, and Quit All at the foot." src="shots/tcssim-open.png" />
+<p class="caption">The window as it opens. Every payload is <tt class="docutils literal">Stopped</tt> -- its simulated
+device is made, so tcspecial finds it, but nothing goes over it -- and
+each panel offers <tt class="docutils literal">Enable</tt>. The heater switches' first line says what
+they are doing; the sensors' says <tt class="docutils literal">Sent: <span class="pre">--:--:--</span></tt>, nothing having
+gone yet.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The temp_1 panel, now Running in black, its button reading Disable, its Sent line still --:--:-- and Pkts: 0 sent." src="shots/tcssim-enable-2.png" />
+<p class="caption"><tt class="docutils literal">Enable</tt> pressed on <tt class="docutils literal">temp_1</tt>. The status is <tt class="docutils literal">Running</tt> and the
+button offers <tt class="docutils literal">Disable</tt>; no reading has gone yet.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The temp_1 panel three seconds later: Running, Sent: 10:00:03 followed by two bytes, and Pkts: 3 sent." src="shots/tcssim-enable-3.png" />
+<p class="caption">Three seconds on. <tt class="docutils literal">Sent</tt> gives the time of the last reading and its
+bytes -- the zone's temperature as the sensor reads it, in the encoding
+tcspecial's conversion reads back -- and <tt class="docutils literal">Pkts</tt> counts three.
+<tt class="docutils literal">Pkt</tt>, <tt class="docutils literal">Seg</tt>, <tt class="docutils literal">Pkt Int</tt> and <tt class="docutils literal">Seg Int</tt> can be changed here while
+it runs, and take effect on the next reading.</p>
+</div>
+</li>
+</ol>
+<p><strong>Switching a heater</strong></p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="The gpio-out-tmass1 panel: Stopped in bold red, an Enable button, and the line zone: disabled, so off." src="shots/tcssim-heater-1.png" />
+<p class="caption">The heater switch <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> as it opens. It drives the
+zone's <tt class="docutils literal">heater_1</tt>, so its line names the zone, and disabled -- its
+button is its power -- it is off whatever it is sent.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The same panel after the vehicle has switched it on: still Stopped, still zone: disabled, so off." src="shots/tcssim-heater-2.png" />
+<p class="caption">tcspecial's thermostat switches it on. Nothing changes on the panel or
+in the zone: a disabled heater stays off. What it was sent is kept.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The same panel after Enable: Running in black, a Disable button, and the line zone: on." src="shots/tcssim-heater-3.png" />
+<p class="caption"><tt class="docutils literal">Enable</tt> pressed. The <tt class="docutils literal">on</tt> it was sent is applied at once --
+<tt class="docutils literal">zone: on</tt> -- rather than at the thermostat's next decision, which
+comes only when the decision changes.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The same panel after the vehicle has switched it off: Running, and the line zone: off." src="shots/tcssim-heater-4.png" />
+<p class="caption">The thermostat switches it off, and the line says <tt class="docutils literal">zone: off</tt>. A
+heater sends nothing, so its <tt class="docutils literal">Pkts</tt> stays at nought throughout.</p>
+</div>
+</li>
+</ol>
+<p><strong>Sizes that cannot be sent</strong></p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="The temp_2 panel with a popup over it, outlined in red: temp_2: these sizes cannot be sent. A segment of 2 bytes cannot be part of a packet of 1: a segment is a piece of a packet. Raise the packet size to 2 or more, or lower the segment size to 1 or less. Behind it the Enable button is greyed out." src="shots/tcssim-sizes-1.png" />
+<p class="caption"><tt class="docutils literal">Pkt</tt> stepped down from 2 to 1 on <tt class="docutils literal">temp_2</tt>, leaving its 2-byte
+segment larger than the packet. A popup says so at once, naming both
+sizes and either way out, and <tt class="docutils literal">Enable</tt> is greyed out.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The temp_2 panel with Pkt and Seg both 2, no popup, and the Enable button pressable again." src="shots/tcssim-sizes-2.png" />
+<p class="caption"><tt class="docutils literal">Pkt</tt> stepped back up to 2. The popup goes and <tt class="docutils literal">Enable</tt> comes
+back. Nothing is written to the files either way.</p>
+</div>
+</li>
+</ol>
+<p><strong>A fault taking effect</strong></p>
+<p>Faults are asked for in the simulator configuration, not in the window (see
+<a class="reference internal" href="#fault-injection">Fault injection</a> above). Here the thermostat example's file has one line
+added to <tt class="docutils literal">temp_3</tt>'s entry:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi_tmass</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
+        </span><span class="name tag">silent_after</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">3</span><span class="whitespace">
+        </span><span class="name tag">accuracy</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.25 K</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">lag</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">6 s</span><span class="whitespace">
+        </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.02 K</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">-0.3 K</span>
+</pre>
+<p><tt class="docutils literal">temp_3</tt>'s <tt class="docutils literal">Configuration</tt> button then lists <tt class="docutils literal">silent_after 3 packets</tt>
+under <tt class="docutils literal">faults</tt>, at the foot of what the simulator configuration said.
+<tt class="docutils literal">temp_2</tt>, which has no fault, and <tt class="docutils literal">temp_3</tt> are enabled together:</p>
+<ol class="arabic">
+<li><div class="first figure">
+<img alt="The temp_2 and temp_3 panels side by side, both Running, both Sent at 10:00:03 and both Pkts: 3 sent." src="shots/tcssim-fault-1.png" />
+<p class="caption">Three seconds on, <tt class="docutils literal">temp_2</tt> and <tt class="docutils literal">temp_3</tt> have each sent three
+readings, and look alike.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The same two panels seven seconds later: temp_2 Sent at 10:00:10 with Pkts: 10 sent; temp_3 still Running but still Sent at 10:00:03 with Pkts: 3 sent." src="shots/tcssim-fault-2.png" />
+<p class="caption">Seven seconds later <tt class="docutils literal">temp_2</tt> has sent ten, the last at 10:00:10.
+<tt class="docutils literal">temp_3</tt> is still <tt class="docutils literal">Running</tt>, its link still open, but has sent
+nothing since its third: its <tt class="docutils literal">Sent</tt> time has stopped, which is the
+sign a wedged instrument gives, and what tcspecial's handler for it
+sees is readings that have stopped coming.</p>
+</div>
+</li>
+</ol>
+</div>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-4">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-5">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="manual.html">The TCSpecial manuals</a></dt>
 <dd>What each of TCSpecial's manuals covers.</dd>

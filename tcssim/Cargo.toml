@@ -31,6 +31,8 @@ rand_distr = "0.4"
 i-slint-backend-testing = "1.18"
 # Directories and files a test can make and have cleaned up after it.
 tempfile = "3.27.0"
+# Writes the manual's screenshots of the window, which src/shots.rs draws.
+png = "0.18"
 
 [build-dependencies]
 slint-build = "1.3"

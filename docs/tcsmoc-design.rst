@@ -124,7 +124,7 @@ Requirement
     Stopped, and was commonly wrong, since the MOC attaches to a tcspecial
     that is already serving the set rather than starting a second one, and
     that one's handlers may have been moving data for hours. Enable, Disable
-    and Query all are what ask.
+    and Query, in the Command menu, are what ask.
 
 Requirement
     A panel's status is what a ``START_NODE`` or ``STOP_NODE`` was answered,
@@ -164,13 +164,13 @@ Requirement
 
 Nothing is asked while the command link is down, and the question is not held
 until it comes up: the panels keep saying unknown until contact is made again
-or somebody presses Query all. Contact returning while the link is down is
+or somebody chooses Query. Contact returning while the link is down is
 rare -- the beacon and the link come back together -- and a question owed
 indefinitely is a question that goes out at a moment nobody chose.
 
 Requirement
     The ground does not ask about its payloads on a timer. It asks at the two
-    moments above and when somebody presses Query all, and otherwise watches
+    moments above and when somebody chooses Query, and otherwise watches
     what arrives.
 
     An enabled payload sends on its own -- that is what enabling it does --
@@ -196,7 +196,7 @@ Requirement
     never changes is worse than none.
 
 Requirement
-    Query all still asks the spacecraft directly, and sets both the status and
+    Query still asks the spacecraft directly, and sets both the status and
     the counters from what it answers. It is the one path by which the
     spacecraft's own account of a handler -- its state, its byte counters,
     the triggers it has sent -- reaches a panel, and somebody pressing it is

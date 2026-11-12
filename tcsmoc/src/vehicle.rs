@@ -2725,6 +2725,11 @@ pub fn run(
     std::process::exit(0);
 }
 
+// The manual's screenshots, made from this window on demand: see
+// `make screenshots-tcsmoc`.
+#[cfg(test)]
+mod screenshots;
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;

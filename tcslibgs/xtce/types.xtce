@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Every type a link between two of tcspecial's nodes can carry, stated
-     once: see "Typed links" in docs/design.rst. A terminal of a node carries
-     one of these, or a structure of them that its configuration writes, and
-     a link is valid only where the types at its two ends are the same.
+     once: see "Typed links" in docs/tcspecial-design.rst. A terminal of a node
+     carries one of these, or a structure of them that its configuration writes,
+     and a link is valid only where the types at its two ends are the same.
 
      Each type has a container of its own holding one datum of it, so that
      tcs-xtce generates a codec for each: what an app node's packet holds,

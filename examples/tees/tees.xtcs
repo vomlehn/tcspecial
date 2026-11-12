@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
     <description>Tees and null nodes: a command copied back to the ground, a reading copied aboard, and data dropped</description>
     <tcspecial>
         <!-- Every port is in the eight thousands, which no other example

@@ -25,7 +25,7 @@ use crate::telemetry_log::TelemetryLog;
 /// How often beacons go: normally, and across a restart.
 ///
 /// Both from the configuration's `beacon` section. See "The beacon across a
-/// restart" in `docs/design.rst`.
+/// restart" in `docs/tcspecial-design.rst`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BeaconTiming {
     /// `beacon.default_interval`: once the MOC has connected.

@@ -23,7 +23,7 @@
 //! whatever was already queued on its data sockets, since that was all made
 //! before the match. Its client sends nothing but CONNECT, RESTART_ARM and
 //! RESTART until it is matched for commanding. See "On the ground" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 //!
 //! One place for every part of a station -- the beacon watch that feeds it,
 //! the client and the data receivers that ask it -- which hold clones of

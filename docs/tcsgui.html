@@ -1,0 +1,1086 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
+<title>tcsgui Manual</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 9511 2024-01-13 09:50:07Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+Despite the name, some widely supported CSS2 features are used.
+
+See https://docutils.sourceforge.io/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: gray; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic, pre.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="tcsgui-manual">
+<h1 class="title">tcsgui Manual</h1>
+
+<div class="contents local topic" id="contents">
+<p class="topic-title"><a class="reference internal" href="#top">Contents</a></p>
+<ul class="simple">
+<li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a></li>
+<li><a class="reference internal" href="#starting-tcsgui" id="toc-entry-2">Starting tcsgui</a><ul>
+<li><a class="reference internal" href="#the-command-line" id="toc-entry-3">The command line</a></li>
+<li><a class="reference internal" href="#what-happens-as-it-starts" id="toc-entry-4">What happens as it starts</a></li>
+<li><a class="reference internal" href="#from-a-checkout" id="toc-entry-5">From a checkout</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-window" id="toc-entry-6">The window</a><ul>
+<li><a class="reference internal" href="#the-sheet-and-its-panes" id="toc-entry-7">The sheet and its panes</a></li>
+<li><a class="reference internal" href="#the-selection-column" id="toc-entry-8">The selection column</a></li>
+<li><a class="reference internal" href="#the-bar" id="toc-entry-9">The bar</a></li>
+<li><a class="reference internal" href="#the-menus" id="toc-entry-10">The menus</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#how-a-configuration-is-drawn" id="toc-entry-11">How a configuration is drawn</a></li>
+<li><a class="reference internal" href="#nodes" id="toc-entry-12">Nodes</a><ul>
+<li><a class="reference internal" href="#placing-a-node" id="toc-entry-13">Placing a node</a></li>
+<li><a class="reference internal" href="#selecting-moving-and-the-node-s-menu" id="toc-entry-14">Selecting, moving and the node's menu</a></li>
+<li><a class="reference internal" href="#a-node-s-window" id="toc-entry-15">A node's window</a></li>
+<li><a class="reference internal" href="#renaming" id="toc-entry-16">Renaming</a></li>
+<li><a class="reference internal" href="#arranging" id="toc-entry-17">Arranging</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#lines" id="toc-entry-18">Lines</a><ul>
+<li><a class="reference internal" href="#drawing-a-line" id="toc-entry-19">Drawing a line</a></li>
+<li><a class="reference internal" href="#moving-and-removing-a-line" id="toc-entry-20">Moving and removing a line</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#subdiagrams" id="toc-entry-21">Subdiagrams</a></li>
+<li><a class="reference internal" href="#the-simulator-file" id="toc-entry-22">The simulator file</a></li>
+<li><a class="reference internal" href="#groups-and-tcspecial-parameters" id="toc-entry-23">Groups and tcspecial parameters</a></li>
+<li><a class="reference internal" href="#checking" id="toc-entry-24">Checking</a><ul>
+<li><a class="reference internal" href="#errors" id="toc-entry-25">Errors</a></li>
+<li><a class="reference internal" href="#concerns" id="toc-entry-26">Concerns</a></li>
+<li><a class="reference internal" href="#what-tcsgui-refuses" id="toc-entry-27">What tcsgui refuses</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#saving" id="toc-entry-28">Saving</a><ul>
+<li><a class="reference internal" href="#autosave" id="toc-entry-29">Autosave</a></li>
+<li><a class="reference internal" href="#save-and-save-as" id="toc-entry-30">Save and Save as</a></li>
+<li><a class="reference internal" href="#what-is-written" id="toc-entry-31">What is written</a></li>
+<li><a class="reference internal" href="#when-a-write-fails" id="toc-entry-32">When a write fails</a></li>
+<li><a class="reference internal" href="#leaving" id="toc-entry-33">Leaving</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#undo-redo-and-crash-recovery" id="toc-entry-34">Undo, redo and crash recovery</a><ul>
+<li><a class="reference internal" href="#undo-and-redo" id="toc-entry-35">Undo and redo</a></li>
+<li><a class="reference internal" href="#the-history" id="toc-entry-36">The history</a></li>
+<li><a class="reference internal" href="#crash-recovery" id="toc-entry-37">Crash recovery</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#read-only-sessions" id="toc-entry-38">Read-only sessions</a></li>
+<li><a class="reference internal" href="#where-tcsgui-keeps-things" id="toc-entry-39">Where tcsgui keeps things</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-40">See Also</a></li>
+</ul>
+</div>
+<div class="section" id="introduction">
+<h1><a class="toc-backref" href="#toc-entry-1">Introduction</a></h1>
+<p>tcsgui is TCSpecial's configuration editor. A configuration is a graph --
+nodes, and the links that join them -- and tcsgui draws that graph, lets you
+change it by drawing, and writes the result back to the same file tcspecial
+will read aboard, in either of its spellings: YTCS, in YAML, or XTCS, in XML
+(see Configuration File Formats in <a class="reference external" href="tcspecial.html#configuration-file-formats">the tcspecial manual</a>). It runs on the ground and
+never flies.</p>
+<p>It edits, in one session, everything a person draws a vehicle with: the top
+configuration file, every file it includes, and, where you name one, the
+simulator's own file, whose physics model tcsgui draws beside the
+configuration. What the files mean -- node types, attributes, links, includes,
+the <tt class="docutils literal">tcspecial</tt> section -- is described in <a class="reference external" href="tcspecial.html">the tcspecial manual</a>; this manual says how tcsgui shows them and how to change
+them. The simulator file is described in the <a class="reference external" href="tcssim.html">tcssim manual</a>.</p>
+<p>Two things about tcsgui are worth knowing before anything else.</p>
+<p><strong>It writes as you go.</strong> With Autosave on, which it is until you turn it off,
+every edit is written to the files as it is made. There is a Save command all
+the same, for the cases described under <a class="reference internal" href="#saving">Saving</a>.</p>
+<p><strong>It is lazy about what is entered and strict about what is.</strong> A node may be
+placed with nothing filled in, and an empty field is a question not yet
+answered rather than a fault. A value that is filled in is held to the same
+rules the flight software applies, in the same words. Requiring that
+everything be entered is the business of <tt class="docutils literal">tcsverify</tt> and of tcspecial
+itself; see the <a class="reference external" href="tcsverify.html">tcsverify manual</a>.</p>
+</div>
+<div class="section" id="starting-tcsgui">
+<h1><a class="toc-backref" href="#toc-entry-2">Starting tcsgui</a></h1>
+<div class="section" id="the-command-line">
+<h2><a class="toc-backref" href="#toc-entry-3">The command line</a></h2>
+<pre class="code text literal-block">
+tcsgui [-r | --read-only] &lt;configuration file&gt; [&lt;simulator file&gt;]
+</pre>
+<p>The configuration file is required. Its extension says its format: <tt class="docutils literal">.xtcs</tt>
+is XTCS, in XML, and anything else, normally <tt class="docutils literal">.ytcs</tt>, is YTCS, in YAML. The file need not
+exist yet: a name that is not there is how a new configuration is begun, and
+any directories missing from its path are made when it is first written.</p>
+<p>The second file, if given, is the simulator's configuration. It is always
+YAML, and its name must end in <tt class="docutils literal">.yaml</tt>; any other name, <tt class="docutils literal">.yml</tt> included,
+is refused before the window opens. Like the configuration, it need not exist
+yet.</p>
+<p><tt class="docutils literal"><span class="pre">-r</span></tt>, <tt class="docutils literal"><span class="pre">--read-only</span></tt> and <tt class="docutils literal"><span class="pre">--readonly</span></tt> are three spellings of one flag,
+and it may go anywhere on the line: see <a class="reference internal" href="#read-only-sessions">Read-only sessions</a>. Any other word
+starting with a dash is refused, so that a mistyped flag is not taken for the
+name of a configuration to create. More than two files are refused too.</p>
+<p>Run with no file, or with a command line it does not take, tcsgui prints its
+usage on the error output and exits with status 2. There is no <tt class="docutils literal"><span class="pre">--help</span></tt>
+option; running it with no arguments is how to see the usage.</p>
+</div>
+<div class="section" id="what-happens-as-it-starts">
+<h2><a class="toc-backref" href="#toc-entry-4">What happens as it starts</a></h2>
+<p>Before any window opens, tcsgui reads its preferences (see <a class="reference internal" href="#where-tcsgui-keeps-things">Where tcsgui
+keeps things</a>) and deletes the undo histories of sessions nobody is coming
+back to -- any more than a week old, and any whose configuration is no longer
+there -- saying on the error output how many it removed.</p>
+<p>It then reads the files. <strong>A file that is there and cannot be read ends
+tcsgui</strong>, with a message on the error output naming the file and saying why,
+and exit status 1. That covers a file that does not parse, one that cannot be
+opened, and a simulator file that parses but cannot be joined to the
+configuration -- two entries of one name, or an entry naming a payload the
+configuration does not have. tcsgui writes every edit as it is made, so a
+session opened on a file it had not read would replace that file at the first
+edit; such a file is put right in a text editor instead.</p>
+<p>A configuration that does not exist yet opens with a ground station already
+in it -- a <tt class="docutils literal">gateway_radio</tt> node called <tt class="docutils literal"><span class="pre">gateway-1</span></tt>, in the upper right of
+the Gateway pane -- and with the <tt class="docutils literal">tcspecial</tt> section's fields present and
+empty, except the beacon interval, which starts at 1000 ms. All of that is
+one edit, so one Undo takes it back.</p>
+<p>Then the undo history of an earlier session is recovered if there is one:
+see <a class="reference internal" href="#crash-recovery">Crash recovery</a>.</p>
+</div>
+<div class="section" id="from-a-checkout">
+<h2><a class="toc-backref" href="#toc-entry-5">From a checkout</a></h2>
+<p>The top-level Makefile runs tcsgui out of the source tree:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>runguiy<span class="whitespace"> </span><span class="name variable">TCSGUI_FILE</span><span class="operator">=</span>tests/manual/thermostat<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runguix<span class="whitespace"> </span><span class="name variable">TCSGUI_FILE</span><span class="operator">=</span>tests/manual/thermostat<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runsimguiy<span class="whitespace"> </span><span class="name variable">TCSGUI_FILE</span><span class="operator">=</span>tests/manual/thermostat
+</pre>
+<p><tt class="docutils literal">runguiy</tt> opens the YAML spelling of <tt class="docutils literal">TCSGUI_FILE</tt> and <tt class="docutils literal">runguix</tt> the
+XML; whatever extension the variable carries is replaced. <tt class="docutils literal">runsimguiy</tt> and
+<tt class="docutils literal">runsimguix</tt> open the simulator file beside it as well, named by
+<tt class="docutils literal">TCSGUI_SIM</tt>, which defaults to the configuration's stem with <tt class="docutils literal">sim</tt> on
+the end. <tt class="docutils literal">TCSGUI_FILE</tt> defaults to <tt class="docutils literal">example.ytcs</tt>, the shipped example,
+which tcsgui will rewrite as it is edited; <tt class="docutils literal">git checkout example.ytcs</tt> puts
+it back. <tt class="docutils literal">make verify</tt> checks the file the same variable names.</p>
+</div>
+</div>
+<div class="section" id="the-window">
+<h1><a class="toc-backref" href="#toc-entry-6">The window</a></h1>
+<p>The main window's title says what it is editing, <tt class="docutils literal">TCSpecial
+Configuration:</tt> and the configuration's absolute path, shortened in the
+middle when it is too long for the title bar. A read-only session says
+<tt class="docutils literal"><span class="pre">(read-only)</span></tt> in the title.</p>
+<p>Under the menu bar is a bar of buttons and messages, and under that, side by
+side, the selection column on the left and the sheet on the right.</p>
+<div class="section" id="the-sheet-and-its-panes">
+<h2><a class="toc-backref" href="#toc-entry-7">The sheet and its panes</a></h2>
+<p>The sheet is divided into working panes, each with its name in light grey
+italic at its top: <tt class="docutils literal">Payloads</tt>, <tt class="docutils literal">Vehicle</tt> and <tt class="docutils literal">Gateway</tt>, left to right.
+What the vehicle carries -- devices, driven lines, programs it runs as
+payloads -- goes in the Payloads pane; the vehicle's own graph --
+computations, logs, tees, apps and subdiagram boxes -- in the Vehicle pane;
+the link to the ground in the Gateway pane. A node stays in its own pane: a
+drag that would carry it across a divider stops at the divider. A
+configuration read from a file that draws a node in the wrong pane, or off
+the grid, or on top of another, is shown with the node moved into place;
+that is not an edit, and nothing is written until the node is moved by hand.</p>
+<p>Left of the Payloads pane is a fourth, labelled <tt class="docutils literal">Physics</tt>, which holds the
+simulator file's physics model: see <a class="reference internal" href="#the-simulator-file">The simulator file</a>. It is drawn
+whether or not a simulator file was given.</p>
+<p>Each pane is painted its own pale tint, but the pane is never told by its
+tint alone: each carries its name, and each kind of node has an outline of
+its own (see <a class="reference internal" href="#how-a-configuration-is-drawn">How a configuration is drawn</a>).</p>
+<p>The dividers between the panes each carry a handle halfway down; drag it to
+move the divider. A pane cannot be made narrower than a tenth of the working
+width, and a divider stops against a node rather than passing over it. Where
+the dividers are is a preference of yours, not part of the configuration, and
+is kept in the preferences file.</p>
+</div>
+<div class="section" id="the-selection-column">
+<h2><a class="toc-backref" href="#toc-entry-8">The selection column</a></h2>
+<p>Down the left of the window are the selection lists, one per pane and in the
+same order: the physics list at the top, then the payloads, the vehicle's
+nodes and the gateway's. Each list shows its types drawn as they will be
+drawn on the sheet, under headings, in alphabetical order within each
+heading. The lines between the lists can be dragged to share the column
+differently, no list going below a tenth of it; where they are is kept in the
+preferences file too.</p>
+<p>The types offered come from the description tree (see <a class="reference internal" href="#where-tcsgui-keeps-things">Where tcsgui keeps
+things</a>). A type the tree describes is offered as its descriptions -- the one
+<tt class="docutils literal">compute</tt> type is offered as <tt class="docutils literal">thermostat</tt>, <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt>,
+<tt class="docutils literal">vote</tt> and <tt class="docutils literal">process</tt>, each with its function already set -- and a type it
+says nothing about is offered as itself. Without a tree at all, every type is
+offered as itself.</p>
+</div>
+<div class="section" id="the-bar">
+<h2><a class="toc-backref" href="#toc-entry-9">The bar</a></h2>
+<p>Left to right:</p>
+<ul class="simple">
+<li>where the window shows a subdiagram's page, that subdiagram's name;</li>
+<li><strong>Undo</strong> and <strong>Redo</strong>, an arrow apiece with the name of the edit each would
+take back or put again, greyed when there is none;</li>
+<li><strong>Save</strong>, drawn as a floppy disk;</li>
+<li><strong>Arrange</strong>, which lays every node out afresh (see <a class="reference internal" href="#arranging">Arranging</a>). While
+any node of the page lies outside its own pane across, it is emphasised and
+says so in words: <tt class="docutils literal">Arrange: 2 nodes are outside their panes</tt>;</li>
+<li><strong>N errors</strong>, present only while there are errors (see <a class="reference internal" href="#checking">Checking</a>);</li>
+<li><strong>N concerns</strong> and <strong>N set aside</strong>, each present only while it counts
+something;</li>
+<li>how many edits can be undone;</li>
+<li>the state of the files: <tt class="docutils literal">saved</tt>, what the last command did, or, in red
+and bold, what stopped the last write.</li>
+</ul>
+</div>
+<div class="section" id="the-menus">
+<h2><a class="toc-backref" href="#toc-entry-10">The menus</a></h2>
+<dl class="docutils">
+<dt><strong>File</strong></dt>
+<dd><strong>Save</strong>, <strong>Save as...</strong>, <strong>Autosave</strong> (a check box), <strong>Edit payload
+groups</strong>, <strong>Edit simulated payload groups</strong> (greyed when no simulator file
+was given), and <strong>Exit</strong>.</dd>
+<dt><strong>Edit</strong></dt>
+<dd><strong>Edit tcspecial parameters</strong> and <strong>Arrange the nodes</strong>.</dd>
+<dt><strong>View</strong></dt>
+<dd><strong>Zoom to the drawing</strong> fits every node and physics component in the
+view; <strong>Zoom to the selection</strong> fits the node, line or component selected,
+and is greyed while nothing is; <strong>Actual size</strong> draws the sheet at its own
+size; <strong>Fit the width</strong>, which is how a window starts, draws the sheet as
+wide as the window allows. A window narrower than the sheet draws the
+sheet smaller rather than cutting panes off. Only the drawing is scaled:
+positions written to the file are in the sheet's own pixels whatever the
+zoom.</dd>
+</dl>
+<p>While a question tcsgui asked at startup is waiting for an answer, the main
+window is greyed and takes no presses, and the menus are disabled.</p>
+</div>
+</div>
+<div class="section" id="how-a-configuration-is-drawn">
+<h1><a class="toc-backref" href="#toc-entry-11">How a configuration is drawn</a></h1>
+<p>Every node is drawn the same size, its name in the middle and its type along
+the inside of its top -- for a compute node, its function instead, such as
+<tt class="docutils literal">vote</tt> or <tt class="docutils literal">to_kelvin</tt>. Which pane a node belongs in is said by its
+outline: a payload is a parallelogram, a node of the vehicle's own graph a
+rectangle with rounded corners, and a gateway a plain rectangle. Within one
+outline the types are told apart by the line around them -- single, doubled,
+dashed, dotted -- its weight, and how the name is set. Every type also has a
+colour of its own, but no two types differ by colour alone.</p>
+<p>A node's <strong>terminals</strong> are small boxes in its corners, each with an arrow
+showing which way its data goes. Along the top, the payload's own data on its
+way to the ground: it arrives at <tt class="docutils literal"><span class="pre">world-in</span></tt> on the left and leaves by
+<tt class="docutils literal"><span class="pre">world-out</span></tt> on the right, the arrows pointing right. Along the bottom, what
+the ground sends on its way to a payload: it arrives at <tt class="docutils literal"><span class="pre">moc-in</span></tt> on the
+right and leaves by <tt class="docutils literal"><span class="pre">moc-out</span></tt> on the left, the arrows pointing left. A node
+shows only the terminals its type has, so a payload has two, on its right,
+and a gateway two, on its left.</p>
+<p>A <strong>line</strong> is a link. It runs from a terminal to a terminal along a route
+that turns square corners and goes around nodes, with an arrowhead at the
+end it arrives at. The two streams' lines are drawn in different colours,
+and are also told apart by the row of terminals they leave and reach: the
+top row for the payload's own data, the bottom row for what the ground sends.
+A line's names are not written beside it: rest the pointer on it and a tip
+shows the node it leaves, the node it reaches and the input there where it
+names one, and under them any comment the file has for the link.</p>
+<p>A <strong>subdiagram's box</strong> is a little taller than a node, says under its name
+how many nodes it holds and how many lines cross its edge, and has a mark in
+the middle of its bottom edge that opens it.</p>
+<p>A <strong>physics component</strong> is a hexagon pointed at both ends with a dotted
+edge, narrower than any node, with its type along its top and its name in
+the middle. It has at most two terminals, both on its right: an output at the
+top and an input below it. The lines of the physics model are dashed, where a
+configuration's links are solid.</p>
+<p><strong>Red means something is wrong</strong>, and nothing else on the sheet is red. A
+node with something wrong with it is drawn with its outline, its name and its
+terminals in red, and it is also counted and named in words on the bar's
+errors button. A node whose type this build does not know is drawn as a small
+open square, which no real type is.</p>
+<p>A selected node, component or line is outlined in dark grey; a selected line
+is drawn over a wider line.</p>
+</div>
+<div class="section" id="nodes">
+<h1><a class="toc-backref" href="#toc-entry-12">Nodes</a></h1>
+<div class="section" id="placing-a-node">
+<h2><a class="toc-backref" href="#toc-entry-13">Placing a node</a></h2>
+<p>Click a type in its list and a node of that type is placed in its own pane,
+as high up as it fits in view without covering anything, and the sheet
+scrolls to it. Or press on the type and drag: the shape comes out of the list
+under the pointer, and letting go over the sheet places the node there, on
+the grid and in its own pane -- let go in another pane, it stops at its own
+pane's edge. Let go anywhere off the sheet, it places nothing. Either way it
+is one edit.</p>
+<p>A new node is named after what was placed, a hyphen and the first number no
+node has: <tt class="docutils literal"><span class="pre">i2c-1</span></tt>, then <tt class="docutils literal"><span class="pre">i2c-2</span></tt>, and <tt class="docutils literal"><span class="pre">i2c-1</span></tt> again if the first is
+deleted. The number says the name is tcsgui's suggestion; rename it.</p>
+</div>
+<div class="section" id="selecting-moving-and-the-node-s-menu">
+<h2><a class="toc-backref" href="#toc-entry-14">Selecting, moving and the node's menu</a></h2>
+<p>A press on a node selects it, and a press that moves more than a few pixels
+drags it. A node moves in steps of five millimetres on the sheet, which keeps
+terminals level with each other, and stays in its own pane. Because the
+corners hold the terminals, a press on a corner takes a line rather than
+moving the node.</p>
+<p>A right click selects a node and opens its menu: <strong>Edit</strong>, which opens the
+node's window, and <strong>Delete</strong>. A subdiagram's box has <strong>Open</strong> first. A click
+anywhere else on the sheet selects nothing and closes any menu.</p>
+<p>The Delete key, or Backspace, removes what is selected: a line at once, a
+node after asking. The question names the node and the lines that go with it.
+Every line to or from a deleted node goes too, and one Undo puts all of it
+back. Cancel leaves everything, the history included, as it was.</p>
+</div>
+<div class="section" id="a-node-s-window">
+<h2><a class="toc-backref" href="#toc-entry-15">A node's window</a></h2>
+<p>A node's window shows its name, as a field with a small <tt class="docutils literal">x</tt> beside it that
+clears it, the attributes its type declares, its comment, and what is wrong
+with it, if anything. Where a simulator file was given and the node is a
+payload, the simulator's settings for it follow under a heading of their own,
+their labels in italic, because they are written to the other file. A field
+the configuration requires is marked beside its name; while a field has the
+focus, what the description tree says about it is shown at the foot of the
+window. Several windows may be open at once, so two nodes can be compared side
+by side, and each stays open until its <strong>Close</strong> button is pressed.</p>
+<p>A value is taken when you are done with it -- on Enter, on leaving the field,
+on Close, or when the window is closed -- not at each keystroke. A tick box
+is taken at once. A cleared field leaves the attribute out of the file, which
+is what an empty value means to the checking anyway.</p>
+</div>
+<div class="section" id="renaming">
+<h2><a class="toc-backref" href="#toc-entry-16">Renaming</a></h2>
+<p>A node is renamed in its window's name field. The new name is refused, with
+the reason under the field, if any other node in any file of the
+configuration has it, if a physics component has it, if it is empty, or if it
+has a dot or a slash in it, which a line reads as separators. A rename is one
+edit and takes everything that names the node with it: its lines, its
+simulator settings, the command bindings that name it and its showing at its
+page's edge. A subdiagram's box is renamed the same way, which renames the
+subdiagram; its file stays where its <tt class="docutils literal">path</tt> says.</p>
+</div>
+<div class="section" id="arranging">
+<h2><a class="toc-backref" href="#toc-entry-17">Arranging</a></h2>
+<p><strong>Arrange</strong>, on the bar or as <strong>Edit -&gt; Arrange the nodes</strong>, lays out every
+node of the page afresh, the way its data flows: payloads in a column down
+their pane, the vehicle's nodes in columns by how many steps from a payload
+each is, the ground in a column of its own, each node level with what feeds
+it where there is room. It is one edit, so one Undo puts a hand-made layout
+back, and nothing is recorded when there was nothing to move.</p>
+</div>
+</div>
+<div class="section" id="lines">
+<h1><a class="toc-backref" href="#toc-entry-18">Lines</a></h1>
+<div class="section" id="drawing-a-line">
+<h2><a class="toc-backref" href="#toc-entry-19">Drawing a line</a></h2>
+<p>A line is drawn in three clicks:</p>
+<ol class="arabic simple">
+<li>Click a terminal. The line is now in hand: a dashed line follows the
+pointer, and a box along the bottom of the sheet says what to click next.</li>
+<li>Click the node the line is to reach, anywhere on it. A menu headed with the
+node's name offers what the line can become there -- the input of the same
+stream, or each of a node's named inputs, <tt class="docutils literal">in0</tt>, <tt class="docutils literal">in1</tt> and so on.</li>
+<li>Choose one.</li>
+</ol>
+<p>A line may be drawn from either end, from the data source or from the sink
+that wants feeding; the file says the same thing either way. Escape, a right
+click, Cancel in the menu or a click on bare sheet puts the line down and
+changes nothing.</p>
+<p>What cannot be made is in the menu too, greyed and saying why in words:
+<tt class="docutils literal"><span class="pre">world-in</span> (fed by to_k1)</tt> for an input something else already feeds,
+<tt class="docutils literal"><span class="pre">world-in</span> (joined already)</tt> for a line the configuration has. A node with
+nothing at all for the line offers no menu, and the line stays in hand while
+the box on the sheet says so. tcsgui will not draw a line from a node to
+itself, one that carries one stream into the other, one the configuration
+already has, or a second line into an input that does not merge.</p>
+</div>
+<div class="section" id="moving-and-removing-a-line">
+<h2><a class="toc-backref" href="#toc-entry-20">Moving and removing a line</a></h2>
+<p>Click the terminal at one end of an existing line and that end comes off into
+the hand. The next node clicked offers to move it to that node's terminal of
+the same name, the far end staying put, as one edit; the menu also offers a
+new line from the terminal instead. Clicked back on the node it came from,
+the menu offers to take the line out, and so does the Delete key while it is
+in hand. A terminal with several lines on it starts a new line, since nothing
+says which of them was meant.</p>
+<p>A line can also be selected by clicking it, and removed with Delete or
+Backspace; a right click on it opens a menu whose one item is <strong>Delete</strong>.</p>
+</div>
+</div>
+<div class="section" id="subdiagrams">
+<h1><a class="toc-backref" href="#toc-entry-21">Subdiagrams</a></h1>
+<p>A configuration's included files are its subdiagrams. On the top page each is
+a box, drawn in the Vehicle pane under the subdiagram's name, whose four
+corner terminals are its edge: what of it the files around it may join, as
+its <tt class="docutils literal">exports</tt> section says (see <a class="reference external" href="tcspecial.html">the tcspecial manual</a>).
+The <tt class="docutils literal">subdiagram</tt> entry, under <strong>Pages</strong> in the vehicle list, places a new
+one, which tcsgui writes to a file of its own beside the top file, in the top
+file's format, and names in the top file's <tt class="docutils literal">include</tt> list.</p>
+<p><strong>Open</strong> in the box's menu, or the mark in the middle of its bottom edge,
+opens its page in a window like the main one, with the same panes, lists,
+bar, menus and edits. Opening one that is already open brings its window
+forward. Every window shows the one document, so they never disagree, and
+each is redrawn after every edit.</p>
+<p>On a subdiagram's page, a margin either side labelled <em>outside</em> holds the
+four edge terminals again: <tt class="docutils literal"><span class="pre">world-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt> on the left,
+<tt class="docutils literal"><span class="pre">world-out</span></tt> and <tt class="docutils literal"><span class="pre">moc-in</span></tt> on the right. A line from another file runs to
+the edge, and a node the file exports that nothing outside joins yet is drawn
+joined to the edge by a line labelled <em>not joined outside</em>.</p>
+<p>Lines are drawn across the edge with the same three clicks:</p>
+<ul class="simple">
+<li>on the top page, clicking a box with a line in hand offers a line to each
+node its file exports at that terminal, and a line taken from a box's
+terminal offers one from each exported node. A box that exports nothing
+there offers no menu, and the window says to open it and join a node to
+its edge;</li>
+<li>inside, clicking an edge terminal and then a node, or a node's terminal
+and then the edge terminal of the same name, offers to show that node
+outside there or to hide it again, and a new line to each node outside that
+can take it. Hiding is greyed, saying why, while a line from another file
+joins the node there. Showing, hiding and the line made with a showing are
+each one edit, and are written into the file's <tt class="docutils literal">exports</tt>.</li>
+</ul>
+<p>tcsgui writes each node, group and command binding back to the file it was
+read from.</p>
+</div>
+<div class="section" id="the-simulator-file">
+<h1><a class="toc-backref" href="#toc-entry-22">The simulator file</a></h1>
+<p>Given a simulator file, tcsgui edits it in the same session: one Save writes
+both files, and one Undo takes back whichever the last edit touched. Without
+one, the physics list is greyed and the Physics pane says to open a simulator
+file.</p>
+<p><strong>A payload's simulator settings</strong> are in its own node window, under their
+heading. A file tcsgui begins names each payload of the configuration under
+its type and nothing else; a setting is written only when it holds a value.</p>
+<p><strong>Simulator groups</strong> are edited from <strong>File -&gt; Edit simulated payload
+groups</strong>, which can also make a group with <strong>New</strong> and remove one with
+<strong>Remove</strong>.</p>
+<p><strong>Physics components</strong> are placed from the physics list, under <tt class="docutils literal">Thermal</tt>,
+<tt class="docutils literal">Power</tt> and <tt class="docutils literal">Motion</tt>, as nodes are from theirs: click a type and it is
+put down the Physics pane, or drag it there. A new component is named after
+its type, an underscore and a free number -- <tt class="docutils literal">heater_3</tt> -- and its window
+opens at once, showing its type's settings and what the simulator's own
+reader says is wrong with them, such as a figure without its unit. A
+component the reader would refuse is drawn red.</p>
+<p>A component is handled as a node is: dragged to move it, right-clicked for
+<strong>Edit</strong> and <strong>Delete</strong>, renamed in its window. A line from its output or
+input terminal to another component makes a physics connection; to a
+payload, or a subdiagram's box, it sets that payload's <tt class="docutils literal">connects</tt>. A line
+from a payload's terminal to a component does the same: from a <tt class="docutils literal">moc</tt>
+terminal it offers the component's inputs, from a <tt class="docutils literal">world</tt> terminal its
+outputs. Where a line could mean more than one terminal tcsgui asks, offering
+each, with Cancel; a join already made is offered greyed, saying so.
+Deleting a component removes its connections and takes it out of every
+payload's <tt class="docutils literal">connects</tt>, and one Undo puts all of it back. The world's
+<tt class="docutils literal">ambient_temp</tt>, and taking away a connection or a join, are done in the
+simulator file by hand for now.</p>
+<p>Each component is drawn on the page it was placed from. Where each was drawn
+is kept in a <tt class="docutils literal">tcsgui</tt> section at the end of the simulator file, which tcssim
+ignores; see the <a class="reference external" href="tcssim.html">tcssim manual</a>.</p>
+</div>
+<div class="section" id="groups-and-tcspecial-parameters">
+<h1><a class="toc-backref" href="#toc-entry-23">Groups and tcspecial parameters</a></h1>
+<p><strong>File -&gt; Edit payload groups</strong> opens a window for the configuration's
+payload groups: choose a group, or make one with <strong>New</strong>, and set its name,
+its interval, and which payloads are in it. Below those are the attributes
+every payload of the group declares; a value typed there is written to every
+payload in the group as one edit, and a field whose payloads disagree says
+so. <tt class="docutils literal">group</tt> and <tt class="docutils literal">interval</tt> are never written to the members. Renaming a
+group renames it on every node in it. <strong>Remove this group</strong> removes it.</p>
+<p><strong>Edit -&gt; Edit tcspecial parameters</strong> opens the configuration's <tt class="docutils literal">tcspecial</tt>
+section: where commands are taken, where beacons go, where the log is
+written. Every attribute the section may have is offered, those that must be
+stated first and marked. A parameter cleared is left out of the file.</p>
+</div>
+<div class="section" id="checking">
+<h1><a class="toc-backref" href="#toc-entry-24">Checking</a></h1>
+<p>tcsgui asks <tt class="docutils literal">tcsverify</tt> about the files as it starts and after every edit,
+so what it says about a configuration is what <tt class="docutils literal">tcsverify</tt>, tcspecial,
+tcsmoc and tcssim say, in their words. There are three kinds of answer.</p>
+<div class="section" id="errors">
+<h2><a class="toc-backref" href="#toc-entry-25">Errors</a></h2>
+<p>An <strong>error</strong> is something the vehicle would refuse: a value a rule refuses,
+two nodes of one name, two lines into one input, a line to a node that is not
+there. While there are any, the bar has a button saying how many --
+<tt class="docutils literal">3 errors</tt> -- whose menu lists them one a line. Choosing one goes to it:</p>
+<ul class="simple">
+<li>a node's error shows the node in the middle of its page, selected, with its
+window open;</li>
+<li>a line's error shows the line in the middle of its page, lit by a wide pale
+line under it, so it stands out by its width;</li>
+<li>a name two nodes share, or a node with no name, is first given a name
+nothing has -- the one repair tcsgui makes by itself -- and then shown as a
+node's error is;</li>
+<li>a group's error opens the groups window on that group, and an error in the
+<tt class="docutils literal">tcspecial</tt> section opens the parameters window.</li>
+</ul>
+<p>The errors are worked out again after every edit and as a node's window
+closes, so one put right leaves the menu, and the button goes with the last.</p>
+<p>If the configuration has errors when it is opened, a question in front of the
+main window says so -- whether some nodes have values that are not valid,
+some links are not, or there are other errors -- with <strong>Ignore</strong>, which
+leaves the errors standing and lets you work, and <strong>Quit</strong>. Ignoring is for
+this session only and is not written anywhere. Either way every node is on
+the sheet in its pane, so a configuration can be looked at before it is put
+right.</p>
+<p>An error made while you work is also said once in a small window, headed
+<em>Something is wrong with the configuration.</em>, that has to be acknowledged; it
+is said again only if it goes away and comes back.</p>
+</div>
+<div class="section" id="concerns">
+<h2><a class="toc-backref" href="#toc-entry-26">Concerns</a></h2>
+<p>A <strong>concern</strong> is a shape that might be a mistake and might be meant: a
+payload whose readings reach nothing, a vehicle node a stream arrives at and
+nothing leaves, one something leaves and nothing arrives at. None of them
+stops a configuration being read, and all are normal while a diagram is being
+drawn, so they are counted rather than refused, and not at all while the
+configuration has one node or none.</p>
+<p><strong>N concerns</strong> on the bar opens a list with a line a concern, each with
+<strong>Go to it</strong>, which selects the node, scrolls to it and opens its window, and
+<strong>Set aside</strong>. A concern set aside moves to the <strong>N set aside</strong> list, where
+<strong>Take up again</strong> moves it back. Setting aside is an edit, so Undo takes it
+back, and it is written in the configuration's <tt class="docutils literal">tcsgui</tt> section, so that
+whoever opens the file next sees the same decision. It is kept by node and
+kind of concern: a concern that stops applying leaves both lists by itself.</p>
+</div>
+<div class="section" id="what-tcsgui-refuses">
+<h2><a class="toc-backref" href="#toc-entry-27">What tcsgui refuses</a></h2>
+<p>Some things are refused at once rather than counted, because they are slips
+of the hand rather than decisions about the vehicle: the lines described under
+<a class="reference internal" href="#drawing-a-line">Drawing a line</a>, a rename to a name that is taken or cannot be a name, a
+node dragged out of its pane. A refused rename says why under the name field,
+and the window will not close until the name is put right or cleared.</p>
+</div>
+</div>
+<div class="section" id="saving">
+<h1><a class="toc-backref" href="#toc-entry-28">Saving</a></h1>
+<div class="section" id="autosave">
+<h2><a class="toc-backref" href="#toc-entry-29">Autosave</a></h2>
+<p>With <strong>File -&gt; Autosave</strong> checked, every edit is written as it is made. With
+it unchecked, edits are written by Save and by the way out of the program, and
+not before -- for trying a change and keeping it only if it works. The undo
+history is written after every edit either way, which is what lets an
+unsaved edit survive a crash (see <a class="reference internal" href="#crash-recovery">Crash recovery</a>). Checking Autosave again
+writes at once whatever was waiting.</p>
+<p>The setting is kept as <tt class="docutils literal">&lt;autosave&gt;</tt> in <tt class="docutils literal"><span class="pre">$HOME/.tcsgui/preferences.xml</span></tt>,
+<tt class="docutils literal">true</tt> or <tt class="docutils literal">false</tt>, and is on by default.</p>
+</div>
+<div class="section" id="save-and-save-as">
+<h2><a class="toc-backref" href="#toc-entry-30">Save and Save as</a></h2>
+<p><strong>Save</strong>, on the bar or in the File menu, writes every file of the session
+now. With Autosave on it is for retrying a write that failed once whatever
+stopped it has been put right, and for rewriting a set of files a failure left
+half new.</p>
+<p><strong>Save as...</strong> asks, in the desktop's own Save dialog, for a new name for the
+top file, and writes every file of the session there: each included file
+placed relative to the new top file as it was to the old, so the include
+paths still find them, and the simulator file beside the new top file under
+its own name. Before writing over files that are already there it lists them
+in a <strong>Replace files</strong> window, with <strong>Cancel</strong> and <strong>Replace</strong>, and writes
+nothing until answered. The session carries on in the new files, with its
+undo history; the old files' history is thrown away.</p>
+</div>
+<div class="section" id="what-is-written">
+<h2><a class="toc-backref" href="#toc-entry-31">What is written</a></h2>
+<p>A save changes only the lines an edit changed, in every file it writes.
+Comments, blank lines, the order of keys and the quoting of values stay as the
+file had them, and a save with no edit leaves every file as it was, byte for
+byte. One change is unavoidable: XML cannot hold two hyphens in a row inside
+a comment, so a run of hyphens in a comment written to an XML file becomes
+one.</p>
+<p>A configuration kept in both spellings -- <tt class="docutils literal">vehicle.ytcs</tt> beside
+<tt class="docutils literal">vehicle.xtcs</tt> -- is written in both, and so is each included file that has
+both. tcsgui never makes the second spelling of a file that has only one.</p>
+<p>Where each node was drawn is written in a <tt class="docutils literal">tcsgui</tt> section at the end of
+each file, with the concerns set aside; tcspecial ignores the section. tcsgui
+also writes into each configuration a reference to its schema -- in XML an
+<tt class="docutils literal">xsi:noNamespaceSchemaLocation</tt> attribute, in YAML a
+<tt class="docutils literal"># <span class="pre">yaml-language-server:</span> $schema=</tt> comment -- so that another editor can
+check the file's shape. See <a class="reference external" href="tcsgui-design.html#schemas-beside-the-tree">Schemas beside the tree</a>.</p>
+</div>
+<div class="section" id="when-a-write-fails">
+<h2><a class="toc-backref" href="#toc-entry-32">When a write fails</a></h2>
+<p>A failed write is said twice: in red and bold on the bar, where it stays
+until a write succeeds, and in a small window headed <em>Something did not
+work.</em>, which says the session is still open and nothing has been lost. Put
+the cause right and press Save, or use Save as if the files cannot be written
+where they are. The window appears once for each thing that goes wrong, not
+once for each edit that fails the same way.</p>
+</div>
+<div class="section" id="leaving">
+<h2><a class="toc-backref" href="#toc-entry-33">Leaving</a></h2>
+<p><strong>File -&gt; Exit</strong> leaves at once when the files have everything. When they do
+not, a window says <em>There are changes the files do not have.</em> and offers:</p>
+<ul class="simple">
+<li><strong>Save and leave</strong>, which leaves only if the save succeeds;</li>
+<li><strong>Save as and leave...</strong>, for files that cannot be written where they are;</li>
+<li><strong>Leave without saving</strong>;</li>
+<li><strong>Stay</strong>.</li>
+</ul>
+<p>However tcsgui ends -- by Exit or by its windows being closed -- it then
+tries once more to write whatever the files do not have, and says on the
+error output whether it did. As the code stands this happens after <strong>Leave
+without saving</strong> too, so the edits are written all the same. If that last
+write fails, the error output says where the session's history is, since it
+is then the only copy of the work.</p>
+</div>
+</div>
+<div class="section" id="undo-redo-and-crash-recovery">
+<h1><a class="toc-backref" href="#toc-entry-34">Undo, redo and crash recovery</a></h1>
+<div class="section" id="undo-and-redo">
+<h2><a class="toc-backref" href="#toc-entry-35">Undo and redo</a></h2>
+<p>Every change to the configuration or the simulator file is an edit, and
+<strong>Undo</strong> and <strong>Redo</strong> on the bar take it back and put it again, each naming
+the edit it would act on. A gesture is one edit however much it changes:
+deleting a node with its lines, arranging a page, writing a value to every
+payload of a group. Selecting, opening windows, moving a divider and zooming
+are not edits. Undo also covers placing the ground station a new
+configuration starts with.</p>
+</div>
+<div class="section" id="the-history">
+<h2><a class="toc-backref" href="#toc-entry-36">The history</a></h2>
+<p>The undo history is kept on the disk, not beside the configuration but in
+your state directory: <tt class="docutils literal">$XDG_STATE_HOME/tcsgui</tt> where <tt class="docutils literal">XDG_STATE_HOME</tt> is
+set to an absolute path, <tt class="docutils literal"><span class="pre">~/.local/state/tcsgui</span></tt> otherwise. Each
+configuration's history is a YAML file named for the configuration's stem and
+a digest of its absolute path, such as <tt class="docutils literal"><span class="pre">graph-3f91c2d4e5f60718.yaml</span></tt>, and it
+says inside which configuration it belongs to. With it is kept how far into
+the history the files go, and an MD5 digest of each file as tcsgui last wrote
+or read it.</p>
+<p>It is written after every edit, and deleted when tcsgui exits cleanly having
+written everything. It is kept after a crash, a kill or a machine going down,
+and after an exit whose last write failed. Histories more than a week old,
+and those whose configuration is no longer there, are deleted when tcsgui
+next starts.</p>
+</div>
+<div class="section" id="crash-recovery">
+<h2><a class="toc-backref" href="#toc-entry-37">Crash recovery</a></h2>
+<p>When tcsgui opens a configuration that has a history -- which means the last
+session on it did not end cleanly -- it holds the history to the files: each
+must still match the digest the history holds for it.</p>
+<ul class="simple">
+<li>If they all match, the history becomes this session's, so Undo reaches back
+past the crash, and every edit it holds that the files do not -- made with
+Autosave off, or whose write failed -- is put back at once, without asking,
+and written if Autosave is on. The bar says how many edits were put back.</li>
+<li>If any file has been changed by something else since, the history no
+longer describes it, so it is discarded and the bar says so. The files are
+left as they are; what is lost is the undo.</li>
+</ul>
+<p>A history written by an older tcsgui that kept no digests is discarded the
+same way.</p>
+</div>
+</div>
+<div class="section" id="read-only-sessions">
+<h1><a class="toc-backref" href="#toc-entry-38">Read-only sessions</a></h1>
+<p><tt class="docutils literal">tcsgui <span class="pre">--read-only</span> thermostat.ytcs</tt> shows a configuration and changes
+nothing. The controls that would change something are greyed rather than
+hidden -- Undo, Redo, Save, Save as, Autosave, Arrange, the nodes' Edit and
+Delete -- and nodes stay where they are when dragged. What the files arrived
+with is still checked and said as the session starts. Nothing is written: not
+the configuration, not the simulator file, not a history, and no other
+session's history is recovered, pruned or deleted.</p>
+</div>
+<div class="section" id="where-tcsgui-keeps-things">
+<h1><a class="toc-backref" href="#toc-entry-39">Where tcsgui keeps things</a></h1>
+<dl class="docutils">
+<dt>Preferences</dt>
+<dd><tt class="docutils literal"><span class="pre">$HOME/.tcsgui/preferences.xml</span></tt>: the shares of the panes and of the
+selection lists, and <tt class="docutils literal">autosave</tt>. The directory and file are made the
+first time tcsgui runs, the file with the defaults and comments saying
+what each element is. It is rewritten whenever a divider is moved or
+Autosave is changed. A file that is missing, unreadable or hand-edited
+into nonsense leaves the defaults in place and says so on the error
+output; tcsgui still starts. A <tt class="docutils literal">config.xml</tt> in the same directory,
+the file's earlier name, is read when <tt class="docutils literal">preferences.xml</tt> is absent.
+tcspecial's visual window reads the same file, so it divides its panes
+where your editor does, but never writes it.</dd>
+<dt>Undo histories</dt>
+<dd><tt class="docutils literal">$XDG_STATE_HOME/tcsgui</tt> or <tt class="docutils literal"><span class="pre">~/.local/state/tcsgui</span></tt>: see <a class="reference internal" href="#the-history">The
+history</a>.</dd>
+<dt>Node descriptions and schemas</dt>
+<dd>What node types there are, which terminals each has and what each may be
+told comes from a tree of descriptions, one YAML or XML file per entry in
+the lists, under <tt class="docutils literal">nodes</tt>; beside it, under <tt class="docutils literal">schema</tt>, are a JSON Schema
+and an XML Schema for the descriptions themselves. tcsgui uses the first
+of these directories that
+exists: <tt class="docutils literal">$TCSGUI_DATA</tt>; <tt class="docutils literal">$XDG_DATA_HOME/tcsgui</tt>, or
+<tt class="docutils literal"><span class="pre">~/.local/share/tcsgui</span></tt> where that is not set; <tt class="docutils literal">share/tcsgui</tt> one
+level up from the directory tcsgui's own executable is in;
+<tt class="docutils literal">/usr/local/share/tcsgui</tt>; <tt class="docutils literal">/usr/share/tcsgui</tt>; and <tt class="docutils literal">tcsgui/share</tt>
+and <tt class="docutils literal">share</tt> under the working directory, which is what finds a
+checkout's own. A description file that cannot be read is reported on
+the error output and the rest of the tree is still used. See <a class="reference external" href="tcsgui-design.html#the-description-tree">The
+description tree</a>.</dd>
+<dt>In the configuration itself</dt>
+<dd>The <tt class="docutils literal">tcsgui</tt> section at the end of each file: where each node was
+drawn and which concerns were set aside. In the simulator file: where
+each physics component was drawn and on which page.</dd>
+</dl>
+<p>Installed, tcsgui is <tt class="docutils literal">bin/tcsgui</tt> with its descriptions in
+<tt class="docutils literal">share/tcsgui</tt> under the same prefix, <tt class="docutils literal">/opt/tcs</tt> by default, and the
+XTCS, YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>, which is
+what <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts there. <tt class="docutils literal">cargo install <span class="pre">--path</span> tcsgui</tt>
+installs only the program, so the data needs <tt class="docutils literal">make <span class="pre">install-data</span></tt> as well;
+see <a class="reference external" href="tcspecial.html">the tcspecial manual</a>.</p>
+</div>
+<div class="section" id="see-also">
+<h1><a class="toc-backref" href="#toc-entry-40">See Also</a></h1>
+<ul class="simple">
+<li><a class="reference external" href="manual.html">The TCSpecial manual</a>, the summary that leads to each
+program's manual.</li>
+<li><a class="reference external" href="tcspecial.html">The tcspecial manual</a>: the flight software and the
+configuration files tcsgui edits.</li>
+<li><a class="reference external" href="tcssim.html">The tcssim manual</a>: the simulator and its file, including
+the physics model drawn in the Physics pane.</li>
+<li><a class="reference external" href="tcsverify.html">The tcsverify manual</a>: the checks tcsgui reports.</li>
+<li><a class="reference external" href="tcsmoc.html">The tcsmoc manual</a>: the ground station a configuration is
+run against.</li>
+<li><a class="reference external" href="design.html">The design</a>, in particular <a class="reference external" href="tcspecial-design.html#what-is-checked-before-anything-runs">What is checked before
+anything runs</a>, <a class="reference external" href="tcsgui-design.html#the-undo-history">The
+undo history</a> and <a class="reference external" href="tcsgui-design.html#the-editor-is-lazy">The editor is lazy</a>, for why tcsgui works as it does.</li>
+</ul>
+</div>
+</div>
+</body>
+</html>

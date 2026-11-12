@@ -62,6 +62,7 @@ fi
 /opt/tcs/lib/pkgconfig/tcs.pc
 /opt/tcs/lib/python3/site-packages
 /opt/tcs/share/tcsgui
+/opt/tcs/share/tcspecial
 %doc /opt/tcs/share/doc/tcspecial-ground
 %config(noreplace) /etc/ld.so.conf.d/tcspecial-ground.conf
 %config(noreplace) /etc/profile.d/tcspecial-ground.sh

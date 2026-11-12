@@ -6,7 +6,7 @@
 //! the `exec` that carries it out: the flag is set in a process image that
 //! is about to be replaced, and the start that comes back knows nothing of
 //! it, so a vehicle somebody asked to stop restarts instead. See
-//! "Restarting" in `docs/design.rst`.
+//! "Restarting" in `docs/tcspecial-design.rst`.
 //!
 //! So the two are blocked in every thread from the first moment of `main`,
 //! before any thread is made, and every thread inherits the block. A signal

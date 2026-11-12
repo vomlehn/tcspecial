@@ -145,7 +145,7 @@ impl Reach {
     /// never used, so the configuration that flies is the one that was tested
     /// and the device is what is opened; under `some` and `all` a node with one
     /// is reached there, and tcssim answers. See "Saying Which Payloads Are
-    /// Simulated" in docs/design.rst.
+    /// Simulated" in docs/tcspecial-design.rst.
     ///
     /// # Arguments
     ///

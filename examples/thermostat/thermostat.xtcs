@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
     <tcspecial>
         <beacon>
             <default_interval>5 s</default_interval>

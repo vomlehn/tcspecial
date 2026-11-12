@@ -12,7 +12,7 @@
 //! name this build's interface, or nothing is written.
 //!
 //! `tcsverify --set-interface <configuration>...` is the command; see "The
-//! configuration names its interface" in `docs/design.rst`.
+//! configuration names its interface" in `docs/tcsverify-design.rst`.
 
 use std::path::Path;
 

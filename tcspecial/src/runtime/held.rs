@@ -6,7 +6,7 @@
 //! restarts onto nothing. What it holds is the configuration running, the
 //! one on its command line, and every one kept in the directory the
 //! command line's `configurations` names. See "The three commands that
-//! always go" in `docs/design.rst`.
+//! always go" in `docs/tcspecial-design.rst`.
 
 use tcslibgs::ConfigDigest;
 

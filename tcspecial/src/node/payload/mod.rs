@@ -20,7 +20,7 @@
 //! Cargo feature named as a configuration writes the type, and [`BUILT`] is
 //! the list of those this build contains. `network` is always here, because
 //! the ground link is one; its raw protocol is the feature `raw`. See "Which
-//! Node Types Are Built" in docs/design.rst.
+//! Node Types Are Built" in docs/tcspecial-design.rst.
 
 #[cfg(feature = "can")]
 pub mod can;

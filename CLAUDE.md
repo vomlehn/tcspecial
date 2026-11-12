@@ -3,8 +3,9 @@
 tcspecial is "telemetry and control, special": flight software that runs a
 spacecraft's payloads as nodes in a configured graph, together with the ground
 software that commands it and the tools that write and check its
-configuration. `docs/design.rst` is the specification and `docs/manual.rst`
-the user's guide.
+configuration. Each program has a design document, its specification, and a
+manual, its user's guide: `docs/design.rst` and `docs/manual.rst` list them
+(`docs/tcspecial-design.rst`, `docs/tcsgui.rst` and so on).
 
 ## What decides a design
 
@@ -136,8 +137,9 @@ started some other way are not, so look for strays on those ports afterwards.
 - When a build breaks in a crate you did not touch, it is probably someone's
   work in progress. Test around it (`--exclude <crate>`) and say so; do not
   "fix" it.
-- Keep the docs current with each change. A requirement in `design.rst` that
-  the code no longer meets is a bug in one or the other.
+- Keep the docs current with each change. A requirement in a design document
+  (`docs/*-design.rst`) that the code no longer meets is a bug in one or the
+  other.
 - A test for a fix should fail without the fix. Check that it does.
 
 ## Style

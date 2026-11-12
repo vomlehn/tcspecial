@@ -1,9 +1,10 @@
 //! tcsgui: editing a TCSpecial configuration as a diagram.
 //!
-//! The configuration is a graph -- nodes joined by links, as `design.rst`
-//! specifies -- and a graph is a thing better drawn than typed. What this
-//! program is for is placing nodes, joining them, and filling in what each one
-//! needs, with the file on disk kept in step as the work happens.
+//! The configuration is a graph -- nodes joined by links, as
+//! `tcsgui-design.rst` specifies -- and a graph is a thing better drawn than
+//! typed. What this program is for is placing nodes, joining them, and filling
+//! in what each one needs, with the file on disk kept in step as the work
+//! happens.
 //!
 //! Three things about it were asked for and are not incidental:
 //!
@@ -784,8 +785,14 @@ fn main() -> Result<(), slint::PlatformError> {
     let path = files.next().unwrap_or_else(|| {
         eprintln!("tcsgui: {USAGE}");
         eprintln!(
-            "tcsgui: the file need not exist yet; it is written as edits are \
-             made, and its history is kept beside it"
+            "tcsgui: the file need not exist yet; with Autosave on, as it is \
+             unless turned off, it is written as edits are made"
+        );
+        eprintln!(
+            "tcsgui: while it is edited, a history of the edits is kept in \
+             the state directory, $XDG_STATE_HOME/tcsgui or \
+             ~/.local/state/tcsgui, so that a crash loses nothing; leaving \
+             tcsgui deletes it"
         );
         eprintln!(
             "tcsgui: a second file is the simulator's own configuration -- \
@@ -992,9 +999,11 @@ fn main() -> Result<(), slint::PlatformError> {
     // the window. What this catches then is the session where a write failed
     // -- a full device, a directory made read-only -- and was then put right
     // without another edit being made. With it off, it is every edit since
-    // the last Save, which the way out writes too. Leaving a session's work in a process that is ending is the
-    // one way this editor could lose anything, so it is worth one more try
-    // and one plain sentence either way.
+    // the last Save, which the way out writes too. Leaving a session's work
+    // in a process that is ending is the one way this editor could lose
+    // anything, so it is worth one more try and one plain sentence either
+    // way -- unless the offer to save was answered "Leave without saving",
+    // which lets the unsaved edits go first, leaving nothing to write.
     let mut kept = false;
     if editor.borrow().unsaved() {
         // Named as it is now, which Save as may have changed.
@@ -3934,8 +3943,13 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             });
         }
         {
+            // Leaving without saving is leaving without saving: what the
+            // files do not have is let go, so that the way out, which writes
+            // anything unsaved, writes nothing.
+            let editor = editor.clone();
             let views = views.clone();
             window.on_left(move || {
+                editor.borrow_mut().abandon_unsaved();
                 let window = views.borrow_mut().leaving.take();
                 if let Some(window) = window {
                     let _ = window.hide();
@@ -4968,8 +4982,8 @@ fn panel_of(
     };
 
     // What this node is asked for. The description tree first, where it
-    // describes this node: a compute node whose function is `mean` is a mean,
-    // and a mean is asked for a mean's attributes rather than for every
+    // describes this node: a compute node whose function is `vote` is a vote,
+    // and a vote is asked for a vote's attributes rather than for every
     // attribute any computation has. See nodes::matching.
     //
     // Otherwise the type's own list, which is what every node was asked for

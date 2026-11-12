@@ -1,7 +1,23 @@
 O = ../OUT
 
+# manual.rst is the short page that says what each manual covers;
+# tcspecial.rst, tcsgui.rst, tcsmoc.rst, tcssim.rst and tcsverify.rst are
+# the programs' manuals. The pages are committed beside their sources: the
+# pre-commit hook remakes the page of each document a commit changes and adds
+# it to the commit, and make html-check in the top directory fails where one
+# is behind (see make hooks there).
+MANUALS = manual.html tcspecial.html tcsgui.html tcsmoc.html tcssim.html \
+	tcsverify.html
+
+# design.rst says the same of the design documents, one per program as the
+# manuals are. tcspecial-design.html, which draws the restart figures, has a
+# rule of its own.
+DESIGNS = design.html tcsgui-design.html tcsmoc-design.html \
+	tcssim-design.html tcsverify-design.html
+
 .PHONY: all
-all:	design.html manual.html third-party.html node-types.html
+all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
+	node-types.html
 
 # The message-flow figures of "In-flight data across a restart" and "The
 # restart and the beacon, in time", drawn by
@@ -10,14 +26,14 @@ FLOWS = restart-commanded.svg restart-crash.svg restart-ground.svg \
 	restart-beacons.svg restart-lost-up.svg restart-lost-answer.svg \
 	restart-lost-beacons.svg
 
-design.html: design.rst $(FLOWS)
-	rst2html design.rst design.html
+tcspecial-design.html: tcspecial-design.rst $(FLOWS)
+	rst2html tcspecial-design.rst tcspecial-design.html
 
 $(FLOWS) &: restart_flows.py
 	python3 restart_flows.py
 
-manual.html: manual.rst
-	rst2html manual.rst manual.html
+$(MANUALS) $(DESIGNS): %.html: %.rst
+	rst2html $< $@
 
 third-party.html: third-party.rst
 	rst2html third-party.rst third-party.html
@@ -27,4 +43,5 @@ node-types.html: node-types.rst
 
 .PHONY: clean
 clean:
-	rm -f design.html manual.html third-party.html node-types.html
+	rm -f tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
+		node-types.html

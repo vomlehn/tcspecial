@@ -26,7 +26,7 @@
 //!
 //! It replaced CCSDS Space Packets, whose header said what the link already
 //! did, and before them JSON. See "The link without a header" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 
 use std::fmt;
 

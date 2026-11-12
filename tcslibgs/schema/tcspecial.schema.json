@@ -609,7 +609,7 @@
           ]
         },
         "carries": {
-          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/design.rst.",
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcsgui-design.rst.",
           "type": [
             "string",
             "number",
@@ -1269,7 +1269,7 @@
           ]
         },
         "carries": {
-          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/design.rst.",
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcsgui-design.rst.",
           "type": [
             "string",
             "number",
@@ -1953,7 +1953,7 @@
           ]
         },
         "carries": {
-          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/design.rst.",
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslibgs/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcsgui-design.rst.",
           "type": [
             "string",
             "number",

@@ -4,7 +4,7 @@
 //! The canvas is divided into three columns, left to right: the payload working
 //! pane, which holds everything the vehicle carries; the vehicle working pane,
 //! which holds the vehicle's own graph; and the gateway working pane, which
-//! holds the ground link. `design.rst` says why, and the short of it
+//! holds the ground link. `tcsgui-design.rst` says why, and the short of it
 //! is that the three parts change on different schedules -- the ground is the
 //! other end of the link and not the vehicle at all, the vehicle's own graph
 //! persists, and what it carries changes between flights -- so a drawing that

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
     <description>Answering to a cFS flight computer: a reading published on its software bus, and a command from it to a heater</description>
     <tcspecial>
         <!-- The vehicle answers to a cFS flight computer rather than to the

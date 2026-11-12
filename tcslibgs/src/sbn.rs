@@ -3,8 +3,8 @@
 //!
 //! The one statement of SBN's wire format and of how a peer is kept, read by
 //! the vehicle and by whatever simulates the cFS end. See "What SBN is, on the
-//! wire" in `docs/design.rst`, which says what in it was checked against SBN
-//! v7.0.1 and how.
+//! wire" in `docs/tcspecial-design.rst`, which says what in it was checked
+//! against SBN v7.0.1 and how.
 //!
 //! # A datagram
 //!

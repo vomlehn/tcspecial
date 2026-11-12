@@ -272,8 +272,8 @@
       <xs:element name="unit" type="xs:string"/>
       <!-- The type a link carries, one of tcslibgs/xtce/types.xtce's or a
            structure of them (name: type, name: type): see "Typed links" in
-           docs/design.rst. What a vote or a tee carries in and out; what a
-           conversion, thermostat or process takes and sends; and what a
+           docs/tcspecial-design.rst. What a vote or a tee carries in and out;
+           what a conversion, thermostat or process takes and sends; and what a
            device or an app carries at each terminal. -->
       <xs:element name="carries" type="xs:string"/>
       <xs:element name="type-in" type="xs:string"/>

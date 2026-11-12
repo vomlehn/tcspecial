@@ -105,7 +105,9 @@ cargo doc -p tcslibgs --open
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslibgs/README.html).
 - [tcslib](https://vomlehn.github.io/tcspecial/tcslib/README.html), what a ground station is built on, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), the same for C and C++.
-- [The tcspecial manual](https://vomlehn.github.io/tcspecial/docs/manual.html) and [design](https://vomlehn.github.io/tcspecial/docs/design.html).
+- [The tcspecial
+manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
+[design](https://vomlehn.github.io/tcspecial/docs/design.html).
 
 ## License
 

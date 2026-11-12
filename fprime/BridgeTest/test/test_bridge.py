@@ -3,7 +3,7 @@
 Run by ``bridge-test``, once tcssim simulates the configuration's
 payloads and tcspecial flies it, with BridgeTest started by
 ``conftest.py`` to run the bridge on it: see those. Each test is one thing
-``docs/design.rst`` asks of the bridge, seen as the rest of an F´
+``docs/tcspecial-design.rst`` asks of the bridge, seen as the rest of an F´
 deployment sees it -- channels, commands and events, by the names the
 dictionary gives them -- and never by looking inside the bridge. In the
 order a run has them: matched, then beacons, then data, then commands.

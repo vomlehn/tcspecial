@@ -2,7 +2,8 @@
 //!
 //! **Experimental, and not yet supported.** Written to be run against the
 //! kernel's dummy sensor by `tests/kernel-dummies.rs`, which has not yet run;
-//! see "What Is Supported and What Is Experimental" in `docs/design.rst`.
+//! see "What Is Supported and What Is Experimental" in
+//! `docs/tcspecial-design.rst`.
 //!
 //! What a buffered IIO device offers user space is a character device that
 //! hands over packed samples: open it, poll it, read it, and what comes back

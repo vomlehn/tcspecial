@@ -649,7 +649,7 @@ const WAIT_FOR_SIMULATOR: std::time::Duration =
 /// One that answers set up for this run is used and left running when this
 /// exits, since this did not start it; one set up for another is refused,
 /// saying what differs; and where nothing answers, tcssim is started and
-/// waited for. See "Waiting for the Simulator" in docs/design.rst.
+/// waited for. See "Waiting for the Simulator" in docs/tcspecial-design.rst.
 ///
 /// # Arguments
 ///

@@ -421,7 +421,7 @@ pub fn from_text(text: &str, unit: Unit, what: &str) -> Result<f64, String> {
 /// its `format` where its bytes are not its type's own layout -- most
 /// significant byte first, as wide as the type -- and the vehicle lays them
 /// out that way as it reads them, so that every node after it sees one
-/// layout for each type: see "Typed links" in `docs/design.rst`. A
+/// layout for each type: see "Typed links" in `docs/tcspecial-design.rst`. A
 /// conversion reads that layout of its `type-in`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Format {

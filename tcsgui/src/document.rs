@@ -3352,10 +3352,10 @@ impl Document {
 
     /// The document as a configuration file.
     ///
-    /// Written in the shape `design.rst` specifies: three sections of nodes,
-    /// each grouped by type, each node carrying its name, its attributes and
-    /// the links that leave it. The canvas positions are written as well, in
-    /// a `tcsgui` section at the end, under a key the flight software
+    /// Written in the shape `tcsgui-design.rst` specifies: three sections of
+    /// nodes, each grouped by type, each node carrying its name, its attributes
+    /// and the links that leave it. The canvas positions are written as well,
+    /// in a `tcsgui` section at the end, under a key the flight software
     /// ignores, so that reopening the file finds the diagram as it was left.
     #[cfg(test)]
     pub fn to_yaml(&self) -> String {
@@ -4066,7 +4066,8 @@ fn escape(text: &str) -> String {
 ///
 /// A run of hyphens becomes one, which reads as the dash it was and is the
 /// smallest change that makes the file legal. It is a thing the XML spelling
-/// does not preserve, and is listed with the others in `docs/design.rst`.
+/// does not preserve, and is listed with the others in
+/// `docs/tcsgui-design.rst`.
 ///
 /// # Arguments
 ///
@@ -4216,7 +4217,7 @@ fn xml_comment(out: &mut String, comment: Option<&str>, indent: usize) {
     }
 }
 
-/// The worked example from `design.rst`: a zone thermostat.
+/// The worked example from `tcsgui-design.rst`: a zone thermostat.
 ///
 /// Built here rather than written out by hand in two formats, so that the
 /// shipped `tests/manual/thermostat.ytcs` and `.xtcs` are what this editor

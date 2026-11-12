@@ -1,11 +1,11 @@
 //! The ground's end of a cFS software bus: a ground station's SBN peer, and the
 //! simulated cFS end that tcssim runs.
 //!
-//! A vehicle that answers to cFS has no command socket, no beacon socket and
-//! no telemetry sockets: everything it takes and sends crosses one SBN peer
-//! as cFS packets told apart by message ID. See "What crosses the bus" in
-//! `docs/design.rst`, [`tcslibgs::sbn`] for the wire and [`tcslibgs::cfs`]
-//! for the packets on it; nothing here states either again.
+//! A vehicle that answers to cFS has no command socket, no beacon socket and no
+//! telemetry sockets: everything it takes and sends crosses one SBN peer as cFS
+//! packets told apart by message ID. See "What crosses the bus" in
+//! `docs/tcspecial-design.rst`, [`tcslibgs::sbn`] for the wire and
+//! [`tcslibgs::cfs`] for the packets on it; nothing here states either again.
 //!
 //! # The simulated cFS end
 //!

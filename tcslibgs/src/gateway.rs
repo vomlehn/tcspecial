@@ -6,7 +6,7 @@
 //! which as the `tcspecial` section's `gateway`, because the kind decides how
 //! every other link in that section is written: commands, payload commands,
 //! payload telemetry and the beacon all go the one way. See "Gateways: what the
-//! vehicle answers to" in `docs/design.rst`.
+//! vehicle answers to" in `docs/tcspecial-design.rst`.
 //!
 //! All four are built. The radio, Yamcs and F´ are reached over UDP sockets,
 //! and cFS over its software bus, as a peer of its Software Bus Network: see

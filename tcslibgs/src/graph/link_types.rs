@@ -1,14 +1,15 @@
 //! Which type each terminal of each node carries, and whether each link's
 //! two ends agree.
 //!
-//! A link has no type of its own: it has the types its two terminals carry,
-//! and the two must be the same exactly. Each node says what its terminals
-//! carry, outright -- a `to_kelvin` sends `kelvin` -- or by an attribute -- a
-//! vote's `carries`, a thermostat's `type-in` and `type-out`, a device's
-//! `world-out-type` -- and nothing is inferred from what is upstream. So a
-//! link is judged by its two ends alone, and a refusal names one link. A null
-//! node, a log and a gateway node take any type. See "Typed links" in
-//! `docs/design.rst`, and [`crate::link_type`] for the types themselves.
+//! A link has no type of its own: it has the types its two terminals carry, and
+//! the two must be the same exactly. Each node says what its terminals carry,
+//! outright -- a `to_kelvin` sends `kelvin` -- or by an attribute -- a vote's
+//! `carries`, a thermostat's `type-in` and `type-out`, a device's
+//! `world-out-type` -- and nothing is inferred from what is upstream. So a link
+//! is judged by its two ends alone, and a refusal names one link. A null node,
+//! a log and a gateway node take any type. See "Typed links" in
+//! `docs/tcspecial-design.rst`, and [`crate::link_type`] for the types
+//! themselves.
 
 use super::terminals::{answers, terminal_at, terminals_of};
 use super::{Destination, Graph, Node};

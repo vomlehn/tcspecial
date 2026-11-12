@@ -7,7 +7,7 @@
 //! two ends state are the same. This is where a configuration's name for a
 //! type is read and written; [`crate::graph::link_types`] says which type each
 //! terminal of each node carries, and checks each link. See "Typed links" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 
 use crate::unit::Unit;
 use std::fmt;

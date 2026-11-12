@@ -9,7 +9,7 @@
 //! width before anything reads it. Only a thermostat takes settings: its
 //! `setpoint` and its `half_band`, each in the unit of what it reads. A
 //! binding naming anything else is refused where the configuration is read.
-//! See "Typed links" in `docs/design.rst`.
+//! See "Typed links" in `docs/tcspecial-design.rst`.
 
 use super::{Destination, Graph, Node};
 use crate::link_text::read_text;

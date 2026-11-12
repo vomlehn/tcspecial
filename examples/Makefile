@@ -13,7 +13,7 @@ RUST_LOG = info
 # none, some or all. All by default, because these targets run on a desk with
 # simulated and dummy devices, and a program that leaves the flag out gets
 # none -- the flight setting -- and refuses every one. See "Simulation Modes" in
-# docs/design.rst.
+# docs/tcspecial-design.rst.
 #   make run-simple SIMULATE=some
 SIMULATE = all
 

@@ -9,7 +9,7 @@
 //! those names, so it says the shape of the tree as well as what is in it. A
 //! RESTART names the configuration to restart onto by its checksum, and a
 //! start loads one by it. See "Keeping configurations on board" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 //!
 //! A directory for each, rather than every file in one, because the names
 //! of included files are the configuration's own: two configurations may

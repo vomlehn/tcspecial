@@ -1,9 +1,9 @@
 //! A configuration: a graph of nodes.
 //!
-//! What a vehicle does, as `design.rst` specifies it. Four things and no more:
-//! nodes, groups of nodes that share a sampling interval, links between nodes,
-//! and bindings that say which commands from the ground may set which
-//! attribute of which node.
+//! What a vehicle does, as `tcspecial-design.rst` specifies it. Four things and
+//! no more: nodes, groups of nodes that share a sampling interval, links
+//! between nodes, and bindings that say which commands from the ground may set
+//! which attribute of which node.
 //!
 //! Three sections of nodes, and they are the three working panes of the
 //! editor: `gateway` holds the ground links, `vehicle` holds what the vehicle

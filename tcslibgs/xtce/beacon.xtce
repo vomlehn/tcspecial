@@ -24,7 +24,7 @@
      The Rust in tcslibgs/src/beacon_packet.rs and the Python in
      python/tcslibgs/beacon_packet.py are generated from this file by
      `make beacon-packet` in tcslibgs/. See "The fixed commands" in
-     docs/design.rst. -->
+     docs/tcspecial-design.rst. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsBeacon">
   <TelemetryMetaData>
     <ParameterTypeSet>

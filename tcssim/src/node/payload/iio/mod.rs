@@ -1,7 +1,7 @@
 //! A simulated device that plays a sensor's sample buffer.
 //!
-//! **Experimental, and not yet supported**: see "What Is Supported and What
-//! Is Experimental" in `docs/design.rst`. This simulates the buffer with a
+//! **Experimental, and not yet supported**: see "What Is Supported and What Is
+//! Experimental" in `docs/tcssim-design.rst`. This simulates the buffer with a
 //! pseudo-terminal where there is no `iio_dummy`.
 //!
 //! What a handler does with an IIO device is open `/dev/iio:deviceN` and

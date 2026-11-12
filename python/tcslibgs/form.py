@@ -4,10 +4,9 @@ number, or bytes.
 The Python spelling of ``tcslibgs::graph::fprime::Form``, with
 ``tcslibgs::unit``'s table of units behind it. What each node sends is not
 worked out here from what the configuration says of it: it is read from the
-configuration's own XTCE, which ``tcsverify --xtce`` writes beside it from
-the configuration and ``tcslibgs/xtce/types.xtce`` (see "The
-configuration's own XTCE" in ``docs/design.rst``), so the rules are the
-Rust's alone.
+configuration's own XTCE, which ``tcsverify --xtce`` writes beside it from the
+configuration and ``tcslibgs/xtce/types.xtce`` (see "The configuration's own
+XTCE" in ``docs/tcspecial-design.rst``), so the rules are the Rust's alone.
 
 * A value -- four bytes of a signed count of its unit's steps, most
   significant first (``compute::from_value``) -- is a number in its unit:

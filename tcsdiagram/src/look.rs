@@ -139,12 +139,11 @@ pub const PHYSICS_LINE: &str = "#b5679a";
 /// the three kinds of discrete lines, drawn alike and told apart by colour
 /// and by the type written along each one's top.
 ///
-/// What this gave up is the twelve units between *neighbours* in one panel.
-/// A ramp of ten in one hue family cannot keep it -- see `design.rst` -- so
-/// within a panel the steps are three to five units, which is "a shade
+/// What this gave up is the twelve units between *neighbours* in one panel. A
+/// ramp of ten in one hue family cannot keep it -- see `tcsgui-design.rst` --
+/// so within a panel the steps are three to five units, which is "a shade
 /// darker", and across panels the closest pair is 30.9. The ramp is the
-/// information: a node's place in its panel is its colour's place in the
-/// ramp.
+/// information: a node's place in its panel is its colour's place in the ramp.
 ///
 /// Searched offline and written down, as the palette before it was: the
 /// maths lives in `sight.rs`, which is test-only, and

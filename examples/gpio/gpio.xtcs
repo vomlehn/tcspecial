@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
     <description>Discrete lines of a GPIO chip: a switch's level to the ground, and the ground's 1 or 0 driving a lamp</description>
     <tcspecial>
         <!-- Every port is in the thirty-two hundreds to thirty-seven

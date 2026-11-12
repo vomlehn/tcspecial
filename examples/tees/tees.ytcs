@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
 
 description: "Tees and null nodes: a command copied back to the ground, a
   reading copied aboard, and data dropped"

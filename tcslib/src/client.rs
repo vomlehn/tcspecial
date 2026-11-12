@@ -614,7 +614,7 @@ impl TcsClient {
     /// after a RESTART is refused there rather than read with definitions
     /// it was not built with. The beacons say whether the RESTART was
     /// taken, and their restart flag ends the station's match: see "The
-    /// beacon across a restart" in `docs/design.rst`.
+    /// beacon across a restart" in `docs/tcspecial-design.rst`.
     ///
     /// # Arguments
     ///
@@ -940,7 +940,7 @@ impl Default for TcsClientBuilder {
 /// repeated by the link; or made before a restart, on either side -- may
 /// say something only another command, or another configuration, gives a
 /// meaning to, so it is counted and dropped rather than read as this one's.
-/// See "On the ground" in `docs/design.rst`.
+/// See "On the ground" in `docs/tcspecial-design.rst`.
 ///
 /// Every answer that arrives is counted in `matched` once: processed where
 /// it is the one waited for, dropped for a mismatch where it is another's,

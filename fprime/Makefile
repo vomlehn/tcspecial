@@ -8,9 +8,9 @@
 #
 #   make test FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
 #
-# The model -- which channels the bridge has, and their IDs -- is written
-# from FPRIME_CONFIG by tcsverify, and the component is built for that
-# configuration and no other: see "F´: gateway_fprime" in docs/design.rst.
+# The model -- which channels the bridge has, and their IDs -- is written from
+# FPRIME_CONFIG by tcsverify, and the component is built for that configuration
+# and no other: see "F´: gateway_fprime" in docs/tcspecial-design.rst.
 
 # The tcspecial tree this directory is in, and what sits beside it: see
 # beside.mk, which also names TCS_PORTS_LOCK.

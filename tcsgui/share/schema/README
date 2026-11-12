@@ -1,54 +1,11 @@
-Schemas for the files tcsgui edits.
+Schemas for tcsgui's own node descriptions, the files under share/nodes that
+say what each node type asks for and how tcsgui draws it.
 
-    tcspecial.xsd            a configuration, written in XML
-    tcspecial.schema.json    the same, written in YAML
-    tcspecial-sim.xsd        a simulator configuration, written in XML
-    tcspecial-sim.schema.json  the same, written in YAML, with the
-                             world section -- its ambient temperature
-                             and its physics model -- which only YAML has
+    node.xsd             a description, written in XML
+    node.schema.json     the same, written in YAML
 
-What these are for is the thing an editor cannot do for a file somebody is
-writing by hand or with another tool: tell them, in their own editor, that
-`payloads` is a section and `payload` is not. They check the *shape* of a file --
-which sections there are, what an entry may say, and which words are words --
-the node types each section takes among them, and the kinds of payload a
-simulator file may simulate.
-
-What they do not check is whether a configuration can be flown. Which
-attributes a node of a given type must state, whether two payloads claim one
-socket, whether a mean's inputs are the ones its links bind: those are rules
-about meaning rather than shape, they are tested against real buses, and
-`tcsverify` is the one place they live. A file these schemas accept may still be
-refused, and the refusal will say why. See `docs/design.rst`, "What is checked
-before anything runs".
-
-A configuration written by tcsgui already says which schema describes it, so
-an editor opening one needs no setting up: the XML carries
-`xsi:noNamespaceSchemaLocation` on its root element and the YAML carries a
-`# yaml-language-server: $schema=` comment at the top. So does the simulator's
-file, which names `tcspecial-sim.schema.json` the same way. The path is
-relative where the schemas sit above the file, which is a source tree, and the
-installed path otherwise. What follows is for a file that does not say, or a
-tool that does not look.
-
-A configuration's name ends in `.ytcs`, for YAML, or `.xtcs`, for XML, which
-an editor does not know without being told: associate the two with YAML and
-XML first. In VS Code, for instance:
-
-    "files.associations": { "*.ytcs": "yaml", "*.xtcs": "xml" }
-
-The simulator's file is `.yaml`, and needs nothing.
-
-A JSON Schema for YAML is not a category error: every YAML document is a JSON
-document in another spelling, and JSON Schema is what editors and language
-servers actually read. Point yours at the file:
-
-    # .yaml-language-server in a directory of configurations, or a comment
-    # at the top of one file:
-    # yaml-language-server: $schema=/usr/share/tcsgui/schema/tcspecial.schema.json
-
-And for the XML spelling, xmllint will check a file against the XSD:
-
-    xmllint --noout --schema /usr/share/tcsgui/schema/tcspecial.xsd vehicle.xtcs
+The schemas of the configurations tcsgui edits -- XTCS and YTCS -- are not
+here: they are tcslibgs's, in tcslibgs/schema, since every program reads
+those formats.
 
 Installed by `make install-data` under $(PREFIX)/share/tcsgui/schema.

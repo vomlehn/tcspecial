@@ -3,7 +3,7 @@
 //! **Supported**, as flown against the kernel's virtual bus by
 //! `tcspecial/tests/kernel-dummies.rs`; nothing has been run against a real CAN
 //! controller. See "What Is Supported and What Is Experimental" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 //!
 //! A CAN payload is not located by a device file. It is on a bus, reached
 //! through a network interface -- `can0`, or `vcan0` for the kernel's virtual

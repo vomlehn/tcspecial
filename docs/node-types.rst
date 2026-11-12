@@ -362,7 +362,7 @@ its path is added to the sorted list in ``the_shipped_descriptions_read``.
 
 A configuration is written in YAML or XML, and the two spellings must say
 the same thing. So a new type goes into both configuration schemas,
-``tcsgui/share/schema/tcspecial.schema.json`` and ``tcspecial.xsd``: its name
+``tcslibgs/schema/tcspecial.schema.json`` and ``tcspecial.xsd``: its name
 in the section's type list, and each new attribute in the JSON node
 definitions and the XSD's ``nodeWords``. A payload type also goes into both
 simulator schemas, ``tcspecial-sim.schema.json`` and ``tcspecial-sim.xsd``.
@@ -385,15 +385,14 @@ them to looking different at all.
 The payload edges and weights are nearly all taken, so a new payload type
 may need a new ``Edge``, as the ``_tmass`` types needed ``DashDotted``.
 
-Documenting It
-==============
-A type is not finished until it is documented, and a requirement in
-``design.rst`` that the code does not meet is a bug in one or the other:
+Documenting It ============== A type is not finished until it is documented, and
+a requirement in ``tcspecial-design.rst`` that the code does not meet is a bug
+in one or the other:
 
-- ``docs/design.rst``: a row in the table under "Every terminal carries one
-  type", the type's requirements where its kind's are, its feature in
-  "Which Node Types Are Built", and, for a payload, the judgement table and
-  the ``sim_address`` requirement;
+- ``docs/tcspecial-design.rst``: a row in the table under "Every terminal
+  carries one type", the type's requirements where its kind's are, its
+  feature in "Which Node Types Are Built", and, for a payload, the judgement
+  table and the ``sim_address`` requirement;
 - ``docs/manual.rst``: a section for the type, with a ``Keywords`` line,
   its attributes and an example; the simulator's list of types; and the
   list of features under "Building tcspecial for a vehicle". Every

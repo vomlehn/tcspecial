@@ -11,7 +11,7 @@
       "minLength": 1
     },
     "type": {
-      "description": "The configuration's own word for the type. Several descriptions may share one: `compute` is one node type, and `mean`, `thermostat`, `to_kelvin` and `process` are four things to place, each a compute node with its function already answered.",
+      "description": "The configuration's own word for the type. Several descriptions may share one: `compute` is one node type, and `process`, `thermostat`, `to_kelvin`, `to_value` and `vote` are five things to place, each a compute node with its function already answered.",
       "type": "string",
       "minLength": 1
     },

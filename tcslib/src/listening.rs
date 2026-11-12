@@ -10,7 +10,7 @@
 //! configuration's checksum on the spacecraft command link, and sends it
 //! again each time no answer comes in time, until the vehicle answers with
 //! that checksum. See "Configurations named by their checksum" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 //!
 //! It commands nothing else. A CONNECT changes nothing aboard but the
 //! beacons, the downlink and which commands are taken, so a repeat is safe,

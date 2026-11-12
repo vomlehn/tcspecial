@@ -35,7 +35,7 @@ The Projects
 ``tcspecial``
     Flight software. It runs a vehicle's payloads as nodes in a graph that a
     configuration file describes, takes commands from the ground and sends
-    beacons. See ``manual.rst`` and ``design.rst``.
+    beacons. See ``tcspecial.rst`` and ``tcspecial-design.rst``.
 
 ``tcslog``
     Flight software. A segmented telemetry log for storage that is fixed
@@ -335,7 +335,7 @@ See Also
     is often out of contact. The manual says how to write a log, read it
     back, and what each outcome of reading means.
 
-`TCSpecial manual <https://vomlehn.github.io/tcspecial/docs/manual.html>`__
+`TCSpecial manuals <https://vomlehn.github.io/tcspecial/docs/manual.html>`__
     TCSpecial is flight software that connects the devices aboard a
     vehicle to the places their data has to reach, aboard and on the
     ground. The manual says how to configure, build and run it.

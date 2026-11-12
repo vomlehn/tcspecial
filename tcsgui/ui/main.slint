@@ -64,9 +64,9 @@ export struct PaletteEntry {
     // `name=value` pairs separated by semicolons.
     //
     // What makes one node type into several things to place: `compute` is one
-    // type, and `mean`, `thermostat`, `to_kelvin` and `process` are four
-    // entries, each a compute node with its `function` already answered. The
-    // pairs come from the description tree -- see tcsgui/share/nodes -- and
+    // type, and `process`, `thermostat`, `to_kelvin`, `to_value` and `vote` are
+    // five entries, each a compute node with its `function` already answered.
+    // The pairs come from the description tree -- see tcsgui/share/nodes -- and
     // travel as text because a callback's arguments do.
     sets: string,
 }
@@ -726,10 +726,11 @@ component Surface inherits Rectangle {
 
     in property <string> trouble: "";
     // And what the last command did, where it did something worth saying:
-    // generating the Rust writes a file somebody named and changes nothing
-    // else, so silence would leave them wondering whether the menu item did
-    // anything. Not red, and in the same place as "saved", that line already
-    // meaning "what has just happened".
+    // Save as writes files somebody named, and a history put back or set
+    // aside at the start changes what the window holds without an edit, so
+    // silence would leave them wondering what had happened. Not red, and in
+    // the same place as "saved", that line already meaning "what has just
+    // happened".
     in property <string> said: "";
     // What this surface is editing: empty for the top diagram, the
     // subdiagram's name otherwise. Shown in the bar so that two windows side
@@ -1759,7 +1760,7 @@ component AlertPanel inherits Rectangle {
     // What kind of thing it is, in one line, and what to do about it.
     //
     // Two kinds reach this window and they want different sentences: a command
-    // that failed -- a write, a generation -- and something wrong with the
+    // that failed -- a write -- and something wrong with the
     // configuration itself. Both are errors and neither has thrown anything
     // away, but "press Save" is advice about the first and nonsense about the
     // second.

@@ -129,3 +129,28 @@ pub use telemetry::*;
 pub use trigger::*;
 pub use types::*;
 pub use verify::*;
+
+/// The user manuals in `docs/`, one for each program. `docs/manual.rst`
+/// only says what each covers. The tests that hold the manuals' examples and
+/// statements to the code read every one of these, so that a passage moved
+/// from one manual to another is still read.
+#[doc(hidden)]
+pub const MANUALS: [&str; 5] = [
+    "tcspecial.rst",
+    "tcsgui.rst",
+    "tcsmoc.rst",
+    "tcssim.rst",
+    "tcsverify.rst",
+];
+
+/// The design documents in `docs/`, one for each program, as the manuals
+/// are. `docs/design.rst` only says what each covers. The tests that hold
+/// the documents' examples to the code read every one of these.
+#[doc(hidden)]
+pub const DESIGNS: [&str; 5] = [
+    "tcspecial-design.rst",
+    "tcsgui-design.rst",
+    "tcsmoc-design.rst",
+    "tcssim-design.rst",
+    "tcsverify-design.rst",
+];

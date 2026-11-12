@@ -2,7 +2,8 @@
 //!
 //! **Supported**, as flown against the kernel's simulated chip, `gpio-sim`, by
 //! `tcspecial/tests/kernel-dummies.rs`; nothing has been run against hardware.
-//! See "What Is Supported and What Is Experimental" in `docs/design.rst`.
+//! See "What Is Supported and What Is Experimental" in
+//! `docs/tcspecial-design.rst`.
 //!
 //! A payload is not always a stream of data. A deployment switch, an arming
 //! line, a thermostat's output, a payload's own "I am alive" line: each is one

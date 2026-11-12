@@ -1,7 +1,8 @@
 //! The schemas say what the software says.
 //!
-//! `tcsgui/share/schema` holds a schema for each file tcsgui edits, in each
-//! spelling: a JSON Schema for the YAML and an XSD for the XML. They are data,
+//! `tcslibgs/schema` holds a schema for each file tcsgui edits, in each
+//! spelling: a JSON Schema for the YAML, YTCS, and an XSD for the XML, XTCS;
+//! `tcsgui/share/schema` holds those of tcsgui's own node descriptions. They are data,
 //! installed on a workstation so that somebody's own editor can tell them that
 //! `payloads` is a section and `payload` is not.
 //!
@@ -13,16 +14,31 @@
 //! problem one step further away.
 //!
 //! What they do not check is whether a configuration can be flown. The schemas
-//! are about shape, `tcsverify` is about meaning, and `share/schema/README`
+//! are about shape, `tcsverify` is about meaning, and `tcslibgs/schema/README`
 //! says so to whoever installs them.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Where the schemas this repository ships are.
-fn schema() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("share/schema")
+/// Where one of the schemas this repository ships is: the XTCS, YTCS and
+/// simulator schemas in `tcslibgs/schema`, which every program reads, and the
+/// node descriptions' own in this editor's `share/schema`.
+///
+/// # Arguments
+///
+/// * `name` - The schema's file name.
+///
+/// # Returns
+///
+/// Its path.
+fn schema_of(name: &str) -> PathBuf {
+    let here = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if name.starts_with("node.") {
+        here.join("share/schema").join(name)
+    } else {
+        here.join("../tcslibgs/schema").join(name)
+    }
 }
 
 /// The repository's root, for the shipped configurations.
@@ -97,7 +113,7 @@ fn example_configurations() -> Vec<String> {
 ///
 /// # Arguments
 ///
-/// * `name` - The schema's file name, under `share/schema`.
+/// * `name` - The schema's file name: see [`schema_of`].
 ///
 /// # Returns
 ///
@@ -107,7 +123,7 @@ fn example_configurations() -> Vec<String> {
 ///
 /// If the file cannot be read or is not JSON.
 fn read(name: &str) -> serde_json::Value {
-    let path = schema().join(name);
+    let path = schema_of(name);
     let text = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     serde_json::from_str(&text)
@@ -221,7 +237,7 @@ fn enumerated(xsd: &str, simple_type: &str) -> Vec<String> {
 
 /// The text of a schema in this repository.
 fn text_of(name: &str) -> String {
-    let path = schema().join(name);
+    let path = schema_of(name);
     std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("{}: {e}", path.display()))
 }
@@ -415,7 +431,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
         Command::new("xmllint")
             .arg("--noout")
             .arg("--schema")
-            .arg(schema().join("tcspecial-sim.xsd"))
+            .arg(schema_of("tcspecial-sim.xsd"))
             .arg(&file)
             .output()
             .expect("xmllint runs")
@@ -544,7 +560,7 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
         let output = Command::new("xmllint")
             .arg("--noout")
             .arg("--schema")
-            .arg(schema().join(schema_name))
+            .arg(schema_of(schema_name))
             .arg(root().join(file))
             .output()
             .expect("xmllint runs");
@@ -560,7 +576,7 @@ fn every_shipped_xml_file_is_valid_against_its_schema() {
 ///
 /// # Arguments
 ///
-/// * `schema_name` - The XSD, by its name in `share/schema`.
+/// * `schema_name` - The XSD, by its file name: see [`schema_of`].
 /// * `file`        - The file to check.
 ///
 /// # Returns
@@ -578,7 +594,7 @@ fn xsd_check(schema_name: &str, file: &Path) -> Result<(), String> {
     let output = Command::new("xmllint")
         .arg("--noout")
         .arg("--schema")
-        .arg(schema().join(schema_name))
+        .arg(schema_of(schema_name))
         .arg(file)
         .output()
         .expect("xmllint runs");
@@ -762,31 +778,28 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
     let mut shipped: Vec<(String, &str)> = [
         (
             "tests/manual/thermostat.xtcs",
-            "../../tcsgui/share/schema/tcspecial.xsd",
+            "../../tcslibgs/schema/tcspecial.xsd",
         ),
         (
             "tests/manual/thermostat.ytcs",
-            "../../tcsgui/share/schema/tcspecial.schema.json",
+            "../../tcslibgs/schema/tcspecial.schema.json",
         ),
         (
             "example-sim.yaml",
-            "tcsgui/share/schema/tcspecial-sim.schema.json",
+            "tcslibgs/schema/tcspecial-sim.schema.json",
         ),
     ]
     .map(|(file, said)| (file.to_string(), said))
     .to_vec();
     // Each example is two directories below the root.
     for file in examples(".xtcs") {
-        shipped.push((file, "../../tcsgui/share/schema/tcspecial.xsd"));
+        shipped.push((file, "../../tcslibgs/schema/tcspecial.xsd"));
     }
     for file in example_configurations() {
-        shipped.push((file, "../../tcsgui/share/schema/tcspecial.schema.json"));
+        shipped.push((file, "../../tcslibgs/schema/tcspecial.schema.json"));
     }
     for file in examples("-sim.yaml") {
-        shipped.push((
-            file,
-            "../../tcsgui/share/schema/tcspecial-sim.schema.json",
-        ));
+        shipped.push((file, "../../tcslibgs/schema/tcspecial-sim.schema.json"));
     }
     for (file, said) in &shipped {
         let (file, said) = (file.as_str(), *said);
@@ -1171,7 +1184,7 @@ fn every_node_description_is_valid_against_its_schema() {
             let output = Command::new("xmllint")
                 .arg("--noout")
                 .arg("--schema")
-                .arg(schema().join("node.xsd"))
+                .arg(schema_of("node.xsd"))
                 .arg(&path)
                 .output()
                 .expect("xmllint runs");
@@ -1226,8 +1239,7 @@ fn every_node_description_is_valid_against_its_schema() {
 #[test]
 fn the_two_node_schemas_describe_the_same_node() {
     let json = read("node.schema.json");
-    let xsd =
-        std::fs::read_to_string(schema().join("node.xsd")).expect("the XSD");
+    let xsd = std::fs::read_to_string(schema_of("node.xsd")).expect("the XSD");
 
     // What the XSD allows inside <node>, read from its element declarations.
     let declared: BTreeSet<String> = xsd

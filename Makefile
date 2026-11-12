@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.6.0
+TCS_HELPERS_REQUIRED := 0.7.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcslibgs/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -74,6 +74,9 @@ DOCDIR = $(DATADIR)/doc
 EXAMPLEDIR = $(DATADIR)/examples/$(PROJECT_NAME)
 PYTHONDIR = $(LIBDIR)/python3/site-packages
 TCSGUI_DATA = $(DESTDIR)$(DATADIR)/$(GUI_NAME)
+# The XTCS, YTCS and simulator schemas, tcslibgs/schema: tcspecial's and not
+# tcsgui's, since they define the formats every program reads.
+SCHEMADIR = $(DATADIR)/tcspecial/schema
 
 # Where the hooks go. Debian's places; the RPM spec moves the .pth file to
 # Fedora's, which names python3's minor version: see
@@ -133,7 +136,7 @@ RELEASE = --release
 RELEASE =
 
 # Default target
-all: build test
+all: hooks-if-there build test
 
 # Display help
 .PHONY: help
@@ -195,6 +198,10 @@ help:
 		"the spellings compared and an HTML check"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
 		"behind its source"
+	@echo "  make hooks       - Have git run tcs-helpers' pre-commit" \
+		"hook, which remakes"
+	@echo "                     the page of each document a commit" \
+		"changes and adds it"
 	@echo "  make format      - Reformat the source"
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
@@ -210,7 +217,8 @@ help:
 		"install-tcspecial-test"
 	@echo "                   - Copy one package's files from a build" \
 		"already made"
-	@echo "  make install-data - Install tcsgui's descriptions and schemas"
+	@echo "  make install-data - Install tcsgui's descriptions and the" \
+		"configuration schemas"
 	@echo "  make uninstall-files - Take away what install-files put in" \
 		"place"
 	@echo "  make links       - Link the installed programs into" \
@@ -974,9 +982,9 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	$(call install_links,tcspecial-ground,$(GROUND_BIN))
 	$(SUBST) packaging/tcs.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
-# The schemas the Python reads are tcsgui's, which install-data puts under
-# $(DATADIR)/$(GUI_NAME): the installed package reaches them through a link,
-# as python/tcslibgs/schema does in the source tree, rather than carrying a
+# The schemas the Python reads are tcslibgs/schema, which install-data puts
+# under $(SCHEMADIR): the installed package reaches them through a link, as
+# python/tcslibgs/schema does in the source tree, rather than carrying a
 # second copy that could differ from the first.
 	set -e; \
 	tmp=$$(mktemp -d -t tcspecial-py.XXXXXXXXXX); \
@@ -994,7 +1002,7 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	schema=$(DESTDIR)$(PYTHONDIR)/tcslibgs/schema; \
 	rm -rf "$$schema"; \
 	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcslibgs \
-		$(DATADIR)/$(GUI_NAME)/schema) "$$schema"; \
+		$(SCHEMADIR)) "$$schema"; \
 	sed -i '/^tcslibgs\/schema\//d' "$$dist/RECORD"
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-c \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
@@ -1054,7 +1062,8 @@ install-tcspecial-test: tcs-helpers
 		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-test.sh; \
 	fi
 
-# Install tcsgui's data: the description tree and the schemas.
+# Install tcsgui's data -- the description tree and its schemas -- and the
+# XTCS, YTCS and simulator schemas of tcslibgs/schema, under $(SCHEMADIR).
 #
 # The whole of tcsgui/share, with its structure: the description tree's shape
 # is part of what it means -- a description at vehicle/compute/vote.yaml is
@@ -1076,6 +1085,9 @@ install-data:
 		-exec install -d -m 755 $(TCSGUI_DATA)/{} \;
 	@cd $(GUI_NAME)/share && find . -type f \
 		-exec install -m 644 {} $(TCSGUI_DATA)/{} \;
+	@install -d -m 755 $(DESTDIR)$(SCHEMADIR)
+	@install -m 644 tcslibgs/schema/README tcslibgs/schema/*.xsd \
+		tcslibgs/schema/*.json $(DESTDIR)$(SCHEMADIR)
 	@echo "✓ $(GUI_NAME) data installed"
 
 # Take away what `make install-files` put in place, with the same PREFIX,
@@ -1105,7 +1117,8 @@ uninstall-files:
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslibgs tcslib tcsui \
 		tcspecial_ground-*.dist-info)
-	rm -rf $(TCSGUI_DATA) $(DESTDIR)$(EXAMPLEDIR) \
+	rm -rf $(TCSGUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
+		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))
 	if [ "$(HOOKS)" = 1 ]; then \
 		rm -f $(addprefix $(DESTDIR)$(PROFILEDIR)/,$(addsuffix .sh, \
@@ -1294,25 +1307,28 @@ docs:
 # reStructuredText and committed beside it, which make in each builds.
 HTML_DIRS = $(DOCS_DIR) examples tcslib tcslib-c tcslibgs
 
-# Fail where a committed page has fallen behind its source, naming it. Every
-# page is made again whatever make thinks of it, since a checkout's times
-# say nothing of which was written last, and compared with what was there.
-# Made in place, so that a page this finds behind is already brought up to
-# date, and needs only committing. What is compared is every page and every
-# figure a page is drawn from that git knows of.
+# Fail where a committed page has fallen behind its source, naming it, having
+# made every page again in place: tcs-helpers' html-pages check, which also
+# compares the figures a page is drawn from.
 .PHONY: html-check
-html-check:
-	@sums=$$(mktemp) && \
-	md5sum $$(git ls-files '*.html' '$(DOCS_DIR)/*.svg') > $$sums && \
-	for dir in $(HTML_DIRS); do \
-		$(MAKE) -s -B -C $$dir > /dev/null || { rm -f $$sums; exit 1; }; \
-	done; \
-	behind=$$(md5sum --quiet -c $$sums 2> /dev/null | \
-		sed 's/: FAILED$$//'); \
-	rm -f $$sums; \
-	if [ -n "$$behind" ]; then \
-		echo "These pages were behind their sources, and are made" \
-			"again now: commit them" >&2; \
-		echo "$$behind" | sed 's/^/  /' >&2; \
-		exit 1; \
+html-check: tcs-helpers
+	"$(TCS_HELPERS)/bin/html-pages" check $(HTML_DIRS)
+
+# Have git run tcs-helpers' pre-commit hook in this checkout, which remakes
+# the page of each document a commit changes and adds it to the commit.
+.PHONY: hooks
+hooks: tcs-helpers
+	git config core.hooksPath "$(TCS_HELPERS)/githooks"
+
+# What make does of make hooks: the same where the tcs-helpers checkout is
+# there and new enough, and only a note where it is not, so that building
+# never needs it.
+.PHONY: hooks-if-there
+hooks-if-there:
+	@if "$(TCS_HELPERS)/bin/tcs-helpers" --require \
+	        $(TCS_HELPERS_REQUIRED) > /dev/null 2>&1; then \
+	    git config core.hooksPath "$(TCS_HELPERS)/githooks"; \
+	else \
+	    echo "note: no tcs-helpers $(TCS_HELPERS_REQUIRED) at" \
+	        "$(TCS_HELPERS), so no pre-commit hook: see make hooks"; \
 	fi

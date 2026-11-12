@@ -5,7 +5,7 @@
 //! written in a configuration, so that the file flown is the file tested,
 //! byte for byte. Read here, once, so that the three programs take the flag
 //! the same way and refuse the same mistakes in the same words. See
-//! "Simulation Modes" in `docs/design.rst`.
+//! "Simulation Modes" in `docs/tcspecial-design.rst`.
 //!
 //! What the mode is checked against is here too: whether each payload is a
 //! real device, a dummy device or a simulated device, [`judge`], found from
@@ -800,7 +800,7 @@ pub fn tcssim_makes(node_type: &str) -> bool {
 /// Says what is wrong, if anything, with a payload's `simulate` against what
 /// is at its endpoint: for tcssim, which compares the two before it
 /// simulates anything. See "Saying Which Payloads Are Simulated" in
-/// docs/design.rst.
+/// docs/tcspecial-design.rst.
 ///
 /// `simulate: true` where the endpoint is real hardware is a configuration
 /// pointing at hardware in a file that says it is simulated; `simulate:

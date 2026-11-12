@@ -15,9 +15,9 @@
 //! last.
 //!
 //! Here rather than in the configuration, which is the distinction worth
-//! stating. A node's position is in the configuration because it is part of
-//! the diagram -- two people reading one configuration should see one drawing,
-//! and `design.rst` says why. How the canvas is divided is not part of the
+//! stating. A node's position is in the configuration because it is part of the
+//! diagram -- two people reading one configuration should see one drawing, and
+//! `tcsgui-design.rst` says why. How the canvas is divided is not part of the
 //! diagram: it is a working preference of the person at the keyboard, and
 //! writing it into the configuration would make resizing a pane a change to a
 //! file that flies.

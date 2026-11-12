@@ -13,7 +13,7 @@
 
      Written by tcsverify, asked for it by its xtce option, from the
      configuration and types.xtce, and not to be edited: see "The
-     configuration's own XTCE" in tcspecial's docs/design.rst. -->
+     configuration's own XTCE" in tcspecial's docs/tcspecial-design.rst. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="can">
   <TelemetryMetaData>
     <ParameterTypeSet>

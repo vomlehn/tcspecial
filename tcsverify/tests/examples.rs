@@ -359,11 +359,12 @@ fn every_example_has_a_diagram_of_its_nodes() {
     }
 }
 
-/// And every example has a section in the manual, which shows its diagram.
+/// And every example has a section in the tcspecial manual, which shows its
+/// diagram.
 #[test]
 fn every_example_is_in_the_manual() {
     let manual =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/manual.rst");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/tcspecial.rst");
     let text = std::fs::read_to_string(&manual)
         .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
     for config in yaml_files().into_iter() {
@@ -378,7 +379,7 @@ fn every_example_is_in_the_manual() {
     }
 }
 
-/// And the manual's examples of a node verify, as the examples do.
+/// And the manuals' examples of a node verify, as the examples do.
 ///
 /// An example in the manual is copied as often as one in `examples/`, and a
 /// rule that changes leaves it behind without anything saying so: the manual
@@ -395,9 +396,6 @@ fn every_example_is_in_the_manual() {
 #[test]
 fn every_node_in_the_manual_verifies() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let manual = root.join("docs/manual.rst");
-    let text = std::fs::read_to_string(&manual)
-        .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
     let worked =
         std::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
             .expect("the worked example");
@@ -405,53 +403,59 @@ fn every_node_in_the_manual_verifies() {
     let dir = tempfile::tempdir().expect("a directory");
 
     let mut checked = 0;
-    for (line, block) in yaml_blocks(&text) {
-        let first = block.lines().next().unwrap_or_default();
-        let sections = tcslibgs::graph::Section::ALL;
-        let file = if first.starts_with("payload_groups:")
-            || sections
-                .iter()
-                .any(|s| first.starts_with(&format!("{}:", s.name())))
-        {
-            format!("{section}{block}")
-        } else if let Some(node_type) = first
-            .strip_prefix("- type ")
-            .and_then(|rest| rest.strip_suffix(':'))
-        {
-            // A type and its nodes, as a section groups them: put under the
-            // section that type belongs to.
-            let nested: String =
-                block.lines().map(|l| format!("{l}\n")).collect();
-            let under = tcslibgs::graph::section_of(node_type.trim()).name();
-            format!("{section}{under}:\n{nested}")
-        } else if first.starts_with("- name:") {
-            let node_type = block
-                .lines()
-                .find_map(|l| l.trim().strip_prefix("type:"))
-                .map(str::trim)
-                .unwrap_or_else(|| {
-                    panic!("manual.rst:{line}: a node with no type")
-                });
-            let nested: String =
-                block.lines().map(|l| format!("  {l}\n")).collect();
-            let under = tcslibgs::graph::section_of(node_type).name();
-            format!("{section}{under}:\n{nested}")
-        } else {
-            continue;
-        };
-        if block.contains("-out:") {
-            continue;
-        }
+    for name in tcslibgs::MANUALS {
+        let manual = root.join("docs").join(name);
+        let text = std::fs::read_to_string(&manual)
+            .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
+        for (line, block) in yaml_blocks(&text) {
+            let first = block.lines().next().unwrap_or_default();
+            let sections = tcslibgs::graph::Section::ALL;
+            let file = if first.starts_with("payload_groups:")
+                || sections
+                    .iter()
+                    .any(|s| first.starts_with(&format!("{}:", s.name())))
+            {
+                format!("{section}{block}")
+            } else if let Some(node_type) = first
+                .strip_prefix("- type ")
+                .and_then(|rest| rest.strip_suffix(':'))
+            {
+                // A type and its nodes, as a section groups them: put under the
+                // section that type belongs to.
+                let nested: String =
+                    block.lines().map(|l| format!("{l}\n")).collect();
+                let under =
+                    tcslibgs::graph::section_of(node_type.trim()).name();
+                format!("{section}{under}:\n{nested}")
+            } else if first.starts_with("- name:") {
+                let node_type = block
+                    .lines()
+                    .find_map(|l| l.trim().strip_prefix("type:"))
+                    .map(str::trim)
+                    .unwrap_or_else(|| {
+                        panic!("{name}:{line}: a node with no type")
+                    });
+                let nested: String =
+                    block.lines().map(|l| format!("  {l}\n")).collect();
+                let under = tcslibgs::graph::section_of(node_type).name();
+                format!("{section}{under}:\n{nested}")
+            } else {
+                continue;
+            };
+            if block.contains("-out:") {
+                continue;
+            }
 
-        let path = dir.path().join(format!("manual-{line}.ytcs"));
-        std::fs::write(&path, &file).unwrap();
-        let report = verify(&path, None, tcsverify::Limits::EVERYTHING);
-        assert!(
-            !report.found_anything(),
-            "the example at manual.rst:{line} does not verify: {:?}\n{file}",
-            report.findings
-        );
-        checked += 1;
+            let path = dir.path().join(format!("{name}-{line}.ytcs"));
+            std::fs::write(&path, &file).unwrap();
+            let report = verify(&path, None, tcsverify::Limits::EVERYTHING);
+            assert!(
+                !report.found_anything(),
+                "the example at {name}:{line} does not verify: {:?}\n{file}",
+                report.findings
+            );
+            checked += 1;
+        }
     }
     // A change to how the manual marks its blocks would otherwise pass this
     // by checking nothing.

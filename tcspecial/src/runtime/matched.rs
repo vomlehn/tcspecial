@@ -7,7 +7,7 @@
 //! beacons and answers, and it acts on no command but CONNECT, RESTART_ARM and
 //! RESTART. Taking a RESTART ends the match for good: the process ends, and
 //! the start that comes back begins unmatched again. See "Configurations
-//! named by their checksum" in `docs/design.rst`.
+//! named by their checksum" in `docs/tcspecial-design.rst`.
 //!
 //! One fact, read in three places -- the beacon sender, the command
 //! interpreter and every link to the ground -- so it is held once, here, and

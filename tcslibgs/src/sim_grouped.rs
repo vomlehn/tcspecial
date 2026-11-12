@@ -850,13 +850,13 @@ mod tests {
         }
     }
 
-    /// Every simulator file and physics model the manual and the design
+    /// Every simulator file and physics model the manuals and the designs
     /// show in YAML is in the shape they are read in.
     #[test]
     fn the_documents_simulator_files_and_models_read() {
         let docs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs");
         let mut shown = 0;
-        for name in ["manual.rst", "design.rst"] {
+        for name in crate::MANUALS.iter().chain(&crate::DESIGNS) {
             let text =
                 std::fs::read_to_string(docs.join(name)).expect("a document");
             let lines: Vec<&str> = text.lines().collect();

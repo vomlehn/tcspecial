@@ -13,7 +13,7 @@
 
 [Unit]
 Description=tcspecial flight software: the vehicle's payloads as a graph
-Documentation=file://@PREFIX@/share/doc/tcspecial/docs/manual.html
+Documentation=file://@PREFIX@/share/doc/tcspecial/docs/tcspecial.html
 ConditionPathExists=@SYSCONFDIR@/tcspecial/tcspecial.ytcs
 Wants=network-online.target
 After=network-online.target

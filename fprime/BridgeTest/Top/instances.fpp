@@ -20,10 +20,10 @@ module BridgeTest {
   # The bridge
   # --------------------------------------------------------------------
 
-  # Its base ID is the gateway node's fprime_id_base, which the model says:
-  # the ID of each channel within the component is then the device id of
-  # the node it carries, as docs/design.rst has it, and the bridge refuses
-  # to run under any other.
+  # Its base ID is the gateway node's fprime_id_base, which the model says: the
+  # ID of each channel within the component is then the device id of the node it
+  # carries, as docs/tcspecial-design.rst has it, and the bridge refuses to run
+  # under any other.
   instance tcsBridge: Tcs.TcsBridge base id Tcs.TcsBridge.ID_BASE \
     queue size Default.QUEUE_SIZE \
     stack size BRIDGE_STACK_SIZE \

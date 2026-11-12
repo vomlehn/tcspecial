@@ -36,7 +36,7 @@
      `make link-packet` in tcslibgs/: change this, and regenerate it, and
      the interface digest with `make interface-digest`. See
      tcslibgs/src/link.rs, and "The link without a header" in
-     docs/design.rst. -->
+     docs/tcspecial-design.rst. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsLink">
   <TelemetryMetaData>
     <ParameterTypeSet>

@@ -351,7 +351,7 @@ impl EndpointPort {
     /// bytes, states so as its `format`, and every node after it sees the
     /// number as its type lays it out -- most significant byte first, as wide
     /// as the type -- so that one layout is read for one type. See "Typed
-    /// links" in `docs/design.rst`.
+    /// links" in `docs/tcspecial-design.rst`.
     pub fn laid_out_as(mut self, format: Format) -> EndpointPort {
         self.laid_out = Some(format);
         self

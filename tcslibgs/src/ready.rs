@@ -6,7 +6,7 @@
 //! the UDP address its simulator file states as `tcssim.ready`, whether it has
 //! made them. tcspecial takes no part: flight software that knows nothing of a
 //! simulator cannot wait for the wrong one. See "Waiting for the Simulator" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 //!
 //! The exchange is a request and an answer and nothing is held between
 //! exchanges: a request carries a sequence number and the answer carries it

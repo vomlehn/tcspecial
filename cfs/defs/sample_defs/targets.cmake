@@ -6,7 +6,7 @@
 #
 # Packets carry cFS's extended header and message IDs are cFE's version 2
 # mapping, the one framing tcspecial speaks: see "What crosses the bus" in
-# tcspecial's docs/design.rst.
+# tcspecial's docs/tcspecial-design.rst.
 
 SET(MISSION_NAME "TcsCfsTest")
 SET(SPACECRAFT_ID 0x42)

@@ -11,7 +11,7 @@
 # The cFS checkout is copied and never changed, and its submodules are
 # fetched at the commits it pins: see prepare. What differs from cFE's
 # sample mission is in defs/, and says why in each file. See "What crosses
-# the bus" in docs/design.rst for what the run is the test of.
+# the bus" in docs/tcspecial-design.rst for what the run is the test of.
 
 # The tcspecial tree this directory is in, and what sits beside it: see
 # beside.mk, which also names TCS_PORTS_LOCK.

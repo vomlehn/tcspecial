@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
 
 description: "A sensor's sample buffer, read through the IIO subsystem, its
   samples going to the ground"

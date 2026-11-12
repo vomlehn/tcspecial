@@ -77,9 +77,9 @@
              with two names is refused where the file is read. -->
         <xs:element name="node" type="xs:string"/>
         <!-- The configuration's own word for the type. Several descriptions
-             may share one: `compute` is one node type, and `mean`,
-             `thermostat`, `to_kelvin` and `process` are four things to
-             place. -->
+             may share one: `compute` is one node type, and `process`,
+             `thermostat`, `to_kelvin`, `to_value` and `vote` are five things
+             to place. -->
         <xs:element name="type" type="xs:string"/>
         <xs:element name="about" type="xs:string"/>
         <xs:element name="sets" type="sets"/>

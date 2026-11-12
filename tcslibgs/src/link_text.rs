@@ -6,7 +6,7 @@
 //! or `0`; and a structure as its fields, `name=value`, separated by spaces --
 //! `x=0.12 y=-0.40 z=9.81`. A string and bytes have none, a line being no
 //! place for either, and a `process` that states one is refused. See "Typed
-//! links" in `docs/design.rst`.
+//! links" in `docs/tcspecial-design.rst`.
 
 use std::fmt::Write as _;
 

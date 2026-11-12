@@ -7,7 +7,7 @@
 //! the address, and a second one started beside it is refused rather than
 //! left to fight it for the payloads' paths. The messages are
 //! `tcslibgs::ready`, and a harness waits through `tcslib::simulator`. See
-//! "Waiting for the Simulator" in `docs/design.rst`.
+//! "Waiting for the Simulator" in `docs/tcspecial-design.rst`.
 
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU8, Ordering};

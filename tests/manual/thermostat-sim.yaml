@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial-sim.schema.json
 
 # How tcssim simulates the payloads of thermostat.ytcs, the manual's
 # fixture: the thermostat example as it would be aboard, its sensors on I2C

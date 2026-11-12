@@ -105,7 +105,7 @@ configuration.
                      source's data is written to -- and say which files
                      were written. A file that already says what would be
                      written is left alone. See \"F´: gateway_fprime\" in
-                     docs/design.rst
+                     docs/tcsverify-design.rst
   --interface-digest print the digest of the interface this build speaks,
                      the 32 lower-case hex digits a configuration's
                      tcspecial section gives as its interface, and exit.

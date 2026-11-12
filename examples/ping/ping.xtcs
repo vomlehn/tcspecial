@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
     <description>A ping, and a ground station that sends one and times the answer</description>
     <tcspecial>
         <!-- Every port is in the seven thousands, which no other example

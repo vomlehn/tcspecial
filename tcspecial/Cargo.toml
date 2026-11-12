@@ -47,7 +47,7 @@ slint-build = { version = "1.18", optional = true }
 # the link to the ground is UDP -- and so is every node that reaches no
 # interface. `raw` is the raw protocol of the network type. The words are
 # tcslibgs::graph::built::OPTIONAL_TYPES, which a test holds these to; see
-# "Which Node Types Are Built" in docs/design.rst.
+# "Which Node Types Are Built" in docs/tcspecial-design.rst.
 [features]
 default = [
     "device-file",

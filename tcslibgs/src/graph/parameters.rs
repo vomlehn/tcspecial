@@ -197,10 +197,10 @@ pub fn nest(flat: &BTreeMap<String, Scalar>) -> BTreeMap<String, Parameter> {
 ///
 /// The gateway kind decides how the links are written -- UDP sockets for the
 /// radio, Yamcs and F´, software bus message IDs for cFS -- so an attribute of
-/// the one is required of a configuration of that kind and refused, by name,
-/// in one of the other: see "One kind per configuration" in
-/// `docs/design.rst`. Yamcs adds the APIDs its CCSDS headers carry, which
-/// only it states.
+/// the one is required of a configuration of that kind and refused, by name, in
+/// one of the other: see "One kind per configuration" in
+/// `docs/tcspecial-design.rst`. Yamcs adds the APIDs its CCSDS headers carry,
+/// which only it states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Needed {
     /// Required of every configuration.

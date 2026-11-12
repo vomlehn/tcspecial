@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial-sim.schema.json
 
 description: Simulator settings for the payloads of thermostat.ytcs and
   thermostat-yamcs.ytcs

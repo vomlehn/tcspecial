@@ -47,9 +47,9 @@
 //! ```
 //!
 //! `sets` is what makes a type with variants into several entries in the
-//! palette: `compute` is one node type and `mean`, `thermostat`, `to_kelvin`
-//! and `process` are four things to place, each of which is a compute node with
-//! its `function` already answered.
+//! palette: `compute` is one node type and `process`, `thermostat`,
+//! `to_kelvin`, `to_value` and `vote` are five things to place, each of which
+//! is a compute node with its `function` already answered.
 //!
 //! `kind` is what the node's window offers a field with: a `boolean` takes a
 //! control with two states, and everything else a box to write in. See
@@ -555,7 +555,7 @@ impl Described {
 /// The description that fits a node, where the tree has one.
 ///
 /// The type has to match and so does everything the description answers: a
-/// compute node whose `function` is `mean` is described by `compute/mean`, and
+/// compute node whose `function` is `vote` is described by `compute/vote`, and
 /// one whose function is something else is not described by it at all. Where
 /// several fit, the one that answers the most -- a description that states two
 /// attributes is about a narrower thing than one that states one, and the
@@ -655,15 +655,31 @@ fn beside_this_program() -> Option<PathBuf> {
     Some(program.parent()?.parent()?.join("share/tcsgui"))
 }
 
-/// The schemas inside a data directory.
+/// Where an installed tcspecial's XTCS and YTCS schemas are, and its
+/// simulator file's: `share/tcspecial/schema` under the prefix this program
+/// was installed under, or where installing by hand once put them.
 ///
 /// What they are for is the one thing an editor cannot do for a file somebody
 /// is writing by hand or with another tool: tell them, in their own editor,
 /// that `payloads` is a section and `payload` is not. They check the shape of a
 /// file; whether a configuration can be flown is `tcsverify`'s to say. See
-/// `share/schema/README`.
-pub fn schema_in(data: &Path) -> PathBuf {
-    data.join("schema")
+/// `tcslibgs/schema/README`. They are tcslibgs's and not this editor's,
+/// because they define the formats every program reads; the schemas of this
+/// editor's own description files stay in its `share/schema`.
+///
+/// # Returns
+///
+/// The first of those directories that exists, or `None`.
+fn installed_schemas() -> Option<PathBuf> {
+    let mut tried: Vec<PathBuf> = Vec::new();
+    if let Some(data) = beside_this_program() {
+        if let Some(share) = data.parent() {
+            tried.push(share.join("tcspecial/schema"));
+        }
+    }
+    tried.push(PathBuf::from("/usr/local/share/tcspecial/schema"));
+    tried.push(PathBuf::from("/usr/share/tcspecial/schema"));
+    tried.into_iter().find(|where_| where_.is_dir())
 }
 
 /// The XSD and the JSON Schema that describe a configuration.
@@ -716,25 +732,25 @@ pub fn schema_reference(destination: &Path, schema: &str) -> String {
     let mut up = PathBuf::new();
     let mut back = String::new();
     for _ in 0..=6 {
-        let candidate = here.join(&up).join("tcsgui/share/schema").join(schema);
+        let candidate = here.join(&up).join("tcslibgs/schema").join(schema);
         if candidate.is_file() {
-            return format!("{back}tcsgui/share/schema/{schema}");
+            return format!("{back}tcslibgs/schema/{schema}");
         }
         up.push("..");
         back.push_str("../");
     }
 
-    // Then where installing puts them. Only an absolute answer: `data_dir`
-    // searches the working directory too, and a path relative to wherever the
-    // editor happened to be started is not a fact about the file.
-    if let Some(data) = data_dir().filter(|data| data.is_absolute()) {
-        let installed = schema_in(&data).join(schema);
+    // Then where installing puts them, which is always an absolute path: a
+    // path relative to wherever the editor happened to be started is not a
+    // fact about the file.
+    if let Some(installed) = installed_schemas() {
+        let installed = installed.join(schema);
         if installed.is_file() {
             return installed.display().to_string();
         }
     }
 
-    format!("/opt/tcs/share/tcsgui/schema/{schema}")
+    format!("/opt/tcs/share/tcspecial/schema/{schema}")
 }
 
 /// The description tree inside a data directory.
@@ -1012,7 +1028,7 @@ mod tests {
     /// Asked only of the descriptions that are about a type as a whole -- a
     /// payload kind, the ground link, a log -- which is what `node ==
     /// node_type` means. A description that is one *variant* of a type is a
-    /// different thing: `mean` lists what a mean needs and `thermostat` what a
+    /// different thing: `vote` lists what a vote needs and `thermostat` what a
     /// thermostat needs, where the table lists what any compute node may say,
     /// so the two are not the same list and are not asked to be. For those the
     /// description is the authority, the window being built from it.
@@ -1204,8 +1220,8 @@ mod tests {
     /// A node is described by the description that answers what it says.
     ///
     /// Which is how one node type becomes several things to place and several
-    /// things to ask about: a compute node whose function is `mean` is a mean,
-    /// and the panel should ask it for a mean's attributes rather than for
+    /// things to ask about: a compute node whose function is `vote` is a vote,
+    /// and the panel should ask it for a vote's attributes rather than for
     /// every attribute any computation has.
     #[test]
     fn a_node_is_matched_to_the_description_that_fits_it() {

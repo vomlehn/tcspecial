@@ -81,7 +81,7 @@ list in the tests to update:
   XML read as the same configuration.
 - `tcsgui/tests/schema.rs` validates each XML file against `tcspecial.xsd`,
   checks each YAML key against `tcspecial.schema.json`, and checks that every
-  file names its schema (`../../tcsgui/share/schema/...`).
+  file names its schema (`../../tcslibgs/schema/...`).
 
 `make` in this directory builds `README.html` from this file, with
 `style.html` in its head -- which is where the tables' cells are told to sit
@@ -393,7 +393,7 @@ kernel's dummy device for it by `tcspecial/tests/kernel-dummies.rs`,
 which plays the device's far end through the kernel: that is what makes CAN
 and GPIO supported. IIO stays experimental until its test has passed, which it
 cannot on a kernel whose `iio_dummy` has no buffer, such as Ubuntu's: see
-"What Is Supported and What Is Experimental" in `docs/design.rst`. The
+"What Is Supported and What Is Experimental" in `docs/tcspecial-design.rst`. The
 devices need root to make, so nothing here makes them. Run this once, from
 the account that runs the examples and the tests:
 

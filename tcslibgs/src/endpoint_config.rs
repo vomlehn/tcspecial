@@ -17,7 +17,7 @@
 //! and the scalar spellings a file may use ([`Scalar`], [`ByteList`]).
 //!
 //! The syntax a tcspecial configuration states them in is specified in
-//! `docs/design.rst`, under "Payload Configuration Files".
+//! `docs/tcspecial-design.rst`, under "Payload Configuration Files".
 
 use std::fmt;
 use std::time::Duration;

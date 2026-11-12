@@ -5,7 +5,7 @@
 # The radio's own protocol, so it is opened, counted and driven as a
 # gateway_radio node is, and like that node it has no Rust of its own: it is
 # served by the network payload code, tcspecial/src/node/payload/network/. See
-# tcslibgs::gateway, and "Gateways" in docs/design.rst.
+# tcslibgs::gateway, and "Gateways" in docs/tcsgui-design.rst.
 node: gateway_fprime
 type: gateway_fprime
 about: >

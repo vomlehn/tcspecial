@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcsgui/share/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
     <description>Answering to an F´ flight computer: a reading, the temperature made of it and what a thermostat would decide of that, to its bridge component, and a command from it to a heater</description>
     <tcspecial>
         <!-- Every port is in the nine thousands, which no other example

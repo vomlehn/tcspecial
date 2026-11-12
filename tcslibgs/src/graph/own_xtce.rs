@@ -24,7 +24,7 @@
 //! fails when one committed there is not what it would write: everything it
 //! says is said by the configuration and `types.xtce` already, and nobody
 //! writes it by hand. See "The configuration's own XTCE" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -287,7 +287,7 @@ fn head(out: &mut String, name: &str) {
 
      Written by tcsverify, asked for it by its xtce option, from the
      configuration and types.xtce, and not to be edited: see \"The
-     configuration's own XTCE\" in tcspecial's docs/design.rst. -->
+     configuration's own XTCE\" in tcspecial's docs/tcspecial-design.rst. -->
 "
     );
     let one_line =

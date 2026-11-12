@@ -4,8 +4,8 @@
 //! called `moc` while the ground was the only thing that could be there. It is
 //! the gateway now, because a cFS or an F´ flight computer can stand where the
 //! ground stood -- see "Gateways: what the vehicle answers to" in
-//! `docs/design.rst` -- and every word a file wrote for that side was renamed
-//! with it.
+//! `docs/tcspecial-design.rst` -- and every word a file wrote for that side was
+//! renamed with it.
 //!
 //! Then the terminals: `payload-` and `gateway-` became `world-` and `moc-`,
 //! for the two sides of the graph each stream travels between -- the world a

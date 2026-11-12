@@ -277,7 +277,7 @@ configuration.</li>
 <li><code>tcsgui/tests/schema.rs</code> validates each XML file against
 <code>tcspecial.xsd</code>, checks each YAML key against
 <code>tcspecial.schema.json</code>, and checks that every file names its
-schema (<code>../../tcsgui/share/schema/...</code>).</li>
+schema (<code>../../tcslibgs/schema/...</code>).</li>
 </ul>
 <p><code>make</code> in this directory builds <code>README.html</code>
 from this file, with <code>style.html</code> in its head – which is
@@ -673,9 +673,9 @@ far end through the kernel: that is what makes CAN and GPIO supported.
 IIO stays experimental until its test has passed, which it cannot on a
 kernel whose <code>iio_dummy</code> has no buffer, such as Ubuntu’s: see
 “What Is Supported and What Is Experimental” in
-<code>docs/design.rst</code>. The devices need root to make, so nothing
-here makes them. Run this once, from the account that runs the examples
-and the tests:</p>
+<code>docs/tcspecial-design.rst</code>. The devices need root to make,
+so nothing here makes them. Run this once, from the account that runs
+the examples and the tests:</p>
 <pre><code>sudo bin/mk-kernel-dummies</code></pre>
 <p>With no arguments it makes the CAN bus and the GPIO chip;
 <code>sudo bin/mk-kernel-dummies iio</code> makes the IIO sensor, and

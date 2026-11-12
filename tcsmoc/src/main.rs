@@ -2057,7 +2057,7 @@ mod tests {
     fn the_design_document_states_the_size_the_window_opens_at() {
         let doc = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
-            .join("docs/design.rst");
+            .join("docs/tcsmoc-design.rst");
         let text = std::fs::read_to_string(&doc).unwrap();
 
         // The four handlers of tcspecial1.ytcs, which is the set the document

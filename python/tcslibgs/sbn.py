@@ -1,9 +1,9 @@
 """SBN, the Software Bus Network, as a ground station speaks it: one peer of
 a cFS software bus, over SBN's UDP protocol module.
 
-The Python spelling of ``tcslibgs/src/sbn.rs``, held to it by the same
-examples in ``tests/test_sbn.py`` as the Rust's own tests use. See "What SBN
-is, on the wire" in ``docs/design.rst``, which says what in it was checked
+The Python spelling of ``tcslibgs/src/sbn.rs``, held to it by the same examples
+in ``tests/test_sbn.py`` as the Rust's own tests use. See "What SBN is, on the
+wire" in ``docs/tcspecial-design.rst``, which says what in it was checked
 against SBN v7.0.1 and how.
 
 A datagram is thirteen bytes of header and then the message, every number

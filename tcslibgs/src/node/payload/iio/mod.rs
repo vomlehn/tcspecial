@@ -4,7 +4,7 @@
 //! handler, and the handler reads the device; nothing has been run against a
 //! real sensor, nor yet against the kernel's `iio_dummy`, whose test is
 //! written and skips on a kernel built without its buffer. See "What Is
-//! Supported and What Is Experimental" in `docs/design.rst`.
+//! Supported and What Is Experimental" in `docs/tcspecial-design.rst`.
 //!
 //! The kernel's Industrial I/O subsystem is what a thermistor, an
 //! accelerometer or an ADC looks like on Linux. A driver offers channels, and
@@ -42,7 +42,7 @@ use crate::endpoint_config::{
 /// channels are enabled, how often the device samples -- is set through
 /// `sysfs` by whoever brought the sensor up. A payload that stated those
 /// would be stating values nothing could apply: see the requirement in
-/// `design.rst` that a payload says only what it can set.
+/// `tcspecial-design.rst` that a payload says only what it can set.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
 )]

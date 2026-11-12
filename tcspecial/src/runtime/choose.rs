@@ -20,7 +20,7 @@
 //! the next start loads, and this start is counted as one of its trials. A
 //! state file that is missing or damaged names nothing, and the start loads
 //! the configuration on its command line. See "Starting, and the restart
-//! flag" in `docs/design.rst`.
+//! flag" in `docs/tcspecial-design.rst`.
 //!
 //! [`Boot::load`] is tcspecial's function that loads a configuration by its
 //! checksum: a start calls it for each configuration the state file names,

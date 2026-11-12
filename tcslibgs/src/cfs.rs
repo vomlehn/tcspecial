@@ -5,7 +5,7 @@
 //! secondary header, and then exactly what the UDP link would carry in a
 //! datagram. This is the one statement of that framing, read by the vehicle and
 //! by whatever simulates the cFS end. See "What crosses the bus" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 //!
 //! The layouts are cFE's, as its `default_cfe_msg_hdr_priext.h` and
 //! `default_cfe_msg_sechdr.h` have them in a build with

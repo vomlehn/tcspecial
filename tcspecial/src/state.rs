@@ -37,7 +37,7 @@
 //! It is written whole to a file beside it, flushed, and renamed over it, and
 //! the directory is flushed after: a power failure part way through leaves
 //! the old file or the new one, never half of each. See "The state file" in
-//! `docs/design.rst`.
+//! `docs/tcspecial-design.rst`.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;

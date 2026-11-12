@@ -785,10 +785,10 @@ pub enum Counted {
 /// the spacecraft never sent. The age says how long ago the last one was; this
 /// says how many there should have been.
 ///
-/// The link delivers in order, so a number that goes back is a start and
-/// not a beacon delayed: see "What is assumed" in `docs/design.rst`. A count
-/// that wraps would also go back, after 2^32 beacons, which at five seconds
-/// each is six centuries.
+/// The link delivers in order, so a number that goes back is a start and not a
+/// beacon delayed: see "What is assumed" in `docs/tcspecial-design.rst`. A
+/// count that wraps would also go back, after 2^32 beacons, which at five
+/// seconds each is six centuries.
 ///
 /// # Arguments
 ///

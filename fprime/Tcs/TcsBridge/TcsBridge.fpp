@@ -9,7 +9,7 @@
 # Which channels it has, and their IDs, are the configuration's: the model
 # included at the end is written from it by
 #     tcsverify --fprime-model=fprime/Tcs/TcsBridge/model <configuration>
-# and never by hand. See "F´: gateway_fprime" in docs/design.rst.
+# and never by hand. See "F´: gateway_fprime" in docs/tcspecial-design.rst.
 
 module Tcs {
 

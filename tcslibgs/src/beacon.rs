@@ -80,7 +80,8 @@ pub struct Beacon {
     /// has taken a CONNECT whose configuration checksum is the one it runs.
     /// While it is set the vehicle sends the ground nothing but beacons and
     /// answers, and acts on no command but CONNECT, RESTART_ARM and RESTART.
-    /// See "Configurations named by their checksum" in `docs/design.rst`.
+    /// See "Configurations named by their checksum" in
+    /// `docs/tcspecial-design.rst`.
     pub restart_flag: bool,
     /// The interface the sender speaks: the digest of the XTCE documents it
     /// was built from. See [`crate::interface`].

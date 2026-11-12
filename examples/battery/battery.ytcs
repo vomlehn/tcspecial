@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
 
 description: "A spacecraft's power bus: a solar array and a battery, a
   power monitor asked over a serial line, the battery's charge counted by a

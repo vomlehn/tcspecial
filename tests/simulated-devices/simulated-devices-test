@@ -19,15 +19,14 @@ to use; neither is made here, since both need root (see bin/mkvcan and
 bin/mkgpio), and the run says which it left out and why.
 
 Started in the order a test harness starts a run (see "Waiting for the
-Simulator" in docs/design.rst): tcssim with every payload sending, waited
-for until it has made its simulated devices; then tcspecial, --simulate=all. The
-ground sends CONNECT until it is answered, and then listens at each
-payload's telemetry port. A payload passes if its data arrives, and the
-device file's must be the start of tcssim's text. When tcssim is stopped,
-by a signal as a harness stops it, every simulated device it made must be
-gone.
-Whatever was started is stopped however the run ends, so that nothing is
-left holding the ports.
+Simulator" in docs/tcspecial-design.rst): tcssim with every payload sending,
+waited for until it has made its simulated devices; then tcspecial,
+--simulate=all. The ground sends CONNECT until it is answered, and then listens
+at each payload's telemetry port. A payload passes if its data arrives, and the
+device file's must be the start of tcssim's text. When tcssim is stopped, by a
+signal as a harness stops it, every simulated device it made must be gone.
+Whatever was started is stopped however the run ends, so that nothing is left
+holding the ports.
 
 The ports are 47000 to 47999, which nothing else in the tree uses, so that
 this can run beside the other tests. tcssim opens its window for the length

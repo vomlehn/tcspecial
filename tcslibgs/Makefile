@@ -189,7 +189,7 @@ $(PING_PY): $(PING_XML) | tcs-xtce
 # Every type a link between two nodes can carry is stated once, in
 # xtce/types.xtce, and held and checked by the Rust tcs-xtce generates from
 # it, without dynamic allocation, as the commands are. See "Typed links" in
-# ../docs/design.rst.
+# ../docs/tcspecial-design.rst.
 TYPES_XML := xtce/types.xtce
 TYPES_RS := src/types_packet.rs
 

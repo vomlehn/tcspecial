@@ -1,10 +1,10 @@
 //! The cFS software bus, as the vehicle is on it: one SBN peer that every
 //! link is carried over.
 //!
-//! A vehicle that answers to cFS has no command socket, no beacon socket and
-//! no telemetry sockets of its own. Everything it takes and sends crosses one
-//! UDP socket to one SBN peer, as cFS packets told apart by message ID: see
-//! "cFS: gateway_cfs" in `docs/design.rst`, [`tcslibgs::sbn`] for the wire,
+//! A vehicle that answers to cFS has no command socket, no beacon socket and no
+//! telemetry sockets of its own. Everything it takes and sends crosses one UDP
+//! socket to one SBN peer, as cFS packets told apart by message ID: see "cFS:
+//! gateway_cfs" in `docs/tcspecial-design.rst`, [`tcslibgs::sbn`] for the wire,
 //! and [`tcslibgs::cfs`] for the packets on it.
 //!
 //! # Who does what

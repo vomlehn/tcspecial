@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcsgui/share/schema/tcspecial-sim.schema.json
+# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial-sim.schema.json
 
 # How tcssim simulates the payload of iio.ytcs.
 description: Simulator settings for the payload of iio.ytcs

@@ -65,9 +65,9 @@ pub struct Editor {
     /// What the last command did, where it did something worth saying.
     ///
     /// Beside `trouble` and not in it: the window has one red text and this is
-    /// not red. Generating the Rust writes a file somebody named and nothing
-    /// else changes, so silence would leave them wondering whether the menu
-    /// item did anything.
+    /// not red. Save as writes files somebody named, and a history put back
+    /// or set aside at the start changes what the window holds without an
+    /// edit, so silence would leave them wondering what had happened.
     said: Option<String>,
     /// The simulator file this session opened, if it was given one: what
     /// `tcsverify` is asked about as the editor starts -- see
@@ -484,6 +484,13 @@ impl Editor {
         self.unsaved
     }
 
+    /// Lets go of what the files do not have, for leaving without saving:
+    /// the files keep what they last had, and the way out, which writes
+    /// whatever is unsaved, finds nothing to write.
+    pub fn abandon_unsaved(&mut self) {
+        self.unsaved = false;
+    }
+
     /// Where the history is kept, for saying so when the configuration itself
     /// cannot be written.
     ///
@@ -792,8 +799,8 @@ impl Editor {
         }
         self.trouble = None;
         // What the last command said is about that command and not about this
-        // one: an edit after generating the code is not a second report that
-        // the code was written.
+        // one: an edit after Save as is not a second report that the files
+        // were written there.
         self.said = None;
         // Until a write succeeds, there is something in the document that no
         // file has. Set before the writing rather than after a failure, so
@@ -2354,6 +2361,33 @@ tcsgui:
         assert_eq!(written.document().nodes.len(), 2);
     }
 
+    /// Leaving without saving writes nothing, and, the exit being one that
+    /// was asked for, the history goes with it: a later start puts nothing
+    /// back.
+    #[test]
+    fn leaving_without_saving_writes_nothing() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("graph.ytcs");
+        {
+            let mut editor = Editor::new(&path);
+            editor.edit(add("a", "i2c"));
+            editor.set_autosave(false);
+            editor.edit(add("b", "spi"));
+            assert!(editor.unsaved());
+            editor.abandon_unsaved();
+            // What main does on the way out.
+            if editor.unsaved() {
+                editor.save();
+            }
+            editor.forget_history();
+        }
+        let mut reopened = Editor::open(&path, crate::pane::default_dividers())
+            .expect("it opens");
+        reopened.recover();
+        assert_eq!(reopened.document().nodes.len(), 1, "b was let go");
+        assert!(!reopened.unsaved());
+    }
+
     /// A configuration changed by something else after its history was
     /// written has its history set aside, and the window says so: the
     /// history no longer describes the file.
@@ -2567,7 +2601,7 @@ tcsgui:
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let mut directories = vec![
             PathBuf::from("tests/manual"),
-            PathBuf::from("tcsgui/share/schema"),
+            PathBuf::from("tcslibgs/schema"),
         ];
         for entry in std::fs::read_dir(root.join("examples")).expect("listed") {
             let entry = entry.expect("an entry");

@@ -9,15 +9,15 @@
 //! The vehicle says which interface it speaks in every beacon, from
 //! [`InterfaceDigest::of_this_build`]: the digest of `tcslibgs/xtce/link.xtce`
 //! and `tcslibgs/xtce/types.xtce` together, which this build was generated
-//! from: the first states every command but the fixed ones, the second
-//! every type a link between nodes can carry. The fixed commands are in `tcslibgs/xtce/fixed.xtce`, and the beacon
-//! in `tcslibgs/xtce/beacon.xtce`, which are not part of the interface: no
-//! change to the interface can touch them. A
-//! configuration names the interface it was written for as the `tcspecial`
-//! section's `interface`, and every program refuses one that is not its
-//! build's own; `tcsverify --interface-digest` prints it. A ground station
-//! reads its own copy with [`InterfaceDigest::of_files`] and compares the
-//! two. See "The configuration names its interface" in `docs/design.rst`.
+//! from: the first states every command but the fixed ones, the second every
+//! type a link between nodes can carry. The fixed commands are in
+//! `tcslibgs/xtce/fixed.xtce`, and the beacon in `tcslibgs/xtce/beacon.xtce`,
+//! which are not part of the interface: no change to the interface can touch
+//! them. A configuration names the interface it was written for as the
+//! `tcspecial` section's `interface`, and every program refuses one that is not
+//! its build's own; `tcsverify --interface-digest` prints it. A ground station
+//! reads its own copy with [`InterfaceDigest::of_files`] and compares the two.
+//! See "The configuration names its interface" in `docs/tcspecial-design.rst`.
 
 use std::fmt;
 use std::path::Path;

@@ -27,8 +27,8 @@ Work is under way on integrating TCSpecial, with its telemetry log
 # To Run
 
 This is a pre-pre-pre-alpha release that mostly displays the GUI. There is a
-design document in docs/design.rst, a manual in docs/manual.rst, and a plan
-for integration with cFS and F´ in docs/third-party.rst. The docs/Makefile
+design document in docs/tcspecial-design.rst, a manual in docs/manual.rst, and a
+plan for integration with cFS and F´ in docs/third-party.rst. The docs/Makefile
 will build HTML pages of each for viewing.
 
 * Clone the source
@@ -192,9 +192,13 @@ To Do
 
 See also
 ========
-* [The tcspecial manual](https://vomlehn.github.io/tcspecial/docs/manual.html): how to write a
-  configuration, and how to run the flight software and the programs that
-  test it.
+* [The TCSpecial manuals](https://vomlehn.github.io/tcspecial/docs/manual.html):
+  what each program's manual covers.
+* [The tcspecial
+manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
+  how to write a configuration, and how to run the flight software and the
+  programs that test it. tcsgui, tcsmoc, tcssim and tcsverify each have a
+  manual of their own, beside it.
 
 * [The tcspecial design](https://vomlehn.github.io/tcspecial/docs/design.html): the specification, and why
   each rule is what it is.

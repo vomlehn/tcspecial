@@ -1841,7 +1841,7 @@ pub struct BeaconJson {
     /// Required, as the interval is, and for the same reason: across a
     /// restart is when the ground most needs to hear from the vehicle, and
     /// how often it does is not something a file should be silently given.
-    /// See "The beacon across a restart" in `docs/design.rst`.
+    /// See "The beacon across a restart" in `docs/tcspecial-design.rst`.
     pub reset_interval: String,
     /// Where beacons originate over UDP, as `address:port`.
     ///
@@ -1961,7 +1961,7 @@ pub struct PayloadCommandJson {
 }
 
 /// The SBN peer the vehicle is on a cFS software bus through, as a file
-/// states it: see "cFS: gateway_cfs" in `docs/design.rst`, and
+/// states it: see "cFS: gateway_cfs" in `docs/tcspecial-design.rst`, and
 /// [`crate::sbn`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SbnJson {
@@ -2074,7 +2074,7 @@ pub struct CIConfigJson {
     /// Required, with no default: where a vehicle keeps state across a power
     /// cycle is a fact about its storage, and a default would be a path that
     /// exists on a desk and not on the vehicle. See "The state file"
-    /// in `docs/design.rst`.
+    /// in `docs/tcspecial-design.rst`.
     pub state_file: String,
     /// The directory the vehicle keeps configurations in, each under its
     /// checksum, or `None` for a vehicle that keeps none: see

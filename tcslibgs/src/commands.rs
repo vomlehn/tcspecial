@@ -174,7 +174,7 @@ impl CommandType {
     /// whatever either end is running, their layouts can never change, and
     /// they are stated apart from every other command, in
     /// `xtce/fixed.xtce`, with opcodes from [`FIXED_OPCODES`]. See "The
-    /// fixed commands" in `docs/design.rst`.
+    /// fixed commands" in `docs/tcspecial-design.rst`.
     ///
     /// # Returns
     ///
@@ -821,11 +821,14 @@ mod tests {
             RESTART_ARM_VALID_DEFAULT,
             std::time::Duration::from_secs(20 * 60)
         );
-        let manual = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../docs/manual.rst"),
-        )
-        .expect("the manual reads");
+        let docs =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs");
+        let manual: String = crate::MANUALS
+            .iter()
+            .map(|name| {
+                std::fs::read_to_string(docs.join(name)).expect("a manual")
+            })
+            .collect();
         let said = manual.split_whitespace().collect::<Vec<_>>().join(" ");
         let minutes = RESTART_ARM_VALID_DEFAULT.as_secs() / 60;
         assert!(
@@ -994,7 +997,7 @@ mod tests {
 
     /// Every command code is below 128, because over a cFS software bus a
     /// command's function code is its code, and a cFS function code is
-    /// seven bits: see "What crosses the bus" in `docs/design.rst`.
+    /// seven bits: see "What crosses the bus" in `docs/tcspecial-design.rst`.
     #[test]
     fn every_command_code_fits_a_cfs_function_code() {
         for kind in (0u8..=255).filter_map(CommandType::from_u8) {

@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial.schema.json
+
+# The deck's science subsystem, which the stages of "Building a Vehicle" from
+# stage 7 on include: the seismometer, and the heat-flow experiment, the
+# regolith thermometer and the heater and thermostat that warm its probe.
+# Everything here is as stage 6 had it; only where it is written has changed.
+# The links to the ground are written to gateway, the name the including file
+# gives its gateway node.
+
+# What a line from another file may reach: every node here whose data leaves
+# for the gateway node in the including file. A line out of this file from any
+# other node is refused, saying to add the node here.
+exports:
+  world-out: [probe_heater, regolith_kelvin, seismometer]
+
+# Payloads read together, once each interval. A group is a clock shared by its
+# members, so that readings to be compared are taken as close together as the
+# hardware allows rather than each on a clock of its own.
+payload_groups:
+  # Thermal moonquakes: the regolith cracks as it warms and cools, so the
+  # seismometer's readings mean most beside the temperature taken at the same
+  # moment.
+  - name: "science_readings"
+    interval: "1 s"
+
+vehicle:
+  - type compute:
+      # Holds the probe at setpoint, in kelvin, by switching its heater: on
+      # below the band and off above it, half_band either side of the setpoint.
+      # The probe is warmed above the regolith around it, and how fast the
+      # warmth leaves it says how well the regolith conducts heat, which is
+      # what the experiment is for. What it decides leaves by its moc-out for
+      # the heater's moc-in: a decision for a payload to act on, travelling
+      # towards it as a command from the ground would.
+      - compute: probe_thermostat
+        function: "thermostat"
+        half_band: "1.0"
+        setpoint: "263.15"
+        type-in: "kelvin"
+        type-out: "u8"
+        moc-out:
+          - probe_heater.probe_thermostat
+        world-in: [regolith_kelvin]
+      # The thermometer's two bytes made a temperature in kelvin: a reading of
+      # 1 is a sixteenth of a degree, and nought is 273.15 K. The node states
+      # what it takes, type-in, and what it makes, a kelvin, is its function's,
+      # so a line from a payload sending anything but an i16 to it is refused
+      # when the configuration is read. The temperature goes to the thermostat
+      # as well as to the ground.
+      - compute: regolith_kelvin
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        type-in: "i16"
+        world-out:
+          - gateway.regolith_kelvin
+          - probe_thermostat.regolith_kelvin
+        world-in: [regolith_thermometer]
+
+payloads:
+  - type gpio_inout:
+      # The probe's heater switch, line 4 of /dev/gpiochip1: 1 for on and 0 for
+      # off, as probe_thermostat decides. A gpio_inout reports as well as
+      # drives: every second it tells the ground what it was last told, so a
+      # report lost on the way is made good by the next. On a desk tcssim
+      # answers for it over UDP at its sim_address, so that no dummy chip is
+      # needed; flown, the chip is opened.
+      - payload: probe_heater
+        lines: "4"
+        path: "/dev/gpiochip1"
+        sim_address: "127.0.0.1:5402"
+        state_interval: "1 s"
+        moc-in: [probe_thermostat]
+        world-out:
+          - gateway.probe_heater
+  - type network:
+      # The seismometer: software on the deck's science computer that sends
+      # each reading over UDP of its own accord. In the science_readings group,
+      # so what has arrived is taken when the group is read, beside the
+      # regolith's temperature. Its readings go to the gateway node, as
+      # everything for the ground does once there is one, so that the ground
+      # has one place to receive the vehicle's data from.
+      - payload: seismometer
+        address: "127.0.0.1"
+        group: "science_readings"
+        port: "5401"
+        protocol: "udp"
+        world-out:
+          - gateway.seismometer
+  - type serial:
+      # The regolith thermometer: a probe pushed into the ground beside the
+      # lander, on a serial line. Asked for its temperature with T?, it answers
+      # two bytes, signed, most significant first, in sixteenths of a degree
+      # Celsius. It is asked each time the science_readings group is read,
+      # rather than by a trigger_interval of its own: a payload has one clock
+      # or the other, never both. Its readings go to regolith_kelvin and not to
+      # the ground, which is sent the temperature instead of the bytes.
+      - payload: regolith_thermometer
+        byte_length: "8"
+        datarate: "9600"
+        group: "science_readings"
+        max_length: "2"
+        path: "/tmp/tcs-deck-regolith"
+        read_timeout: "none"
+        stop_bits: "1"
+        trigger: '"T?\r"'
+        world-out-type: "i16"
+        world-out:
+          - regolith_kelvin.regolith_thermometer
+
+commands:
+  # The temperature, in kelvin, the probe is held at, which the ground may set
+  # while the vehicle runs: SET_NODE naming probe_thermostat and setpoint. An
+  # attribute no binding names is refused.
+  - { from: gateway, sets: probe_thermostat.setpoint }
+
+tcsgui:
+  nodes:
+    - { node: probe_heater, x: 34, y: 224 }
+    - { node: probe_thermostat, x: 525, y: 224 }
+    - { node: regolith_kelvin, x: 299, y: 129 }
+    - { node: regolith_thermometer, x: 34, y: 129 }
+    - { node: seismometer, x: 34, y: 34 }

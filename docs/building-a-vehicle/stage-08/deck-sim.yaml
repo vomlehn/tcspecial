@@ -1,0 +1,99 @@
+# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial-sim.schema.json
+
+# How tcssim simulates the payloads of deck.ytcs. The two files are joined
+# by name, and nothing here names a payload that file does not have.
+
+description: Simulator settings for stage 8 of Building a Vehicle
+
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no
+# example and no other stage uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7927"
+
+# The physics of the deck: the regolith around the thermometer's probe,
+# which the probe's heater warms. The surroundings are the lunar ground's,
+# twenty degrees below freezing.
+world:
+  ambient_temp: "253.15 K"
+
+  physics:
+    components:
+      - type thermal_mass:
+          # The regolith the probe sits in, starting at its surroundings'
+          # temperature. Eight watts on would settle it twenty kelvin above
+          # them, so the heater holds the thermostat's setpoint, ten above,
+          # on about half the time.
+          - component: regolith
+            capacity: "20 J/K"
+            heater_1_power: "8 W"
+            start: "253.15 K"
+            time_constant: "50 s"
+
+          # The deck's hull, which the lunar day warms and cools: half a
+          # kelvin either side of its surroundings over a period made an hour
+          # so that a run on a desk sees it move.
+          - component: hull
+            capacity: "200 J/K"
+            period: "60 min"
+            start: "253.15 K"
+            swing: "0.5 K"
+            time_constant: "300 s"
+
+# The hull's sensors, read together as their group is in deck.ytcs. Each
+# reports the hull's temperature from a place of its own on it.
+simulated_payload_groups:
+  - group: hull_readings
+    connects: hull.temperature
+    drift: 0.05 K
+    drift_time: 30 min
+    packet_interval: 5 s
+    simulate: true
+
+simulated_payloads:
+  - type network:
+      # A reading a second. There is no ground motion in tcssim's physics,
+      # so what it sends is bytes of its own making, as for examples/minimal.
+      - payload: seismometer
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
+
+  - type serial:
+      # Asked, and answering: a triggered payload has no rate of its own here.
+      # It reports the regolith's temperature, in the encoding
+      # regolith_kelvin reads back, to a quarter of a kelvin, with a little
+      # noise on each reading.
+      - payload: regolith_thermometer
+        accuracy: 0.25 K
+        connects: regolith.temperature
+        noise: 0.02 K
+        simulate: true
+
+  - type gpio_inout:
+      # Driven: tcssim switches the regolith's heater while the vehicle
+      # has the line on.
+      - payload: probe_heater
+        connects: regolith.heater_1
+        simulate: true
+
+  - type i2c_tmass:
+      - payload: hull_temp_1
+        accuracy: 0.5 K
+        group: hull_readings
+        lag: 4 s
+        noise: 0.03 K
+
+      - payload: hull_temp_2
+        accuracy: 0.5 K
+        group: hull_readings
+        lag: 4 s
+        noise: 0.03 K
+        offset: +0.2 K
+
+      - payload: hull_temp_3
+        accuracy: 0.5 K
+        group: hull_readings
+        lag: 4 s
+        noise: 0.03 K
+        offset: -0.3 K

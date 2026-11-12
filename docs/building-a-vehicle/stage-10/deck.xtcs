@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../tcslibgs/schema/tcspecial.xsd">
+    <!-- Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst):
+         choosing the gateway. The deck of stage 9, answering to an F´
+         flight computer rather than to the ground by radio: the tcspecial
+         section's gateway and the gateway node are all that change. The
+         node is still called gateway, so the subsystems' links to it are
+         unchanged. -->
+
+    <description>A lunar lander's science deck</description>
+    <tcspecial>
+        <!-- tcspecial sends beacons from the interface the send attribute
+             names, and the MOC receives them on the address the recv
+             attribute names.
+
+             default_interval is how often a beacon goes while all is well:
+             how long the ground may wait to learn the vehicle is alive,
+             paid for with a beacon's few dozen bytes on the link each
+             time. reset_interval is how often one goes after a start,
+             until the ground has connected, so that a restart is seen
+             quickly. -->
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:5650</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:5550</send>
+        </beacon>
+        <!-- The vehicle answers to an F´ flight computer. Its links are
+             still the radio's, UDP in the radio's protocol, because the
+             far end of each is the F´ deployment's TcsBridge component,
+             which is a ground station built on tcslib-c as far as
+             tcspecial can tell. -->
+        <gateway>fprime</gateway>
+        <interface>c7820f9bfe585feab72247ece0a2261d</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <!-- Commands to a payload are sent to tcspecial at dest_base plus
+             the payload's device id, and the responses are read on the
+             network interface source_base names.
+
+             Simple payloads, such as these, do not use payload commands:
+             what a simple payload is configured with is in this file, and
+             it is not changed while tcspecial is running. At present only
+             applications use the payload_command values. -->
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <!-- tcspecial sends telemetry from the network interface
+             source_base names, plus the payload's device id, and the MOC
+             receives it on the network interface dest_base names, plus the
+             payload's device id. -->
+        <payload_telemetry>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <!-- tcspecial counts its starts in this file, which must be on
+             storage that survives a power cycle on a vehicle. Each stage
+             of the guide has a file of its own, so that one stage's starts
+             are not counted as another's. -->
+        <state_file>/tmp/tcspecial-deck-stage-10.state</state_file>
+        <!-- Commands to tcspecial are sent from the MOC's address,
+             tcs_cmd.send, to tcspecial at tcs_cmd.recv, and tcspecial
+             sends its responses back to tcs_cmd.send. -->
+        <tcs_cmd>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:4100</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- Each path is the file's from this file's directory, without its
+         extension; the file is read in this file's spelling. Nothing in a
+         path is expanded, so a path is written as it is. -->
+    <include name="science" path="../common/science-logged"/>
+    <include name="thermal" path="../common/thermal"/>
+    <gateways>
+        <type name="gateway_fprime">
+            <!-- The F´ bridge's end of the link, both ways. What comes
+                 down arrives at bridge_base plus the device id of the node
+                 that sent it, as a gateway_radio's ground_base is counted
+                 on, and the bridge gives it the F´ ID fprime_id_base plus
+                 that same id: the camera, device id 0, arrives at
+                 127.0.0.1:5100 as 0x3000, and hull_temp, device id 5, at
+                 127.0.0.1:5105 as 0x3005. What the bridge sends up arrives
+                 at address and port. -->
+            <gateway name="gateway">
+                <address>127.0.0.1</address>
+                <bridge_base>127.0.0.1:5100</bridge_base>
+                <fprime_id_base>0x3000</fprime_id_base>
+                <port>5000</port>
+                <world-in>camera</world-in>
+                <world-in>hull_kelvin_1</world-in>
+                <world-in>hull_kelvin_2</world-in>
+                <world-in>hull_kelvin_3</world-in>
+                <world-in>hull_temp</world-in>
+                <world-in>probe_heater</world-in>
+                <world-in>regolith_kelvin</world-in>
+                <world-in>seismometer</world-in>
+            </gateway>
+        </type>
+    </gateways>
+    <payloads>
+        <!-- A payload that is a program rather than a device: tcspecial
+             starts it, and it writes its readings to tcspecial over the
+             file interfaces an app node is run with (see tcsapp). It is
+             never asked, so nothing here says when it sends. -->
+        <type name="app_pl">
+            <!-- The camera. ../camera.py stands in for the camera's own
+                 software: it sends a small made-up frame every
+                 app-payload-arg seconds, so that the stage runs on a desk
+                 with no camera. The path is from the repository's root,
+                 which is where tcspecial is run from. -->
+            <payload name="camera">
+                <app-payload-arg>10</app-payload-arg>
+                <executable>docs/building-a-vehicle/camera.py</executable>
+                <world-out>gateway.camera</world-out>
+            </payload>
+        </type>
+    </payloads>
+    <tcsgui>
+        <nodes>
+            <node name="camera" x="34" y="600"/>
+            <node name="gateway" x="790" y="34"/>
+            <node name="science" x="299" y="53"/>
+            <node name="thermal" x="299" y="336"/>
+        </nodes>
+    </tcsgui>
+</configuration>

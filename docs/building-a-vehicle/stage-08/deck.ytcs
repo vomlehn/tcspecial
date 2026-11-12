@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial.schema.json
+
+# Stage 8 of "Building a Vehicle" (docs/building-a-vehicle.rst): a log aboard.
+# The science subsystem keeps what it measures in a log node, for when the link
+# is down: this file includes ../common/science-logged where stage 7 included
+# ../common/science, and nothing else here changes but the state file.
+
+description: "A lunar lander's science deck"
+
+tcspecial:
+  # tcspecial sends beacons from the interface the send attribute names, and
+  # the MOC receives them on the address the recv attribute names.
+  #
+  # default_interval is how often a beacon goes while all is well: how long the
+  # ground may wait to learn the vehicle is alive, paid for with a beacon's few
+  # dozen bytes on the link each time. reset_interval is how often one goes
+  # after a start, until the ground has connected, so that a restart is seen
+  # quickly.
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
+    send: "0.0.0.0:5550"
+  gateway: "radio"
+  interface: "c7820f9bfe585feab72247ece0a2261d"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  # Commands to a payload are sent to tcspecial at dest_base plus the payload's
+  # device id, and the responses are read on the network interface source_base
+  # names.
+  #
+  # Simple payloads, such as these, do not use payload commands: what a simple
+  # payload is configured with is in this file, and it is not changed while
+  # tcspecial is running. At present only applications use the payload_command
+  # values.
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  # tcspecial sends telemetry from the network interface source_base names,
+  # plus the payload's device id, and the MOC receives it on the network
+  # interface dest_base names, plus the payload's device id.
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  # tcspecial counts its starts in this file, which must be on storage that
+  # survives a power cycle on a vehicle. Each stage of the guide has a file of
+  # its own, so that one stage's starts are not counted as another's.
+  state_file: "/tmp/tcspecial-deck-stage-08.state"
+  # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
+  # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
+  # tcs_cmd.send.
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+# Each path is the file's from this file's directory, without its extension;
+# the file is read in this file's spelling. Nothing in a path is expanded, so a
+# path is written as it is.
+include:
+  - subdiagram: science
+    path: ../common/science-logged
+  - subdiagram: thermal
+    path: ../common/thermal
+
+gateways:
+  - type gateway_radio:
+      # The ground's end of the vehicle's data. tcspecial sends what each node
+      # drawn into it produces to ground_base's address, at its port plus that
+      # node's device id, so each source arrives on a port of its own:
+      # hull_temp, id 4, on 127.0.0.1:5104, and the seismometer, id 13, on
+      # 5113. What the ground sends up arrives at address and port, which the
+      # ground's setpoint command needs.
+      - gateway: gateway
+        address: "127.0.0.1"
+        ground_base: "127.0.0.1:5100"
+        port: "5000"
+        world-in:
+          - hull_kelvin_1
+          - hull_kelvin_2
+          - hull_kelvin_3
+          - hull_temp
+          - probe_heater
+          - regolith_kelvin
+          - seismometer
+
+tcsgui:
+  nodes:
+    - { node: gateway, x: 790, y: 34 }
+    - { node: science, x: 299, y: 53 }
+    - { node: thermal, x: 299, y: 336 }

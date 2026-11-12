@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../tcslibgs/schema/tcspecial.xsd">
+    <!-- The deck's thermal subsystem, which the stages of "Building a
+         Vehicle" from stage 7 on include: the hull's three temperature
+         sensors, their conversions and the vote between them. Everything
+         here is as stage 6 had it; only where it is written has changed.
+         The links to the ground are written to gateway, the name the
+         including file gives its gateway node. -->
+
+    <!-- What a line from another file may reach: every node here whose
+         data leaves for the gateway node in the including file. -->
+    <exports>
+        <world-out>hull_kelvin_1</world-out>
+        <world-out>hull_kelvin_2</world-out>
+        <world-out>hull_kelvin_3</world-out>
+        <world-out>hull_temp</world-out>
+    </exports>
+    <!-- Payloads read together, once each interval. A group is a clock
+         shared by its members, so that readings to be compared are taken
+         as close together as the hardware allows rather than each on a
+         clock of its own. -->
+    <!-- The hull's three sensors, read together so that the vote compares
+         readings of one moment. Every five seconds, because a hull's
+         temperature changes over minutes and a reading more often would be
+         bytes on the link that say nothing new. -->
+    <payload_groups>
+        <name>hull_readings</name>
+        <interval>5 s</interval>
+    </payload_groups>
+    <vehicle>
+        <type name="compute">
+            <!-- Each hull sensor's reading made a temperature in kelvin,
+                 for the vote and for the ground. One conversion each, so
+                 that the ground sees each sensor and can tell which one
+                 the vote left out. -->
+            <compute name="hull_kelvin_1">
+                <function>to_kelvin</function>
+                <offset>273.15</offset>
+                <scale>0.0625</scale>
+                <type-in>i16</type-in>
+                <world-out>gateway.hull_kelvin_1</world-out>
+                <world-out>hull_temp.in0</world-out>
+                <world-in>hull_temp_1</world-in>
+            </compute>
+            <compute name="hull_kelvin_2">
+                <function>to_kelvin</function>
+                <offset>273.15</offset>
+                <scale>0.0625</scale>
+                <type-in>i16</type-in>
+                <world-out>gateway.hull_kelvin_2</world-out>
+                <world-out>hull_temp.in1</world-out>
+                <world-in>hull_temp_2</world-in>
+            </compute>
+            <compute name="hull_kelvin_3">
+                <function>to_kelvin</function>
+                <offset>273.15</offset>
+                <scale>0.0625</scale>
+                <type-in>i16</type-in>
+                <world-out>gateway.hull_kelvin_3</world-out>
+                <world-out>hull_temp.in2</world-out>
+                <world-in>hull_temp_3</world-in>
+            </compute>
+            <!-- One temperature out of the three, the middle one: median.
+                 A mean would carry a bad sensor's error into the answer,
+                 and waiting for all three would make one dead sensor no
+                 answer at all. The vote keeps the last reading from each
+                 input and answers on every arrival once two of the three
+                 have reported, so a sensor that stops is outvoted by the
+                 two that go on. -->
+            <compute name="hull_temp">
+                <algorithm>median</algorithm>
+                <carries>kelvin</carries>
+                <function>vote</function>
+                <world-out>gateway.hull_temp</world-out>
+                <world-in>in0</world-in>
+                <world-in>in1</world-in>
+                <world-in>in2</world-in>
+            </compute>
+        </type>
+    </vehicle>
+    <payloads>
+        <!-- Three temperature sensors on the hull, I2C parts on one bus.
+             Three, so that one gone wrong is outvoted by the other two. -->
+        <type name="i2c_tmass">
+            <!-- One of three sensors of the same place, the deck's hull,
+                 so that its temperature survives one of them going wrong.
+                 Two bytes, signed, most significant first, in sixteenths
+                 of a degree Celsius. On a desk it is reached over UDP at
+                 its sim_address, where tcssim answers with the hull's
+                 temperature, so that no bus and no dummy device is needed;
+                 flown, the bus is opened. -->
+            <payload name="hull_temp_1">
+                <address>0x48</address>
+                <group>hull_readings</group>
+                <path>/dev/i2c-1</path>
+                <read_size>2</read_size>
+                <sim_address>127.0.0.1:5403</sim_address>
+                <world-out-type>i16</world-out-type>
+                <world-out>hull_kelvin_1.hull_temp_1</world-out>
+            </payload>
+            <!-- The second of the three: the same part as hull_temp_1, at
+                 the next address on the bus. -->
+            <payload name="hull_temp_2">
+                <address>0x49</address>
+                <group>hull_readings</group>
+                <path>/dev/i2c-1</path>
+                <read_size>2</read_size>
+                <sim_address>127.0.0.1:5404</sim_address>
+                <world-out-type>i16</world-out-type>
+                <world-out>hull_kelvin_2.hull_temp_2</world-out>
+            </payload>
+            <!-- The third, at the next address again. -->
+            <payload name="hull_temp_3">
+                <address>0x4a</address>
+                <group>hull_readings</group>
+                <path>/dev/i2c-1</path>
+                <read_size>2</read_size>
+                <sim_address>127.0.0.1:5405</sim_address>
+                <world-out-type>i16</world-out-type>
+                <world-out>hull_kelvin_3.hull_temp_3</world-out>
+            </payload>
+        </type>
+    </payloads>
+    <tcsgui>
+        <nodes>
+            <node name="hull_kelvin_1" x="299" y="336"/>
+            <node name="hull_kelvin_2" x="299" y="412"/>
+            <node name="hull_kelvin_3" x="299" y="488"/>
+            <node name="hull_temp" x="525" y="412"/>
+            <node name="hull_temp_1" x="34" y="336"/>
+            <node name="hull_temp_2" x="34" y="412"/>
+            <node name="hull_temp_3" x="34" y="488"/>
+        </nodes>
+    </tcsgui>
+</configuration>

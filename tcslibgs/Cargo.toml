@@ -19,7 +19,7 @@ md5 = "0.8"
 # from xtce/link.xtce. The version is the one the tcs-xtce checkout beside
 # this tree, whose generator wrote that code, must be at, as the code calls
 # this runtime: see the tcs-xtce target in Makefile.
-tcs-xtce = "=0.5.0"
+tcs-xtce = "=0.6.0"
 # Writes and reads the count before a string or bytes sent the ground where
 # no XTCE decodes it: unsigned LEB128. See link_type::Count.
 leb128 = "0.2"

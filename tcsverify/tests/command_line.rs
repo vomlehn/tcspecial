@@ -589,6 +589,40 @@ fn with_payloads_at(dir: &Path, ports: &[(&str, u16)]) -> PathBuf {
     path
 }
 
+/// A gateway node's ground port counted past 65535 -- its ground_base at
+/// the last port, and a second source counted on from it -- is a
+/// configuration complete and unflyable: an error, which fails the run, and
+/// not the warning a node half filled in is. Without `Problem::Clash` it
+/// was such a warning, and this run passed.
+#[test]
+fn a_gateway_port_past_the_last_fails_the_run() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let file = with_payloads_at(dir.path(), &[("one", 7001), ("two", 7002)]);
+    let mut text = std::fs::read_to_string(&file).expect("read");
+    for name in ["one", "two"] {
+        let port = if name == "one" { 7001 } else { 7002 };
+        let at = format!("        port: \"{port}\"\n");
+        text = text.replace(
+            &at,
+            &format!("{at}        world-out:\n          - ground.{name}\n"),
+        );
+    }
+    text.push_str(
+        "gateways:\n  - type gateway_radio:\n      - gateway: ground\n        \
+         ground_base: \"127.0.0.1:65535\"\n        \
+         world-in: [one, two]\n",
+    );
+    std::fs::write(&file, &text).expect("written");
+    let (lines, status) = run(&[file.to_str().expect("path")]);
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains(": error: ") && l.contains("65535")),
+        "{lines:?}"
+    );
+    assert_eq!(status, 1, "{lines:?}");
+}
+
 /// `--summary` lists, after checking, the thermostat's gateway node's far
 /// end at its `ground_base` plus each source's device id, by source; and
 /// the rates each link carries, with the beacon's and the total.

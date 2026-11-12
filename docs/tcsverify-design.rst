@@ -30,8 +30,9 @@ Requirement
 Requirement
     A problem is an **error** where the configuration says something wrong --
     two nodes of one name, a link to a node that is not there, a link carrying
-    one stream into the other, a node of a type that does not exist -- and a
-    **warning** where it has not finished
+    one stream into the other, a node of a type that does not exist, two
+    links on one port, message ID, APID or F´ ID, or one counted past its
+    range -- and a **warning** where it has not finished
     saying it: a node whose attributes are not all in yet, a node nothing is
     linked to. One statement of which is which,
     ``tcslibgs::graph::check::Problem::severity``, so that the verifier, the

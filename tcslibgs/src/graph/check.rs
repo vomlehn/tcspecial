@@ -218,6 +218,18 @@ pub enum Problem {
     /// entered belongs here, where the complaint can name the file, the line
     /// and the attribute.
     BadNode { node: String, why: String },
+    /// A port, message ID, APID or F´ ID that two of the configuration's
+    /// links share, or that counting from its base takes past where such a
+    /// thing can go.
+    ///
+    /// Not a node half filled in, as [`Problem::BadNode`] may be, but a
+    /// configuration whose every field is answered and which cannot be flown
+    /// as it stands: two sources on one port of the ground arrive
+    /// interleaved, and a port past 65535 is a socket that cannot be. So it
+    /// is an error, which fails tcsverify, rather than the warning an
+    /// unfinished node is. `node` is the one the clash is reported on, and
+    /// `why` names what it shares and with whom.
+    Clash { node: String, why: String },
     /// Two nodes that want the same device, address, bus place, line or
     /// socket.
     ///
@@ -377,6 +389,7 @@ impl Problem {
                 About::Section("tcspecial")
             }
             Problem::BadNode { node, .. } => About::Node(node.clone()),
+            Problem::Clash { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
             Problem::VoteInputs { node, .. } => About::Node(node.clone()),
@@ -577,6 +590,7 @@ impl Problem {
             // The reason already names the node: see reach_of, whose
             // complaints are written to be read on their own.
             Problem::BadNode { why, .. } => why.clone(),
+            Problem::Clash { why, .. } => why.clone(),
             Problem::TwoNodesWantOneThing { message, .. } => message.clone(),
             Problem::NoTcspecial => "this configuration has no tcspecial \
                  section, so nothing says where commands are taken, where \
@@ -1413,7 +1427,7 @@ impl Graph {
         // say it.
         if let Err(refused) = crate::graph::telemetry::of(self) {
             match refused.node {
-                Some(node) => problems.push(Problem::BadNode {
+                Some(node) => problems.push(Problem::Clash {
                     node,
                     why: refused.why,
                 }),
@@ -1431,7 +1445,7 @@ impl Graph {
         if self.tcspecial_reads() {
             if let Err(refused) = crate::graph::telemetry::msgids(self) {
                 match refused.node {
-                    Some(node) => problems.push(Problem::BadNode {
+                    Some(node) => problems.push(Problem::Clash {
                         node,
                         why: refused.why,
                     }),
@@ -1451,7 +1465,7 @@ impl Graph {
             // reads, as the message IDs are.
             if let Err(refused) = crate::graph::telemetry::apids(self) {
                 match refused.node {
-                    Some(node) => problems.push(Problem::BadNode {
+                    Some(node) => problems.push(Problem::Clash {
                         node,
                         why: refused.why,
                     }),
@@ -1468,7 +1482,7 @@ impl Graph {
         // ground and a model that could not be made is a bridge that could
         // not be built. See `crate::graph::fprime`.
         if let Err(refused) = crate::graph::fprime::every(self) {
-            problems.push(Problem::BadNode {
+            problems.push(Problem::Clash {
                 node: refused.node,
                 why: refused.why,
             });
@@ -2608,9 +2622,9 @@ mod tests {
             vec![node("a", "i2c"), ground],
             vec![link("a", &["ground"])],
         );
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("ground"),
+            "ground",
             &["beacon.apid", "apid_base of \"ground\"", "0x100", "change"]
         ));
 
@@ -2625,9 +2639,9 @@ mod tests {
             vec![ground, node("s", "i2c")],
             vec![link("s", &["ground"])],
         );
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("ground"),
+            "ground",
             &["beacon.apid", "sends to \"ground\"", "0x100"]
         ));
 
@@ -2641,9 +2655,9 @@ mod tests {
             vec![node("a", "i2c"), node("ground", "gateway_yamcs"), second],
             vec![link("a", &["ground", "other"])],
         );
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("other"),
+            "other",
             &["apid_base of \"ground\"", "apid_base of \"other\"", "0x200"]
         ));
         let mut second = node("other", "gateway_yamcs");
@@ -2659,9 +2673,9 @@ mod tests {
             vec![node("ground", "gateway_yamcs"), node("s", "i2c"), second],
             vec![link("s", &["ground"])],
         );
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("ground"),
+            "ground",
             &["apid_base of \"other\"", "sends to \"ground\"", "0x202"]
         ));
 
@@ -2674,7 +2688,7 @@ mod tests {
             vec![ground, node("s", "i2c")],
             vec![link("s", &["ground"])],
         );
-        assert!(says(&g, Some("ground"), &["apid_base", "0x7ff", "lower"]));
+        assert!(clashes(&g, "ground", &["apid_base", "0x7ff", "lower"]));
 
         // A gateway's own apid_base and its device id 0's downlink share
         // one, told apart by the packet type.
@@ -2737,25 +2751,25 @@ mod tests {
 
         // Under the beacon's.
         let g = with_section(yamcs(), "payload_telemetry.apid_base", "0xFF");
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("b"),
+            "b",
             &["beacon.apid", "\"b\"'s telemetry", "0x100", "change"]
         ));
 
         // Under a gateway node's apid_base.
         let g = with_section(yamcs(), "payload_telemetry.apid_base", "0x1FF");
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("b"),
+            "b",
             &["apid_base of \"ground\"", "\"b\"'s telemetry", "0x200"]
         ));
 
         // Past eleven bits.
         let g = with_section(yamcs(), "payload_telemetry.apid_base", "0x7FF");
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("b"),
+            "b",
             &["payload_telemetry.apid_base", "0x7ff", "lower"]
         ));
 
@@ -2812,6 +2826,28 @@ mod tests {
         let mut g = graph(nodes, links);
         g.tcspecial = Some(crate::graph::parameters::nest(&said));
         g
+    }
+
+    /// Tells whether checking a graph finds a clash -- a port, message ID,
+    /// APID or F´ ID shared or out of range -- on a node, saying everything
+    /// wanted.
+    ///
+    /// # Arguments
+    ///
+    /// * `g`         - The graph.
+    /// * `node_name` - The node the clash is reported on.
+    /// * `wanted`    - Words the clash's message must all contain.
+    ///
+    /// # Returns
+    ///
+    /// Whether there is such a clash.
+    fn clashes(g: &Graph, node_name: &str, wanted: &[&str]) -> bool {
+        g.check().iter().any(|p| match p {
+            Problem::Clash { node, why } => {
+                node == node_name && wanted.iter().all(|w| why.contains(w))
+            }
+            _ => false,
+        })
     }
 
     /// Whether a check says something about `node_name` containing every
@@ -2916,27 +2952,27 @@ mod tests {
         };
         // Outside the range.
         let g = with_fsw("0x4381", "0x4240");
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("fsw"),
+            "fsw",
             &["cmd_msgid of \"fsw\"", "0x4381", "msgid_range"]
         ));
         // Telemetry's where a command's is wanted.
         let g = with_fsw("0x4241", "0x4240");
-        assert!(says(&g, Some("fsw"), &["0x4241", "reads as telemetry"]));
+        assert!(clashes(&g, "fsw", &["0x4241", "reads as telemetry"]));
         // A command's where telemetry's is.
         let g = with_fsw("0x4281", "0x42C0");
-        assert!(says(&g, Some("a"), &["0x42c0", "reads as a command"]));
+        assert!(clashes(&g, "a", &["0x42c0", "reads as a command"]));
         // Two uses of one: the spacecraft's command ID.
         let g = with_fsw("0x4280", "0x4240");
-        assert!(says(
+        assert!(clashes(
             &g,
-            Some("fsw"),
+            "fsw",
             &["tcs_cmd.cmd_msgid", "both message ID 0x4280"]
         ));
         // A source landing on the beacon's.
         let g = with_fsw("0x4281", "0x4201");
-        assert!(says(&g, Some("a"), &["beacon.tlm_msgid", "0x4201"]));
+        assert!(clashes(&g, "a", &["beacon.tlm_msgid", "0x4201"]));
     }
 
     /// A source whose largest datum would not fit in a cFS packet of
@@ -2990,7 +3026,7 @@ mod tests {
             assert!(
                 problems.iter().any(|p| matches!(
                     p,
-                    Problem::BadNode { node, why }
+                    Problem::Clash { node, why }
                         if node == node_name && why.contains(wanted)
                 )),
                 "{node_name} should be told about {wanted}: {problems:?}"

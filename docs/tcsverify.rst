@@ -66,7 +66,8 @@ the file, the line and what is wrong there:
 Each line says which kind it is. An **error** is a configuration that says
 something wrong -- two nodes of one name, a link to a node that is not there,
 a node whose type does not exist (the message lists the types each section
-takes). A **warning** is about one node's own attributes, or a node nothing
+takes), two things on one port, message ID or APID, or a port counted past
+65535. A **warning** is about one node's own attributes, or a node nothing
 is linked to: an attribute not in yet, and one that is there and wrong, as
 both warnings above are. The first is the state every configuration is in
 while it is being drawn, and a reader of either has the same thing to do --
@@ -283,11 +284,12 @@ other problems, above it, by the checks every run makes:
   port.
 * Two sources on one port of the ground, and a port counted past 65535
   from a base, were checked already, as were a message ID used twice,
-  outside ``msgid_range`` or of the wrong type for its use, and an APID
-  used twice or past ``0x7FF``. Each is said about the node it is in, as a
-  **warning** -- the kind every problem with a node's own attributes is --
-  so it does not fail the run; the vehicle refuses it all the same. Said
-  about the ``tcspecial`` section, it is an error.
+  outside ``msgid_range`` or of the wrong type for its use, an APID used
+  twice or past ``0x7FF``, and an F´ ID shared or past 32 bits. Each is
+  an **error**, which fails the run, whether it is said about a node or
+  about the ``tcspecial`` section: a clash is not a node half filled in
+  but a configuration whose every field is answered and which cannot be
+  flown as it stands.
 
 A configuration that does not read has no summary: the run says so on
 stderr, after the problems that say why, and exits 1, as a digest that

@@ -94,7 +94,8 @@ impl Platform for Headless {
 /// # Panics
 ///
 /// If the window was not made by [`Headless`].
-fn drawn(window: &slint::Window, (width, height): (u32, u32)) -> Vec<u8> {
+fn drawn(window: &slint::Window, size: (u32, u32)) -> Vec<u8> {
+    let (width, height) = size;
     let adapter = MADE.with(|made| {
         made.borrow()
             .iter()
@@ -322,7 +323,8 @@ impl Session {
     /// # Returns
     ///
     /// The point in the window.
-    fn on_sheet(&self, (x, y): (f32, f32)) -> LogicalPosition {
+    fn on_sheet(&self, at: (f32, f32)) -> LogicalPosition {
+        let (x, y) = at;
         let canvas =
             i_slint_backend_testing::ElementHandle::find_by_element_id(
                 &self.ui,

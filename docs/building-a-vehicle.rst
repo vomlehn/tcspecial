@@ -205,15 +205,11 @@ parts named.
 From the desk to flight
 =======================
 What changes between the configuration that has run on a desk and the one
-that flies, as one checklist, each item linking to where it is said in
-full. (To be written as a page of the tcspecial manual and linked from
-here.)
-
-* ``--simulate=none``, and what tcspecial then refuses.
-* ``sim_address`` left out.
-* No ``visual`` build.
-* The golden configuration, and configurations named by checksum.
-* Which packages go on the vehicle and which on the ground.
+that flies is a checklist of its own, `From the desk to flight
+<desk-to-flight.html>`__, each item linking to where it is said in full: the
+flight setting, the real addresses, storage that survives a power cycle, the
+build, the packages, the supervisor, the configurations kept aboard, and the
+ground's agreeing to the configuration.
 
 Where to go next
 ================

@@ -142,6 +142,10 @@ The other documents beside these:
     payloads, computations, files and gateway of a lander's science deck.
     An outline for now.
 
+`From the desk to flight <desk-to-flight.html>`__
+    What changes between a configuration that has run on a desk and one
+    that flies, as a checklist.
+
 `Writing node types <node-types.html>`__
     How to add a node type to TCSpecial.
 

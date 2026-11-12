@@ -17,7 +17,7 @@ DESIGNS = design.html tcsgui-design.html tcsmoc-design.html \
 
 .PHONY: all
 all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
-	node-types.html building-a-vehicle.html
+	node-types.html building-a-vehicle.html desk-to-flight.html
 
 # The message-flow figures of "In-flight data across a restart" and "The
 # restart and the beacon, in time", drawn by
@@ -69,7 +69,11 @@ node-types.html: node-types.rst
 building-a-vehicle.html: building-a-vehicle.rst
 	rst2html building-a-vehicle.rst building-a-vehicle.html
 
+# What changes between a configuration run on a desk and one that flies.
+desk-to-flight.html: desk-to-flight.rst
+	rst2html desk-to-flight.rst desk-to-flight.html
+
 .PHONY: clean
 clean:
 	rm -f tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
-		node-types.html building-a-vehicle.html
+		node-types.html building-a-vehicle.html desk-to-flight.html

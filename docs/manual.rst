@@ -137,6 +137,11 @@ The other documents beside these:
     How TCSpecial's flight software, libraries and ground programs are
     built, and why.
 
+`Building a vehicle <building-a-vehicle.html>`__
+    From the shipped examples to a whole vehicle, a stage at a time: the
+    payloads, computations, files and gateway of a lander's science deck.
+    An outline for now.
+
 `Writing node types <node-types.html>`__
     How to add a node type to TCSpecial.
 

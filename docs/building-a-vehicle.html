@@ -1,0 +1,657 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
+<title>Building a Vehicle: From the Examples to a Whole One</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 9511 2024-01-13 09:50:07Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+Despite the name, some widely supported CSS2 features are used.
+
+See https://docutils.sourceforge.io/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: gray; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic, pre.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="building-a-vehicle-from-the-examples-to-a-whole-one">
+<h1 class="title">Building a Vehicle: From the Examples to a Whole One</h1>
+
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Outline, for review. Each section says what it will teach, what the
+reader adds to the configuration, how they check it, and which figures
+it will have. Nothing below is written out yet, and the stage
+directories, figures and screenshots it names do not exist yet.</p>
+</div>
+<div class="contents local topic" id="table-of-contents">
+<p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
+<ul class="simple">
+<li><a class="reference internal" href="#what-this-guide-is-for" id="toc-entry-1">What this guide is for</a></li>
+<li><a class="reference internal" href="#the-vehicle" id="toc-entry-2">The vehicle</a></li>
+<li><a class="reference internal" href="#stage-1-one-payload-to-the-ground" id="toc-entry-3">Stage 1: one payload to the ground</a></li>
+<li><a class="reference internal" href="#stage-2-a-second-payload" id="toc-entry-4">Stage 2: a second payload</a></li>
+<li><a class="reference internal" href="#stage-3-a-computation-between-payload-and-ground" id="toc-entry-5">Stage 3: a computation between payload and ground</a></li>
+<li><a class="reference internal" href="#stage-4-commands-down-to-a-payload" id="toc-entry-6">Stage 4: commands down to a payload</a></li>
+<li><a class="reference internal" href="#stage-5-rates-and-groups" id="toc-entry-7">Stage 5: rates and groups</a></li>
+<li><a class="reference internal" href="#stage-6-redundant-sensors-and-a-vote" id="toc-entry-8">Stage 6: redundant sensors and a vote</a></li>
+<li><a class="reference internal" href="#stage-7-splitting-the-vehicle-into-files" id="toc-entry-9">Stage 7: splitting the vehicle into files</a></li>
+<li><a class="reference internal" href="#stage-8-keeping-a-log-aboard" id="toc-entry-10">Stage 8: keeping a log aboard</a></li>
+<li><a class="reference internal" href="#stage-9-a-payload-with-code-of-its-own" id="toc-entry-11">Stage 9: a payload with code of its own</a></li>
+<li><a class="reference internal" href="#stage-10-choosing-the-gateway" id="toc-entry-12">Stage 10: choosing the gateway</a></li>
+<li><a class="reference internal" href="#checking-the-whole-vehicle" id="toc-entry-13">Checking the whole vehicle</a></li>
+<li><a class="reference internal" href="#from-the-desk-to-flight" id="toc-entry-14">From the desk to flight</a></li>
+<li><a class="reference internal" href="#where-to-go-next" id="toc-entry-15">Where to go next</a></li>
+<li><a class="reference internal" href="#how-this-guide-is-made" id="toc-entry-16">How this guide is made</a></li>
+</ul>
+</div>
+<div class="section" id="what-this-guide-is-for">
+<h1><a class="toc-backref" href="#toc-entry-1">What this guide is for</a></h1>
+<p>The shipped examples each show one idea: one payload, one computation, one
+gateway. A mission's vehicle has all of them at once, and the ways they
+combine -- shared names, ports and IDs, files that include others, rates
+that add up on one link -- are what no single example shows.</p>
+<p>This guide builds one vehicle, a small lunar lander's science deck, a stage
+at a time, from the minimal example to a configuration a mission could start
+from. Each stage adds one thing, says why it is added the way it is, and
+ends with a configuration that <tt class="docutils literal">tcsverify</tt> passes and that runs on a desk
+with <tt class="docutils literal"><span class="pre">--simulate=all</span></tt>.</p>
+<p>It is a companion to the manuals, not a replacement: each stage links to
+the manual section that says everything about what it adds.</p>
+<ul class="simple">
+<li><strong>Who it is for:</strong> someone who has run an example and now has a vehicle
+of their own to describe.</li>
+<li><strong>What it assumes:</strong> the programs are built or installed (the tcspecial
+manual's &quot;Installing&quot;), and the reader has run the minimal example once.</li>
+</ul>
+<p><strong>Figure 1 -- The finished vehicle.</strong> tcsgui's drawing of the stage-10
+configuration, every node and link, with the subsystem files as boxes. The
+picture the guide works towards, shown first so that each stage can be
+placed in it.</p>
+</div>
+<div class="section" id="the-vehicle">
+<h1><a class="toc-backref" href="#toc-entry-2">The vehicle</a></h1>
+<p>A lander's science deck, chosen so that each stage needs a different part of
+TCSpecial, and so that every payload has a simulated device tcssim already
+provides:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="24%" />
+<col width="35%" />
+<col width="41%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Payload</th>
+<th class="head">Interface</th>
+<th class="head">Stage it arrives in</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>Seismometer</td>
+<td>network (UDP)</td>
+<td>1</td>
+</tr>
+<tr><td>Soil thermometer</td>
+<td>serial</td>
+<td>2</td>
+</tr>
+<tr><td>Heater</td>
+<td>GPIO</td>
+<td>4</td>
+</tr>
+<tr><td>Three hull sensors</td>
+<td>I<sup>2</sup>C on a mass</td>
+<td>6</td>
+</tr>
+<tr><td>Camera</td>
+<td>app node (existing code)</td>
+<td>9</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Figure 2 -- The deck.</strong> A drawing of the deck: each payload where it sits,
+labelled with its name and interface, so the reader knows what the nodes
+stand for before meeting them. Drawn by hand in SVG; any colour is the
+Okabe-Ito palette's and is paired with a label, never alone.</p>
+<p>Each stage's configuration is in <tt class="docutils literal"><span class="pre">examples/vehicle/stage-N/</span></tt>, in both
+spellings, with its simulator file, so that a reader can start at any stage,
+or compare two with <tt class="docutils literal">diff</tt>.</p>
+</div>
+<div class="section" id="stage-1-one-payload-to-the-ground">
+<h1><a class="toc-backref" href="#toc-entry-3">Stage 1: one payload to the ground</a></h1>
+<p><em>Starts from:</em> <tt class="docutils literal">examples/minimal</tt>.</p>
+<ul class="simple">
+<li>The anatomy of a configuration: the <tt class="docutils literal">tcspecial</tt> section (where commands
+arrive, where beacons go, the log), one gateway, one payload, and the
+line between them.</li>
+<li>Names: every node has one, and lines are written as <tt class="docutils literal">node.name</tt>.</li>
+<li>Running it: <tt class="docutils literal">tcsverify</tt>, then tcsmoc with <tt class="docutils literal"><span class="pre">--simulate=all</span></tt>, which
+starts tcspecial and tcssim.</li>
+<li>What the ground sees: the beacon, the seismometer's panel.</li>
+</ul>
+<p><em>Figures:</em> tcsgui's drawing of the stage; tcsmoc's window with the beacon
+and the seismometer's panel, the parts the text names marked with numbered
+callouts.</p>
+</div>
+<div class="section" id="stage-2-a-second-payload">
+<h1><a class="toc-backref" href="#toc-entry-4">Stage 2: a second payload</a></h1>
+<ul class="simple">
+<li>Adding the soil thermometer, on a serial line: a payload type with
+attributes of its own (the tcspecial manual's &quot;A Serial Payload&quot;).</li>
+<li>What changes elsewhere: the simulator file gains its device; the ground
+receives it on a port of its own.</li>
+<li>Where ports and IDs come from: a node's device id is its place among the
+nodes sorted by name, and the ground port is the gateway's base plus that
+id. Adding a node can move another's port -- why, and how to tell.</li>
+</ul>
+<p><em>Figures:</em> the stage's drawing; <strong>Figure -- where each payload arrives</strong>: a
+table-like figure of nodes, device ids and ground ports, before and after
+the new node, the changed rows marked with a symbol as well as a colour.</p>
+<p><em>Common mistake shown:</em> two payloads given one name, and <tt class="docutils literal">tcsverify</tt>'s
+message for it.</p>
+</div>
+<div class="section" id="stage-3-a-computation-between-payload-and-ground">
+<h1><a class="toc-backref" href="#toc-entry-5">Stage 3: a computation between payload and ground</a></h1>
+<ul class="simple">
+<li>A <tt class="docutils literal">to_kelvin</tt> computation on the thermometer's reading: a vehicle node
+between a payload and the gateway.</li>
+<li>The four terminals, <tt class="docutils literal"><span class="pre">world-in</span></tt>, <tt class="docutils literal"><span class="pre">world-out</span></tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>, <tt class="docutils literal"><span class="pre">moc-out</span></tt>,
+by the corner they sit at, and why a reading runs world-in to world-out.</li>
+<li>Typed links: the computation states what it takes and makes, and the
+configuration is refused when a line joins two that do not agree.</li>
+</ul>
+<p><em>Figures:</em> the stage's drawing; <strong>Figure -- the four terminals</strong>, one node
+large, each corner labelled with its terminal's name and what flows there.</p>
+</div>
+<div class="section" id="stage-4-commands-down-to-a-payload">
+<h1><a class="toc-backref" href="#toc-entry-6">Stage 4: commands down to a payload</a></h1>
+<ul class="simple">
+<li>The heater, on a GPIO line, commanded from the ground through <tt class="docutils literal"><span class="pre">moc-out</span></tt>
+and <tt class="docutils literal"><span class="pre">moc-in</span></tt>.</li>
+<li>A <tt class="docutils literal">thermostat</tt> computation that switches the heater from the
+thermometer's temperature, and the ground's command that overrides it.</li>
+<li>Sending a command from tcsmoc, and reading its answer.</li>
+</ul>
+<p><em>Figures:</em> the stage's drawing; tcsmoc sending the heater a command, with
+the command and its answer marked.</p>
+</div>
+<div class="section" id="stage-5-rates-and-groups">
+<h1><a class="toc-backref" href="#toc-entry-7">Stage 5: rates and groups</a></h1>
+<ul class="simple">
+<li>How often each payload is read, and why some are read together: the
+groups section.</li>
+<li>What the beacon interval is for, and what it costs.</li>
+<li>Adding up what crosses the link: each payload's rate times its size, the
+beacon's, and the margin the link needs. Worked by hand here; the
+summary <tt class="docutils literal">tcsverify</tt> is to print (see &quot;Checking the whole vehicle&quot;) does
+it for you.</li>
+</ul>
+<p><em>Figures:</em> <strong>Figure -- a second of the link</strong>: a timeline of what is sent in
+one second, each payload's packets as labelled blocks with a fill pattern
+of their own.</p>
+</div>
+<div class="section" id="stage-6-redundant-sensors-and-a-vote">
+<h1><a class="toc-backref" href="#toc-entry-8">Stage 6: redundant sensors and a vote</a></h1>
+<ul class="simple">
+<li>Three hull temperature sensors on one thermal mass, and a <tt class="docutils literal">vote</tt>
+computation that takes them in and sends one value on.</li>
+<li>Why a vote, rather than one sensor: what the vote does when one sensor
+disagrees or stops.</li>
+<li>Watching it in tcsmoc while tcssim fails a sensor.</li>
+</ul>
+<p><em>Figures:</em> the stage's drawing; tcsmoc's panels as one sensor is failed in
+tcssim, before and after, the failed sensor marked.</p>
+</div>
+<div class="section" id="stage-7-splitting-the-vehicle-into-files">
+<h1><a class="toc-backref" href="#toc-entry-9">Stage 7: splitting the vehicle into files</a></h1>
+<ul class="simple">
+<li>The configuration has grown past one screen. Each subsystem -- thermal,
+science -- moves into a file of its own, included by the top file.</li>
+<li>Includes and subdiagrams: names, relative paths, and why nothing in a path
+is expanded.</li>
+<li>Exports: which of a file's nodes a line from another file may reach, and
+the message when a line crosses where nothing is exported.</li>
+<li>Two vehicles sharing a subsystem file, as the thermostat examples do.</li>
+</ul>
+<p><em>Figures:</em> <strong>Figure -- the files</strong>: the top file and the files it includes,
+as boxes with their exports at the corners; tcsgui's drawing of the same,
+with the subsystems collapsed to boxes.</p>
+</div>
+<div class="section" id="stage-8-keeping-a-log-aboard">
+<h1><a class="toc-backref" href="#toc-entry-10">Stage 8: keeping a log aboard</a></h1>
+<ul class="simple">
+<li>A <tt class="docutils literal">log</tt> node: what is kept aboard for when the link is down, and how the
+ground asks for it later.</li>
+<li>The segment files, their sizes, and what fills the storage.</li>
+</ul>
+<p><em>Figures:</em> the stage's drawing; <strong>Figure -- the log through a pass</strong>: what
+is logged while the ground is out of sight and sent when it returns, on a
+timeline.</p>
+</div>
+<div class="section" id="stage-9-a-payload-with-code-of-its-own">
+<h1><a class="toc-backref" href="#toc-entry-11">Stage 9: a payload with code of its own</a></h1>
+<ul class="simple">
+<li>The camera, whose software exists already: an <tt class="docutils literal">app</tt> node runs it as a
+program over file interfaces, rather than being written as a node type.</li>
+<li>When to use an app node, and when a node type is the better choice
+(pointing to &quot;Writing node types&quot;).</li>
+</ul>
+<p><em>Figures:</em> the stage's drawing; <strong>Figure -- an app node</strong>: the program, its
+file interfaces and the node, labelled.</p>
+</div>
+<div class="section" id="stage-10-choosing-the-gateway">
+<h1><a class="toc-backref" href="#toc-entry-12">Stage 10: choosing the gateway</a></h1>
+<ul class="simple">
+<li>Until now the vehicle has spoken to the ground directly by radio. Most
+missions put a flight computer in between: F´, cFS, or a ground system
+such as Yamcs.</li>
+<li>What changes: only the gateway, and the ground's side of the link; the
+rest of the vehicle is untouched. The same deck, three times, each with
+a different gateway.</li>
+</ul>
+<p><em>Figures:</em> the three gateways side by side, the unchanged rest of the
+vehicle drawn the same in each, the gateway node labelled with its type.</p>
+</div>
+<div class="section" id="checking-the-whole-vehicle">
+<h1><a class="toc-backref" href="#toc-entry-13">Checking the whole vehicle</a></h1>
+<ul class="simple">
+<li><tt class="docutils literal">tcsverify</tt> on the whole configuration, and what its messages say at
+this size.</li>
+<li>Both spellings, and <tt class="docutils literal">tcsverify a.xtcs a.ytcs</tt> to compare them.</li>
+<li>The summary of everything the vehicle uses -- ports, message IDs, APIDs,
+rates against the link -- and the clashes it warns of. (To be added to
+<tt class="docutils literal">tcsverify</tt> as <tt class="docutils literal"><span class="pre">--summary</span></tt>; this section waits for it.)</li>
+</ul>
+<p><em>Figures:</em> a <tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> run on the finished vehicle, with its
+parts named.</p>
+</div>
+<div class="section" id="from-the-desk-to-flight">
+<h1><a class="toc-backref" href="#toc-entry-14">From the desk to flight</a></h1>
+<p>What changes between the configuration that has run on a desk and the one
+that flies, as one checklist, each item linking to where it is said in
+full. (To be written as a page of the tcspecial manual and linked from
+here.)</p>
+<ul class="simple">
+<li><tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, and what tcspecial then refuses.</li>
+<li><tt class="docutils literal">sim_address</tt> left out.</li>
+<li>No <tt class="docutils literal">visual</tt> build.</li>
+<li>The golden configuration, and configurations named by checksum.</li>
+<li>Which packages go on the vehicle and which on the ground.</li>
+</ul>
+</div>
+<div class="section" id="where-to-go-next">
+<h1><a class="toc-backref" href="#toc-entry-15">Where to go next</a></h1>
+<ul class="simple">
+<li>The tcspecial manual, for every payload type and attribute.</li>
+<li>&quot;Writing node types&quot;, for what no shipped type does.</li>
+<li>The tcsgui manual, for drawing and editing the configuration.</li>
+<li>The examples' README, for the examples this guide drew on.</li>
+</ul>
+</div>
+<div class="section" id="how-this-guide-is-made">
+<h1><a class="toc-backref" href="#toc-entry-16">How this guide is made</a></h1>
+<p><em>For maintainers; not part of the published guide.</em></p>
+<ul class="simple">
+<li>The source is <tt class="docutils literal"><span class="pre">docs/building-a-vehicle.rst</span></tt>; <tt class="docutils literal">make</tt> in <tt class="docutils literal">docs/</tt>
+writes <tt class="docutils literal"><span class="pre">building-a-vehicle.html</span></tt>, which <tt class="docutils literal">make <span class="pre">html-check</span></tt> holds
+current.</li>
+<li>The stage configurations live in <tt class="docutils literal"><span class="pre">examples/vehicle/stage-N/</span></tt>, and a
+test verifies every stage, both spellings, so that the guide cannot
+drift from what the programs accept.</li>
+<li>The tcsgui drawings and tcsmoc screenshots are made by a screenshots
+test, as the manuals' are (<tt class="docutils literal">make screenshots</tt>), so they are made again
+rather than redrawn when a window changes. The drawings that are not
+screenshots -- the deck, the terminals, the files, the timelines -- are
+SVG by hand, Okabe-Ito colours paired with labels, patterns or shapes.</li>
+</ul>
+</div>
+</div>
+</body>
+</html>

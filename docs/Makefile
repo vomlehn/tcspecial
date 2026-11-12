@@ -17,7 +17,7 @@ DESIGNS = design.html tcsgui-design.html tcsmoc-design.html \
 
 .PHONY: all
 all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
-	node-types.html
+	node-types.html building-a-vehicle.html
 
 # The message-flow figures of "In-flight data across a restart" and "The
 # restart and the beacon, in time", drawn by
@@ -63,7 +63,13 @@ third-party.html: third-party.rst
 node-types.html: node-types.rst
 	rst2html node-types.rst node-types.html
 
+# The guide from the examples to a whole vehicle. Its figures are to come:
+# the screenshots from a screenshots test, as the manuals' are, and the
+# rest drawn by hand.
+building-a-vehicle.html: building-a-vehicle.rst
+	rst2html building-a-vehicle.rst building-a-vehicle.html
+
 .PHONY: clean
 clean:
 	rm -f tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
-		node-types.html
+		node-types.html building-a-vehicle.html

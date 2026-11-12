@@ -1,0 +1,49 @@
+# Publishes the repository's committed HTML -- the manual, the design, the
+# examples and the libraries' READMEs -- as the GitHub Pages site,
+# https://vomlehn.github.io/tcspecial/, on every push to main.
+#
+# GitHub's own Pages build, which this replaces, stops at a symbolic link
+# that leads outside the repository, and python/tcslibgs/_xtce holds four:
+# they reach the Python runtime in the tcs-xtce checkout beside this one,
+# so that its code is stated once (see python/README.md). On GitHub there
+# is no checkout beside, so the links lead nowhere and every build since
+# they were added failed. Here they are left out of what is published,
+# which has no use for them, and everything else is published as it is
+# committed: nothing is built, so the site is exactly the HTML that
+# `make html-check` holds current.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publication at a time; a newer push replaces one still waiting.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Leave out links that lead outside the repository
+        run: |
+          find . -path ./.git -prune -o -type l ! -exec test -e {} \; \
+              -print -delete
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,121 @@
+# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial.schema.json
+
+# Stage 3 of "Building a Vehicle" (docs/building-a-vehicle.rst): a computation
+# between a payload and the ground: the regolith thermometer's readings made
+# temperatures in kelvin. A computation's output goes only where a line takes
+# it, so this is also the stage that adds the gateway node, the ground's end of
+# the vehicle's data, and draws the seismometer into it too.
+
+description: "A lunar lander's science deck"
+
+tcspecial:
+  # tcspecial sends beacons from the interface the send attribute names, and
+  # the MOC receives them on the address the recv attribute names.
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
+    send: "0.0.0.0:5550"
+  gateway: "radio"
+  interface: "c7820f9bfe585feab72247ece0a2261d"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  # Commands to a payload are sent to tcspecial at dest_base plus the payload's
+  # device id, and the responses are read on the network interface source_base
+  # names.
+  #
+  # Simple payloads, such as these, do not use payload commands: what a simple
+  # payload is configured with is in this file, and it is not changed while
+  # tcspecial is running. At present only applications use the payload_command
+  # values.
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  # tcspecial sends telemetry from the network interface source_base names,
+  # plus the payload's device id, and the MOC receives it on the network
+  # interface dest_base names, plus the payload's device id.
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  # tcspecial counts its starts in this file, which must be on storage that
+  # survives a power cycle on a vehicle. Each stage of the guide has a file of
+  # its own, so that one stage's starts are not counted as another's.
+  state_file: "/tmp/tcspecial-deck-stage-03.state"
+  # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
+  # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
+  # tcs_cmd.send.
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+gateways:
+  - type gateway_radio:
+      # The ground's end of the vehicle's data, added here because it is first
+      # needed here: a node with lines goes where its lines say and nowhere
+      # else, so the temperatures regolith_kelvin makes need a line to
+      # somewhere, and the ground is reached through a gateway node. tcspecial
+      # sends what each node drawn into it produces to ground_base's address,
+      # at its port plus that node's device id: regolith_kelvin is id 1, so its
+      # temperatures arrive on 127.0.0.1:5101, and the seismometer, id 3, on
+      # 5103. It is called gateway in every later stage, which is the name the
+      # links to it are written with.
+      - gateway: gateway
+        ground_base: "127.0.0.1:5100"
+        world-in: [regolith_kelvin, seismometer]
+
+vehicle:
+  - type compute:
+      # The thermometer's two bytes made a temperature in kelvin: a reading of
+      # 1 is a sixteenth of a degree, and nought is 273.15 K. The node states
+      # what it takes, type-in, and what it makes, a kelvin, is its function's,
+      # so a line from a payload sending anything but an i16 to it is refused
+      # when the configuration is read.
+      - compute: regolith_kelvin
+        function: "to_kelvin"
+        offset: "273.15"
+        scale: "0.0625"
+        type-in: "i16"
+        world-out:
+          - gateway.regolith_kelvin
+        world-in: [regolith_thermometer]
+
+payloads:
+  - type network:
+      # The seismometer: software on the deck's science computer that sends
+      # each reading over UDP of its own accord, so nothing here says when to
+      # read it. Its readings go to the gateway node, as everything for the
+      # ground does once there is one, so that the ground has one place to
+      # receive the vehicle's data from.
+      - payload: seismometer
+        address: "127.0.0.1"
+        port: "5401"
+        protocol: "udp"
+        world-out:
+          - gateway.seismometer
+  - type serial:
+      # The regolith thermometer: a probe pushed into the ground beside the
+      # lander, on a serial line. Asked for its temperature with T?, it answers
+      # two bytes, signed, most significant first, in sixteenths of a degree
+      # Celsius. It is asked once a second, by its own trigger_interval. Its
+      # readings go to regolith_kelvin and not to the ground, which is sent the
+      # temperature instead of the bytes.
+      - payload: regolith_thermometer
+        byte_length: "8"
+        datarate: "9600"
+        max_length: "2"
+        path: "/tmp/tcs-deck-regolith"
+        read_timeout: "none"
+        stop_bits: "1"
+        trigger: '"T?\r"'
+        trigger_interval: "1 s"
+        world-out-type: "i16"
+        world-out:
+          - regolith_kelvin.regolith_thermometer
+
+tcsgui:
+  nodes:
+    - { node: gateway, x: 790, y: 34 }
+    - { node: regolith_kelvin, x: 299, y: 129 }
+    - { node: regolith_thermometer, x: 34, y: 129 }
+    - { node: seismometer, x: 34, y: 34 }

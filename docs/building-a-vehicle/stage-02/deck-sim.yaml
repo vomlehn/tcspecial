@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial-sim.schema.json
+
+# How tcssim simulates the payloads of deck.ytcs. The two files are joined
+# by name, and nothing here names a payload that file does not have.
+
+description: Simulator settings for stage 2 of Building a Vehicle
+
+# Where tcssim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no
+# example and no other stage uses, so that two can be run at once.
+tcssim:
+  ready: "127.0.0.1:7921"
+
+simulated_payloads:
+  - type network:
+      # A reading a second. There is no ground motion in tcssim's physics,
+      # so what it sends is bytes of its own making, as for examples/minimal.
+      - payload: seismometer
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
+
+  - type serial:
+      # Asked, and answering: a triggered payload has no rate of its own here.
+      # Nothing converts its readings yet, so tcssim has no encoding to send
+      # a temperature in, and answers bytes of its own making; stage 3 joins
+      # it to the regolith once regolith_kelvin says how a reading is read.
+      - payload: regolith_thermometer
+        simulate: true

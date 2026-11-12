@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial.schema.json
+
+# Stage 1 of "Building a Vehicle" (docs/building-a-vehicle.rst): one payload,
+# the seismometer, its readings going straight to the ground. It is
+# examples/minimal with the payload named for what it is and given a port of
+# its own, and nothing else.
+
+description: "A lunar lander's science deck"
+
+tcspecial:
+  # tcspecial sends beacons from the interface the send attribute names, and
+  # the MOC receives them on the address the recv attribute names.
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
+    send: "0.0.0.0:5550"
+  gateway: "radio"
+  interface: "c7820f9bfe585feab72247ece0a2261d"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  # Commands to a payload are sent to tcspecial at dest_base plus the payload's
+  # device id, and the responses are read on the network interface source_base
+  # names.
+  #
+  # Simple payloads, such as these, do not use payload commands: what a simple
+  # payload is configured with is in this file, and it is not changed while
+  # tcspecial is running. At present only applications use the payload_command
+  # values.
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  # tcspecial sends telemetry from the network interface source_base names,
+  # plus the payload's device id, and the MOC receives it on the network
+  # interface dest_base names, plus the payload's device id.
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  # tcspecial counts its starts in this file, which must be on storage that
+  # survives a power cycle on a vehicle. Each stage of the guide has a file of
+  # its own, so that one stage's starts are not counted as another's.
+  state_file: "/tmp/tcspecial-deck-stage-01.state"
+  # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
+  # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
+  # tcs_cmd.send.
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+payloads:
+  - type network:
+      # The seismometer: software on the deck's science computer that sends
+      # each reading over UDP of its own accord, so nothing here says when to
+      # read it. No line is drawn from it, so tcspecial sends what it reads to
+      # the ground over the tcspecial section's payload_telemetry: from
+      # source_base plus the seismometer's device id to dest_base plus the same
+      # id. A device id is a node's place among the names of all the nodes,
+      # sorted, counting from nought, and the seismometer is the only node, so
+      # it is 0 and the ground hears it on 127.0.0.1:6100.
+      - payload: seismometer
+        address: "127.0.0.1"
+        port: "5401"
+        protocol: "udp"
+
+tcsgui:
+  nodes:
+    - { node: seismometer, x: 34, y: 34 }

@@ -27,7 +27,9 @@ ping they are timing.
 Whether anything at all has arrived since the last ping is kept too, so that
 a ground station with no window (:func:`report`) prints what came that did
 not answer it -- an earlier ping's answer, or what is no answer at all --
-rather than saying nothing came.
+rather than saying nothing came. It is the one thing kept here that
+``tcslib::ping`` does not keep: tcsmoc always shows its pings in a window,
+which shows the last thing received whatever it was, and has no use for it.
 
 The three times
 ---------------

@@ -2113,7 +2113,11 @@ pub(crate) mod tests {
             let t0 = Instant::now()
                 .checked_sub(Duration::from_secs(5))
                 .expect("a time five seconds back");
-            plot.reading(0, t0, 292.0);
+            // A reading of every value, so that each says one in the
+            // legend, as long as a running vehicle makes it.
+            for trace in 0..plot.traces.len() {
+                plot.reading(trace, t0, 294.8125);
+            }
             plot.decision(0, t0, true);
         }
         std::thread::sleep(REDRAW + Duration::from_millis(50));
@@ -2141,5 +2145,71 @@ pub(crate) mod tests {
         );
         // Once beside the strip, as its state, and once on it.
         assert_eq!(said("on").len(), 2, "the switch on is said on its strip");
+
+        // Nothing in the window is cut off at the size it opens at: the
+        // legend of four temperatures and a band ran off its right edge,
+        // the last temperature and the band with it. A Text squeezed into
+        // less room than it needs reports the room it was given and draws
+        // what fits, so each is measured against itself in a window wide
+        // enough for anything, as well as against the window's edge.
+        let widths = |window: &PlotWindow| -> Vec<(String, f32, f32)> {
+            ElementHandle::find_by_element_type_name(window, "Text")
+                .map(|text| {
+                    (
+                        text.accessible_label().unwrap_or_default().to_string(),
+                        text.absolute_position().x,
+                        text.size().width,
+                    )
+                })
+                .collect()
+        };
+        // Laid out afresh and redrawn first, twice: a repeater nested in
+        // another's rows -- the legend's traces -- holds the rows it had
+        // until it is.
+        for wide in [821.0, 820.0] {
+            window
+                .window()
+                .set_size(slint::LogicalSize::new(wide, 620.0));
+            std::thread::sleep(REDRAW + Duration::from_millis(50));
+            slint::platform::update_timers_and_animations();
+            let _ = widths(&window);
+        }
+        let opened = widths(&window);
+        let width = window.window().size().to_logical(1.0).width;
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(4000.0, 620.0));
+        let roomy = widths(&window);
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(820.0, 620.0));
+        assert_eq!(opened.len(), roomy.len(), "the same words, wide or not");
+        // What the legends say: each panel's unit, its traces and its band.
+        let legend: Vec<String> = window
+            .get_panels()
+            .iter()
+            .flat_map(|panel| {
+                let traces: Vec<String> =
+                    panel.traces.iter().map(|t| t.said.to_string()).collect();
+                [panel.unit.to_string(), panel.band_said.to_string()]
+                    .into_iter()
+                    .chain(traces)
+            })
+            .filter(|said| !said.is_empty())
+            .collect();
+        assert!(legend.len() > 5, "the legend is all there: {legend:?}");
+        for ((label, x, given), (_, _, needs)) in opened.iter().zip(&roomy) {
+            assert!(
+                x + given <= width,
+                "{label:?} reaches {}, past the {width} the window is wide",
+                x + given
+            );
+            if legend.contains(label) {
+                assert!(
+                    given + 0.5 >= *needs,
+                    "{label:?} is given {given} of the {needs} it needs"
+                );
+            }
+        }
     }
 }

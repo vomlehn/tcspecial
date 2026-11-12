@@ -66,7 +66,7 @@ use slint::{Model, ModelRc, VecModel};
 use tcsdiagram::look::ground_of;
 use tcsdiagram::{look, pane, physics, route, style};
 
-use document::{Document, Fault};
+use document::{Concern, Document, Fault};
 use editor::Editor;
 use journal::{Edit, Link};
 use pane::{
@@ -75,7 +75,7 @@ use pane::{
 };
 use style::NodeType;
 use subdiagram::{Home, Qualified};
-use tcslibgs::graph::check::Problem;
+use tcslibgs::graph::check::{Problem, Severity};
 
 slint::include_modules!();
 
@@ -311,6 +311,10 @@ struct Views {
     /// out again at every refresh, so an error put right leaves the list as
     /// it is put right. See [`errors_of`].
     errors: Rc<RefCell<Vec<Trouble>>>,
+    /// What `tcsverify` warned of, as concerns, worked out with the errors:
+    /// kept so that the concerns' buttons and list, which count and index
+    /// it, need not ask tcsverify again. See [`concerns_of`].
+    unfinished: Rc<RefCell<Vec<Concern>>>,
     /// The line chosen from the errors button, drawn lit until it is put
     /// right or another error is chosen.
     lit: Rc<RefCell<Option<Link>>>,
@@ -570,7 +574,15 @@ impl Views {
         self.alert(editor);
         // The errors as they now are, for the button; and the line chosen
         // from it is put out once it is put right.
-        let errors = errors_of(editor);
+        let (errors, unfinished) = errors_of(editor);
+        *self.unfinished.borrow_mut() = unfinished;
+        // The list of concerns, if it is open, as the concerns now are: a
+        // concern that stops applying leaves it by itself, and one an edit,
+        // an undo or a redo raises joins it, as an error does the errors'
+        // menu. Whichever of the two lists it is showing.
+        if let Some(window) = self.concerns.as_ref() {
+            list_concerns(editor, self, window.get_aside());
+        }
         {
             let mut lit = self.lit.borrow_mut();
             let still = |line: &Link| {
@@ -644,10 +656,15 @@ impl Views {
                 (held.as_ref(), lit.as_ref()),
             );
         }
-        // The same list in every window, each of which has the button.
+        // The same list in every window, each of which has the button; and
+        // what might be wrong, counted on the two buttons beside it, the list
+        // itself being a window. See `concerns_of`.
         let error_rows = ModelRc::from(Rc::new(VecModel::from(error_rows)));
+        let (raised, aside) = concerns_of(editor, self);
         for window in self.top.upgrade().iter().chain(self.open.values()) {
             window.set_error_rows(error_rows.clone());
+            window.set_concern_count(raised.len() as i32);
+            window.set_aside_count(aside.len() as i32);
         }
         // How the selection column is shared, in every window alike.
         let physics_list = self.physics_list.get();
@@ -1015,6 +1032,7 @@ fn open_main(
         showing: Rc::new(RefCell::new(String::new())),
         errors: Rc::new(RefCell::new(Vec::new())),
         lit: Rc::new(RefCell::new(None)),
+        unfinished: Rc::new(RefCell::new(Vec::new())),
     }));
     alerting(&views);
     // Which node the panel is showing, per window.
@@ -2035,11 +2053,7 @@ fn put(
     ui.set_redo_label(label(editor.journal().next_redo()));
     ui.set_trouble(editor.trouble().unwrap_or_default().into());
     ui.set_said(editor.said().unwrap_or_default().into());
-    // What might be wrong, counted on the two buttons: the list itself is a
-    // window. See `Document::concerns`.
-    let (raised, aside) = editor.document().concerns_apart();
-    ui.set_concern_count(raised.len() as i32);
-    ui.set_aside_count(aside.len() as i32);
+    ui.set_unsaved(editor.unsaved());
     ui.set_outside_count(
         editor.document().outside_panes(home, dividers) as i32,
     );
@@ -2170,9 +2184,9 @@ fn put_node(window: &NodeWindow, editor: &Editor, node: &str) {
     window.set_node_type(node_type.into());
     window.set_comment(comment.into());
     window.set_about(about.into());
-    // Where the simulator's settings go on into a second column: half of
-    // them in each, rounding up, so that no column is much taller than the
-    // node's own and the window fits on a screen.
+    // Where the simulator's settings, under the node's own, go on into
+    // their second column: half of them in each, rounding up, so that the
+    // window is as short as two columns make it and fits on a screen.
     let heading = fields.iter().position(|f| f.is_heading);
     let split = heading.map_or(fields.len(), |at| {
         at + 1 + (fields.len() - at - 1).div_ceil(2)
@@ -2767,7 +2781,7 @@ fn show_concerns(
                         return;
                     };
                     let (raised, set_aside) =
-                        editor.borrow().document().concerns_apart();
+                        concerns_of(&editor.borrow(), &shown);
                     let list = if window.get_aside() {
                         set_aside
                     } else {
@@ -2792,7 +2806,7 @@ fn show_concerns(
                     };
                     let was_aside = window.get_aside();
                     let (raised, set_aside) =
-                        editor.borrow().document().concerns_apart();
+                        concerns_of(&editor.borrow(), &shown);
                     let list = if was_aside { set_aside } else { raised };
                     list.get(which as usize).map(|concern| Edit::SetAside {
                         node: concern.node().to_string(),
@@ -2803,13 +2817,8 @@ fn show_concerns(
                 if let Some(edit) = decision {
                     editor.borrow_mut().edit(edit);
                     // The list has changed under the row that was pressed, so
-                    // it is written again before anybody presses another.
-                    let aside = views
-                        .borrow()
-                        .concerns
-                        .as_ref()
-                        .is_some_and(|window| window.get_aside());
-                    list_concerns(&editor.borrow(), &views, aside);
+                    // it is written again before anybody presses another: the
+                    // refresh does that, as it does after every change.
                     views.borrow().refresh(&editor.borrow());
                 }
             });
@@ -2826,7 +2835,7 @@ fn show_concerns(
         views.borrow_mut().concerns = Some(window);
     }
 
-    list_concerns(&editor.borrow(), views, aside);
+    list_concerns(&editor.borrow(), &views.borrow(), aside);
     let window = views
         .borrow()
         .concerns
@@ -2839,6 +2848,22 @@ fn show_concerns(
     }
 }
 
+/// Finds the concerns, the drawing's own and what `tcsverify` warned of when
+/// the errors were last worked out, apart from those set aside.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose concerns are found.
+/// * `views`  - The windows, which keep what tcsverify warned of.
+///
+/// # Returns
+///
+/// What has not been looked at, and what was set aside: see
+/// `Document::concerns_with`.
+fn concerns_of(editor: &Editor, views: &Views) -> (Vec<Concern>, Vec<Concern>) {
+    editor.document().concerns_with(&views.unfinished.borrow())
+}
+
 /// Writes one of the two lists of concerns into their window, if it is
 /// open.
 ///
@@ -2848,8 +2873,8 @@ fn show_concerns(
 /// * `views`  - The windows, which hold the list's window.
 /// * `aside`  - Whether to list what was set aside rather than what has not
 ///              been looked at.
-fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
-    let (raised, set_aside) = editor.document().concerns_apart();
+fn list_concerns(editor: &Editor, views: &Views, aside: bool) {
+    let (raised, set_aside) = concerns_of(editor, views);
     let shown = if aside { set_aside } else { raised };
     let rows: Vec<ConcernRow> = shown
         .iter()
@@ -2863,7 +2888,7 @@ fn list_concerns(editor: &Editor, views: &Rc<RefCell<Views>>, aside: bool) {
     let everything: Vec<String> =
         rows.iter().map(|row| row.said.to_string()).collect();
 
-    if let Some(window) = views.borrow().concerns.as_ref() {
+    if let Some(window) = views.concerns.as_ref() {
         window.set_aside(aside);
         window.set_everything(everything.join("\n").into());
         window.set_rows(ModelRc::from(Rc::new(VecModel::from(rows))));
@@ -3388,21 +3413,33 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
 /// changes, and deliberately lazy about what has not been typed yet; tcsverify
 /// is the rules tcspecial, tcsmoc and tcssim refuse a file by, asked of the
 /// files as they are on the disk. A file the editor opened quietly and the
-/// vehicle would refuse is the disagreement this is here to end, so what the
-/// rules find is listed too -- warnings included, the unfinished being worth
-/// knowing about -- in tcsverify's own words.
+/// vehicle would refuse is the disagreement this is here to end, so the
+/// errors the rules find are listed too, in tcsverify's own words. Its
+/// warnings are not errors -- a node not filled in yet, a node with no line
+/// on it, which is how every node is placed -- and are counted with the
+/// concerns instead: see [`verified`].
 ///
 /// Of the files on the disk rather than the document, because the files are
-/// what those programs read. They are the same thing here: every edit is
-/// written as it is made.
-fn errors_of(editor: &Editor) -> Vec<Trouble> {
+/// what those programs read. They are the same thing here while Autosave is
+/// on: every edit is written as it is made.
+///
+/// # Arguments
+///
+/// * `editor` - The session whose configuration is checked.
+///
+/// # Returns
+///
+/// The errors, the editor's own first; and what tcsverify warned of, as
+/// concerns.
+fn errors_of(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
     let mut troubles = troubles_of(editor.document());
-    troubles.extend(verified(editor));
-    troubles
+    let (errors, warnings) = verified(editor);
+    troubles.extend(errors);
+    (troubles, warnings)
 }
 
 /// Finds what `tcsverify` says of the files that the editor's own faults do
-/// not already say.
+/// not already say, its errors apart from its warnings.
 ///
 /// Nothing for a file that is not there yet, which is how a new configuration
 /// is begun: an empty session is not one with a problem.
@@ -3414,12 +3451,12 @@ fn errors_of(editor: &Editor) -> Vec<Trouble> {
 ///
 /// # Returns
 ///
-/// One row per finding not already said, warnings included, in the order
-/// tcsverify found them.
-fn verified(editor: &Editor) -> Vec<Trouble> {
+/// One row per error not already said, in the order tcsverify found them;
+/// and one concern per warning about a node, in the same order.
+fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
     let (config, simulator) = editor.files();
     if !config.exists() {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
     let simulator = simulator.filter(|path| path.exists());
     let report =
@@ -3434,39 +3471,80 @@ fn verified(editor: &Editor) -> Vec<Trouble> {
     };
 
     // In the order found, as tcsverify prints them.
-    report
-        .findings
-        .iter()
-        .filter(|finding| {
-            finding
-                .problem
-                .as_ref()
-                .is_none_or(|problem| !said_already(problem, &faults))
-        })
-        .map(|finding| {
-            let node =
-                match finding.problem.as_ref().map(|problem| problem.about()) {
-                    Some(tcslibgs::About::Node(name)) => name,
-                    _ => String::new(),
-                };
-            let at = (!node.is_empty()).then(|| at_of(&node)).flatten();
-            let fix = match &finding.problem {
-                _ if at.is_some() => Fix::Node,
-                Some(Problem::NoTcspecial)
-                | Some(Problem::BadTcspecial { .. }) => Fix::Parameters,
-                Some(Problem::EmptyGroup { group }) => {
-                    Fix::Group(group.clone())
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+    for finding in &report.findings {
+        if finding
+            .problem
+            .as_ref()
+            .is_some_and(|problem| said_already(problem, &faults))
+        {
+            continue;
+        }
+        let node = match finding.problem.as_ref().map(|problem| problem.about())
+        {
+            Some(tcslibgs::About::Node(name)) => name,
+            _ => String::new(),
+        };
+        let at = (!node.is_empty()).then(|| at_of(&node)).flatten();
+        if finding.severity == Severity::Warning {
+            // Every warning is a rule's about a node; one about a node the
+            // drawing does not hold has nowhere to go and nothing to set
+            // aside, and the file it is in is being rewritten as it is drawn.
+            let said = finding.message.clone();
+            match &finding.problem {
+                _ if at.is_none() => {}
+                Some(Problem::NodeOnNoLink { .. })
+                | Some(Problem::Unconnected { .. }) => {
+                    warnings.push(Concern::Unlinked { node, said })
                 }
-                _ => Fix::Nothing,
-            };
-            Trouble {
-                at,
-                node: if at.is_some() { node } else { String::new() },
-                said: finding.to_string(),
-                fix,
+                _ => warnings.push(Concern::Unfinished { node, said }),
             }
-        })
-        .collect()
+            continue;
+        }
+        let fix = match &finding.problem {
+            _ if at.is_some() => Fix::Node,
+            Some(Problem::NoTcspecial) | Some(Problem::BadTcspecial { .. }) => {
+                Fix::Parameters
+            }
+            Some(Problem::EmptyGroup { group }) => Fix::Group(group.clone()),
+            _ => Fix::Nothing,
+        };
+        errors.push(Trouble {
+            at,
+            node: if at.is_some() { node } else { String::new() },
+            said: said_where(finding, at.is_some()),
+            fix,
+        });
+    }
+    (errors, warnings)
+}
+
+/// Says an error tcsverify found as the errors button's menu says it.
+///
+/// Without the word "error", which is what the whole menu is, and without
+/// the path the file was named by, which is the session's own file and
+/// would fill a menu line before it said anything. An error about a node is
+/// gone to by choosing it, so it needs no place in a file; any other starts
+/// with the file's name and the line, which is the one way to find it.
+///
+/// # Arguments
+///
+/// * `finding` - What tcsverify found.
+/// * `on_node` - Whether it is about a node the drawing holds.
+///
+/// # Returns
+///
+/// The menu's words for it.
+fn said_where(finding: &tcsverify::Finding, on_node: bool) -> String {
+    if on_node {
+        return finding.message.clone();
+    }
+    let file = finding.file.file_name().map_or_else(
+        || finding.file.display().to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    );
+    format!("{file}:{}: {}", finding.line, finding.message)
 }
 
 /// Tells whether one of the editor's own faults already says what this
@@ -3590,7 +3668,7 @@ fn errors_said(troubles: &[Trouble]) -> String {
 /// * `editor` - The session just opened.
 /// * `views`  - The windows, the main one of which warns.
 fn warn_of_errors(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
-    let said = errors_said(&errors_of(&editor.borrow()));
+    let said = errors_said(&errors_of(&editor.borrow()).0);
     if said.is_empty() {
         return;
     }
@@ -8809,6 +8887,84 @@ mod tests {
         assert!(said(&["a.ytcs", "b.ytcs", "c.ytcs"]).is_err());
     }
 
+    /// Says whether the main window's bar has a line of text saying exactly
+    /// this.
+    ///
+    /// # Arguments
+    ///
+    /// * `window` - The main window.
+    /// * `said`   - The words.
+    ///
+    /// # Returns
+    ///
+    /// `true` if some element of the window is labelled with them.
+    fn bar_says(window: &MainWindow, said: &str) -> bool {
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            window, said,
+        )
+        .next()
+        .is_some()
+    }
+
+    /// The bar counts the edits that can be undone in words that agree with
+    /// the count: one edit, two edits, no edits.
+    #[test]
+    fn the_bar_counts_edits_in_the_singular_and_the_plural() {
+        i_slint_backend_testing::init_no_event_loop();
+        let window = MainWindow::new().expect("a window");
+        for (depth, said) in [
+            (0, "0 edits can be undone"),
+            (1, "1 edit can be undone"),
+            (2, "2 edits can be undone"),
+        ] {
+            window.set_undo_depth(depth);
+            assert!(bar_says(&window, said), "the bar should say {said:?}");
+        }
+        assert!(!bar_says(&window, "1 edits can be undone"));
+    }
+
+    /// With Autosave off an edit is not on the disk until Save, and the bar
+    /// says so rather than "saved"; Save writes it, and the bar says saved
+    /// again.
+    #[test]
+    fn the_bar_says_when_edits_are_not_saved() {
+        i_slint_backend_testing::init_no_event_loop();
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle.ytcs");
+        let mut editor = Editor::open(&path, dividers()).expect("it opens");
+        editor.set_autosave(false);
+        let window = MainWindow::new().expect("a window");
+        let shown = |editor: &Editor| {
+            put(
+                &window,
+                editor,
+                &None,
+                (None, None),
+                dividers(),
+                (20, 35),
+                (None, None),
+            );
+        };
+        shown(&editor);
+        assert!(bar_says(&window, "saved"), "nothing has been changed yet");
+
+        editor.edit(Edit::AddNode {
+            name: "log-1".to_string(),
+            node_type: "log".to_string(),
+            home: None,
+        });
+        shown(&editor);
+        assert!(editor.unsaved(), "Autosave is off");
+        assert!(bar_says(&window, "not saved"), "the edit is not written");
+        assert!(!bar_says(&window, "saved"), "and the bar must not say so");
+
+        editor.save();
+        shown(&editor);
+        assert!(!editor.unsaved(), "Save writes it: {:?}", editor.trouble());
+        assert!(bar_says(&window, "saved"));
+        assert!(!bar_says(&window, "not saved"));
+    }
+
     /// A window too narrow for the whole sheet draws it smaller, so that
     /// some of every pane is in view, and never so small, nor the window so
     /// narrow, that the sheet does not fit; a window wide enough draws it
@@ -9422,8 +9578,9 @@ mod tests {
     ///
     /// The editor is lazy about a node that is not finished; the rules are
     /// not, and a vehicle would refuse the file. So the startup list says what
-    /// tcsverify says about it -- in its words, with the file and the line --
-    /// beside the editor's own rows.
+    /// tcsverify says about it -- in its words -- beside the editor's own
+    /// rows: its errors among the errors, and its warnings, which are what an
+    /// unfinished drawing looks like, among the concerns.
     #[test]
     fn the_startup_list_says_what_tcsverify_says() {
         let where_ = tempfile::tempdir().expect("a directory");
@@ -9439,7 +9596,7 @@ mod tests {
         .expect("a configuration with an empty group and an unfinished node");
 
         let editor = Editor::open(&path, dividers()).expect("it opens");
-        let troubles = errors_of(&editor);
+        let (troubles, unfinished) = errors_of(&editor);
         let said: Vec<&str> =
             troubles.iter().map(|t| t.said.as_str()).collect();
 
@@ -9451,33 +9608,109 @@ mod tests {
             "{said:#?}"
         );
 
-        // The unfinished node is the rules' alone, and it is there, said as
-        // tcsverify says it and offering the node.
+        // The unfinished node is the rules' alone, and it is a concern about
+        // the node, said as tcsverify says it, and not an error.
         let report =
             tcsverify::verify(&path, None, tcsverify::Limits::EVERYTHING);
-        let unfinished = report
+        let warning = report
             .findings
             .iter()
-            .find(|f| f.severity == tcslibgs::graph::check::Severity::Warning)
+            .find(|f| f.severity == Severity::Warning)
             .expect("tcsverify should warn about the unfinished node");
-        let row = troubles
-            .iter()
-            .find(|t| t.said == unfinished.to_string())
-            .unwrap_or_else(|| {
-                panic!("{unfinished} should be listed: {said:#?}")
-            });
-        assert_eq!(row.fix, Fix::Node);
-        assert!(row.at.is_some());
+        assert!(
+            unfinished.iter().any(|concern| matches!(concern,
+                Concern::Unfinished { node, said }
+                    if node == "a" && *said == warning.message)),
+            "{warning} should be a concern: {unfinished:#?}"
+        );
+        assert!(
+            !troubles.iter().any(|t| t.said.contains(&warning.message)),
+            "{warning} is not an error: {said:#?}"
+        );
 
-        // And nothing tcsverify reports is missing from the list.
+        // And every error tcsverify reports is in the list, in its words.
         for finding in &report.findings {
-            let listed = troubles.iter().any(|t| t.said == finding.to_string())
-                || finding
-                    .problem
-                    .as_ref()
-                    .is_some_and(|p| said_already(p, &editor.faults()));
+            if finding.severity == Severity::Warning {
+                continue;
+            }
+            let listed =
+                troubles.iter().any(|t| t.said.ends_with(&finding.message))
+                    || finding
+                        .problem
+                        .as_ref()
+                        .is_some_and(|p| said_already(p, &editor.faults()));
             assert!(listed, "{finding} is not listed: {said:#?}");
         }
+    }
+
+    /// A node just placed is not an error: the errors button counts what is
+    /// wrong, and a node with no line on it and its fields still empty is
+    /// what every node is when it is placed. Both of tcsverify's warnings
+    /// about it are concerns instead, and no line of the errors' menu starts
+    /// with the path the session was given.
+    #[test]
+    fn a_node_just_placed_is_a_concern_and_not_an_error() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/battery");
+        for file in ["battery.ytcs", "battery.xtce"] {
+            std::fs::copy(example.join(file), where_.path().join(file))
+                .expect("the battery example is copied");
+        }
+        let path = where_.path().join("battery.ytcs");
+        let mut editor = Editor::open(&path, dividers()).expect("it opens");
+        let (troubles, _) = errors_of(&editor);
+        assert!(troubles.is_empty(), "{troubles:#?}");
+
+        editor.edit(Edit::AddNode {
+            name: "log-1".to_string(),
+            node_type: "log".to_string(),
+            home: None,
+        });
+        let (troubles, unfinished) = errors_of(&editor);
+        assert!(troubles.is_empty(), "nothing is wrong yet: {troubles:#?}");
+        let kinds: Vec<String> = unfinished
+            .iter()
+            .filter(|concern| concern.node() == "log-1")
+            .map(|concern| concern.kind())
+            .collect();
+        assert!(
+            kinds.contains(&"unfinished".to_string())
+                && kinds.contains(&"unlinked".to_string()),
+            "both warnings should be concerns: {unfinished:#?}"
+        );
+        let (raised, _) = editor.document().concerns_with(&unfinished);
+        assert!(
+            raised.iter().any(|concern| concern.node() == "log-1"),
+            "and counted on the concerns button: {raised:#?}"
+        );
+        assert!(
+            raised
+                .iter()
+                .all(|concern| !concern.describe().starts_with('/')),
+            "{raised:#?}"
+        );
+    }
+
+    /// An error tcsverify finds that is not about a node starts with the
+    /// file's name and the line, and not with the path the session was
+    /// given, which would fill the menu's line before it said anything.
+    #[test]
+    fn an_error_in_a_file_is_said_by_the_file_name() {
+        let finding = tcsverify::Finding {
+            file: std::path::PathBuf::from(
+                "/home/someone/battery/battery-sim.yaml",
+            ),
+            line: 97,
+            message: "\"shunt\" cannot be simulated".to_string(),
+            severity: Severity::Error,
+            problem: None,
+        };
+        assert_eq!(
+            said_where(&finding, false),
+            "battery-sim.yaml:97: \"shunt\" cannot be simulated"
+        );
+        assert_eq!(said_where(&finding, true), "\"shunt\" cannot be simulated");
     }
 
     /// A configuration that is not there yet has nothing wrong with it.
@@ -9486,7 +9719,8 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let editor = Editor::open(&where_.path().join("new.ytcs"), dividers())
             .expect("it opens");
-        assert!(verified(&editor).is_empty());
+        let (errors, warnings) = verified(&editor);
+        assert!(errors.is_empty() && warnings.is_empty());
     }
 
     /// The startup warning says which kinds of error there are, and not
@@ -12973,6 +13207,7 @@ mod tests {
         the_warning_offers_a_way_out_of_the_editor();
         an_error_chosen_from_the_button_is_gone_to_and_leaves_when_put_right();
         closing_the_main_window_closes_what_says_what_is_wrong();
+        the_list_of_concerns_follows_every_change();
         an_emptied_field_takes_the_attribute_off();
         a_type_carried_out_of_its_list_goes_where_it_is_let_go();
         a_physics_type_carried_out_goes_where_it_is_let_go();
@@ -13345,6 +13580,28 @@ mod tests {
                     .is_some(),
                 "{name} is out of view"
             );
+        }
+
+        // And none is cut off at the side: the window, at the width it
+        // wants, holds every box whole, and that width is one a screen has
+        // room for beside the main window. Three columns side by side once
+        // wanted more than that, and the window was opened narrower still.
+        let width = window.get_wanted_width();
+        assert!(width <= 860.0, "{width} pixels is too wide for a window");
+        window.window().set_size(slint::LogicalSize::new(
+            width,
+            window.get_wanted_height(),
+        ));
+        for name in &named {
+            for found in
+                testing::ElementHandle::find_by_accessible_label(&window, name)
+            {
+                let right = found.absolute_position().x + found.size().width;
+                assert!(
+                    right <= width + 0.5,
+                    "{name}'s box ends at {right}, past the window's {width}"
+                );
+            }
         }
 
         let clear = testing::ElementHandle::find_by_accessible_label(
@@ -13845,6 +14102,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }))
     }
 
@@ -14059,6 +14317,65 @@ mod tests {
         let _ = ui.hide();
     }
 
+    /// The list of concerns, open, follows every change as the errors' menu
+    /// does: a node placed joins it, and Undo takes it out again, without
+    /// the list being opened again.
+    fn the_list_of_concerns_follows_every_change() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let example = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/battery");
+        for file in ["battery.ytcs", "battery.xtce"] {
+            std::fs::copy(example.join(file), where_.path().join(file))
+                .expect("the battery example is copied");
+        }
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.path().join("battery.ytcs"), dividers())
+                .expect("it opens"),
+        ));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        views.borrow().refresh(&editor.borrow());
+        show_concerns(&editor, &views, false);
+        let listed = || {
+            views
+                .borrow()
+                .concerns
+                .as_ref()
+                .expect("the list is open")
+                .get_rows()
+                .iter()
+                .map(|row| row.node.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert!(!listed().contains(&"log-1".to_string()), "{:?}", listed());
+
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "log-1".to_string(),
+            node_type: "log".to_string(),
+            home: None,
+        });
+        views.borrow().refresh(&editor.borrow());
+        assert!(
+            listed().contains(&"log-1".to_string()),
+            "the node placed should join the open list: {:?}",
+            listed()
+        );
+
+        editor.borrow_mut().undo();
+        views.borrow().refresh(&editor.borrow());
+        assert!(
+            !listed().contains(&"log-1".to_string()),
+            "and Undo should take it out: {:?}",
+            listed()
+        );
+        if let Some(window) = views.borrow_mut().concerns.take() {
+            let _ = window.hide();
+        }
+        let _ = ui.hide();
+    }
+
     /// Delete asks, and only takes the node away if it is answered.
     ///
     /// The menu's second item, and the one a press meant for Edit is next to.
@@ -14126,6 +14443,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14272,6 +14590,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14433,6 +14752,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14526,6 +14846,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         alerting(&views);
 
@@ -14674,6 +14995,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         alerting(&views);
 
@@ -14823,6 +15145,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14950,6 +15273,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15160,6 +15484,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15504,6 +15829,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15657,6 +15983,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15763,6 +16090,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15933,6 +16261,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
 
         show_group(&editor, &views);
@@ -16019,6 +16348,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
 
         // Nothing owed: leaving asks nothing. (The loop is not running in a
@@ -16181,6 +16511,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -16465,6 +16796,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
 
         show_node(&editor, &views, "temp_1");
@@ -16560,6 +16892,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -16698,6 +17031,7 @@ mod tests {
             showing: Rc::new(RefCell::new(String::new())),
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
+            unfinished: Rc::new(RefCell::new(Vec::new())),
         }));
 
         // The only group there is, so the window opens on it.

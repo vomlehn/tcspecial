@@ -528,6 +528,14 @@ fn placing_and_joining(out: &Path, work: &Path) {
          rows have moved, the place clicked has to move with them"
     );
     let placed = session.centre("log-1");
+    // Placed and nothing more is unfinished and not wrong: counted with the
+    // concerns, and not on an errors button, which the bar does not have.
+    assert_eq!(
+        ui.get_error_rows().row_count(),
+        0,
+        "a node placed is no error"
+    );
+    assert!(ui.get_concern_count() > 0, "it is a concern");
     Shot {
         name: "place-1",
         window: ui.window(),
@@ -580,6 +588,7 @@ fn placing_and_joining(out: &Path, work: &Path) {
     .expect("the offer is in the menu")
     .invoke_accessible_default_action();
     assert_eq!(session.editor.borrow().document().links.len(), lines + 1);
+    assert_eq!(ui.get_error_rows().row_count(), 0, "still no error");
     Shot {
         name: "place-4",
         window: ui.window(),
@@ -695,11 +704,18 @@ fn an_error_and_undo(out: &Path, work: &Path) {
         .get("shunt")
         .map(|node| node.clone_strong());
     let node = node.expect("choosing the error opens the node's window");
+    // At the size it opens at, which holds every field whole: its own, and
+    // the simulator's under them.
+    // The width first: how tall the wrapped sentences are depends on it.
+    let width = node.get_wanted_width().ceil() as u32;
+    drawn(node.window(), (width, 600));
+    let size = (width, node.get_wanted_height().ceil() as u32);
+    assert!(size.0 <= 860, "the window fits beside another: {size:?}");
     Shot {
         name: "error-4",
         window: node.window(),
-        size: (860, 600),
-        part: Some((0, 0, 860, 320)),
+        size,
+        part: None,
         markers: Vec::new(),
     }
     .take(out);
@@ -786,6 +802,15 @@ fn saving_and_leaving(out: &Path, work: &Path) {
     node.invoke_comment_set("The power monitor's bus voltage.".into());
     node.invoke_closed();
     assert!(session.editor.borrow().unsaved(), "the edit is not written");
+    assert!(ui.get_unsaved(), "and the bar says so");
+    Shot {
+        name: "not-saved",
+        window: ui.window(),
+        size: WIDE,
+        part: Some((0, 40, 1000, 50)),
+        markers: Vec::new(),
+    }
+    .take(out);
     ui.invoke_exit_requested();
     let leave = session
         .views

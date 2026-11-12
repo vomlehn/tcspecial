@@ -262,8 +262,8 @@ fn handle_transfer_button(
 
         // The status the button's label came from, so what happens is
         // what the label offered.
-        let showing = match model.row_data(row) {
-            Some(info) => info.status.to_string(),
+        let (showing, startable) = match model.row_data(row) {
+            Some(info) => (info.status.to_string(), may_start(&info)),
             None => return,
         };
 
@@ -274,6 +274,10 @@ fn handle_transfer_button(
         };
 
         match transfer_wanted(&showing) {
+            // The window offers no Enable while the sizes cannot be sent,
+            // and this holds to the same answer rather than trusting that
+            // it never asks.
+            Transfer::Send if !startable => return,
             Transfer::Send => {
                 payload.send(true);
                 update_row(&model, row, |info| {
@@ -292,6 +296,22 @@ fn handle_transfer_button(
         let driving = SharedString::from(payload.driving_said());
         update_row(&model, row, |info| info.driving = driving);
     });
+}
+
+/// Says whether a panel's payload may be started: not while its packet and
+/// segment sizes cannot be sent, which `sizes_problem` decides and the
+/// panel's row holds. Only starting is refused. A payload already sending
+/// may always be stopped, whatever its sizes have become.
+///
+/// # Arguments
+///
+/// * `info` - The panel's row.
+///
+/// # Returns
+///
+/// Whether it may be started.
+fn may_start(info: &PayloadInfo) -> bool {
+    info.sizes_problem.is_empty()
 }
 
 /// Puts what each payload has done since the last look into its panel:
@@ -537,12 +557,19 @@ fn joined_to_the_world(
                     Kind::Decision => None,
                 };
                 let place = place(at)?;
+                // A heater's switch, which its panel says is heating rather
+                // than on: a heater's own, or one of a zone's heater_N --
+                // a thermal mass's only decisions are its heaters.
+                let heater = matches!(
+                    (&model.components[place.component].what, unit),
+                    (tcslibgs::node::physics::Resolution::Heater(_), _)
+                        | (
+                            tcslibgs::node::physics::Resolution::ThermalMass(_),
+                            None
+                        )
+                );
                 // Disabled, as every payload starts: its panel's button, or
                 // --sending, enables it.
-                let heater = matches!(
-                    model.components[place.component].what,
-                    tcslibgs::node::physics::Resolution::Heater(_)
-                );
                 Attachment::Drives {
                     world: world.clone(),
                     place,
@@ -1337,8 +1364,19 @@ fn main() {
         let _ = payload.start();
         // As though its button had been pressed, where --sending asks, or
         // the simulator file's enable says so of this payload: which for a
-        // heater is to power it.
-        if sending || sims.get(row).is_some_and(|sim| sim.enabled) {
+        // heater is to power it. And so refused, as the button is, while
+        // the files give sizes that cannot be sent; the panel says why.
+        let asked = sending || sims.get(row).is_some_and(|sim| sim.enabled);
+        let info = model.row_data(row);
+        let startable = info.as_ref().is_some_and(may_start);
+        if let (true, false, Some(info)) = (asked, startable, &info) {
+            eprintln!(
+                "tcssim: {} is not started: its packet and segment sizes \
+                 cannot be sent; its panel says why",
+                info.name
+            );
+        }
+        if asked && startable {
             payload.send(true);
             update_row(&model, row, |info| {
                 info.status = SharedString::from(RUNNING_STATUS);
@@ -1732,14 +1770,16 @@ mod tests {
                 payload_config_attached(&dh, &settings, None)
                     .expect("a payload"),
             )]));
-        handle_config_edits(&ui, payloads, model.clone());
+        handle_config_edits(&ui, payloads.clone(), model.clone());
+        handle_transfer_button(&ui, payloads, model.clone());
         ui.show().unwrap();
 
-        let button = |ui: &MainWindow| {
-            ElementHandle::find_by_accessible_label(ui, ENABLE_LABEL)
+        let button_offering = |ui: &MainWindow, label: &str| {
+            ElementHandle::find_by_accessible_label(ui, label)
                 .next()
                 .and_then(|b| b.accessible_enabled())
         };
+        let button = |ui: &MainWindow| button_offering(ui, ENABLE_LABEL);
         // What the popup says is selectable text, whose words are its
         // accessible value rather than a label: see copy.slint.
         let said = |ui: &MainWindow| -> Vec<String> {
@@ -1784,6 +1824,57 @@ mod tests {
                 && line.contains("packet of 11")),
             "nothing on screen says what is wrong: {shown:?}"
         );
+
+        // And all of what it says is inside the popup's border. The popup
+        // was a fixed 290x100, and the sentence ran past the foot of it.
+        let border =
+            ElementHandle::find_by_element_id(&ui, "PayloadPanel::sizes-box")
+                .next()
+                .expect("the popup is open");
+        let foot = border.absolute_position().y + border.size().height;
+        for text in ElementHandle::find_by_element_type_name(&ui, "TextInput")
+            .filter(|e| {
+                e.accessible_value()
+                    .is_some_and(|v| v.contains("cannot be part"))
+            })
+        {
+            let bottom = text.absolute_position().y + text.size().height;
+            assert!(
+                bottom <= foot + 0.5,
+                "what the popup says reaches {bottom}, past its border's \
+                 foot at {foot}"
+            );
+        }
+
+        // A press of the Enable the window does not offer starts nothing:
+        // Rust holds to the same answer the button does.
+        ui.invoke_transfer_payload(0);
+        assert_eq!(
+            model.row_data(0).map(|info| info.status.to_string()),
+            Some(STOPPED_STATUS.to_string()),
+            "a payload whose sizes cannot be sent was started"
+        );
+
+        // But a payload already sending when its sizes went wrong can
+        // always be stopped: the button was taken away from it too, and it
+        // went on sending sizes that cannot be sent until they were put
+        // right.
+        update_row(&model, 0, |info| info.status = RUNNING_STATUS.into());
+        assert_eq!(
+            button_offering(&ui, DISABLE_LABEL),
+            Some(true),
+            "a running payload whose sizes cannot be sent cannot be stopped"
+        );
+        ElementHandle::find_by_accessible_label(&ui, DISABLE_LABEL)
+            .next()
+            .expect("a Disable button")
+            .invoke_accessible_default_action();
+        assert_eq!(
+            model.row_data(0).map(|info| info.status.to_string()),
+            Some(STOPPED_STATUS.to_string()),
+            "Disable did not stop it"
+        );
+        assert_eq!(button(&ui), Some(false), "stopped, it offers a start");
 
         // And back up again: the pair can be sent, so the button returns and
         // the popup stops saying otherwise. An open popup still saying these
@@ -2087,6 +2178,11 @@ mod tests {
         // hold is checked by the tests of show_traffic instead, and how much
         // room they have by the heights below.
 
+        // A line of the panels' type, as the markup measures it.
+        let line_height = PanelProbe::new()
+            .expect("a window to measure a line in")
+            .get_line_height();
+
         for (set, rows) in cases {
             let panels = rows.len();
 
@@ -2177,7 +2273,20 @@ mod tests {
             // Measured rather than reasoned about: each is a number this
             // backend reports, and each was found by reading them.
             let rows = [
+                "PayloadPanel::title-row",
+                "PayloadPanel::config-row",
                 "PayloadPanel::controls-row",
+                "PayloadPanel::sent-row",
+                "PayloadPanel::recv-row",
+                "PayloadPanel::packets-row",
+            ];
+            // The rows that are a line of text, every one of which is at
+            // least a line of the window's type tall. They were told
+            // fourteen and eighteen pixels in type of twelve points, and cut
+            // off every descender and underscore: "temp_1" read "temp 1".
+            let text_rows = [
+                "PayloadPanel::title-row",
+                "PayloadPanel::config-row",
                 "PayloadPanel::sent-row",
                 "PayloadPanel::recv-row",
                 "PayloadPanel::packets-row",
@@ -2193,6 +2302,17 @@ mod tests {
             // times over, which cost the suite a minute and a half.
             let placed: Vec<Vec<(f32, f32)>> =
                 rows.iter().map(|id| geometry(id)).collect();
+            for id in text_rows {
+                let tall = geometry(id);
+                assert_eq!(tall.len(), panels, "{set}: {id} not built");
+                for (n, (_, height)) in tall.into_iter().enumerate() {
+                    assert!(
+                        height + 0.5 >= line_height,
+                        "{set}: panel {n}'s {id} is {height} tall, which \
+                         cuts off a line of text {line_height} tall"
+                    );
+                }
+            }
             let sent_rows = geometry("PayloadPanel::sent-row");
             let buttons: Vec<(Option<String>, f32, f32)> =
                 ElementHandle::find_by_element_type_name(&ui, "Button")
@@ -2635,6 +2755,46 @@ mod tests {
             &dh_configs
         )
         .is_err());
+    }
+
+    /// The thermostat example's two heater switches each say which heater
+    /// they are, and say it in the words the design gives: heating, off, or
+    /// disabled, so off.
+    ///
+    /// Both are joined straight to the zone's two heater inputs, and their
+    /// panels named the zone alone -- "zone: on" over "zone: on" -- so that
+    /// the two could not be told apart, and said "on" where a heater is
+    /// heating.
+    #[test]
+    fn the_examples_heaters_say_which_they_are_and_what_they_do() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload_path = root.join("examples/thermostat/thermostat.ytcs");
+        let sim_file = SimConfigFile::load(
+            root.join("examples/thermostat/thermostat-sim.yaml"),
+        )
+        .expect("the simulator file reads");
+        let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
+        let sims = sim_file.resolve(&dh_configs).expect("it fits");
+        let (attached, _) =
+            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+                .expect("the world is made");
+
+        for (payload, heater) in [
+            ("gpio-out-tmass1", "zone.heater_1"),
+            ("gpio-out-tmass2", "zone.heater_2"),
+        ] {
+            let switch = &attached[payload];
+            assert_eq!(
+                switch.driving_said(),
+                format!("{heater}: disabled, so off"),
+                "{payload}"
+            );
+            switch.enable_at(true, 1.0);
+            assert_eq!(switch.driving_said(), format!("{heater}: off"));
+            switch.sent_at(1.0, 2.0);
+            assert_eq!(switch.driving_said(), format!("{heater}: heating"));
+        }
     }
 
     /// Has a simulator file's tcssim section name the thermostats tcssim
@@ -3337,6 +3497,49 @@ mod tests {
             shown.contains(&wanted),
             "the popup shows something other than the parameters of this \
              payload:\n{shown:?}"
+        );
+
+        // More lines than the popup has room for, and a wheel turned over
+        // them brings up the rest. The text stood in its scrolling area
+        // alone, which measures only layouts, so the area took it to be no
+        // taller than itself and the lines at the foot -- the faults --
+        // could not be reached.
+        let find = |id: &str| {
+            ElementHandle::find_by_element_id(&ui, id)
+                .next()
+                .unwrap_or_else(|| panic!("no {id}"))
+        };
+        let area = find("PayloadPanel::parameters-scroll");
+        let text = find("PayloadPanel::parameters-text");
+        assert!(
+            text.size().height > area.size().height,
+            "the parameters ({}) fit the popup ({}): nothing to scroll",
+            text.size().height,
+            area.size().height
+        );
+        let before = text.absolute_position().y;
+        // The backend places an element of a popup from the popup's corner
+        // rather than the window's, and the popup hangs 4 pixels in from
+        // the panel's.
+        let panel =
+            ElementHandle::find_by_element_type_name(&ui, "PayloadPanel")
+                .next()
+                .expect("a panel")
+                .absolute_position();
+        let over = area.absolute_position();
+        ui.window().dispatch_event(
+            slint::platform::WindowEvent::PointerScrolled {
+                position: slint::LogicalPosition::new(
+                    panel.x + 4.0 + over.x + area.size().width / 2.0,
+                    panel.y + 4.0 + over.y + area.size().height / 2.0,
+                ),
+                delta_x: 0.0,
+                delta_y: -60.0,
+            },
+        );
+        assert!(
+            text.absolute_position().y < before,
+            "a turn of the wheel did not scroll the parameters"
         );
     }
 

@@ -732,6 +732,9 @@ component Surface inherits Rectangle {
     // the same place as "saved", that line already meaning "what has just
     // happened".
     in property <string> said: "";
+    // Whether there are edits the files do not have, which with Autosave off
+    // is every edit until Save: the line then says so rather than "saved".
+    in property <bool> unsaved: false;
     // What this surface is editing: empty for the top diagram, the
     // subdiagram's name otherwise. Shown in the bar so that two windows side
     // by side cannot be confused for one another.
@@ -1054,15 +1057,25 @@ component Surface inherits Rectangle {
             }
 
             Text {
-                text: undo-depth + " edits can be undone";
+                text: undo-depth
+                    + (undo-depth == 1 ? " edit can" : " edits can")
+                    + " be undone";
                 font-size: Type.body;
                 vertical-alignment: center;
             }
             // Saving needs no button: every edit is written as it is made.
-            // What it needs is somewhere to say when that failed.
+            // What it needs is somewhere to say when that failed -- and,
+            // with Autosave off, that there are edits waiting for Save, which
+            // "saved" would deny. In words, and not green, since nothing is
+            // safe yet; red is kept for what failed.
             Text {
-                text: trouble != "" ? trouble : (said != "" ? said : "saved");
-                color: trouble == "" ? #2d6a4f : #c0392b;
+                text: trouble != "" ? trouble
+                    : said != "" ? said
+                    : unsaved ? "not saved"
+                    : "saved";
+                color: trouble != "" ? #c0392b
+                    : unsaved && said == "" ? #333333
+                    : #2d6a4f;
                 font-size: Type.body;
                 font-weight: trouble == "" ? 400 : 700;
                 vertical-alignment: center;
@@ -2053,6 +2066,7 @@ export component MainWindow inherits Window {
 
     in property <string> trouble: "";
     in property <string> said: "";
+    in property <bool> unsaved: false;
     in property <string> selected: "";
 
     callback undo-clicked();
@@ -2316,6 +2330,7 @@ export component MainWindow inherits Window {
         show-concerns => { root.show-concerns(); }
         show-aside => { root.show-aside(); }
         said: root.said;
+        unsaved: root.unsaved;
         canvas-offset <=> root.canvas-offset;
         undo-clicked => { root.undo-clicked(); }
         redo-clicked => { root.redo-clicked(); }
@@ -2899,7 +2914,9 @@ export component NodeWindow inherits Window {
     title: root.node == "" ? "a node" : root.node;
     background: Colors.window;
     // As tall as what it holds, every field in view: see the fields below.
-    min-width: 360px;
+    // And never narrower than what it holds, so no field is cut off at the
+    // side: the simulator's two columns are the widest thing in it.
+    min-width: max(360px, whole.min-width);
 
     in property <string> node: "";
     // Its own name, which is what its field shows and what renaming it
@@ -3003,7 +3020,7 @@ export component NodeWindow inherits Window {
 
     // How large what it holds wants to be, which tcsgui grows the window to
     // when what is shown grows: see SimWindow. The width its narrowest, the
-    // layout's being the description at the foot on one line.
+    // layout's preferred one being the description at the foot on one line.
     out property <length> wanted-height: whole.preferred-height;
     out property <length> wanted-width: root.min-width;
 
@@ -3045,41 +3062,51 @@ export component NodeWindow inherits Window {
         // reached, the toolkit's order leaving out what is clipped, and one a
         // reader did not know was there.
         //
-        // In columns: the node's own attributes, and beside them the
-        // simulator's settings for it, which are written to a different file
-        // -- the heading over them names it -- in two columns of their own,
-        // there being as many as twenty of them. One model and not three,
-        // each column drawing its own rows of it, so that Tab goes down the
-        // first column, then the second, then the third.
+        // The node's own attributes first, and under them the simulator's
+        // settings for it, which are written to a different file -- the
+        // heading over them names it -- in two columns of their own, there
+        // being as many as twenty of them. Under and not beside: three
+        // columns side by side made a window wider than a screen's share,
+        // and its last column was cut off. One model and not three, each
+        // part drawing its own rows of it, so that Tab goes down the node's
+        // fields, then the first column, then the second.
+        VerticalLayout {
+            alignment: start;
+            for f in root.fields: VerticalLayout {
+                padding-bottom: !f.simulated && !f.is-heading
+                    ? Space.tight : 0px;
+                if !f.simulated && !f.is-heading: FieldRow {
+                    field: f;
+                    came => { root.came(f); }
+                    went => { root.went(f); }
+                    typed(text) => { root.typed(f, text); }
+                    done => { root.take(); }
+                    ticked(on) => { root.ticked(f, on); }
+                }
+            }
+        }
+        // The heading: what file these go to. In a layout of its own, with
+        // no spacing, so the rows of the model that are not the heading take
+        // no room between the node's fields and the simulator's.
+        VerticalLayout {
+            spacing: 0px;
+            for f in root.fields: VerticalLayout {
+                padding-top: f.is-heading ? Space.step : 0px;
+                if f.is-heading: Text {
+                    text: f.name;
+                    font-size: Type.small;
+                    font-weight: Type.bold;
+                    color: #6b7280;
+                }
+            }
+        }
         HorizontalLayout {
             spacing: Space.wide;
             VerticalLayout {
                 alignment: start;
-                for f in root.fields: VerticalLayout {
-                    padding-bottom: !f.simulated && !f.is-heading
-                        ? Space.tight : 0px;
-                    if !f.simulated && !f.is-heading: FieldRow {
-                        field: f;
-                        came => { root.came(f); }
-                        went => { root.went(f); }
-                        typed(text) => { root.typed(f, text); }
-                        done => { root.take(); }
-                        ticked(on) => { root.ticked(f, on); }
-                    }
-                }
-            }
-            VerticalLayout {
-                alignment: start;
                 for f[i] in root.fields: VerticalLayout {
-                    padding-bottom: (f.simulated && i < root.split)
-                        || f.is-heading ? Space.tight : 0px;
-                    // The heading: what file these go to.
-                    if f.is-heading: Text {
-                        text: f.name;
-                        font-size: Type.small;
-                        font-weight: Type.bold;
-                        color: #6b7280;
-                    }
+                    padding-bottom: f.simulated && !f.is-heading
+                        && i < root.split ? Space.tight : 0px;
                     if f.simulated && !f.is-heading && i < root.split:
                     FieldRow {
                         field: f;
@@ -3094,14 +3121,8 @@ export component NodeWindow inherits Window {
             VerticalLayout {
                 alignment: start;
                 for f[i] in root.fields: VerticalLayout {
-                    padding-bottom: (f.simulated && i >= root.split)
-                        || f.is-heading ? Space.tight : 0px;
-                    // As tall as the heading beside it, so the rows line up.
-                    if f.is-heading: Text {
-                        text: " ";
-                        font-size: Type.small;
-                        font-weight: Type.bold;
-                    }
+                    padding-bottom: f.simulated && !f.is-heading
+                        && i >= root.split ? Space.tight : 0px;
                     if f.simulated && !f.is-heading && i >= root.split:
                     FieldRow {
                         field: f;

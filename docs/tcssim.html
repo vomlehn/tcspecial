@@ -1120,7 +1120,12 @@ run starts from what they say.</p>
 the packet size. Equal is the ordinary case -- a packet sent in one segment.
 Make them disagree and a message says so at once, naming both sizes and
 either way out of it, and the button that starts the payload is taken away
-until they agree again; the edit that fixes them takes the message back. The
+until they agree again; the edit that fixes them takes the message back.
+Only starting is refused: a payload already running when its sizes stop
+agreeing still offers <tt class="docutils literal">Disable</tt>, which stops it, rather than going on
+sending them until they are put right. Nor does <tt class="docutils literal"><span class="pre">--sending</span></tt> or the
+simulator configuration's <tt class="docutils literal">enable</tt> start a payload whose files give sizes
+that cannot be sent; tcssim says so as it starts, and the panel says why. The
 sizes are checked when the files are read as well, so a set whose simulator
 configuration states a segment larger than the packet it is given says so
 before anything is touched.</p>
@@ -1131,12 +1136,15 @@ under <a class="reference external" href="tcspecial.html#seeing-what-was-read">S
 <dt><tt class="docutils literal">Sent</tt></dt>
 <dd>When the last packet went, and the first few bytes of it. A part the
 vehicle drives sends nothing, and this line says what it is doing instead,
-in words, naming the component of the physics model it is joined to:
-<tt class="docutils literal">heater_1: heating</tt> or <tt class="docutils literal">heater_1: off</tt> for a switch joined to a
-<tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt>, <tt class="docutils literal">zone: on</tt> or <tt class="docutils literal">zone: off</tt> for one
-joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or <tt class="docutils literal">heater_2</tt>, as in the
-thermostat example, and <tt class="docutils literal">disabled, so off</tt> after the name for either
-while its panel has it disabled -- see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>.</dd>
+in words, naming the heater it switches in the physics model: <tt class="docutils literal">heating</tt>
+or <tt class="docutils literal">off</tt>, and <tt class="docutils literal">disabled, so off</tt> while its panel has it disabled --
+see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>. A switch joined to a
+<tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt> is named by the component, as in
+<tt class="docutils literal">heater_1: heating</tt>; one joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or
+<tt class="docutils literal">heater_2</tt>, as in the thermostat example, by the mass and the input, as
+in <tt class="docutils literal">zone.heater_2: off</tt>, so that a zone's two heaters' panels never say
+the same thing. A driven part that is not a heater says <tt class="docutils literal">on</tt> where a
+heater says <tt class="docutils literal">heating</tt>, or <tt class="docutils literal">at</tt> the value it is held at.</dd>
 <dt><tt class="docutils literal">Recv</tt></dt>
 <dd><p class="first">When the last packet arrived, and the first few bytes of it -- for a payload
 that answers requests. A payload that sends of its own accord is never
@@ -1198,28 +1206,30 @@ it runs, and take effect on the next reading.</p>
 <p><strong>Switching a heater</strong></p>
 <ol class="arabic">
 <li><div class="first figure">
-<img alt="The gpio-out-tmass1 panel: Stopped in bold red, an Enable button, and the line zone: disabled, so off." src="shots/tcssim-heater-1.png" />
+<img alt="The gpio-out-tmass1 panel: Stopped in bold red, an Enable button, and the line zone.heater_1: disabled, so off." src="shots/tcssim-heater-1.png" />
 <p class="caption">The heater switch <tt class="docutils literal"><span class="pre">gpio-out-tmass1</span></tt> as it opens. It drives the
-zone's <tt class="docutils literal">heater_1</tt>, so its line names the zone, and disabled -- its
+zone's <tt class="docutils literal">heater_1</tt>, so its line names that heater --
+<tt class="docutils literal"><span class="pre">gpio-out-tmass2</span></tt>'s says <tt class="docutils literal">zone.heater_2</tt> -- and disabled -- its
 button is its power -- it is off whatever it is sent.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The same panel after the vehicle has switched it on: still Stopped, still zone: disabled, so off." src="shots/tcssim-heater-2.png" />
+<img alt="The same panel after the vehicle has switched it on: still Stopped, still zone.heater_1: disabled, so off." src="shots/tcssim-heater-2.png" />
 <p class="caption">tcspecial's thermostat switches it on. Nothing changes on the panel or
 in the zone: a disabled heater stays off. What it was sent is kept.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The same panel after Enable: Running in black, a Disable button, and the line zone: on." src="shots/tcssim-heater-3.png" />
+<img alt="The same panel after Enable: Running in black, a Disable button, and the line zone.heater_1: heating." src="shots/tcssim-heater-3.png" />
 <p class="caption"><tt class="docutils literal">Enable</tt> pressed. The <tt class="docutils literal">on</tt> it was sent is applied at once --
-<tt class="docutils literal">zone: on</tt> -- rather than at the thermostat's next decision, which
-comes only when the decision changes.</p>
+<tt class="docutils literal">zone.heater_1: heating</tt> -- rather than at the thermostat's next
+decision, which comes only when the decision changes.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The same panel after the vehicle has switched it off: Running, and the line zone: off." src="shots/tcssim-heater-4.png" />
-<p class="caption">The thermostat switches it off, and the line says <tt class="docutils literal">zone: off</tt>. A
+<img alt="The same panel after the vehicle has switched it off: Running, and the line zone.heater_1: off." src="shots/tcssim-heater-4.png" />
+<p class="caption">The thermostat switches it off, and the line says
+<tt class="docutils literal">zone.heater_1: off</tt>. A
 heater sends nothing, so its <tt class="docutils literal">Pkts</tt> stays at nought throughout.</p>
 </div>
 </li>
@@ -1227,16 +1237,25 @@ heater sends nothing, so its <tt class="docutils literal">Pkts</tt> stays at nou
 <p><strong>Sizes that cannot be sent</strong></p>
 <ol class="arabic">
 <li><div class="first figure">
-<img alt="The temp_2 panel with a popup over it, outlined in red: temp_2: these sizes cannot be sent. A segment of 2 bytes cannot be part of a packet of 1: a segment is a piece of a packet. Raise the packet size to 2 or more, or lower the segment size to 1 or less. Behind it the Enable button is greyed out." src="shots/tcssim-sizes-1.png" />
+<img alt="The temp_2 panel, Pkt 1 and Seg 2, its Enable button greyed out, and below the buttons a popup outlined in red: temp_2: these sizes cannot be sent. A segment of 2 bytes cannot be part of a packet of 1: a segment is a piece of a packet. Raise the packet size to 2 or more, or lower the segment size to 1 or less." src="shots/tcssim-sizes-1.png" />
 <p class="caption"><tt class="docutils literal">Pkt</tt> stepped down from 2 to 1 on <tt class="docutils literal">temp_2</tt>, leaving its 2-byte
-segment larger than the packet. A popup says so at once, naming both
-sizes and either way out, and <tt class="docutils literal">Enable</tt> is greyed out.</p>
+segment larger than the packet. A popup under the buttons says so at
+once, naming both sizes and either way out, and <tt class="docutils literal">Enable</tt> is greyed
+out.</p>
 </div>
 </li>
 <li><div class="first figure">
 <img alt="The temp_2 panel with Pkt and Seg both 2, no popup, and the Enable button pressable again." src="shots/tcssim-sizes-2.png" />
 <p class="caption"><tt class="docutils literal">Pkt</tt> stepped back up to 2. The popup goes and <tt class="docutils literal">Enable</tt> comes
 back. Nothing is written to the files either way.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="The temp_2 panel Running, Pkt 1 and Seg 2, the same popup under its buttons, and its Disable button pressable." src="shots/tcssim-sizes-3.png" />
+<p class="caption"><tt class="docutils literal">Enable</tt> pressed, and <tt class="docutils literal">Pkt</tt> stepped down to 1 again while it
+runs. The popup says the same, but <tt class="docutils literal">Disable</tt> stays: only starting is
+refused, and a payload sending sizes that cannot be sent can always be
+stopped.</p>
 </div>
 </li>
 </ol>
@@ -1255,9 +1274,7 @@ added to <tt class="docutils literal">temp_3</tt>'s entry:</p>
         </span><span class="name tag">noise</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.02 K</span><span class="whitespace">
         </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">-0.3 K</span>
 </pre>
-<p><tt class="docutils literal">temp_3</tt>'s <tt class="docutils literal">Configuration</tt> button then lists <tt class="docutils literal">silent_after 3 packets</tt>
-under <tt class="docutils literal">faults</tt>, at the foot of what the simulator configuration said.
-<tt class="docutils literal">temp_2</tt>, which has no fault, and <tt class="docutils literal">temp_3</tt> are enabled together:</p>
+<p><tt class="docutils literal">temp_2</tt>, which has no fault, and <tt class="docutils literal">temp_3</tt> are enabled together:</p>
 <ol class="arabic">
 <li><div class="first figure">
 <img alt="The temp_2 and temp_3 panels side by side, both Running, both Sent at 10:00:03 and both Pkts: 3 sent." src="shots/tcssim-fault-1.png" />
@@ -1272,6 +1289,14 @@ readings, and look alike.</p>
 nothing since its third: its <tt class="docutils literal">Sent</tt> time has stopped, which is the
 sign a wedged instrument gives, and what tcspecial's handler for it
 sees is readings that have stopped coming.</p>
+</div>
+</li>
+<li><div class="first figure">
+<img alt="temp_3's parameters popup scrolled to its foot: From the simulator configuration, packet_interval 1000 ms, segment_interval 1000 ms, segment_size 3 bytes, and under faults, silent_after 3 packets." src="shots/tcssim-fault-3.png" />
+<p class="caption"><tt class="docutils literal">temp_3</tt>'s <tt class="docutils literal">Configuration</tt> pressed, and its list scrolled to the
+foot with the mouse wheel: under <tt class="docutils literal">faults</tt>, at the end of what the
+simulator configuration said, is <tt class="docutils literal">silent_after 3 packets</tt>. The list
+is longer than the popup, and scrolls.</p>
 </div>
 </li>
 </ol>

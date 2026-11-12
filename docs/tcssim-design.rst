@@ -1213,10 +1213,32 @@ Requirement
     edited would have the payload refuse to start for no stated reason.
 
 Requirement
+    Only starting is refused. A payload already sending when its sizes stop
+    agreeing offers ``Disable`` as ever, and a press of it stops the
+    payload. The button was taken away whatever the payload was doing, so a
+    payload running when its sizes went wrong could not be stopped until
+    they were put right, and went on sending them meanwhile -- the one
+    thing the refusal is there to prevent.
+
+Requirement
+    A payload that ``--sending`` or its simulator file's ``enable`` would
+    start is not started while its files give sizes that cannot be sent.
+    It is started as though its ``Enable`` had been pressed, and that press
+    would be refused; tcssim says so as it starts, and the panel says why.
+
+Requirement
     The window decides neither. It asks for the two sizes to be judged and
-    obeys the answer -- showing what it says and disabling the button while
-    it says anything -- so there is one rule rather than one in each place
-    that acts on it.
+    obeys the answer -- showing what it says and disabling the button that
+    starts the payload while it says anything -- so there is one rule
+    rather than one in each place that acts on it. Rust holds a press to
+    the same answer, so an ``Enable`` that reached it while the sizes cannot
+    be sent starts nothing.
+
+Requirement
+    The popup that says the sizes cannot be sent is as tall as what it
+    says, and hangs under the panel's buttons, so that it hides neither the
+    two sizes nor whether the payload can be started. It was a fixed size
+    that the sentence ran out of, hung over the spin box just stepped.
 
 Each panel has two buttons: one that starts and stops the payload, and one
 that shows the whole of what the two files said about it.
@@ -1290,6 +1312,23 @@ Requirement
     state is never told by a colour alone.
 
 Requirement
+    The words follow the name of the heater the panel switches, so that no
+    two panels say the same thing of different heaters. A switch joined to
+    a ``heater`` component's ``on`` names the component, ``heater_1:
+    heating``; one joined to a thermal mass's own ``heater_1`` or
+    ``heater_2`` names the mass and the input, ``zone.heater_2: off``. The
+    thermostat example's two switches both named the zone they are joined
+    to, and said ``on`` rather than ``heating``, so that its two heaters'
+    panels read ``zone: on`` alike.
+
+Requirement
+    A row of text in a panel is the height of its text, which is the window's
+    type. Rows told a height of their own, fourteen and eighteen pixels in
+    type of twelve points, cut off every descender and underscore --
+    ``temp_1`` read ``temp 1`` -- and left the packet count half under the
+    next row of panels.
+
+Requirement
     Each panel has a button that shows every parameter read from the two
     configuration files for that payload, in both programs. What a panel has
     room for is a name, a size and what has moved; a payload set says a good
@@ -1318,6 +1357,10 @@ Requirement
     Nothing shown is a measurement. What a payload has done is on the panel
     itself, and a list that mixed the two would leave no way to tell a
     configured value from an observed one.
+
+Requirement
+    What it shows scrolls, so the foot of a list longer than the popup --
+    where the faults are -- can be reached.
 
 Requirement
     Only the attributes of the payload's own type are shown, and only the
@@ -1362,7 +1405,7 @@ for the columns the payload count calls for, and because it opens it at exactly
 that many panels' width plus the chrome, the window arrives at the same count.
 
 The five sources of the thermostat example give a row of three and a row of two in a
-1206x668 window. The size is the one ``window_size`` gives, which a test reads
+1206x764 window. The size is the one ``window_size`` gives, which a test reads
 out of this document so that the number here cannot quietly stop being the one
 the program opens at.
 

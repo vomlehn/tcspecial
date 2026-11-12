@@ -206,7 +206,8 @@ Left to right:
 * **N concerns** and **N set aside**, each present only while it counts
   something;
 * how many edits can be undone;
-* the state of the files: ``saved``, what the last command did, or, in red
+* the state of the files: ``saved``; ``not saved``, with Autosave off and
+  edits the files do not have yet; what the last command did; or, in red
   and bold, what stopped the last write.
 
 The menus
@@ -325,7 +326,8 @@ A node's window shows its name, as a field with a small ``x`` beside it that
 clears it, the attributes its type declares, its comment, and what is wrong
 with it, if anything. Where a simulator file was given and the node is a
 payload, the simulator's settings for it follow under a heading of their own,
-their labels in italic, because they are written to the other file. A field
+in two columns below the node's own fields, their labels in italic, because
+they are written to the other file. A field
 the configuration requires is marked beside its name; while a field has the
 focus, what the description tree says about it is shown at the foot of the
 window. Several windows may be open at once, so two nodes can be compared side
@@ -413,13 +415,14 @@ For example, to record the battery example's bus voltage in a log of its own:
       :alt: The vehicle list scrolled down to the heading Ends of the
             graph, its log entry marked 1. On the sheet a new node, log-1,
             in the upper right of the Vehicle pane. The bar's Undo button
-            reads add log "log-1", and a new button reads 2 errors.
+            reads add log "log-1", the concerns button 4 concerns, and
+            the bar says 1 edit can be undone.
 
       Click ``log`` in the vehicle list, under *Ends of the graph* (1). A
       node called ``log-1`` is placed as high in the Vehicle pane as it fits.
       Nothing is joined to it and nothing is filled in yet, which
-      ``tcsverify`` reports, so the bar's errors button counts it (see
-      `Errors`_).
+      ``tcsverify`` warns of. That is how every node starts, not an error,
+      so the bar's concerns button counts it (see `Concerns`_).
 
 #. .. figure:: shots/tcsgui-place-2.png
       :width: 100%
@@ -444,12 +447,12 @@ For example, to record the battery example's bus voltage in a log of its own:
       :width: 100%
       :alt: A line now runs from bus_volts's upper right terminal to
             log-1's upper left, log-1 marked 4. The bar's Undo button reads
-            link "bus_volts" to "log-1", the errors button 1 error, and the
-            bar says 2 edits can be undone.
+            link "bus_volts" to "log-1", the concerns button 3 concerns,
+            and the bar says 2 edits can be undone.
 
       Choose it. The line is drawn (4) and written, and Undo names it. One
-      error is left: nothing of the log is filled in yet, which is done in
-      its window, next.
+      concern about the log is gone; another is left, since nothing of the
+      log is filled in yet, which is done in its window, next.
 
 Moving and removing a line
 --------------------------
@@ -575,12 +578,15 @@ Errors
 An **error** is something the vehicle would refuse: a value a rule refuses,
 two nodes of one name, two lines into one input, a line to a node that is not
 there. While there are any, the bar has a button saying how many --
-``3 errors`` -- whose menu lists them one a line. The menu lists everything
-``tcsverify`` says about the files, in its words, its warnings among them,
-and each but a node's own fault starts with the file and line it is about:
-so a node just placed, joined to nothing and with fields it requires left
-empty, is listed until it is joined and filled in, although it is not drawn
-red. Choosing one goes to it:
+``3 errors`` -- whose menu lists them one a line. The menu lists every
+error ``tcsverify`` finds in the files, in its words, beside tcsgui's own:
+one about a node names the node, and any other starts with the name of the
+file and the line it is about, as ``battery-sim.yaml:97:``. What
+``tcsverify`` only warns of -- a node joined to nothing, or with fields it
+requires left empty, which is every node just placed -- is not an error and
+is not listed here, but counted with the concerns (see `Concerns`_). A node
+tcsgui finds wrong is drawn red, and is always in the menu. Choosing one
+goes to it:
 
 * a node's error shows the node in the middle of its page, selected, with its
   window open;
@@ -645,8 +651,8 @@ Here, in the battery example, a port that cannot be one is typed into the
 #. .. figure:: shots/tcsgui-error-3.png
       :width: 100%
       :alt: The 2 errors button pressed, marked 3, and under it a menu of
-            two lines: the shunt's port, and an error from line 97 of
-            battery-sim.yaml saying the shunt cannot be simulated.
+            two lines: the shunt's port, and one starting
+            battery-sim.yaml:97: saying the shunt cannot be simulated.
 
       Press the button (3): its menu lists the errors.
 
@@ -655,8 +661,8 @@ Here, in the battery example, a port that cannot be one is typed into the
       :alt: The shunt's window: its name, its type network, the same
             sentence about port 99999 in red italic, and its fields --
             protocol udp, address 127.0.0.1, port 99999 and the rest --
-            with, beside them under the heading simulated payload, the
-            simulator's settings in italic.
+            with, under them, the heading simulated payload and the
+            simulator's settings in two columns, in italic.
 
       Choose the first. The ``shunt`` is selected in the middle of the
       sheet and its window opens, saying the same thing in red. Put the port
@@ -670,7 +676,11 @@ payload whose readings reach nothing, a vehicle node a stream arrives at and
 nothing leaves, one something leaves and nothing arrives at. None of them
 stops a configuration being read, and all are normal while a diagram is being
 drawn, so they are counted rather than refused, and not at all while the
-configuration has one node or none.
+configuration has one node or none. What ``tcsverify`` warns of is counted
+with them, in its words: a node joined to nothing at all, and a node whose
+required fields are not all filled in yet. tcsgui does not call either an
+error, since every node is both when it is placed, but the vehicle refuses
+a configuration that still has them.
 
 **N concerns** on the bar opens a list with a line a concern, each with
 **Go to it**, which selects the node, scrolls to it and opens its window, and
@@ -679,6 +689,9 @@ configuration has one node or none.
 back, and it is written in the configuration's ``tcsgui`` section, so that
 whoever opens the file next sees the same decision. It is kept by node and
 kind of concern: a concern that stops applying leaves both lists by itself.
+An open list is written again after every edit, Undo and Redo, as the
+errors' menu is, so it never shows a concern that has gone or leaves out
+one just raised.
 
 What tcsgui refuses
 -------------------
@@ -701,6 +714,13 @@ not before -- for trying a change and keeping it only if it works. The undo
 history is written after every edit either way, which is what lets an
 unsaved edit survive a crash (see `Crash recovery`_). Checking Autosave again
 writes at once whatever was waiting.
+
+.. figure:: shots/tcsgui-not-saved.png
+   :width: 100%
+   :alt: The bar with Autosave off: an Undo button reading comment on
+         "bus_volts", 2 concerns, 1 edit can be undone, and not saved.
+
+   With Autosave off, the bar says ``not saved`` until Save writes the edit.
 
 The setting is kept as ``<autosave>`` in ``$HOME/.tcsgui/preferences.xml``,
 ``true`` or ``false``, and is on by default.
@@ -810,16 +830,16 @@ Going on from the example under `Errors`_:
 #. .. figure:: shots/tcsgui-undo-1.png
       :width: 100%
       :alt: The bar: an Undo button reading set port of "shunt", a greyed
-            Redo arrow, 2 errors, and 1 edits can be undone; the shunt
-            below, red and selected.
+            Redo arrow, 2 errors, 2 concerns, and 1 edit can be undone; the
+            shunt below, red and selected.
 
       The last edit set the shunt's port, and the Undo button says so.
 
 #. .. figure:: shots/tcsgui-undo-2.png
       :width: 100%
       :alt: The bar: a greyed Undo arrow, a Redo button reading set port
-            of "shunt", no errors button, and 0 edits can be undone; the
-            shunt below no longer red.
+            of "shunt", no errors button, 2 concerns, and 0 edits can be
+            undone; the shunt below no longer red.
 
       Press it. The port is put back and written, the errors go, and
       **Redo** offers to set it again.

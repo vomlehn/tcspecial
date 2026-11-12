@@ -9,11 +9,12 @@ Introduction
 ============
 
 .. warning::
-   TCSpecial is very early software and is subject to rapid change. Until
-   1.0, any change to its API changes the minor version number (0.1 to
-   0.2), so a release that changes only the patch number never breaks code
-   built against it. Feedback is welcome, even at this stage: open an issue
-   at https://github.com/vomlehn/tcspecial/issues.
+   TCSpecial is an alpha release. It is not fully tested, it is not feature
+   complete, and it is subject to rapid change. Until 1.0, any change to its
+   API changes the minor version number (0.1 to 0.2), so a release that
+   changes only the patch number never breaks code built against it.
+   Feedback is welcome, even at this stage: open an issue at
+   https://github.com/vomlehn/tcspecial/issues.
 
 .. note::
    TCSpecial has been designed for spacecraft and ground communication with high
@@ -2125,9 +2126,22 @@ payload disabled in one window is disabled in the other rather than silent in
 one and disabled in the other; they were the payload's own, ``Send`` and
 ``Silent``, which left the reader of two windows translating.
 
+A payload starts disabled in tcssim, as though nobody had pressed
+``Enable``, unless the simulator configuration says ``enable: true`` for it
+(``<enable value="true"/>`` in XML), in its own entry or its group's, a
+payload's own overriding its group's; or unless tcssim is given
+``--sending``, which starts every payload whatever the file says. The two
+add up: a payload starts enabled if either asks, and ``enable: false`` does
+not hold one back from ``--sending``. Either way it is started as a press of
+``Enable`` would start it, so a payload whose sizes cannot be sent stays
+disabled, and its panel says why. tcspecial never reads the simulator
+configuration, so ``enable`` says nothing about what a configuration that
+flies does.
+
 A heater, or any part the vehicle drives, sends nothing, so in tcssim the
-same button is its power. Disabled -- as every payload starts, unless tcssim
-is given ``--sending`` -- it is unpowered, or failed, and stays off whatever
+same button is its power. Disabled -- as every payload starts, unless the
+simulator configuration's ``enable`` or tcssim's ``--sending`` says
+otherwise -- it is unpowered, or failed, and stays off whatever
 the vehicle, or a thermostat tcssim plays, decides: it gives the
 simulated world no heat. What it is sent meanwhile is kept, the latest
 replacing the one before, and ``Enable`` applies that latest at once, since

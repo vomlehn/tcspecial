@@ -26,7 +26,9 @@ export struct DHInfo {
     /// order the file describes them.
     dev-id: int,
     config: string,
-    packet-size: int,
+    // How big each packet is, in words: "2 bytes", or "not fixed" where
+    // the configuration fixes no size.
+    packet-size: string,
     // From tcspecial, by way of the command interpreter
     status: string,
     // What the ground itself received from this payload: the time the last
@@ -65,7 +67,7 @@ component DHPanel inherits Rectangle {
     in property <int> dev-id: 0;
     in property <string> dh-config: "UDP localhost:5000";
     in property <string> dh-status: "Stopped";
-    in property <int> packet-size: 12;
+    in property <string> packet-size;
     in property <string> oc-time: "--:--:--";
     in property <string> oc-data: "";
     in property <int> packets-recv: 0;
@@ -133,7 +135,7 @@ component DHPanel inherits Rectangle {
             // property of a simulation rather than of a payload, so it lives in
             // the simulator's own file and tcssim is what shows it.
             Text {
-                text: "Packet Size: " + packet-size + " bytes";
+                text: "Packet Size: " + packet-size;
                 font-size: Fonts.window;
             }
         }
@@ -175,11 +177,18 @@ component DHPanel inherits Rectangle {
             }
         }
 
+        // As wide and as tall as what it shows, so that the counts a Query
+        // adds are read whole rather than cut off at a fixed 300 by 340: no
+        // narrower than the 300 it was, and no larger than the window,
+        // inside which Slint keeps a popup, moving it left or up where it
+        // would run off. Past that the list scrolls.
         parameters-popup := PopupWindow {
             x: 4px;
             y: 4px;
-            width: 300px;
-            height: 340px;
+            width: max(300px,
+                       parameters-text.preferred-width
+                       + 2 * parameters-layout.padding + 24px);
+            height: parameters-layout.preferred-height;
             // Closed by a press outside it, not by any press: a press inside
             // is somebody selecting what it says to copy it.
             close-policy: close-on-click-outside;
@@ -189,7 +198,7 @@ component DHPanel inherits Rectangle {
                 border-color: #808080;
                 border-width: 1px;
 
-                VerticalLayout {
+                parameters-layout := VerticalLayout {
                     padding: 6px;
                     spacing: 4px;
 
@@ -205,13 +214,21 @@ component DHPanel inherits Rectangle {
                         }
                     }
 
-                    // Scrolled rather than sized to the text: how many lines
-                    // there are depends on the kind of payload and on how
-                    // many faults the simulator file asked for, and a popup
-                    // tall enough for the longest of them would be taller
-                    // than the window.
-                    ScrollView {
-                        Copyable {
+                    // Sized to the text, and scrolled where the window is
+                    // too small for that: how many lines there are depends
+                    // on the kind of node and on whether a Query has been
+                    // answered.
+                    parameters-scroll := ScrollView {
+                        // Asks for the whole list, which the popup is
+                        // sized to; given less, by a window too small for
+                        // it, it scrolls.
+                        preferred-width: parameters-text.preferred-width;
+                        preferred-height: parameters-text.preferred-height;
+                        parameters-text := Copyable {
+                            // Its own size, so that a list too big for the
+                            // area is scrolled rather than squeezed into it.
+                            width: self.preferred-width;
+                            height: self.preferred-height;
                             // The lines are columns of name and value, so
                             // they only line up in a font whose characters
                             // are one width -- and they are not wrapped, a
@@ -926,11 +943,16 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                HorizontalLayout {
-                    Text {
-                        text: "Last Response: " + last-response;
-                        font-size: Fonts.window;
-                    }
+                // Wrapped, and never cut off: what the last press came to
+                // is read in full, and a refusal or the answers of six
+                // nodes is longer than the window is wide. Unwrapped, the
+                // line also widened the whole group past the window, which
+                // pushed the Plot button and the restart target's checksum
+                // off its right edge with it.
+                last-response-text := Text {
+                    text: "Last Response: " + last-response;
+                    font-size: Fonts.window;
+                    wrap: word-wrap;
                 }
 
                 command-times-row := HorizontalLayout {
@@ -939,7 +961,14 @@ export component MainWindow inherits Window {
                     Text { text: cmd-sent-time; font-size: Fonts.window; }
                     Text { text: "Last rcvd:"; font-size: Fonts.window; }
                     Text { text: cmd-recv-time; font-size: Fonts.window; }
-                    Text { text: vehicle-packets; font-size: Fonts.window; }
+                    // The count of packets, which takes what the row has left
+                    // and wraps in it rather than running off the window.
+                    vehicle-packets-text := Text {
+                        text: vehicle-packets;
+                        font-size: Fonts.window;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                    }
                 }
             }
         }
@@ -1107,6 +1136,46 @@ export struct SwitchShown {
     spans: [SpanShown],
 }
 
+// One panel's legend: its unit, each trace's colour, name and latest
+// reading, and what it says of a thermostat's band. Wrapped onto as many
+// lines as the width it is given needs, so that nothing of it is cut off at
+// the window's edge however many values a unit has: four temperatures and
+// a band ran off the right of a window of the size the plot opens at.
+component PlotLegend inherits FlexboxLayout {
+    // The panel whose legend it is.
+    in property <PanelShown> panel;
+    // The colour the band's words are written in.
+    in property <color> band-words;
+    spacing-horizontal: 12px;
+    min-height: 24px;
+
+    Text {
+        text: panel.unit;
+        font-weight: 700;
+        vertical-alignment: center;
+    }
+    for trace in panel.traces: HorizontalLayout {
+        spacing: 4px;
+        Rectangle {
+            width: 18px;
+            height: 3px;
+            y: (parent.height - self.height) / 2;
+            background: trace.colour;
+        }
+        Text {
+            text: trace.said;
+            font-family: Fonts.mono;
+            vertical-alignment: center;
+        }
+    }
+    if panel.band-said != "": Text {
+        text: panel.band-said;
+        color: band-words;
+        font-italic: true;
+        vertical-alignment: center;
+    }
+}
+
 // The plot window, opened by Plot: every value that reaches the ground, a
 // panel for each unit, and every switch's decisions under them, over the
 // span chosen with the buttons at the top. What is drawn is worked out in
@@ -1146,13 +1215,16 @@ export component PlotWindow inherits Window {
     callback span-chosen(int);
     // Each panel's size, which Rust draws the paths to. The panels share
     // the plotting area's height, a gap between each, and each has its
-    // legend on a strip of its own above it, so that the legend never hides
-    // what is drawn.
+    // legend above it, so that the legend never hides what is drawn. A
+    // legend takes as many lines as it needs at the width it has, so what
+    // the legends take is measured, and every panel's plot is given an
+    // equal share of what is left: one height for Rust to draw to.
     out property <length> plot-width: area.width - root.axis-width - root.gap;
-    out property <length> panel-height: root.slot-height - root.legend-height;
-    property <length> slot-height:
-        (area.height - (root.panels.length - 1) * root.gap)
-            / max(1, root.panels.length);
+    out property <length> panel-height: max(
+        0px,
+        (area.height - legends.preferred-height
+            - (root.panels.length - 1) * root.gap)
+            / max(1, root.panels.length));
 
     property <color> switch-on: #009E73;
     property <color> switch-off: #D4D8DD;
@@ -1167,7 +1239,6 @@ export component PlotWindow inherits Window {
     property <color> edge: #9CA3AF;
     property <length> axis-width: 92px;
     property <length> gap: 8px;
-    property <length> legend-height: 24px;
 
     VerticalLayout {
         padding: 10px;
@@ -1195,231 +1266,235 @@ export component PlotWindow inherits Window {
             vertical-stretch: 1;
             min-height: 200px;
 
-            for panel[p] in root.panels: Rectangle {
+            // Every panel's legend, laid out as the panels' are and never
+            // drawn: what they come to together, which the height each
+            // panel's plot is given is worked out from. Placed, so that what
+            // it measures is not taken for what the area needs.
+            legends := VerticalLayout {
                 x: 0;
-                y: p * (root.slot-height + root.gap);
+                y: 0;
+                width: root.plot-width;
+                visible: false;
+                for panel in root.panels: PlotLegend {
+                    panel: panel;
+                    band-words: root.band-words;
+                }
+            }
+
+            VerticalLayout {
+                x: 0;
+                y: 0;
                 width: parent.width;
-                height: root.slot-height;
+                height: parent.height;
+                spacing: root.gap;
+                alignment: start;
 
-                // The legend: the unit, then each trace's colour, name and
-                // latest reading.
-                HorizontalLayout {
-                    x: root.axis-width + root.gap;
-                    y: 0;
-                    width: root.plot-width;
-                    height: root.legend-height;
-                    spacing: 12px;
-                    alignment: start;
-                    Text {
-                        text: panel.unit;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                    }
-                    for trace in panel.traces: HorizontalLayout {
-                        spacing: 4px;
-                        Rectangle {
-                            width: 18px;
-                            height: 3px;
-                            y: (parent.height - self.height) / 2;
-                            background: trace.colour;
+                for panel in root.panels: VerticalLayout {
+                    // The legend: the unit, then each trace's colour, name
+                    // and latest reading, and the band, over the plot and
+                    // as wide as it, wrapped onto as many lines as it takes.
+                    HorizontalLayout {
+                        padding-left: root.axis-width + root.gap;
+                        PlotLegend {
+                            panel: panel;
+                            band-words: root.band-words;
+                            width: root.plot-width;
                         }
-                        Text {
-                            text: trace.said;
+                    }
+
+                    Rectangle {
+                        height: root.panel-height;
+
+                        // The axis: each tick's value, centred on its rule. The
+                        // top and bottom ones stand out of the panel by half a
+                        // line, beside the legend and into the gap below, where
+                        // nothing else is written in the axis's column.
+                        for tick in panel.ticks: Text {
+                            x: 0;
+                            width: root.axis-width;
+                            y: tick.y * 1px - self.height / 2;
+                            text: tick.said;
+                            horizontal-alignment: right;
                             font-family: Fonts.mono;
-                            vertical-alignment: center;
                         }
-                    }
-                    if panel.band-said != "": Text {
-                        text: panel.band-said;
-                        color: root.band-words;
-                        font-italic: true;
-                        vertical-alignment: center;
-                    }
-                }
 
-                // The axis: each tick's value, centred on its rule. The top
-                // and bottom ones stand out of the panel by half a line,
-                // beside the legend's strip and into the gap below, where
-                // nothing else is written in the axis's column.
-                for tick in panel.ticks: Text {
-                    x: 0;
-                    width: root.axis-width;
-                    y: root.legend-height + tick.y * 1px - self.height / 2;
-                    text: tick.said;
-                    horizontal-alignment: right;
-                    font-family: Fonts.mono;
-                }
-
-                Rectangle {
-                    x: root.axis-width + root.gap;
-                    y: root.legend-height;
-                    width: root.plot-width;
-                    height: root.panel-height;
-                    background: #ffffff;
-                    border-width: 1px;
-                    border-color: root.edge;
-                    clip: true;
-
-                    // The band, behind everything else: white where the
-                    // reading is held, pale yellow a half band either side,
-                    // pale red beyond, each region said in words at the
-                    // left and each edge a line. A region too thin for its
-                    // words goes without them; the legend still names the
-                    // band.
-                    if panel.banded: Rectangle {
-                        x: 0;
-                        y: 0;
-                        width: parent.width;
-                        height: parent.height;
                         Rectangle {
-                            x: 0;
+                            x: root.axis-width + root.gap;
                             y: 0;
-                            width: parent.width;
-                            height: max(0px, panel.too-high * 1px);
-                            background: root.band-far;
-                        }
-                        Rectangle {
-                            x: 0;
-                            y: panel.too-high * 1px;
-                            width: parent.width;
-                            height: (panel.high - panel.too-high) * 1px;
-                            background: root.band-near;
-                        }
-                        Rectangle {
-                            x: 0;
-                            y: panel.low * 1px;
-                            width: parent.width;
-                            height: (panel.too-low - panel.low) * 1px;
-                            background: root.band-near;
-                        }
-                        Rectangle {
-                            x: 0;
-                            y: panel.too-low * 1px;
-                            width: parent.width;
-                            height: max(0px,
+                            width: root.plot-width;
+                            height: root.panel-height;
+                            background: #ffffff;
+                            border-width: 1px;
+                            border-color: root.edge;
+                            clip: true;
+
+                            // The band, behind everything else: white where the
+                            // reading is held, pale yellow a half band either
+                            // side, pale red beyond, each region said in words
+                            // at the left and each edge a line. A region too
+                            // thin for its words goes without them; the legend
+                            // still names the band.
+                            if panel.banded: Rectangle {
+                                x: 0;
+                                y: 0;
+                                width: parent.width;
+                                height: parent.height;
+                                Rectangle {
+                                    x: 0;
+                                    y: 0;
+                                    width: parent.width;
+                                    height: max(0px, panel.too-high * 1px);
+                                    background: root.band-far;
+                                }
+                                Rectangle {
+                                    x: 0;
+                                    y: panel.too-high * 1px;
+                                    width: parent.width;
+                                    height: (panel.high - panel.too-high) * 1px;
+                                    background: root.band-near;
+                                }
+                                Rectangle {
+                                    x: 0;
+                                    y: panel.low * 1px;
+                                    width: parent.width;
+                                    height: (panel.too-low - panel.low) * 1px;
+                                    background: root.band-near;
+                                }
+                                Rectangle {
+                                    x: 0;
+                                    y: panel.too-low * 1px;
+                                    width: parent.width;
+                                    height: max(
+                                        0px,
                                         parent.height - panel.too-low * 1px);
-                            background: root.band-far;
-                        }
-                        for edge in [panel.too-high, panel.high, panel.low,
-                                     panel.too-low]: Rectangle {
-                            x: 0;
-                            y: edge * 1px;
-                            width: parent.width;
-                            height: 1px;
-                            background: root.band-edge;
-                        }
-                        Text {
-                            x: 4px;
-                            y: panel.too-high * 1px - self.height;
-                            visible: panel.too-high * 1px >= self.height;
-                            text: "too high";
-                            color: root.band-words;
-                            font-italic: true;
-                        }
-                        Text {
-                            x: 4px;
-                            y: panel.high * 1px - self.height;
-                            visible: (panel.high - panel.too-high) * 1px
-                                     >= self.height;
-                            text: "high";
-                            color: root.band-words;
-                            font-italic: true;
-                        }
-                        Text {
-                            x: 4px;
-                            y: panel.low * 1px + 1px;
-                            visible: (panel.too-low - panel.low) * 1px
-                                     >= self.height;
-                            text: "low";
-                            color: root.band-words;
-                            font-italic: true;
-                        }
-                        Text {
-                            x: 4px;
-                            y: panel.too-low * 1px + 1px;
-                            visible: parent.height - panel.too-low * 1px
-                                     >= self.height;
-                            text: "too low";
-                            color: root.band-words;
-                            font-italic: true;
-                        }
-                    }
+                                    background: root.band-far;
+                                }
+                                for edge in [panel.too-high, panel.high,
+                                             panel.low, panel.too-low]
+                                        : Rectangle {
+                                    x: 0;
+                                    y: edge * 1px;
+                                    width: parent.width;
+                                    height: 1px;
+                                    background: root.band-edge;
+                                }
+                                Text {
+                                    x: 4px;
+                                    y: panel.too-high * 1px - self.height;
+                                    visible:
+                                        panel.too-high * 1px >= self.height;
+                                    text: "too high";
+                                    color: root.band-words;
+                                    font-italic: true;
+                                }
+                                Text {
+                                    x: 4px;
+                                    y: panel.high * 1px - self.height;
+                                    visible: (panel.high - panel.too-high) * 1px
+                                             >= self.height;
+                                    text: "high";
+                                    color: root.band-words;
+                                    font-italic: true;
+                                }
+                                Text {
+                                    x: 4px;
+                                    y: panel.low * 1px + 1px;
+                                    visible: (panel.too-low - panel.low) * 1px
+                                             >= self.height;
+                                    text: "low";
+                                    color: root.band-words;
+                                    font-italic: true;
+                                }
+                                Text {
+                                    x: 4px;
+                                    y: panel.too-low * 1px + 1px;
+                                    visible: parent.height - panel.too-low * 1px
+                                             >= self.height;
+                                    text: "too low";
+                                    color: root.band-words;
+                                    font-italic: true;
+                                }
+                            }
 
-                    for tick in panel.ticks: Rectangle {
-                        x: 0;
-                        y: tick.y * 1px;
-                        width: parent.width;
-                        height: 1px;
-                        background: root.rule;
-                    }
+                            for tick in panel.ticks: Rectangle {
+                                x: 0;
+                                y: tick.y * 1px;
+                                width: parent.width;
+                                height: 1px;
+                                background: root.rule;
+                            }
 
-                    // Each setpoint, a rule darker and thicker than the
-                    // ticks', and said in words at its right end, so that it
-                    // is told from them by more than its shade.
-                    for setpoint in panel.setpoints: Rectangle {
-                        x: 0;
-                        y: setpoint * 1px - 1px;
-                        width: parent.width;
-                        height: 2px;
-                        background: #6B7280;
-                        Text {
-                            x: parent.width - self.width - 4px;
-                            y: -self.height;
-                            text: "setpoint";
-                            color: #4B5563;
-                            font-italic: true;
+                            // Each setpoint, a rule darker and thicker than the
+                            // ticks', and said in words at its right end, so
+                            // that it is told from them by more than its shade.
+                            for setpoint in panel.setpoints: Rectangle {
+                                x: 0;
+                                y: setpoint * 1px - 1px;
+                                width: parent.width;
+                                height: 2px;
+                                background: #6B7280;
+                                Text {
+                                    x: parent.width - self.width - 4px;
+                                    y: -self.height;
+                                    text: "setpoint";
+                                    color: #4B5563;
+                                    font-italic: true;
+                                }
+                            }
+
+                            // The simulated world's ambient temperature: a
+                            // dashed rule, told from a setpoint's solid one by
+                            // its dashes and by its words, which say whose
+                            // figure it is: at the right end, clear of the
+                            // band's words at the left, and under the rule
+                            // where the setpoint's are over theirs, so the two
+                            // are not written over each other where the rules
+                            // are close. On the rule and not in the legend,
+                            // which is full already. A dash every ten pixels,
+                            // six long.
+                            for dash in panel.ambiented
+                                    ? floor(parent.width / 10px)
+                                    : 0: Rectangle {
+                                x: dash * 10px;
+                                y: panel.ambient * 1px - 1px;
+                                width: 6px;
+                                height: 2px;
+                                background: #4B5563;
+                            }
+                            if panel.ambiented: Text {
+                                x: parent.width - self.width - 4px;
+                                y: panel.ambient * 1px + 2px;
+                                text: panel.ambient-said;
+                                color: #4B5563;
+                                font-italic: true;
+                            }
+
+                            for trace in panel.traces: Path {
+                                x: 0;
+                                y: 0;
+                                width: parent.width;
+                                height: parent.height;
+                                viewbox-width: self.width / 1px;
+                                viewbox-height: self.height / 1px;
+                                commands: trace.commands;
+                                stroke: trace.colour;
+                                stroke-width: 2px;
+                            }
+
+                            // A dot on each trace where each reading arrived,
+                            // in the trace's colour, so that what was read is
+                            // told from the line drawn between readings.
+                            for trace in panel.traces: Path {
+                                x: 0;
+                                y: 0;
+                                width: parent.width;
+                                height: parent.height;
+                                viewbox-width: self.width / 1px;
+                                viewbox-height: self.height / 1px;
+                                commands: trace.dots;
+                                fill: trace.colour;
+                            }
                         }
-                    }
-
-                    // The simulated world's ambient temperature: a dashed
-                    // rule, told from a setpoint's solid one by its dashes
-                    // and by its words, which say whose figure it is: at the
-                    // right end, clear of the band's words at the left, and
-                    // under the rule where the setpoint's are over theirs,
-                    // so the two are not written over each other where the
-                    // rules are close. On the rule and not in the legend,
-                    // which is full already.
-                    // A dash every ten pixels, six long.
-                    for dash in panel.ambiented ? floor(parent.width / 10px)
-                                                : 0: Rectangle {
-                        x: dash * 10px;
-                        y: panel.ambient * 1px - 1px;
-                        width: 6px;
-                        height: 2px;
-                        background: #4B5563;
-                    }
-                    if panel.ambiented: Text {
-                        x: parent.width - self.width - 4px;
-                        y: panel.ambient * 1px + 2px;
-                        text: panel.ambient-said;
-                        color: #4B5563;
-                        font-italic: true;
-                    }
-
-                    for trace in panel.traces: Path {
-                        x: 0;
-                        y: 0;
-                        width: parent.width;
-                        height: parent.height;
-                        viewbox-width: self.width / 1px;
-                        viewbox-height: self.height / 1px;
-                        commands: trace.commands;
-                        stroke: trace.colour;
-                        stroke-width: 2px;
-                    }
-
-                    // A dot on each trace where each reading arrived, in the
-                    // trace's colour, so that what was read is told from the
-                    // line drawn between readings.
-                    for trace in panel.traces: Path {
-                        x: 0;
-                        y: 0;
-                        width: parent.width;
-                        height: parent.height;
-                        viewbox-width: self.width / 1px;
-                        viewbox-height: self.height / 1px;
-                        commands: trace.dots;
-                        fill: trace.colour;
                     }
                 }
             }

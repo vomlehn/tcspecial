@@ -41,8 +41,9 @@ use tcsverify::startup::Startup;
 
 use crate::payload::{PayloadConfig, SimulatedPayload};
 use crate::{
-    grid, handle_config_edits, handle_transfer_button, load, payload_info_from,
-    show_progress, update_row, MainWindow, PayloadInfo, RUNNING_STATUS,
+    grid, handle_config_edits, handle_transfer_button, load, may_start,
+    payload_info_from, show_progress, update_row, MainWindow, PayloadInfo,
+    RUNNING_STATUS,
 };
 
 /// Where the pictures go, from the crate's directory.
@@ -208,7 +209,8 @@ impl Scene {
             .map(|config: PayloadConfig| SimulatedPayload::new(config))
             .collect();
         for (row, payload) in made.iter().enumerate() {
-            if sims.get(row).is_some_and(|sim| sim.enabled) {
+            let startable = model.row_data(row).is_some_and(|i| may_start(&i));
+            if startable && sims.get(row).is_some_and(|sim| sim.enabled) {
                 payload.send(true);
                 update_row(&model, row, |info| {
                     info.status = RUNNING_STATUS.into();
@@ -333,6 +335,36 @@ impl Scene {
         } else {
             spin.invoke_accessible_decrement_action();
         }
+    }
+
+    /// Turns the mouse wheel over an element of a popup a payload's panel
+    /// has open, as a scroll does.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`   - The payload whose panel has the popup open.
+    /// * `id`     - The element, by its id as the testing backend names
+    ///              it: `PayloadPanel::parameters-scroll`.
+    /// * `pixels` - How far, in logical pixels; less than nought scrolls
+    ///              towards the foot.
+    fn wheel(&self, name: &str, id: &str, pixels: f32) {
+        let over = ElementHandle::find_by_element_id(&self.ui, id)
+            .next()
+            .unwrap_or_else(|| panic!("no {id}"));
+        // The backend places an element of a popup from the popup's corner
+        // rather than the window's, and the popups hang 4 pixels in from
+        // the panel's.
+        let panel = self.panel(name);
+        let at = over.absolute_position();
+        let size = over.size();
+        self.window.dispatch_event(WindowEvent::PointerScrolled {
+            position: slint::LogicalPosition::new(
+                panel.x + 4.0 + at.x + size.width / 2.0,
+                panel.y + 4.0 + at.y + size.height / 2.0,
+            ),
+            delta_x: 0.0,
+            delta_y: pixels,
+        });
     }
 
     /// Lets simulated seconds pass: each second, every payload that sends
@@ -491,12 +523,25 @@ fn screenshots() {
     scene.shoot("tcssim-heater-4.png", Some(heater), 1.0);
 
     // Changing the sizes: a packet made smaller than its segment, and put
-    // back. The popup that says so hangs from the panel's top left corner.
-    let sizes = scene.panel("temp_2").grown(1.0);
+    // back. The popup that says so hangs under the panel's buttons and
+    // below the panel's foot, so the picture is taken deeper than the
+    // panel is.
+    let panel = scene.panel("temp_2");
+    let sizes = Area {
+        height: panel.height + 70.0,
+        ..panel
+    }
+    .grown(1.0);
     scene.step("temp_2", 0, false);
     scene.shoot("tcssim-sizes-1.png", Some(sizes), 1.0);
     scene.step("temp_2", 0, true);
-    scene.shoot("tcssim-sizes-2.png", Some(sizes), 1.0);
+    // No popup now, so the panel alone.
+    scene.shoot("tcssim-sizes-2.png", Some(panel.grown(1.0)), 1.0);
+    // And a payload already running when its sizes go wrong, which can
+    // still be stopped: only starting is refused.
+    scene.press("temp_2", "Enable");
+    scene.step("temp_2", 0, false);
+    scene.shoot("tcssim-sizes-3.png", Some(sizes), 1.0);
     drop(scene);
 
     // A fault: the same set, with temp_3 told to go quiet after three
@@ -518,4 +563,16 @@ fn screenshots() {
     scene.shoot("tcssim-fault-1.png", Some(pair), 1.0);
     scene.pass(7);
     scene.shoot("tcssim-fault-2.png", Some(pair), 1.0);
+
+    // Where the fault is said: temp_3's Configuration, scrolled to its
+    // foot. The popup hangs a little below the panel, so the picture is
+    // taken a little deeper than the panel is.
+    let panel = scene.panel("temp_3");
+    let popup = Area {
+        height: panel.height + 40.0,
+        ..panel
+    };
+    scene.press("temp_3", "Configuration");
+    scene.wheel("temp_3", "PayloadPanel::parameters-scroll", -2000.0);
+    scene.shoot("tcssim-fault-3.png", Some(popup.grown(1.0)), 1.0);
 }

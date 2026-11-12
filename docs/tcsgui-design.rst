@@ -400,7 +400,8 @@ project's own SVG files beside the markup, ``undo.svg``, ``redo.svg`` and
 ``save.svg``, rather than an icon set's: compiled into the program, they are
 nothing to fail to load. Each takes the colour of the button's text, so it
 goes grey with the button when there is nothing to take back. Beside them the
-bar says how many edits can be undone.
+bar says how many edits can be undone -- *1 edit*, *2 edits*, the noun
+agreeing with the count.
 
 The Canvas
 ==========
@@ -1670,7 +1671,20 @@ file's own ``tcsgui`` section beside where the nodes were drawn: two people
 editing one configuration should not each have to decide again that a payload
 nobody reads yet is on purpose. It is remembered by node and kind, so a concern
 that stops applying leaves both lists by itself and comes back if the line it
-was about is deleted -- nothing has to be tidied up after drawing.
+was about is deleted -- nothing has to be tidied up after drawing. The list,
+while it is open, is worked out again after every change -- an edit, an undo,
+a redo, edits put back after a crash -- as the errors' menu is (see
+`Errors`_): a list that went on showing what the drawing no longer has would
+be a list of decisions about nothing.
+
+What ``tcsverify`` warns of is a concern too, in its words and under the same
+rules: a node with no line on it at all (kind ``unlinked``), said once where
+the drawing's own rules already have something to say about that node, and a
+node whose required fields are not all filled in (kind ``unfinished``). Both
+are warnings to ``tcsverify`` for the reason they are concerns here: the
+configuration has not finished saying something rather than said something
+wrong. The vehicle still refuses a file that has them, which is why they are
+counted and not left out.
 
 Errors
 ------
@@ -1683,8 +1697,19 @@ simulator file -- and **not each error**. Each is in the errors button's menu,
 and a list read once at startup is a list nobody has to hand when they come to
 put the errors right. The warning has two buttons: **Ignore**, which takes it
 away and leaves the errors as they stand, and **Quit**, which leaves the
-editor. The errors are the editor's own faults and everything ``tcsverify``
-finds in the files, warnings included, in its words.
+editor. The errors are the editor's own faults and every error ``tcsverify``
+finds in the files, in its words: one about a node names the node, which
+choosing it goes to, and any other starts with the file's name and the line
+-- ``battery-sim.yaml:97:`` -- and not the path the session was given, which
+would fill a menu's line before it said anything. ``tcsverify``'s *warnings*
+are not errors. They are what an unfinished configuration looks like -- a
+node joined to nothing, a node whose required fields are not all in -- which
+is every node the moment it is placed, and an errors button that counted
+them would say "2 errors" about a node nobody had had the chance to fill in:
+the editor would be crying wolf, against `The Editor Is Lazy`_. They are
+concerns, and counted there (see `Concerns`_). So every node drawn red is in
+the errors' menu, the red keying on the editor's own faults (see `A node
+that is wrong`_), and nothing in the menu is something not yet done.
 
 **One button finds every error.** While the configuration has any, the bar has
 a button saying how many -- *3 errors* -- whose menu lists them, one line each,
@@ -1733,7 +1758,8 @@ Alerts
 Anything that goes wrong is said twice: in red at the end of the bar along the
 top of the window, and in a small window of its own that has to be acknowledged.
 The line on the bar is the state -- what stopped the last write, in red, and
-otherwise, not in red, what the last command did or ``saved`` -- and the window
+otherwise, not in red, what the last command did, ``not saved`` while Autosave
+is off and there are edits the files do not have, or ``saved`` -- and the window
 is the moment it happened. Both, because either alone is wrong: a line is easy
 to carry on typing past without reading, and the thing it says is the one thing
 in this editor that silence makes worse -- a full device stays full while every
@@ -1855,11 +1881,15 @@ and not the node's, and Tab passes it by.
 Every field of a node's window is in view at once, none scrolled out of sight:
 a field out of sight is one its reader does not know is there, and one Tab
 never reaches, the toolkit's order leaving out what is clipped. So each field
-is its name beside its box, one row tall, and the window is in columns -- the
-node's own attributes, then the simulator's settings for it, which are
-written to a different file and named so by the heading over them, in two
-columns of their own, there being as many as twenty -- and as tall as the
-longest column. Tab goes down each column in turn. A window whose fields grow,
+is its name beside its box, one row tall: the node's own attributes first,
+and under them the simulator's settings for it, which are written to a
+different file and named so by the heading over them, in two columns of
+their own, there being as many as twenty. Under and not beside: the three
+columns side by side made a window wider than its share of a screen, and it
+opened narrower than that, so its last column was cut off. The window is as
+tall as all of that and never narrower than its widest part, so no field is
+cut off at the foot or the side. Tab goes down the node's fields, then each
+column in turn. A window whose fields grow,
 a complaint appearing over them or a component with more settings shown in
 the physics window, grows with them.
 

@@ -98,7 +98,7 @@ impl Sizes {
     pub fn for_tests() -> Self {
         Self {
             panel_width: 394.0,
-            panel_height: 192.0,
+            panel_height: 224.0,
             chrome_width: 24.0,
             chrome_height: 92.0,
         }
@@ -265,10 +265,10 @@ mod tests {
         let shape = grid_shape(&sizes(), 4);
         assert_eq!((shape.columns, shape.rows), (3, 2));
         // Three panels across and two rows down, plus the chrome: 3 x 394 + 24
-        // and 2 x 192 + 92. Written out rather than computed from the fixture,
+        // and 2 x 224 + 92. Written out rather than computed from the fixture,
         // so that a change to a panel's size has to be looked at here rather
         // than silently agreeing with itself.
-        assert_eq!((shape.width, shape.height), (1206.0, 476.0));
+        assert_eq!((shape.width, shape.height), (1206.0, 540.0));
     }
 
     /// A row is filled before another is started under it, three across.

@@ -148,6 +148,34 @@ Requirement
     have restarted during the silence with none of them running.
 
 Requirement
+    A moment owes the question; it is asked at the first chance after it.
+    Neither moment can always ask at once: every command but CONNECT,
+    RESTART_ARM and RESTART waits for the window to be matched for
+    commanding (see
+    `Matching the configurations <tcsmoc.html#matching-the-configurations>`__),
+    which needs a clear beacon carrying this window's
+    checksum and a CONNECT of its own answered since the match last ended.
+    The first beacon usually arrives with the link down, the window having
+    just opened, and a fresh start's carries the restart flag; and an outage
+    ends the match. So the question is owed from the moment, for as long as
+    contact holds, and asked at once where the window is matched, at the
+    Connect that matches it, or at the clear beacon that does. Losing contact
+    forgets it, the next contact owing its own, and a Connect pressed with
+    nothing owed asks nothing: a third moment would be a question nobody's
+    reading of the beacons called for.
+
+Requirement
+    At the end of an outage the window sends the CONNECT itself, where
+    nothing can have changed what it would say: the link is still up, its
+    last CONNECT agreed, and the returning beacons carry this window's
+    checksum with the restart flag clear and no start of tcspecial heard
+    (one is the operator's to Connect to, and takes the link down). The
+    operator chose to command this vehicle with that Connect; an outage is
+    the vehicle not being heard, not the operator changing their mind, and a
+    window that waited for Disconnect and Connect to ask what it owed would
+    leave every panel Stale until somebody thought to press them.
+
+Requirement
     A payload whose last press was Disable is not asked about. The operator
     said to stop it; asking the spacecraft would spend a command to be told
     what the ground already knows, and a panel saying Stopped because
@@ -156,17 +184,19 @@ Requirement
     anything about is asked.
 
 Requirement
-    The asking happens off the event loop, and what comes back is painted by
-    the next pass of the refresh. Each question waits on the spacecraft for as
-    long as the timeout allows, and a burst of them on the event loop would
-    stop the window repainting at exactly the moment an operator is watching
-    it.
+    The asking happens off the event loop, on a thread of its own, and what
+    comes back is handed to the window's thread to paint as it arrives. Each
+    question waits on the spacecraft for as long as the timeout allows, and
+    a burst of them on the event loop would stop the window repainting at
+    exactly the moment an operator is watching it.
 
-Nothing is asked while the command link is down, and the question is not held
-until it comes up: the panels keep saying unknown until contact is made again
-or somebody chooses Query. Contact returning while the link is down is
-rare -- the beacon and the link come back together -- and a question owed
-indefinitely is a question that goes out at a moment nobody chose.
+Nothing is asked while the command link is down. The question owed is held
+until the link comes up only while contact holds since the moment that owed
+it: a Connect pressed then is the operator choosing the moment, and it is
+the first moment the first beacon's question can be asked at all, since the
+window opens with the link down. It is not held across a loss of contact,
+so a question is never owed indefinitely, to go out at a moment nobody
+chose.
 
 Requirement
     The ground does not ask about its payloads on a timer. It asks at the two
@@ -733,6 +763,21 @@ is comparing a node against the file that describes it.
 
 It shows no packet interval: that is a simulator setting, stated in the
 simulator file and shown by tcssim.
+
+Requirement
+    A panel shows its source's packet size as the configuration states it:
+    the width of the type the source sends at its ``world-out``, or, for a
+    string or bytes, its ``read_size`` where it gives one, and ``not fixed``
+    where the configuration gives neither. It was nought on every panel,
+    which reads as a source sending empty packets.
+
+Requirement
+    Nothing the operator reads is cut off at the window's edge. ``Last
+    Response`` and the packet count under it wrap; the Configuration pop-up
+    is as wide and as tall as what it shows, within the window, and scrolls
+    only past that; and the plot window's legends wrap onto as many lines as
+    they need, the panels sharing the height that is left, one plot height
+    for all of them so that Rust draws every panel to one size.
 
 The two lines of what arrived are the ground's own reading: when something
 last came from that source and the head of it, counted from the moment the MOC

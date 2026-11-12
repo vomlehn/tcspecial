@@ -156,6 +156,24 @@ pub enum Concern {
     /// A vehicle node something leaves and nothing arrives at: it is sending
     /// what it has not been given.
     NothingArrives { node: String },
+    /// A node `tcsverify` says has not finished saying what it is: an
+    /// attribute its type needs that is not filled in yet. A warning to
+    /// tcsverify, and a concern here rather than an error: an empty field is
+    /// a question not yet answered (see "The Editor Is Lazy" in the design).
+    Unfinished {
+        /// The node, by its absolute name.
+        node: String,
+        /// What tcsverify says about it, in its words.
+        said: String,
+    },
+    /// A node `tcsverify` says has no line on it at all, which is how every
+    /// node is placed. Its other warning, said here for the same reason.
+    Unlinked {
+        /// The node, by its absolute name.
+        node: String,
+        /// What tcsverify says about it, in its words.
+        said: String,
+    },
 }
 
 impl Concern {
@@ -168,7 +186,9 @@ impl Concern {
         match self {
             Concern::GoesNowhere { node, .. }
             | Concern::NothingLeaves { node }
-            | Concern::NothingArrives { node } => node,
+            | Concern::NothingArrives { node }
+            | Concern::Unfinished { node, .. }
+            | Concern::Unlinked { node, .. } => node,
         }
     }
 
@@ -179,7 +199,8 @@ impl Concern {
     ///
     /// # Returns
     ///
-    /// `<terminal>-goes-nowhere`, `nothing-leaves` or `nothing-arrives`.
+    /// `<terminal>-goes-nowhere`, `nothing-leaves`, `nothing-arrives`,
+    /// `unfinished` or `unlinked`.
     pub fn kind(&self) -> String {
         match self {
             Concern::GoesNowhere { terminal, .. } => {
@@ -187,6 +208,8 @@ impl Concern {
             }
             Concern::NothingLeaves { .. } => "nothing-leaves".to_string(),
             Concern::NothingArrives { .. } => "nothing-arrives".to_string(),
+            Concern::Unfinished { .. } => "unfinished".to_string(),
+            Concern::Unlinked { .. } => "unlinked".to_string(),
         }
     }
 
@@ -211,6 +234,8 @@ impl Concern {
             Concern::NothingArrives { node } => {
                 format!("\"{node}\": something leaves and nothing arrives")
             }
+            Concern::Unfinished { said, .. }
+            | Concern::Unlinked { said, .. } => said.clone(),
         }
     }
 }
@@ -1194,8 +1219,49 @@ impl Document {
     /// applying leaves both lists by itself -- the set-aside is remembered by
     /// node and kind, and a kind that no longer holds is not raised -- so
     /// nothing has to be tidied up after a link is drawn.
+    #[cfg(test)]
     pub fn concerns_apart(&self) -> (Vec<Concern>, Vec<Concern>) {
-        self.concerns()
+        self.concerns_with(&[])
+    }
+
+    /// The concerns set aside and the rest, as [`Document::concerns_apart`],
+    /// with what `tcsverify` warned of among them.
+    ///
+    /// Its warnings are things not finished yet, and are concerns for the
+    /// reason the drawing's own are: they are what a diagram halfway through
+    /// being drawn looks like. Held to the same rule, so none while there is
+    /// one node or none; and a node with no line at all that already has a
+    /// concern about where its data goes is not said twice.
+    ///
+    /// # Arguments
+    ///
+    /// * `found` - What tcsverify warned of, as concerns: see
+    ///             [`Concern::Unfinished`] and [`Concern::Unlinked`].
+    ///
+    /// # Returns
+    ///
+    /// What has not been looked at, and what was set aside, each in the
+    /// document's order and then tcsverify's.
+    pub fn concerns_with(
+        &self,
+        found: &[Concern],
+    ) -> (Vec<Concern>, Vec<Concern>) {
+        let mut concerns = self.concerns();
+        if self.nodes.len() >= 2 {
+            let own = concerns.clone();
+            concerns.extend(
+                found
+                    .iter()
+                    .filter(|concern| {
+                        !matches!(concern, Concern::Unlinked { .. })
+                            || !own
+                                .iter()
+                                .any(|said| said.node() == concern.node())
+                    })
+                    .cloned(),
+            );
+        }
+        concerns
             .into_iter()
             .partition(|concern| !self.aside.contains(&concern.key()))
     }

@@ -1198,7 +1198,7 @@ mod tests {
                 "to gateway, at 127.0.0.1:{}",
                 5100 + row
             )),
-            packet_size: 0,
+            packet_size: SharedString::from("2 bytes"),
             status: SharedString::from(crate::vehicle::UNKNOWN_STATUS),
             oc_time: SharedString::from(NO_TRANSFER_TIME),
             oc_data: SharedString::new(),
@@ -1439,6 +1439,7 @@ mod tests {
         let links = tcslibgs::graph::telemetry::of(&graph)
             .expect("its links to the ground");
         let shipped = crate::vehicle::panels(
+            &graph,
             &links,
             &crate::vehicle::settable_of(&graph),
         );
@@ -1731,6 +1732,53 @@ mod tests {
                          {window_height} tall"
                     );
                 }
+            }
+            // Last, because it leaves the window taller above the panels
+            // than it opens: a Last Response as long as the answers of many
+            // nodes are, and a count of packets in the millions. Both are
+            // wrapped rather than run off the window's edge, which pushed
+            // every control in the group above the panels off it with them.
+            ui.set_last_response(SharedString::from(
+                (0..12)
+                    .map(|n| format!("consensus_temp_{n}: Active"))
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            ));
+            ui.set_vehicle_packets(SharedString::from(
+                "Packets: 12345678 received = 12345678 processed + 0 \
+                 malformed + 0 mismatched",
+            ));
+
+            let window = ui.window().size().to_logical(1.0);
+            // A Text that does not fit reports the width it took rather
+            // than the one it was given, so it is held to the window too.
+            for id in [
+                "MainWindow::last-response-text",
+                "MainWindow::vehicle-packets-text",
+            ] {
+                let line = ElementHandle::find_by_element_id(&ui, id)
+                    .next()
+                    .unwrap_or_else(|| panic!("the window has {id}"));
+                let right = line.absolute_position().x + line.size().width;
+                assert!(
+                    right <= window.width,
+                    "{what}: {id} reaches {right}, past the {} the window is \
+                     wide",
+                    window.width
+                );
+            }
+
+            for button in
+                ElementHandle::find_by_element_type_name(&ui, "Button")
+            {
+                let right = button.absolute_position().x + button.size().width;
+                assert!(
+                    right <= window.width,
+                    "{what}: with a long Last Response, the {:?} button \
+                     reaches {right}, past the {} the window is wide",
+                    button.accessible_label(),
+                    window.width
+                );
             }
         }
 
@@ -2429,6 +2477,7 @@ mod tests {
         let links = tcslibgs::graph::telemetry::of(&graph)
             .expect("its links to the ground");
         let model = crate::vehicle::panels(
+            &graph,
             &links,
             &crate::vehicle::settable_of(&graph),
         );

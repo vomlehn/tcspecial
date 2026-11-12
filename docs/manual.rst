@@ -3,11 +3,12 @@ TCSpecial Manuals
 =================
 
 .. warning::
-   TCSpecial is very early software and is subject to rapid change. Until
-   1.0, any change to its API changes the minor version number (0.1 to
-   0.2), so a release that changes only the patch number never breaks code
-   built against it. Feedback is welcome, even at this stage: open an issue
-   at https://github.com/vomlehn/tcspecial/issues.
+   TCSpecial is an alpha release. It is not fully tested, it is not feature
+   complete, and it is subject to rapid change. Until 1.0, any change to its
+   API changes the minor version number (0.1 to 0.2), so a release that
+   changes only the patch number never breaks code built against it.
+   Feedback is welcome, even at this stage: open an issue at
+   https://github.com/vomlehn/tcspecial/issues.
 
 TCSpecial is **telemetry and control, special**, and it is flight software.
 It connects the devices aboard a vehicle -- on an I\ :superscript:`2`\ C

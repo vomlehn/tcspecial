@@ -49,8 +49,10 @@ use tcslib::gateway::DATUM_BYTES;
 use tcslib::matched::Matched;
 use tcslib::ping::{Pinger, Uplink};
 use tcslib::simulator;
+use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::telemetry::{self, Reaches, Telemetered, Via};
 use tcslibgs::graph::Graph;
+use tcslibgs::link_type::LinkType;
 use tcslibgs::ready::SetUpFor;
 use tcslibgs::sim_config::SimConfigFile;
 use tcslibgs::simulate::Mode;
@@ -307,6 +309,116 @@ const UNMATCHED_HEADING: &str = "Not sent: the match between the ground's \
                                  and the vehicle's configurations is still \
                                  in progress";
 
+/// The heading of that pop-up where the two checksums agree, and what was
+/// lost is the match for commanding: the beacons went overdue, or tcspecial
+/// started again, since this station's last Connect. Nothing is in progress
+/// then, and nothing about the checksums is to be checked.
+const MATCH_LOST_HEADING: &str = "Not sent: the match for commanding was \
+                                  lost";
+
+/// What a command refused unmatched comes to: the pop-up's heading and
+/// text, and what `Last Response` says.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Refusal {
+    /// The pop-up's heading.
+    heading: &'static str,
+    /// What `Last Response` says: the reason, in one sentence.
+    response: String,
+    /// What the pop-up says: the reason, and the checksums it rests on.
+    message: String,
+}
+
+/// What the window knows of the match when a command is refused for want
+/// of it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MatchSeen<'a> {
+    /// The checksum the vehicle's last beacon carried, as the window shows
+    /// it; empty where no beacon has been heard.
+    theirs: &'a str,
+    /// This station's configuration's checksum, where it has one.
+    ours: Option<tcslibgs::ConfigDigest>,
+    /// Whether the station is matched for listening: the last beacon is
+    /// recent, has its restart flag clear, and carries `ours`.
+    listening: bool,
+    /// Whether the last beacon's restart flag was set.
+    flagged: bool,
+}
+
+/// Says why a command was refused unmatched, in words that fit the case.
+///
+/// Where the vehicle's beacon carries this station's checksum, nothing is to
+/// be compared and nothing is in progress: the match for commanding was had
+/// and lost, to beacons that went overdue or to a start of tcspecial. Lost to
+/// an outage, it is made again without a press when the beacons return (see
+/// [`Asking`]), and the operator is told so. Otherwise what brings it back is
+/// a Connect; the link is up -- a refusal is only made on a link that is up
+/// -- so its button reads Disconnect, and the press is Disconnect and then
+/// Connect. Saying, as the library does, to
+/// check that the checksums agree, beside two that plainly do, sends the
+/// operator looking for a fault that is not there. Elsewhere the library's
+/// own refusal is said, which is what the window and every other station
+/// built on it say alike.
+///
+/// # Arguments
+///
+/// * `kind`    - What kind of command was refused.
+/// * `refused` - The library's refusal, `TcsError::Unmatched`, in words.
+/// * `seen`    - What the window knows of the match.
+///
+/// # Returns
+///
+/// The heading, `Last Response` and the pop-up's text.
+fn unmatched_refusal(
+    kind: tcslibgs::CommandType,
+    refused: &str,
+    seen: MatchSeen<'_>,
+) -> Refusal {
+    let agreed = seen.ours.is_some_and(|ours| {
+        !seen.theirs.is_empty() && seen.theirs == ours.to_string()
+    });
+    if !agreed {
+        return Refusal {
+            heading: UNMATCHED_HEADING,
+            response: refused.to_string(),
+            message: format!(
+                "{refused}.{}",
+                checksums_of(seen.theirs, seen.ours)
+            ),
+        };
+    }
+    let (why, then) = if seen.flagged {
+        (
+            "tcspecial has started again since this station's Connect",
+            "press Disconnect, then Connect",
+        )
+    } else if !seen.listening {
+        (
+            "the vehicle's beacons are overdue, so the match for commanding \
+             was lost",
+            "nothing need be pressed: when the beacons arrive again, this \
+             window sends CONNECT itself and asks what each node is doing",
+        )
+    } else {
+        (
+            "the match for commanding was lost while the vehicle was not \
+             heard from, and has not been made again",
+            "press Disconnect, then Connect",
+        )
+    };
+    let response =
+        format!("{kind:?} not sent: {why}. The checksums agree, so {then}");
+    let message = format!(
+        "{response}. The vehicle's beacon carries md5 {}, which is this \
+         station's configuration's.",
+        seen.theirs
+    );
+    Refusal {
+        heading: MATCH_LOST_HEADING,
+        response,
+        message,
+    }
+}
+
 /// The heading of the pop-up a restart pressed before a CONNECT has been
 /// answered asks in.
 const UNANSWERED_HEADING: &str = "No CONNECT has been answered yet";
@@ -328,7 +440,22 @@ fn checksums_said(
     ui: &MainWindow,
     ours: Option<tcslibgs::ConfigDigest>,
 ) -> String {
-    let theirs = ui.get_beacon_checksum();
+    checksums_of(&ui.get_beacon_checksum(), ours)
+}
+
+/// [`checksums_said`], from the two checksums.
+///
+/// # Arguments
+///
+/// * `theirs` - The checksum the vehicle's last beacon carried; empty where
+///              no beacon has been heard.
+/// * `ours`   - This station's configuration's checksum, where it has one.
+///
+/// # Returns
+///
+/// A sentence to follow what a pop-up says, with a space before it, or
+/// nothing where neither is known.
+fn checksums_of(theirs: &str, ours: Option<tcslibgs::ConfigDigest>) -> String {
     match (theirs.is_empty(), ours) {
         (false, Some(ours)) => format!(
             " The vehicle's beacon carries md5 {theirs}; this station's \
@@ -393,18 +520,29 @@ fn refused_unmatched(
     let refused = {
         let mut guard = link.lock().unwrap();
         let ours = guard.matched().ours();
+        let listening = guard.matched().for_listening();
         guard
             .client()
             .and_then(|client| client.may_go(kind).err())
-            .map(|e| (e, ours))
+            .map(|e| (e, ours, listening))
     };
-    let Some((e, ours)) = refused else {
+    let Some((e, ours, listening)) = refused else {
         return false;
     };
-    let said = format!("{e}.{}", checksums_said(ui, ours));
-    eprintln!("{UNMATCHED_HEADING}: {said}");
-    ui.set_last_response(SharedString::from(e.to_string()));
-    show_notice(ui, UNMATCHED_HEADING, &said, false);
+    let theirs = ui.get_beacon_checksum();
+    let refusal = unmatched_refusal(
+        kind,
+        &e.to_string(),
+        MatchSeen {
+            theirs: &theirs,
+            ours,
+            listening,
+            flagged: ui.get_beacon_restart() == tcsui::RESTARTED_CONNECT,
+        },
+    );
+    eprintln!("{}: {}", refusal.heading, refusal.message);
+    ui.set_last_response(SharedString::from(refusal.response));
+    show_notice(ui, refusal.heading, &refusal.message, false);
     true
 }
 
@@ -511,6 +649,51 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
     settable
 }
 
+/// What a panel says its packet size is where the configuration fixes none.
+///
+/// Words rather than nought, which was what every panel said once whatever
+/// its node sent: a size of nought reads as a source that sends empty
+/// packets, which none does.
+pub const NO_PACKET_SIZE: &str = "not fixed";
+
+/// How big each packet of a source's data is, as its panel says it.
+///
+/// From the configuration, which is what a panel is compared against: the
+/// width of the type the source sends at its `world-out`, which is every
+/// datum of a number, a boolean or a structure of them; and for a string or
+/// bytes, whose length is each datum's own, the node's `read_size` where it
+/// states one, which is as much as one read asks the part for. The count a
+/// string or bytes is sent after is not counted: it is how the link carries
+/// the datum, and not the datum.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+/// * `link`  - The source's link to the ground.
+///
+/// # Returns
+///
+/// The size in bytes, such as `2 bytes`, or [`NO_PACKET_SIZE`] where the
+/// configuration fixes none.
+fn packet_size_of(graph: &Graph, link: &Telemetered) -> String {
+    let width = match &link.carries {
+        LinkType::Basic(basic) => basic.width(),
+        LinkType::Structure(fields) => {
+            fields.iter().map(|(_, basic)| basic.width()).sum()
+        }
+    };
+    let read = || {
+        let node = graph.node(&link.source)?;
+        let size = reach_of(node).ok()?.read_size?;
+        usize::try_from(size).ok()
+    };
+    match width.or_else(read) {
+        Some(1) => "1 byte".to_string(),
+        Some(size) => format!("{size} bytes"),
+        None => NO_PACKET_SIZE.to_string(),
+    }
+}
+
 /// One panel per link to the ground, in the order the configuration declares
 /// the sources.
 ///
@@ -519,6 +702,7 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
 ///
 /// # Arguments
 ///
+/// * `graph`    - The configuration the links are of.
 /// * `links`    - Each source's link to the ground.
 /// * `settable` - Each node's settable attributes, by the node's name.
 ///
@@ -526,6 +710,7 @@ pub fn settable_of(graph: &Graph) -> BTreeMap<String, Vec<String>> {
 ///
 /// The panels, in device id order, with nothing yet received.
 pub fn panels(
+    graph: &Graph,
     links: &[Telemetered],
     settable: &BTreeMap<String, Vec<String>>,
 ) -> Vec<DHInfo> {
@@ -551,7 +736,7 @@ pub fn panels(
                 // The node's device id, which is what its port is counted on.
                 dev_id: i32::try_from(link.id).unwrap_or(i32::MAX),
                 config: SharedString::from(format!("{via}, at {at}")),
-                packet_size: 0,
+                packet_size: SharedString::from(packet_size_of(graph, link)),
                 status: SharedString::from(UNKNOWN_STATUS),
                 oc_time: SharedString::from(NO_TRANSFER_TIME),
                 oc_data: SharedString::new(),
@@ -814,26 +999,45 @@ fn command_links_of(
 /// * `agreed`  - Where the verdict is kept: whether the digests matched, or
 ///               `None` where the CONNECT did not get through.
 /// * `digest`  - The checksum of the configuration this window read.
-///
-/// # Panics
-///
-/// If the lock on the link is poisoned.
 fn hear_what_the_vehicle_read(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     agreed: &Agreed,
     digest: tcslibgs::ConfigDigest,
 ) {
+    ui.set_last_response(SharedString::from(connect_said(
+        link, agreed, digest,
+    )));
+}
+
+/// Sends a CONNECT, keeps the verdict, and says how it went. Touches no
+/// window, so that the asking done off the event loop can send one: see
+/// [`Asking`].
+///
+/// # Arguments
+///
+/// * `link`    - The link the CONNECT goes on.
+/// * `agreed`  - Where the verdict is kept: whether the digests matched, or
+///               `None` where the CONNECT did not get through.
+/// * `digest`  - The checksum of the configuration this window read.
+///
+/// # Returns
+///
+/// What `Last Response` is to say of it.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
+fn connect_said(
+    link: &Mutex<CiLink>,
+    agreed: &Agreed,
+    digest: tcslibgs::ConfigDigest,
+) -> String {
     let answer = {
         let mut guard = link.lock().unwrap();
         match guard.client() {
             Some(client) => client.connect(digest),
-            None => {
-                ui.set_last_response(SharedString::from(
-                    crate::ci_link::NOT_CONNECTED,
-                ));
-                return;
-            }
+            None => return crate::ci_link::NOT_CONNECTED.to_string(),
         }
     };
 
@@ -869,16 +1073,14 @@ fn hear_what_the_vehicle_read(
             if !same || theirs != version {
                 eprintln!("{said}");
             }
-            ui.set_last_response(SharedString::from(said));
+            said
         }
         Err(e) => {
             eprintln!("CONNECT did not get through: {e}");
             if let Ok(mut held) = agreed.lock() {
                 *held = None;
             }
-            ui.set_last_response(SharedString::from(format!(
-                "CONNECT failed: {e}"
-            )));
+            format!("CONNECT failed: {e}")
         }
     }
 }
@@ -915,92 +1117,142 @@ fn query_every_node(
     ask_nodes(ui, link, agreed, model, None);
 }
 
-/// Asks the spacecraft what each node is doing, because contact has just been
-/// made: on the first beacon, and at the end of an outage.
-///
-/// Not a poll: nothing is asked while contact simply holds. A node whose last
-/// press was Disable is left out, because the operator said to stop it and
-/// there is nothing to ask. And where nothing may be asked -- the link is
-/// down, the vehicle has not agreed which configuration it is flying, or the
-/// window is not matched for commanding -- nothing is, and nothing is said: the panels keep what they show until
-/// contact is next made or somebody presses Query all.
-///
-/// # Arguments
-///
-/// * `ui`       - The window, whose Last Response says what was found.
-/// * `link`     - The link the queries go on.
-/// * `agreed`   - Whether the vehicle has agreed which configuration it is
-///                flying.
-/// * `model`    - The panels, whose statuses are updated.
-/// * `declined` - Which panels' nodes the operator has stopped, which are
-///                not asked about.
-fn contact_made(
-    ui: &MainWindow,
-    link: &Arc<Mutex<CiLink>>,
-    agreed: &Agreed,
-    model: &impl Model<Data = DHInfo>,
-    declined: &crate::Declined,
-) {
-    let connected = link
-        .lock()
-        .map(|mut guard| {
-            guard.client().is_some() && guard.matched().for_commanding()
-        })
-        .unwrap_or(false);
-    if connected && may_command_nodes(agreed) {
-        ask_nodes(ui, link, agreed, model, Some(declined));
-    }
+/// One node to ask about: its panel, and what the question names it by.
+#[derive(Debug, Clone)]
+struct Asked {
+    /// The panel's row, which what was found is shown in.
+    row: usize,
+    /// The node's id, which the question names.
+    node: tcslibgs::NodeId,
 }
 
-/// After a Connect, asks what [`contact_made`] would have asked, where contact
-/// was made before the link was up.
-///
-/// The first beacon usually arrives before anybody has pressed Connect, and
-/// then nothing could be asked: the panels would say Unknown until an outage
-/// ended or somebody pressed Query all. A Connect the vehicle agrees to, with
-/// the spacecraft being heard from, is the moment the asking was owed. What
-/// the Connect said stays in Last Response, with what the asking found after
-/// it.
+/// What a node's QUERY_NODE came to: the status it was answered with,
+/// whether the node is running and what it has moved; or why there was no
+/// answer.
+type Answered =
+    Result<(tcslibgs::CommandStatus, bool, tcslibgs::NodeCounts), String>;
+
+/// The nodes of the panels, each panel's node once, in the panels' order:
+/// every one, or with `declined`, every one the operator has not stopped.
 ///
 /// # Arguments
 ///
-/// * `ui`       - The window, whose Last Response says what was found.
-/// * `link`     - The link the queries go on.
-/// * `agreed`   - Whether the vehicle has agreed which configuration it is
-///                flying.
-/// * `model`    - The panels, whose statuses are updated.
-/// * `declined` - Which panels' nodes the operator has stopped, which are
-///                not asked about.
-/// * `contact`  - Whether the spacecraft is being heard from.
-fn connected_in_contact(
-    ui: &MainWindow,
-    link: &Arc<Mutex<CiLink>>,
-    agreed: &Agreed,
+/// * `model`    - The panels.
+/// * `declined` - Which panels' nodes the operator has stopped, to leave
+///                them out; `None` keeps every node.
+///
+/// # Returns
+///
+/// The nodes to ask about.
+fn to_ask(
     model: &impl Model<Data = DHInfo>,
-    declined: &crate::Declined,
-    contact: &Mutex<tcslib::beacon::Contact>,
-) {
-    let heard =
-        matches!(contact.lock().as_deref(), Ok(tcslib::beacon::Contact::Made));
-    if !heard || !may_command_nodes(agreed) {
-        return;
+    declined: Option<&crate::Declined>,
+) -> Vec<Asked> {
+    (0..model.row_count())
+        .filter(|row| {
+            !declined.is_some_and(|declined| was_declined(declined, *row))
+        })
+        .filter_map(|row| {
+            let info = model.row_data(row)?;
+            Some(Asked {
+                row,
+                node: tcslibgs::NodeId(
+                    u32::try_from(info.dev_id).unwrap_or(u32::MAX),
+                ),
+            })
+        })
+        .collect()
+}
+
+/// Asks each node what it is doing and has moved: one QUERY_NODE a node,
+/// each waiting on the vehicle for as long as the client's timeout allows.
+/// Touches no window, so that it can be done off the event loop.
+///
+/// # Arguments
+///
+/// * `link`  - The link the questions go on.
+/// * `asked` - The nodes to ask about.
+///
+/// # Returns
+///
+/// Each node's panel row and what its question came to; a node asked
+/// after the link went down is answered with [`crate::ci_link::NOT_CONNECTED`].
+fn query_nodes(
+    link: &Mutex<CiLink>,
+    asked: &[Asked],
+) -> Vec<(usize, Answered)> {
+    asked
+        .iter()
+        .map(|asked| {
+            let answer = match link.lock() {
+                Ok(mut guard) => match guard.client() {
+                    Some(client) => {
+                        client.query_node(asked.node).map_err(|e| e.to_string())
+                    }
+                    None => Err(crate::ci_link::NOT_CONNECTED.to_string()),
+                },
+                Err(_) => Err(crate::ci_link::NOT_CONNECTED.to_string()),
+            };
+            (asked.row, answer)
+        })
+        .collect()
+}
+
+/// Puts what the nodes answered in their panels: each status, and the
+/// counts beside what the panel's Configuration already says.
+///
+/// # Arguments
+///
+/// * `model`   - The panels.
+/// * `answers` - Each node's panel row and what its question came to.
+///
+/// # Returns
+///
+/// What was found, node by node, for `Last Response`.
+fn show_node_answers(
+    model: &impl Model<Data = DHInfo>,
+    answers: &[(usize, Answered)],
+) -> String {
+    let mut said = Vec::new();
+    for (row, answer) in answers {
+        let Some(mut info) = model.row_data(*row) else {
+            continue;
+        };
+        match answer {
+            // No such node aboard: a tcspecial flying another configuration,
+            // which nobody here can speak for.
+            Ok((tcslibgs::CommandStatus::NotFound, _, _)) => {
+                info.status = SharedString::from(UNKNOWN_STATUS);
+                said.push(format!("{}: {}", info.name, info.status));
+                model.set_row_data(*row, info);
+            }
+            Ok((status, enabled, counts)) if status.is_success() => {
+                info.status = SharedString::from(if *enabled {
+                    ACTIVE_STATUS
+                } else {
+                    STOPPED_STATUS
+                });
+                info.parameters = SharedString::from(format!(
+                    "{}\n\nwhat it has moved since the vehicle started\n{}",
+                    describes(&info),
+                    counted(counts)
+                ));
+                said.push(format!("{}: {}", info.name, info.status));
+                model.set_row_data(*row, info);
+            }
+            Ok((status, _, _)) => said.push(format!("{}: {status}", info.name)),
+            Err(e) => said.push(format!("{}: no answer ({e})", info.name)),
+        }
     }
-    let connect_said = ui.get_last_response();
-    contact_made(ui, link, agreed, model, declined);
-    let asked = ui.get_last_response();
-    if asked != connect_said {
-        ui.set_last_response(SharedString::from(format!(
-            "{connect_said}; {asked}"
-        )));
-    }
+    said.join("; ")
 }
 
 /// Asks each panel's node what it is doing and has moved, and shows it:
 /// every node, or with `declined`, every node the operator has not stopped.
 ///
 /// Nothing is asked where the vehicle has not agreed which configuration it
-/// is flying, and the asking stops where the link is down; Last Response
-/// says so, or what each node answered.
+/// is flying, or where the link is down; Last Response says so, or what each
+/// node answered.
 ///
 /// # Arguments
 ///
@@ -1026,58 +1278,235 @@ fn ask_nodes(
         ui.set_last_response(SharedString::from(NOT_AGREED));
         return;
     }
+    if link.lock().unwrap().client().is_none() {
+        ui.set_last_response(SharedString::from(crate::ci_link::NOT_CONNECTED));
+        return;
+    }
+    let answers = query_nodes(link, &to_ask(model, declined));
+    ui.set_last_response(SharedString::from(show_node_answers(
+        model, &answers,
+    )));
+}
 
-    let mut said = Vec::new();
-    for row in 0..model.row_count() {
-        if declined.is_some_and(|declined| was_declined(declined, row)) {
-            continue;
+/// The question about the nodes that the design owes the spacecraft at two
+/// moments, the first beacon and the end of a beacon outage, and the
+/// asking of it, off the event loop.
+///
+/// Neither moment is one at which a QUERY_NODE can always go. Every command
+/// but CONNECT, RESTART_ARM and RESTART waits for this window to be matched
+/// for commanding (see `tcslib::matched`): a beacon carrying this window's
+/// checksum with its restart flag clear, and a CONNECT of this window's
+/// answered since the match last ended. A first beacon usually comes before
+/// Connect has been pressed, with the link down, and a fresh start's carries
+/// the restart flag; and an outage ends the match, so the beacons that end
+/// it find the window unmatched. So the question is owed from the moment and
+/// asked at the first chance after it: at once where the window is matched,
+/// as the window becomes matched where it is not, and at a Connect pressed
+/// while it is owed. Losing contact again forgets it, the next contact owing
+/// its own.
+///
+/// At the end of an outage the match is made again here, by a CONNECT sent
+/// without a press, where nothing can have changed what it would say: the
+/// link is still up, its last CONNECT agreed, and the returning beacons
+/// carry this window's checksum with the flag clear and no start of
+/// tcspecial heard. The operator chose to command this vehicle with that
+/// Connect, and an outage is the vehicle not being heard, not the operator
+/// changing their mind; making them Disconnect and Connect to ask what they
+/// are owed would leave every panel Stale until they did.
+#[derive(Clone)]
+pub(crate) struct Asking {
+    /// The window the answers are shown in.
+    ui: slint::Weak<MainWindow>,
+    /// The link the questions, and a CONNECT, go on.
+    link: Arc<Mutex<CiLink>>,
+    /// Whether the link's last CONNECT agreed.
+    agreed: Agreed,
+    /// Which panels' nodes the operator has stopped, which are not asked
+    /// about.
+    declined: crate::Declined,
+    /// Every panel's node, in the panels' order.
+    nodes: Arc<Vec<Asked>>,
+    /// This window's configuration's checksum, which a CONNECT carries.
+    digest: Option<tcslibgs::ConfigDigest>,
+    /// Whether the question is owed: set as contact is made, cleared as it
+    /// is asked and as contact is lost.
+    owed: Arc<AtomicBool>,
+    /// Held while a question is being settled, so that two threads started
+    /// close together neither both ask nor both send a CONNECT.
+    one_at_a_time: Arc<Mutex<()>>,
+}
+
+/// What settling an owed question came to, for the window to show.
+#[derive(Debug, Default)]
+struct Found {
+    /// What a CONNECT sent first said, where one was.
+    connected: Option<String>,
+    /// Each node's panel row and what its question came to; empty where
+    /// nothing was asked.
+    answers: Vec<(usize, Answered)>,
+}
+
+impl Found {
+    /// Shows what was found: the panels take the answers, and `Last
+    /// Response` says what the CONNECT and the answers said.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The window.
+    fn show(&self, ui: &MainWindow) {
+        let answered = show_node_answers(&ui.get_dh_model(), &self.answers);
+        let said: Vec<&str> = self
+            .connected
+            .as_deref()
+            .into_iter()
+            .chain(Some(answered.as_str()))
+            .filter(|said| !said.is_empty())
+            .collect();
+        if !said.is_empty() {
+            ui.set_last_response(SharedString::from(said.join("; ")));
         }
-        let Some(mut info) = model.row_data(row) else {
-            continue;
-        };
-        let node =
-            tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
-        let answer = {
-            let mut guard = link.lock().unwrap();
-            match guard.client() {
-                Some(client) => client.query_node(node),
-                None => {
-                    ui.set_last_response(SharedString::from(
-                        crate::ci_link::NOT_CONNECTED,
-                    ));
-                    return;
-                }
-            }
-        };
+    }
+}
 
-        match answer {
-            // No such node aboard: a tcspecial flying another configuration,
-            // which nobody here can speak for.
-            Ok((tcslibgs::CommandStatus::NotFound, _, _)) => {
-                info.status = SharedString::from(UNKNOWN_STATUS);
-                said.push(format!("{}: {}", info.name, info.status));
-                model.set_row_data(row, info);
-            }
-            Ok((status, enabled, counts)) if status.is_success() => {
-                info.status = SharedString::from(if enabled {
-                    ACTIVE_STATUS
-                } else {
-                    STOPPED_STATUS
-                });
-                info.parameters = SharedString::from(format!(
-                    "{}\n\nwhat it has moved since the vehicle started\n{}",
-                    describes(&info),
-                    counted(&counts)
-                ));
-                said.push(format!("{}: {}", info.name, info.status));
-                model.set_row_data(row, info);
-            }
-            Ok((status, _, _)) => said.push(format!("{}: {status}", info.name)),
-            Err(e) => said.push(format!("{}: no answer ({e})", info.name)),
+impl Asking {
+    /// What the asking needs, from what the buttons have.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui`       - The window.
+    /// * `link`     - The command link.
+    /// * `agreed`   - Whether the link's last CONNECT agreed.
+    /// * `declined` - Which panels' nodes the operator has stopped.
+    /// * `digest`   - This window's configuration's checksum.
+    /// * `model`    - The panels, whose nodes are the ones asked about.
+    ///
+    /// # Returns
+    ///
+    /// The asking, with nothing owed.
+    pub(crate) fn new(
+        ui: &MainWindow,
+        link: &Arc<Mutex<CiLink>>,
+        agreed: &Agreed,
+        declined: &crate::Declined,
+        digest: Option<tcslibgs::ConfigDigest>,
+        model: &impl Model<Data = DHInfo>,
+    ) -> Asking {
+        Asking {
+            ui: ui.as_weak(),
+            link: link.clone(),
+            agreed: agreed.clone(),
+            declined: declined.clone(),
+            nodes: Arc::new(to_ask(model, None)),
+            digest,
+            owed: Arc::new(AtomicBool::new(false)),
+            one_at_a_time: Arc::new(Mutex::new(())),
         }
     }
 
-    ui.set_last_response(SharedString::from(said.join("; ")));
+    /// Contact made, on the first beacon or at the end of an outage: the
+    /// question is owed, and asked at once where it can be.
+    ///
+    /// # Arguments
+    ///
+    /// * `restarted` - Whether the pass that made contact heard a start of
+    ///                 tcspecial, after which no CONNECT is sent unpressed.
+    pub(crate) fn contact_made(&self, restarted: bool) {
+        self.owed.store(true, Ordering::SeqCst);
+        self.in_background(!restarted);
+    }
+
+    /// Contact lost: what was owed is forgotten.
+    pub(crate) fn contact_lost(&self) {
+        self.owed.store(false, Ordering::SeqCst);
+    }
+
+    /// The window may have become able to ask -- it has become matched for
+    /// commanding, or Connect has been pressed -- so a question still owed
+    /// is asked.
+    pub(crate) fn may_ask_now(&self) {
+        if self.owed.load(Ordering::SeqCst) {
+            self.in_background(false);
+        }
+    }
+
+    /// Settles an owed question on a thread of its own, and shows what it
+    /// came to on the window's.
+    ///
+    /// # Arguments
+    ///
+    /// * `reconnect` - Whether a CONNECT may be sent first: see
+    ///                 [`Asking::settle`].
+    fn in_background(&self, reconnect: bool) {
+        let asking = self.clone();
+        thread::spawn(move || {
+            if let Some(found) = asking.settle(reconnect) {
+                let weak = asking.ui.clone();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(ui) = weak.upgrade() {
+                        found.show(&ui);
+                    }
+                });
+            }
+        });
+    }
+
+    /// Asks the owed question, where it is owed and can be asked, first
+    /// sending a CONNECT where `reconnect` allows and one would make the
+    /// window matched again. Touches no window: what it found is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `reconnect` - Whether a CONNECT may be sent: only at the end of an
+    ///                 outage in which no start of tcspecial was heard.
+    ///
+    /// # Returns
+    ///
+    /// What was found, or `None` where nothing was sent.
+    fn settle(&self, reconnect: bool) -> Option<Found> {
+        let _one = self.one_at_a_time.lock().ok()?;
+        if !self.owed.load(Ordering::SeqCst) {
+            return None;
+        }
+        let (up, listening, commanding) = {
+            let mut guard = self.link.lock().ok()?;
+            let listening = guard.matched().for_listening();
+            let commanding = guard.matched().for_commanding();
+            (guard.client().is_some(), listening, commanding)
+        };
+        // Nothing is asked with the link down; the question stays owed, for
+        // a Connect pressed while contact holds.
+        if !up {
+            return None;
+        }
+        let mut found = Found::default();
+        let agreed_before =
+            matches!(self.agreed.lock().as_deref(), Ok(Some(true)));
+        if reconnect && listening && !commanding && agreed_before {
+            if let Some(digest) = self.digest {
+                found.connected =
+                    Some(connect_said(&self.link, &self.agreed, digest));
+            }
+        }
+        let commanding = self
+            .link
+            .lock()
+            .ok()
+            .is_some_and(|guard| guard.matched().for_commanding());
+        if commanding
+            && may_command_nodes(&self.agreed)
+            && self.owed.swap(false, Ordering::SeqCst)
+        {
+            let asked: Vec<Asked> = self
+                .nodes
+                .iter()
+                .filter(|asked| !was_declined(&self.declined, asked.row))
+                .cloned()
+                .collect();
+            found.answers = query_nodes(&self.link, &asked);
+        }
+        (found.connected.is_some() || !found.answers.is_empty())
+            .then_some(found)
+    }
 }
 
 /// What a panel says about its node before any query: where its data goes.
@@ -1361,6 +1790,54 @@ fn command_a_node(
     ui.set_last_response(SharedString::from(said));
 }
 
+/// What the window does as contact changes and as it becomes matched for
+/// commanding, each on the thread it has to be done on. `run` and the
+/// manual's screenshots wire their beacon watches with this.
+///
+/// # Arguments
+///
+/// * `ui`     - The window.
+/// * `asking` - The question owed about the nodes, where there is a link
+///              to ask it on.
+///
+/// # Returns
+///
+/// The beacon watch's callbacks: contact lost makes every node's status
+/// stale, on the window's thread, and forgets what was owed; contact made
+/// owes the question, and the window becoming matched for commanding asks
+/// it, both off the window's thread.
+pub(crate) fn contacts_for(
+    ui: &MainWindow,
+    asking: Option<&Asking>,
+) -> crate::beacon_receive::Contacts {
+    let lost: crate::beacon_receive::OnContact = {
+        let weak = ui.as_weak();
+        let asking = asking.cloned();
+        Arc::new(move || {
+            if let Some(asking) = &asking {
+                asking.contact_lost();
+            }
+            let weak = weak.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    every_node_lost_contact(&ui.get_dh_model());
+                }
+            });
+        })
+    };
+    crate::beacon_receive::Contacts {
+        lost: Some(lost),
+        made: asking.cloned().map(|asking| {
+            Arc::new(move |restarted| asking.contact_made(restarted))
+                as crate::beacon_receive::OnMade
+        }),
+        commanding: asking.cloned().map(|asking| {
+            Arc::new(move || asking.may_ask_now())
+                as crate::beacon_receive::OnContact
+        }),
+    }
+}
+
 /// Wires every control that sends a command.
 ///
 /// Apart from `run` so that it can be driven in a test: a button is pressed
@@ -1374,8 +1851,8 @@ fn command_a_node(
 /// digested -- which leaves nothing to check the vehicle's answer against,
 /// and so nothing that may be commanded by id.
 ///
-/// `contact` is the beacon thread's reading of whether the spacecraft is
-/// being heard from, which a Connect reads: see [`connected_in_contact`].
+/// `asking` is the question about the nodes owed since contact was made,
+/// which a Connect asks where the link was down: see [`Asking`].
 ///
 /// # Arguments
 ///
@@ -1386,7 +1863,7 @@ fn command_a_node(
 /// * `digest`   - This end's configuration digest, or `None`.
 /// * `model`    - The panels.
 /// * `declined` - The operator's last word about each panel's node.
-/// * `contact`  - Whether the spacecraft is being heard from.
+/// * `asking`   - The question owed about the nodes.
 /// * `graph`    - The configuration, which says what type each setting is.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn command_buttons(
@@ -1396,7 +1873,7 @@ pub(crate) fn command_buttons(
     digest: Option<tcslibgs::ConfigDigest>,
     model: &Rc<VecModel<DHInfo>>,
     declined: &crate::Declined,
-    contact: &Arc<Mutex<tcslib::beacon::Contact>>,
+    asking: &Asking,
     graph: &Arc<Graph>,
 ) {
     // Connect and Disconnect, the one button whose meaning follows the
@@ -1406,9 +1883,7 @@ pub(crate) fn command_buttons(
         let weak = ui.as_weak();
         let link = link.clone();
         let agreed = agreed.clone();
-        let model = model.clone();
-        let declined = declined.clone();
-        let contact = contact.clone();
+        let asking = asking.clone();
         ui.on_link_clicked(move || {
             let ui = weak.unwrap();
 
@@ -1454,14 +1929,9 @@ pub(crate) fn command_buttons(
             match digest {
                 Some(digest) => {
                     hear_what_the_vehicle_read(&ui, &link, &agreed, digest);
-                    connected_in_contact(
-                        &ui,
-                        &link,
-                        &agreed,
-                        model.as_ref(),
-                        &declined,
-                        &contact,
-                    );
+                    // A question owed since contact was made, which a
+                    // link that was down could not ask.
+                    asking.may_ask_now();
                 }
                 // Nothing to compare with, so nothing may be commanded by id:
                 // the warning at startup said why.
@@ -2320,7 +2790,7 @@ pub fn run(
     crate::remember_main_window(&ui);
     let _ = Sizes::settle(&ui);
 
-    let rows_in_order = panels(&links, &settable_of(&graph));
+    let rows_in_order = panels(&graph, &links, &settable_of(&graph));
     let rows: Arc<BTreeMap<String, usize>> = Arc::new(
         rows_in_order
             .iter()
@@ -2463,6 +2933,11 @@ pub fn run(
     pm_tcspecial.start_child(tcspecial, payload_path, mode);
 
     let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+    // The question about the nodes owed as contact is made, where there is a
+    // link to ask it on: see `Asking`.
+    let asking = link.as_ref().map(|link| {
+        Asking::new(&ui, link, &agreed, &declined, digest, model.as_ref())
+    });
     // The interval the configuration sends beacons at, which is what says how
     // late one is; a configuration whose interval cannot be read gets the
     // standard schedule, and says so.
@@ -2510,47 +2985,8 @@ pub fn run(
                     pm_tcssim.clone(),
                     Some(pm_tcspecial.clone()),
                 )),
-                // What the nodes do as contact changes, each on the window's
-                // thread, which is the only one that may touch the panels.
-                crate::beacon_receive::Contacts {
-                    // Contact lost: every node's status is stale.
-                    lost: Some({
-                        let weak = ui.as_weak();
-                        Arc::new(move || {
-                            let weak = weak.clone();
-                            let _ = slint::invoke_from_event_loop(move || {
-                                if let Some(ui) = weak.upgrade() {
-                                    every_node_lost_contact(&ui.get_dh_model());
-                                }
-                            });
-                        })
-                    }),
-                    // Contact made: the spacecraft is asked about every node
-                    // the operator has not stopped, where it can be asked.
-                    made: link.clone().map(|link| {
-                        let weak = ui.as_weak();
-                        let agreed = agreed.clone();
-                        let declined = declined.clone();
-                        Arc::new(move || {
-                            let weak = weak.clone();
-                            let link = link.clone();
-                            let agreed = agreed.clone();
-                            let declined = declined.clone();
-                            let _ = slint::invoke_from_event_loop(move || {
-                                if let Some(ui) = weak.upgrade() {
-                                    contact_made(
-                                        &ui,
-                                        &link,
-                                        &agreed,
-                                        &ui.get_dh_model(),
-                                        &declined,
-                                    );
-                                }
-                            });
-                        })
-                            as crate::beacon_receive::OnContact
-                    }),
-                },
+                // What the nodes do as contact changes: see `contacts_for`.
+                contacts_for(&ui, asking.as_ref()),
             ))
         }
         Ok(None) => None,
@@ -2702,6 +3138,10 @@ pub fn run(
         ui.run().unwrap();
         std::process::exit(0);
     };
+    // There is a link, so there is the asking made for it.
+    let Some(asking) = asking else {
+        unreachable!("the asking is made wherever there is a link")
+    };
 
     command_buttons(
         &ui,
@@ -2710,7 +3150,7 @@ pub fn run(
         digest,
         &model,
         &declined,
-        &contact,
+        &asking,
         &Arc::new(graph.clone()),
     );
 
@@ -2897,7 +3337,14 @@ pub(crate) mod tests {
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
         let declined = declined_for(0);
-        let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+        let asking = Asking::new(
+            &ui,
+            &link,
+            &agreed,
+            &declined,
+            Some(ours),
+            model.as_ref(),
+        );
         command_buttons(
             &ui,
             &link,
@@ -2905,7 +3352,7 @@ pub(crate) mod tests {
             Some(ours),
             &model,
             &declined,
-            &contact,
+            &asking,
             &Arc::new(example("simple-app")),
         );
         assert!(
@@ -3020,8 +3467,11 @@ pub(crate) mod tests {
         ui.show().expect("shown");
         let graph = example("simple-app");
         let links = telemetry::of(&graph).expect("its links");
-        let model: Rc<VecModel<DHInfo>> =
-            Rc::new(VecModel::from(panels(&links, &settable_of(&graph))));
+        let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(panels(
+            &graph,
+            &links,
+            &settable_of(&graph),
+        )));
         ui.set_dh_model(ModelRc::from(model.clone()));
         let here = |port| HostPort {
             address: "127.0.0.1".to_string(),
@@ -3037,7 +3487,14 @@ pub(crate) mod tests {
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
         let declined = declined_for(model.row_count());
-        let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+        let asking = Asking::new(
+            &ui,
+            &link,
+            &agreed,
+            &declined,
+            Some(ours),
+            model.as_ref(),
+        );
         command_buttons(
             &ui,
             &link,
@@ -3045,7 +3502,7 @@ pub(crate) mod tests {
             Some(ours),
             &model,
             &declined,
-            &contact,
+            &asking,
             &Arc::new(example("simple-app")),
         );
         link.lock()
@@ -3097,6 +3554,21 @@ pub(crate) mod tests {
             assert!(!ui.get_notice_up(), "{pressed}: OK closes it");
         }
 
+        // The beacon carrying this window's own checksum, as one does
+        // through an outage: the pop-up says the match was lost and how it
+        // comes back, not to compare two checksums that agree.
+        ui.set_beacon_checksum(SharedString::from(ours.to_string()));
+        ui.invoke_ping_clicked();
+        assert!(ui.get_notice_up(), "agreeing checksums: no pop-up");
+        assert_eq!(ui.get_notice_heading().as_str(), MATCH_LOST_HEADING);
+        let said = ui.get_notice_message().to_string();
+        assert!(said.contains("beacons are overdue"), "{said}");
+        assert!(!said.contains("Check that"), "{said}");
+        let response = ui.get_last_response().to_string();
+        assert!(response.contains("sends CONNECT itself"), "{response}");
+        press("OK");
+        ui.set_beacon_checksum(SharedString::from(theirs.to_string()));
+
         // ARM Restart, before any CONNECT has been answered: asked first.
         ui.invoke_menu_action(MenuAction::ArmRestart);
         assert!(ui.get_notice_up() && ui.get_notice_asks(), "asked first");
@@ -3124,6 +3596,96 @@ pub(crate) mod tests {
             vec![CommandType::RestartArm],
             "the arm Go on sent, and nothing else"
         );
+    }
+
+    /// A command refused unmatched says what to do in the case it is in:
+    /// where the vehicle's checksum is this station's, that the match was
+    /// lost and to Disconnect and Connect, rather than to check two
+    /// checksums that agree.
+    #[test]
+    fn an_unmatched_refusal_fits_its_case() {
+        use tcslibgs::{CommandType, ConfigDigest};
+
+        let ours = ConfigDigest([0x5Au8; 16]);
+        let other = ConfigDigest([0x11u8; 16]).to_string();
+        let same = ours.to_string();
+        let refused =
+            tcslibgs::TcsError::Unmatched(CommandType::Ping).to_string();
+        let seen = |theirs, listening, flagged| MatchSeen {
+            theirs,
+            ours: Some(ours),
+            listening,
+            flagged,
+        };
+
+        // Another checksum, or none heard: the library's words, and both
+        // checksums to compare.
+        for theirs in [other.as_str(), ""] {
+            let said = unmatched_refusal(
+                CommandType::Ping,
+                &refused,
+                seen(theirs, false, false),
+            );
+            assert_eq!(said.heading, UNMATCHED_HEADING);
+            assert_eq!(said.response, refused);
+            assert!(said.message.starts_with(&refused), "{said:?}");
+            assert!(said.message.contains(&same), "{said:?}");
+        }
+
+        // The same checksum: lost, in each of the three ways, and never a
+        // word about checking it.
+        for (listening, flagged, why, then) in [
+            (false, false, "beacons are overdue", "sends CONNECT itself"),
+            (false, true, "started again", "Disconnect, then Connect"),
+            (
+                true,
+                false,
+                "not been made again",
+                "Disconnect, then Connect",
+            ),
+        ] {
+            let said = unmatched_refusal(
+                CommandType::Ping,
+                &refused,
+                seen(&same, listening, flagged),
+            );
+            assert_eq!(said.heading, MATCH_LOST_HEADING, "{why}");
+            for text in [&said.response, &said.message] {
+                assert!(text.starts_with("Ping not sent: "), "{text}");
+                assert!(text.contains(why), "{text}");
+                assert!(text.contains(then), "{text}");
+                assert!(!text.contains("Check that"), "{text}");
+                assert!(!text.contains("  "), "{text:?}");
+            }
+            assert!(said.message.contains(&same), "{said:?}");
+        }
+    }
+
+    /// Runs the window's event loop until `done` says so: what a thread
+    /// asked the window's thread to do is done there.
+    ///
+    /// # Arguments
+    ///
+    /// * `what` - What is waited for, for the failure.
+    /// * `done` - Whether it has happened.
+    ///
+    /// # Panics
+    ///
+    /// If it has not happened within ten seconds.
+    fn pump_until(what: &str, done: impl Fn() -> bool) {
+        let deadline =
+            std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !done() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "waited too long for {what}"
+            );
+            let _ = slint::invoke_from_event_loop(|| {
+                let _ = slint::quit_event_loop();
+            });
+            slint::run_event_loop().expect("the event loop");
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
     }
 
     /// The port of an address a simulated vehicle is at.
@@ -3364,7 +3926,7 @@ payloads:
     fn each_source_has_a_panel_in_device_id_order() {
         let graph = example("thermostat");
         let links = telemetry::of(&graph).expect("its links");
-        let panels = panels(&links, &settable_of(&graph));
+        let panels = panels(&graph, &links, &settable_of(&graph));
         let named: Vec<(String, i32)> = panels
             .iter()
             .map(|p| (p.name.to_string(), p.dev_id))
@@ -3392,12 +3954,60 @@ payloads:
         assert!(panels[5].config.contains("5110"), "{}", panels[5].config);
     }
 
+    /// A panel says the packet size its configuration gives its source, and
+    /// says plainly where the configuration gives none, rather than nought.
+    #[test]
+    fn a_panel_says_its_sources_packet_size() {
+        let sizes = |graph: &Graph| -> Vec<(String, String)> {
+            let links = telemetry::of(graph).expect("its links");
+            panels(graph, &links, &settable_of(graph))
+                .iter()
+                .map(|p| (p.name.to_string(), p.packet_size.to_string()))
+                .collect()
+        };
+        let said = |pairs: &[(&str, &str)]| -> Vec<(String, String)> {
+            pairs
+                .iter()
+                .map(|(name, size)| (name.to_string(), size.to_string()))
+                .collect()
+        };
+
+        // The width of the type each source sends: a kelvin is four bytes,
+        // and a heater's switch, a set of one line, is a u8.
+        assert_eq!(
+            sizes(&example("thermostat")),
+            said(&[
+                ("consensus_temp", "4 bytes"),
+                ("gpio-out-tmass1", "1 byte"),
+                ("gpio-out-tmass2", "1 byte"),
+                ("to_k1", "4 bytes"),
+                ("to_k2", "4 bytes"),
+                ("to_k3", "4 bytes"),
+            ])
+        );
+
+        // Bytes, whose length is each datum's own: not fixed, and said so.
+        let mut graph = example("minimal");
+        assert_eq!(sizes(&graph), said(&[("sensor", NO_PACKET_SIZE)]));
+
+        // Unless the node says how much a read asks for.
+        let sensor = graph
+            .nodes
+            .iter_mut()
+            .find(|node| node.name == "sensor")
+            .expect("the sensor");
+        sensor
+            .attributes
+            .insert("read_size".to_string(), tcslibgs::Scalar::of("6"));
+        assert_eq!(sizes(&graph), said(&[("sensor", "6 bytes")]));
+    }
+
     /// The minimal example's sensor reports over payload_telemetry.
     #[test]
     fn an_untouched_payload_has_a_panel_too() {
         let graph = example("minimal");
         let links = telemetry::of(&graph).expect("its links");
-        let panels = panels(&links, &settable_of(&graph));
+        let panels = panels(&graph, &links, &settable_of(&graph));
         assert_eq!(panels.len(), 1);
         assert_eq!(panels[0].name.as_str(), "sensor");
         assert!(
@@ -3448,8 +4058,11 @@ payloads:
             "the example binds the thermostat's setpoint and nothing else"
         );
 
-        let shown =
-            panels(&telemetry::of(&graph).expect("its links"), &settable);
+        let shown = panels(
+            &graph,
+            &telemetry::of(&graph).expect("its links"),
+            &settable,
+        );
         // The thermostat is one of the panels, its decision reaching the
         // ground as well as the heaters, and it is the one that binds
         // something: its panel offers the setpoint and the others offer
@@ -3475,7 +4088,8 @@ payloads:
             shown[0].name.to_string(),
             vec!["setpoint".to_string(), "band".to_string()],
         );
-        let offered = panels(&telemetry::of(&graph).expect("its links"), &both);
+        let offered =
+            panels(&graph, &telemetry::of(&graph).expect("its links"), &both);
         assert_eq!(offered[0].settable.as_str(), "setpoint, band");
         assert_eq!(offered[0].setting.as_str(), "setpoint");
     }
@@ -3755,7 +4369,7 @@ vehicle:
         let answering = std::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let mut seen = Vec::new();
-            for _ in 0..7 {
+            for _ in 0..9 {
                 let (size, from) = match vehicle.recv_from(&mut buffer) {
                     Ok(got) => got,
                     Err(_) => return seen,
@@ -3838,7 +4452,7 @@ vehicle:
         let mut settable = settable_of(&graph);
         settable.insert(links[0].source.clone(), vec!["setpoint".to_string()]);
         let model: Rc<VecModel<DHInfo>> =
-            Rc::new(VecModel::from(panels(&links, &settable)));
+            Rc::new(VecModel::from(panels(&graph, &links, &settable)));
         ui.set_dh_model(ModelRc::from(model.clone()));
         ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
         ui.set_ci_address(SharedString::from(at.clone()));
@@ -3862,9 +4476,28 @@ vehicle:
         )));
         let agreed: Agreed = Arc::new(Mutex::new(None));
         let declined = declined_for(model.row_count());
-        // The spacecraft being heard from, as the beacon thread would say: so
-        // a Connect is the moment to ask what each node is doing.
-        let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Made));
+        let asking = Asking::new(
+            &ui,
+            &link,
+            &agreed,
+            &declined,
+            Some(ours),
+            model.as_ref(),
+        );
+        // Contact made while the link was down, as the beacon thread would
+        // say it: the question is owed, and nothing can ask it yet.
+        asking.owed.store(true, Ordering::SeqCst);
+        assert!(asking.settle(true).is_none(), "nothing asked, link down");
+        assert!(asking.owed.load(Ordering::SeqCst), "and it is still owed");
+        // The asking done as contact is made, as the beacon thread does it
+        // but on this thread, so that what it sends is in order with the
+        // presses: owed, settled, and shown.
+        let owe_and_settle = |reconnect: bool| {
+            asking.owed.store(true, Ordering::SeqCst);
+            if let Some(found) = asking.settle(reconnect) {
+                found.show(&ui);
+            }
+        };
         command_buttons(
             &ui,
             &link,
@@ -3872,7 +4505,7 @@ vehicle:
             Some(ours),
             &model,
             &declined,
-            &contact,
+            &asking,
             &Arc::new(example("thermostat")),
         );
 
@@ -3913,28 +4546,23 @@ vehicle:
         );
         assert!(may_command_nodes(&agreed), "and remember that it did");
         // And, contact having been made before the link was up, the Connect
-        // asked what the node is doing: stopped, which only asking could tell.
-        assert_eq!(
-            model.row_data(0).expect("the panel").status.as_str(),
-            STOPPED_STATUS,
-            "a Connect in contact should have asked the spacecraft"
-        );
+        // asked what the node is doing, off the window's thread: stopped,
+        // which only asking could tell.
+        pump_until("the owed question answered", || {
+            model.row_data(0).expect("the panel").status.as_str()
+                == STOPPED_STATUS
+        });
+        assert!(!asking.owed.load(Ordering::SeqCst), "nothing is owed now");
         assert!(
-            ui.get_last_response().as_str().contains("agrees"),
-            "what the Connect said should still be there: {}",
+            ui.get_last_response()
+                .as_str()
+                .contains("thermostat: Stopped"),
+            "Last Response says what was found: {}",
             ui.get_last_response()
         );
-        // Out of contact, a Connect asks nothing: were it to, the simulated
+        // Asked once, a Connect asks nothing more: were it to, the simulated
         // vehicle's list below would say so.
-        let out_of_contact = Mutex::new(tcslib::beacon::Contact::Lost);
-        connected_in_contact(
-            &ui,
-            &link,
-            &agreed,
-            model.as_ref(),
-            &declined,
-            &out_of_contact,
-        );
+        assert!(asking.settle(false).is_none(), "nothing more to ask");
 
         // And now a panel's Disable reaches the vehicle, which answers about
         // the node the panel is for.
@@ -3958,7 +4586,7 @@ vehicle:
         // Contact made now asks nothing: the one node is one the operator
         // stopped. Were it asked, the simulated vehicle's list below would
         // say so.
-        contact_made(&ui, &link, &agreed, model.as_ref(), &declined);
+        owe_and_settle(false);
 
         // And the Set button in the panel's popup, which has to be opened
         // first: a popup's contents are not built until it is shown.
@@ -4052,6 +4680,30 @@ vehicle:
             shown.contains("device id"),
             "beside what the popup said already: {shown}"
         );
+        // And the popup shows the counts whole: as wide and as tall as the
+        // list, where at a fixed 300 by 340 it cut the lines off at its
+        // right edge and the last of them under the field below.
+        ui.window().set_size(slint::LogicalSize::new(900.0, 800.0));
+        ui.show().expect("shown");
+        press("Configuration");
+        let list =
+            ElementHandle::find_by_element_id(&ui, "DHPanel::parameters-text")
+                .next()
+                .expect("the popup's list");
+        let room = ElementHandle::find_by_element_id(
+            &ui,
+            "DHPanel::parameters-scroll",
+        )
+        .next()
+        .expect("the popup's scrolling area");
+        assert!(
+            room.size().width >= list.size().width
+                && room.size().height >= list.size().height,
+            "the list is {:?} in an area {:?}",
+            list.size(),
+            room.size()
+        );
+        let _ = ui.hide();
 
         // Enable puts the node back: Active, and no longer declined.
         press("Enable");
@@ -4066,11 +4718,31 @@ vehicle:
 
         // So contact made asks about it, and the panel says what the
         // spacecraft answered -- stopped, which only asking could tell.
-        contact_made(&ui, &link, &agreed, model.as_ref(), &declined);
+        owe_and_settle(false);
         assert_eq!(
             model.row_data(0).expect("the panel").status.as_str(),
             STOPPED_STATUS,
             "contact made should have asked the spacecraft"
+        );
+
+        // An outage: the beacons go overdue, which ends the match for
+        // commanding, and come back clear and carrying this window's
+        // checksum. Contact made again sends a CONNECT unpressed, the link
+        // being up and its last CONNECT having agreed, and asks once it is
+        // matched again: no Disconnect and Connect.
+        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Aging, false);
+        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        assert!(!matched.for_commanding(), "the outage ended the match");
+        // Not where the beacons that ended it heard a start of tcspecial:
+        // that is the operator's to Connect to.
+        owe_and_settle(false);
+        assert!(!matched.for_commanding(), "no CONNECT after a start");
+        owe_and_settle(true);
+        assert!(matched.for_commanding(), "matched again, unpressed");
+        let said = ui.get_last_response().to_string();
+        assert!(
+            said.contains("agrees") && said.contains("thermostat: Stopped"),
+            "Last Response says what the CONNECT and the asking found: {said}"
         );
 
         let sent = answering.join().expect("the simulated vehicle answered");
@@ -4083,6 +4755,8 @@ vehicle:
                 tcslibgs::CommandType::SetNode,
                 tcslibgs::CommandType::QueryNode,
                 tcslibgs::CommandType::StartNode,
+                tcslibgs::CommandType::QueryNode,
+                tcslibgs::CommandType::Connect,
                 tcslibgs::CommandType::QueryNode
             ],
             "the commands the presses and contact made should have sent, and \

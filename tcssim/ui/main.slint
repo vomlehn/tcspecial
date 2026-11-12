@@ -45,8 +45,8 @@ export struct PayloadInfo {
     // From the running simulation
     status: string,
     // What a part the vehicle drives is doing, in words -- "heater_1:
-    // heating", "heater_1: off", "heater_1: disabled, so off" -- and empty
-    // for a payload that drives nothing. Such a part sends nothing, so its
+    // heating", "zone.heater_2: off", "heater_1: disabled, so off" -- and
+    // empty for a payload that drives nothing. Such a part sends nothing, so its
     // panel says this where another's says what it last sent.
     driving: string,
     last-sent-time: string,
@@ -94,15 +94,23 @@ component PayloadPanel inherits Rectangle {
         padding: 4px;
         spacing: 2px;
         sizes-popup := PopupWindow {
+            // Under the row of buttons, so that it hides neither the two
+            // sizes it is about nor the button that starts and stops the
+            // payload. Hung from the panel's corner, it covered both: the
+            // spin box just stepped, and whether Enable had gone.
             x: 4px;
-            y: 4px;
-            width: 290px;
-            height: 100px;
+            y: controls-row.y + controls-row.height + 2px;
+            // As wide as the panel inside its padding, and as tall as what it
+            // says comes to at that width. It was a fixed 290x100, and the
+            // sentence, which names both sizes and both ways out, ran four
+            // lines past the bottom of its border.
+            width: root.width - 8px;
+            height: sizes-box.preferred-height;
             // Closed by a press outside it, not by any press: a press inside
             // is somebody selecting what it says to copy it.
             close-policy: close-on-click-outside;
 
-            Rectangle {
+            sizes-box := Rectangle {
                 background: white;
                 border-color: #c00000;
                 border-width: 1px;
@@ -136,7 +144,9 @@ component PayloadPanel inherits Rectangle {
         parameters-popup := PopupWindow {
             x: 4px;
             y: 4px;
-            width: 300px;
+            // As wide as the panel inside its padding: the lines are not
+            // wrapped, and a narrower popup cut the values short.
+            width: root.width - 8px;
             height: 240px;
             // As above: a press inside is somebody selecting.
             close-policy: close-on-click-outside;
@@ -166,16 +176,26 @@ component PayloadPanel inherits Rectangle {
                     // there are depends on the kind of payload and on how
                     // many faults were asked for, and a popup tall enough for
                     // the longest of them would be taller than the window.
-                    ScrollView {
-                        parameters-text := Copyable {
-                            // The lines are columns of name and value, so
-                            // they only line up in a font whose characters
-                            // are one width -- and they are not wrapped, a
-                            // column broken in two being no column.
-                            font-family: Fonts.mono;
-                            font-size: Fonts.window;
-                            wrap: no-wrap;
-                            text: parameters;
+                    //
+                    // The text is in a layout of its own because a scrolling
+                    // area measures only the layouts inside it: with the
+                    // text standing in it alone, the area took the text to
+                    // be as tall as itself, had nothing to scroll, and the
+                    // lines at the foot -- the faults -- could not be
+                    // reached.
+                    parameters-scroll := ScrollView {
+                        VerticalLayout {
+                            parameters-text := Copyable {
+                                // The lines are columns of name and value,
+                                // so they only line up in a font whose
+                                // characters are one width -- and they are
+                                // not wrapped, a column broken in two being
+                                // no column.
+                                font-family: Fonts.mono;
+                                font-size: Fonts.window;
+                                wrap: no-wrap;
+                                text: parameters;
+                            }
                         }
                     }
                 }
@@ -183,10 +203,19 @@ component PayloadPanel inherits Rectangle {
         }
 
 
+        // The rows of text state no height and take their text's.
+        //
+        // They stated one -- eighteen pixels here and on the line below,
+        // fourteen on the three rows of data -- in a window whose type is
+        // twelve points, sixteen pixels before a descender: every
+        // underscore and descender was cut off, so that "temp_1" read
+        // "temp 1", and the packet count hung below the panel under the next
+        // row of panels. A row the height of its text is the height of the
+        // window's type, whatever that comes to.
+
         // Header row - combine name and status
-        HorizontalLayout {
+        title-row := HorizontalLayout {
             spacing: 4px;
-            height: 18px;
             // The name and the number of the payload, which is its place in
             // the payload configuration -- the first payload the file
             // describes is 0. Nothing states it: the file's order decides it,
@@ -207,9 +236,8 @@ component PayloadPanel inherits Rectangle {
             }
         }
 
-        HorizontalLayout {
+        config-row := HorizontalLayout {
             spacing: 4px;
-            height: 18px;
             Text {
                 text: "Config: " + payload-config;
                 font-size: Fonts.window;
@@ -327,10 +355,14 @@ component PayloadPanel inherits Rectangle {
             // what a panel is opened to do.
             Button {
                 text: payload-status == "Running" ? "Disable" : "Enable";
-                // Nothing to press while the two sizes describe something
+                // Nothing to start while the two sizes describe something
                 // that cannot be sent: a segment is a piece of a packet, and
                 // a piece larger than the whole is not a thing to start.
-                enabled: sizes-problem == "";
+                // Stopping is always there: a payload already sending when
+                // its sizes went wrong goes on sending with them until it
+                // is stopped, and a button taken away from it then left no
+                // way to stop it but to put the sizes right first.
+                enabled: payload-status == "Running" || sizes-problem == "";
                 clicked => { transfer-clicked(); }
             }
             // What the two files said about this payload. On the same row as
@@ -360,7 +392,6 @@ component PayloadPanel inherits Rectangle {
         // what it is doing instead, in words: whether a heater is heating,
         // off, or disabled in this panel and so off whatever it is sent.
         sent-row := HorizontalLayout {
-            height: 14px;
             if driving == "" : Text {
                 text: "Sent: " + last-sent-time + " " + last-sent-data;
                 font-size: Fonts.window;
@@ -377,10 +408,15 @@ component PayloadPanel inherits Rectangle {
         // spent saying that nothing can happen here. The row itself is kept
         // so that every panel is the same shape and the rows below it do not
         // move from one panel to the next.
+        //
+        // Kept by the text going empty rather than by the Text going: an
+        // empty Text is still a line tall, where a row with nothing in it
+        // would be no height at all now that the rows take their text's.
         recv-row := HorizontalLayout {
-            height: 14px;
-            if triggered : Text {
-                text: "Recv: " + last-recv-time + " " + last-recv-data;
+            Text {
+                text: triggered
+                    ? "Recv: " + last-recv-time + " " + last-recv-data
+                    : "";
                 font-size: Fonts.window;
             }
         }
@@ -389,7 +425,6 @@ component PayloadPanel inherits Rectangle {
         // spoken to, so "0 recv" is a number that cannot become anything
         // else. What it sent is all there is to count.
         packets-row := HorizontalLayout {
-            height: 14px;
             if triggered : Text {
                 text: "Pkts: " + packets-sent + " sent / "
                     + packets-recv + " recv";
@@ -416,8 +451,16 @@ component PayloadPanel inherits Rectangle {
 export component PanelProbe inherits Window {
     default-font-size: Fonts.window;
     probe := PayloadPanel { }
+    // A line of the window's type, with a descender and an underscore in
+    // it, which is the least a row of text in a panel may be given. Only
+    // the tests ask for it: they hold every row of a panel to it.
+    line := Text {
+        text: "temp_1 gy";
+        font-size: Fonts.window;
+    }
     out property <length> panel-width: probe.preferred-width;
     out property <length> panel-height: probe.preferred-height;
+    out property <length> line-height: line.preferred-height;
 }
 
 export component MainWindow inherits Window {

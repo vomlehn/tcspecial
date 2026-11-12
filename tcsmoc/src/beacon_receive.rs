@@ -59,15 +59,22 @@ pub struct Decided {
 /// started again. Called from the beacon thread, as [`OnContact`] is.
 pub type OnBeacon = Arc<dyn Fn(bool) + Send + Sync>;
 
-/// What the window does as contact is lost and as it is made.
+/// What to do as contact is made: given whether the pass that made it heard
+/// a start of tcspecial. Called from the beacon thread, as [`OnContact`] is.
+pub type OnMade = Arc<dyn Fn(bool) + Send + Sync>;
+
+/// What the window does as contact is lost and as it is made, and as the
+/// window becomes matched for commanding.
 #[derive(Clone, Default)]
 pub struct Contacts {
     /// As contact is lost: every node's status goes stale.
     pub lost: Option<OnContact>,
-    /// As contact is made, on the first beacon and at the end of an outage,
-    /// and as the window becomes matched for commanding: the spacecraft is
-    /// asked what each node is doing, where it may be.
-    pub made: Option<OnContact>,
+    /// As contact is made, on the first beacon and at the end of an outage:
+    /// the spacecraft is owed a question about what each node is doing.
+    pub made: Option<OnMade>,
+    /// As the window becomes matched for commanding, which is when a
+    /// question owed since contact was made can first be asked.
+    pub commanding: Option<OnContact>,
 }
 
 /// Whether a pass that reads `now` is the one where contact was lost, the
@@ -180,22 +187,24 @@ impl BeaconReceive {
             // And what the nodes do about a change, once, as it happens. A
             // loss: every status a panel shows is what the spacecraft said
             // while it was being heard from, and none of it can be taken as
-            // true now. Contact made: the spacecraft can be asked again.
-            // A match for commanding that begins on this pass is asked about
-            // as contact made is: the clear beacon that follows a Connect
-            // may arrive after the Connect's answer, and the nodes could not
-            // be asked until it had.
-            let then = if contact_lost(was, pass.contact) {
-                contacts.lost.as_ref()
-            } else if contact_made(was, pass.contact)
-                || (!was_commanding && now_commanding)
-            {
-                contacts.made.as_ref()
-            } else {
-                None
-            };
-            if let Some(then) = then {
-                then();
+            // true now. Contact made: the spacecraft is owed a question
+            // about its nodes. A match for commanding that begins on this
+            // pass is when that question can first go: the clear beacon that
+            // follows a CONNECT may arrive after the CONNECT's answer, and
+            // nothing could be asked until it had.
+            if contact_lost(was, pass.contact) {
+                if let Some(lost) = &contacts.lost {
+                    lost();
+                }
+            } else if contact_made(was, pass.contact) {
+                if let Some(made) = &contacts.made {
+                    made(pass.restarted);
+                }
+            }
+            if !was_commanding && now_commanding {
+                if let Some(commanding) = &contacts.commanding {
+                    commanding();
+                }
             }
 
             let shown = Shown::of(pass);

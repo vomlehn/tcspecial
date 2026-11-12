@@ -828,7 +828,12 @@ A segment is a piece of a packet, so the segment size may not be larger than
 the packet size. Equal is the ordinary case -- a packet sent in one segment.
 Make them disagree and a message says so at once, naming both sizes and
 either way out of it, and the button that starts the payload is taken away
-until they agree again; the edit that fixes them takes the message back. The
+until they agree again; the edit that fixes them takes the message back.
+Only starting is refused: a payload already running when its sizes stop
+agreeing still offers ``Disable``, which stops it, rather than going on
+sending them until they are put right. Nor does ``--sending`` or the
+simulator configuration's ``enable`` start a payload whose files give sizes
+that cannot be sent; tcssim says so as it starts, and the panel says why. The
 sizes are checked when the files are read as well, so a set whose simulator
 configuration states a segment larger than the packet it is given says so
 before anything is touched.
@@ -840,13 +845,16 @@ under `Seeing what was read <tcspecial.html#seeing-what-was-read>`__ -- and then
 ``Sent``
   When the last packet went, and the first few bytes of it. A part the
   vehicle drives sends nothing, and this line says what it is doing instead,
-  in words, naming the component of the physics model it is joined to:
-  ``heater_1: heating`` or ``heater_1: off`` for a switch joined to a
-  ``heater`` component's ``on``, ``zone: on`` or ``zone: off`` for one
-  joined to a thermal mass's own ``heater_1`` or ``heater_2``, as in the
-  thermostat example, and ``disabled, so off`` after the name for either
-  while its panel has it disabled -- see `Starting and stopping a payload
-  <tcspecial.html#starting-and-stopping-a-payload>`__.
+  in words, naming the heater it switches in the physics model: ``heating``
+  or ``off``, and ``disabled, so off`` while its panel has it disabled --
+  see `Starting and stopping a payload
+  <tcspecial.html#starting-and-stopping-a-payload>`__. A switch joined to a
+  ``heater`` component's ``on`` is named by the component, as in
+  ``heater_1: heating``; one joined to a thermal mass's own ``heater_1`` or
+  ``heater_2``, as in the thermostat example, by the mass and the input, as
+  in ``zone.heater_2: off``, so that a zone's two heaters' panels never say
+  the same thing. A driven part that is not a heater says ``on`` where a
+  heater says ``heating``, or ``at`` the value it is held at.
 
 ``Recv``
   When the last packet arrived, and the first few bytes of it -- for a payload
@@ -917,46 +925,50 @@ window, drawn without opening it.
 
 #. .. figure:: shots/tcssim-heater-1.png
       :alt: The gpio-out-tmass1 panel: Stopped in bold red, an Enable
-            button, and the line zone: disabled, so off.
+            button, and the line zone.heater_1: disabled, so off.
 
       The heater switch ``gpio-out-tmass1`` as it opens. It drives the
-      zone's ``heater_1``, so its line names the zone, and disabled -- its
+      zone's ``heater_1``, so its line names that heater --
+      ``gpio-out-tmass2``'s says ``zone.heater_2`` -- and disabled -- its
       button is its power -- it is off whatever it is sent.
 
 #. .. figure:: shots/tcssim-heater-2.png
       :alt: The same panel after the vehicle has switched it on: still
-            Stopped, still zone: disabled, so off.
+            Stopped, still zone.heater_1: disabled, so off.
 
       tcspecial's thermostat switches it on. Nothing changes on the panel or
       in the zone: a disabled heater stays off. What it was sent is kept.
 
 #. .. figure:: shots/tcssim-heater-3.png
       :alt: The same panel after Enable: Running in black, a Disable
-            button, and the line zone: on.
+            button, and the line zone.heater_1: heating.
 
       ``Enable`` pressed. The ``on`` it was sent is applied at once --
-      ``zone: on`` -- rather than at the thermostat's next decision, which
-      comes only when the decision changes.
+      ``zone.heater_1: heating`` -- rather than at the thermostat's next
+      decision, which comes only when the decision changes.
 
 #. .. figure:: shots/tcssim-heater-4.png
       :alt: The same panel after the vehicle has switched it off: Running,
-            and the line zone: off.
+            and the line zone.heater_1: off.
 
-      The thermostat switches it off, and the line says ``zone: off``. A
+      The thermostat switches it off, and the line says
+      ``zone.heater_1: off``. A
       heater sends nothing, so its ``Pkts`` stays at nought throughout.
 
 **Sizes that cannot be sent**
 
 #. .. figure:: shots/tcssim-sizes-1.png
-      :alt: The temp_2 panel with a popup over it, outlined in red: temp_2:
+      :alt: The temp_2 panel, Pkt 1 and Seg 2, its Enable button greyed
+            out, and below the buttons a popup outlined in red: temp_2:
             these sizes cannot be sent. A segment of 2 bytes cannot be part
             of a packet of 1: a segment is a piece of a packet. Raise the
             packet size to 2 or more, or lower the segment size to 1 or
-            less. Behind it the Enable button is greyed out.
+            less.
 
       ``Pkt`` stepped down from 2 to 1 on ``temp_2``, leaving its 2-byte
-      segment larger than the packet. A popup says so at once, naming both
-      sizes and either way out, and ``Enable`` is greyed out.
+      segment larger than the packet. A popup under the buttons says so at
+      once, naming both sizes and either way out, and ``Enable`` is greyed
+      out.
 
 #. .. figure:: shots/tcssim-sizes-2.png
       :alt: The temp_2 panel with Pkt and Seg both 2, no popup, and the
@@ -964,6 +976,15 @@ window, drawn without opening it.
 
       ``Pkt`` stepped back up to 2. The popup goes and ``Enable`` comes
       back. Nothing is written to the files either way.
+
+#. .. figure:: shots/tcssim-sizes-3.png
+      :alt: The temp_2 panel Running, Pkt 1 and Seg 2, the same popup
+            under its buttons, and its Disable button pressable.
+
+      ``Enable`` pressed, and ``Pkt`` stepped down to 1 again while it
+      runs. The popup says the same, but ``Disable`` stays: only starting is
+      refused, and a payload sending sizes that cannot be sent can always be
+      stopped.
 
 **A fault taking effect**
 
@@ -983,8 +1004,6 @@ added to ``temp_3``'s entry:
            noise: 0.02 K
            offset: -0.3 K
 
-``temp_3``'s ``Configuration`` button then lists ``silent_after 3 packets``
-under ``faults``, at the foot of what the simulator configuration said.
 ``temp_2``, which has no fault, and ``temp_3`` are enabled together:
 
 #. .. figure:: shots/tcssim-fault-1.png
@@ -1004,6 +1023,17 @@ under ``faults``, at the foot of what the simulator configuration said.
       nothing since its third: its ``Sent`` time has stopped, which is the
       sign a wedged instrument gives, and what tcspecial's handler for it
       sees is readings that have stopped coming.
+
+#. .. figure:: shots/tcssim-fault-3.png
+      :alt: temp_3's parameters popup scrolled to its foot: From the
+            simulator configuration, packet_interval 1000 ms,
+            segment_interval 1000 ms, segment_size 3 bytes, and under
+            faults, silent_after 3 packets.
+
+      ``temp_3``'s ``Configuration`` pressed, and its list scrolled to the
+      foot with the mouse wheel: under ``faults``, at the end of what the
+      simulator configuration said, is ``silent_after 3 packets``. The list
+      is longer than the popup, and scrolls.
 
 See Also
 ========

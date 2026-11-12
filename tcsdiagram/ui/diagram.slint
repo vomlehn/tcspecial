@@ -335,11 +335,11 @@ export component NodeShape inherits Rectangle {
     // Where the pointer is while a line is being drawn from one of this
     // node's terminals. See Terminal::dragged.
     callback link-dragging(length, length);
-    // This node was pressed, so it is the one drawn as selected: by a right
-    // click, which does nothing else, or by the left press that offers its
-    // menu or starts a drag of it.
+    // This node was pressed, so it is the one drawn as selected: by a left
+    // press, which may start a drag of it, or by the right click that offers
+    // its menu.
     callback chosen();
-    // What the menu a left click opens asks for: the node's attributes, or
+    // What the menu a right click opens asks for: the node's attributes, or
     // the node's removal. See the menu itself, below the grip.
     callback edit-requested();
     callback delete-requested();
@@ -568,7 +568,7 @@ export component NodeShape inherits Rectangle {
         }
     }
 
-    // What a left click on a node offers: a node's own commands, which have
+    // What a right click on a node offers: a node's own commands, which have
     // nowhere else to live -- a node is not in the menu bar, and the menu bar
     // is for the configuration as a whole.
     //

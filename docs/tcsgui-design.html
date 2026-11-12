@@ -787,7 +787,8 @@ project's own SVG files beside the markup, <tt class="docutils literal">undo.svg
 <tt class="docutils literal">save.svg</tt>, rather than an icon set's: compiled into the program, they are
 nothing to fail to load. Each takes the colour of the button's text, so it
 goes grey with the button when there is nothing to take back. Beside them the
-bar says how many edits can be undone.</p>
+bar says how many edits can be undone -- <em>1 edit</em>, <em>2 edits</em>, the noun
+agreeing with the count.</p>
 </div>
 </div>
 <div class="section" id="the-canvas">
@@ -1936,7 +1937,19 @@ file's own <tt class="docutils literal">tcsgui</tt> section beside where the nod
 editing one configuration should not each have to decide again that a payload
 nobody reads yet is on purpose. It is remembered by node and kind, so a concern
 that stops applying leaves both lists by itself and comes back if the line it
-was about is deleted -- nothing has to be tidied up after drawing.</p>
+was about is deleted -- nothing has to be tidied up after drawing. The list,
+while it is open, is worked out again after every change -- an edit, an undo,
+a redo, edits put back after a crash -- as the errors' menu is (see
+<a class="reference internal" href="#errors">Errors</a>): a list that went on showing what the drawing no longer has would
+be a list of decisions about nothing.</p>
+<p>What <tt class="docutils literal">tcsverify</tt> warns of is a concern too, in its words and under the same
+rules: a node with no line on it at all (kind <tt class="docutils literal">unlinked</tt>), said once where
+the drawing's own rules already have something to say about that node, and a
+node whose required fields are not all filled in (kind <tt class="docutils literal">unfinished</tt>). Both
+are warnings to <tt class="docutils literal">tcsverify</tt> for the reason they are concerns here: the
+configuration has not finished saying something rather than said something
+wrong. The vehicle still refuses a file that has them, which is why they are
+counted and not left out.</p>
 </div>
 <div class="section" id="errors">
 <h2><a class="toc-backref" href="#toc-entry-35">Errors</a></h2>
@@ -1948,8 +1961,19 @@ simulator file -- and <strong>not each error</strong>. Each is in the errors but
 and a list read once at startup is a list nobody has to hand when they come to
 put the errors right. The warning has two buttons: <strong>Ignore</strong>, which takes it
 away and leaves the errors as they stand, and <strong>Quit</strong>, which leaves the
-editor. The errors are the editor's own faults and everything <tt class="docutils literal">tcsverify</tt>
-finds in the files, warnings included, in its words.</p>
+editor. The errors are the editor's own faults and every error <tt class="docutils literal">tcsverify</tt>
+finds in the files, in its words: one about a node names the node, which
+choosing it goes to, and any other starts with the file's name and the line
+-- <tt class="docutils literal"><span class="pre">battery-sim.yaml:97:</span></tt> -- and not the path the session was given, which
+would fill a menu's line before it said anything. <tt class="docutils literal">tcsverify</tt>'s <em>warnings</em>
+are not errors. They are what an unfinished configuration looks like -- a
+node joined to nothing, a node whose required fields are not all in -- which
+is every node the moment it is placed, and an errors button that counted
+them would say &quot;2 errors&quot; about a node nobody had had the chance to fill in:
+the editor would be crying wolf, against <a class="reference internal" href="#the-editor-is-lazy">The Editor Is Lazy</a>. They are
+concerns, and counted there (see <a class="reference internal" href="#concerns">Concerns</a>). So every node drawn red is in
+the errors' menu, the red keying on the editor's own faults (see <a class="reference internal" href="#a-node-that-is-wrong">A node
+that is wrong</a>), and nothing in the menu is something not yet done.</p>
 <p><strong>One button finds every error.</strong> While the configuration has any, the bar has
 a button saying how many -- <em>3 errors</em> -- whose menu lists them, one line each,
 attribute values and links alike. Choosing one goes to it:</p>
@@ -1993,7 +2017,8 @@ for afterwards is what goes wrong <em>while somebody works</em>, which is news.<
 <p>Anything that goes wrong is said twice: in red at the end of the bar along the
 top of the window, and in a small window of its own that has to be acknowledged.
 The line on the bar is the state -- what stopped the last write, in red, and
-otherwise, not in red, what the last command did or <tt class="docutils literal">saved</tt> -- and the window
+otherwise, not in red, what the last command did, <tt class="docutils literal">not saved</tt> while Autosave
+is off and there are edits the files do not have, or <tt class="docutils literal">saved</tt> -- and the window
 is the moment it happened. Both, because either alone is wrong: a line is easy
 to carry on typing past without reading, and the thing it says is the one thing
 in this editor that silence makes worse -- a full device stays full while every
@@ -2103,11 +2128,15 @@ and not the node's, and Tab passes it by.</p>
 <p>Every field of a node's window is in view at once, none scrolled out of sight:
 a field out of sight is one its reader does not know is there, and one Tab
 never reaches, the toolkit's order leaving out what is clipped. So each field
-is its name beside its box, one row tall, and the window is in columns -- the
-node's own attributes, then the simulator's settings for it, which are
-written to a different file and named so by the heading over them, in two
-columns of their own, there being as many as twenty -- and as tall as the
-longest column. Tab goes down each column in turn. A window whose fields grow,
+is its name beside its box, one row tall: the node's own attributes first,
+and under them the simulator's settings for it, which are written to a
+different file and named so by the heading over them, in two columns of
+their own, there being as many as twenty. Under and not beside: the three
+columns side by side made a window wider than its share of a screen, and it
+opened narrower than that, so its last column was cut off. The window is as
+tall as all of that and never narrower than its widest part, so no field is
+cut off at the foot or the side. Tab goes down the node's fields, then each
+column in turn. A window whose fields grow,
 a complaint appearing over them or a component with more settings shown in
 the physics window, grows with them.</p>
 <p>The name is a field like any other, taken as a value is, with a small &quot;x&quot; beside

@@ -1555,10 +1555,29 @@ is touched. A simulator file may state a segment larger than the packet the
 tcspecial configuration gives, and a panel that said nothing until it was
 edited would have the payload refuse to start for no stated reason.</dd>
 <dt>Requirement</dt>
+<dd>Only starting is refused. A payload already sending when its sizes stop
+agreeing offers <tt class="docutils literal">Disable</tt> as ever, and a press of it stops the
+payload. The button was taken away whatever the payload was doing, so a
+payload running when its sizes went wrong could not be stopped until
+they were put right, and went on sending them meanwhile -- the one
+thing the refusal is there to prevent.</dd>
+<dt>Requirement</dt>
+<dd>A payload that <tt class="docutils literal"><span class="pre">--sending</span></tt> or its simulator file's <tt class="docutils literal">enable</tt> would
+start is not started while its files give sizes that cannot be sent.
+It is started as though its <tt class="docutils literal">Enable</tt> had been pressed, and that press
+would be refused; tcssim says so as it starts, and the panel says why.</dd>
+<dt>Requirement</dt>
 <dd>The window decides neither. It asks for the two sizes to be judged and
-obeys the answer -- showing what it says and disabling the button while
-it says anything -- so there is one rule rather than one in each place
-that acts on it.</dd>
+obeys the answer -- showing what it says and disabling the button that
+starts the payload while it says anything -- so there is one rule
+rather than one in each place that acts on it. Rust holds a press to
+the same answer, so an <tt class="docutils literal">Enable</tt> that reached it while the sizes cannot
+be sent starts nothing.</dd>
+<dt>Requirement</dt>
+<dd>The popup that says the sizes cannot be sent is as tall as what it
+says, and hangs under the panel's buttons, so that it hides neither the
+two sizes nor whether the payload can be started. It was a fixed size
+that the sentence ran out of, hung over the spin box just stepped.</dd>
 </dl>
 <p>Each panel has two buttons: one that starts and stops the payload, and one
 that shows the whole of what the two files said about it.</p>
@@ -1624,6 +1643,21 @@ disable one.</dd>
 says what it last sent, a heater sending nothing. Words, so that the
 state is never told by a colour alone.</dd>
 <dt>Requirement</dt>
+<dd>The words follow the name of the heater the panel switches, so that no
+two panels say the same thing of different heaters. A switch joined to
+a <tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt> names the component, <tt class="docutils literal">heater_1:
+heating</tt>; one joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or
+<tt class="docutils literal">heater_2</tt> names the mass and the input, <tt class="docutils literal">zone.heater_2: off</tt>. The
+thermostat example's two switches both named the zone they are joined
+to, and said <tt class="docutils literal">on</tt> rather than <tt class="docutils literal">heating</tt>, so that its two heaters'
+panels read <tt class="docutils literal">zone: on</tt> alike.</dd>
+<dt>Requirement</dt>
+<dd>A row of text in a panel is the height of its text, which is the window's
+type. Rows told a height of their own, fourteen and eighteen pixels in
+type of twelve points, cut off every descender and underscore --
+<tt class="docutils literal">temp_1</tt> read <tt class="docutils literal">temp 1</tt> -- and left the packet count half under the
+next row of panels.</dd>
+<dt>Requirement</dt>
 <dd>Each panel has a button that shows every parameter read from the two
 configuration files for that payload, in both programs. What a panel has
 room for is a name, a size and what has moved; a payload set says a good
@@ -1649,6 +1683,9 @@ as something a payload does.</dd>
 <dd>Nothing shown is a measurement. What a payload has done is on the panel
 itself, and a list that mixed the two would leave no way to tell a
 configured value from an observed one.</dd>
+<dt>Requirement</dt>
+<dd>What it shows scrolls, so the foot of a list longer than the popup --
+where the faults are -- can be reached.</dd>
 <dt>Requirement</dt>
 <dd>Only the attributes of the payload's own type are shown, and only the
 faults that were asked for. A device has no protocol and a bus no port;
@@ -1686,7 +1723,7 @@ reflows the grid into the room that appeared. Rust opens the window wide enough
 for the columns the payload count calls for, and because it opens it at exactly
 that many panels' width plus the chrome, the window arrives at the same count.</p>
 <p>The five sources of the thermostat example give a row of three and a row of two in a
-1206x668 window. The size is the one <tt class="docutils literal">window_size</tt> gives, which a test reads
+1206x764 window. The size is the one <tt class="docutils literal">window_size</tt> gives, which a test reads
 out of this document so that the number here cannot quietly stop being the one
 the program opens at.</p>
 </div>

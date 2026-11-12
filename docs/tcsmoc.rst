@@ -136,7 +136,13 @@ another row is started under it, and a ``Quit`` button at the foot of the
 window, which stops the tcspecial and tcssim the MOC started.
 
 Each panel shows its handler's name and number, its status, how it is
-reached, and its packet size; then two readings and one count. The number is
+reached, and its packet size; then two readings and one count. The packet
+size is what the configuration says each datum of the source is: the width
+of the type it sends at its ``world-out`` -- ``4 bytes`` for a kelvin, ``1
+byte`` for a heater's switch -- or, for a string or bytes, whose length is
+each datum's own, the node's ``read_size`` where it states one. Where the
+configuration fixes neither, the panel says ``Packet Size: not fixed``. The
+number is
 the payload's device id, its place among the names of the configuration's
 nodes, counted from nought -- ``auto-send (dev id 0)`` -- and nothing in the
 file states it. Both windows count the same way, so a payload is the same
@@ -190,8 +196,8 @@ The pictures are the window itself on the thermostat example, drawn by
 tcsmoc's own code from what a vehicle would send it, and shrunk to fit the
 page; ``make screenshots-tcsmoc`` in the top directory makes them again. The
 window opens wider than the page, three panels to a row, and a line longer
-than the window, such as ``Last Response`` listing six nodes, ends where the
-window does.
+than the window, such as ``Last Response`` listing six nodes, is wrapped
+onto the lines under it.
 
 Coming up and connecting
 ------------------------
@@ -253,7 +259,8 @@ Coming up and connecting
       Connected; the vehicle agrees.
 
 4. The vehicle, matched, clears its flag and beacons at once. That beacon
-   matches the window, which asks the vehicle what each node is doing: one
+   matches the window, which asks the vehicle what each node is doing --
+   the question the first beacon owed it, which could not go before -- one
    ``QUERY_NODE`` per panel. ``Last Response`` lists the answers, in place
    of what the ``CONNECT`` said, and each panel takes its own --
    ``Active`` here, in green. The field beside the indicator is empty.
@@ -311,16 +318,17 @@ Commanding a node
 
 2. A panel's ``Configuration`` shows what the configuration says of its
    node and, once a ``Query`` has been answered, what the node has moved
-   since the vehicle started, as the vehicle counts it. The list is wider
-   and longer than the pop-up, which scrolls; a click outside closes it.
+   since the vehicle started, as the vehicle counts it. The pop-up is as
+   wide and as tall as the list, and scrolls only where the window is too
+   small for it; a click outside closes it.
 
    .. figure:: shots/tcsmoc-configuration.png
       :alt: The consensus_temp parameters pop-up over its panel: its device
             id and where the ground receives it, then "what it has moved
             since the vehicle started" with taken, reads failed, given 2400
-            bytes, refused, dropped, asked and strangers, cut off at the
-            pop-up's right edge, and under it "No command binding names
-            this node, so nothing on it may be set from the ground."
+            bytes in 600 deliveries, refused, dropped, asked, strangers and
+            last moved, each line whole, and under it "No command binding
+            names this node, so nothing on it may be set from the ground."
 
       What ``Configuration`` shows after a ``Query``.
 
@@ -379,45 +387,45 @@ thermostat example beacons every five seconds once matched.
 
 3. Eight late, forty seconds after the last, the indicator blinks red. A
    command pressed now -- here ``Ping``, from the ``Command`` menu -- is
-   not sent: a pop-up in front of the greyed window says why and names the
-   checksum in the vehicle's last beacon beside this window's own. They are
-   the same here, the vehicle having gone quiet rather than changed what it
-   runs. ``OK`` closes it.
+   not sent: a pop-up in front of the greyed window says why. The checksum
+   in the vehicle's last beacon is this window's own, the vehicle having
+   gone quiet rather than changed what it runs, so there is nothing to
+   compare: the pop-up says the match for commanding was lost with the
+   beacons and that nothing need be pressed, since the window connects
+   again by itself when they return. ``OK`` closes it.
 
    .. figure:: shots/tcsmoc-unmatched.png
       :alt: The window greyed behind a pop-up headed "Not sent: the match
-            between the ground's and the vehicle's configurations is still
-            in progress", which says "Ping not sent: the configurations are
-            not yet matched" and names the same md5 checksum for the
-            vehicle's beacon and this station's configuration, with Copy
-            and OK buttons. The indicator behind it is red.
+            for commanding was lost", which says "Ping not sent: the
+            vehicle's beacons are overdue, so the match for commanding was
+            lost. The checksums agree, so nothing need be pressed: when the
+            beacons arrive again, this window sends CONNECT itself and asks
+            what each node is doing", and names the vehicle's checksum as
+            this station's own, with Copy and OK buttons. Last Response
+            says the same, wrapped onto three lines. The indicator behind
+            it is red.
 
       Waiting: red, and a command refused unsent.
 
 4. The beacons come back: the indicator is green again and the window is
-   matched for listening, so data is read once more. The panels stay
-   ``Stale`` and commands are still refused, because what matched the
-   window for commanding was a ``CONNECT`` answered before the outage. The
-   link is still up -- its button reads ``Disconnect`` -- so the way back is
-   ``Disconnect`` and then ``Connect``.
+   matched for listening, so data is read once more. What matched it for
+   commanding was a ``CONNECT`` answered before the outage, and the outage
+   ended that; but the link is still up, its last ``CONNECT`` agreed, and the
+   returning beacons carry this window's checksum with no new start of
+   tcspecial behind them. So the window sends a ``CONNECT`` itself, is
+   matched for commanding again, and asks about every node it owes a
+   question: ``Last Response`` gives what the ``CONNECT`` found and then what
+   the asking found, and the panels say what the vehicle answered. Where a
+   new start was heard instead, nothing is sent unpressed, and ``Connect``
+   is the operator's.
 
    .. figure:: shots/tcsmoc-heard-again.png
-      :alt: The window with a green indicator again, Status: Connected, and
-            every panel still reading Stale.
+      :alt: The window with a green indicator again, Status: Connected,
+            Last Response beginning "tcspecial agrees: v0.1.0 md5
+            9327ee80...; consensus_temp: Active; gpio-out-tmass1: Active",
+            and every panel saying Active.
 
-      Heard again, not yet commanding.
-
-5. After ``Disconnect`` and ``Connect`` the vehicle agrees, the window is
-   matched for commanding again, and it asks about every node: ``Last
-   Response`` gives what the ``CONNECT`` found and then what the asking
-   found, and the panels say what the vehicle answered.
-
-   .. figure:: shots/tcsmoc-reconnected.png
-      :alt: The window after Disconnect and Connect: Last Response begins
-            "tcspecial agrees: v0.1.0 md5 9327ee80...; consensus_temp:
-            Active; gpio-out-tmass1: Active" and every panel says Active.
-
-      Connected again.
+      Heard again: connected and asked again without a press.
 
 Restarting the vehicle
 ----------------------
@@ -500,9 +508,10 @@ closed.
 .. figure:: shots/tcsmoc-plot.png
    :alt: The plot window over the last ten minutes of the thermostat
          example, the 10 min button chosen. One panel, in kelvin, scaled
-         285 to 300: its legend names consensus_temp, to_k1 and to_k2 with
-         their latest readings, about 294.8 K, beside their colours, and is
-         cut off at to_k3 and the band; the four temperatures run close
+         285 to 300: its legend, on two lines, names consensus_temp, to_k1,
+         to_k2 and to_k3 with their latest readings, about 294.8 K, beside
+         their colours, and the band, 291.15-295.15 K (thermostat); the
+         four temperatures run close
          together as two slow rises and falls between about 291 and 295 K.
          Behind them the band: white from 291.15 to 295.15 K around a dark
          rule labelled setpoint, pale yellow regions labelled high and low,
@@ -513,8 +522,7 @@ closed.
          and on said beside each as its state.
 
    The thermostat example's plot window, as it opens, showing the last ten
-   minutes. At this width the legend has no room for its fourth value or
-   the band's name, which run off its right edge.
+   minutes. At this width the legend takes two lines.
 
 Values in one unit share a panel, so that two temperatures are read off one
 axis and a voltage is never read off a current's: the descent example has
@@ -524,7 +532,9 @@ it shows -- its lowest and highest reading in the span, and the setpoint of
 any thermostat reading values in its unit, drawn as a dark rule labelled
 ``setpoint`` -- rounded out to ticks one, two or five of a power of ten
 apart. Over each panel its legend names the unit and each value, with its
-latest reading, beside its colour. Each reading is a dot on its line, where
+latest reading, beside its colour, on as many lines as the window's width
+needs, so that none of it is cut off; the panels share what height is left.
+Each reading is a dot on its line, where
 and when it arrived, so that a reading is told from the line drawn between
 two; where readings crowd into one column of the screen, one dot stands for
 them.
@@ -651,46 +661,6 @@ command is, though. Before the window is matched for commanding nothing is
 sent: the ping window says why where the ping would have been, and the
 pop-up a refused command brings comes up in the main window.
 
-A triggered payload on the console
-==================================
-A payload that answers requests sends nothing until tcspecial asks it to, so
-when such a panel shows no data the question is what the MOC sent and what came
-back -- and a panel shows neither. For those payloads, and only those, tcsmoc
-says both on the terminal it was started from.
-
-At startup, once per triggered payload, the whole of what it will be addressed
-by and asked with:
-
-.. code-block:: console
-
-   triggered payload triggered-send: TCP localhost:5003, trigger 0x67 6F 0A every 1000 ms, OC 127.0.0.1:6003, status Stopped
-
-Then one line for every command sent about it. A press of its button:
-
-.. code-block:: console
-
-   triggered payload triggered-send: Enable pressed: sending START_DH as a Network handler
-   triggered payload triggered-send: START_DH answered Success, so the panel now says Active
-
-and one from ``Query``, carrying the status each answer came back with
-and the trigger count:
-
-.. code-block:: console
-
-   triggered payload triggered-send: QUERY_DH Success: 5 triggers sent, 0 bytes to the ground, 0 from it; QUERY_DH_SAMPLE Success
-
-That one is said when it changes and not again until it changes once more:
-what is worth reading is the answer where something moved. A payload that is
-not transmitting therefore says this once and then nothing.
-
-``NotFound`` there is worth knowing: the panel shows zeroes either way, but it
-means the tcspecial being talked to has no such handler, which usually means it
-was started from a different configuration -- most often one left running from
-an earlier payload set, which tcsmoc attaches to rather than replacing. The
-trigger count is the one number that says the asking is happening at all; it
-appears in no other counter, because a trigger is a write with no read behind
-it.
-
 What each end read
 ==================
 When a link comes up, tcsmoc sends its software version and an MD5 of the
@@ -767,9 +737,11 @@ counted, and as a match begins whatever was already waiting is dropped and
 counted too. It is *matched for commanding* once, besides, its own
 ``Connect`` has been answered with its checksum; until then every command but
 ``Connect``, ``ARM Restart`` and ``Initiate restart`` is refused before it
-is sent. tcsmoc says why in an error pop-up in front of the panels, headed
-*Not sent: the match between the ground's and the vehicle's configurations
-is still in progress*, and in ``Last Response``::
+is sent. tcsmoc says why in an error pop-up in front of the panels and in
+``Last Response``. Where the vehicle's last beacon carries another checksum,
+or none has been heard, the pop-up is headed *Not sent: the match between
+the ground's and the vehicle's configurations is still in progress*, and
+``Last Response`` says::
 
    Ping not sent: the configurations are not yet matched. Check that the checksum in the vehicle's beacon is this station's configuration's, and Connect
 
@@ -791,9 +763,17 @@ A beacon with the flag set, one carrying another checksum, or the beacons
 going overdue ends both, and the next ``Connect`` after the beacons say the
 vehicle is matched again makes the station matched for commanding once more.
 So after a restart, which takes the link down, press ``Connect`` before
-commanding; and after an outage, which leaves the link up and its button
-reading ``Disconnect``, press ``Disconnect`` and then ``Connect``. See `When
-the vehicle goes quiet`_.
+commanding. After an outage, which leaves the link up and its button reading
+``Disconnect``, tcsmoc sends that ``CONNECT`` itself when the beacons return
+clear and carrying its checksum with no new start behind them, where the
+link's last ``CONNECT`` agreed; otherwise press ``Disconnect`` and then
+``Connect``. See `When the vehicle goes quiet`_.
+
+Where the vehicle's beacon carries this station's own checksum, a command
+refused unmatched has nothing to compare, and the pop-up says so: it is
+headed *Not sent: the match for commanding was lost*, and says how the
+match was lost and what brings it back -- the beacons returning, for an
+outage, and ``Disconnect`` and then ``Connect`` otherwise.
 
 Commands
 ========
@@ -1026,10 +1006,9 @@ beacon did arrive when it arrived.
 
 Panels start at ``Unknown``: a MOC that has just come up has been told
 nothing, and the tcspecial it attached to may have been running handlers for
-hours. They are filled in when the window is first matched for commanding
--- the MOC then asks the spacecraft what each handler is doing -- and until
-then the panels' ``Last recv`` lines are what say whether a payload is
-delivering.
+hours. They are filled in by asking the spacecraft what each handler is
+doing, and until then the panels' ``Last recv`` lines are what say whether a
+payload is delivering.
 
 The indicator leaving green is also what the payload panels go by. A panel's
 status is what the spacecraft answered the last ``Enable`` or ``Disable``, and
@@ -1041,31 +1020,30 @@ last status known, and a disconnected MOC cannot find out either. It happens
 once, as contact is lost, and not before the first beacon, when there was no
 contact to lose.
 
-When the window is matched for commanding again, the MOC asks the spacecraft
-what each handler is doing, and the panels say what it answers: ``Active``
-for one that is running, ``Stopped`` for one that is not, and ``Unknown`` for
-a handler this tcspecial has not got -- which is what an operator sees when
-the MOC has attached to a tcspecial left running for another payload set.
+The spacecraft is asked about its handlers at two moments: when the first
+beacon arrives, and when a beacon outage ends. The panels then say what it
+answers: ``Active`` for one that is running, ``Stopped`` for one that is
+not, and ``Unknown`` for a handler this tcspecial has not got -- which is
+what an operator sees when the MOC has attached to a tcspecial left running
+for another payload set. A payload whose last press was ``Disable`` is left
+out: the operator said to stop that one, so there is nothing to ask. It is
+not a poll -- nothing is asked while contact simply holds -- and the asking
+is done off the window's thread, so the window keeps repainting while the
+answers come. ``Query`` asks about every payload whenever it is chosen.
 
-That asking happens at one moment and no other: as the window becomes matched
-for commanding. That is a ``Connect`` the vehicle agrees to while its beacons
-already say it is matched, and ``Last Response`` then says what the
-``Connect`` found and what the asking found after it; or, where the beacons
-still carry the restart flag when the ``Connect`` is answered, as they do
-after every start, the beacon with the flag clear that the vehicle sends at
-once on matching, and ``Last Response`` then says what the asking found.
-Neither the first beacon nor the end of an outage asks by itself: the first
-beacon of a start carries the restart flag, and an outage ends the match for
-commanding, which only a ``Connect`` makes again -- ``Disconnect`` and then
-``Connect``, the link having stayed up. It is not a poll -- nothing is asked
-while contact simply holds -- and a payload whose last press was ``Disable``
-is left out of it: the operator said to stop that one, so there is nothing
-to ask. ``Query`` asks about every payload whenever it is chosen.
-
-Until then nothing is asked and nothing is said: the panels keep what they
-show -- ``Unknown`` before the first answer, ``Stale`` after an outage --
-until the window is next matched for commanding. ``Query`` is refused unsent
-before then, as every command but the three is.
+Neither moment can always ask at once, because nothing but ``Connect``,
+``ARM Restart`` and ``Initiate restart`` is sent until the window is matched
+for commanding (see `Matching the configurations`_). So the question is owed
+from the moment and asked at the first chance after it, for as long as
+contact holds: at once where the window is matched; at the ``Connect`` that
+matches it, where the link was down when the first beacon came -- as it is
+when the window has just opened -- and ``Last Response`` then says what the
+``Connect`` found and then what the asking found, or, where the beacons
+still carry the restart flag, as after every start, at the clear beacon the
+vehicle sends at once on matching; and at the end of an outage, after the
+``CONNECT`` tcsmoc sends itself. Contact lost again forgets the question,
+and the next contact owes its own. A ``Connect`` pressed while nothing is
+owed asks nothing.
 
 Nothing else changes a panel's status. The once-a-second refresh shows what has
 arrived and leaves the status to the commands and to the beacon.

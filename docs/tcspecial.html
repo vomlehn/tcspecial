@@ -468,11 +468,12 @@ ul.auto-toc {
 <h1><a class="toc-backref" href="#toc-entry-1">Introduction</a></h1>
 <div class="admonition warning">
 <p class="first admonition-title">Warning</p>
-<p class="last">TCSpecial is very early software and is subject to rapid change. Until
-1.0, any change to its API changes the minor version number (0.1 to
-0.2), so a release that changes only the patch number never breaks code
-built against it. Feedback is welcome, even at this stage: open an issue
-at <a class="reference external" href="https://github.com/vomlehn/tcspecial/issues">https://github.com/vomlehn/tcspecial/issues</a>.</p>
+<p class="last">TCSpecial is an alpha release. It is not fully tested, it is not feature
+complete, and it is subject to rapid change. Until 1.0, any change to its
+API changes the minor version number (0.1 to 0.2), so a release that
+changes only the patch number never breaks code built against it.
+Feedback is welcome, even at this stage: open an issue at
+<a class="reference external" href="https://github.com/vomlehn/tcspecial/issues">https://github.com/vomlehn/tcspecial/issues</a>.</p>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
@@ -2451,9 +2452,21 @@ and there is nothing else to ask of it. The words are tcsmoc's, so that a
 payload disabled in one window is disabled in the other rather than silent in
 one and disabled in the other; they were the payload's own, <tt class="docutils literal">Send</tt> and
 <tt class="docutils literal">Silent</tt>, which left the reader of two windows translating.</p>
+<p>A payload starts disabled in tcssim, as though nobody had pressed
+<tt class="docutils literal">Enable</tt>, unless the simulator configuration says <tt class="docutils literal">enable: true</tt> for it
+(<tt class="docutils literal">&lt;enable <span class="pre">value=&quot;true&quot;/&gt;</span></tt> in XML), in its own entry or its group's, a
+payload's own overriding its group's; or unless tcssim is given
+<tt class="docutils literal"><span class="pre">--sending</span></tt>, which starts every payload whatever the file says. The two
+add up: a payload starts enabled if either asks, and <tt class="docutils literal">enable: false</tt> does
+not hold one back from <tt class="docutils literal"><span class="pre">--sending</span></tt>. Either way it is started as a press of
+<tt class="docutils literal">Enable</tt> would start it, so a payload whose sizes cannot be sent stays
+disabled, and its panel says why. tcspecial never reads the simulator
+configuration, so <tt class="docutils literal">enable</tt> says nothing about what a configuration that
+flies does.</p>
 <p>A heater, or any part the vehicle drives, sends nothing, so in tcssim the
-same button is its power. Disabled -- as every payload starts, unless tcssim
-is given <tt class="docutils literal"><span class="pre">--sending</span></tt> -- it is unpowered, or failed, and stays off whatever
+same button is its power. Disabled -- as every payload starts, unless the
+simulator configuration's <tt class="docutils literal">enable</tt> or tcssim's <tt class="docutils literal"><span class="pre">--sending</span></tt> says
+otherwise -- it is unpowered, or failed, and stays off whatever
 the vehicle, or a thermostat tcssim plays, decides: it gives the
 simulated world no heat. What it is sent meanwhile is kept, the latest
 replacing the one before, and <tt class="docutils literal">Enable</tt> applies that latest at once, since

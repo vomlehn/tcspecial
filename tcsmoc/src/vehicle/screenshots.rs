@@ -49,7 +49,7 @@ use tcslibgs::{
 };
 
 use super::*;
-use crate::beacon_receive::{BeaconReceive, Contacts, Decided, OnContact};
+use crate::beacon_receive::{BeaconReceive, Decided};
 use crate::{DHInfo, MainWindow, MenuAction, PingWindow, PlotWindow};
 
 thread_local! {
@@ -743,7 +743,7 @@ impl Station {
 
         let ui = MainWindow::new().expect("a window");
         let sizes = Sizes::settle(&ui);
-        let rows_in_order = panels(&links, &settable_of(&graph));
+        let rows_in_order = panels(&graph, &links, &settable_of(&graph));
         let rows: Arc<BTreeMap<String, usize>> = Arc::new(
             rows_in_order
                 .iter()
@@ -828,40 +828,8 @@ impl Station {
             Some(digest),
         )
         .expect("the beacon watch");
-        let lost: OnContact = {
-            let weak = ui.as_weak();
-            Arc::new(move || {
-                let weak = weak.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = weak.upgrade() {
-                        every_node_lost_contact(&ui.get_dh_model());
-                    }
-                });
-            })
-        };
-        let made: OnContact = {
-            let weak = ui.as_weak();
-            let link = link.clone();
-            let agreed = agreed.clone();
-            let declined = declined.clone();
-            Arc::new(move || {
-                let weak = weak.clone();
-                let link = link.clone();
-                let agreed = agreed.clone();
-                let declined = declined.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(ui) = weak.upgrade() {
-                        contact_made(
-                            &ui,
-                            &link,
-                            &agreed,
-                            &ui.get_dh_model(),
-                            &declined,
-                        );
-                    }
-                });
-            })
-        };
+        let asking =
+            Asking::new(&ui, &link, &agreed, &declined, Some(digest), &*model);
         let heard: crate::beacon_receive::OnBeacon = {
             let weak = ui.as_weak();
             let link = link.clone();
@@ -879,10 +847,7 @@ impl Station {
                 matched: matched.clone(),
             },
             None,
-            Contacts {
-                lost: Some(lost),
-                made: Some(made),
-            },
+            contacts_for(&ui, Some(&asking)),
         );
 
         // The ping window, the plot and the receivers, as `run` makes them.
@@ -944,7 +909,7 @@ impl Station {
             Some(digest),
             &model,
             &declined,
-            &contact,
+            &asking,
             &Arc::new(graph.clone()),
         );
         settle();
@@ -1252,6 +1217,13 @@ fn thermostat() {
     station.refresh();
     shoot(ui.window(), Some(above_panels(ui)), "connected");
     station.beacon(2, false);
+    // The asking, which is done off the window's thread.
+    until("the nodes asked about", || {
+        station
+            .model
+            .row_data(0)
+            .is_some_and(|row| row.status == "Active")
+    });
     station.refresh();
     shoot(ui.window(), Some(down_to_panel(ui, 0)), "matched");
 
@@ -1317,12 +1289,22 @@ fn thermostat() {
     let panel = &panel_elements(ui)[consensus];
     press_in(panel, "Configuration");
     settle();
+    // The pop-up, which is sized to what it shows, and the panel it is
+    // over. Its elements give their positions within the pop-up, which is
+    // 4 pixels in from the panel's corner: see the PopupWindow's x and y.
+    let popup =
+        ElementHandle::find_by_element_id(ui, "DHPanel::parameters-layout")
+            .next()
+            .expect("the Configuration pop-up");
     let around = Region::around(panel, 10.0);
+    let at = panel.absolute_position();
+    let right = at.x + 4.0 + popup.size().width + 10.0;
+    let foot = at.y + 4.0 + popup.size().height + 10.0;
     shoot(
         ui.window(),
         Some(Region {
-            width: 330.0,
-            height: 370.0,
+            width: (right - around.x).max(around.width),
+            height: (foot - around.y).max(around.height),
             ..around
         }),
         "configuration",
@@ -1373,15 +1355,17 @@ fn thermostat() {
     );
     press(ui, "OK");
 
-    // The beacons come back: contact, and the panels stay Stale until a
-    // Connect matches the window for commanding again.
+    // The beacons come back: contact, and the window sends CONNECT itself
+    // and asks what each node is doing, off its own thread.
     station.beacon(6, false);
+    until("the nodes asked about again", || {
+        station
+            .model
+            .row_data(0)
+            .is_some_and(|row| row.status == "Active")
+    });
     station.refresh();
     shoot(ui.window(), Some(down_to_panel(ui, 0)), "heard-again");
-    press(ui, "Disconnect");
-    station.connect();
-    station.refresh();
-    shoot(ui.window(), Some(down_to_panel(ui, 0)), "reconnected");
 
     // A restart onto the configuration the vehicle runs: ARM Restart,
     // Initiate restart, the flagged beacon, and the new start's first.

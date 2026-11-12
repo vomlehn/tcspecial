@@ -267,10 +267,16 @@ impl Attachment {
     /// heater is heating, off, or disabled and so off. Words, so that the
     /// panel says it in more than a colour.
     ///
+    /// The part is named by what it drives. A component's own `on` is the
+    /// component -- `heater_1`, a heater -- but any other input is named in
+    /// full: a zone's two heaters are its inputs `heater_1` and `heater_2`,
+    /// and naming the zone alone, as this once did, gave two panels saying
+    /// `zone: heating` and no way to tell which heater either was.
+    ///
     /// # Returns
     ///
-    /// The part and what it is doing -- `heater_1: heating` -- or empty for
-    /// any other attachment.
+    /// The part and what it is doing -- `heater_1: heating`,
+    /// `zone.heater_2: off` -- or empty for any other attachment.
     pub fn driving_said(&self) -> String {
         let (
             Attachment::Drives {
@@ -285,7 +291,7 @@ impl Attachment {
             return String::new();
         };
         let name = world.name_of(*place);
-        let part = name.split('.').next().unwrap_or(&name);
+        let part = name.strip_suffix(".on").unwrap_or(&name);
         let doing = match (driving, unit) {
             (Driving::Disabled, _) => "disabled, so off".to_string(),
             (Driving::At(value), None) if value > 0.5 => {

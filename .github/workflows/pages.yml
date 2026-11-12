@@ -40,7 +40,7 @@ jobs:
       - name: Leave out links that lead outside the repository
         run: |
           find . -path ./.git -prune -o -type l ! -exec test -e {} \; \
-              -print -delete
+              -print -exec rm -- {} +
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

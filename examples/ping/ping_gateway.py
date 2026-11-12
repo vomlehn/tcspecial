@@ -74,7 +74,7 @@ from tcslib.beacon import Beacons, Schedule  # noqa: E402
 from tcslib.listening import Listening  # noqa: E402
 from tcslib.processes import Vehicle  # noqa: E402
 from tcslibgs import configuration  # noqa: E402
-from ping_ground import Pinger, interval  # noqa: E402
+from ping_ground import Pinger, report  # noqa: E402
 from ping_window import run_the_window, the_one  # noqa: E402
 
 #: The example's configuration, without its extension: ``.xtcs``, which is
@@ -331,17 +331,10 @@ def run_without_a_window(setup, beacons, pinger, count):
                 and pinger.exchange().received_at
             ):
                 break
-        exchange = pinger.exchange()
-        if exchange.received_at is None:
-            print("received: nothing", flush=True)
-            answered_all = False
-            continue
-        print(f"received: {exchange.received}", flush=True)
-        print(
-            f"times: round trip {interval(exchange.round_trip())}, up "
-            f"{interval(exchange.up())}, down {interval(exchange.down())}",
-            flush=True,
-        )
+        lines, answered = report(pinger.exchange())
+        for line in lines:
+            print(line, flush=True)
+        answered_all = answered_all and answered
     return 0 if answered_all else 1
 
 

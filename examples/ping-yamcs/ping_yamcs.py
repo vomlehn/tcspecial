@@ -71,7 +71,7 @@ from tcslib.yamcs_ground import (  # noqa: E402
     write_yamcs, yamcs_home)
 from tcslibgs import configuration, ping, ping_packet  # noqa: E402
 from tcslibgs import yamcs as generated  # noqa: E402
-from ping_ground import Exchange, Pinger, interval  # noqa: E402
+from ping_ground import Exchange, Pinger, report  # noqa: E402
 from ping_window import run_the_window, the_one  # noqa: E402
 
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
@@ -353,15 +353,10 @@ def ping_and_print(pinger, count):
             if (pinger.receive(max(deadline - time.monotonic(), 0.01))
                     and pinger.exchange().received_at):
                 break
-        exchange = pinger.exchange()
-        if exchange.received_at is None:
-            print("received: nothing", flush=True)
-            answered_all = False
-        else:
-            print(f"received: {exchange.received}", flush=True)
-            print(f"times: round trip {interval(exchange.round_trip())}, up "
-                  f"{interval(exchange.up())}, down "
-                  f"{interval(exchange.down())}", flush=True)
+        lines, answered = report(pinger.exchange())
+        for line in lines:
+            print(line, flush=True)
+        answered_all = answered_all and answered
     return 0 if answered_all else 1
 
 

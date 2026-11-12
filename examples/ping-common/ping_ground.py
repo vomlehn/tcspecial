@@ -24,6 +24,11 @@ again before it came back -- is still the last thing received, and is shown
 as that. It changes none of the times, because it is not the answer to the
 ping they are timing.
 
+Whether anything at all has arrived since the last ping is kept too, so that
+a ground station with no window (:func:`report`) prints what came that did
+not answer it -- an earlier ping's answer, or what is no answer at all --
+rather than saying nothing came.
+
 The three times
 ---------------
 * the round trip: from the ground sending the ping to the ground receiving
@@ -72,6 +77,10 @@ class Exchange:
     received_at: int = None
     #: When the vehicle had the last ping, by the vehicle's clock.
     answered_at: int = None
+    #: Whether anything has arrived on the answer link since the last ping
+    #: was sent: its answer, an earlier ping's, or something that is not an
+    #: answer at all, which ``received`` then says.
+    arrived: bool = False
 
     def round_trip(self):
         """Ground sent to ground received, in nanoseconds, or ``None``."""
@@ -186,6 +195,7 @@ class Pinger:
             received=text,
             received_at=at if latest else self._exchange.received_at,
             answered_at=pong.answered if latest else self._exchange.answered_at,
+            arrived=True,
         )
 
     def _not_an_answer(self, why):
@@ -202,6 +212,7 @@ class Pinger:
             received=f"not an answer: {why}",
             received_at=self._exchange.received_at,
             answered_at=self._exchange.answered_at,
+            arrived=True,
         )
 
     def close(self):
@@ -246,3 +257,32 @@ def interval(nanoseconds):
     sign = "-" if nanoseconds < 0 else ""
     whole, part = divmod(abs(nanoseconds), 1_000_000)
     return f"{sign}{whole}.{part:06d} ms"
+
+
+def report(exchange):
+    """What a ground station with no window prints of a ping, once it has
+    waited for the answer: the lines after the one saying what was sent.
+
+    Something that arrived and does not answer the ping -- an earlier
+    ping's answer, or what is not an answer at all -- is printed as what
+    it is, so that a link that delivers the wrong thing is not mistaken
+    for one that delivers nothing.
+
+    Args:
+        exchange: The :class:`Exchange` after the wait.
+
+    Returns:
+        The lines, and whether the ping was answered.
+    """
+    if exchange.received_at is not None:
+        return [
+            f"received: {exchange.received}",
+            f"times: round trip {interval(exchange.round_trip())}, up "
+            f"{interval(exchange.up())}, down {interval(exchange.down())}",
+        ], True
+    if exchange.arrived:
+        return [
+            f"received: {exchange.received}",
+            "times: none, since nothing answered this ping",
+        ], False
+    return ["received: nothing"], False

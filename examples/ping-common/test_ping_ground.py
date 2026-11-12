@@ -17,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "python"))
 sys.path.insert(0, str(HERE))
 
-from ping_ground import Pinger, interval, precise_time  # noqa: E402
+from ping_ground import Pinger, interval, precise_time, report  # noqa: E402
 from tcslibgs import count, ping  # noqa: E402
 from tcslibgs.configuration import HostPort  # noqa: E402
 
@@ -41,7 +41,9 @@ class Clock:
         return self.at
 
 
-class PingerTest(unittest.TestCase):
+class WithPinger(unittest.TestCase):
+    """A pinger whose vehicle is a socket of the test's."""
+
     def setUp(self):
         self.clock = Clock(AT)
         self.vehicle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -59,6 +61,10 @@ class PingerTest(unittest.TestCase):
     def the_vehicle_had(self):
         """What reached the vehicle."""
         return self.vehicle.recvfrom(256)[0]
+
+
+class PingerTest(WithPinger):
+    """What the pinger keeps as pings go and answers come."""
 
     def test_a_ping_goes_up_numbered_and_timed(self):
         self.assertEqual(self.pinger.ping(), f"ping #1 {ping.time_text(AT)}")
@@ -135,6 +141,49 @@ class PingerTest(unittest.TestCase):
         self.assertTrue(self.pinger.receive(timeout=2))
         self.assertIsNotNone(self.pinger.exchange().received_at)
         self.assertFalse(self.pinger.receive(timeout=0.01), "nothing more came")
+
+
+class ReportTest(WithPinger):
+    """What a ground station with no window prints of each ping."""
+
+    def test_an_answer_is_printed_with_its_times(self):
+        message = self.pinger.ping().encode()
+        self.pinger.answered(ping.reply(message, AT + 3), AT + 5)
+        lines, answered = report(self.pinger.exchange())
+        self.assertTrue(answered)
+        self.assertTrue(lines[0].startswith("received: ping #1 "), lines)
+        self.assertTrue(lines[1].startswith("times: round trip "), lines)
+
+    def test_nothing_is_printed_as_nothing(self):
+        self.pinger.ping()
+        self.assertEqual(report(self.pinger.exchange()),
+                         (["received: nothing"], False))
+
+    def test_what_is_not_an_answer_is_printed_as_what_it_is(self):
+        self.pinger.ping()
+        self.pinger.answered(b"hello", AT + 1)
+        lines, answered = report(self.pinger.exchange())
+        self.assertFalse(answered)
+        self.assertTrue(lines[0].startswith("received: not an answer: "),
+                        lines)
+
+    def test_an_earlier_pings_answer_is_printed_and_not_timed(self):
+        first = self.pinger.ping().encode()
+        self.clock.at = AT + SECOND
+        self.pinger.ping()
+        self.pinger.answered(ping.reply(first, AT + 7), AT + SECOND + 9)
+        lines, answered = report(self.pinger.exchange())
+        self.assertFalse(answered)
+        self.assertTrue(lines[0].startswith("received: ping #1 "), lines)
+        self.assertEqual(lines[1],
+                         "times: none, since nothing answered this ping")
+
+    def test_a_ping_forgets_what_arrived_for_the_one_before(self):
+        self.pinger.ping()
+        self.pinger.answered(b"hello", AT + 1)
+        self.pinger.ping()
+        self.assertEqual(report(self.pinger.exchange()),
+                         (["received: nothing"], False))
 
 
 class ShowingTest(unittest.TestCase):

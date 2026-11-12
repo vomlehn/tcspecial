@@ -198,8 +198,18 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         assert_eq!(had.count, count);
         let answer = ping::reply(&buffer[..got], ping::now().expect("a clock"))
             .expect("answered");
+        // A ping node sends a string, and the vehicle sends a string down
+        // after a count of its bytes, as it is counted on a link that no
+        // XTCE describes: see tcslibgs::graph::telemetry's count.
+        let mut down = Vec::new();
+        tcslibgs::link_type::counted(
+            answer.as_bytes(),
+            tcslibgs::link_type::Count::Groups,
+            &mut down,
+        )
+        .expect("counted");
         uplink
-            .send_to(answer.as_bytes(), ("127.0.0.1", answers))
+            .send_to(&down, ("127.0.0.1", answers))
             .expect("sent down");
     }
 

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="400" viewBox="0 0 780 400" role="img" aria-labelledby="title desc">
+  <title id="title">An app node and its program</title>
+  <desc id="desc">On the left, tcspecial, holding the app node, which takes its place in the graph like any other node. On the right, the program the app node runs, written in any language. Three interfaces join them, each a file descriptor the program inherits. Descriptor 0, the payload interface, drawn solid and blue with arrows both ways: the program reads payload data on it and writes gateway data back. Descriptor 1, the gateway interface, drawn dashed and vermillion with arrows both ways: the program reads gateway data on it and writes payload data back. Descriptor 2, the error interface, drawn dotted and grey with one arrow, from the program to tcspecial: the program writes what went wrong. A program that can read its standard input and write its standard output can take part.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .label { font-size: 13px; fill: #1f2937; }
+      .small { font-size: 12px; fill: #4b5563; }
+      .box { fill: #f3f4f6; stroke: #374151; stroke-width: 2; }
+      .inner { fill: #ffffff; stroke: #374151; stroke-width: 1.5; }
+      .payload { stroke: #0072B2; stroke-width: 3; fill: none; }
+      .gateway { stroke: #D55E00; stroke-width: 3; fill: none; stroke-dasharray: 9 6; }
+      .errors { stroke: #6b7280; stroke-width: 3; fill: none; stroke-dasharray: 2 5; stroke-linecap: round; }
+    </style>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0072B2"/>
+    </marker>
+    <marker id="vermillion" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#D55E00"/>
+    </marker>
+    <marker id="grey" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+  <rect width="780" height="400" fill="#ffffff"/>
+
+  <!-- tcspecial, and the app node inside it. -->
+  <rect class="box" x="30" y="40" width="230" height="300" rx="10"/>
+  <text class="name" x="145" y="70" text-anchor="middle">tcspecial</text>
+  <rect class="inner" x="60" y="120" width="170" height="170" rx="8"/>
+  <text class="name" x="145" y="150" text-anchor="middle">the app node</text>
+  <text class="small" x="145" y="172" text-anchor="middle">a node of the graph,</text>
+  <text class="small" x="145" y="188" text-anchor="middle">joined by lines</text>
+  <text class="small" x="145" y="204" text-anchor="middle">like any other</text>
+
+  <!-- The program. -->
+  <rect class="box" x="520" y="40" width="230" height="300" rx="10"/>
+  <text class="name" x="635" y="70" text-anchor="middle">the program</text>
+  <text class="small" x="635" y="92" text-anchor="middle">any language: it reads and</text>
+  <text class="small" x="635" y="108" text-anchor="middle">writes its descriptors</text>
+
+  <!-- Descriptor 0: the payload interface, both ways. -->
+  <path class="payload" d="M238,150 L512,150" marker-start="url(#blue)" marker-end="url(#blue)"/>
+  <text class="label" x="375" y="140" text-anchor="middle">0 -- payload interface</text>
+  <text class="small" x="375" y="172" text-anchor="middle">reads payload data, writes gateway data</text>
+
+  <!-- Descriptor 1: the gateway interface, both ways. -->
+  <path class="gateway" d="M238,225 L512,225" marker-start="url(#vermillion)" marker-end="url(#vermillion)"/>
+  <text class="label" x="375" y="215" text-anchor="middle">1 -- gateway interface</text>
+  <text class="small" x="375" y="247" text-anchor="middle">reads gateway data, writes payload data</text>
+
+  <!-- Descriptor 2: errors, from the program only. -->
+  <path class="errors" d="M512,300 L238,300" marker-end="url(#grey)"/>
+  <text class="label" x="375" y="290" text-anchor="middle">2 -- error interface</text>
+  <text class="small" x="375" y="322" text-anchor="middle">writes what went wrong</text>
+
+  <!-- Key. -->
+  <line class="payload" x1="40" y1="372" x2="80" y2="372"/>
+  <text class="small" x="88" y="376">solid: 0</text>
+  <line class="gateway" x1="180" y1="372" x2="220" y2="372"/>
+  <text class="small" x="228" y="376">dashed: 1</text>
+  <line class="errors" x1="330" y1="372" x2="370" y2="372"/>
+  <text class="small" x="378" y="376">dotted, one way: 2</text>
+</svg>

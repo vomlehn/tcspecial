@@ -364,22 +364,15 @@ ul.auto-toc {
 <div class="document" id="building-a-vehicle-from-the-examples-to-a-whole-one">
 <h1 class="title">Building a Vehicle: From the Examples to a Whole One</h1>
 
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">Outline, for review. Each section says what it will teach, what the
-reader adds to the configuration, how they check it, and which figures
-it will have. Nothing below is written out yet, and the stage
-directories, figures and screenshots it names do not exist yet.</p>
-</div>
 <div class="contents local topic" id="table-of-contents">
 <p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
 <ul class="simple">
 <li><a class="reference internal" href="#what-this-guide-is-for" id="toc-entry-1">What this guide is for</a></li>
 <li><a class="reference internal" href="#the-vehicle" id="toc-entry-2">The vehicle</a></li>
 <li><a class="reference internal" href="#stage-1-one-payload-to-the-ground" id="toc-entry-3">Stage 1: one payload to the ground</a></li>
-<li><a class="reference internal" href="#stage-2-a-second-payload" id="toc-entry-4">Stage 2: a second payload</a></li>
-<li><a class="reference internal" href="#stage-3-a-computation-between-payload-and-ground" id="toc-entry-5">Stage 3: a computation between payload and ground</a></li>
-<li><a class="reference internal" href="#stage-4-commands-down-to-a-payload" id="toc-entry-6">Stage 4: commands down to a payload</a></li>
+<li><a class="reference internal" href="#stage-2-a-second-payload-and-where-ports-come-from" id="toc-entry-4">Stage 2: a second payload, and where ports come from</a></li>
+<li><a class="reference internal" href="#stage-3-a-computation-and-a-gateway-to-reach-the-ground" id="toc-entry-5">Stage 3: a computation, and a gateway to reach the ground</a></li>
+<li><a class="reference internal" href="#stage-4-commands-back-down" id="toc-entry-6">Stage 4: commands back down</a></li>
 <li><a class="reference internal" href="#stage-5-rates-and-groups" id="toc-entry-7">Stage 5: rates and groups</a></li>
 <li><a class="reference internal" href="#stage-6-redundant-sensors-and-a-vote" id="toc-entry-8">Stage 6: redundant sensors and a vote</a></li>
 <li><a class="reference internal" href="#stage-7-splitting-the-vehicle-into-files" id="toc-entry-9">Stage 7: splitting the vehicle into files</a></li>
@@ -389,32 +382,37 @@ directories, figures and screenshots it names do not exist yet.</p>
 <li><a class="reference internal" href="#checking-the-whole-vehicle" id="toc-entry-13">Checking the whole vehicle</a></li>
 <li><a class="reference internal" href="#from-the-desk-to-flight" id="toc-entry-14">From the desk to flight</a></li>
 <li><a class="reference internal" href="#where-to-go-next" id="toc-entry-15">Where to go next</a></li>
-<li><a class="reference internal" href="#how-this-guide-is-made" id="toc-entry-16">How this guide is made</a></li>
+<li><a class="reference internal" href="#how-this-guide-is-kept-true" id="toc-entry-16">How this guide is kept true</a></li>
 </ul>
 </div>
 <div class="section" id="what-this-guide-is-for">
 <h1><a class="toc-backref" href="#toc-entry-1">What this guide is for</a></h1>
 <p>The shipped examples each show one idea: one payload, one computation, one
 gateway. A mission's vehicle has all of them at once, and the ways they
-combine -- shared names, ports and IDs, files that include others, rates
-that add up on one link -- are what no single example shows.</p>
+combine -- names shared across the graph, ports and ids that move as nodes
+are added, files that include others, rates that add up on one link -- are
+what no single example shows.</p>
 <p>This guide builds one vehicle, a small lunar lander's science deck, a stage
 at a time, from the minimal example to a configuration a mission could start
-from. Each stage adds one thing, says why it is added the way it is, and
-ends with a configuration that <tt class="docutils literal">tcsverify</tt> passes and that runs on a desk
-with <tt class="docutils literal"><span class="pre">--simulate=all</span></tt>.</p>
-<p>It is a companion to the manuals, not a replacement: each stage links to
-the manual section that says everything about what it adds.</p>
+from. Each stage adds one thing and says why it is added the way it is. Every
+stage is a configuration that <tt class="docutils literal">tcsverify</tt> passes and that runs on a desk
+under <tt class="docutils literal"><span class="pre">--simulate=all</span></tt>, and a test holds every one of them to that, so the
+files the guide shows are the files that work.</p>
+<p>It is a companion to the manuals, not a replacement: each stage names the
+section of the <a class="reference external" href="tcspecial.html">tcspecial manual</a> that says everything
+about what it adds.</p>
 <ul class="simple">
-<li><strong>Who it is for:</strong> someone who has run an example and now has a vehicle
-of their own to describe.</li>
+<li><strong>Who it is for:</strong> someone who has run an example and now has a vehicle of
+their own to describe.</li>
 <li><strong>What it assumes:</strong> the programs are built or installed (the tcspecial
 manual's &quot;Installing&quot;), and the reader has run the minimal example once.</li>
 </ul>
-<p><strong>Figure 1 -- The finished vehicle.</strong> tcsgui's drawing of the stage-10
-configuration, every node and link, with the subsystem files as boxes. The
-picture the guide works towards, shown first so that each stage can be
-placed in it.</p>
+<div class="figure">
+<img alt="tcsgui showing the finished deck: the top file, with two subsystem boxes, science and thermal, the camera, and the gateway node, joined by lines to the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
+<p class="caption">Where the guide ends: the deck of stage 9 as tcsgui draws it, its two
+subsystems collapsed into boxes, the camera beside them, and every line
+ending at the gateway node.</p>
+</div>
 </div>
 <div class="section" id="the-vehicle">
 <h1><a class="toc-backref" href="#toc-entry-2">The vehicle</a></h1>
@@ -423,194 +421,588 @@ TCSpecial, and so that every payload has a simulated device tcssim already
 provides:</p>
 <table border="1" class="docutils">
 <colgroup>
-<col width="24%" />
-<col width="35%" />
-<col width="41%" />
+<col width="46%" />
+<col width="45%" />
+<col width="9%" />
 </colgroup>
 <thead valign="bottom">
 <tr><th class="head">Payload</th>
 <th class="head">Interface</th>
-<th class="head">Stage it arrives in</th>
+<th class="head">Stage</th>
 </tr>
 </thead>
 <tbody valign="top">
-<tr><td>Seismometer</td>
+<tr><td><tt class="docutils literal">seismometer</tt></td>
 <td>network (UDP)</td>
 <td>1</td>
 </tr>
-<tr><td>Soil thermometer</td>
-<td>serial</td>
+<tr><td><tt class="docutils literal">regolith_thermometer</tt></td>
+<td>serial, asked with <tt class="docutils literal">T?</tt></td>
 <td>2</td>
 </tr>
-<tr><td>Heater</td>
-<td>GPIO</td>
+<tr><td><tt class="docutils literal">probe_heater</tt></td>
+<td>GPIO line</td>
 <td>4</td>
 </tr>
-<tr><td>Three hull sensors</td>
-<td>I<sup>2</sup>C on a mass</td>
+<tr><td><tt class="docutils literal">hull_temp_1</tt> to <tt class="docutils literal">_3</tt></td>
+<td>I<sup>2</sup>C</td>
 <td>6</td>
 </tr>
-<tr><td>Camera</td>
-<td>app node (existing code)</td>
+<tr><td><tt class="docutils literal">camera</tt></td>
+<td>an app node (a program)</td>
 <td>9</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Figure 2 -- The deck.</strong> A drawing of the deck: each payload where it sits,
-labelled with its name and interface, so the reader knows what the nodes
-stand for before meeting them. Drawn by hand in SVG; any colour is the
-Okabe-Ito palette's and is paired with a label, never alone.</p>
-<p>Each stage's configuration is in <tt class="docutils literal"><span class="pre">examples/vehicle/stage-N/</span></tt>, in both
-spellings, with its simulator file, so that a reader can start at any stage,
-or compare two with <tt class="docutils literal">diff</tt>.</p>
+<p>The regolith thermometer and its heater are a heat-flow probe, as the Apollo
+landers carried: the probe is warmed above the ground around it, and how fast
+it cools says how well the regolith conducts heat. The three hull sensors
+watch the deck's own temperature, and are three so that one going wrong does
+not take the reading with it.</p>
+<p>Each stage is a directory of <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/</span></tt>: <tt class="docutils literal"><span class="pre">stage-01</span></tt> to
+<tt class="docutils literal"><span class="pre">stage-10</span></tt>, each holding the configuration in both spellings,
+<tt class="docutils literal">deck.ytcs</tt> and <tt class="docutils literal">deck.xtcs</tt>, and its simulator file, <tt class="docutils literal"><span class="pre">deck-sim.yaml</span></tt>.
+From stage 7 the stages include files in <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/common/</span></tt>.
+Any stage can be started from, and two compared with <tt class="docutils literal">diff</tt>:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>diff<span class="whitespace"> </span>docs/building-a-vehicle/stage-02/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">       </span>docs/building-a-vehicle/stage-03/deck.ytcs
+</pre>
+<p>Every stage runs the way an example does, tcsmoc starting tcspecial and
+tcssim itself:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>run<span class="whitespace"> </span><span class="name variable">TCSPECIAL_CONFIG_FILE</span><span class="operator">=</span>docs/building-a-vehicle/stage-04/deck<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">       </span><span class="name variable">TCSPECIAL_SIM_FILE</span><span class="operator">=</span>docs/building-a-vehicle/stage-04/deck-sim.yaml
+</pre>
 </div>
 <div class="section" id="stage-1-one-payload-to-the-ground">
 <h1><a class="toc-backref" href="#toc-entry-3">Stage 1: one payload to the ground</a></h1>
-<p><em>Starts from:</em> <tt class="docutils literal">examples/minimal</tt>.</p>
-<ul class="simple">
-<li>The anatomy of a configuration: the <tt class="docutils literal">tcspecial</tt> section (where commands
-arrive, where beacons go, the log), one gateway, one payload, and the
-line between them.</li>
-<li>Names: every node has one, and lines are written as <tt class="docutils literal">node.name</tt>.</li>
-<li>Running it: <tt class="docutils literal">tcsverify</tt>, then tcsmoc with <tt class="docutils literal"><span class="pre">--simulate=all</span></tt>, which
-starts tcspecial and tcssim.</li>
-<li>What the ground sees: the beacon, the seismometer's panel.</li>
-</ul>
-<p><em>Figures:</em> tcsgui's drawing of the stage; tcsmoc's window with the beacon
-and the seismometer's panel, the parts the text names marked with numbered
-callouts.</p>
+<p><em>Starts from:</em> <tt class="docutils literal">examples/minimal</tt>, with the payload named for what it is.</p>
+<p>A configuration has a <tt class="docutils literal">tcspecial</tt> section, which says where tcspecial takes
+its commands, where it sends its beacons and where it keeps its state, and
+then the nodes. Stage 1 has one node, the seismometer: software on the deck's
+science computer that sends each reading over UDP of its own accord.</p>
+<pre class="literal-block">
+
+  - type network:
+      # The seismometer: software on the deck's science computer that sends
+      # each reading over UDP of its own accord, so nothing here says when to
+      # read it. No line is drawn from it, so tcspecial sends what it reads to
+      # the ground over the tcspecial section's payload_telemetry: from
+      # source_base plus the seismometer's device id to dest_base plus the same
+      # id. A device id is a node's place among the names of all the nodes,
+      # sorted, counting from nought, and the seismometer is the only node, so
+      # it is 0 and the ground hears it on 127.0.0.1:6100.
+      - payload: seismometer
+        address: &quot;127.0.0.1&quot;
+        port: &quot;5401&quot;
+        protocol: &quot;udp&quot;
+
+
+</pre>
+<p>Nothing is drawn from the seismometer to anywhere, so tcspecial sends what it
+reads straight to the ground over the <tt class="docutils literal">tcspecial</tt> section's
+<tt class="docutils literal">payload_telemetry</tt>: to its <tt class="docutils literal">dest_base</tt> port plus the seismometer's
+<em>device id</em>. A device id is a node's place among the names of all the nodes,
+sorted, counting from nought. The seismometer is the only node, so it is 0,
+and the ground hears it on 127.0.0.1:6100.</p>
+<div class="figure">
+<img alt="tcsgui showing one network payload, seismometer, in the Payloads column, with no lines." src="shots/vehicle-stage-01.png" style="width: 100%;" />
+<p class="caption">Stage 1 in tcsgui: one payload, nothing drawn from it.</p>
 </div>
-<div class="section" id="stage-2-a-second-payload">
-<h1><a class="toc-backref" href="#toc-entry-4">Stage 2: a second payload</a></h1>
-<ul class="simple">
-<li>Adding the soil thermometer, on a serial line: a payload type with
-attributes of its own (the tcspecial manual's &quot;A Serial Payload&quot;).</li>
-<li>What changes elsewhere: the simulator file gains its device; the ground
-receives it on a port of its own.</li>
-<li>Where ports and IDs come from: a node's device id is its place among the
-nodes sorted by name, and the ground port is the gateway's base plus that
-id. Adding a node can move another's port -- why, and how to tell.</li>
-</ul>
-<p><em>Figures:</em> the stage's drawing; <strong>Figure -- where each payload arrives</strong>: a
-table-like figure of nodes, device ids and ground ports, before and after
-the new node, the changed rows marked with a symbol as well as a colour.</p>
-<p><em>Common mistake shown:</em> two payloads given one name, and <tt class="docutils literal">tcsverify</tt>'s
-message for it.</p>
+<p>Check it, then run it:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcsverify<span class="whitespace"> </span>docs/building-a-vehicle/stage-01/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">            </span>docs/building-a-vehicle/stage-01/deck-sim.yaml
+</pre>
+<p>tcsmoc shows the beacon, which says the vehicle is alive and which
+configuration it runs, and a panel for the seismometer.</p>
+<p><em>See:</em> &quot;A Network Payload&quot; in the tcspecial manual.</p>
 </div>
-<div class="section" id="stage-3-a-computation-between-payload-and-ground">
-<h1><a class="toc-backref" href="#toc-entry-5">Stage 3: a computation between payload and ground</a></h1>
-<ul class="simple">
-<li>A <tt class="docutils literal">to_kelvin</tt> computation on the thermometer's reading: a vehicle node
-between a payload and the gateway.</li>
-<li>The four terminals, <tt class="docutils literal"><span class="pre">world-in</span></tt>, <tt class="docutils literal"><span class="pre">world-out</span></tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>, <tt class="docutils literal"><span class="pre">moc-out</span></tt>,
-by the corner they sit at, and why a reading runs world-in to world-out.</li>
-<li>Typed links: the computation states what it takes and makes, and the
-configuration is refused when a line joins two that do not agree.</li>
-</ul>
-<p><em>Figures:</em> the stage's drawing; <strong>Figure -- the four terminals</strong>, one node
-large, each corner labelled with its terminal's name and what flows there.</p>
+<div class="section" id="stage-2-a-second-payload-and-where-ports-come-from">
+<h1><a class="toc-backref" href="#toc-entry-4">Stage 2: a second payload, and where ports come from</a></h1>
+<p>The regolith thermometer is a probe on a serial line: asked <tt class="docutils literal">T?</tt>, it
+answers two bytes, a signed temperature in sixteenths of a degree Celsius.
+It is asked once a second, by its own <tt class="docutils literal">trigger_interval</tt>.</p>
+<pre class="literal-block">
+
+      # The regolith thermometer: a probe pushed into the ground beside the
+      # lander, on a serial line. Asked for its temperature with T?, it answers
+      # two bytes, signed, most significant first, in sixteenths of a degree
+      # Celsius. It is asked once a second, by its own trigger_interval. It is
+      # device 0, the first name sorted, so the ground hears it on
+      # 127.0.0.1:6100.
+      - payload: regolith_thermometer
+        byte_length: &quot;8&quot;
+        datarate: &quot;9600&quot;
+        max_length: &quot;2&quot;
+        path: &quot;/tmp/tcs-deck-regolith&quot;
+        read_timeout: &quot;none&quot;
+        stop_bits: &quot;1&quot;
+        trigger: '&quot;T?\r&quot;'
+        trigger_interval: &quot;1 s&quot;
+        world-out-type: &quot;i16&quot;
+
+
+</pre>
+<p>The simulator file gains a device for it too, a pseudo-terminal at
+<tt class="docutils literal"><span class="pre">/tmp/tcs-deck-regolith</span></tt> that answers when asked.</p>
+<p>Adding a node can move every other node's port. Device ids are places in the
+sorted names, and <tt class="docutils literal">regolith_thermometer</tt> sorts before <tt class="docutils literal">seismometer</tt>:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="39%" />
+<col width="15%" />
+<col width="21%" />
+<col width="26%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Node</th>
+<th class="head">Device id</th>
+<th class="head">Port, stage 1</th>
+<th class="head">Port, stage 2</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal">regolith_thermometer</tt></td>
+<td>0</td>
+<td>--</td>
+<td>6100</td>
+</tr>
+<tr><td><tt class="docutils literal">seismometer</tt></td>
+<td>1 (was 0)</td>
+<td>6100</td>
+<td><strong>6101</strong> (moved)</td>
+</tr>
+</tbody>
+</table>
+<p>A ground station written for stage 1 now listens to the thermometer on the
+seismometer's old port. This is why a ground station should take its ports
+from the configuration -- tcslib's and tcsmoc's do -- rather than from a list
+written beside it, and why <tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole
+vehicle</a>) lists every port a configuration uses.</p>
+<div class="figure">
+<img alt="tcsgui showing two payloads, seismometer and regolith_thermometer, with no lines." src="shots/vehicle-stage-02.png" style="width: 100%;" />
+<p class="caption">Stage 2: two payloads, each still reporting straight to the ground.</p>
 </div>
-<div class="section" id="stage-4-commands-down-to-a-payload">
-<h1><a class="toc-backref" href="#toc-entry-6">Stage 4: commands down to a payload</a></h1>
-<ul class="simple">
-<li>The heater, on a GPIO line, commanded from the ground through <tt class="docutils literal"><span class="pre">moc-out</span></tt>
-and <tt class="docutils literal"><span class="pre">moc-in</span></tt>.</li>
-<li>A <tt class="docutils literal">thermostat</tt> computation that switches the heater from the
-thermometer's temperature, and the ground's command that overrides it.</li>
-<li>Sending a command from tcsmoc, and reading its answer.</li>
-</ul>
-<p><em>Figures:</em> the stage's drawing; tcsmoc sending the heater a command, with
-the command and its answer marked.</p>
+<p><em>See:</em> &quot;A Serial Payload&quot; in the tcspecial manual.</p>
+</div>
+<div class="section" id="stage-3-a-computation-and-a-gateway-to-reach-the-ground">
+<h1><a class="toc-backref" href="#toc-entry-5">Stage 3: a computation, and a gateway to reach the ground</a></h1>
+<p>The thermometer's two bytes mean nothing to the ground until they are a
+temperature. A <tt class="docutils literal">to_kelvin</tt> computation, <tt class="docutils literal">regolith_kelvin</tt>, makes them
+one: it is a <em>vehicle node</em>, between a payload and the ground.</p>
+<pre class="literal-block">
+
+      # The thermometer's two bytes made a temperature in kelvin: a reading of
+      # 1 is a sixteenth of a degree, and nought is 273.15 K. The node states
+      # what it takes, type-in, and what it makes, a kelvin, is its function's,
+      # so a line from a payload sending anything but an i16 to it is refused
+      # when the configuration is read.
+      - compute: regolith_kelvin
+        function: &quot;to_kelvin&quot;
+        offset: &quot;273.15&quot;
+        scale: &quot;0.0625&quot;
+        type-in: &quot;i16&quot;
+        world-out:
+          - gateway.regolith_kelvin
+        world-in: [regolith_thermometer]
+
+
+</pre>
+<p>A node joins others through four <em>terminals</em>, one at each corner. Readings
+travel across the top, towards the ground; what the ground sends back travels
+across the bottom, towards a payload:</p>
+<div class="figure">
+<object data="vehicle-terminals.svg" style="width: 80%;" type="image/svg+xml">A node with world-in at the upper left and world-out at the upper
+right, readings flowing left to right towards the ground, and
+moc-in at the lower right and moc-out at the lower left, commands
+flowing right to left towards a payload.</object>
+<p class="caption">A node's four terminals. A line is written under its source as
+<tt class="docutils literal">node.name</tt> -- <tt class="docutils literal">regolith_kelvin.regolith_thermometer</tt> under the
+thermometer's <tt class="docutils literal"><span class="pre">world-out</span></tt> -- and the node it reaches lists the name
+under its sink, <tt class="docutils literal"><span class="pre">world-in:</span> [regolith_thermometer]</tt>.</p>
+</div>
+<p>Lines are typed: the thermometer states that it sends an <tt class="docutils literal">i16</tt>
+(<tt class="docutils literal"><span class="pre">world-out-type</span></tt>), the computation that it takes one (<tt class="docutils literal"><span class="pre">type-in</span></tt>), and a
+line between two that disagree is refused when the configuration is loaded.</p>
+<p>A node with lines goes where its lines say and nowhere else, so
+<tt class="docutils literal">regolith_kelvin</tt>'s temperatures need a line to somewhere, and the ground
+is reached through a <em>gateway node</em>. It arrives here, at the stage that first
+needs it, and the seismometer is drawn into it too, so that the ground has
+one place to receive everything from:</p>
+<pre class="literal-block">
+
+  - type gateway_radio:
+      # The ground's end of the vehicle's data, added here because it is first
+      # needed here: a node with lines goes where its lines say and nowhere
+      # else, so the temperatures regolith_kelvin makes need a line to
+      # somewhere, and the ground is reached through a gateway node. tcspecial
+      # sends what each node drawn into it produces to ground_base's address,
+      # at its port plus that node's device id: regolith_kelvin is id 1, so its
+      # temperatures arrive on 127.0.0.1:5101, and the seismometer, id 3, on
+      # 5103. It is called gateway in every later stage, which is the name the
+      # links to it are written with.
+      - gateway: gateway
+        ground_base: &quot;127.0.0.1:5100&quot;
+        world-in: [regolith_kelvin, seismometer]
+
+
+</pre>
+<div class="figure">
+<img alt="tcsgui showing the thermometer feeding regolith_kelvin, and regolith_kelvin and the seismometer feeding the gateway node." src="shots/vehicle-stage-03.png" style="width: 100%;" />
+<p class="caption">Stage 3: the first computation, and the gateway node on the right.</p>
+</div>
+<p><em>See:</em> &quot;The vocabulary&quot; and the computations in the tcspecial manual.</p>
+</div>
+<div class="section" id="stage-4-commands-back-down">
+<h1><a class="toc-backref" href="#toc-entry-6">Stage 4: commands back down</a></h1>
+<p>The heat-flow probe needs its heater: a GPIO line, <tt class="docutils literal">probe_heater</tt>, which a
+<tt class="docutils literal">thermostat</tt> computation switches from the probe's temperature. The
+thermostat's decision leaves at its <tt class="docutils literal"><span class="pre">moc-out</span></tt> and arrives at the heater's
+<tt class="docutils literal"><span class="pre">moc-in</span></tt> -- the bottom of the terminals figure above.</p>
+<pre class="literal-block">
+
+      # The probe's heater switch, line 4 of /dev/gpiochip1: 1 for on and 0 for
+      # off, as probe_thermostat decides. A gpio_inout reports as well as
+      # drives: every second it tells the ground what it was last told, so a
+      # report lost on the way is made good by the next. On a desk tcssim
+      # answers for it over UDP at its sim_address, so that no dummy chip is
+      # needed; flown, the chip is opened.
+      - payload: probe_heater
+        lines: &quot;4&quot;
+        path: &quot;/dev/gpiochip1&quot;
+        sim_address: &quot;127.0.0.1:5402&quot;
+        state_interval: &quot;1 s&quot;
+        moc-in: [probe_thermostat]
+        world-out:
+          - gateway.probe_heater
+  
+</pre>
+<p>The heater reports to the gateway every second what it was last told, so the
+ground follows it on a beat and a lost report is made good by the next. On a
+desk, tcssim answers for the line over UDP at its <tt class="docutils literal">sim_address</tt>; flown, the
+GPIO chip is opened instead, and nothing in the configuration changes.</p>
+<p>The ground does not switch the heater itself: the thermostat decides again on
+every reading, and a command to the heater would be overruled within a
+second. What the ground sets is the thermostat's setpoint, through a
+<em>command binding</em>, the one way the ground may change a node's attribute while
+the vehicle runs:</p>
+<pre class="literal-block">
+
+
+commands:
+  # The temperature, in kelvin, the probe is held at, which the ground may set
+  # while the vehicle runs: SET_NODE naming probe_thermostat and setpoint. An
+  # attribute no binding names is refused.
+  - { from: gateway, sets: probe_thermostat.setpoint }
+
+
+</pre>
+<div class="figure">
+<img alt="tcsgui showing probe_thermostat fed by regolith_kelvin, with a line from its lower left back to probe_heater." src="shots/vehicle-stage-04.png" style="width: 100%;" />
+<p class="caption">Stage 4: the thermostat's decision travelling back to the heater.</p>
+</div>
+<p><em>See:</em> &quot;A GPIO Payload&quot; in the tcspecial manual, and the <a class="reference external" href="tcsmoc.html">tcsmoc manual</a> for sending the setpoint.</p>
 </div>
 <div class="section" id="stage-5-rates-and-groups">
 <h1><a class="toc-backref" href="#toc-entry-7">Stage 5: rates and groups</a></h1>
-<ul class="simple">
-<li>How often each payload is read, and why some are read together: the
-groups section.</li>
-<li>What the beacon interval is for, and what it costs.</li>
-<li>Adding up what crosses the link: each payload's rate times its size, the
-beacon's, and the margin the link needs. Worked by hand here; the
-summary <tt class="docutils literal">tcsverify</tt> is to print (see &quot;Checking the whole vehicle&quot;) does
-it for you.</li>
-</ul>
-<p><em>Figures:</em> <strong>Figure -- a second of the link</strong>: a timeline of what is sent in
-one second, each payload's packets as labelled blocks with a fill pattern
-of their own.</p>
+<p>A thermal moonquake -- the regolith cracking as it warms and cools -- means
+most beside the temperature taken at the same moment. A <em>group</em> is a clock
+shared by its members, so that readings to be compared are taken together:</p>
+<pre class="literal-block">
+
+  # Thermal moonquakes: the regolith cracks as it warms and cools, so the
+  # seismometer's readings mean most beside the temperature taken at the same
+  # moment.
+  - name: &quot;science_readings&quot;
+    interval: &quot;1 s&quot;
+
+
+</pre>
+<p>The seismometer and the thermometer join <tt class="docutils literal">science_readings</tt>, and the
+thermometer gives up its own <tt class="docutils literal">trigger_interval</tt>: a payload has one clock,
+its group's or its own, never both.</p>
+<p>A rate costs link. Each payload read on a schedule sends that many data a
+second, each node fed by it at most as many, and the beacon one every
+<tt class="docutils literal">default_interval</tt>; their sum is what the link must carry, with margin.
+<tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> adds it up (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole vehicle</a>).</p>
+<p>The drawing is stage 4's: a group changes when nodes are read, not how they
+are joined.</p>
+<p><em>See:</em> &quot;Lengths of Time&quot; and the groups in the tcspecial manual.</p>
 </div>
 <div class="section" id="stage-6-redundant-sensors-and-a-vote">
 <h1><a class="toc-backref" href="#toc-entry-8">Stage 6: redundant sensors and a vote</a></h1>
-<ul class="simple">
-<li>Three hull temperature sensors on one thermal mass, and a <tt class="docutils literal">vote</tt>
-computation that takes them in and sends one value on.</li>
-<li>Why a vote, rather than one sensor: what the vote does when one sensor
-disagrees or stops.</li>
-<li>Watching it in tcsmoc while tcssim fails a sensor.</li>
-</ul>
-<p><em>Figures:</em> the stage's drawing; tcsmoc's panels as one sensor is failed in
-tcssim, before and after, the failed sensor marked.</p>
+<p>Three hull temperature sensors on one thermal mass, each with its
+conversion, and a <tt class="docutils literal">vote</tt> that takes the three and sends one value on:</p>
+<pre class="literal-block">
+
+      # Each hull sensor's reading made a temperature in kelvin, for the vote
+      # and for the ground. One conversion each, so that the ground sees each
+      # sensor and can tell which one the vote left out.
+      - compute: hull_kelvin_1
+        function: &quot;to_kelvin&quot;
+        offset: &quot;273.15&quot;
+        scale: &quot;0.0625&quot;
+        type-in: &quot;i16&quot;
+        world-out:
+          - gateway.hull_kelvin_1
+          - hull_temp.in0
+        world-in: [hull_temp_1]
+      - compute: hull_kelvin_2
+        function: &quot;to_kelvin&quot;
+        offset: &quot;273.15&quot;
+        scale: &quot;0.0625&quot;
+        type-in: &quot;i16&quot;
+        world-out:
+          - gateway.hull_kelvin_2
+          - hull_temp.in1
+        world-in: [hull_temp_2]
+      - compute: hull_kelvin_3
+        function: &quot;to_kelvin&quot;
+        offset: &quot;273.15&quot;
+        scale: &quot;0.0625&quot;
+        type-in: &quot;i16&quot;
+        world-out:
+          - gateway.hull_kelvin_3
+          - hull_temp.in2
+        world-in: [hull_temp_3]
+      # One temperature out of the three, the middle one: median. A mean would
+      # carry a bad sensor's error into the answer, and waiting for all three
+      # would make one dead sensor no answer at all. The vote keeps the last
+      # reading from each input and answers on every arrival once two of the
+      # three have reported, so a sensor that stops is outvoted by the two that
+      # go on.
+      - compute: hull_temp
+        algorithm: &quot;median&quot;
+        carries: &quot;kelvin&quot;
+        function: &quot;vote&quot;
+        world-out:
+          - gateway.hull_temp
+        world-in: [in0, in1, in2]
+      # Holds the probe at setpoint, in kelvin, by switching its heater: on
+      # below the band and off above it, half_band either side of the setpoint.
+      # The probe is warmed above the regolith around it, and how fast the
+      # warmth leaves it says how well the regolith conducts heat, which is
+      # what the experiment is for. What it decides leaves by its moc-out for
+      # the heater's moc-in: a decision for a payload to act on, travelling
+      # towards it as a command from the ground would.
+      - compute: probe_thermostat
+        function: &quot;thermostat&quot;
+        half_band: &quot;1.0&quot;
+        setpoint: &quot;263.15&quot;
+        type-in: &quot;kelvin&quot;
+        type-out: &quot;u8&quot;
+        moc-out:
+          - probe_heater.probe_thermostat
+        world-in: [regolith_kelvin]
+      # The thermometer's two bytes made a temperature in kelvin: a reading of
+      # 1 is a sixteenth of a degree, and nought is 273.15 K. The node states
+      # what it takes, type-in, and what it makes, a kelvin, is its function's,
+      # so a line from a payload sending anything but an i16 to it is refused
+      # when the configuration is read. The temperature goes to the thermostat
+      # as well as to the ground.
+      - compute: regolith_kelvin
+        function: &quot;to_kelvin&quot;
+        offset: &quot;273.15&quot;
+        scale: &quot;0.0625&quot;
+        type-in: &quot;i16&quot;
+        world-out:
+          - gateway.regolith_kelvin
+          - probe_thermostat.regolith_kelvin
+        world-in: [regolith_thermometer]
+
+
+</pre>
+<p>The vote takes the median, so one sensor that drifts or stops is outvoted
+rather than averaged in, and it produces a value on every arrival, so one
+sensor that stops reporting does not stop the deck from knowing its
+temperature. In tcssim, fail one sensor and watch <tt class="docutils literal">hull_temp</tt> hold while
+the failed sensor's own reading goes astray.</p>
+<div class="figure">
+<img alt="tcsgui showing three hull_temp payloads, each feeding a hull_kelvin conversion, the three conversions feeding hull_temp, and everything reaching the gateway." src="shots/vehicle-stage-06.png" style="width: 100%;" />
+<p class="caption">Stage 6: the deck in one file, at the size where one file stops being
+comfortable.</p>
+</div>
+<p><em>See:</em> &quot;Temperature Sensors on a Thermal Mass&quot; in the tcspecial manual.</p>
 </div>
 <div class="section" id="stage-7-splitting-the-vehicle-into-files">
 <h1><a class="toc-backref" href="#toc-entry-9">Stage 7: splitting the vehicle into files</a></h1>
-<ul class="simple">
-<li>The configuration has grown past one screen. Each subsystem -- thermal,
-science -- moves into a file of its own, included by the top file.</li>
-<li>Includes and subdiagrams: names, relative paths, and why nothing in a path
-is expanded.</li>
-<li>Exports: which of a file's nodes a line from another file may reach, and
-the message when a line crosses where nothing is exported.</li>
-<li>Two vehicles sharing a subsystem file, as the thermostat examples do.</li>
-</ul>
-<p><em>Figures:</em> <strong>Figure -- the files</strong>: the top file and the files it includes,
-as boxes with their exports at the corners; tcsgui's drawing of the same,
-with the subsystems collapsed to boxes.</p>
+<p>Stage 6 is past one screen. Its graph does not change in stage 7; it is
+divided, each subsystem into a file of its own, which the top file includes:</p>
+<pre class="literal-block">
+
+  - subdiagram: science
+    path: ../common/science
+  - subdiagram: thermal
+    path: ../common/thermal
+
+
+</pre>
+<p>An included file has no <tt class="docutils literal">tcspecial</tt> section and includes no others. It
+says which of its nodes a line from another file may reach, in its
+<tt class="docutils literal">exports</tt>, so that a subsystem's insides stay its own:</p>
+<pre class="literal-block">
+
+  world-out: [hull_kelvin_1, hull_kelvin_2, hull_kelvin_3, hull_temp]
+
+
+</pre>
+<p>A line that crosses into or out of a file anywhere else is refused, saying
+which list to add the node to. Device ids, and so ports, do not change: a
+node is known by its name in every file.</p>
+<div class="figure">
+<img alt="tcsgui showing two subdiagram boxes, science and thermal, each with several lines to the gateway node." src="shots/vehicle-stage-07.png" style="width: 100%;" />
+<p class="caption">Stage 7: the same graph as stage 6, drawn as tcsgui draws included
+files: a box each, whose corners are its exports.</p>
+</div>
+<p>Two vehicles may include one file, as the thermostat examples share
+<tt class="docutils literal"><span class="pre">examples/thermostat-common</span></tt>: a subsystem written once and flown in
+several configurations.</p>
+<p><em>See:</em> &quot;Which Files There Are&quot; in the tcspecial manual.</p>
 </div>
 <div class="section" id="stage-8-keeping-a-log-aboard">
 <h1><a class="toc-backref" href="#toc-entry-10">Stage 8: keeping a log aboard</a></h1>
-<ul class="simple">
-<li>A <tt class="docutils literal">log</tt> node: what is kept aboard for when the link is down, and how the
-ground asks for it later.</li>
-<li>The segment files, their sizes, and what fills the storage.</li>
-</ul>
-<p><em>Figures:</em> the stage's drawing; <strong>Figure -- the log through a pass</strong>: what
-is logged while the ground is out of sight and sent when it returns, on a
-timeline.</p>
+<p>A lander is out of contact for hours. A <tt class="docutils literal">log</tt> node keeps what it is sent in
+segment files aboard, for the ground to ask for when it can. The science
+subsystem gains one, fed by the seismometer and the probe's temperature:</p>
+<pre class="literal-block">
+
+      # What the science subsystem measured, kept aboard: the link to the
+      # ground is up only while a ground station is scheduled to listen, and a
+      # reading sent while nobody is listening is lost. Each record is written
+      # with the time it was written and its place in the session,
+      # variable_ts_rc, so the ground can line the two sources up afterwards.
+      # The records go into segment files of segment_bytes each in directory,
+      # which must be there already; each that fills is handed to segsend,
+      # beside tcspecial's own executable, to be sent to the ground when it can
+      # be.
+      - compute: science_log
+        directory: &quot;/tmp/telemetry&quot;
+        format: &quot;variable_ts_rc&quot;
+        segment_bytes: &quot;65536&quot;
+        world-in: [regolith_kelvin, seismometer]
+
+
+</pre>
+<p>Stage 7 must not change when stage 8 is written, so the logged subsystem is
+<tt class="docutils literal"><span class="pre">common/science-logged</span></tt>, a copy of <tt class="docutils literal">common/science</tt> with the log, and
+the top file changes only the path it includes. <tt class="docutils literal">diff</tt> the two to see the
+log alone.</p>
+<p><em>See:</em> &quot;The logging node&quot; in the <a class="reference external" href="tcspecial-design.html">design</a>, and
+&quot;Where the logs' segments go&quot; in the tcspecial manual.</p>
 </div>
 <div class="section" id="stage-9-a-payload-with-code-of-its-own">
 <h1><a class="toc-backref" href="#toc-entry-11">Stage 9: a payload with code of its own</a></h1>
-<ul class="simple">
-<li>The camera, whose software exists already: an <tt class="docutils literal">app</tt> node runs it as a
-program over file interfaces, rather than being written as a node type.</li>
-<li>When to use an app node, and when a node type is the better choice
-(pointing to &quot;Writing node types&quot;).</li>
-</ul>
-<p><em>Figures:</em> the stage's drawing; <strong>Figure -- an app node</strong>: the program, its
-file interfaces and the node, labelled.</p>
+<p>The camera's software exists already, and is not a device on a bus: it is a
+program. An <em>app node</em> runs it, and it takes part in the graph like any
+other node:</p>
+<pre class="literal-block">
+
+      # The camera. ../camera.py stands in for the camera's own software: it
+      # sends a small made-up frame every app-payload-arg seconds, so that the
+      # stage runs on a desk with no camera. The path is from the repository's
+      # root, which is where tcspecial is run from.
+      - payload: camera
+        app-payload-arg: &quot;10&quot;
+        executable: &quot;docs/building-a-vehicle/camera.py&quot;
+        world-out:
+          - gateway.camera
+
+
+</pre>
+<p>The program is joined to tcspecial by three file interfaces it inherits, so
+a program in any language that can read its standard input can take part:</p>
+<div class="figure">
+<object data="vehicle-app-node.svg" style="width: 80%;" type="image/svg+xml">tcspecial holding the app node on the left, the program on the
+right, joined by descriptor 0, the payload interface, and
+descriptor 1, the gateway interface, each both ways, and descriptor
+2, the error interface, from the program only.</object>
+<p class="caption">An app node and its program. <tt class="docutils literal">camera.py</tt> beside the stages stands in
+for a camera, sending a numbered frame every ten seconds.</p>
+</div>
+<p>Use an app node for code that exists already or must change without
+rebuilding the flight software; write a node type (see <a class="reference external" href="node-types.html">Writing node types</a>) for what many vehicles will need, checked as tcspecial
+checks its own.</p>
+<div class="figure">
+<img alt="tcsgui showing the science and thermal boxes and the camera, all reaching the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
+<p class="caption">Stage 9: the whole deck.</p>
+</div>
 </div>
 <div class="section" id="stage-10-choosing-the-gateway">
 <h1><a class="toc-backref" href="#toc-entry-12">Stage 10: choosing the gateway</a></h1>
-<ul class="simple">
-<li>Until now the vehicle has spoken to the ground directly by radio. Most
-missions put a flight computer in between: F´, cFS, or a ground system
-such as Yamcs.</li>
-<li>What changes: only the gateway, and the ground's side of the link; the
-rest of the vehicle is untouched. The same deck, three times, each with
-a different gateway.</li>
-</ul>
-<p><em>Figures:</em> the three gateways side by side, the unchanged rest of the
-vehicle drawn the same in each, the gateway node labelled with its type.</p>
+<p>Until now the deck has spoken to the ground directly by radio. Most missions
+put a flight computer in between. Stage 10 is stage 9 with the gateway
+changed to F´'s, and nothing else:</p>
+<pre class="literal-block">
+
+      # The F´ bridge's end of the link, both ways. What comes down arrives at
+      # bridge_base plus the device id of the node that sent it, as a
+      # gateway_radio's ground_base is counted on, and the bridge gives it the
+      # F´ ID fprime_id_base plus that same id: the camera, device id 0,
+      # arrives at 127.0.0.1:5100 as 0x3000, and hull_temp, device id 5, at
+      # 127.0.0.1:5105 as 0x3005. What the bridge sends up arrives at address
+      # and port.
+      - gateway: gateway
+        address: &quot;127.0.0.1&quot;
+        bridge_base: &quot;127.0.0.1:5100&quot;
+        fprime_id_base: &quot;0x3000&quot;
+        port: &quot;5000&quot;
+        world-in:
+          - camera
+          - hull_kelvin_1
+          - hull_kelvin_2
+          - hull_kelvin_3
+          - hull_temp
+          - probe_heater
+          - regolith_kelvin
+          - seismometer
+
+
+</pre>
+<p>The gateway node keeps its name, <tt class="docutils literal">gateway</tt>, which every line to it is
+written with, so no subsystem file changes. <tt class="docutils literal">diff</tt> stages 9 and 10 to see
+the whole of the difference. A cFS or Yamcs ground system is the same
+change: see the <tt class="docutils literal">cfs</tt> and <tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> examples.</p>
+<p><em>See:</em> &quot;The fprime example&quot;, &quot;The cfs example&quot; and &quot;The thermostat-yamcs
+example&quot; in the tcspecial manual.</p>
 </div>
 <div class="section" id="checking-the-whole-vehicle">
 <h1><a class="toc-backref" href="#toc-entry-13">Checking the whole vehicle</a></h1>
-<ul class="simple">
-<li><tt class="docutils literal">tcsverify</tt> on the whole configuration, and what its messages say at
-this size.</li>
-<li>Both spellings, and <tt class="docutils literal">tcsverify a.xtcs a.ytcs</tt> to compare them.</li>
-<li>The summary of everything the vehicle uses -- ports, message IDs, APIDs,
-rates against the link -- and the clashes it warns of. (To be added to
-<tt class="docutils literal">tcsverify</tt> as <tt class="docutils literal"><span class="pre">--summary</span></tt>; this section waits for it.)</li>
-</ul>
-<p><em>Figures:</em> a <tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> run on the finished vehicle, with its
-parts named.</p>
+<p><tt class="docutils literal">tcsverify</tt> checks the whole configuration, every file it includes, and
+the simulator file beside it:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcsverify<span class="whitespace"> </span>docs/building-a-vehicle/stage-09/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">            </span>docs/building-a-vehicle/stage-09/deck-sim.yaml
+</pre>
+<p><tt class="docutils literal">tcsverify a.xtcs a.ytcs <span class="pre">a-sim.yaml</span></tt> holds the two spellings to saying the
+same thing.</p>
+<p><tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> adds, after the problems, everything the vehicle
+uses of what must not clash or overflow: each address and port, and who
+binds it; the device ids; message IDs and APIDs, where there are any; and
+the rates that reach the ground, added up. Two things on one socket fail the
+run. For stage 9, shortened:</p>
+<pre class="code text literal-block">
+Addresses and ports
+  address         bound by  what
+  0.0.0.0:4000    vehicle   tcs_cmd.recv, where spacecraft commands ...
+  ...
+  127.0.0.1:5100  ground    &quot;gateway&quot; ground_base plus device id 0: ...
+  127.0.0.1:5105  ground    &quot;gateway&quot; ground_base plus device id 5: ...
+  127.0.0.1:5114  ground    &quot;gateway&quot; ground_base plus device id 14: ...
+  ...
+Rates to the ground
+  link                     data/s  bytes/datum  bytes/s  how
+  hull_temp to gateway      &lt;=0.6            4    &lt;=2.4  one per datum ...
+  probe_heater to gateway       1            1        1  state_interval 1 s
+  seismometer to gateway        1            ?        ?  group ... 1 s
+  beacon                      0.2            ?        ?  default_interval 5 s
+  total                     &lt;=4.4                 &lt;=9.8  not counting ...
+</pre>
+<p>A <tt class="docutils literal">?</tt> is what the configuration does not say: the seismometer sends bytes
+of no fixed length, and the camera sends whenever it has a frame. A mission
+fills those in from what it knows of its instruments.</p>
+<p><em>See:</em> the <a class="reference external" href="tcsverify.html">tcsverify manual</a>.</p>
 </div>
 <div class="section" id="from-the-desk-to-flight">
 <h1><a class="toc-backref" href="#toc-entry-14">From the desk to flight</a></h1>
@@ -623,27 +1015,27 @@ ground's agreeing to the configuration.</p>
 <div class="section" id="where-to-go-next">
 <h1><a class="toc-backref" href="#toc-entry-15">Where to go next</a></h1>
 <ul class="simple">
-<li>The tcspecial manual, for every payload type and attribute.</li>
-<li>&quot;Writing node types&quot;, for what no shipped type does.</li>
-<li>The tcsgui manual, for drawing and editing the configuration.</li>
-<li>The examples' README, for the examples this guide drew on.</li>
+<li>The <a class="reference external" href="tcspecial.html">tcspecial manual</a>, for every payload type and
+attribute.</li>
+<li><a class="reference external" href="node-types.html">Writing node types</a>, for what no shipped type does.</li>
+<li>The <a class="reference external" href="tcsgui.html">tcsgui manual</a>, for drawing and editing the
+configuration.</li>
+<li>The <a class="reference external" href="../examples/README.html">examples</a>, which the stages drew on.</li>
 </ul>
 </div>
-<div class="section" id="how-this-guide-is-made">
-<h1><a class="toc-backref" href="#toc-entry-16">How this guide is made</a></h1>
-<p><em>For maintainers; not part of the published guide.</em></p>
+<div class="section" id="how-this-guide-is-kept-true">
+<h1><a class="toc-backref" href="#toc-entry-16">How this guide is kept true</a></h1>
 <ul class="simple">
-<li>The source is <tt class="docutils literal"><span class="pre">docs/building-a-vehicle.rst</span></tt>; <tt class="docutils literal">make</tt> in <tt class="docutils literal">docs/</tt>
-writes <tt class="docutils literal"><span class="pre">building-a-vehicle.html</span></tt>, which <tt class="docutils literal">make <span class="pre">html-check</span></tt> holds
-current.</li>
-<li>The stage configurations live in <tt class="docutils literal"><span class="pre">examples/vehicle/stage-N/</span></tt>, and a
-test verifies every stage, both spellings, so that the guide cannot
-drift from what the programs accept.</li>
-<li>The tcsgui drawings and tcsmoc screenshots are made by a screenshots
-test, as the manuals' are (<tt class="docutils literal">make screenshots</tt>), so they are made again
-rather than redrawn when a window changes. The drawings that are not
-screenshots -- the deck, the terminals, the files, the timelines -- are
-SVG by hand, Okabe-Ito colours paired with labels, patterns or shapes.</li>
+<li>The excerpts above are read from the stage files when the page is made, so
+they cannot say other than the files do.</li>
+<li><tt class="docutils literal">tcsverify/tests/vehicle_guide.rs</tt> verifies every stage with its
+simulator file, holds the two spellings to each other, and checks each
+names the interface of the build; <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> and <tt class="docutils literal">make
+comparespellings</tt> take in the stages with the examples.</li>
+<li>The tcsgui drawings are made by <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/screenshots.sh</span></tt>,
+which opens each stage in tcsgui on an X display of its own and captures
+it. The other figures are SVG drawn by hand, their colours the Okabe-Ito
+palette's, each paired with a label, a shape or a line style.</li>
 </ul>
 </div>
 </div>

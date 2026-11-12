@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420" role="img" aria-labelledby="title desc">
+  <title id="title">A node's four terminals</title>
+  <desc id="desc">One node, drawn large, with a terminal at each corner. Across the top, readings travel from left to right, towards the ground: they arrive at world-in, the upper left corner, and leave at world-out, the upper right corner. Across the bottom, what the ground sends back travels from right to left: it arrives at moc-in, the lower right corner, and leaves at moc-out, the lower left corner. The top line is solid and blue and labelled readings; the bottom line is dashed and vermillion and labelled commands. Payloads are on the left, the ground on the right.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .term { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .label { font-size: 13px; fill: #1f2937; }
+      .side { font-size: 14px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .node { fill: #f3f4f6; stroke: #374151; stroke-width: 2; }
+      .world { stroke: #0072B2; stroke-width: 3; fill: none; }
+      .moc { stroke: #D55E00; stroke-width: 3; fill: none; stroke-dasharray: 9 6; }
+    </style>
+    <marker id="world-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0072B2"/>
+    </marker>
+    <marker id="moc-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#D55E00"/>
+    </marker>
+  </defs>
+  <rect width="760" height="420" fill="#ffffff"/>
+
+  <text class="side" x="40" y="40">PAYLOADS</text>
+  <text class="side" x="700" y="40" text-anchor="end">THE GROUND</text>
+
+  <!-- The node. -->
+  <rect class="node" x="230" y="110" width="300" height="200" rx="10"/>
+  <text class="term" x="380" y="215" text-anchor="middle">a node</text>
+
+  <!-- Corner terminals: squares for world, circles for moc, so shape tells
+       them apart as well as colour. -->
+  <rect x="222" y="102" width="16" height="16" fill="#0072B2"/>
+  <rect x="522" y="102" width="16" height="16" fill="#0072B2"/>
+  <circle cx="230" cy="310" r="9" fill="#D55E00"/>
+  <circle cx="530" cy="310" r="9" fill="#D55E00"/>
+
+  <text class="term" x="246" y="140">world-in</text>
+  <text class="term" x="514" y="140" text-anchor="end">world-out</text>
+  <text class="term" x="246" y="292">moc-out</text>
+  <text class="term" x="514" y="292" text-anchor="end">moc-in</text>
+
+  <!-- Readings: in at the upper left, out at the upper right. -->
+  <path class="world" d="M60,110 L214,110" marker-end="url(#world-head)"/>
+  <path class="world" d="M546,110 L700,110" marker-end="url(#world-head)"/>
+  <text class="label" x="60" y="98">readings arrive</text>
+  <text class="label" x="700" y="98" text-anchor="end">readings leave, to the ground</text>
+
+  <!-- Commands: in at the lower right, out at the lower left. -->
+  <path class="moc" d="M700,310 L546,310" marker-end="url(#moc-head)"/>
+  <path class="moc" d="M214,310 L60,310" marker-end="url(#moc-head)"/>
+  <text class="label" x="700" y="338" text-anchor="end">commands arrive from the ground</text>
+  <text class="label" x="60" y="338">commands leave, to a payload</text>
+
+  <!-- Key. -->
+  <line class="world" x1="60" y1="385" x2="110" y2="385"/>
+  <text class="label" x="120" y="390">solid, square ends: world-, readings</text>
+  <line class="moc" x1="400" y1="385" x2="450" y2="385"/>
+  <text class="label" x="460" y="390">dashed, round ends: moc-, commands</text>
+</svg>

@@ -1833,6 +1833,21 @@ impl Graph {
             }
         }
 
+        // And no two sockets of any other kinds are one: the section's
+        // links, each source's link to the ground, each node's address and
+        // each sim_address. The pairs above, and two sources on one port of
+        // the ground, are held apart by their own rules and not again here.
+        // See `crate::graph::sockets`.
+        for clash in crate::graph::sockets::clashes(self) {
+            problems.push(match clash.node {
+                Some(node) => Problem::TwoNodesWantOneThing {
+                    node,
+                    message: clash.why,
+                },
+                None => Problem::BadTcspecial { why: clash.why },
+            });
+        }
+
         // What may be written to a payload.
         //
         // A payload that is read is asked for its readings, and the bytes

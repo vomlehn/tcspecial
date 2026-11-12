@@ -275,10 +275,7 @@ impl LinkType {
                 return basic_accepts(*basic, data);
             }
         };
-        let width: usize = fields
-            .iter()
-            .map(|(_, basic)| basic.width().unwrap_or(0))
-            .sum();
+        let width = self.width().unwrap_or(0);
         if data.len() != width {
             return Err(format!(
                 "a {self} is {width} bytes and {} arrived",
@@ -293,6 +290,31 @@ impl LinkType {
             at += wide;
         }
         Ok(())
+    }
+
+    /// Says how many bytes a datum of this type is, as it travels: a basic
+    /// type's width, or a structure's fields' widths added up, each field
+    /// following the one before with nothing between them.
+    ///
+    /// The one statement of a structure's width, which [`LinkType::accepts`]
+    /// holds a datum to and `tcsverify --summary` counts a link's bytes by.
+    ///
+    /// # Returns
+    ///
+    /// The width, or `None` for a string or bytes, whose length is the
+    /// datum's own.
+    pub fn width(&self) -> Option<usize> {
+        match self {
+            LinkType::Basic(basic) => basic.width(),
+            // A field of no fixed width is refused where a structure is
+            // read, so every field here has one.
+            LinkType::Structure(fields) => Some(
+                fields
+                    .iter()
+                    .map(|(_, basic)| basic.width().unwrap_or(0))
+                    .sum(),
+            ),
+        }
     }
 
     /// Says what unit a datum of this type is in.

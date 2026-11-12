@@ -399,7 +399,7 @@ fn written(value: &impl std::fmt::Display, out: &mut [u8]) -> Option<usize> {
 /// # Returns
 ///
 /// Whether it is empty, `0.0.0.0`, `::` or `*`.
-fn binds_every_interface(address: &str) -> bool {
+pub(crate) fn binds_every_interface(address: &str) -> bool {
     address.is_empty()
         || address == "0.0.0.0"
         || address == "::"

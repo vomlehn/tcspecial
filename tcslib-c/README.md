@@ -1,23 +1,23 @@
 # tcslib-c
 
-**tcslib-c is tcslib for C and C++.** It is the library a ground station
+**tcslib-c is tcslib-moc for C and C++.** It is the library a ground station
 written in C or C++ is built on: the vehicle's beacons, the vehicle's data
 from a gateway node, and commands to the vehicle, behind one header,
 `include/tcs.h`.
 
 It is not a second implementation of anything. Each function is a call into
-[tcslib](../tcslib/README.md), so a C or C++ ground station reads the
+[tcslib-moc](../tcslib-moc/README.md), so a C or C++ ground station reads the
 configuration, counts ports and ages beacons exactly as tcsmoc does, and the
 two cannot come to disagree.
 
 C and C++ alike: the header is C, includable from C++ as it stands, with C
 linkage throughout, and nothing in it that C++ will not compile.
 
-A configuration that answers to cFS is used through the same calls: tcslib
+A configuration that answers to cFS is used through the same calls: tcslib-moc
 joins the cFS end as tcssim simulates it as an SBN peer, on a
 thread of its own, and the beacons, the data and the commands go over that
 peer (see "A vehicle on a cFS software bus" in
-[tcslib's README](../tcslib/README.md)). Nothing in the header changes.
+[tcslib-moc's README](../tcslib-moc/README.md)). Nothing in the header changes.
 
 ## What is in it
 
@@ -60,7 +60,7 @@ peer (see "A vehicle on a cFS software bus" in
 - **Data up.** `tcs_uplink_open` opens the way up to a gateway node that
   binds an address and port aboard, and each `tcs_uplink_send` sends one
   datum there, which leaves the node by its `moc-out` links for the
-  nodes they reach: a heater driven, a line set. It is tcslib's
+  nodes they reach: a heater driven, a line set. It is tcslib-moc's
   `ping::Uplink`, the way the ping goes up. What goes up drives a payload
   as a command does, so it goes only while the station is matched for
   commanding, and fails unsent before, saying the configurations are not
@@ -176,7 +176,7 @@ The header alone is also compiled as C99 and as C++11.
 ## Known limits
 
 - **A query's counts are not given.** `tcs_client_query_node` says whether a
-  node is running; the counts of what it has moved, which tcslib's answer
+  node is running; the counts of what it has moved, which tcslib-moc's answer
   carries, have no C spelling yet.
 - **One thread per handle.** A handle is used from one thread at a time;
   nothing in the library locks one. `tcs_last_error()` is per thread.
@@ -212,14 +212,14 @@ The header alone is also compiled as C99 and as C++11.
   remains is said in the source where it happens, and is:
   - *Once, at startup.* Each `_open` allocates its handle, which has to outlive
     the call and whose size C does not see. `tcs_configuration_open` reads and
-    checks a whole configuration, as tcslib does; `tcs_gateway_open` makes the
-    names of the node's sources, which every receive then points at, and the
+    checks a whole configuration, as tcslib-moc does; `tcs_gateway_open` makes
+    the names of the node's sources, which every receive then points at, and the
     buffer every datum is received in; and `tcs_configuration_node_id` asks
-    tcslib for every node's id.
-  - *In tcslib, as a station runs, only where something happens.* A beacon
+    tcslib-moc for every node's id.
+  - *In tcslib-moc, as a station runs, only where something happens.* A beacon
     pass, a datum, a ping and its answer, and a command sent allocate
     nothing. What does: a remark or warning, on the pass where something
-    changed; an answer to a command, whose strings tcslib reads as its own;
+    changed; an answer to a command, whose strings tcslib-moc reads as its own;
     and what came down from the ping node that is not an answer, to say why.
 
 `make` in this directory builds `README.html` from this file.
@@ -227,7 +227,7 @@ The header alone is also compiled as C99 and as C++11.
 ## See also
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-c/README.html).
-- [tcslib](https://vomlehn.github.io/tcspecial/tcslib/README.html), the Rust library this one wraps, and [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share.
+- [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), the Rust library this one wraps, and [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

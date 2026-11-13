@@ -9,7 +9,7 @@ Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
 Description: tcspecial's ground libraries and configuration editor
- What a ground station for tcspecial is built on: libtcs, tcslib for C and
+ What a ground station for tcspecial is built on: libtcs, tcslib-moc for C and
  C++, with its header tcs.h and pkg-config file tcs.pc; the Python
  packages tcslibgs, tcslib and tcsui; and tcsgui, the graphical
  configuration editor, with its node descriptions and schemas. Everything

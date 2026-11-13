@@ -1375,7 +1375,7 @@ screenshots: screenshots-tcsgui screenshots-tcsmoc screenshots-tcssim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
-HTML_DIRS = $(DOCS_DIR) examples tcslib tcslib-c tcslibgs
+HTML_DIRS = $(DOCS_DIR) examples tcslib-moc tcslib-c tcslibgs
 
 # Fail where a committed page has fallen behind its source, naming it, having
 # made every page again in place: tcs-helpers' html-pages check, which also

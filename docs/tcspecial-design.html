@@ -602,7 +602,7 @@ describes, takes commands from the ground, and sends beacons.</dd>
 <dd>What both ends share: the configuration file formats and the rules about
 them, the command and telemetry messages, and the digest each end says it
 read. Every rule in this document is stated there once.</dd>
-<dt><tt class="docutils literal">tcslib</tt></dt>
+<dt><tt class="docutils literal"><span class="pre">tcslib-moc</span></tt></dt>
 <dd>What a control application on the ground is built on. A mission control
 system drives a client rather than speaking the protocol itself.</dd>
 <dt><tt class="docutils literal">tcsmoc</tt></dt>
@@ -1463,7 +1463,7 @@ it: one byte for a datum below 128 bytes, two for any there is. A count
 in more bytes than it needs, or that does not say how many bytes follow
 it, is refused. A datum of a type with a width of its own is sent with
 no count, and between nodes nothing is counted. Ground programs that
-read through <tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver</span></tt> are given each datum
+read through <tt class="docutils literal"><span class="pre">tcslib_moc::gateway::GatewayReceiver</span></tt> are given each datum
 without its count; Python reading a link itself takes it off with
 <tt class="docutils literal">python/tcslibgs/count.py</tt>.</dd>
 <dt>Requirement</dt>
@@ -1684,7 +1684,7 @@ its F´ model is written from the configuration by <tt class="docutils literal">
 an F´ deployment against tcspecial and tcssim, data both ways, the node
 commands and the restart -- see <a class="reference internal" href="#f-gateway-fprime">F´: gateway_fprime</a>. The ground's end of
 the bus is built too: tcssim simulates the cFS end, and tcslib's SBN
-transport, <tt class="docutils literal"><span class="pre">tcslib::bus</span></tt>, lets tcsmoc and every station on tcslib command
+transport, <tt class="docutils literal"><span class="pre">tcslib_moc::bus</span></tt>, lets tcsmoc and every station on tcslib command
 a vehicle that answers to cFS through it (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>).</p>
 <p>The gateway nodes are written in the <tt class="docutils literal">gateways</tt> section, linked through
 <tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt> and
@@ -2068,7 +2068,7 @@ transport, so that tcsmoc can test a configuration that answers to cFS as
 it tests one that answers to the ground. A run against cFS's own Linux
 build, with SBN, is the test that the wire format is SBN's and not only
 ours.</p>
-<p><strong>Built</strong> (2026-10-31). <tt class="docutils literal"><span class="pre">tcslib::bus</span></tt> holds both ground-side ends.
+<p><strong>Built</strong> (2026-10-31). <tt class="docutils literal"><span class="pre">tcslib_moc::bus</span></tt> holds both ground-side ends.
 <tt class="docutils literal">SimulatedCfs</tt> is the cFS end as tcssim runs it: it binds <tt class="docutils literal">sbn.peer</tt>,
 is processor <tt class="docutils literal">sbn.peer_processor_id</tt> to the vehicle, subscribes to
 every message ID the vehicle publishes, and is a bus to the ground stations
@@ -2484,7 +2484,7 @@ console and asks the operator whether to continue anyway, quitting -- and
 stopping the tcspecial and tcssim it started -- if not.</dd>
 <dt>Requirement</dt>
 <dd>Ground software gets a gateway node's data with a function call --
-<tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver::open</span></tt> names the node in the
+<tt class="docutils literal"><span class="pre">tcslib_moc::gateway::GatewayReceiver::open</span></tt> names the node in the
 configuration, and <tt class="docutils literal"><span class="pre">GatewayReceiver::receive</span></tt> returns each datum with the
 name of the node that produced it -- rather than opening sockets of its own.
 One function between the configuration and the data is one place that counts
@@ -3412,7 +3412,7 @@ command interpreter on its own thread, the conductor running one pass,
 a thread for each node, given its part of every stage, and the beacons. Each node has a state and a wakeup descriptor, so a
 command that disables a node reaches it while it is waiting. On the
 ground, data arrives as UDP and is taken with
-tcslib::gateway::GatewayReceiver::receive.</object>
+tcslib_moc::gateway::GatewayReceiver::receive.</object>
 <p class="caption">What a configuration becomes, and what runs at once.</p>
 </div>
 <div class="section" id="what-the-file-becomes">
@@ -4953,8 +4953,8 @@ systems as follows:</p>
 +-----------------------+  :   +---------------------------+   +-------------+
 </pre>
 <p>On the ground, a mission's control software (such as YAMCS or MCT) is built on
-tcslib -- or on tcslib-c from C and C++, or on the Python <tt class="docutils literal">tcslib</tt> -- to send
-commands, receive the vehicle's data and listen for its beacons. These are
+tcslib-moc -- or on tcslib-c from C and C++, or on the Python <tt class="docutils literal">tcslib</tt> -- to
+send commands, receive the vehicle's data and listen for its beacons. These are
 shown as a single communications link, though they could be using multiple
 frequencies or channels. Both ends read the same configuration, and a beacon
 carries its digest, so each can tell when the other is reading another one.</p>
@@ -5208,7 +5208,7 @@ and the last 32 characters that end the datagram. It is packed and
 unpacked by the code tcs-xtce generates from that document, in Rust without
 allocating and in Python; what each field must say -- the name, decimal
 digits, lower-case hex -- and turning the text into numbers and digests and
-back is <tt class="docutils literal"><span class="pre">tcslibgs::beacon</span></tt>'s, which tcspecial and <tt class="docutils literal">tcslib</tt> use, and
+back is <tt class="docutils literal"><span class="pre">tcslibgs::beacon</span></tt>'s, which tcspecial and <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> use, and
 <tt class="docutils literal">python/tcslibgs/beacon.py</tt>'s; the two are held to each other by the same
 examples in their tests, and to what the hand-written packer that came
 before wrote, byte for byte. For example:</p>
@@ -5277,7 +5277,7 @@ seen for what it is.</dd>
 <dd>Writing a beacon allocates nothing: tcspecial's beacon thread makes one
 <tt class="docutils literal">BeaconPacker</tt> when it starts, and every beacon is written into its
 fixed buffer of <tt class="docutils literal">BEACON_BYTES</tt>. Reading one allocates nothing either,
-the digests being read into fixed arrays, and <tt class="docutils literal">tcslib</tt>'s tests hold a
+the digests being read into fixed arrays, and <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>'s tests hold a
 beacon pass to no allocation at all.</dd>
 <dt>Requirement</dt>
 <dd>A beacon carries no time. What the ground shows is when the last one
@@ -5367,7 +5367,7 @@ are read; there is no generation, in the state file or anywhere else;
 the beacon goes fast from start, and from a restart's being initiated,
 and slows when a CONNECT carrying the running configuration's checksum
 is taken. <tt class="docutils literal"><span class="pre">tcslibgs::interface</span></tt> gives the interface digest in Rust and
-Python, and <tt class="docutils literal">tcsverify <span class="pre">--interface-digest</span></tt> prints it. <tt class="docutils literal">tcslib</tt>'s
+Python, and <tt class="docutils literal">tcsverify <span class="pre">--interface-digest</span></tt> prints it. <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>'s
 <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library, holds nothing back after a
 RESTART, the vehicle refusing what follows it, and the beacon watches in
 Rust and Python judge a start by the beacon's number alone. Commands and
@@ -5427,7 +5427,7 @@ taken for the other.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">tcslibgs::link</span></tt> is the one place a command or an answer is turned
 into a packet and back, and every program goes through it: tcspecial,
-<tt class="docutils literal">tcslib</tt> and through it the C/C++ library and tcsmoc, and every test
+<tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> and through it the C/C++ library and tcsmoc, and every test
 that plays the other end. A ground station in Python sends CONNECT through
 <tt class="docutils literal">tcslibgs.fixed</tt>, which packs it with the code tcs-xtce generates from
 <tt class="docutils literal">fixed.xtce</tt>.</dd>
@@ -5513,7 +5513,7 @@ and counted as malformed. A packet that is taken but refused is
 answered, as now.</dd>
 <dt>Requirement</dt>
 <dd>There is no generation number anywhere: not in an answer, not in the
-state file, and not in <tt class="docutils literal">tcslib</tt>. A start is told by the beacon's
+state file, and not in <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>. A start is told by the beacon's
 restart flag, and which configuration it runs by its checksum.</dd>
 </dl>
 </div>
@@ -5776,7 +5776,7 @@ vehicle is match it, and restart it onto a configuration already
 there.</dd>
 <dt>Requirement</dt>
 <dd>The ground compares interface digests before it sends a command of the
-interface: <tt class="docutils literal">tcslib</tt> refuses to send one while the last beacon's
+interface: <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> refuses to send one while the last beacon's
 interface digest differs from the digest of the documents the ground
 read, and says which documents and which two digests. The fixed
 commands are never refused for this, because they are how a mismatch is
@@ -5919,7 +5919,7 @@ would only check again what was checked.</p>
 <dt>Requirement</dt>
 <dd>Every transport the link runs over checks what it carries end to end.
 UDP is sent with its checksum, over IPv4 as over IPv6: nothing in
-tcspecial or <tt class="docutils literal">tcslib</tt> turns it off (<tt class="docutils literal">SO_NO_CHECK</tt>), and a MOC that
+tcspecial or <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> turns it off (<tt class="docutils literal">SO_NO_CHECK</tt>), and a MOC that
 sends some other way must not either.</dd>
 </dl>
 </div>
@@ -5946,7 +5946,7 @@ after a RESTART changes nothing, and the ground takes a CONNECT as
 matched only when its answer carries the station's checksum. In <a class="reference internal" href="#on-the-ground">On the
 ground</a>, every requirement but tcsmoc's pop-ups, which are built since:
 the station's match
-(<tt class="docutils literal"><span class="pre">tcslib::matched</span></tt>), data dropped and counted while not matched and
+(<tt class="docutils literal"><span class="pre">tcslib_moc::matched</span></tt>), data dropped and counted while not matched and
 what is queued dropped and counted as a match begins, a match ended by a
 flagged beacon, another checksum or an overdue beacon, answers taken
 only by their sequence, the four counts (shown by tcsmoc and given by
@@ -6103,7 +6103,7 @@ is in it are the procedure's last steps.</dd>
 <dt>Requirement</dt>
 <dd>There is no generation number. A start of tcspecial is told by its
 restart flag, and which configuration it runs by its checksum; nothing
-in the state file, the beacon, the answers or <tt class="docutils literal">tcslib</tt> counts starts.</dd>
+in the state file, the beacon, the answers or <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> counts starts.</dd>
 <dt>Requirement</dt>
 <dd>The state file names, by checksum, the configuration the next start
 loads -- the one the last taken RESTART named, or else the one the
@@ -6226,9 +6226,9 @@ joined: the <tt class="docutils literal">exec</tt> ends it, and it holds nothing
 began using its configuration, has its restart flag clear and carries
 that configuration's checksum, and while that beacon is recent: its
 beacon watch says the vehicle is heard from
-(<tt class="docutils literal"><span class="pre">tcslib::beacon::Stage::Heard</span></tt>). A beacon gone overdue -- four times
+(<tt class="docutils literal"><span class="pre">tcslib_moc::beacon::Stage::Heard</span></tt>). A beacon gone overdue -- four times
 <tt class="docutils literal">beacon.default_interval</tt> since it arrived, which is four beacons
-missed in a row, <tt class="docutils literal"><span class="pre">tcslib::beacon::AGING_AFTER_MISSED</span></tt> -- ends the
+missed in a row, <tt class="docutils literal"><span class="pre">tcslib_moc::beacon::AGING_AFTER_MISSED</span></tt> -- ends the
 match as a flagged one does, and the next beacon that qualifies begins
 it again, with the drop of queued data that a match begins with. A
 station that has missed beacons cannot then go on reading as though the
@@ -6268,14 +6268,14 @@ configuration mismatch. tcsmoc shows all four.</dd>
 checksum the vehicle is running, so that the operator can retrieve that
 configuration.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library, refuses
+<dd><tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library, refuses
 every command but CONNECT, RESTART_ARM and RESTART, unsent, while the
 station is not matched for commanding.</dd>
 <dt>Requirement</dt>
 <dd>A datum a station sends up to a gateway node, which leaves it by its
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> links to drive a payload, is held to the same match: a
 station that keeps one sends nothing up, and says so, while it is not
-matched for commanding. <tt class="docutils literal"><span class="pre">tcslib::ping::Uplink</span></tt> is the one way up,
+matched for commanding. <tt class="docutils literal"><span class="pre">tcslib_moc::ping::Uplink</span></tt> is the one way up,
 gated by <tt class="docutils literal"><span class="pre">Uplink::gated_by</span></tt>, and the C/C++ library's <tt class="docutils literal">tcs_uplink</tt>
 is it, gated so. The ping is the exception, sent ungated by tcsmoc and
 <tt class="docutils literal">tcs_pinger</tt>: a ping node answers it whatever the configuration, and
@@ -6649,12 +6649,12 @@ the start that came back is refused <tt class="docutils literal">NotArmed</tt> t
 holds no arm, and restarts nothing. See <a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send
 meanwhile</a>.</dd>
 <dt>Requirement</dt>
-<dd>The ground takes an answer only as the answer to the command whose
-sequence it carries. <tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++
-library, waits for the answer to the command it sent, and drops and
-counts any other that arrives first -- an answer to a command that timed
-out, one the link repeated, or one from before a restart -- so that
-nothing one command was answered with is read as another's
+<dd>The ground takes an answer only as the answer to the command whose sequence
+it carries. <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++
+library, waits for the answer to the command it sent, and drops and counts
+any other that arrives first -- an answer to a command that timed out, one
+the link repeated, or one from before a restart -- so that nothing one
+command was answered with is read as another's
 (<tt class="docutils literal"><span class="pre">TcsClient::answers_dropped</span></tt>).</dd>
 </dl>
 <p>What that means for each command: PING and the two queries change nothing.
@@ -6817,7 +6817,7 @@ whenever the beacon it waited for was lost.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Sending a RESTART does not, of itself, stop a ground station sending
-anything. <tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library,
+anything. <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library,
 sends what it is asked to once the RESTART has gone just as before it,
 subject to the match (see <a class="reference internal" href="#on-the-ground">On the ground</a>), and a command that reaches
 the vehicle after the RESTART is answered <tt class="docutils literal">Unmatched</tt> there and not
@@ -6892,7 +6892,7 @@ whose count has gone back -- started again, or a second station -- would
 otherwise have every command answered <tt class="docutils literal">Stale</tt>, and this is where it
 starts its count again.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal">tcslib</tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library, sends
+<dd><tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>'s <tt class="docutils literal">TcsClient</tt>, and through it the C/C++ library, sends
 nothing but CONNECT, RESTART_ARM and RESTART, refusing every other
 command unsent, while the station is not matched for commanding (see
 <a class="reference internal" href="#on-the-ground">On the ground</a>): which the beacons' restart flag and checksum, and a
@@ -7092,7 +7092,7 @@ paired with the requirement above that closes it.</p>
 <dd>Over IPv4 a UDP checksum of nought means none was computed, and a
 receiver cannot tell from its socket that a datagram arrived unchecked.
 The requirement that every sender computes it closes this for tcspecial
-and <tt class="docutils literal">tcslib</tt>, but not for a MOC built elsewhere that turns it off. Run
+and <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>, but not for a MOC built elsewhere that turns it off. Run
 over IPv6, where the checksum is mandatory and Linux drops a datagram
 without one, the link is closed against that too.</dd>
 <dt>A read-only file can still be deleted</dt>
@@ -8144,7 +8144,7 @@ the order tcsgui draws them in.</dd>
 <p>The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.  It is used for building control applications using mission control
 software such as YAMCS or MCT.</p>
-<p>Those operations are <tt class="docutils literal"><span class="pre">tcslib::client::TcsClient</span></tt>. A control application
+<p>Those operations are <tt class="docutils literal"><span class="pre">tcslib_moc::client::TcsClient</span></tt>. A control application
 drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
@@ -10270,7 +10270,7 @@ served only testing.</dd>
 <div class="section" id="waiting-for-the-simulator">
 <h2><a class="toc-backref" href="#toc-entry-135">Waiting for the Simulator</a></h2>
 <p>Implemented: the messages are <tt class="docutils literal"><span class="pre">tcslibgs::ready</span></tt>, tcssim's end is
-<tt class="docutils literal">tcssim/src/ready.rs</tt>, a harness waits through <tt class="docutils literal"><span class="pre">tcslib::simulator</span></tt> or
+<tt class="docutils literal">tcssim/src/ready.rs</tt>, a harness waits through <tt class="docutils literal"><span class="pre">tcslib_moc::simulator</span></tt> or
 <tt class="docutils literal">python/tcslib/simulator.py</tt>, and tcsmoc and <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> are
 harnesses.</p>
 <p>A simulated device has to exist before tcspecial looks for it, and a dummy
@@ -10304,11 +10304,10 @@ it likes, with nothing to reset: there is no connection to be left half
 open, and no reconnection to race the noticing that the old one has gone.
 A request that is lost is sent again, and a repeated one does no harm.</dd>
 <dt>Requirement</dt>
-<dd>The messages are defined in <tt class="docutils literal">tcslibgs</tt>, beside the commands and
-telemetry, and a ground station waits through one function in <tt class="docutils literal">tcslib</tt>,
-with the same function in the Python ground station's library. Every
-harness then waits the same way, and there is one statement of what the
-messages are.</dd>
+<dd>The messages are defined in <tt class="docutils literal">tcslibgs</tt>, beside the commands and telemetry,
+and a ground station waits through one function in <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt>, with the
+same function in the Python ground station's library. Every harness then
+waits the same way, and there is one statement of what the messages are.</dd>
 <dt>Requirement</dt>
 <dd>Tcssim makes every simulated device as it starts and keeps it until it
 stops. A panel's button decides only whether its payload sends: a simulated

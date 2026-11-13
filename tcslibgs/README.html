@@ -267,11 +267,11 @@ screen each window goes.</li>
 <h2 id="what-tcslibgs-is-not">What tcslibgs is not</h2>
 <p>It has no network code for the ground. Opening a link to the vehicle,
 sending a command, receiving data and listening for beacons are all in
-<code>tcslib</code>, which builds on this crate and re-exports it. The
-flight software itself is <code>tcspecial</code>.</p>
+<code>tcslib-moc</code>, which builds on this crate and re-exports it.
+The flight software itself is <code>tcspecial</code>.</p>
 <h2 id="who-uses-it">Who uses it</h2>
 <p>Every crate in the workspace that has anything to do with the link or
-a configuration: tcspecial, tcslib, tcsmoc, tcssim, tcsgui and
+a configuration: tcspecial, tcslib-moc, tcsmoc, tcssim, tcsgui and
 tcsverify, and <code>examples/beacon</code>.</p>
 <h2 id="building-and-testing">Building and testing</h2>
 <pre><code>cargo build -p tcslibgs
@@ -285,7 +285,7 @@ from this file, and <code>make clean</code> removes it.</p>
 href="https://vomlehn.github.io/tcspecial/tcslibgs/README.html">This
 page as HTML</a>.</li>
 <li><a
-href="https://vomlehn.github.io/tcspecial/tcslib/README.html">tcslib</a>,
+href="https://vomlehn.github.io/tcspecial/tcslib-moc/README.html">tcslib-moc</a>,
 what a ground station is built on, and <a
 href="https://vomlehn.github.io/tcspecial/tcslib-c/README.html">tcslib-c</a>,
 the same for C and C++.</li>

@@ -486,7 +486,7 @@ dependencies = [
  "libc",
  "slint",
  "slint-build",
- "tcslib",
+ "tcslib-moc",
  "tcslibgs",
  "tcsui",
 ]
@@ -4439,7 +4439,7 @@ name = "simple_app"
 version = "0.1.0"
 dependencies = [
  "tcsapp",
- "tcslib",
+ "tcslib-moc",
  "tcslibgs",
  "tempfile",
 ]
@@ -4878,7 +4878,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcslib"
+name = "tcslib-c"
+version = "0.1.0"
+dependencies = [
+ "tcslib-moc",
+ "tcslibgs",
+ "tempfile",
+]
+
+[[package]]
+name = "tcslib-moc"
 version = "0.1.0"
 dependencies = [
  "libc",
@@ -4886,15 +4895,6 @@ dependencies = [
  "tcslibgs",
  "tempfile",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "tcslib-c"
-version = "0.1.0"
-dependencies = [
- "tcslib",
- "tcslibgs",
- "tempfile",
 ]
 
 [[package]]
@@ -4932,7 +4932,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
- "tcslib",
+ "tcslib-moc",
  "tcslibgs",
  "tcspecial",
  "tcsui",
@@ -4954,7 +4954,7 @@ dependencies = [
  "socket2",
  "tcsapp",
  "tcsdiagram",
- "tcslib",
+ "tcslib-moc",
  "tcslibgs",
  "tcslog",
  "tcsverify",
@@ -4975,7 +4975,7 @@ dependencies = [
  "signal-hook",
  "slint",
  "slint-build",
- "tcslib",
+ "tcslib-moc",
  "tcslibgs",
  "tcsverify",
  "tempfile",
@@ -4986,7 +4986,7 @@ name = "tcsui"
 version = "0.1.0"
 dependencies = [
  "slint",
- "tcslib",
+ "tcslib-moc",
 ]
 
 [[package]]

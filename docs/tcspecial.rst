@@ -41,16 +41,15 @@ configuration file at startup, which is the whole of the architecture: the
 program is a set of node types and a machine for moving data along declared
 links, and what a particular vehicle does is a file.
 
-**C/C++, Rust and Python are all supported.** A program that runs aboard --
-the program of an app node, or a payload that is a program rather than a
-device -- is talked to through file descriptors it inherits, which a program
-in any of the three already knows how to read and write, so it may be written
-in C, C++, Rust or Python. On the ground, a station is built on ``tcslib`` in
-Rust, on ``tcslib-c`` in C or C++ -- the same library behind one header,
-``tcslib-c/include/tcs.h`` -- or on its Python spelling under ``python/``.
-Every interface offered to C is offered to C++ as well: a C header can be
-included from C++ as it stands, and nothing in it is C that C++ will not
-compile.
+**C/C++, Rust and Python are all supported.** A program that runs aboard -- the
+program of an app node, or a payload that is a program rather than a device --
+is talked to through file descriptors it inherits, which a program in any of the
+three already knows how to read and write, so it may be written in C, C++, Rust
+or Python. On the ground, a station is built on ``tcslib-moc`` in Rust, on
+``tcslib-c`` in C or C++ -- the same library behind one header,
+``tcslib-c/include/tcs.h`` -- or on its Python spelling under ``python/``. Every
+interface offered to C is offered to C++ as well: a C header can be included
+from C++ as it stands, and nothing in it is C that C++ will not compile.
 
 **cFS and F´.** Work is under way on using TCSpecial, its telemetry log tcslog
 and its packet compiler tcs-xtce with the two flight software frameworks most
@@ -2206,25 +2205,25 @@ A gateway node is the ground's end of the vehicle's data. tcspecial sends what
 each node drawn into a gateway node produces as UDP datagrams to the address in
 the gateway node's ``ground_base``, at its port plus the source node's device
 id, so each source arrives on a port of its own. Ground software does not open
-those ports itself: it gets the data from the gateway node with a function
-call, ``tcslib::gateway::GatewayReceiver::receive``, which works the ports out
+those ports itself: it gets the data from the gateway node with a function call,
+``tcslib_moc::gateway::GatewayReceiver::receive``, which works the ports out
 from the same configuration and says which node each datum came from. A loop
 that does not keep each datum takes it with ``GatewayReceiver::receive_into``,
-into a buffer of ``tcslib::gateway::DATUM_BYTES`` it made before it started, and
-allocates nothing. What it does with the data then -- process it, display it,
-log it -- is its own business. A gateway node that the ground sends commands or
-other data through also states the ``address`` and ``port`` tcspecial binds to
-receive them.
+into a buffer of ``tcslib_moc::gateway::DATUM_BYTES`` it made before it started,
+and allocates nothing. What it does with the data then -- process it, display
+it, log it -- is its own business. A gateway node that the ground sends commands
+or other data through also states the ``address`` and ``port`` tcspecial binds
+to receive them.
 
-tcsmoc runs a configuration as a ground station for that data: one
-panel per source, filled through ``tcslib::gateway``, with tcspecial started on
-the same file and tcssim where the simulator file simulates anything. Both
-it and tcspecial digest the configuration files they read, and tcspecial
-sends its digest in every beacon. If tcspecial's digest is not the one tcsmoc
-computed -- the vehicle is serving a different configuration, so its sources
-may not send where the panels say -- tcsmoc says so and asks whether to
-continue anyway, in front of its panels, which are greyed and take no presses
-until it is answered; Quit stops tcspecial and tcssim and exits.
+tcsmoc runs a configuration as a ground station for that data: one panel per
+source, filled through ``tcslib_moc::gateway``, with tcspecial started on the
+same file and tcssim where the simulator file simulates anything. Both it and
+tcspecial digest the configuration files they read, and tcspecial sends its
+digest in every beacon. If tcspecial's digest is not the one tcsmoc computed --
+the vehicle is serving a different configuration, so its sources may not send
+where the panels say -- tcsmoc says so and asks whether to continue anyway, in
+front of its panels, which are greyed and take no presses until it is answered;
+Quit stops tcspecial and tcssim and exits.
 
 It also commands the vehicle, on the two links the ``tcspecial`` section states.
 Connect brings the link up and sends a ``CONNECT``, which is how the two ends
@@ -2579,7 +2578,7 @@ tcspecial sends the words to the gateway node on the ground, ``gateway-1``, at
 its ``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port
 5101. The ground is ``lorem_gateway``, the example's second program. It gets
 the words from ``gateway-1`` with
-``tcslib::gateway::GatewayReceiver::receive_into``, into a buffer it made
+``tcslib_moc::gateway::GatewayReceiver::receive_into``, into a buffer it made
 before it started listening, prints each with one space
 between them, and stops at the end of the line. ``gateway-1`` states no
 ``address`` or ``port``, because nothing goes back up to the vehicle.
@@ -2593,7 +2592,7 @@ so tcsmoc cannot be run on the same configuration beside it. ``-v`` says when
 it is matched; a vehicle answering with another configuration's checksum is
 said whatever the flag. ``ping_gateway.py`` does the same as soon as it has
 started the vehicle, and ``--pings`` waits for the match before its first
-ping. Through ``tcslib::listening`` in Rust and ``tcslib.listening`` in
+ping. Through ``tcslib_moc::listening`` in Rust and ``tcslib.listening`` in
 Python, either of which a station of your own that only listens can use.
 
 Both programs are beside the configuration: the payload is a Python 3 script
@@ -2631,11 +2630,11 @@ a vehicle with nothing aboard is not one; its readings reach the ground over
 It is also the example of how a ground program is put together, because almost
 none of it is the program's own:
 
-* ``tcslib::beacon`` binds the socket, reads each datagram, counts the beacons
-  that did not arrive, compares the digest each one carries with the ground's
-  own, and says how stale the last one is as a stage: Unheard, Heard, Aging or Waiting.
-  There is no toolkit in it, so a ground station with no screen -- a logger, a
-  test -- uses exactly this.
+* ``tcslib_moc::beacon`` binds the socket, reads each datagram, counts the
+  beacons that did not arrive, compares the digest each one carries with the
+  ground's own, and says how stale the last one is as a stage: Unheard, Heard,
+  Aging or Waiting. There is no toolkit in it, so a ground station with no
+  screen -- a logger, a test -- uses exactly this.
 * ``tcsui`` holds the panel, as markup other windows import, and works out
   what to show on it: which colour the indicator is, and the two lines beside
   it.
@@ -2656,18 +2655,18 @@ digest, also as 32 hex digits:
 
    tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 
-It is text so that it can be read as it is, in a packet capture, a log or
-with any UDP listener, with nothing to decode it. Its layout is stated in
-XTCE, in ``tcslibgs/xtce/beacon.xtce``, as six text fields -- each but the
-last ended by its colon -- and nothing else, so a ground system that reads
-XTCE can read it too. That is what goes on the wire; what the window shows on
-its ``Last msg:`` line is written for the window, as ``tcspecial v0.1.0 md5``
-and the digest. tcspecial writes each beacon, and ``tcslib::beacon`` reads it,
-with ``tcslibgs::Beacon``, which the Python in ``python/tcslibgs/beacon.py``
-says again, held to it by the same examples in their tests. The example's test
-writes the beacon it sends the same way. A beacon is read strictly: anything
-with a field out of its form, a seventh field, a trailing colon or newline, or
-more than 106 bytes, is not a beacon.
+It is text so that it can be read as it is, in a packet capture, a log or with
+any UDP listener, with nothing to decode it. Its layout is stated in XTCE, in
+``tcslibgs/xtce/beacon.xtce``, as six text fields -- each but the last ended by
+its colon -- and nothing else, so a ground system that reads XTCE can read it
+too. That is what goes on the wire; what the window shows on its ``Last msg:``
+line is written for the window, as ``tcspecial v0.1.0 md5`` and the digest.
+tcspecial writes each beacon, and ``tcslib_moc::beacon`` reads it, with
+``tcslibgs::Beacon``, which the Python in ``python/tcslibgs/beacon.py`` says
+again, held to it by the same examples in their tests. The example's test writes
+the beacon it sends the same way. A beacon is read strictly: anything with a
+field out of its form, a seventh field, a trailing colon or newline, or more
+than 106 bytes, is not a beacon.
 
 tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
@@ -2750,20 +2749,20 @@ times until that ping's own answer arrives -- an answer is matched to its ping
 by the count. An answer to an earlier ping is still shown as the last thing
 received, and changes none of the times.
 
-The ground station is built the way the ``beacon`` program is, from two halves and a
-little of its own, and the halves are the same ones in Python:
-``python/tcslib/beacon.py`` is ``tcslib::beacon``, ``python/tcsui/beacon_panel.py``
-is ``tcsui``'s panel, and ``python/tcslibgs`` holds the ping format and what a
-ground station reads out of a configuration. It reads the XML spelling, the
-standard library having no YAML, and asks ``tcsverify --digest`` for the
-digest it compares each beacon's with rather than working it out a second
-time. The rules are then written twice, in Rust and in Python, and the
-example's tests hold them to one another: the Python's own tests use the Rust
-tests' examples, one test checks that the Python reads the same ports from
-``ping.xtcs`` as the Rust does from ``ping.ytcs``, and one plays the vehicle with
-the Rust -- the ping answered by the function the ``ping`` node answers with,
-the beacon packed as tcspecial packs it -- against the ground station.
-``cargo test`` runs them all.
+The ground station is built the way the ``beacon`` program is, from two halves
+and a little of its own, and the halves are the same ones in Python:
+``python/tcslib/beacon.py`` is ``tcslib_moc::beacon``,
+``python/tcsui/beacon_panel.py`` is ``tcsui``'s panel, and ``python/tcslibgs``
+holds the ping format and what a ground station reads out of a configuration. It
+reads the XML spelling, the standard library having no YAML, and asks
+``tcsverify --digest`` for the digest it compares each beacon's with rather than
+working it out a second time. The rules are then written twice, in Rust and in
+Python, and the example's tests hold them to one another: the Python's own tests
+use the Rust tests' examples, one test checks that the Python reads the same
+ports from ``ping.xtcs`` as the Rust does from ``ping.ytcs``, and one plays the
+vehicle with the Rust -- the ping answered by the function the ``ping`` node
+answers with, the beacon packed as tcspecial packs it -- against the ground
+station. ``cargo test`` runs them all.
 
 The ground station starts the vehicle itself -- tcspecial from the build, on
 the same configuration -- and kills it when it exits, however it exits: if the
@@ -2791,7 +2790,7 @@ ground can reach both ways -- a gateway node binding an address and port with a
 link to it, and its link back down -- gives the MOC a ``Ping node`` button
 beside ``Command``. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
-keep them by the same rules, ``tcslib::ping`` in Rust and
+keep them by the same rules, ``tcslib_moc::ping`` in Rust and
 ``examples/ping-common/ping_ground.py`` in Python. ``examples/ping-common``
 holds what the ping example shares with ping-yamcs, the ping link, the
 window and the ``ping`` node, in ``ping-common/ping.ytcs`` and its XML,
@@ -3624,7 +3623,7 @@ cargo installs programs and nothing else, so tcsgui installed this way has
 no descriptions or schemas until ``make install-data`` puts them in
 ``/opt/tcs/share/tcsgui`` and ``/opt/tcs/share/tcspecial/schema``, and an app program installed this way is in
 ``bin`` rather than ``libexec``. The library crates -- ``tcslibgs``,
-``tcslib`` and the rest -- are taken by a Rust ground station as path or git
+``tcslib-moc`` and the rest -- are taken by a Rust ground station as path or git
 dependencies, and are not installed.
 
 A C or C++ ground station
@@ -4512,7 +4511,7 @@ waiting:
 exits with a failure saying what it last heard: nothing, which is a tcssim
 not running or an address that is wrong, or a simulator still starting, or one
 that failed or is set up for another run. A ground station of its own waits
-through ``tcslib::simulator::wait``, or ``tcslib.simulator.wait`` in Python.
+through ``tcslib_moc::simulator::wait``, or ``tcslib.simulator.wait`` in Python.
 
 Each payload starts silent, until its panel's button is pressed, unless the
 simulator file says ``enable: true`` of it or of its group, and then it starts
@@ -4698,7 +4697,7 @@ that satisfies both.
    * - `libc <https://crates.io/crates/libc>`__
      - 0.2
      - `0.2.190 <https://docs.rs/libc/0.2.190>`__
-     - tcsapp, tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim
+     - tcsapp, tcsgui, tcslib-moc, tcslibgs, tcsmoc, tcspecial, tcssim
      - The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.
      - `repository <https://github.com/rust-lang/libc>`__
    * - `log <https://crates.io/crates/log>`__
@@ -4746,7 +4745,7 @@ that satisfies both.
    * - `serde <https://crates.io/crates/serde>`__
      - 1.0
      - `1.0.229 <https://docs.rs/serde/1.0.229>`__
-     - tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim
+     - tcsgui, tcslib-moc, tcslibgs, tcsmoc, tcspecial, tcssim
      - Turns the configuration, the commands and the telemetry into Rust types and back.
      - `repository <https://github.com/serde-rs/serde>`__
    * - `serde_json <https://crates.io/crates/serde_json>`__
@@ -4809,7 +4808,7 @@ that satisfies both.
    * - `thiserror <https://crates.io/crates/thiserror>`__
      - 1.0
      - `1.0.69 <https://docs.rs/thiserror/1.0.69>`__
-     - tcslib, tcslibgs, tcspecial
+     - tcslib-moc, tcslibgs, tcspecial
      - Writes the error types and their messages.
      - `repository <https://github.com/dtolnay/thiserror>`__
 

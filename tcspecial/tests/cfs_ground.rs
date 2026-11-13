@@ -1,8 +1,8 @@
-//! The cfs example, commanded from the ground: tcslib's peer of the bus,
+//! The cfs example, commanded from the ground: tcslib-moc's peer of the bus,
 //! through the simulated cFS end that tcssim runs, against the vehicle itself.
 //!
 //! What `tests/cfs.rs` checks byte by byte, as the cFS end, this checks as a
-//! ground station sees it: through `tcslib::bus`, with the station's own
+//! ground station sees it: through `tcslib_moc::bus`, with the station's own
 //! beacon watch, command client and gateway receiver, none of which is told
 //! that the vehicle is on a bus rather than a radio.
 
@@ -13,11 +13,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tcslib::beacon::{self, Arrived, Schedule};
-use tcslib::bus::SimulatedCfs;
-use tcslib::gateway::GatewayReceiver;
-use tcslib::matched::Matched;
-use tcslib::{command_links_of, CommandStatus, NodeId, TcsClient};
+use tcslib_moc::beacon::{self, Arrived, Schedule};
+use tcslib_moc::bus::SimulatedCfs;
+use tcslib_moc::gateway::GatewayReceiver;
+use tcslib_moc::matched::Matched;
+use tcslib_moc::{command_links_of, CommandStatus, NodeId, TcsClient};
 use tcslibgs::graph::Graph;
 
 mod common;
@@ -83,7 +83,7 @@ fn example(dir: &Path) -> (std::path::PathBuf, u16) {
 }
 
 /// A vehicle that answers to cFS is commanded, heard and read from the
-/// ground through tcslib, as one that answers to the radio is.
+/// ground through tcslib-moc, as one that answers to the radio is.
 #[test]
 fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
     let dir = tempfile::tempdir().expect("a directory");

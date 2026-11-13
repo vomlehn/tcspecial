@@ -1,4 +1,4 @@
-# Makefile for the tcslib crate's README
+# Makefile for the tcslib-moc crate's README
 #
 # Cargo builds the crate itself, from the repository's root: see README.md.
 # This builds only the page.
@@ -9,7 +9,7 @@ all:	docs
 # Display help
 .PHONY: help
 help:
-	@echo "Makefile for the tcslib README"
+	@echo "Makefile for the tcslib-moc README"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make README.html     - Build README.html from README.md"
@@ -21,7 +21,8 @@ docs: README.html
 # A page of its own, so pandoc's --standalone: it carries its own head and
 # styling, and reads the same wherever it is copied to.
 README.html: README.md
-	pandoc --standalone --metadata pagetitle=tcslib README.md -o README.html
+	pandoc --standalone --metadata pagetitle=tcslib-moc README.md \
+		-o README.html
 
 .PHONY: clean
 clean:

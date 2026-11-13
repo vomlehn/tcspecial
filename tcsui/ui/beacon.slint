@@ -13,7 +13,7 @@
 //     import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 //
 // Nothing is computed here. What colour the indicator is and what the two
-// lines say are worked out in Rust, from what `tcslib::beacon` reports, and
+// lines say are worked out in Rust, from what `tcslib_moc::beacon` reports, and
 // set as properties: see the crate's `shown`.
 
 import { Fonts } from "fonts.slint";
@@ -31,7 +31,7 @@ export component BeaconPanel inherits TitledBox {
     // configuration it is serving, and the digest of the files it read.
     in property <string> last-message: "<none>";
     // Which stage the indicator is at, in a word --
-    // tcslib::beacon::Stage::label -- shown after the indicator, which says
+    // tcslib_moc::beacon::Stage::label -- shown after the indicator, which says
     // the same thing in colour: the eye goes to the colour first, and the
     // word says what it means. Empty is a window that does not show it, and
     // the row is then the label and the indicator alone.

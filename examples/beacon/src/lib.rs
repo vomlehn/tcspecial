@@ -18,7 +18,7 @@ slint::include_modules!();
 /// widest of these, so that the window opens at the width a beacon will want
 /// and keeps it.
 ///
-/// Written by [`tcslib::beacon::what_it_read`], which writes every beacon's
+/// Written by [`tcslib_moc::beacon::what_it_read`], which writes every beacon's
 /// message, so a change to the format changes the width with it.
 ///
 /// # Returns
@@ -36,13 +36,13 @@ pub fn widest_messages() -> Vec<String> {
         .expect("255.255.255 is a version");
     let mut messages: Vec<String> = (0..16u8)
         .map(|digit| {
-            tcslib::beacon::what_it_read(
+            tcslib_moc::beacon::what_it_read(
                 version,
                 ConfigDigest([digit * 0x11; 16]),
             )
         })
         .collect();
-    messages.push(tcslib::beacon::NO_BEACON_MESSAGE.to_string());
+    messages.push(tcslib_moc::beacon::NO_BEACON_MESSAGE.to_string());
     messages
 }
 

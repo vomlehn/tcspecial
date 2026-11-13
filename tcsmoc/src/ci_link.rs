@@ -14,8 +14,8 @@
 //! that there was no longer a connection: taking the client away from one
 //! holder would have left the others talking to a socket that was closed.
 
-use tcslib::matched::Matched;
-use tcslib::{TcsClient, UdpConnection};
+use tcslib_moc::matched::Matched;
+use tcslib_moc::{TcsClient, UdpConnection};
 use tcslibgs::{HostPort, TcsResult, Timestamp};
 
 /// The local address the MOC sends from where nothing says otherwise: any
@@ -267,7 +267,12 @@ mod tests {
     fn matched() -> Matched {
         let ours = tcslibgs::ConfigDigest([0x5A; 16]);
         let matched = Matched::for_configuration(ours);
-        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        matched.beacon(
+            false,
+            Some(ours),
+            tcslib_moc::beacon::Stage::Heard,
+            false,
+        );
         let mark = matched.before_connect();
         matched.connect_answered(ours, mark);
         matched

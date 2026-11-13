@@ -1,6 +1,6 @@
 """A ground station that only listens, and the CONNECT it sends all the same.
 
-The Python spelling of ``tcslib/src/listening.rs``. A vehicle sends nothing
+The Python spelling of ``tcslib-moc/src/listening.rs``. A vehicle sends nothing
 down but its beacons and the answers to its commands until it takes a
 CONNECT carrying the checksum of the configuration it runs, so a station
 that only reads the vehicle's data receives nothing unless somebody has sent
@@ -30,7 +30,7 @@ def command_link_of(config):
     on, wherever it is: ``tcs_cmd.send`` to ``tcs_cmd.recv``, or, for a
     configuration that answers over a software bus, from a port the system
     chooses to this process's peer of the bus, which publishes each command
-    -- as ``tcslib::command_links_of`` gives them.
+    -- as ``tcslib_moc::command_links_of`` gives them.
 
     Args:
         config: The :class:`tcslibgs.configuration.Configuration`.

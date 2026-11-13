@@ -3,7 +3,7 @@ resolver = "2"
 
 members = [
     "tcslibgs",
-    "tcslib",
+    "tcslib-moc",
     "tcspecial",
     "tcsmoc",
     "tcssim",
@@ -15,7 +15,7 @@ members = [
     # How a configuration is drawn -- the panes, the nodes, the links -- for
     # the editor and for tcspecial's visual window alike. See tcsdiagram.
     "tcsdiagram",
-    # tcslib for C and C++: the ground station's library behind one header.
+    # tcslib-moc for C and C++: the ground station's library behind one header.
     # See tcslib-c.
     "tcslib-c",
     # The file interfaces an app node's program is run with, and the five

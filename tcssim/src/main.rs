@@ -1092,7 +1092,7 @@ fn wait_for_another(
             return 1;
         }
     };
-    match tcslib::simulator::wait(at, &ours, patience) {
+    match tcslib_moc::simulator::wait(at, &ours, patience) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("tcssim --wait: {e}");
@@ -1281,10 +1281,10 @@ fn main() {
     // software bus the vehicle joins as an SBN peer, and the ground joins
     // too, as the radio's far end is the ground itself. Made before the
     // readiness socket says ready, so that a vehicle started then finds it;
-    // kept until tcssim ends. See `tcslib::bus`.
+    // kept until tcssim ends. See `tcslib_moc::bus`.
     let _cfs_end = match Graph::load(&payload_path)
         .map_err(|e| format!("{payload_path}: {e}"))
-        .and_then(|graph| tcslib::bus::SimulatedCfs::open(&graph))
+        .and_then(|graph| tcslib_moc::bus::SimulatedCfs::open(&graph))
     {
         Ok(cfs) => {
             if let Some(cfs) = &cfs {

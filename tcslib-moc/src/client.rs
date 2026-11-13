@@ -1,6 +1,6 @@
 //! TCSpecial client for ground software integration
 //!
-//! This is what a control application built on tcslib talks to tcspecial
+//! This is what a control application built on tcslib-moc talks to tcspecial
 //! through: one set of operations for global control and status, and one set
 //! per data handler. A mission control system such as YAMCS or MCT drives a
 //! [`TcsClient`] rather than speaking the command and telemetry protocol

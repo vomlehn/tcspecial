@@ -1,6 +1,6 @@
 """The ground's half of a ping, with no window.
 
-The Python spelling of ``tcslib/src/ping.rs``, which is what tcsmoc pings a
+The Python spelling of ``tcslib-moc/src/ping.rs``, which is what tcsmoc pings a
 ``ping`` node with: the same rules for what is kept and the same three times,
 shown the same way. Here between the two halves it borrows: the ping format
 (``python/tcslibgs/ping.py``, after ``tcslibgs``) and the configuration
@@ -28,7 +28,7 @@ Whether anything at all has arrived since the last ping is kept too, so that
 a ground station with no window (:func:`report`) prints what came that did
 not answer it -- an earlier ping's answer, or what is no answer at all --
 rather than saying nothing came. It is the one thing kept here that
-``tcslib::ping`` does not keep: tcsmoc always shows its pings in a window,
+``tcslib_moc::ping`` does not keep: tcsmoc always shows its pings in a window,
 which shows the last thing received whatever it was, and has no use for it.
 
 The three times
@@ -56,7 +56,7 @@ from tcslibgs import count, ping
 NANOS = 1_000_000_000
 
 #: What a panel shows for a ping or an answer before there is one:
-#: ``tcslib::ping::NO_MESSAGE``, the beacon panel's placeholder.
+#: ``tcslib_moc::ping::NO_MESSAGE``, the beacon panel's placeholder.
 NO_MESSAGE = NO_BEACON_MESSAGE
 #: What :func:`precise_time` shows for no time: ``NO_PRECISE_TIME``.
 NO_PRECISE_TIME = "--:--:--.---------"

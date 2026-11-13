@@ -3,7 +3,7 @@
 //
 // The point of the example: the panel is not this program's, and neither is
 // what it shows. The markup comes from tcsui, which tcsmoc shows the same
-// panel from, and what fills it in comes from tcslib::beacon -- so this
+// panel from, and what fills it in comes from tcslib_moc::beacon -- so this
 // window is the wiring and nothing more. The button is there so that what
 // the panel shows can be made to change: start the vehicle and its beacons
 // arrive, stop it and they cease.
@@ -36,14 +36,14 @@ export component WatchWindow inherits Window {
     in-out property <color> indicator-color: #c0c0c0;
     in-out property <string> last-received: "--:--:--";
     in-out property <string> last-message: "<none>";
-    // Which stage the indicator is at, in words, as the beacon loop reports
-    // it: Unheard until a beacon arrives, then Heard, Aging and Waiting as
-    // the last one grows older. The words are tcslib::beacon::Stage::label's,
-    // set with every pass; this is only what shows before the first.
+    // Which stage the indicator is at, in words, as the beacon loop reports it:
+    // Unheard until a beacon arrives, then Heard, Aging and Waiting as the last
+    // one grows older. The words are tcslib_moc::beacon::Stage::label's, set
+    // with every pass; this is only what shows before the first.
     in-out property <string> stage: "Unheard";
     // Every shape a beacon's message takes at its widest, a line each, which
     // the panel's message line is held to: see beacon_example::widest_messages,
-    // which writes them with tcslib::beacon::what_it_read, so the format is
+    // which writes them with tcslib_moc::beacon::what_it_read, so the format is
     // stated once.
     in property <string> messages: "";
     // What the button says: what a click will do to the vehicle. It opens

@@ -4,7 +4,7 @@ The test is the simulated cFS end -- a UDP socket speaking SBN's wire
 format, as ``tcslibgs.sbn`` and ``tcslibgs.cfs`` state it -- with the
 vehicle behind it: it answers the station's announcement, takes its
 subscriptions, publishes a beacon and answers a CONNECT, as
-``tcslib/src/bus.rs``'s tests play the peers of the Rust.
+``tcslib-moc/src/bus.rs``'s tests play the peers of the Rust.
 """
 
 import socket

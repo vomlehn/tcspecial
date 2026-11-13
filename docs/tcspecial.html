@@ -499,16 +499,15 @@ a <strong>link</strong>. Neither is written in the software. Both are read from 
 configuration file at startup, which is the whole of the architecture: the
 program is a set of node types and a machine for moving data along declared
 links, and what a particular vehicle does is a file.</p>
-<p><strong>C/C++, Rust and Python are all supported.</strong> A program that runs aboard --
-the program of an app node, or a payload that is a program rather than a
-device -- is talked to through file descriptors it inherits, which a program
-in any of the three already knows how to read and write, so it may be written
-in C, C++, Rust or Python. On the ground, a station is built on <tt class="docutils literal">tcslib</tt> in
-Rust, on <tt class="docutils literal"><span class="pre">tcslib-c</span></tt> in C or C++ -- the same library behind one header,
-<tt class="docutils literal"><span class="pre">tcslib-c/include/tcs.h</span></tt> -- or on its Python spelling under <tt class="docutils literal">python/</tt>.
-Every interface offered to C is offered to C++ as well: a C header can be
-included from C++ as it stands, and nothing in it is C that C++ will not
-compile.</p>
+<p><strong>C/C++, Rust and Python are all supported.</strong> A program that runs aboard -- the
+program of an app node, or a payload that is a program rather than a device --
+is talked to through file descriptors it inherits, which a program in any of the
+three already knows how to read and write, so it may be written in C, C++, Rust
+or Python. On the ground, a station is built on <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> in Rust, on
+<tt class="docutils literal"><span class="pre">tcslib-c</span></tt> in C or C++ -- the same library behind one header,
+<tt class="docutils literal"><span class="pre">tcslib-c/include/tcs.h</span></tt> -- or on its Python spelling under <tt class="docutils literal">python/</tt>. Every
+interface offered to C is offered to C++ as well: a C header can be included
+from C++ as it stands, and nothing in it is C that C++ will not compile.</p>
 <p><strong>cFS and F´.</strong> Work is under way on using TCSpecial, its telemetry log tcslog
 and its packet compiler tcs-xtce with the two flight software frameworks most
 missions are built on, NASA's core Flight System and JPL's F´. What each
@@ -2525,24 +2524,24 @@ ids say which port each node's data reaches the ground on.</p>
 each node drawn into a gateway node produces as UDP datagrams to the address in
 the gateway node's <tt class="docutils literal">ground_base</tt>, at its port plus the source node's device
 id, so each source arrives on a port of its own. Ground software does not open
-those ports itself: it gets the data from the gateway node with a function
-call, <tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver::receive</span></tt>, which works the ports out
+those ports itself: it gets the data from the gateway node with a function call,
+<tt class="docutils literal"><span class="pre">tcslib_moc::gateway::GatewayReceiver::receive</span></tt>, which works the ports out
 from the same configuration and says which node each datum came from. A loop
 that does not keep each datum takes it with <tt class="docutils literal"><span class="pre">GatewayReceiver::receive_into</span></tt>,
-into a buffer of <tt class="docutils literal"><span class="pre">tcslib::gateway::DATUM_BYTES</span></tt> it made before it started, and
-allocates nothing. What it does with the data then -- process it, display it,
-log it -- is its own business. A gateway node that the ground sends commands or
-other data through also states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> tcspecial binds to
-receive them.</p>
-<p>tcsmoc runs a configuration as a ground station for that data: one
-panel per source, filled through <tt class="docutils literal"><span class="pre">tcslib::gateway</span></tt>, with tcspecial started on
-the same file and tcssim where the simulator file simulates anything. Both
-it and tcspecial digest the configuration files they read, and tcspecial
-sends its digest in every beacon. If tcspecial's digest is not the one tcsmoc
-computed -- the vehicle is serving a different configuration, so its sources
-may not send where the panels say -- tcsmoc says so and asks whether to
-continue anyway, in front of its panels, which are greyed and take no presses
-until it is answered; Quit stops tcspecial and tcssim and exits.</p>
+into a buffer of <tt class="docutils literal"><span class="pre">tcslib_moc::gateway::DATUM_BYTES</span></tt> it made before it started,
+and allocates nothing. What it does with the data then -- process it, display
+it, log it -- is its own business. A gateway node that the ground sends commands
+or other data through also states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> tcspecial binds
+to receive them.</p>
+<p>tcsmoc runs a configuration as a ground station for that data: one panel per
+source, filled through <tt class="docutils literal"><span class="pre">tcslib_moc::gateway</span></tt>, with tcspecial started on the
+same file and tcssim where the simulator file simulates anything. Both it and
+tcspecial digest the configuration files they read, and tcspecial sends its
+digest in every beacon. If tcspecial's digest is not the one tcsmoc computed --
+the vehicle is serving a different configuration, so its sources may not send
+where the panels say -- tcsmoc says so and asks whether to continue anyway, in
+front of its panels, which are greyed and take no presses until it is answered;
+Quit stops tcspecial and tcssim and exits.</p>
 <p>It also commands the vehicle, on the two links the <tt class="docutils literal">tcspecial</tt> section states.
 Connect brings the link up and sends a <tt class="docutils literal">CONNECT</tt>, which is how the two ends
 compare what they read and how they are <em>matched</em>: see <a class="reference external" href="tcsmoc.html#matching-the-configurations">Matching the
@@ -2855,7 +2854,7 @@ holding the line terminator.</p>
 its <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">127.0.0.1:5100</tt>, plus <tt class="docutils literal">lorem</tt>'s device id, 1: port
 5101. The ground is <tt class="docutils literal">lorem_gateway</tt>, the example's second program. It gets
 the words from <tt class="docutils literal"><span class="pre">gateway-1</span></tt> with
-<tt class="docutils literal"><span class="pre">tcslib::gateway::GatewayReceiver::receive_into</span></tt>, into a buffer it made
+<tt class="docutils literal"><span class="pre">tcslib_moc::gateway::GatewayReceiver::receive_into</span></tt>, into a buffer it made
 before it started listening, prints each with one space
 between them, and stops at the end of the line. <tt class="docutils literal"><span class="pre">gateway-1</span></tt> states no
 <tt class="docutils literal">address</tt> or <tt class="docutils literal">port</tt>, because nothing goes back up to the vehicle.</p>
@@ -2868,7 +2867,7 @@ so tcsmoc cannot be run on the same configuration beside it. <tt class="docutils
 it is matched; a vehicle answering with another configuration's checksum is
 said whatever the flag. <tt class="docutils literal">ping_gateway.py</tt> does the same as soon as it has
 started the vehicle, and <tt class="docutils literal"><span class="pre">--pings</span></tt> waits for the match before its first
-ping. Through <tt class="docutils literal"><span class="pre">tcslib::listening</span></tt> in Rust and <tt class="docutils literal">tcslib.listening</tt> in
+ping. Through <tt class="docutils literal"><span class="pre">tcslib_moc::listening</span></tt> in Rust and <tt class="docutils literal">tcslib.listening</tt> in
 Python, either of which a station of your own that only listens can use.</p>
 <p>Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
@@ -2901,11 +2900,11 @@ a vehicle with nothing aboard is not one; its readings reach the ground over
 <p>It is also the example of how a ground program is put together, because almost
 none of it is the program's own:</p>
 <ul class="simple">
-<li><tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> binds the socket, reads each datagram, counts the beacons
-that did not arrive, compares the digest each one carries with the ground's
-own, and says how stale the last one is as a stage: Unheard, Heard, Aging or Waiting.
-There is no toolkit in it, so a ground station with no screen -- a logger, a
-test -- uses exactly this.</li>
+<li><tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt> binds the socket, reads each datagram, counts the
+beacons that did not arrive, compares the digest each one carries with the
+ground's own, and says how stale the last one is as a stage: Unheard, Heard,
+Aging or Waiting. There is no toolkit in it, so a ground station with no
+screen -- a logger, a test -- uses exactly this.</li>
 <li><tt class="docutils literal">tcsui</tt> holds the panel, as markup other windows import, and works out
 what to show on it: which colour the indicator is, and the two lines beside
 it.</li>
@@ -2924,18 +2923,18 @@ digest, also as 32 hex digits:</p>
 <pre class="code text literal-block">
 tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 </pre>
-<p>It is text so that it can be read as it is, in a packet capture, a log or
-with any UDP listener, with nothing to decode it. Its layout is stated in
-XTCE, in <tt class="docutils literal">tcslibgs/xtce/beacon.xtce</tt>, as six text fields -- each but the
-last ended by its colon -- and nothing else, so a ground system that reads
-XTCE can read it too. That is what goes on the wire; what the window shows on
-its <tt class="docutils literal">Last msg:</tt> line is written for the window, as <tt class="docutils literal">tcspecial v0.1.0 md5</tt>
-and the digest. tcspecial writes each beacon, and <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt> reads it,
-with <tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>, which the Python in <tt class="docutils literal">python/tcslibgs/beacon.py</tt>
-says again, held to it by the same examples in their tests. The example's test
-writes the beacon it sends the same way. A beacon is read strictly: anything
-with a field out of its form, a seventh field, a trailing colon or newline, or
-more than 106 bytes, is not a beacon.</p>
+<p>It is text so that it can be read as it is, in a packet capture, a log or with
+any UDP listener, with nothing to decode it. Its layout is stated in XTCE, in
+<tt class="docutils literal">tcslibgs/xtce/beacon.xtce</tt>, as six text fields -- each but the last ended by
+its colon -- and nothing else, so a ground system that reads XTCE can read it
+too. That is what goes on the wire; what the window shows on its <tt class="docutils literal">Last msg:</tt>
+line is written for the window, as <tt class="docutils literal">tcspecial v0.1.0 md5</tt> and the digest.
+tcspecial writes each beacon, and <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt> reads it, with
+<tt class="docutils literal"><span class="pre">tcslibgs::Beacon</span></tt>, which the Python in <tt class="docutils literal">python/tcslibgs/beacon.py</tt> says
+again, held to it by the same examples in their tests. The example's test writes
+the beacon it sends the same way. A beacon is read strictly: anything with a
+field out of its form, a seventh field, a trailing colon or newline, or more
+than 106 bytes, is not a beacon.</p>
 <p>tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
@@ -3008,20 +3007,20 @@ own. <tt class="docutils literal">Send ping</tt> is the default button: Enter or
 times until that ping's own answer arrives -- an answer is matched to its ping
 by the count. An answer to an earlier ping is still shown as the last thing
 received, and changes none of the times.</p>
-<p>The ground station is built the way the <tt class="docutils literal">beacon</tt> program is, from two halves and a
-little of its own, and the halves are the same ones in Python:
-<tt class="docutils literal">python/tcslib/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcslib::beacon</span></tt>, <tt class="docutils literal">python/tcsui/beacon_panel.py</tt>
-is <tt class="docutils literal">tcsui</tt>'s panel, and <tt class="docutils literal">python/tcslibgs</tt> holds the ping format and what a
-ground station reads out of a configuration. It reads the XML spelling, the
-standard library having no YAML, and asks <tt class="docutils literal">tcsverify <span class="pre">--digest</span></tt> for the
-digest it compares each beacon's with rather than working it out a second
-time. The rules are then written twice, in Rust and in Python, and the
-example's tests hold them to one another: the Python's own tests use the Rust
-tests' examples, one test checks that the Python reads the same ports from
-<tt class="docutils literal">ping.xtcs</tt> as the Rust does from <tt class="docutils literal">ping.ytcs</tt>, and one plays the vehicle with
-the Rust -- the ping answered by the function the <tt class="docutils literal">ping</tt> node answers with,
-the beacon packed as tcspecial packs it -- against the ground station.
-<tt class="docutils literal">cargo test</tt> runs them all.</p>
+<p>The ground station is built the way the <tt class="docutils literal">beacon</tt> program is, from two halves
+and a little of its own, and the halves are the same ones in Python:
+<tt class="docutils literal">python/tcslib/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt>,
+<tt class="docutils literal">python/tcsui/beacon_panel.py</tt> is <tt class="docutils literal">tcsui</tt>'s panel, and <tt class="docutils literal">python/tcslibgs</tt>
+holds the ping format and what a ground station reads out of a configuration. It
+reads the XML spelling, the standard library having no YAML, and asks
+<tt class="docutils literal">tcsverify <span class="pre">--digest</span></tt> for the digest it compares each beacon's with rather than
+working it out a second time. The rules are then written twice, in Rust and in
+Python, and the example's tests hold them to one another: the Python's own tests
+use the Rust tests' examples, one test checks that the Python reads the same
+ports from <tt class="docutils literal">ping.xtcs</tt> as the Rust does from <tt class="docutils literal">ping.ytcs</tt>, and one plays the
+vehicle with the Rust -- the ping answered by the function the <tt class="docutils literal">ping</tt> node
+answers with, the beacon packed as tcspecial packs it -- against the ground
+station. <tt class="docutils literal">cargo test</tt> runs them all.</p>
 <p>The ground station starts the vehicle itself -- tcspecial from the build, on
 the same configuration -- and kills it when it exits, however it exits: if the
 ground station is killed or crashes, the kernel kills tcspecial. So a vehicle
@@ -3045,7 +3044,7 @@ ground can reach both ways -- a gateway node binding an address and port with a
 link to it, and its link back down -- gives the MOC a <tt class="docutils literal">Ping node</tt> button
 beside <tt class="docutils literal">Command</tt>. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
-keep them by the same rules, <tt class="docutils literal"><span class="pre">tcslib::ping</span></tt> in Rust and
+keep them by the same rules, <tt class="docutils literal"><span class="pre">tcslib_moc::ping</span></tt> in Rust and
 <tt class="docutils literal"><span class="pre">examples/ping-common/ping_ground.py</span></tt> in Python. <tt class="docutils literal"><span class="pre">examples/ping-common</span></tt>
 holds what the ping example shares with ping-yamcs, the ping link, the
 window and the <tt class="docutils literal">ping</tt> node, in <tt class="docutils literal"><span class="pre">ping-common/ping.ytcs</span></tt> and its XML,
@@ -3796,7 +3795,7 @@ digest is taken over, and the part of tcs-xtce that takes it, are inside
 no descriptions or schemas until <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts them in
 <tt class="docutils literal">/opt/tcs/share/tcsgui</tt> and <tt class="docutils literal">/opt/tcs/share/tcspecial/schema</tt>, and an app program installed this way is in
 <tt class="docutils literal">bin</tt> rather than <tt class="docutils literal">libexec</tt>. The library crates -- <tt class="docutils literal">tcslibgs</tt>,
-<tt class="docutils literal">tcslib</tt> and the rest -- are taken by a Rust ground station as path or git
+<tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> and the rest -- are taken by a Rust ground station as path or git
 dependencies, and are not installed.</p>
 </div>
 <div class="section" id="a-c-or-c-ground-station">
@@ -4565,7 +4564,7 @@ waiting:</p>
 exits with a failure saying what it last heard: nothing, which is a tcssim
 not running or an address that is wrong, or a simulator still starting, or one
 that failed or is set up for another run. A ground station of its own waits
-through <tt class="docutils literal"><span class="pre">tcslib::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib.simulator.wait</tt> in Python.</p>
+through <tt class="docutils literal"><span class="pre">tcslib_moc::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib.simulator.wait</tt> in Python.</p>
 <p>Each payload starts silent, until its panel's button is pressed, unless the
 simulator file says <tt class="docutils literal">enable: true</tt> of it or of its group, and then it starts
 sending as though the button had been pressed. <tt class="docutils literal">tcssim <span class="pre">--sending</span></tt> starts
@@ -4739,7 +4738,7 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/libc">libc</a></td>
 <td>0.2</td>
 <td><a class="reference external" href="https://docs.rs/libc/0.2.190">0.2.190</a></td>
-<td>tcsapp, tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim</td>
+<td>tcsapp, tcsgui, tcslib-moc, tcslibgs, tcsmoc, tcspecial, tcssim</td>
 <td>The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.</td>
 <td><a class="reference external" href="https://github.com/rust-lang/libc">repository</a></td>
 </tr>
@@ -4795,7 +4794,7 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde">serde</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/serde/1.0.229">1.0.229</a></td>
-<td>tcsgui, tcslib, tcslibgs, tcsmoc, tcspecial, tcssim</td>
+<td>tcsgui, tcslib-moc, tcslibgs, tcsmoc, tcspecial, tcssim</td>
 <td>Turns the configuration, the commands and the telemetry into Rust types and back.</td>
 <td><a class="reference external" href="https://github.com/serde-rs/serde">repository</a></td>
 </tr>
@@ -4868,7 +4867,7 @@ with <tt class="docutils literal">visual</tt></td>
 <tr><td><a class="reference external" href="https://crates.io/crates/thiserror">thiserror</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/thiserror/1.0.69">1.0.69</a></td>
-<td>tcslib, tcslibgs, tcspecial</td>
+<td>tcslib-moc, tcslibgs, tcspecial</td>
 <td>Writes the error types and their messages.</td>
 <td><a class="reference external" href="https://github.com/dtolnay/thiserror">repository</a></td>
 </tr>

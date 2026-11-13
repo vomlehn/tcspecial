@@ -1,12 +1,12 @@
-# tcslib
+# tcslib-moc
 
-**tcslib is the library a ground station is built on.** It is the ground's
+**tcslib-moc is the library a ground station is built on.** It is the ground's
 side of the link to a spacecraft running tcspecial: everything a program on
 the ground needs in order to command the vehicle, receive the vehicle's data,
 and know that the vehicle is there.
 
-A ground station does three things with a spacecraft, and tcslib has one part
-for each:
+A ground station does three things with a spacecraft, and tcslib-moc has one
+part for each:
 
 - **Commanding it.** `TcsClient` sends commands to tcspecial's command
   interpreter and returns its answers: ping it, start, stop, set and query a
@@ -50,15 +50,15 @@ The link to tcspecial is UDP, and only UDP: `TcsClient` sends its commands
 through a `UdpConnection` -- on a bus, to the station's peer of it, which
 publishes each one.
 
-## What tcslib is not
+## What tcslib-moc is not
 
-tcslib has no windows. Showing what it receives is the job of the programs
+tcslib-moc has no windows. Showing what it receives is the job of the programs
 built on it: `tcsui` holds the panels the ground programs share, and `tcsmoc`
 is the test ground station that puts them on the screen.
 
-tcslib does not define the link either. The commands, the telemetry, and the
-configuration files both ends read belong to `tcslibgs`, which the vehicle
-uses too. tcslib re-exports all of it, so a ground program needs only tcslib.
+tcslib-moc does not define the link either. The commands, the telemetry, and the
+configuration files both ends read belong to `tcslibgs`, which the vehicle uses
+too. tcslib-moc re-exports all of it, so a ground program needs only tcslib-moc.
 
 ## Who uses it
 
@@ -72,9 +72,9 @@ uses too. tcslib re-exports all of it, so a ground program needs only tcslib.
 ## Building and testing
 
 ```
-cargo build -p tcslib
-cargo test -p tcslib
-cargo doc -p tcslib --open
+cargo build -p tcslib-moc
+cargo test -p tcslib-moc
+cargo doc -p tcslib-moc --open
 ```
 
 `make` in this directory builds `README.html` from this file, and
@@ -82,7 +82,7 @@ cargo doc -p tcslib --open
 
 ## See also
 
-- [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib/README.html).
+- [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html).
 - [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), this library for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and

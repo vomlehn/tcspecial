@@ -6,7 +6,7 @@
 //! through Slint's testing backend, and the text in it is read back.
 //!
 //! What the panel looks like is `tcsui`'s business and what a beacon means is
-//! `tcslib::beacon`'s; this is the join.
+//! `tcslib_moc::beacon`'s; this is the join.
 
 use std::time::{Duration, SystemTime};
 
@@ -14,7 +14,7 @@ use i_slint_backend_testing::ElementHandle;
 use slint::ComponentHandle;
 
 use beacon_example::{show, WatchWindow};
-use tcslib::beacon::{Schedule, NO_BEACON_MESSAGE};
+use tcslib_moc::beacon::{Schedule, NO_BEACON_MESSAGE};
 use tcslibgs::NO_TRANSFER_TIME;
 use tcsui::{palette, Shown};
 
@@ -103,7 +103,7 @@ fn the_window_shows_what_a_pass_reported() {
 /// window opening -- Unheard -- through every stage a beacon ages through.
 #[test]
 fn the_stage_line_follows_the_stage() {
-    use tcslib::beacon::Stage;
+    use tcslib_moc::beacon::Stage;
 
     i_slint_backend_testing::init_no_event_loop();
     let window = WatchWindow::new().expect("the window opens");
@@ -195,7 +195,7 @@ fn the_stage_line_follows_the_stage() {
 #[test]
 fn the_values_line_up_after_their_labels() {
     use beacon_example::prepare;
-    use tcslib::beacon::Stage;
+    use tcslib_moc::beacon::Stage;
 
     i_slint_backend_testing::init_no_event_loop();
     let window = WatchWindow::new().expect("the window opens");

@@ -1,10 +1,9 @@
 """Waiting for the simulator before tcspecial is started.
 
-The Python spelling of ``tcslib/src/simulator.rs``: :func:`ask` asks once and
-gives what was said, or ``None`` where nothing answered, and :func:`wait`
-waits until the simulator is ready for this run, raising :class:`NotReady`
-with what it last heard where it is not. The messages are
-``tcslibgs/ready.py``.
+The Python spelling of ``tcslib-moc/src/simulator.rs``: :func:`ask` asks once
+and gives what was said, or ``None`` where nothing answered, and :func:`wait`
+waits until the simulator is ready for this run, raising :class:`NotReady` with
+what it last heard where it is not. The messages are ``tcslibgs/ready.py``.
 """
 
 import socket

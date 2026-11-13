@@ -93,7 +93,7 @@ Requirement
     datagram, the digest comparison, the beacons that did not arrive and how
     stale the last one is. No toolkit is linked into it, because a ground
     station with no screen -- a logger, a test, a program that only watches --
-    needs the facts and not the look. It is ``tcslib::beacon``.
+    needs the facts and not the look. It is ``tcslib_moc::beacon``.
 
 Requirement
     How stale the last beacon is, is a named stage and not a colour. A stage

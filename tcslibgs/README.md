@@ -81,13 +81,13 @@ the editor is the one the vehicle would have refused the file with.
 
 It has no network code for the ground. Opening a link to the vehicle,
 sending a command, receiving data and listening for beacons are all in
-`tcslib`, which builds on this crate and re-exports it. The flight software
+`tcslib-moc`, which builds on this crate and re-exports it. The flight software
 itself is `tcspecial`.
 
 ## Who uses it
 
 Every crate in the workspace that has anything to do with the link or a
-configuration: tcspecial, tcslib, tcsmoc, tcssim, tcsgui and tcsverify, and
+configuration: tcspecial, tcslib-moc, tcsmoc, tcssim, tcsgui and tcsverify, and
 `examples/beacon`.
 
 ## Building and testing
@@ -104,7 +104,7 @@ cargo doc -p tcslibgs --open
 ## See also
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslibgs/README.html).
-- [tcslib](https://vomlehn.github.io/tcspecial/tcslib/README.html), what a ground station is built on, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), the same for C and C++.
+- [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), what a ground station is built on, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), the same for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

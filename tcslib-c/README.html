@@ -170,23 +170,23 @@
 </head>
 <body>
 <h1 id="tcslib-c">tcslib-c</h1>
-<p><strong>tcslib-c is tcslib for C and C++.</strong> It is the library
-a ground station written in C or C++ is built on: the vehicle’s beacons,
-the vehicle’s data from a gateway node, and commands to the vehicle,
-behind one header, <code>include/tcs.h</code>.</p>
+<p><strong>tcslib-c is tcslib-moc for C and C++.</strong> It is the
+library a ground station written in C or C++ is built on: the vehicle’s
+beacons, the vehicle’s data from a gateway node, and commands to the
+vehicle, behind one header, <code>include/tcs.h</code>.</p>
 <p>It is not a second implementation of anything. Each function is a
-call into <a href="../tcslib/README.md">tcslib</a>, so a C or C++ ground
-station reads the configuration, counts ports and ages beacons exactly
-as tcsmoc does, and the two cannot come to disagree.</p>
+call into <a href="../tcslib-moc/README.md">tcslib-moc</a>, so a C or
+C++ ground station reads the configuration, counts ports and ages
+beacons exactly as tcsmoc does, and the two cannot come to disagree.</p>
 <p>C and C++ alike: the header is C, includable from C++ as it stands,
 with C linkage throughout, and nothing in it that C++ will not
 compile.</p>
 <p>A configuration that answers to cFS is used through the same calls:
-tcslib joins the cFS end as tcssim simulates it as an SBN peer, on a
+tcslib-moc joins the cFS end as tcssim simulates it as an SBN peer, on a
 thread of its own, and the beacons, the data and the commands go over
 that peer (see “A vehicle on a cFS software bus” in <a
-href="../tcslib/README.md">tcslib’s README</a>). Nothing in the header
-changes.</p>
+href="../tcslib-moc/README.md">tcslib-moc’s README</a>). Nothing in the
+header changes.</p>
 <h2 id="what-is-in-it">What is in it</h2>
 <ul>
 <li><strong>The configuration.</strong>
@@ -236,10 +236,10 @@ off.</li>
 up to a gateway node that binds an address and port aboard, and each
 <code>tcs_uplink_send</code> sends one datum there, which leaves the
 node by its <code>moc-out</code> links for the nodes they reach: a
-heater driven, a line set. It is tcslib’s <code>ping::Uplink</code>, the
-way the ping goes up. What goes up drives a payload as a command does,
-so it goes only while the station is matched for commanding, and fails
-unsent before, saying the configurations are not yet matched.</li>
+heater driven, a line set. It is tcslib-moc’s <code>ping::Uplink</code>,
+the way the ping goes up. What goes up drives a payload as a command
+does, so it goes only while the station is matched for commanding, and
+fails unsent before, saying the configurations are not yet matched.</li>
 <li><strong>Commands.</strong> <code>tcs_client_open</code> opens the
 two command links the configuration states.
 <code>tcs_client_connect</code> says whether the vehicle is flying this
@@ -353,8 +353,8 @@ alone is also compiled as C99 and as C++11.</p>
 <ul>
 <li><strong>A query’s counts are not given.</strong>
 <code>tcs_client_query_node</code> says whether a node is running; the
-counts of what it has moved, which tcslib’s answer carries, have no C
-spelling yet.</li>
+counts of what it has moved, which tcslib-moc’s answer carries, have no
+C spelling yet.</li>
 <li><strong>One thread per handle.</strong> A handle is used from one
 thread at a time; nothing in the library locks one.
 <code>tcs_last_error()</code> is per thread.</li>
@@ -400,17 +400,17 @@ happens, and is:
 <li><em>Once, at startup.</em> Each <code>_open</code> allocates its
 handle, which has to outlive the call and whose size C does not see.
 <code>tcs_configuration_open</code> reads and checks a whole
-configuration, as tcslib does; <code>tcs_gateway_open</code> makes the
-names of the node’s sources, which every receive then points at, and the
-buffer every datum is received in; and
-<code>tcs_configuration_node_id</code> asks tcslib for every node’s
+configuration, as tcslib-moc does; <code>tcs_gateway_open</code> makes
+the names of the node’s sources, which every receive then points at, and
+the buffer every datum is received in; and
+<code>tcs_configuration_node_id</code> asks tcslib-moc for every node’s
 id.</li>
-<li><em>In tcslib, as a station runs, only where something happens.</em>
-A beacon pass, a datum, a ping and its answer, and a command sent
-allocate nothing. What does: a remark or warning, on the pass where
-something changed; an answer to a command, whose strings tcslib reads as
-its own; and what came down from the ping node that is not an answer, to
-say why.</li>
+<li><em>In tcslib-moc, as a station runs, only where something
+happens.</em> A beacon pass, a datum, a ping and its answer, and a
+command sent allocate nothing. What does: a remark or warning, on the
+pass where something changed; an answer to a command, whose strings
+tcslib-moc reads as its own; and what came down from the ping node that
+is not an answer, to say why.</li>
 </ul></li>
 </ul>
 <p><code>make</code> in this directory builds <code>README.html</code>
@@ -421,7 +421,7 @@ from this file.</p>
 href="https://vomlehn.github.io/tcspecial/tcslib-c/README.html">This
 page as HTML</a>.</li>
 <li><a
-href="https://vomlehn.github.io/tcspecial/tcslib/README.html">tcslib</a>,
+href="https://vomlehn.github.io/tcspecial/tcslib-moc/README.html">tcslib-moc</a>,
 the Rust library this one wraps, and <a
 href="https://vomlehn.github.io/tcspecial/tcslibgs/README.html">tcslibgs</a>,
 what the ground and the vehicle share.</li>

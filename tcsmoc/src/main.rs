@@ -2031,7 +2031,7 @@ mod tests {
         assert!(
             shown
                 .iter()
-                .any(|line| line == tcslib::beacon::NO_BEACON_MESSAGE),
+                .any(|line| line == tcslib_moc::beacon::NO_BEACON_MESSAGE),
             "the beacon box does not say that nothing has been said: {shown:?}"
         );
 
@@ -2041,7 +2041,7 @@ mod tests {
         beacon_receive::show_beacon(
             &ui,
             &tcsui::Shown::at(
-                &tcslib::beacon::Schedule::standard().at(Duration::ZERO),
+                &tcslib_moc::beacon::Schedule::standard().at(Duration::ZERO),
                 Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
                 "tcspecial v0.1.0 md5 0123456789abcdef",
             ),
@@ -2067,7 +2067,7 @@ mod tests {
         let restarted = tcsui::Shown {
             restart: tcsui::restart_of(true),
             ..tcsui::Shown::at(
-                &tcslib::beacon::Schedule::standard().at(Duration::ZERO),
+                &tcslib_moc::beacon::Schedule::standard().at(Duration::ZERO),
                 None,
                 "",
             )

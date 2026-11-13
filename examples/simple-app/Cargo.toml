@@ -9,7 +9,7 @@ sends; the payload itself is lorem_pl.py"""
 
 [dependencies]
 # How the ground gets the payload's words from the gateway node.
-tcslib = { path = "../../tcslib" }
+tcslib-moc = { path = "../../tcslib-moc" }
 
 # The payload's tests run lorem_pl.py the way tcspecial does.
 [dev-dependencies]

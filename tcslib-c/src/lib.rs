@@ -1,10 +1,10 @@
-//! tcslib for C and C++.
+//! tcslib-moc for C and C++.
 //!
-//! What a ground station is built on -- the vehicle's beacons, its data from
-//! a gateway node, and commands to it -- behind one header, `include/tcs.h`,
+//! What a ground station is built on -- the vehicle's beacons, its data from a
+//! gateway node, and commands to it -- behind one header, `include/tcs.h`,
 //! which says the whole of the interface and is includable from C and C++
-//! alike. Nothing here is a second implementation of anything: each function
-//! is the C spelling of a call into `tcslib`, so a C or C++ station reads the
+//! alike. Nothing here is a second implementation of anything: each function is
+//! the C spelling of a call into `tcslib-moc`, so a C or C++ station reads the
 //! configuration, counts ports and ages beacons exactly as tcsmoc does.
 //!
 //! Every function keeps the header's conventions. A handle is a `Box` handed
@@ -22,8 +22,8 @@
 //! `TCS_ERROR_BYTES`, `TCS_TEXT_BYTES` and `TCS_MAX_REMARKS` in the header,
 //! which say how large. Text too long for its buffer is cut short at a
 //! character, ending "...", so that a cut is seen rather than taken for the
-//! whole. Each place that does allocate says so where it does it, and why:
-//! the handles, once, at startup, and what tcslib itself builds as it reads a
+//! whole. Each place that does allocate says so where it does it, and why: the
+//! handles, once, at startup, and what tcslib-moc itself builds as it reads a
 //! beacon, a datum or an answer.
 //!
 //! The header is written by hand, for people, and `tests/c_and_cpp.rs` is
@@ -42,13 +42,13 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tcslib::beacon::{
+use tcslib_moc::beacon::{
     Beacons, Contact, Schedule, Stage, Waker, STANDARD_INTERVAL,
 };
-use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
-use tcslib::matched::Matched;
-use tcslib::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
-use tcslib::{command_links_of, CommandStatus, TcsClient};
+use tcslib_moc::gateway::{GatewayReceiver, DATUM_BYTES};
+use tcslib_moc::matched::Matched;
+use tcslib_moc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
+use tcslib_moc::{command_links_of, CommandStatus, TcsClient};
 use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
 use tcslibgs::graph::parameters::beacon_interval_of;
 use tcslibgs::graph::units;
@@ -237,7 +237,7 @@ fn guard<T>(otherwise: T, body: impl FnOnce() -> Result<T, Failed>) -> T {
         Ok(Err(Failed)) => otherwise,
         Err(_) => {
             fail(
-                "an internal error in tcslib: this is a bug, and worth \
+                "an internal error in tcslib-moc: this is a bug, and worth \
                  reporting",
             );
             otherwise
@@ -464,7 +464,7 @@ pub unsafe extern "C" fn tcs_configuration_node_id(
         let configuration = handle_of(configuration, "the configuration")?;
         let name = text_of(name, "the node's name")?;
         let out = out_of(id, "the id")?;
-        // Allocates: tcslib's map of every node's id. A station asks for an
+        // Allocates: tcslib-moc's map of every node's id. A station asks for an
         // id as it starts, to know which node to command, and not as it runs.
         let ids = telemetry::ids(&configuration.graph);
         let found = ids.get(name).ok_or_else(|| {
@@ -658,7 +658,7 @@ pub unsafe extern "C" fn tcs_beacons_listen(
             .unwrap_or(STANDARD_INTERVAL);
         // At the socket the beacon link states, or from this process's
         // peer of a software bus.
-        let beacons = tcslib::beacon::open(
+        let beacons = tcslib_moc::beacon::open(
             graph,
             Schedule::for_interval(interval),
             Some(configuration.digest),
@@ -670,7 +670,7 @@ pub unsafe extern "C" fn tcs_beacons_listen(
             ))
         })?;
         let mut said = Text::EMPTY;
-        said.set(tcslib::beacon::NO_BEACON_MESSAGE);
+        said.set(tcslib_moc::beacon::NO_BEACON_MESSAGE);
         // Allocates, once, at startup: the handle, which outlives this call
         // and whose size C does not see -- the fixed buffers in it included.
         Ok(Box::into_raw(Box::new(tcs_beacons {
@@ -707,7 +707,7 @@ pub unsafe extern "C" fn tcs_beacons_pass(
     guard(-1, || {
         let watch = handle_of_mut(beacons, "the beacons")?;
         let out = out_of(pass, "the pass")?;
-        // Allocates nothing but what tcslib does: a remark or warning, on
+        // Allocates nothing but what tcslib-moc does: a remark or warning, on
         // the pass where something changed. What the pass holds is copied
         // into the handle's fixed buffers.
         let found = watch.beacons.pass();
@@ -935,7 +935,7 @@ pub unsafe extern "C" fn tcs_beacons_waker_close(
 /// A gateway node, open, and the last datum it received.
 pub struct tcs_gateway {
     gateway: GatewayReceiver,
-    /// Each source's name as C reads it, in the order tcslib numbers them,
+    /// Each source's name as C reads it, in the order tcslib-moc numbers them,
     /// made once when the node is opened: a datum's source is one of these,
     /// so a receive points at one rather than copying a name.
     names: Vec<CString>,
@@ -1521,7 +1521,7 @@ pub unsafe extern "C" fn tcs_uplink_send(
     guard(-1, || {
         let up = handle_of_mut(uplink, "the uplink")?;
         let data = bytes_of(data, length)?;
-        // Allocates, in tcslib, only where it is not sent, to say why.
+        // Allocates, in tcslib-moc, only where it is not sent, to say why.
         // Copied here into a fixed buffer.
         up.uplink.send(data).map_err(fail)?;
         Ok(0)
@@ -1637,9 +1637,9 @@ pub unsafe extern "C" fn tcs_client_open(
     })
 }
 
-// The commands below allocate nothing of their own in tcslib: each is packed
-// into the connection's own buffer and its answer read into fixed room, as
-// the link's packets are. What allocates is the error message, where there
+// The commands below allocate nothing of their own in tcslib-moc: each is
+// packed into the connection's own buffer and its answer read into fixed room,
+// as the link's packets are. What allocates is the error message, where there
 // is one.
 
 /// Sends CONNECT, and says whether the vehicle is flying this
@@ -2346,8 +2346,8 @@ pub unsafe extern "C" fn tcs_pinger_answered(
         } else {
             std::slice::from_raw_parts(data, length)
         };
-        // Allocates, in tcslib, only where what arrived is not an answer, to
-        // say why. Copied here into a fixed buffer.
+        // Allocates, in tcslib-moc, only where what arrived is not an answer,
+        // to say why. Copied here into a fixed buffer.
         ping.pinger.answered(data, now()?);
         ping.received.set(
             ping.pinger

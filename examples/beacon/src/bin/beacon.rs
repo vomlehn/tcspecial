@@ -11,7 +11,7 @@
 //! It is also the example of how the two halves fit together. Nothing about
 //! beacons is written here:
 //!
-//! * [`tcslib::beacon`] binds the socket, reads each datagram, counts the
+//! * [`tcslib_moc::beacon`] binds the socket, reads each datagram, counts the
 //!   beacons that did not arrive, compares the digest with this end's own and
 //!   says how stale the last one is.
 //! * `tcsui` holds the panel and works out what to show on it.
@@ -45,7 +45,7 @@ use slint::ComponentHandle;
 use beacon_example::{
     notice_exit, prepare, show_on, wire, Vehicle, WatchWindow,
 };
-use tcslib::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
+use tcslib_moc::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
 use tcslibgs::graph::Graph;

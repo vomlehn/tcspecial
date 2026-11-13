@@ -1,6 +1,6 @@
 """The beacon's facts and its panel, held to the Rust's own examples.
 
-The tests of ``tcslib/src/beacon.rs`` and ``tcsui/src/lib.rs`` said again,
+The tests of ``tcslib-moc/src/beacon.rs`` and ``tcsui/src/lib.rs`` said again,
 with the same figures. The beacons are written here as text, field by field,
 rather than by the code under test; ``examples/ping/tests/pings.rs`` sends
 this program beacons the Rust writes, so a change to the layout is caught at
@@ -74,7 +74,7 @@ def schedule():
 
 class StageTest(unittest.TestCase):
     def test_each_stage_is_called_what_it_is(self):
-        # Stage::label in tcslib::beacon, word for word.
+        # Stage::label in tcslib_moc::beacon, word for word.
         self.assertEqual(
             [stage.label() for stage in Stage],
             ["Unheard", "Heard", "Aging", "Waiting"],
@@ -173,7 +173,7 @@ class ScheduleTest(unittest.TestCase):
                 return Stage.AGING
             return Stage.HEARD
 
-        # tcslib::beacon's thresholds, figure for figure.
+        # tcslib_moc::beacon's thresholds, figure for figure.
         self.assertEqual(
             (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED,
              beacon.WAITING_AFTER_MISSED),

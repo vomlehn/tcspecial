@@ -37,9 +37,9 @@ use slint::platform::software_renderer::{
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-use tcslib::beacon::{Contact, Link};
-use tcslib::gateway::GatewayReceiver;
-use tcslib::matched::Matched;
+use tcslib_moc::beacon::{Contact, Link};
+use tcslib_moc::gateway::GatewayReceiver;
+use tcslib_moc::matched::Matched;
 use tcslibgs::graph::telemetry::{self, Reaches};
 use tcslibgs::graph::Graph;
 use tcslibgs::{
@@ -817,8 +817,8 @@ impl Station {
         let beacon_from = UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let interval = tcslibgs::graph::parameters::beacon_interval_of(&graph)
             .expect("its interval")
-            .unwrap_or(tcslib::beacon::STANDARD_INTERVAL);
-        let beacons = tcslib::beacon::Beacons::on(
+            .unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL);
+        let beacons = tcslib_moc::beacon::Beacons::on(
             socket,
             Link {
                 send: here(&beacon_from.local_addr().unwrap().to_string()),
@@ -860,7 +860,7 @@ impl Station {
             .map(|n| n.name.clone())
             .expect("a gateway node");
         let (receiver, moved) = receiver_on_free_ports(&graph, &gateway);
-        let pings = tcslib::ping::route_of(&graph).map(|route| {
+        let pings = tcslib_moc::ping::route_of(&graph).map(|route| {
             let vehicle_ping =
                 UdpSocket::bind("127.0.0.1:0").expect("a ping socket");
             let port = vehicle_ping.local_addr().unwrap().port();

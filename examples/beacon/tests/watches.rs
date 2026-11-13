@@ -1,8 +1,8 @@
 //! The example's own configuration, watched the way the example watches it.
 //!
 //! No window: what the window shows is `tcsui`'s and is tested there, and what
-//! a beacon means is `tcslib::beacon`'s and is tested there. What is left to
-//! check is the join -- that this example's configuration says where the
+//! a beacon means is `tcslib_moc::beacon`'s and is tested there. What is left
+//! to check is the join -- that this example's configuration says where the
 //! beacons are, that a station reading it listens where tcspecial would send,
 //! and that a beacon sent from that address is reported as one.
 //!
@@ -13,7 +13,7 @@
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
 
-use tcslib::beacon::{Arrived, Beacons, Contact, Schedule, Stage};
+use tcslib_moc::beacon::{Arrived, Beacons, Contact, Schedule, Stage};
 use tcslibgs::config_digest::digest_of_file;
 use tcslibgs::graph::parameters::beacon_of;
 use tcslibgs::graph::Graph;
@@ -83,7 +83,7 @@ fn a_beacon_from_the_configured_address_is_heard() {
     drop(listening);
 
     let mut station = match Beacons::listening(
-        tcslib::beacon::Link {
+        tcslib_moc::beacon::Link {
             send: link.send.clone(),
             recv: tcslibgs::HostPort {
                 address: at.ip().to_string(),

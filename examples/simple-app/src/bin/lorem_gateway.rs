@@ -1,19 +1,19 @@
 //! The example's ground end: it prints the line the vehicle sends.
 //!
-//! What plays the ground software while this example runs. tcspecial
-//! sends `lorem`'s words as UDP datagrams to the configuration's gateway node,
-//! and this program gets them from that node with one function call --
-//! `tcslib::gateway::GatewayReceiver::receive` -- rather than opening a socket
-//! of its own: the library works out from the configuration which port each
-//! source's data arrives at, exactly as the vehicle does, and says which node
-//! each datum came from.
+//! What plays the ground software while this example runs. tcspecial sends
+//! `lorem`'s words as UDP datagrams to the configuration's gateway node, and
+//! this program gets them from that node with one function call --
+//! `tcslib_moc::gateway::GatewayReceiver::receive` -- rather than opening a
+//! socket of its own: the library works out from the configuration which port
+//! each source's data arrives at, exactly as the vehicle does, and says which
+//! node each datum came from.
 //!
 //! It sends a CONNECT of its own, with its configuration's checksum, before
 //! it waits for a word: a vehicle sends nothing down until it has taken one,
 //! and a station that only listens cannot count on a commanding station's
 //! being there. It sends it again each time no answer comes in time, or the
 //! answer carries another configuration's checksum, until the vehicle
-//! answers with this one's -- through `tcslib::listening`, from the
+//! answers with this one's -- through `tcslib_moc::listening`, from the
 //! configuration's `tcs_cmd.send`, so nothing else may be using that address
 //! meanwhile. A configuration with no `tcspecial` section states no command
 //! link, and nothing is sent.
@@ -38,8 +38,8 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use simple_app::TERMINATOR;
-use tcslib::gateway::{GatewayReceiver, DATUM_BYTES};
-use tcslib::listening::{Heard, Listening};
+use tcslib_moc::gateway::{GatewayReceiver, DATUM_BYTES};
+use tcslib_moc::listening::{Heard, Listening};
 
 /// How long each CONNECT waits for its answer before it is sent again.
 const CONNECT_WAIT: Duration = Duration::from_secs(1);
@@ -49,7 +49,7 @@ const CONNECT_WAIT: Duration = Duration::from_secs(1);
 const CONFIGURATION: &str = "examples/simple-app/simple-app";
 
 /// The spelling read where neither `--yaml` nor `--xml` is given.
-const SPELLING: tcslib::ConfigFormat = tcslib::ConfigFormat::Yaml;
+const SPELLING: tcslib_moc::ConfigFormat = tcslib_moc::ConfigFormat::Yaml;
 
 /// The node in it that `lorem`'s words go to, which the configuration calls
 /// `gateway-1`.
@@ -84,7 +84,7 @@ impl Arguments {
     fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
         let mut names = Vec::new();
         let mut verbose = false;
-        let mut spelling = tcslib::Spelling::default();
+        let mut spelling = tcslib_moc::Spelling::default();
         for arg in args {
             if spelling.take(&arg)? {
                 continue;
@@ -162,7 +162,7 @@ fn main() -> ExitCode {
 
     // The CONNECT, once the node is open, so that nothing the vehicle sends
     // as it matches arrives before there is a socket to take it.
-    let graph = match tcslib::graph::Graph::load(&configuration) {
+    let graph = match tcslib_moc::graph::Graph::load(&configuration) {
         Ok(graph) => graph,
         Err(e) => {
             eprintln!("lorem_gateway: {configuration}: {e}");

@@ -1,10 +1,10 @@
 /*
- * tcs.h -- tcslib for C and C++.
+ * tcs.h -- tcslib-moc for C and C++.
  *
  * What a ground station is built on, behind one header: the vehicle's beacons,
  * the vehicle's data from a gateway node, data up to a gateway node, and
  * commands to the vehicle. The same library the Rust ground programs use --
- * tcslib -- so a C or C++ station reads the configuration, counts ports and
+ * tcslib-moc -- so a C or C++ station reads the configuration, counts ports and
  * ages beacons exactly as tcsmoc does.
  *
  * C and C++ alike. The header is C, includable from C++ as it stands; every

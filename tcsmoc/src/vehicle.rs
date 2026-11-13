@@ -4,8 +4,8 @@
 //! each node drawn into a gateway node sends to the gateway node's
 //! `ground_base` plus its device id, and each payload nothing touches sends
 //! over `payload_telemetry` -- see `tcslibgs::graph::telemetry`. So there is
-//! one panel per source, filled through `tcslib::gateway`, the same function
-//! call any ground software uses.
+//! one panel per source, filled through `tcslib_moc::gateway`, the same
+//! function call any ground software uses.
 //!
 //! # What the buttons send
 //!
@@ -44,11 +44,11 @@ use std::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-use tcslib::gateway::GatewayReceiver;
-use tcslib::gateway::DATUM_BYTES;
-use tcslib::matched::Matched;
-use tcslib::ping::{Pinger, Uplink};
-use tcslib::simulator;
+use tcslib_moc::gateway::GatewayReceiver;
+use tcslib_moc::gateway::DATUM_BYTES;
+use tcslib_moc::matched::Matched;
+use tcslib_moc::ping::{Pinger, Uplink};
+use tcslib_moc::simulator;
 use tcslibgs::graph::reach::reach_of;
 use tcslibgs::graph::telemetry::{self, Reaches, Telemetered, Via};
 use tcslibgs::graph::Graph;
@@ -969,11 +969,11 @@ fn simulator_for(
 ///
 /// # Errors
 ///
-/// What `tcslib::command_links_of` says is wrong with the section.
+/// What `tcslib_moc::command_links_of` says is wrong with the section.
 fn command_links_of(
     graph: &Graph,
 ) -> Result<Option<(String, String, Commanded)>, String> {
-    let Some(links) = tcslib::command_links_of(graph)? else {
+    let Some(links) = tcslib_moc::command_links_of(graph)? else {
         return Ok(None);
     };
     Ok(Some((
@@ -1049,7 +1049,7 @@ fn connect_said(
         Ok((theirs, their_digest)) => {
             eprintln!(
                 "CONNECT answer: {}",
-                tcslib::beacon::what_it_read(theirs, their_digest)
+                tcslib_moc::beacon::what_it_read(theirs, their_digest)
             );
             let same = their_digest == digest;
             if let Ok(mut held) = agreed.lock() {
@@ -1294,7 +1294,7 @@ fn ask_nodes(
 ///
 /// Neither moment is one at which a QUERY_NODE can always go. Every command
 /// but CONNECT, RESTART_ARM and RESTART waits for this window to be matched
-/// for commanding (see `tcslib::matched`): a beacon carrying this window's
+/// for commanding (see `tcslib_moc::matched`): a beacon carrying this window's
 /// checksum with its restart flag clear, and a CONNECT of this window's
 /// answered since the match last ended. A first beacon usually comes before
 /// Connect has been pressed, with the link down, and a fresh start's carries
@@ -2431,7 +2431,7 @@ fn take_down_at_a_start(
 /// # Returns
 ///
 /// The line.
-pub(crate) fn packets_said(counts: &tcslib::matched::Counts) -> String {
+pub(crate) fn packets_said(counts: &tcslib_moc::matched::Counts) -> String {
     format!(
         "Packets: {} received = {} processed + {} malformed + {} mismatched",
         counts.received(),
@@ -2476,7 +2476,7 @@ struct PingFeed {
 }
 
 /// Hands what the ping node sent down to the pinger, and says the window has
-/// something to show. Allocates nothing: see `tcslib::ping::Pinger`.
+/// something to show. Allocates nothing: see `tcslib_moc::ping::Pinger`.
 ///
 /// # Arguments
 ///
@@ -2674,7 +2674,7 @@ fn ping_node(
     graph: &Graph,
     matched: &Matched,
 ) -> Result<Option<(String, PingFeed)>, String> {
-    let Some(route) = tcslib::ping::route_of(graph) else {
+    let Some(route) = tcslib_moc::ping::route_of(graph) else {
         return Ok(None);
     };
     let uplink = Uplink::open(graph, &route.gateway)
@@ -2850,7 +2850,7 @@ pub fn run(
     // clear of the restart flag and carries this configuration's checksum,
     // and whether a Connect of this window's has been answered with it.
     // The beacon watch keeps it; the command link, the data receivers and
-    // the counts under Last Response read it. See `tcslib::matched`.
+    // the counts under Last Response read it. See `tcslib_moc::matched`.
     let matched = match digest {
         Some(digest) => Matched::for_configuration(digest),
         None => Matched::with_no_checksum(),
@@ -2932,7 +2932,7 @@ pub fn run(
     let pm_tcspecial = Arc::new(ProcessManager::new());
     pm_tcspecial.start_child(tcspecial, payload_path, mode);
 
-    let contact = Arc::new(Mutex::new(tcslib::beacon::Contact::Lost));
+    let contact = Arc::new(Mutex::new(tcslib_moc::beacon::Contact::Lost));
     // The question about the nodes owed as contact is made, where there is a
     // link to ask it on: see `Asking`.
     let asking = link.as_ref().map(|link| {
@@ -2943,19 +2943,21 @@ pub fn run(
     // standard schedule, and says so.
     let interval = match tcslibgs::graph::parameters::beacon_interval_of(&graph)
     {
-        Ok(interval) => interval.unwrap_or(tcslib::beacon::STANDARD_INTERVAL),
+        Ok(interval) => {
+            interval.unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL)
+        }
         Err(e) => {
             startup.warning(format!(
                 "The beacon interval cannot be read, so the beacon indicator \
                  ages as though it were {:?}: {e}",
-                tcslib::beacon::STANDARD_INTERVAL
+                tcslib_moc::beacon::STANDARD_INTERVAL
             ));
-            tcslib::beacon::STANDARD_INTERVAL
+            tcslib_moc::beacon::STANDARD_INTERVAL
         }
     };
     // At the socket the beacon link states, or from the station's peer of a
-    // software bus: see `tcslib::beacon::open`.
-    let _beacon_receive = match tcslib::beacon::open(
+    // software bus: see `tcslib_moc::beacon::open`.
+    let _beacon_receive = match tcslib_moc::beacon::open(
         &graph,
         crate::config::constants::beacon_schedule(interval),
         digest,
@@ -2996,13 +2998,13 @@ pub fn run(
         }
     };
 
-    // The ground's end of every link, through tcslib::gateway: one receiver per
-    // gateway node and one for the payloads that report over payload_telemetry,
-    // each on a thread of its own. A port that cannot be bound is said with
-    // the rest of what was found, and costs its panels their data.
-    // The ping node, where there is one the ground can reach both ways: a
+    // The ground's end of every link, through tcslib_moc::gateway: one receiver
+    // per gateway node and one for the payloads that report over
+    // payload_telemetry, each on a thread of its own. A port that cannot be
+    // bound is said with the rest of what was found, and costs its panels their
+    // data. The ping node, where there is one the ground can reach both ways: a
     // window of its own, opened by Ping node, that pings it and times the
-    // answer. See `tcslib::ping`.
+    // answer. See `tcslib_moc::ping`.
     let ping_window = PingWindow::new().unwrap();
     let pings = match ping_node(&ui, &ping_window, &graph, &matched) {
         Ok(pings) => pings,
@@ -3320,7 +3322,7 @@ pub(crate) mod tests {
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::default());
         ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
         ui.set_ci_address(SharedString::from(at.clone()));
-        let matched = tcslib::matched::Matched::for_configuration(ours);
+        let matched = tcslib_moc::matched::Matched::for_configuration(ours);
         let link = Arc::new(Mutex::new(CiLink::down_commanding(
             "127.0.0.1:0",
             Commanded {
@@ -4123,7 +4125,7 @@ payloads:
     /// what became of each packet add up to the first.
     #[test]
     fn the_packets_line_says_all_four_counts() {
-        let said = packets_said(&tcslib::matched::Counts {
+        let said = packets_said(&tcslib_moc::matched::Counts {
             processed: 7,
             malformed: 1,
             mismatched: 4,
@@ -4264,7 +4266,12 @@ vehicle:
         // Matched, as a clear beacon of this configuration and a CONNECT
         // answered with it make it: a ping goes up, numbered from one, and is
         // shown.
-        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        matched.beacon(
+            false,
+            Some(ours),
+            tcslib_moc::beacon::Stage::Heard,
+            false,
+        );
         matched.connect_answered(ours, matched.before_connect());
         assert!(matched.for_commanding());
         press();
@@ -4281,7 +4288,7 @@ vehicle:
         assert_eq!(ping_window.get_sent().as_str(), sent);
         assert_eq!(
             ping_window.get_received_time().as_str(),
-            tcslib::ping::NO_PRECISE_TIME,
+            tcslib_moc::ping::NO_PRECISE_TIME,
             "nothing has answered it"
         );
 
@@ -4354,7 +4361,12 @@ vehicle:
         // the beacon thread would say: matched for listening, so that a
         // Connect answered with its checksum matches it for commanding.
         let matched = Matched::for_configuration(ours);
-        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        matched.beacon(
+            false,
+            Some(ours),
+            tcslib_moc::beacon::Stage::Heard,
+            false,
+        );
 
         // A simulated vehicle: one socket for both links, since what is being
         // tested is that a press gets an answer back and not which socket it
@@ -4730,8 +4742,18 @@ vehicle:
         // checksum. Contact made again sends a CONNECT unpressed, the link
         // being up and its last CONNECT having agreed, and asks once it is
         // matched again: no Disconnect and Connect.
-        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Aging, false);
-        matched.beacon(false, Some(ours), tcslib::beacon::Stage::Heard, false);
+        matched.beacon(
+            false,
+            Some(ours),
+            tcslib_moc::beacon::Stage::Aging,
+            false,
+        );
+        matched.beacon(
+            false,
+            Some(ours),
+            tcslib_moc::beacon::Stage::Heard,
+            false,
+        );
         assert!(!matched.for_commanding(), "the outage ended the match");
         // Not where the beacons that ended it heard a start of tcspecial:
         // that is the operator's to Connect to.

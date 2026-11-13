@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 license.workspace = true
 description = """\
-tcslib for C and C++: a ground station's beacons, the vehicle's data from a \
-gateway node, and commands to the vehicle, behind one header"""
+tcslib-moc for C and C++: a ground station's beacons, the vehicle's data from \
+a gateway node, and commands to the vehicle, behind one header"""
 
 [lib]
 # libtcs.a and libtcs.so, which a C or C++ program links with
@@ -14,7 +14,7 @@ name = "tcs"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-tcslib = { path = "../tcslib" }
+tcslib-moc = { path = "../tcslib-moc" }
 tcslibgs = { path = "../tcslibgs" }
 
 [dev-dependencies]

@@ -1,6 +1,6 @@
 //! TCSpecial Ground/Space Library (tcslibgs)
 //!
-//! What the ground portion of the software (tcslib) and the space portion
+//! What the ground portion of the software (tcslib-moc) and the space portion
 //! (tcspecial) share: the commands, the telemetry, and the types a data
 //! handler is described in.
 //!

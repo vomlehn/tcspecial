@@ -1,9 +1,9 @@
 //! The client's operations, driven against a simulated tcspecial.
 //!
-//! tcslib is what a control application is built on, so what matters is that
-//! each operation sends the command it says and hands back what the answering
-//! telemetry carried. Until this existed the client had one test, of a
-//! builder's timeout field, and nothing exercised a command at all.
+//! tcslib-moc is what a control application is built on, so what matters is
+//! that each operation sends the command it says and hands back what the
+//! answering telemetry carried. Until this existed the client had one test, of
+//! a builder's timeout field, and nothing exercised a command at all.
 //!
 //! The simulated tcspecial is a UDP socket that reads a command and answers
 //! it, which is the whole of what the client needs on the other end. Nothing
@@ -14,9 +14,9 @@ use std::net::UdpSocket;
 use std::thread;
 use std::time::Duration;
 
-use tcslib::beacon::Stage;
-use tcslib::matched::Matched;
-use tcslib::{TcsClient, UdpConnection};
+use tcslib_moc::beacon::Stage;
+use tcslib_moc::matched::Matched;
+use tcslib_moc::{TcsClient, UdpConnection};
 use tcslibgs::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,

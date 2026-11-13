@@ -1,4 +1,4 @@
-"""Waiting for the simulator, held to ``tcslib/src/simulator.rs``'s tests.
+"""Waiting for the simulator, held to ``tcslib-moc/src/simulator.rs``'s tests.
 
 The same cases: a simulator that becomes ready is waited for, a failure and a
 difference are said at once, and silence and starting are told apart. And the

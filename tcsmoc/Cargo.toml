@@ -7,7 +7,7 @@ description = "TCSpecial Mission Operations Center test GUI"
 build = "build.rs"
 
 [dependencies]
-tcslib = { path = "../tcslib" }
+tcslib-moc = { path = "../tcslib-moc" }
 # The panels this window is made of, and what to show on them.
 tcsui = { path = "../tcsui" }
 tcslibgs = { path = "../tcslibgs" }

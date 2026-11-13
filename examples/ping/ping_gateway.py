@@ -5,9 +5,9 @@ Two halves borrowed and one of its own, as the beacon example is put together
 in Rust:
 
 * the beacon, from ``python/tcslib/beacon.py`` and
-  ``python/tcsui/beacon_panel.py`` -- the Python spellings of ``tcslib::beacon``
-  and ``tcsui`` -- so the window says whether the vehicle is alive before
-  anybody presses anything;
+  ``python/tcsui/beacon_panel.py`` -- the Python spellings of
+  ``tcslib_moc::beacon`` and ``tcsui`` -- so the window says whether the vehicle
+  is alive before anybody presses anything;
 * the ping, from ``examples/ping-common/ping_ground.py``, which sends each
   ping up to the ``gateway`` node and times the ``ping`` node's answer, and
   the window, from ``ping_window.py`` beside it: what ping-yamcs, the same

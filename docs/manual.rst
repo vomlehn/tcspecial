@@ -158,9 +158,9 @@ The other documents beside these:
     The shipped example configurations, and what each one shows.
 
 The libraries
-    `tcslib <../tcslib/README.html>`__ aboard, in Rust, and `tcslib-c
-    <../tcslib-c/README.html>`__, its C interface; `tcslibgs
-    <../tcslibgs/README.html>`__ on the ground.
+    `tcslib-moc <../tcslib-moc/README.html>`__ in the MOC, in Rust, and
+    `tcslib-c <../tcslib-c/README.html>`__, its C interface; `tcslibgs
+    <../tcslibgs/README.html>`__, used aboard and in the MOC.
 
 The rest of the TCS software
 ============================

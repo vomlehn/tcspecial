@@ -736,7 +736,7 @@ fn at_least_one(
 
 /// Reads the section's `interface`, and refuses one that is not this build's.
 ///
-/// The one place the rule is stated. tcspecial, tcsverify, tcsmoc, tcslib
+/// The one place the rule is stated. tcspecial, tcsverify, tcsmoc, tcslib-moc
 /// and the C/C++ library all read the section through [`ci_config_of`], so
 /// all of them refuse a configuration written for another interface, saying
 /// both digests: a build can speak only the interface it was compiled from,
@@ -813,7 +813,7 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
 /// `beacon.default_interval`, as a length of time.
 ///
 /// What a ground station ages each beacon against -- see
-/// `tcslib::beacon::Schedule::for_interval` -- so it is read here, from the
+/// `tcslib_moc::beacon::Schedule::for_interval` -- so it is read here, from the
 /// same section the link is, rather than assumed: a station that took every
 /// vehicle to beacon every five seconds would call a ten-second beacon late
 /// when it was on time.

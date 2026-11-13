@@ -310,7 +310,7 @@ goes straight to the ground (MOC).</td>
 <td><code>beacon</code></td>
 <td>The one thing a ground station knows without asking: a window
 showing the spacecraft’s beacon, built from the two halves any ground
-station would use – <code>tcslib::beacon</code> to listen and
+station would use – <code>tcslib_moc::beacon</code> to listen and
 <code>tcsui</code>’s panel to show it.</td>
 </tr>
 <tr>
@@ -396,11 +396,11 @@ one the ground read.</p>
 <p>It is also the example of how a ground program is put together,
 because almost nothing in it is its own:</p>
 <ul>
-<li><code>tcslib::beacon</code> binds the socket, reads each datagram,
-counts the beacons that did not arrive, compares the digest in each one
-with the ground’s own and says how stale the last one is. No window, no
-toolkit: a ground station with no screen – a logger, a test – uses
-exactly this.</li>
+<li><code>tcslib_moc::beacon</code> binds the socket, reads each
+datagram, counts the beacons that did not arrive, compares the digest in
+each one with the ground’s own and says how stale the last one is. No
+window, no toolkit: a ground station with no screen – a logger, a test –
+uses exactly this.</li>
 <li><code>tcsui</code> holds the panel, as markup other windows import,
 and works out what to show on it: which colour the indicator is, and the
 two lines beside it.</li>
@@ -418,9 +418,9 @@ digest in hex:</p>
 <pre><code>tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef</code></pre>
 <p>It is text so that it can be read as it is, in a packet capture or
 with any UDP listener. tcspecial writes every beacon and
-<code>tcslib::beacon</code> reads it with <code>tcslibgs::Beacon</code>,
-and this example’s test writes the beacon it sends the same way. The
-window shows it differently, as
+<code>tcslib_moc::beacon</code> reads it with
+<code>tcslibgs::Beacon</code>, and this example’s test writes the beacon
+it sends the same way. The window shows it differently, as
 <code>tcspecial v0.1.0 md5 &lt;digest&gt;</code>.</p>
 <p>After the indicator, on its <code>Status:</code> row, is the stage
 the indicator is at, in a word: <code>Unheard</code> before any beacon
@@ -457,7 +457,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – the <code>beacon</code> program, on
-<code>tcslib::beacon</code> and <code>tcsui</code>.</li>
+<code>tcslib_moc::beacon</code> and <code>tcsui</code>.</li>
 <li>Vehicle: Rust – tcspecial.</li>
 <li>Payload: Rust – tcssim simulates <code>sensor</code>, a network
 payload.</li>
@@ -481,7 +481,7 @@ Press <code>Send ping</code> to send one: it clears the time received
 until its own answer, matched by count, arrives.</p>
 <p>It is built the way the <code>beacon</code> program is, from the same
 two halves written again in Python: <code>python/tcslib/beacon.py</code>
-after <code>tcslib::beacon</code>,
+after <code>tcslib_moc::beacon</code>,
 <code>python/tcsui/beacon_panel.py</code> after <code>tcsui</code>, and
 <code>python/tcslibgs</code> for the ping format, the beacon and the
 configuration. The interface digest beacons are checked against is
@@ -517,7 +517,7 @@ uses.</p>
 <p>tcsmoc pings it too:
 <code>make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping</code>, then
 the <code>Ping node</code> button beside <code>Command</code>. It is the
-same panel, kept by <code>tcslib::ping</code>, which
+same panel, kept by <code>tcslib_moc::ping</code>, which
 <code>ping_ground.py</code> is written after.</p>
 <p>Languages:</p>
 <ul>
@@ -1097,18 +1097,18 @@ packet holding the line terminator.</li>
 the crate beside the configuration. It gets <code>lorem</code>’s words
 from the configuration’s gateway node, <code>gateway-1</code>, with one
 function call,
-<code>tcslib::gateway::GatewayReceiver::receive_into</code>, which works
-out from the configuration which port they arrive at and puts each word
-in a buffer made before the loop, so that the loop allocates nothing; it
-writes out each word with one space between them, and stops when the
-terminator arrives. Before its first word it sends a CONNECT of its own,
-carrying the configuration’s checksum, with
-<code>tcslib::listening</code>, and sends it again each second until the
-vehicle answers with that checksum: a vehicle sends nothing down until
-it has taken one, and nothing else in this example sends one. It sends
-it from the configuration’s <code>tcs_cmd.send</code>, so tcsmoc cannot
-be run on the same configuration beside it; <code>-v</code> says when it
-is matched.</li>
+<code>tcslib_moc::gateway::GatewayReceiver::receive_into</code>, which
+works out from the configuration which port they arrive at and puts each
+word in a buffer made before the loop, so that the loop allocates
+nothing; it writes out each word with one space between them, and stops
+when the terminator arrives. Before its first word it sends a CONNECT of
+its own, carrying the configuration’s checksum, with
+<code>tcslib_moc::listening</code>, and sends it again each second until
+the vehicle answers with that checksum: a vehicle sends nothing down
+until it has taken one, and nothing else in this example sends one. It
+sends it from the configuration’s <code>tcs_cmd.send</code>, so tcsmoc
+cannot be run on the same configuration beside it; <code>-v</code> says
+when it is matched.</li>
 </ul>
 <pre><code>make run-simple-app</code></pre>
 <p>That checks for Python 3, builds the vehicle and the ground station,
@@ -1132,7 +1132,7 @@ one constant both programs read.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – <code>lorem_gateway</code>, on
-<code>tcslib::gateway</code>.</li>
+<code>tcslib_moc::gateway</code>.</li>
 <li>Vehicle: Rust – tcspecial, which runs the payload as its
 <code>app_pl</code> node.</li>
 <li>Payload: Python 3 – <code>lorem_pl.py</code>.</li>

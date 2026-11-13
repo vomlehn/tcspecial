@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>tcslib</title>
+  <title>tcslib-moc</title>
   <style>
     html {
       color: #1a1a1a;
@@ -169,14 +169,14 @@
   </style>
 </head>
 <body>
-<h1 id="tcslib">tcslib</h1>
-<p><strong>tcslib is the library a ground station is built on.</strong>
-It is the ground’s side of the link to a spacecraft running tcspecial:
-everything a program on the ground needs in order to command the
-vehicle, receive the vehicle’s data, and know that the vehicle is
+<h1 id="tcslib-moc">tcslib-moc</h1>
+<p><strong>tcslib-moc is the library a ground station is built
+on.</strong> It is the ground’s side of the link to a spacecraft running
+tcspecial: everything a program on the ground needs in order to command
+the vehicle, receive the vehicle’s data, and know that the vehicle is
 there.</p>
-<p>A ground station does three things with a spacecraft, and tcslib has
-one part for each:</p>
+<p>A ground station does three things with a spacecraft, and tcslib-moc
+has one part for each:</p>
 <ul>
 <li><p><strong>Commanding it.</strong> <code>TcsClient</code> sends
 commands to tcspecial’s command interpreter and returns its answers:
@@ -228,15 +228,15 @@ that cFS’s own ground system.</p></li>
 <p>The link to tcspecial is UDP, and only UDP: <code>TcsClient</code>
 sends its commands through a <code>UdpConnection</code> – on a bus, to
 the station’s peer of it, which publishes each one.</p>
-<h2 id="what-tcslib-is-not">What tcslib is not</h2>
-<p>tcslib has no windows. Showing what it receives is the job of the
+<h2 id="what-tcslib-moc-is-not">What tcslib-moc is not</h2>
+<p>tcslib-moc has no windows. Showing what it receives is the job of the
 programs built on it: <code>tcsui</code> holds the panels the ground
 programs share, and <code>tcsmoc</code> is the test ground station that
 puts them on the screen.</p>
-<p>tcslib does not define the link either. The commands, the telemetry,
-and the configuration files both ends read belong to
-<code>tcslibgs</code>, which the vehicle uses too. tcslib re-exports all
-of it, so a ground program needs only tcslib.</p>
+<p>tcslib-moc does not define the link either. The commands, the
+telemetry, and the configuration files both ends read belong to
+<code>tcslibgs</code>, which the vehicle uses too. tcslib-moc re-exports
+all of it, so a ground program needs only tcslib-moc.</p>
 <h2 id="who-uses-it">Who uses it</h2>
 <ul>
 <li><code>tcsmoc</code>, the test ground station.</li>
@@ -252,16 +252,16 @@ beforehand.</li>
 through <code>beacon</code>.</li>
 </ul>
 <h2 id="building-and-testing">Building and testing</h2>
-<pre><code>cargo build -p tcslib
-cargo test -p tcslib
-cargo doc -p tcslib --open</code></pre>
+<pre><code>cargo build -p tcslib-moc
+cargo test -p tcslib-moc
+cargo doc -p tcslib-moc --open</code></pre>
 <p><code>make</code> in this directory builds <code>README.html</code>
 from this file, and <code>make clean</code> removes it.</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a
-href="https://vomlehn.github.io/tcspecial/tcslib/README.html">This page
-as HTML</a>.</li>
+href="https://vomlehn.github.io/tcspecial/tcslib-moc/README.html">This
+page as HTML</a>.</li>
 <li><a
 href="https://vomlehn.github.io/tcspecial/tcslibgs/README.html">tcslibgs</a>,
 what the ground and the vehicle share, and <a

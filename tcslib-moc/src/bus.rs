@@ -469,7 +469,7 @@ impl Keeper {
             Due::Heartbeat => self.say(kind::HEARTBEAT, 0),
             Due::Disconnect => {
                 eprintln!(
-                    "tcslib: the SBN peer at {} has been silent for {:?}: \
+                    "tcslib-moc: the SBN peer at {} has been silent for {:?}: \
                      disconnected, and announcing to it again",
                     self.peer_at,
                     sbn::SILENCE
@@ -501,7 +501,7 @@ impl Keeper {
         }
         if self.liveness.heard(now) {
             eprintln!(
-                "tcslib: the SBN peer at {} is connected, as processor {} \
+                "tcslib-moc: the SBN peer at {} is connected, as processor {} \
                  of spacecraft {}",
                 self.peer_at, self.us.processor_id, self.us.spacecraft_id
             );
@@ -516,8 +516,8 @@ impl Keeper {
                     self.verified.store(true, Ordering::SeqCst);
                 } else {
                     eprintln!(
-                        "tcslib: the SBN peer at {} says its protocol version \
-                         is {:?}, and SBN {} speaks {}: refused",
+                        "tcslib-moc: the SBN peer at {} says its protocol \
+                         version is {:?}, and SBN {} speaks {}: refused",
                         self.peer_at,
                         &self.room[sbn::HEADER_BYTES..size],
                         self.release.name,
@@ -532,8 +532,8 @@ impl Keeper {
                 {
                     let (mut arrived, mut expected) = ([0u8; 96], [0u8; 96]);
                     eprintln!(
-                        "tcslib: the SBN peer at {} subscribed with the ident \
-                         \"{}\", and sbn.ident says \"{}\": refused",
+                        "tcslib-moc: the SBN peer at {} subscribed with the \
+                         ident \"{}\", and sbn.ident says \"{}\": refused",
                         self.peer_at,
                         sbn::ident_text(carried, &mut arrived),
                         sbn::ident_text(&self.ident, &mut expected)
@@ -610,7 +610,7 @@ impl Keeper {
         }
         if !self.verified.load(Ordering::SeqCst) {
             eprintln!(
-                "tcslib: a command was not sent: the SBN peer at {} is not \
+                "tcslib-moc: a command was not sent: the SBN peer at {} is not \
                  connected",
                 self.peer_at
             );
@@ -631,7 +631,7 @@ impl Keeper {
                 Some((_, msgid)) => *msgid,
                 None => {
                     eprintln!(
-                        "tcslib: a command about node {} was not sent: the \
+                        "tcslib-moc: a command about node {} was not sent: the \
                          configuration has no node of that id",
                         id.0
                     );

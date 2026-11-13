@@ -25,7 +25,7 @@ What there is, in the order a reader meets it:
     them, the command and telemetry messages, and the digest each end says it
     read. Every rule in this document is stated there once.
 
-``tcslib``
+``tcslib-moc``
     What a control application on the ground is built on. A mission control
     system drives a client rather than speaking the protocol itself.
 
@@ -947,7 +947,7 @@ Requirement
     in more bytes than it needs, or that does not say how many bytes follow
     it, is refused. A datum of a type with a width of its own is sent with
     no count, and between nodes nothing is counted. Ground programs that
-    read through ``tcslib::gateway::GatewayReceiver`` are given each datum
+    read through ``tcslib_moc::gateway::GatewayReceiver`` are given each datum
     without its count; Python reading a link itself takes it off with
     ``python/tcslibgs/count.py``.
 
@@ -1192,7 +1192,7 @@ its F´ model is written from the configuration by ``tcsverify
 an F´ deployment against tcspecial and tcssim, data both ways, the node
 commands and the restart -- see `F´: gateway_fprime`_. The ground's end of
 the bus is built too: tcssim simulates the cFS end, and tcslib's SBN
-transport, ``tcslib::bus``, lets tcsmoc and every station on tcslib command
+transport, ``tcslib_moc::bus``, lets tcsmoc and every station on tcslib command
 a vehicle that answers to cFS through it (see `What crosses the bus`_).
 
 The gateway nodes are written in the ``gateways`` section, linked through
@@ -1583,7 +1583,7 @@ Requirement
     build, with SBN, is the test that the wire format is SBN's and not only
     ours.
 
-    **Built** (2026-10-31). ``tcslib::bus`` holds both ground-side ends.
+    **Built** (2026-10-31). ``tcslib_moc::bus`` holds both ground-side ends.
     ``SimulatedCfs`` is the cFS end as tcssim runs it: it binds ``sbn.peer``,
     is processor ``sbn.peer_processor_id`` to the vehicle, subscribes to
     every message ID the vehicle publishes, and is a bus to the ground stations
@@ -2036,7 +2036,7 @@ Requirement
 
 Requirement
     Ground software gets a gateway node's data with a function call --
-    ``tcslib::gateway::GatewayReceiver::open`` names the node in the
+    ``tcslib_moc::gateway::GatewayReceiver::open`` names the node in the
     configuration, and ``GatewayReceiver::receive`` returns each datum with the
     name of the node that produced it -- rather than opening sockets of its own.
     One function between the configuration and the data is one place that counts
@@ -2979,7 +2979,7 @@ the second is threads, descriptors and bytes.
          a thread for each node, given its part of every stage, and the beacons. Each node has a state and a wakeup descriptor, so a
          command that disables a node reaches it while it is waiting. On the
          ground, data arrives as UDP and is taken with
-         tcslib::gateway::GatewayReceiver::receive.
+         tcslib_moc::gateway::GatewayReceiver::receive.
    :width: 100%
 
    What a configuration becomes, and what runs at once.
@@ -4685,8 +4685,8 @@ systems as follows:
    +-----------------------+  :   +---------------------------+   +-------------+
 
 On the ground, a mission's control software (such as YAMCS or MCT) is built on
-tcslib -- or on tcslib-c from C and C++, or on the Python ``tcslib`` -- to send
-commands, receive the vehicle's data and listen for its beacons. These are
+tcslib-moc -- or on tcslib-c from C and C++, or on the Python ``tcslib`` -- to
+send commands, receive the vehicle's data and listen for its beacons. These are
 shown as a single communications link, though they could be using multiple
 frequencies or channels. Both ends read the same configuration, and a beacon
 carries its digest, so each can tell when the other is reading another one.
@@ -4897,7 +4897,7 @@ and the last 32 characters that end the datagram. It is packed and
 unpacked by the code tcs-xtce generates from that document, in Rust without
 allocating and in Python; what each field must say -- the name, decimal
 digits, lower-case hex -- and turning the text into numbers and digests and
-back is ``tcslibgs::beacon``'s, which tcspecial and ``tcslib`` use, and
+back is ``tcslibgs::beacon``'s, which tcspecial and ``tcslib-moc`` use, and
 ``python/tcslibgs/beacon.py``'s; the two are held to each other by the same
 examples in their tests, and to what the hand-written packer that came
 before wrote, byte for byte. For example:
@@ -4954,7 +4954,7 @@ Requirement
     Writing a beacon allocates nothing: tcspecial's beacon thread makes one
     ``BeaconPacker`` when it starts, and every beacon is written into its
     fixed buffer of ``BEACON_BYTES``. Reading one allocates nothing either,
-    the digests being read into fixed arrays, and ``tcslib``'s tests hold a
+    the digests being read into fixed arrays, and ``tcslib-moc``'s tests hold a
     beacon pass to no allocation at all.
 
 Requirement
@@ -5049,7 +5049,7 @@ is the one it follows.
    the beacon goes fast from start, and from a restart's being initiated,
    and slows when a CONNECT carrying the running configuration's checksum
    is taken. ``tcslibgs::interface`` gives the interface digest in Rust and
-   Python, and ``tcsverify --interface-digest`` prints it. ``tcslib``'s
+   Python, and ``tcsverify --interface-digest`` prints it. ``tcslib-moc``'s
    ``TcsClient``, and through it the C/C++ library, holds nothing back after a
    RESTART, the vehicle refusing what follows it, and the beacon watches in
    Rust and Python judge a start by the beacon's number alone. Commands and
@@ -5111,7 +5111,7 @@ Replaced
 Requirement
     ``tcslibgs::link`` is the one place a command or an answer is turned
     into a packet and back, and every program goes through it: tcspecial,
-    ``tcslib`` and through it the C/C++ library and tcsmoc, and every test
+    ``tcslib-moc`` and through it the C/C++ library and tcsmoc, and every test
     that plays the other end. A ground station in Python sends CONNECT through
     ``tcslibgs.fixed``, which packs it with the code tcs-xtce generates from
     ``fixed.xtce``.
@@ -5201,7 +5201,7 @@ Requirement
 
 Requirement
     There is no generation number anywhere: not in an answer, not in the
-    state file, and not in ``tcslib``. A start is told by the beacon's
+    state file, and not in ``tcslib-moc``. A start is told by the beacon's
     restart flag, and which configuration it runs by its checksum.
 
 The fixed commands
@@ -5445,7 +5445,7 @@ Requirement
 
 Requirement
     The ground compares interface digests before it sends a command of the
-    interface: ``tcslib`` refuses to send one while the last beacon's
+    interface: ``tcslib-moc`` refuses to send one while the last beacon's
     interface digest differs from the digest of the documents the ground
     read, and says which documents and which two digests. The fixed
     commands are never refused for this, because they are how a mismatch is
@@ -5601,7 +5601,7 @@ would only check again what was checked.
 Requirement
     Every transport the link runs over checks what it carries end to end.
     UDP is sent with its checksum, over IPv4 as over IPv6: nothing in
-    tcspecial or ``tcslib`` turns it off (``SO_NO_CHECK``), and a MOC that
+    tcspecial or ``tcslib-moc`` turns it off (``SO_NO_CHECK``), and a MOC that
     sends some other way must not either.
 
 Configurations named by their checksum
@@ -5628,7 +5628,7 @@ Configurations named by their checksum
    matched only when its answer carries the station's checksum. In `On the
    ground`_, every requirement but tcsmoc's pop-ups, which are built since:
    the station's match
-   (``tcslib::matched``), data dropped and counted while not matched and
+   (``tcslib_moc::matched``), data dropped and counted while not matched and
    what is queued dropped and counted as a match begins, a match ended by a
    flagged beacon, another checksum or an overdue beacon, answers taken
    only by their sequence, the four counts (shown by tcsmoc and given by
@@ -5794,7 +5794,7 @@ Starting, and the restart flag
 Requirement
     There is no generation number. A start of tcspecial is told by its
     restart flag, and which configuration it runs by its checksum; nothing
-    in the state file, the beacon, the answers or ``tcslib`` counts starts.
+    in the state file, the beacon, the answers or ``tcslib-moc`` counts starts.
 
 Requirement
     The state file names, by checksum, the configuration the next start
@@ -5927,9 +5927,9 @@ Requirement
     began using its configuration, has its restart flag clear and carries
     that configuration's checksum, and while that beacon is recent: its
     beacon watch says the vehicle is heard from
-    (``tcslib::beacon::Stage::Heard``). A beacon gone overdue -- four times
+    (``tcslib_moc::beacon::Stage::Heard``). A beacon gone overdue -- four times
     ``beacon.default_interval`` since it arrived, which is four beacons
-    missed in a row, ``tcslib::beacon::AGING_AFTER_MISSED`` -- ends the
+    missed in a row, ``tcslib_moc::beacon::AGING_AFTER_MISSED`` -- ends the
     match as a flagged one does, and the next beacon that qualifies begins
     it again, with the drop of queued data that a match begins with. A
     station that has missed beacons cannot then go on reading as though the
@@ -5975,7 +5975,7 @@ Requirement
     configuration.
 
 Requirement
-    ``tcslib``'s ``TcsClient``, and through it the C/C++ library, refuses
+    ``tcslib-moc``'s ``TcsClient``, and through it the C/C++ library, refuses
     every command but CONNECT, RESTART_ARM and RESTART, unsent, while the
     station is not matched for commanding.
 
@@ -5983,7 +5983,7 @@ Requirement
     A datum a station sends up to a gateway node, which leaves it by its
     ``moc-out`` links to drive a payload, is held to the same match: a
     station that keeps one sends nothing up, and says so, while it is not
-    matched for commanding. ``tcslib::ping::Uplink`` is the one way up,
+    matched for commanding. ``tcslib_moc::ping::Uplink`` is the one way up,
     gated by ``Uplink::gated_by``, and the C/C++ library's ``tcs_uplink``
     is it, gated so. The ping is the exception, sent ungated by tcsmoc and
     ``tcs_pinger``: a ping node answers it whatever the configuration, and
@@ -6371,12 +6371,12 @@ Requirement
     meanwhile`_.
 
 Requirement
-    The ground takes an answer only as the answer to the command whose
-    sequence it carries. ``tcslib``'s ``TcsClient``, and through it the C/C++
-    library, waits for the answer to the command it sent, and drops and
-    counts any other that arrives first -- an answer to a command that timed
-    out, one the link repeated, or one from before a restart -- so that
-    nothing one command was answered with is read as another's
+    The ground takes an answer only as the answer to the command whose sequence
+    it carries. ``tcslib-moc``'s ``TcsClient``, and through it the C/C++
+    library, waits for the answer to the command it sent, and drops and counts
+    any other that arrives first -- an answer to a command that timed out, one
+    the link repeated, or one from before a restart -- so that nothing one
+    command was answered with is read as another's
     (``TcsClient::answers_dropped``).
 
 What that means for each command: PING and the two queries change nothing.
@@ -6552,7 +6552,7 @@ whenever the beacon it waited for was lost.
 
 Requirement
     Sending a RESTART does not, of itself, stop a ground station sending
-    anything. ``tcslib``'s ``TcsClient``, and through it the C/C++ library,
+    anything. ``tcslib-moc``'s ``TcsClient``, and through it the C/C++ library,
     sends what it is asked to once the RESTART has gone just as before it,
     subject to the match (see `On the ground`_), and a command that reaches
     the vehicle after the RESTART is answered ``Unmatched`` there and not
@@ -6635,7 +6635,7 @@ Requirement
     starts its count again.
 
 Requirement
-    ``tcslib``'s ``TcsClient``, and through it the C/C++ library, sends
+    ``tcslib-moc``'s ``TcsClient``, and through it the C/C++ library, sends
     nothing but CONNECT, RESTART_ARM and RESTART, refusing every other
     command unsent, while the station is not matched for commanding (see
     `On the ground`_): which the beacons' restart flag and checksum, and a
@@ -6830,7 +6830,7 @@ UDP may carry no checksum
     Over IPv4 a UDP checksum of nought means none was computed, and a
     receiver cannot tell from its socket that a datagram arrived unchecked.
     The requirement that every sender computes it closes this for tcspecial
-    and ``tcslib``, but not for a MOC built elsewhere that turns it off. Run
+    and ``tcslib-moc``, but not for a MOC built elsewhere that turns it off. Run
     over IPv6, where the checksum is mandatory and Linux drops a datagram
     without one, the link is closed against that too.
 
@@ -7782,7 +7782,7 @@ The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.  It is used for building control applications using mission control
 software such as YAMCS or MCT.
 
-Those operations are ``tcslib::client::TcsClient``. A control application
+Those operations are ``tcslib_moc::client::TcsClient``. A control application
 drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
@@ -9949,7 +9949,7 @@ Requirement
 Waiting for the Simulator
 -------------------------
 Implemented: the messages are ``tcslibgs::ready``, tcssim's end is
-``tcssim/src/ready.rs``, a harness waits through ``tcslib::simulator`` or
+``tcssim/src/ready.rs``, a harness waits through ``tcslib_moc::simulator`` or
 ``python/tcslib/simulator.py``, and tcsmoc and ``tcssim --wait`` are
 harnesses.
 
@@ -9987,11 +9987,10 @@ Requirement
     A request that is lost is sent again, and a repeated one does no harm.
 
 Requirement
-    The messages are defined in ``tcslibgs``, beside the commands and
-    telemetry, and a ground station waits through one function in ``tcslib``,
-    with the same function in the Python ground station's library. Every
-    harness then waits the same way, and there is one statement of what the
-    messages are.
+    The messages are defined in ``tcslibgs``, beside the commands and telemetry,
+    and a ground station waits through one function in ``tcslib-moc``, with the
+    same function in the Python ground station's library. Every harness then
+    waits the same way, and there is one statement of what the messages are.
 
 Requirement
     Tcssim makes every simulated device as it starts and keeps it until it

@@ -6,7 +6,7 @@
 //! so that a simulator left running from an earlier run is found: it holds
 //! the address, and a second one started beside it is refused rather than
 //! left to fight it for the payloads' paths. The messages are
-//! `tcslibgs::ready`, and a harness waits through `tcslib::simulator`. See
+//! `tcslibgs::ready`, and a harness waits through `tcslib_moc::simulator`. See
 //! "Waiting for the Simulator" in `docs/tcspecial-design.rst`.
 
 use std::net::{SocketAddr, UdpSocket};

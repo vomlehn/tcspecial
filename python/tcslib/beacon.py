@@ -1,6 +1,6 @@
 """Listening for a spacecraft's beacons.
 
-The Python spelling of ``tcslib/src/beacon.rs``: the half of a ground
+The Python spelling of ``tcslib-moc/src/beacon.rs``: the half of a ground
 station's beacon that is not a window. The other half, the panel, is
 ``python/tcsui/beacon_panel.py``, as it is ``tcsui`` in Rust. Everything here
 is said there first, in the same words, and ``python/tests/test_beacon.py``
@@ -55,7 +55,7 @@ STANDARD_INTERVAL = 5 * SECOND
 #: How many beacons in a row have gone missing when the steady green indicator
 #: starts to blink, when it turns yellow, and when it turns red:
 #: ``BLINKING_AFTER_MISSED``, ``AGING_AFTER_MISSED`` and
-#: ``WAITING_AFTER_MISSED`` in ``tcslib::beacon``.
+#: ``WAITING_AFTER_MISSED`` in ``tcslib_moc::beacon``.
 BLINKING_AFTER_MISSED = 2
 AGING_AFTER_MISSED = 4
 WAITING_AFTER_MISSED = 8
@@ -108,8 +108,8 @@ class Stage(enum.Enum):
         """What this stage is called where a person reads it.
 
         Returns:
-            The stage's name: ``Stage::label`` in ``tcslib::beacon``, word for
-            word.
+            The stage's name: ``Stage::label`` in ``tcslib_moc::beacon``, word
+            for word.
         """
         return {
             Stage.UNHEARD: "Unheard",
@@ -780,7 +780,7 @@ def open(config, schedule, expected):
     """Listen for a configuration's beacons, wherever they arrive: at the
     socket its beacon link states, or, for one that answers over a software
     bus, from this process's peer of the bus under ``beacon.tlm_msgid`` --
-    ``tcslib::beacon::open``.
+    ``tcslib_moc::beacon::open``.
 
     Args:
         config:   The :class:`tcslibgs.configuration.Configuration`.

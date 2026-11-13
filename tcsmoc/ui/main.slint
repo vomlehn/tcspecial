@@ -4,7 +4,7 @@ import {
 } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcsverify/ui/copy.slint";
 // The beacon's panel, shared with the other ground programs: see tcsui. What
-// it shows is worked out in Rust, from what tcslib::beacon reports.
+// it shows is worked out in Rust, from what tcslib_moc::beacon reports.
 import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
 import { PingPanel } from "../../tcsui/ui/ping.slint";
 import { Fonts } from "../../tcsui/ui/fonts.slint";
@@ -691,7 +691,7 @@ export component MainWindow inherits Window {
     callback ping-clicked();
     // Whether the configuration has a ping node the ground can reach both
     // ways, and so whether there is a Ping node button: see
-    // `tcslib::ping::route_of`. Not the PING above, which asks whether the
+    // `tcslib_moc::ping::route_of`. Not the PING above, which asks whether the
     // command link reaches the vehicle; this asks a node of the vehicle the
     // time and times the answer.
     in property <bool> can-ping-node: false;

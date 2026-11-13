@@ -1,4 +1,4 @@
-//! TCSpecial Ground Software Library (tcslib)
+//! TCSpecial Ground Software Library (tcslib-moc)
 //!
 //! This library provides a client interface for ground software to communicate
 //! with the TCSpecial command interpreter running on spacecraft.

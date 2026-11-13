@@ -1,6 +1,6 @@
 //! Window pieces shared by the ground programs, and what to show on them.
 //!
-//! The other half of [`tcslib::beacon`]. That one listens and says what is
+//! The other half of [`tcslib_moc::beacon`]. That one listens and says what is
 //! true of the spacecraft -- how stale the last beacon is, what it said, and
 //! whether anything is being heard from; this one says what that looks like:
 //! which colour the indicator is, and the two lines of text beside it.
@@ -22,13 +22,13 @@
 //! The Rust side sets its three properties from [`Shown::of`].
 //!
 //! The ping panel, `ui/ping.slint`, is the same arrangement for
-//! [`tcslib::ping`]: the markup shows seven rows, and [`PingShown::of`] says
-//! what each says.
+//! [`tcslib_moc::ping`]: the markup shows seven rows, and [`PingShown::of`]
+//! says what each says.
 
 use std::time::SystemTime;
 
 use slint::Color;
-use tcslib::beacon::{received_at, Pass, Showing, Stage};
+use tcslib_moc::beacon::{received_at, Pass, Showing, Stage};
 
 /// The colours an indicator is drawn in.
 ///
@@ -145,7 +145,7 @@ pub struct Shown {
     /// What that beacon said.
     pub message: String,
     /// Which stage the indicator is at, in words: see
-    /// [`tcslib::beacon::Stage::label`]. Read from the same reading as the
+    /// [`tcslib_moc::beacon::Stage::label`]. Read from the same reading as the
     /// colour, so the two cannot disagree.
     pub stage: String,
     /// What the field beside the indicator says of a restart:
@@ -227,7 +227,7 @@ impl Shown {
 }
 
 /// What the ping panel's rows should say: `ui/ping.slint`'s seven
-/// properties, from what [`tcslib::ping::Pinger`] keeps.
+/// properties, from what [`tcslib_moc::ping::Pinger`] keeps.
 ///
 /// All from one reading of one exchange, for the reason [`Shown`] is: a time
 /// received beside a ping it does not answer would be two accounts of one
@@ -254,8 +254,8 @@ impl PingShown {
     ///
     /// The rows' text, with the placeholder for a message not sent or not
     /// answered.
-    pub fn of(exchange: &tcslib::ping::Exchange) -> PingShown {
-        use tcslib::ping::{interval, precise_time, NO_MESSAGE};
+    pub fn of(exchange: &tcslib_moc::ping::Exchange) -> PingShown {
+        use tcslib_moc::ping::{interval, precise_time, NO_MESSAGE};
         PingShown {
             sent: exchange
                 .sent
@@ -278,7 +278,7 @@ impl PingShown {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslib::beacon::Schedule;
+    use tcslib_moc::beacon::Schedule;
 
     /// The contrast between two colours, by WCAG's relative luminance:
     /// one for the same light, twenty-one for black against white.
@@ -461,8 +461,8 @@ mod tests {
     /// come back: empty, and then each in the words the Python shows.
     #[test]
     fn the_ping_panel_says_what_the_exchange_is() {
-        use tcslib::node::vehicle::ping;
-        use tcslib::ping::{Exchange, Pinger};
+        use tcslib_moc::node::vehicle::ping;
+        use tcslib_moc::ping::{Exchange, Pinger};
 
         // Before anything, each field shows its placeholder, in the shape of
         // what will be there: the markup's own defaults.

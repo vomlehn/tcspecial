@@ -11,7 +11,7 @@
 //     import { PingPanel } from "../../tcsui/ui/ping.slint";
 //
 // Nothing is computed here. What each row says is worked out in Rust, from
-// what `tcslib::ping` keeps, and set as properties: see the crate's
+// what `tcslib_moc::ping` keeps, and set as properties: see the crate's
 // `PingShown`.
 import { Button } from "std-widgets.slint";
 import { TitledBox } from "titled.slint";
@@ -29,7 +29,7 @@ component Value inherits Text {
 
 export component PingPanel inherits TitledBox {
     // The last ping sent, as it went, and when, to the nanosecond. Each says
-    // what tcslib::ping says for nothing yet until there is something.
+    // what tcslib_moc::ping says for nothing yet until there is something.
     in property <string> sent: "<none>";
     in property <string> sent-time: "--:--:--.---------";
     // The last thing received from the ping node, and when the answer to the

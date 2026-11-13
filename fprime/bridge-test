@@ -12,8 +12,8 @@
 # first. `make test` in fprime/ runs this with the right arguments.
 #
 # Started in the order a test harness starts a run (see "Waiting for the
-# Simulator" in docs/tcspecial-design.rst): tcs-sim, which is waited for until it
-# has made its simulated devices; tcspecial on the configuration,
+# Simulator" in docs/tcspecial-design.rst): tcs-sim, which is waited for until
+# it has made its simulated devices; tcspecial on the configuration,
 # --simulate=all; and F´'s ground system. Then pytest, with F´'s test API,
 # starts BridgeTest, which opens the same configuration and connects to the
 # ground system, and holds the bridge to what docs/tcspecial-design.rst asks of

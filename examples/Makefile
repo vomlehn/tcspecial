@@ -55,12 +55,12 @@ help:
 		"playing the F´ bridge"
 	@echo "  make run-cfs         - Run tcs-moc on the cfs example," \
 		"tcs-sim simulating the cFS end"
-	@echo "  make run-can         - Run tcs-moc on the can example, on the" \
-		"kernel's virtual CAN bus"
-	@echo "  make run-gpio        - Run tcs-moc on the gpio example, on the" \
-		"kernel's gpio-sim chip"
-	@echo "  make run-iio         - Run tcs-moc on the iio example, on the" \
-		"kernel's iio_dummy sensor"
+	@echo "  make run-can         - Run tcs-moc on the can example, on" \
+		"the kernel's virtual CAN bus"
+	@echo "  make run-gpio        - Run tcs-moc on the gpio example, on" \
+		"the kernel's gpio-sim chip"
+	@echo "  make run-iio         - Run tcs-moc on the iio example, on" \
+		"the kernel's iio_dummy sensor"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's" \
 		"payload needs"
 	@echo "  make check-tkinter   - Check for the tkinter the ping" \

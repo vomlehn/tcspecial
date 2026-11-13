@@ -2332,9 +2332,9 @@ def ambient(path, tcs_verify=None):
     ``None`` is not a failure. A run whose world states none shows none.
 
     Args:
-        path:      The configuration file.
-        tcs-verify: The tcs-verify program to run, or ``None`` to find one with
-                   :func:`find_tcs_verify`.
+        path:       The configuration file.
+        tcs_verify: The tcs-verify program to run, or ``None`` to find one
+                    with :func:`find_tcs_verify`.
 
     Returns:
         A pair: the temperature and ``None``; or ``None`` and the reason it
@@ -2361,9 +2361,9 @@ def write_own_xtce(path, tcs_verify=None):
     as a test makes one; a shipped configuration's is committed beside it.
 
     Args:
-        path:      The configuration file.
-        tcs-verify: The tcs-verify program to run, or ``None`` to find one with
-                   :func:`find_tcs_verify`.
+        path:       The configuration file.
+        tcs_verify: The tcs-verify program to run, or ``None`` to find one
+                    with :func:`find_tcs_verify`.
 
     Returns:
         A pair: ``True`` and ``None``; or ``False`` and the reason it was
@@ -2392,9 +2392,9 @@ def digest(path, tcs_verify=None):
     so rather than claiming every beacon agrees.
 
     Args:
-        path:      The configuration file.
-        tcs-verify: The tcs-verify program to run, or ``None`` to find one with
-                   :func:`find_tcs_verify`.
+        path:       The configuration file.
+        tcs_verify: The tcs-verify program to run, or ``None`` to find one
+                    with :func:`find_tcs_verify`.
 
     Returns:
         A pair: the digest, as thirty-two hex digits, and ``None``; or

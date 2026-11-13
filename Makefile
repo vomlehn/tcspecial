@@ -1092,8 +1092,9 @@ install-tcspecial-test: tcs-helpers
 		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-test.sh; \
 	fi
 
-# Install tcs-gui's data -- the description tree and its schemas -- and the XTCS,
-# YTCS and simulator schemas of tcslib-protocol/schema, under $(SCHEMADIR).
+# Install tcs-gui's data -- the description tree and its schemas -- and the
+# XTCS, YTCS and simulator schemas of tcslib-protocol/schema, under
+# $(SCHEMADIR).
 #
 # The whole of tcs-gui/share, with its structure: the description tree's shape
 # is part of what it means -- a description at vehicle/compute/vote.yaml is

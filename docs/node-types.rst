@@ -72,9 +72,9 @@ crates:
 ``tcslib_protocol::node``
     Its attributes, and every rule about what a configuration may say about it.
     tcslib-protocol is shared by the ground and the vehicle, so a rule written
-    here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all apply,
-    and they all report it alike. A rule about what a configuration may say
-    belongs here and nowhere else.
+    here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all
+    apply, and they all report it alike. A rule about what a configuration may
+    say belongs here and nowhere else.
 
 ``tcspecial::node``
     The flight side: opening the device, reading and writing it.
@@ -339,8 +339,8 @@ its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
 string or bytes must be XTCE's, so ``Telemetered::count`` must give it
 ``Count::Xtce``. The Python ground lists gateway types by hand, in
 ``GATEWAY_BASES`` and ``ON_BUS`` in ``python/tcslib_protocol/configuration.py``.
-Its description in tcs-gui is at the top of ``tcs-gui/share/nodes/``, and since it
-has no node module, it is one of the exemptions in
+Its description in tcs-gui is at the top of ``tcs-gui/share/nodes/``, and since
+it has no node module, it is one of the exemptions in
 ``every_description_has_its_rust`` in ``tcs-gui/src/nodes.rs``.
 
 The Editor and the Schemas

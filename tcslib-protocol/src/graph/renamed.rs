@@ -13,6 +13,13 @@
 //! with them. A sink lists names, a link is written to one, and a file in the
 //! old words is told both.
 //!
+//! Then the programs: tcsgui and tcssim became tcs-gui and tcs-sim, a hyphen
+//! after `tcs` for every program and library that neither flies nor is a
+//! library a station or the vehicle runs on, so the sections named for them
+//! were renamed too. A configuration has a `tcs-gui` section; a simulator
+//! file has that and a `tcs-sim` section, and is held to its own list,
+//! [`SIMULATOR_RENAMED`], since nothing else a configuration renamed is in it.
+//!
 //! A file still written in the old words is refused here, by line, and told
 //! the word to write instead. Refused rather than read as before, because one
 //! word for two things is what the rename was for, and a reader that took
@@ -136,20 +143,49 @@ const RENAMED: &[Renamed] = &[
         new: "app-gateway-arg",
         then: "",
     },
+    // Named for the configuration editor, whose name has a hyphen now.
+    Renamed {
+        old: "tcsgui",
+        place: Place::Section,
+        new: "tcs-gui",
+        then: "",
+    },
+];
+
+/// Every word a simulator file used to say, and the word it is now: the
+/// sections named for the two programs that read it, renamed with them.
+const SIMULATOR_RENAMED: &[Renamed] = &[
+    Renamed {
+        old: "tcsgui",
+        place: Place::Section,
+        new: "tcs-gui",
+        then: "",
+    },
+    Renamed {
+        old: "tcssim",
+        place: Place::Section,
+        new: "tcs-sim",
+        then: "",
+    },
 ];
 
 /// The renamed word, if any, a word in this place is.
 ///
 /// # Arguments
 ///
+/// * `table` - The words renamed in this kind of file.
 /// * `place` - Where the word was written.
 /// * `word`  - The word.
 ///
 /// # Returns
 ///
 /// The entry for it, or `None` for a word that was never renamed.
-fn renamed(place: Place, word: &str) -> Option<&'static Renamed> {
-    RENAMED.iter().find(|r| r.place == place && r.old == word)
+fn renamed(
+    table: &'static [Renamed],
+    place: Place,
+    word: &str,
+) -> Option<&'static Renamed> {
+    table.iter().find(|r| r.place == place && r.old == word)
 }
 
 /// Says what a file must call something it still calls by its old name.
@@ -165,9 +201,49 @@ fn renamed(place: Place, word: &str) -> Option<&'static Renamed> {
 /// word to write instead; or `None` for a file that writes none of them, or
 /// that does not parse, which the parser has its own words for.
 pub fn refused(text: &str, format: ConfigFormat) -> Option<String> {
+    refused_from(text, format, RENAMED)
+}
+
+/// Says what a simulator file must call a section it still calls by its old
+/// name.
+///
+/// # Arguments
+///
+/// * `text`   - The file's text.
+/// * `format` - What it is written in.
+///
+/// # Returns
+///
+/// A sentence naming the line the first old section is on, the section, and
+/// its name now; or `None` for a file that has none of them, or that does
+/// not parse.
+pub fn refused_in_simulator(
+    text: &str,
+    format: ConfigFormat,
+) -> Option<String> {
+    refused_from(text, format, SIMULATOR_RENAMED)
+}
+
+/// Says what a file must call the first thing it calls by an old name.
+///
+/// # Arguments
+///
+/// * `text`   - The file's text.
+/// * `format` - What it is written in.
+/// * `table`  - The words renamed in this kind of file.
+///
+/// # Returns
+///
+/// A sentence naming the line, the old word, and the word to write instead;
+/// or `None` for a file that writes none of them, or that does not parse.
+fn refused_from(
+    text: &str,
+    format: ConfigFormat,
+    table: &'static [Renamed],
+) -> Option<String> {
     let (line, said) = match format {
-        ConfigFormat::Yaml => in_yaml(text),
-        ConfigFormat::Xml => in_xml(text),
+        ConfigFormat::Yaml => in_yaml(text, table),
+        ConfigFormat::Xml => in_xml(text, table),
     }?;
     let what = match said.place {
         Place::Section => format!("the {} section", said.old),
@@ -184,19 +260,23 @@ pub fn refused(text: &str, format: ConfigFormat) -> Option<String> {
 ///
 /// # Arguments
 ///
-/// * `text` - The file's text.
+/// * `text`  - The file's text.
+/// * `table` - The words renamed in this kind of file.
 ///
 /// # Returns
 ///
 /// The line, from 1, and the word; or `None` where there is none or the
 /// text is not YAML.
-fn in_yaml(text: &str) -> Option<(usize, &'static Renamed)> {
+fn in_yaml(
+    text: &str,
+    table: &'static [Renamed],
+) -> Option<(usize, &'static Renamed)> {
     let file: serde_norway::Value = serde_norway::from_str(text).ok()?;
     let sections = file.as_mapping()?;
     let mut found: Vec<&'static Renamed> = Vec::new();
     for (key, value) in sections {
         if let Some(said) =
-            key.as_str().and_then(|k| renamed(Place::Section, k))
+            key.as_str().and_then(|k| renamed(table, Place::Section, k))
         {
             found.push(said);
         }
@@ -207,15 +287,17 @@ fn in_yaml(text: &str) -> Option<(usize, &'static Renamed)> {
         for entry in entries.filter_map(serde_norway::Value::as_mapping) {
             for (key, nodes) in entry {
                 let typed = key.as_str().and_then(|k| k.strip_prefix("type "));
-                if let Some(said) =
-                    typed.and_then(|t| renamed(Place::NodeType, t.trim()))
+                if let Some(said) = typed
+                    .and_then(|t| renamed(table, Place::NodeType, t.trim()))
                 {
                     found.push(said);
                 }
                 let nodes = nodes.as_sequence().into_iter().flatten();
                 for node in nodes.filter_map(serde_norway::Value::as_mapping) {
                     let keys = node.keys().filter_map(|key| key.as_str());
-                    found.extend(keys.filter_map(|k| renamed(Place::Key, k)));
+                    found.extend(
+                        keys.filter_map(|k| renamed(table, Place::Key, k)),
+                    );
                 }
             }
         }
@@ -356,13 +438,17 @@ fn keys(line: &str) -> impl Iterator<Item = &str> {
 ///
 /// # Arguments
 ///
-/// * `text` - The file's text.
+/// * `text`  - The file's text.
+/// * `table` - The words renamed in this kind of file.
 ///
 /// # Returns
 ///
 /// The line, from 1, and the word; or `None` where there is none or the
 /// text is not well-formed XML.
-fn in_xml(text: &str) -> Option<(usize, &'static Renamed)> {
+fn in_xml(
+    text: &str,
+    table: &'static [Renamed],
+) -> Option<(usize, &'static Renamed)> {
     let mut reader = quick_xml::Reader::from_str(text);
     reader.config_mut().trim_text(true);
     let line_at = |at: u64| {
@@ -383,17 +469,21 @@ fn in_xml(text: &str) -> Option<(usize, &'static Renamed)> {
         let element = |tag: &quick_xml::events::BytesStart, depth: usize| {
             let name = tag.name().as_ref().to_string();
             match depth {
-                2 => renamed(Place::Section, &name),
+                2 => renamed(table, Place::Section, &name),
                 3 if name == "type" => {
                     tag.attributes().flatten().find_map(|attribute| {
                         (attribute.key.as_ref() == "name")
                             .then(|| {
-                                renamed(Place::NodeType, attribute.value.trim())
+                                renamed(
+                                    table,
+                                    Place::NodeType,
+                                    attribute.value.trim(),
+                                )
                             })
                             .flatten()
                     })
                 }
-                5 => renamed(Place::Key, &name),
+                5 => renamed(table, Place::Key, &name),
                 _ => None,
             }
         };
@@ -727,6 +817,55 @@ mod tests {
         assert_eq!(asked, 2 * RENAMED.len());
     }
 
+    /// A simulator file is held to its own list: a section named for a
+    /// program by its old name is refused, in both spellings, at its line,
+    /// and told the name now; and a simulator file that is read is read
+    /// through the same refusal.
+    #[test]
+    fn a_simulator_file_with_an_old_section_is_told_the_new_one() {
+        for said in SIMULATOR_RENAMED {
+            let yaml = format!(
+                "description: a file\n{}:\n  ready: \"127.0.0.1:7900\"\n",
+                said.old
+            );
+            let told = format!(
+                "at line 2, the {} section is called {} now: rename it",
+                said.old, said.new
+            );
+            assert_eq!(
+                refused_in_simulator(&yaml, ConfigFormat::Yaml),
+                Some(told.clone())
+            );
+            let why = crate::sim_config::SimConfigFile::parse(
+                &yaml,
+                ConfigFormat::Yaml,
+            )
+            .expect_err("an old section is refused")
+            .to_string();
+            assert!(why.contains(&told), "{why}");
+
+            let xml = format!(
+                "<simulator>\n<description>a file</description>\n\
+                 <{0}><ready>127.0.0.1:7900</ready></{0}>\n</simulator>\n",
+                said.old
+            );
+            assert_eq!(
+                refused_in_simulator(&xml, ConfigFormat::Xml),
+                Some(told.replace("line 2", "line 3"))
+            );
+        }
+    }
+
+    /// A simulator file in the new names is taken, and so is a configuration
+    /// word that was never a simulator file's.
+    #[test]
+    fn a_simulator_file_in_the_new_names_is_taken() {
+        let yaml =
+            "description: a file\ntcs-sim:\n  ready: \"127.0.0.1:7900\"\n\
+                    tcs-gui:\n  nodes: []\nmoc: []\n";
+        assert_eq!(refused_in_simulator(yaml, ConfigFormat::Yaml), None);
+    }
+
     /// The piece of a file that writes an old word, as the two helpers below
     /// write it.
     ///
@@ -760,7 +899,15 @@ mod tests {
     /// The file's text.
     fn yaml_with_old(said: &Renamed) -> String {
         match said.place {
-            Place::Section => yaml_with("gateways:\n", "moc:\n"),
+            Place::Section if said.new == "gateways" => {
+                yaml_with("gateways:\n", "moc:\n")
+            }
+            // A section that was renamed and kept its place: written last.
+            Place::Section => format!(
+                "{}{}:\n  nodes: []\n",
+                yaml_with("description", "description"),
+                said.old
+            ),
             Place::NodeType => yaml_with(
                 &format!("type {}:", said.new),
                 &format!("type {}:", said.old),
@@ -782,7 +929,13 @@ mod tests {
     /// The file's text.
     fn xml_with_old(said: &Renamed) -> String {
         match said.place {
-            Place::Section => xml_with("gateways>", "moc>"),
+            Place::Section if said.new == "gateways" => {
+                xml_with("gateways>", "moc>")
+            }
+            Place::Section => xml_with(
+                "</configuration>",
+                &format!("<{0}></{0}>\n</configuration>", said.old),
+            ),
             Place::NodeType => xml_with(
                 &format!("<type name=\"{}\">", said.new),
                 &format!("<type name=\"{}\">", said.old),

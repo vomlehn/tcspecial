@@ -502,8 +502,8 @@ example needs no dummy device, no sudo and no hardware. Flown, the buses and
 the chip are opened. The buses themselves are flown against simulated devices
 by `make simulated-devices-test`, with `tests/manual/thermostat.ytcs`.
 
-tcs-sim joins the simulated payloads to the vehicle's physics model, in the world
-section of `thermostat-sim.yaml`, a link to
+tcs-sim joins the simulated payloads to the vehicle's physics model, in the
+world section of `thermostat-sim.yaml`, a link to
 `thermostat-common/thermostat-sim.yaml`, which thermostat-yamcs's simulator
 file is a link to too: a zone with two heaters of its own, four watts each,
 `heater_1_power` and `heater_2_power`. All three sensors are joined to

@@ -486,9 +486,9 @@ dependencies = [
  "libc",
  "slint",
  "slint-build",
+ "tcs-ui",
  "tcslib-moc",
  "tcslib-protocol",
- "tcsui",
 ]
 
 [[package]]
@@ -4830,31 +4830,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcs-xtce"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd7333d5769eef1ae25acb24f165558a227e00f69477df5db20004524810501b"
-dependencies = [
- "bnum",
-]
-
-[[package]]
-name = "tcsapp"
-version = "0.1.0"
-dependencies = [
- "libc",
- "tempfile",
-]
-
-[[package]]
-name = "tcsdiagram"
+name = "tcs-diagram"
 version = "0.1.0"
 dependencies = [
  "tcslib-protocol",
 ]
 
 [[package]]
-name = "tcsgui"
+name = "tcs-gui"
 version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
@@ -4871,9 +4854,80 @@ dependencies = [
  "similar",
  "slint",
  "slint-build",
- "tcsdiagram",
+ "tcs-diagram",
+ "tcs-verify",
  "tcslib-protocol",
- "tcsverify",
+ "tempfile",
+]
+
+[[package]]
+name = "tcs-moc"
+version = "0.1.0"
+dependencies = [
+ "i-slint-backend-testing",
+ "libc",
+ "png",
+ "serde",
+ "slint",
+ "slint-build",
+ "tcs-ui",
+ "tcs-verify",
+ "tcslib-moc",
+ "tcslib-protocol",
+ "tcspecial",
+ "tempfile",
+]
+
+[[package]]
+name = "tcs-sim"
+version = "0.1.0"
+dependencies = [
+ "i-slint-backend-testing",
+ "libc",
+ "png",
+ "rand",
+ "rand_distr",
+ "serde",
+ "signal-hook",
+ "slint",
+ "slint-build",
+ "tcs-verify",
+ "tcslib-moc",
+ "tcslib-protocol",
+ "tempfile",
+]
+
+[[package]]
+name = "tcs-ui"
+version = "0.1.0"
+dependencies = [
+ "slint",
+ "tcslib-moc",
+]
+
+[[package]]
+name = "tcs-verify"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tcslib-protocol",
+ "tempfile",
+]
+
+[[package]]
+name = "tcs-xtce"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd7333d5769eef1ae25acb24f165558a227e00f69477df5db20004524810501b"
+dependencies = [
+ "bnum",
+]
+
+[[package]]
+name = "tcsapp"
+version = "0.1.0"
+dependencies = [
+ "libc",
  "tempfile",
 ]
 
@@ -4923,24 +4977,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcsmoc"
-version = "0.1.0"
-dependencies = [
- "i-slint-backend-testing",
- "libc",
- "png",
- "serde",
- "slint",
- "slint-build",
- "tcslib-moc",
- "tcslib-protocol",
- "tcspecial",
- "tcsui",
- "tcsverify",
- "tempfile",
-]
-
-[[package]]
 name = "tcspecial"
 version = "0.1.0"
 dependencies = [
@@ -4952,50 +4988,14 @@ dependencies = [
  "slint",
  "slint-build",
  "socket2",
+ "tcs-diagram",
+ "tcs-verify",
  "tcsapp",
- "tcsdiagram",
  "tcslib-moc",
  "tcslib-protocol",
  "tcslog",
- "tcsverify",
  "tempfile",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "tcssim"
-version = "0.1.0"
-dependencies = [
- "i-slint-backend-testing",
- "libc",
- "png",
- "rand",
- "rand_distr",
- "serde",
- "signal-hook",
- "slint",
- "slint-build",
- "tcslib-moc",
- "tcslib-protocol",
- "tcsverify",
- "tempfile",
-]
-
-[[package]]
-name = "tcsui"
-version = "0.1.0"
-dependencies = [
- "slint",
- "tcslib-moc",
-]
-
-[[package]]
-name = "tcsverify"
-version = "0.1.0"
-dependencies = [
- "serde_json",
- "tcslib-protocol",
- "tempfile",
 ]
 
 [[package]]

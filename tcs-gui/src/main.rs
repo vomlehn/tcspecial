@@ -822,8 +822,8 @@ fn main() -> Result<(), slint::PlatformError> {
              to end in \".yaml\""
         );
         eprintln!(
-            "tcs-gui: -r, --read-only or --readonly opens the files to look at: \
-             nothing in them can be changed and nothing is written"
+            "tcs-gui: -r, --read-only or --readonly opens the files to look \
+             at: nothing in them can be changed and nothing is written"
         );
         std::process::exit(2);
     });

@@ -613,8 +613,8 @@ Requirement
     one of a pair is how the two come to describe different sets, which is
     reported rather than run -- every data handler of the tcspecial
     configuration must have a simulated payload naming it -- but it is reported
-    by tcs-sim, after tcs-moc has already come up, which makes it a confusing way
-    to find out.
+    by tcs-sim, after tcs-moc has already come up, which makes it a confusing
+    way to find out.
 
 The sets live under ``tests/manual`` rather than at the repository root
 because running one is something a person does at a terminal: each opens
@@ -884,8 +884,8 @@ Requirement
     every command passes, so a press that forgot to record one cannot
     happen.
 
-Testing requires starting up tcs-sim before other operations and shutting it down
-when tcs-moc is halted.
+Testing requires starting up tcs-sim before other operations and shutting it
+down when tcs-moc is halted.
 
 See Also
 ========

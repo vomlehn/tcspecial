@@ -5,8 +5,8 @@
 //! `tcslib_protocol::node::vehicle::ping`, which is what a ping and its answer
 //! say. This is the ground's half of the exchange, as [`crate::beacon`] is the
 //! ground's half of a beacon, and with no window in it for the same reason:
-//! tcs-moc shows it in a panel, and a program with no screen -- a test, a logger
-//! -- wants it without a toolkit.
+//! tcs-moc shows it in a panel, and a program with no screen -- a test, a
+//! logger -- wants it without a toolkit.
 //!
 //! Three pieces:
 //!

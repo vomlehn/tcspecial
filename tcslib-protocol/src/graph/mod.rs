@@ -278,7 +278,7 @@ pub struct GraphFile {
     /// person who arranges a diagram expects the arrangement to survive being
     /// closed, two people reading one configuration should see one drawing,
     /// and a second file to keep in step is a second file to lose.
-    #[serde(default)]
+    #[serde(default, rename = "tcs-gui")]
     pub tcs_gui: Option<TcsGui>,
     /// The sections a configuration file used to have, kept to be refused.
     ///

@@ -72,6 +72,7 @@ mod shots;
 
 use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
+use tcs_verify::startup::Startup;
 use tcslib_protocol::graph::Graph;
 use tcslib_protocol::node::physics::Resolution;
 use tcslib_protocol::ready::SetUpFor;
@@ -79,7 +80,6 @@ use tcslib_protocol::simulate::{
     counted, disagreement, judge, refusals, Host, Judged, Mode, Verdict,
 };
 use tcslib_protocol::{ResolvedSim, SimConfigFile};
-use tcs_verify::startup::Startup;
 
 slint::include_modules!();
 

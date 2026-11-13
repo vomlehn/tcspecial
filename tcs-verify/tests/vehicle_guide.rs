@@ -15,8 +15,8 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::graph::Graph;
 use tcs_verify::verify;
+use tcslib_protocol::graph::Graph;
 
 /// The directory the guide's stages are in.
 ///
@@ -68,7 +68,8 @@ fn every_stage_verifies() {
             sim.display()
         );
 
-        let report = verify(&config, Some(&sim), tcs_verify::Limits::EVERYTHING);
+        let report =
+            verify(&config, Some(&sim), tcs_verify::Limits::EVERYTHING);
         let findings: Vec<String> =
             report.findings.iter().map(|f| f.to_string()).collect();
         assert!(

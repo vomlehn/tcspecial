@@ -12,9 +12,9 @@ this with the right arguments.
 One configuration with a payload of each type, written into the run
 directory, since a simulated device's path is there: a device file, a serial
 line, a serial line that is an RS-485 bus, a SPI peripheral, an rpmsg channel
-and an IIO buffer, each a file or pseudo-terminal tcs-sim makes, and an HDLC line
-reached at its sim_address over UDP. A CAN payload is added where a virtual CAN
-bus is up, and a GPIO payload where a gpio-sim chip is there for this user
+and an IIO buffer, each a file or pseudo-terminal tcs-sim makes, and an HDLC
+line reached at its sim_address over UDP. A CAN payload is added where a virtual
+CAN bus is up, and a GPIO payload where a gpio-sim chip is there for this user
 to use; neither is made here, since both need root (see bin/mkvcan and
 bin/mkgpio), and the run says which it left out and why.
 

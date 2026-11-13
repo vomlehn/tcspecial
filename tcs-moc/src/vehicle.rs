@@ -44,6 +44,8 @@ use std::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
+use tcs_ui::PingShown;
+use tcs_verify::startup::Startup;
 use tcslib_moc::gateway::GatewayReceiver;
 use tcslib_moc::gateway::DATUM_BYTES;
 use tcslib_moc::matched::Matched;
@@ -58,8 +60,6 @@ use tcslib_protocol::sim_config::SimConfigFile;
 use tcslib_protocol::simulate::Mode;
 use tcslib_protocol::unit::Unit;
 use tcslib_protocol::{DHSample, Timestamp};
-use tcs_ui::PingShown;
-use tcs_verify::startup::Startup;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
@@ -847,7 +847,7 @@ const WAIT_FOR_SIMULATOR: std::time::Duration =
 /// * `payload_path` - The configuration's path, for tcs-sim and for messages.
 /// * `sim_path`     - The simulator file's path, if the set has one.
 /// * `mode`         - The run's simulation mode.
-/// * `pm_tcs_sim`    - What starts tcs-sim, and is asked whether it has
+/// * `pm_tcs_sim`   - What starts tcs-sim, and is asked whether it has
 ///                    exited.
 ///
 /// # Errors
@@ -4809,7 +4809,8 @@ vehicle:
         );
     }
 
-    /// tcs-sim is started only for a configuration it has something to simulate.
+    /// tcs-sim is started only for a configuration it has something to
+    /// simulate.
     #[test]
     fn the_simulator_is_started_only_with_something_to_simulate() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");

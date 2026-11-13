@@ -365,9 +365,9 @@ pub fn verify(
 ///
 /// Each node of a type `built` leaves out is reported as that tcspecial would
 /// refuse it, in the same words: see [`tcslib_protocol::graph::built`].
-/// Tcspecial asks this with the types it was built with, and tcs-verify with the
-/// types `--types` names, so a configuration can be held to a vehicle's build
-/// on the ground. [`verify`] is this with every type.
+/// Tcspecial asks this with the types it was built with, and tcs-verify with
+/// the types `--types` names, so a configuration can be held to a vehicle's
+/// build on the ground. [`verify`] is this with every type.
 ///
 /// # Arguments
 ///
@@ -976,8 +976,8 @@ fn check_graph(
 /// payloads if the configuration read.
 ///
 /// By name first: see `tcslib_protocol::SimConfigFile::problems_by_name`. Then,
-/// where the names are all right, what tcs-sim and tcs-moc ask before starting a
-/// simulator, `tcslib_protocol::graph::simulated::handlers`, and what tcs-sim
+/// where the names are all right, what tcs-sim and tcs-moc ask before starting
+/// a simulator, `tcslib_protocol::graph::simulated::handlers`, and what tcs-sim
 /// asks of each payload's settings against its handler,
 /// `tcslib_protocol::SimConfigFile::problems`: a file that passed here and was
 /// refused there would be a verifier saying yes to a run that fails.

@@ -109,8 +109,8 @@ def wait(at, ours, patience):
             raise NotReady(
                 "silent",
                 f"nothing answered at {at[0]}:{at[1]} in {waited:.1f} s: "
-                "tcs-sim is not running, or tcs_sim.ready in the simulator file "
-                "is not where it is",
+                "tcs-sim is not running, or tcs-sim.ready in the simulator "
+                "file is not where it is",
             )
         answer = ask(at, left)
         if answer is None:

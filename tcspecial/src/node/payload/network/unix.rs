@@ -610,8 +610,8 @@ mod tests {
             "it wrote somewhere without having been written to"
         );
 
-        // Playing tcs-sim: the device binds a path of its own, so that it can be
-        // answered, and speaks first.
+        // Playing tcs-sim: the device binds a path of its own, so that it can
+        // be answered, and speaks first.
         let device =
             UnixDatagram::bind(&device_path).expect("the device binds");
         device
@@ -652,8 +652,8 @@ mod tests {
         let device_path = a_path("driven-device");
         std::fs::remove_file(&device_path).ok();
 
-        // The device, playing tcs-sim: it binds the path the configuration names
-        // and waits to be driven, saying nothing.
+        // The device, playing tcs-sim: it binds the path the configuration
+        // names and waits to be driven, saying nothing.
         let device =
             UnixDatagram::bind(&device_path).expect("the device binds");
 

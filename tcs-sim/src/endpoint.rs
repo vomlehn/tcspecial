@@ -82,8 +82,8 @@ pub fn payload_config_attached(
             // A payload of a type the operating system has no dummy device
             // for, whose node gives a sim_address: tcspecial reaches it over
             // UDP there when the run simulates, which is the only kind of run
-            // tcs-sim takes part in, so the simulator is a UDP payload there, by
-            // the same rule of which end speaks first. See
+            // tcs-sim takes part in, so the simulator is a UDP payload there,
+            // by the same rule of which end speaks first. See
             // `tcslib_protocol::graph::reach::Reach::opened`.
             // Discrete lines whose node gives a sim_address: tcs-sim answers
             // for them there, in the lines' own datagrams rather than as a

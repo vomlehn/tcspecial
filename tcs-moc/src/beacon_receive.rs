@@ -23,9 +23,9 @@ use std::thread;
 
 use slint::{SharedString, Weak};
 
+use tcs_ui::Shown;
 use tcslib_moc::beacon::{Arrived, Beacons, Contact};
 use tcslib_moc::matched::Matched;
-use tcs_ui::Shown;
 
 use crate::MainWindow;
 

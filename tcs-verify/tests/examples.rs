@@ -10,8 +10,8 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::graph::Graph;
 use tcs_verify::verify;
+use tcslib_protocol::graph::Graph;
 
 const SIM_SUFFIX: &str = "-sim.yaml";
 
@@ -156,8 +156,9 @@ fn every_shipped_configuration_names_this_builds_interface() {
     for path in &files {
         let text = std::fs::read_to_string(path).expect("it reads");
         let xml = path.extension().is_some_and(|e| e == "xtcs");
-        let (_, set) = tcs_verify::set_interface::set_in_text(&text, xml, &ours)
-            .unwrap_or_else(|why| panic!("{}: {why}", path.display()));
+        let (_, set) =
+            tcs_verify::set_interface::set_in_text(&text, xml, &ours)
+                .unwrap_or_else(|why| panic!("{}: {why}", path.display()));
         if set != tcs_verify::set_interface::Set::Already {
             stale.push(path.display().to_string());
         }
@@ -166,7 +167,8 @@ fn every_shipped_configuration_names_this_builds_interface() {
     assert!(
         stale.is_empty(),
         "these do not name this build's interface, {ours}: run `make \
-         set-interfaces` (tcs-verify --set-interface) and commit them: {stale:?}"
+         set-interfaces` (tcs-verify --set-interface) and commit them: \
+         {stale:?}"
     );
 }
 
@@ -224,7 +226,8 @@ fn every_example_verifies() {
             sim.display()
         );
 
-        let report = verify(&config, Some(&sim), tcs_verify::Limits::EVERYTHING);
+        let report =
+            verify(&config, Some(&sim), tcs_verify::Limits::EVERYTHING);
         let findings: Vec<String> =
             report.findings.iter().map(|f| f.to_string()).collect();
         assert!(

@@ -2,7 +2,7 @@
 
 The Python spelling of ``tcslib-protocol/src/ready.rs``, in the same words: a
 harness sends a request carrying a sequence number to the address the simulator
-file states as ``tcs_sim.ready``, and tcs-sim answers with the same number, its
+file states as ``tcs-sim.ready``, and tcs-sim answers with the same number, its
 state -- starting, ready or failed -- what it is set up for, and why it failed
 where it did. Both messages are fixed in size and big-endian.
 """

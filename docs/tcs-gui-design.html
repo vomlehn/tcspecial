@@ -1585,9 +1585,9 @@ button anywhere else on the page selects nothing, and closes whatever menu was
 open. A line is a <tt class="docutils literal">Path</tt>, and a press on a path is not reported, so the press
 goes to the page underneath, which asks which line runs within a few pixels of
 the point, by the line's points rather than its drawing: see
-<tt class="docutils literal"><span class="pre">tcs_diagram::route::distance_to</span></tt>. Only the document's lines are found, not the
-ones an edge draws to a node nothing joins outside yet, there being no line to
-take out. A selected line is kept by what it joins rather than where it is in
+<tt class="docutils literal"><span class="pre">tcs_diagram::route::distance_to</span></tt>. Only the document's lines are found, not
+the ones an edge draws to a node nothing joins outside yet, there being no line
+to take out. A selected line is kept by what it joins rather than where it is in
 the page's list, so an edit elsewhere that redraws the page keeps it selected,
 and one that takes it away selects nothing.</p>
 <p>&quot;Stayed put&quot; is within three pixels, not exactly nowhere. The test was that
@@ -2505,8 +2505,8 @@ of that schema is shipped for a file written by hand.</p>
 the file, in the same way the <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section is.</p>
 <p>A schema nothing is checked against is worse than no schema: it refuses files
 the software accepts, or accepts what the software refuses, and either way the
-person believes the schema. So <tt class="docutils literal"><span class="pre">tcs-gui/tests/schema.rs</span></tt> holds each against the
-lists the software itself reads from -- the section's parameters from
+person believes the schema. So <tt class="docutils literal"><span class="pre">tcs-gui/tests/schema.rs</span></tt> holds each against
+the lists the software itself reads from -- the section's parameters from
 <tt class="docutils literal"><span class="pre">graph::parameters::ATTRIBUTES</span></tt>, the simulator's settings from
 <tt class="docutils literal"><span class="pre">sim_config::SETTINGS</span></tt> -- rather than against a copy written out there, which
 would be the same problem one step further away. Every shipped XML file is

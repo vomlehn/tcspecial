@@ -1280,9 +1280,9 @@ button anywhere else on the page selects nothing, and closes whatever menu was
 open. A line is a ``Path``, and a press on a path is not reported, so the press
 goes to the page underneath, which asks which line runs within a few pixels of
 the point, by the line's points rather than its drawing: see
-``tcs_diagram::route::distance_to``. Only the document's lines are found, not the
-ones an edge draws to a node nothing joins outside yet, there being no line to
-take out. A selected line is kept by what it joins rather than where it is in
+``tcs_diagram::route::distance_to``. Only the document's lines are found, not
+the ones an edge draws to a node nothing joins outside yet, there being no line
+to take out. A selected line is kept by what it joins rather than where it is in
 the page's list, so an edit elsewhere that redraws the page keeps it selected,
 and one that takes it away selects nothing.
 
@@ -2300,8 +2300,8 @@ the file, in the same way the ``tcs-gui`` section is.
 
 A schema nothing is checked against is worse than no schema: it refuses files
 the software accepts, or accepts what the software refuses, and either way the
-person believes the schema. So ``tcs-gui/tests/schema.rs`` holds each against the
-lists the software itself reads from -- the section's parameters from
+person believes the schema. So ``tcs-gui/tests/schema.rs`` holds each against
+the lists the software itself reads from -- the section's parameters from
 ``graph::parameters::ATTRIBUTES``, the simulator's settings from
 ``sim_config::SETTINGS`` -- rather than against a copy written out there, which
 would be the same problem one step further away. Every shipped XML file is

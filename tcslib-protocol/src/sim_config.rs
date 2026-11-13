@@ -1466,7 +1466,7 @@ pub struct SimConfigFile {
     /// ready. Optional as the file parses, so that the editor and tcs-verify
     /// read a file without one, and required by everything that uses it --
     /// tcs-sim to start, and a harness to wait: see [`SimConfigFile::ready`].
-    #[serde(default)]
+    #[serde(default, rename = "tcs-sim")]
     pub tcs_sim: Option<SimTcsSim>,
     /// The groups of settings, in name order.
     #[serde(default, deserialize_with = "crate::sim_grouped::groups")]
@@ -1498,7 +1498,7 @@ pub struct SimConfigFile {
     /// file share its world, and should be shown one drawing of it. Last in
     /// the file for the reason a configuration's is, being about a screen
     /// and not the vehicle. See [`SimTcsGui`].
-    #[serde(default)]
+    #[serde(default, rename = "tcs-gui")]
     pub tcs_gui: Option<SimTcsGui>,
 }
 
@@ -1535,12 +1535,12 @@ pub struct SimTcsSim {
     /// The UDP address, as `address:port`, at which tcs-sim answers whether it
     /// has made its simulated devices: see `crate::ready`.
     pub ready: String,
-    /// The thermostat nodes of the configuration tcs-sim simulates, in the order
-    /// written, none if the file states none: tcs-sim then reads the sensors
-    /// that feed each and switches the heaters each drives itself, with each
-    /// node's setpoint and band, so that a zone's loop closes with no tcspecial
-    /// running. A file writes them under `thermostat`, one name or several
-    /// separated by commas, as a vehicle of several zones, or a staged
+    /// The thermostat nodes of the configuration tcs-sim simulates, in the
+    /// order written, none if the file states none: tcs-sim then reads the
+    /// sensors that feed each and switches the heaters each drives itself, with
+    /// each node's setpoint and band, so that a zone's loop closes with no
+    /// tcspecial running. A file writes them under `thermostat`, one name or
+    /// several separated by commas, as a vehicle of several zones, or a staged
     /// thermostat, has several thermostat nodes.
     ///
     /// Unstated for a run with tcspecial, whose own thermostats would
@@ -1822,10 +1822,15 @@ impl SimConfigFile {
     /// # Errors
     ///
     /// A file in a shape it had before -- its payloads not grouped by type,
-    /// or its physics model in a file of its own -- at its line, and
-    /// whatever the parser refuses.
+    /// or its physics model in a file of its own -- or with a section by its
+    /// old name, at its line, and whatever the parser refuses.
     pub fn parse(text: &str, format: ConfigFormat) -> TcsResult<Self> {
         if let Some(why) = crate::sim_reshaped::sim_refused(text, format) {
+            return Err(TcsError::Config(why));
+        }
+        if let Some(why) =
+            crate::graph::renamed::refused_in_simulator(text, format)
+        {
             return Err(TcsError::Config(why));
         }
         format.parse(text)
@@ -1848,16 +1853,17 @@ impl SimConfigFile {
     pub fn ready(&self) -> Result<std::net::SocketAddr, String> {
         let wanted = "the simulator file needs a tcs-sim section saying where \
                       tcs-sim answers whether it is ready, as an address:port \
-                      no other run uses -- tcs-sim: { ready: \"127.0.0.1:7900\" \
-                      }";
+                      no other run uses -- tcs-sim: \
+                      { ready: \"127.0.0.1:7900\" }";
         let Some(section) = self.tcs_sim.as_ref() else {
             return Err(wanted.to_string());
         };
         let said = section.ready.trim();
         said.parse().map_err(|_| {
             format!(
-                "tcs-sim.ready is \"{said}\", which is not an address:port such \
-                 as 127.0.0.1:7900: give the address and port tcs-sim answers at"
+                "tcs-sim.ready is \"{said}\", which is not an address:port \
+                 such as 127.0.0.1:7900: give the address and port tcs-sim \
+                 answers at"
             )
         })
     }
@@ -3230,7 +3236,8 @@ simulated_payloads:
     }
 
     /// A payload that is not simulated has no data handler here, the handlers
-    /// being the payloads tcs-sim simulates, and is not reported as naming none.
+    /// being the payloads tcs-sim simulates, and is not reported as naming
+    /// none.
     #[test]
     fn a_payload_that_is_not_simulated_needs_no_handler() {
         let file = parse(
@@ -4748,10 +4755,12 @@ physics:
         .expect_err("not a number")
         .to_string();
         assert!(why.contains("zone") && why.contains("left"), "{why}");
-        let why =
-            SimConfigFile::parse("tcs-gui:\n  places: []\n", ConfigFormat::Yaml)
-                .expect_err("not a key the section has")
-                .to_string();
+        let why = SimConfigFile::parse(
+            "tcs-gui:\n  places: []\n",
+            ConfigFormat::Yaml,
+        )
+        .expect_err("not a key the section has")
+        .to_string();
         assert!(why.contains("places"), "{why}");
     }
 

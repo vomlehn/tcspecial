@@ -27,9 +27,9 @@
 # with tcspecial running, whose own thermostat switches the same heaters.
 description: Simulator settings for the payloads of thermostat.ytcs
 
-# Where tcs-sim answers whether it has made its simulated devices, which whatever
-# starts the run asks before it starts tcspecial. A port no other example
-# uses, so that two can be run at once.
+# Where tcs-sim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
 tcs-sim:
   ready: "127.0.0.1:7907"
 

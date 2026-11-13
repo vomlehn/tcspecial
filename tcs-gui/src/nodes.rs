@@ -590,7 +590,8 @@ pub fn matching<'a>(
         .max_by_key(|one| one.sets.len())
 }
 
-/// Where tcs-gui's own data is: the description tree, and the schemas beside it.
+/// Where tcs-gui's own data is: the description tree, and the schemas beside
+/// it.
 ///
 /// The first of these that exists, which is a search and not one path because
 /// the same program is run from three places. In order:
@@ -599,10 +600,10 @@ pub fn matching<'a>(
 /// * `$XDG_DATA_HOME/tcs-gui`, or `~/.local/share/tcs-gui`, which is where a
 ///   person's own descriptions belong and where edited ones will be written;
 /// * `share/tcs-gui` beside the directory this program is in -- so
-///   `/opt/tcs/share/tcs-gui` for an editor installed as `/opt/tcs/bin/tcs-gui`,
-///   which is where `make install` and the packages put them -- found from
-///   the program rather than named, so that an install under any `PREFIX`
-///   finds its own data and not another install's;
+///   `/opt/tcs/share/tcs-gui` for an editor installed as
+///   `/opt/tcs/bin/tcs-gui`, which is where `make install` and the packages put
+///   them -- found from the program rather than named, so that an install under
+///   any `PREFIX` finds its own data and not another install's;
 /// * `/usr/local/share/tcs-gui` and `/usr/share/tcs-gui`, which is where
 ///   installing put them before it put everything under one prefix, and
 ///   where a copy installed by hand may still be;

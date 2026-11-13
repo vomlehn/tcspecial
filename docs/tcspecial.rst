@@ -3442,9 +3442,9 @@ There are three, because three kinds of machine take them:
    What a ground station is built on. ``lib/libtcs_moc_c.so.4`` and
    ``lib/libtcs_moc_c.a`` with ``include/tcslib-moc-c.h`` and
    ``lib/pkgconfig/tcslib-moc-c.pc``; the Python packages ``tcslib_protocol``,
-   ``tcslib_moc`` and ``tcs_ui`` in ``lib/python3/site-packages``; ``bin/tcs-gui``
-   with its descriptions in ``share/tcs-gui``; and the XTCS, YTCS and simulator
-   schemas in ``share/tcspecial/schema``.
+   ``tcslib_moc`` and ``tcs_ui`` in ``lib/python3/site-packages``;
+   ``bin/tcs-gui`` with its descriptions in ``share/tcs-gui``; and the XTCS,
+   YTCS and simulator schemas in ``share/tcspecial/schema``.
 ``tcspecial-test``
    ``bin/tcs-moc`` and ``bin/tcs-sim``, which never fly, and ``bin/segsend``,
    the test one, which deletes each segment it is given. It depends on
@@ -3709,7 +3709,8 @@ it, Wayland may ignore it, and a tiling window manager will do as it likes.
 
 Everything at once
 ------------------
-``make runmocy`` runs tcs-moc, which starts a tcspecial and a tcs-sim of its own:
+``make runmocy`` runs tcs-moc, which starts a tcspecial and a tcs-sim of its
+own:
 
 .. code-block:: console
 
@@ -4139,8 +4140,8 @@ for, and every configuration states it:
 It is the digest of the ``tcslib-protocol/xtce/link.xtce`` a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
 lower-case hex digits. A build speaks only the interface it was made from, so
-tcs-verify, tcspecial, tcs-moc and the libraries all refuse a configuration whose
-``interface`` is not their build's, saying both digests: a vehicle reading
+tcs-verify, tcspecial, tcs-moc and the libraries all refuse a configuration
+whose ``interface`` is not their build's, saying both digests: a vehicle reading
 commands with other layouts than the ground's would be doing whatever each
 command happened to mean to it.
 

@@ -11,10 +11,10 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
+use tcs_verify::startup::Startup;
 use tcslib_protocol::config::payload_path_from_args;
 use tcslib_protocol::simulate::Mode;
 use tcslib_protocol::{Edge, NO_TRANSFER_TIME};
-use tcs_verify::startup::Startup;
 
 use crate::oc_link::Arrivals;
 
@@ -849,8 +849,8 @@ fn main() {
     // starts the other two and they inherit its environment, so a variable here
     // would name their file as well. The run's simulation mode, given to both
     // programs this starts: see `tcslib_protocol::simulate`. Under the flight
-    // setting, which is what a run without the flag gets, tcs-sim is not started
-    // at all.
+    // setting, which is what a run without the flag gets, tcs-sim is not
+    // started at all.
     let (mode, args) =
         match tcslib_protocol::simulate::take_mode(env::args().collect()) {
             Ok(taken) => taken,
@@ -963,7 +963,7 @@ fn handle_quit(
 /// # Arguments
 ///
 /// * `ui`           - The window.
-/// * `pm_tcs_sim`    - The tcs-sim the MOC started.
+/// * `pm_tcs_sim`   - The tcs-sim the MOC started.
 /// * `pm_tcspecial` - The tcspecial the MOC started, or `None` where it
 ///                    attached to one already running.
 fn handle_close(
@@ -988,7 +988,7 @@ fn handle_close(
 ///
 /// # Arguments
 ///
-/// * `pm_tcs_sim`    - The tcs-sim the MOC started.
+/// * `pm_tcs_sim`   - The tcs-sim the MOC started.
 /// * `pm_tcspecial` - The tcspecial the MOC started, or `None` where it
 ///                    attached to one already running.
 ///
@@ -1055,7 +1055,7 @@ fn main_window() -> Option<MainWindow> {
 ///
 /// # Arguments
 ///
-/// * `pm_tcs_sim`    - The tcs-sim the MOC started.
+/// * `pm_tcs_sim`   - The tcs-sim the MOC started.
 /// * `pm_tcspecial` - The tcspecial the MOC started, or `None`.
 ///
 /// # Panics
@@ -1123,7 +1123,7 @@ fn ask_to_stop() {
 ///
 /// # Arguments
 ///
-/// * `pm_tcs_sim`    - The tcs-sim the MOC started.
+/// * `pm_tcs_sim`   - The tcs-sim the MOC started.
 /// * `pm_tcspecial` - The tcspecial the MOC started, or `None` where it
 ///                    attached to one already running.
 pub(crate) fn stop_if_asked(

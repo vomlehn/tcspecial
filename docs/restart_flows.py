@@ -87,7 +87,8 @@ def wrapped(x, y, text, anchor, style, chars=OUTCOME_CHARS):
     Returns:
         The SVG text element.
     """
-    lines = textwrap.wrap(text, chars)
+    # Not at a hyphen: a program's name, such as tcs-moc, is one word.
+    lines = textwrap.wrap(text, chars, break_on_hyphens=False)
     spans = "".join(
         f'<tspan x="{x}" dy="{0 if i == 0 else 14}">{escape(line)}</tspan>'
         for i, line in enumerate(lines))

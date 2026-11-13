@@ -87,8 +87,8 @@ itself is `tcspecial`.
 ## Who uses it
 
 Every crate in the workspace that has anything to do with the link or a
-configuration: tcspecial, tcslib-moc, tcs-moc, tcs-sim, tcs-gui and tcs-verify, and
-`examples/beacon`.
+configuration: tcspecial, tcslib-moc, tcs-moc, tcs-sim, tcs-gui and tcs-verify,
+and `examples/beacon`.
 
 ## Building and testing
 

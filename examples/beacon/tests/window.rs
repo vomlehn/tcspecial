@@ -14,9 +14,9 @@ use i_slint_backend_testing::ElementHandle;
 use slint::ComponentHandle;
 
 use beacon_example::{show, WatchWindow};
+use tcs_ui::{palette, Shown};
 use tcslib_moc::beacon::{Schedule, NO_BEACON_MESSAGE};
 use tcslib_protocol::NO_TRANSFER_TIME;
-use tcs_ui::{palette, Shown};
 
 /// What the window has on it, as an operator would read it.
 ///

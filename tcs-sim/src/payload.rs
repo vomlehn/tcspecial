@@ -118,9 +118,9 @@ pub struct PayloadConfig {
     /// Whether this payload sends: its panel's button.
     ///
     /// Apart from whether it is running, which it is from the moment tcs-sim
-    /// starts: its simulation is made as tcs-sim starts and kept until it stops,
-    /// so that tcspecial finds it whatever the panel says, and the button
-    /// decides only whether anything goes over it. See
+    /// starts: its simulation is made as tcs-sim starts and kept until it
+    /// stops, so that tcspecial finds it whatever the panel says, and the
+    /// button decides only whether anything goes over it. See
     /// [`Pacing::a_packet_is_due`].
     pub sending: Arc<AtomicBool>,
     /// Whether its simulation has been made, which the readiness socket says:

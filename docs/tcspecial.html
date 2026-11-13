@@ -3636,9 +3636,9 @@ go</a>).</dd>
 <dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs_moc_c.so.4</tt> and
 <tt class="docutils literal">lib/libtcs_moc_c.a</tt> with <tt class="docutils literal"><span class="pre">include/tcslib-moc-c.h</span></tt> and
 <tt class="docutils literal"><span class="pre">lib/pkgconfig/tcslib-moc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
-<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt>
-with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS, YTCS and simulator
-schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
+<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
+<tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS,
+YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
 <dd><tt class="docutils literal"><span class="pre">bin/tcs-moc</span></tt> and <tt class="docutils literal"><span class="pre">bin/tcs-sim</span></tt>, which never fly, and <tt class="docutils literal">bin/segsend</tt>,
 the test one, which deletes each segment it is given. It depends on
@@ -3871,7 +3871,8 @@ land on top of each other. It is a request to the window system: X11 honours
 it, Wayland may ignore it, and a tiling window manager will do as it likes.</p>
 <div class="section" id="everything-at-once">
 <h2><a class="toc-backref" href="#toc-entry-60">Everything at once</a></h2>
-<p><tt class="docutils literal">make runmocy</tt> runs tcs-moc, which starts a tcspecial and a tcs-sim of its own:</p>
+<p><tt class="docutils literal">make runmocy</tt> runs tcs-moc, which starts a tcspecial and a tcs-sim of its
+own:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">TCSPECIAL_CONFIG_FILE</span><span class="operator">=</span>examples/minimal/minimal<span class="whitespace">
@@ -4247,8 +4248,8 @@ for, and every configuration states it:</p>
 <p>It is the digest of the <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce/link.xtce</span></tt> a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
 lower-case hex digits. A build speaks only the interface it was made from, so
-tcs-verify, tcspecial, tcs-moc and the libraries all refuse a configuration whose
-<tt class="docutils literal">interface</tt> is not their build's, saying both digests: a vehicle reading
+tcs-verify, tcspecial, tcs-moc and the libraries all refuse a configuration
+whose <tt class="docutils literal">interface</tt> is not their build's, saying both digests: a vehicle reading
 commands with other layouts than the ground's would be doing whatever each
 command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>

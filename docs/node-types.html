@@ -450,9 +450,9 @@ crates:</p>
 <dt><tt class="docutils literal"><span class="pre">tcslib_protocol::node</span></tt></dt>
 <dd>Its attributes, and every rule about what a configuration may say about it.
 tcslib-protocol is shared by the ground and the vehicle, so a rule written
-here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all apply,
-and they all report it alike. A rule about what a configuration may say
-belongs here and nowhere else.</dd>
+here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all
+apply, and they all report it alike. A rule about what a configuration may
+say belongs here and nowhere else.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial::node</span></tt></dt>
 <dd>The flight side: opening the device, reading and writing it.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcs_sim::node</span></tt></dt>
@@ -694,8 +694,8 @@ its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
 string or bytes must be XTCE's, so <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> must give it
 <tt class="docutils literal"><span class="pre">Count::Xtce</span></tt>. The Python ground lists gateway types by hand, in
 <tt class="docutils literal">GATEWAY_BASES</tt> and <tt class="docutils literal">ON_BUS</tt> in <tt class="docutils literal">python/tcslib_protocol/configuration.py</tt>.
-Its description in tcs-gui is at the top of <tt class="docutils literal"><span class="pre">tcs-gui/share/nodes/</span></tt>, and since it
-has no node module, it is one of the exemptions in
+Its description in tcs-gui is at the top of <tt class="docutils literal"><span class="pre">tcs-gui/share/nodes/</span></tt>, and since
+it has no node module, it is one of the exemptions in
 <tt class="docutils literal">every_description_has_its_rust</tt> in <tt class="docutils literal"><span class="pre">tcs-gui/src/nodes.rs</span></tt>.</p>
 </div>
 <div class="section" id="the-editor-and-the-schemas">

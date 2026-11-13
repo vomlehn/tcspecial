@@ -1582,8 +1582,8 @@ Requirement
     ours.
 
     **Built** (2026-10-31). ``tcslib_moc::bus`` holds both ground-side ends.
-    ``SimulatedCfs`` is the cFS end as tcs-sim runs it: it binds ``sbn.peer``, is
-    processor ``sbn.peer_processor_id`` to the vehicle, subscribes to every
+    ``SimulatedCfs`` is the cFS end as tcs-sim runs it: it binds ``sbn.peer``,
+    is processor ``sbn.peer_processor_id`` to the vehicle, subscribes to every
     message ID the vehicle publishes, and is a bus to the ground stations that
     join it -- what the vehicle publishes goes to each station that subscribed
     to it, and what a station publishes goes to the vehicle where the vehicle
@@ -1605,11 +1605,11 @@ Requirement
     tcs-sim simulates the cFS end of every configuration that answers to cFS,
     whenever it runs, and so is not run beside a real cFS: the far end is one
     socket, and two programs cannot both be it. Whether it is simulated is not
-    written in the simulator file, because nothing would read it but tcs-sim, and
-    a run against a real cFS is a run without tcs-sim. A ``gateway_cfs`` node,
-    like the other gateway nodes, has no simulated device of its own in tcs-sim:
-    it is the far end that is simulated, not the node, and the mode does not
-    count it (``tcslib_protocol::simulate::counted``).
+    written in the simulator file, because nothing would read it but tcs-sim,
+    and a run against a real cFS is a run without tcs-sim. A ``gateway_cfs``
+    node, like the other gateway nodes, has no simulated device of its own in
+    tcs-sim: it is the far end that is simulated, not the node, and the mode
+    does not count it (``tcslib_protocol::simulate::counted``).
 
     Only the simulated cFS end takes a ground station as a peer. SBN on a real
     cFS passes nothing from one peer on to another: each peer's pipe is made
@@ -7449,8 +7449,8 @@ Requirement
     ``tcslib_protocol::node`` are built whatever tcspecial is built with:
     tcs-verify and tcs-gui run on the ground and check configurations for any
     vehicle, so what a configuration may say about a type cannot depend on how
-    one vehicle's tcspecial was built. Tcs-sim is built with every type, since it
-    runs on a development host and not on the target.
+    one vehicle's tcspecial was built. Tcs-sim is built with every type, since
+    it runs on a development host and not on the target.
 
 Requirement
     Some of tcspecial is in every build. The network type over UDP, TCP and
@@ -9576,7 +9576,7 @@ what is wrong with them.
    ||                     ||  :    ||                       ||     || Payloads      ||
    +=======================+  :    +=========================+     +=================+
    |  +---------+          |  :    |    +=================+  |     |                 |
-   |  | tcs-moc  |          |  :  ----+->| tcspecial      |  |     |                 |
+   |  | tcs-moc |          |  :  ----+->| tcspecial      |  |     |                 |
    |  | Control |          |  : |  | |  |(tcslib-protocol)|  |     |                 |
    |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
    |  +---------+          |  : |  | |  | Command         |  |     |                 |
@@ -9764,9 +9764,9 @@ Requirement
 Saying Which Payloads Are Simulated
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Implemented: ``simulate`` is read by
-``tcslib_protocol::sim_config::SimConfigFile::simulate_of``, tcs-sim's comparison
-is ``tcslib_protocol::simulate::disagreement``, and a simulated device reached
-over UDP is ``tcslib_protocol::graph::reach::Reach::opened``.
+``tcslib_protocol::sim_config::SimConfigFile::simulate_of``, tcs-sim's
+comparison is ``tcslib_protocol::simulate::disagreement``, and a simulated
+device reached over UDP is ``tcslib_protocol::graph::reach::Reach::opened``.
 
 Which payloads a run means to simulate is said in the simulator file, payload
 by payload, and checked against what is at each endpoint before tcs-sim
@@ -10088,8 +10088,8 @@ somebody has to pass on, and one that can only be read has to be typed out
 again, wrongly. So popups say what they say in text that can be selected --
 drag across it for some of it, Ctrl+A for all of it, Ctrl+C to copy -- and each
 has a Copy button for the whole of it at once, heading and lines one to a
-line. The small popups on tcs-moc's and tcs-sim's panels close on a press outside
-them rather than on any press, a press inside being somebody selecting.
+line. The small popups on tcs-moc's and tcs-sim's panels close on a press
+outside them rather than on any press, a press inside being somebody selecting.
 
 Hints
 =====

@@ -112,8 +112,8 @@ pub struct Reach {
 /// watches kept as it is: see [`crate::node::payload::gpio`].
 ///
 /// Every other type has a dummy device the kernel makes, or a simulated device
-/// tcs-sim makes, at the endpoint tcspecial opens, which is the better test: the
-/// code that runs is the code that flies.
+/// tcs-sim makes, at the endpoint tcspecial opens, which is the better test:
+/// the code that runs is the code that flies.
 ///
 /// # Arguments
 ///

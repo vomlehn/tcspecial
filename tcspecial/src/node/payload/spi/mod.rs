@@ -52,10 +52,10 @@ const SPI_CS_HIGH: u8 = 0x04;
 ///
 /// A spidev node takes the requests above and clocks a peripheral on the terms
 /// they set. A terminal takes none of them -- it has no clock to set -- and is
-/// what tcs-sim simulates a peripheral with, there being no module that emulates
-/// one. The bytes of such a link are real and its clocking does not exist, so a
-/// handler on one is told what it has, once, rather than left to infer it from
-/// transfers that work while the terms did not take.
+/// what tcs-sim simulates a peripheral with, there being no module that
+/// emulates one. The bytes of such a link are real and its clocking does not
+/// exist, so a handler on one is told what it has, once, rather than left to
+/// infer it from transfers that work while the terms did not take.
 ///
 /// Nothing else is accepted. A regular file, or a character device that is
 /// neither of these, is a path naming something other than what the

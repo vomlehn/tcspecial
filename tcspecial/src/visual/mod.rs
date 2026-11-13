@@ -35,7 +35,9 @@ use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use tcs_diagram::look::{self, ground_of};
 use tcs_diagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
 use tcs_diagram::style;
-use tcs_diagram::view::{self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet};
+use tcs_diagram::view::{
+    self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet,
+};
 use tcslib_protocol::graph::{Destination, Graph};
 
 use crate::runtime;

@@ -59,7 +59,7 @@ pub struct Simulator {
     /// kept so that saving does not drop it, as the masses are. Without one
     /// tcs-sim will not start, and an editor that wrote it away would be the
     /// thing that broke a set that worked.
-    #[serde(default)]
+    #[serde(default, rename = "tcs-sim")]
     pub tcs_sim: Settings,
     /// The world: the file's `world` section, its ambient temperature and
     /// its physics model's components and their connections. Empty for a
@@ -440,7 +440,7 @@ impl tcslib_protocol::sim_grouped::SimEntry for Entry {
 struct File {
     #[serde(default)]
     description: Option<String>,
-    #[serde(default)]
+    #[serde(default, rename = "tcs-sim")]
     tcs_sim: BTreeMap<String, Scalar>,
     #[serde(default)]
     world: Option<WorldFile>,
@@ -460,7 +460,7 @@ struct File {
     simulated_payloads: Vec<Entry>,
     /// Where the editor drew each physics component, read as every program
     /// reads it.
-    #[serde(default)]
+    #[serde(default, rename = "tcs-gui")]
     tcs_gui: Option<tcslib_protocol::sim_config::SimTcsGui>,
 }
 

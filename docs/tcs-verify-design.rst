@@ -122,9 +122,9 @@ Requirement
     each, in orders no file can change, so that two summaries can be compared
     with ``diff``. Every list is ``tcslib-protocol``'s --
     ``graph::sockets::of``, ``graph::telemetry::ids``, ``msgids`` and ``apids``,
-    ``graph::rates::of`` -- and tcs-verify lays them out and states none of them.
-    A configuration that does not read has no summary, which fails the run, as a
-    digest not given does.
+    ``graph::rates::of`` -- and tcs-verify lays them out and states none of
+    them. A configuration that does not read has no summary, which fails the
+    run, as a digest not given does.
 
 Requirement
     No two sockets a configuration states or implies are one socket:
@@ -188,21 +188,22 @@ Requirement
     which is not a statement about any file.
 
 Requirement
-    Tcs-verify states no rule of its own. Every problem it reports comes from the
-    same rules in ``tcslib-protocol`` that the programs reading these files use,
-    so a set it accepts is a set they accept. A verifier with rules of its own
-    would eventually disagree with them, and then a passing check would mean
+    Tcs-verify states no rule of its own. Every problem it reports comes from
+    the same rules in ``tcslib-protocol`` that the programs reading these files
+    use, so a set it accepts is a set they accept. A verifier with rules of its
+    own would eventually disagree with them, and then a passing check would mean
     nothing.
 
 Requirement
-    Every program that reads these files asks tcs-verify about them as it starts,
-    before anything else is read from them, and says what it says in its words:
-    tcspecial, tcs-moc, tcs-sim and tcs-gui report the same problems, each with its
-    file and line, as ``tcs-verify`` does for the same files. What a program then
-    refuses for its own reasons -- tcs-sim a payload it has it cannot simulate,
-    tcs-moc a configuration it does not control -- is said beside them. Where a
-    rule is the simulator's rather than the file's, it is in ``tcslib-protocol``
-    all the same (``simulable``), so that tcs-verify asks it too.
+    Every program that reads these files asks tcs-verify about them as it
+    starts, before anything else is read from them, and says what it says in its
+    words: tcspecial, tcs-moc, tcs-sim and tcs-gui report the same problems,
+    each with its file and line, as ``tcs-verify`` does for the same files. What
+    a program then refuses for its own reasons -- tcs-sim a payload it has it
+    cannot simulate, tcs-moc a configuration it does not control -- is said
+    beside them. Where a rule is the simulator's rather than the file's, it is
+    in ``tcslib-protocol`` all the same (``simulable``), so that tcs-verify asks
+    it too.
 
     Which of them stops a program is the program's business. tcspecial
     refuses a configuration with a warning in it, as above; tcs-moc
@@ -214,8 +215,8 @@ Requirement
     window of its own, before the main window, and the main window opens only
     once that one has been closed -- or not at all, where what was found stops
     the program. tcs-moc and tcs-sim share the window
-    (``tcs-verify/ui/startup.slint``); tcs-gui's is the one that offers a fix for
-    each problem, and lists beside its own faults whatever else tcs-verify
+    (``tcs-verify/ui/startup.slint``); tcs-gui's is the one that offers a fix
+    for each problem, and lists beside its own faults whatever else tcs-verify
     finds, warnings included. Everything is said on stderr as well.
 
 Requirement

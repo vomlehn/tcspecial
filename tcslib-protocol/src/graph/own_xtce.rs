@@ -20,7 +20,7 @@
 //! attribute's type copied from `types.xtce` (see
 //! [`crate::graph::settings`]).
 //!
-//! `tcsverify --xtce` writes it beside the configuration, and `make check`
+//! `tcs-verify --xtce` writes it beside the configuration, and `make check`
 //! fails when one committed there is not what it would write: everything it
 //! says is said by the configuration and `types.xtce` already, and nobody
 //! writes it by hand. See "The configuration's own XTCE" in
@@ -285,7 +285,7 @@ fn head(out: &mut String, name: &str) {
      in a byte whose top bit says another follows. How each gateway frames
      what it sends is the ground station's to add.
 
-     Written by tcsverify, asked for it by its xtce option, from the
+     Written by tcs-verify, asked for it by its xtce option, from the
      configuration and types.xtce, and not to be edited: see \"The
      configuration's own XTCE\" in tcspecial's docs/tcspecial-design.rst. -->
 "

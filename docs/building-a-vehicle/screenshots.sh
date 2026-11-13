@@ -1,25 +1,25 @@
 #!/bin/sh
-# Draws each stage of "Building a Vehicle" as tcsgui draws it, into
+# Draws each stage of "Building a Vehicle" as tcs-gui draws it, into
 # docs/shots/vehicle-stage-NN.png, for the guide's figures.
 #
-#   docs/building-a-vehicle/screenshots.sh <tcsgui> <display>
+#   docs/building-a-vehicle/screenshots.sh <tcs-gui> <display>
 #
-# <tcsgui> is the program, built; <display> an X display that is not the
+# <tcs-gui> is the program, built; <display> an X display that is not the
 # person's own, such as a Xephyr started with
 #
 #   Xephyr :5 -screen 1600x1000
 #
-# so that no window opens on their screen. Each stage is opened in a tcsgui
+# so that no window opens on their screen. Each stage is opened in a tcs-gui
 # of its own, with a home and state directory of its own so that nothing
 # the person has set changes the drawing, given time to draw, captured with
 # ffmpeg, and closed. Run from the repository's top directory.
 set -eu
 
 if [ $# -ne 2 ]; then
-	echo "usage: screenshots.sh <tcsgui> <display>" >&2
+	echo "usage: screenshots.sh <tcs-gui> <display>" >&2
 	exit 2
 fi
-tcsgui=$1
+tcs_gui=$1
 display=$2
 out=docs/shots
 work=$(mktemp -d)
@@ -40,13 +40,13 @@ figure='s|^\.\. figure:: shots/vehicle-stage-\([0-9][0-9]\)\.png$|\1|p'
 stages=$(sed -n "$figure" docs/building-a-vehicle.rst | sort -u)
 for n in $stages; do
 	stage=docs/building-a-vehicle/stage-$n
-	# Without WAYLAND_DISPLAY, so that tcsgui opens on the X display
+	# Without WAYLAND_DISPLAY, so that tcs-gui opens on the X display
 	# given rather than on the person's Wayland one.
 	env -u WAYLAND_DISPLAY HOME="$work/home" XDG_STATE_HOME="$work/state" \
-		DISPLAY="$display" "$tcsgui" "$stage/deck.ytcs" \
-		> "$work/tcsgui.log" 2>&1 &
+		DISPLAY="$display" "$tcs_gui" "$stage/deck.ytcs" \
+		> "$work/tcs-gui.log" 2>&1 &
 	pid=$!
-	# Long enough for tcsgui to lay the diagram out and draw it; a
+	# Long enough for tcs-gui to lay the diagram out and draw it; a
 	# capture taken before that is black.
 	sleep 15
 	ffmpeg -loglevel error -y -f x11grab -draw_mouse 0 \

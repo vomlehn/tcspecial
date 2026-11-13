@@ -1,5 +1,5 @@
 """Draws the message-flow diagrams of `In-flight data across a restart`, and
-those of the tcsmoc manual, which show what goes up and comes down as an
+those of the tcs-moc manual, which show what goes up and comes down as an
 operator connects, commands a node and pings.
 
 Each diagram is a list of messages and notes, written below, from which an
@@ -330,7 +330,7 @@ BEACONS = [
     note("vehicle", 15.5, "exec: the new start loads A; its first beacon "
          "goes at once"),
     msg("down", "any", "beacon #1, restart", 17, 18, "number went back: a "
-        "new start; tcsmoc takes the link down: press Connect"),
+        "new start; tcs-moc takes the link down: press Connect"),
     msg("up", "any", "CONNECT with A", 20, 21, "checksums match: flag "
         "cleared; downlink opens; a beacon at once"),
     msg("down", "any", "answer: running A", 21.5, 22.5, "CONNECT answered "
@@ -412,7 +412,7 @@ LOST_BEACONS = [
         "commanding"),
 ]
 
-# The figures of the tcsmoc manual: what goes up and what comes down behind
+# The figures of the tcs-moc manual: what goes up and what comes down behind
 # what an operator presses, as its screenshots show it.
 
 MOC_CONNECT = [
@@ -509,7 +509,7 @@ if __name__ == "__main__":
          "station's match. While it cleans up it beacons every reset "
          "interval, the number still going up. After the exec the new "
          "start's first beacon, number 1, goes at once with the flag set; "
-         "the number going back says a new start, and tcsmoc takes its link "
+         "the number going back says a new start, and tcs-moc takes its link "
          "down. The station sends CONNECT with A, which matches: the "
          "vehicle clears the flag, answers, and sends beacon 2, normal, at "
          "once, and from then beacons every default interval.",
@@ -545,19 +545,19 @@ if __name__ == "__main__":
          "normal, makes the station matched for commanding. Nothing is "
          "stuck.",
          LOST_BEACONS)
-    draw("tcsmoc-connect", "Coming up: the first beacon, Connect, the match",
+    draw("tcs-moc-connect", "Coming up: the first beacon, Connect, the match",
          "The vehicle starts on configuration A with its restart flag set "
-         "and sends beacon 1; tcsmoc shows the indicator green and "
+         "and sends beacon 1; tcs-moc shows the indicator green and "
          "Restarted, connect, and is not matched. The operator presses "
          "Connect, which sends CONNECT with A. The checksums match, so the "
          "vehicle clears the flag, opens the downlink, answers that it is "
-         "running A and sends beacon 2, normal, at once. tcsmoc says the "
+         "running A and sends beacon 2, normal, at once. tcs-moc says the "
          "vehicle agrees, becomes matched for commanding with beacon 2, "
          "and sends one QUERY_NODE per panel; the answers make each panel "
          "Active. From then each node's data is read into its panel and "
          "the plot.",
          MOC_CONNECT)
-    draw("tcsmoc-command", "Commanding a node from its panel",
+    draw("tcs-moc-command", "Commanding a node from its panel",
          "With the two ends matched on A, Disable on a panel sends "
          "STOP_NODE for that panel's node; the vehicle stops it and "
          "answers Success, and the panel says Stopped. Enable sends "
@@ -567,7 +567,7 @@ if __name__ == "__main__":
          "and the answers set each panel's status and the counts its "
          "Configuration shows.",
          MOC_COMMAND)
-    draw("tcsmoc-ping", "Pinging the ping node",
+    draw("tcs-moc-ping", "Pinging the ping node",
          "Matched for commanding, Send ping in the ping window sends ping "
          "1 with the MOC's time up through the gateway node to the ping "
          "node, which adds its own time and sends it back down to the "

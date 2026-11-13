@@ -30,11 +30,11 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make README.html     - Build README.html from README.md"
-	@echo "  make run-simple      - Run tcsmoc on the minimal example"
-	@echo "  make run-thermostat  - Run tcsmoc on the thermostat example"
-	@echo "  make run-battery     - Run tcsmoc on the battery example:" \
+	@echo "  make run-simple      - Run tcs-moc on the minimal example"
+	@echo "  make run-thermostat  - Run tcs-moc on the thermostat example"
+	@echo "  make run-battery     - Run tcs-moc on the battery example:" \
 		"a power bus through an orbit, a load shed in eclipse"
-	@echo "  make run-descent     - Run tcsmoc on the descent example:" \
+	@echo "  make run-descent     - Run tcs-moc on the descent example:" \
 		"a lander flown down by a guidance program"
 	@echo "  make run-simple-app  - Run the simple-app example, printing" \
 		"its line"
@@ -49,27 +49,27 @@ help:
 	@echo "  make run-thermostat-yamcs - Run the thermostat-yamcs" \
 		"example: the thermostat, watched through Yamcs, over CCSDS" \
 		"packets (YAMCS_HOME=<yamcs>)"
-	@echo "  make run-tees        - Run tcsmoc on the tees example: tees" \
+	@echo "  make run-tees        - Run tcs-moc on the tees example: tees" \
 		"and null nodes"
-	@echo "  make run-fprime      - Run tcsmoc on the fprime example," \
+	@echo "  make run-fprime      - Run tcs-moc on the fprime example," \
 		"playing the F´ bridge"
-	@echo "  make run-cfs         - Run tcsmoc on the cfs example," \
-		"tcssim simulating the cFS end"
-	@echo "  make run-can         - Run tcsmoc on the can example, on the" \
+	@echo "  make run-cfs         - Run tcs-moc on the cfs example," \
+		"tcs-sim simulating the cFS end"
+	@echo "  make run-can         - Run tcs-moc on the can example, on the" \
 		"kernel's virtual CAN bus"
-	@echo "  make run-gpio        - Run tcsmoc on the gpio example, on the" \
+	@echo "  make run-gpio        - Run tcs-moc on the gpio example, on the" \
 		"kernel's gpio-sim chip"
-	@echo "  make run-iio         - Run tcsmoc on the iio example, on the" \
+	@echo "  make run-iio         - Run tcs-moc on the iio example, on the" \
 		"kernel's iio_dummy sensor"
 	@echo "  make check-python3   - Check for the Python 3 simple-app's" \
 		"payload needs"
 	@echo "  make check-tkinter   - Check for the tkinter the ping" \
 		"example's window needs"
 
-# Running tcsmoc on one of the examples.
+# Running tcs-moc on one of the examples.
 #
-# $(1) is the example's directory, whose configuration is named for it. tcsmoc
-# starts tcspecial on the same file, and tcssim where the simulator file
+# $(1) is the example's directory, whose configuration is named for it. tcs-moc
+# starts tcspecial on the same file, and tcs-sim where the simulator file
 # beside it -- $(1)-sim.yaml, found by name -- simulates anything; its panels
 # show what each source sends to the ground. A payload on a device -- the
 # thermostat's I2C, SPI and GPIO -- needs that device. `make mkstubs` in the
@@ -84,17 +84,17 @@ help:
 define runexample_on
 	( \
 		set -eu; \
-		echo "Running tcsmoc on examples/$(1)/$(1).ytcs..."; \
+		echo "Running tcs-moc on examples/$(1)/$(1).ytcs..."; \
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		cargo build -q --bin tcspecial --bin tcssim --bin tcsmoc; \
-		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcsmoc -- \
+		cargo build -q --bin tcspecial --bin tcs-sim --bin tcs-moc; \
+		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcs-moc -- \
 			--simulate=$(SIMULATE) examples/$(1)/$(1).ytcs \
 	)
 endef
 
-# Run tcsmoc on the minimal example: one payload, simulated by tcssim, its
+# Run tcs-moc on the minimal example: one payload, simulated by tcs-sim, its
 # telemetry going to the ground.
 .PHONY: run-simple
 run-simple: docs
@@ -109,43 +109,43 @@ README.html: README.md style.html
 	pandoc --standalone --metadata pagetitle=Examples -H style.html \
 		README.md -o README.html
 
-# Run tcsmoc on the thermostat example.
+# Run tcs-moc on the thermostat example.
 .PHONY: run-thermostat
 run-thermostat:
 	$(call runexample_on,thermostat)
 
-# Run tcsmoc on the battery example: a power bus through a six minute orbit,
+# Run tcs-moc on the battery example: a power bus through a six minute orbit,
 # its charge counted by a program and its science load shed in eclipse.
 .PHONY: run-battery
 run-battery:
 	$(call runexample_on,battery)
 
-# Run tcsmoc on the descent example: a lander flown down from five hundred
+# Run tcs-moc on the descent example: a lander flown down from five hundred
 # metres by a guidance program throttling its engine.
 .PHONY: run-descent
 run-descent:
 	$(call runexample_on,descent)
 
-# Run tcsmoc on the tees example: a command copied back to the ground, a
+# Run tcs-moc on the tees example: a command copied back to the ground, a
 # reading copied aboard, and data dropped.
 .PHONY: run-tees
 run-tees:
 	$(call runexample_on,tees)
 
-# Run tcsmoc on the fprime example: a vehicle that answers to an F´ flight
-# computer, tcsmoc playing the bridge component's part.
+# Run tcs-moc on the fprime example: a vehicle that answers to an F´ flight
+# computer, tcs-moc playing the bridge component's part.
 .PHONY: run-fprime
 run-fprime:
 	$(call runexample_on,fprime)
 
-# Run tcsmoc on the cfs example: a vehicle that answers to a cFS flight
-# computer, tcssim simulating the cFS end of the software bus and tcsmoc
+# Run tcs-moc on the cfs example: a vehicle that answers to a cFS flight
+# computer, tcs-sim simulating the cFS end of the software bus and tcs-moc
 # joining that bus as the ground.
 .PHONY: run-cfs
 run-cfs:
 	$(call runexample_on,cfs)
 
-# Run tcsmoc on the examples whose payloads are the kernel's dummy devices:
+# Run tcs-moc on the examples whose payloads are the kernel's dummy devices:
 # a virtual CAN bus, a gpio-sim chip and an iio_dummy sensor. Each
 # device has to be there first, and making one needs root, so these do not:
 # `sudo bin/mk-kernel-dummies can gpio iio`, in the top-level directory,
@@ -239,7 +239,7 @@ run-beacon:
 # tcspecial if the ground station is killed or crashes. It stays until its
 # window is closed. The ground station is Python 3,
 # examples/ping/ping_gateway.py, so Python and its tkinter are checked for
-# first; tcsverify is built beside the vehicle because the window asks it for
+# first; tcs-verify is built beside the vehicle because the window asks it for
 # the configuration's digest, which it compares every beacon's with.
 #
 # It opens a window, so it wants a display. Without one,
@@ -248,7 +248,7 @@ run-beacon:
 # and stops the vehicle.
 .PHONY: run-ping
 run-ping: check-tkinter
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify --bin segsend
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify --bin segsend
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME) on examples/ping/ping.xtcs..."; \
@@ -272,16 +272,16 @@ run-ping-yamcs: check-tkinter
 			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
 		exit 1; \
 	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcsverify --bin segsend
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify --bin segsend
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
 		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)"
 
 # The thermostat example with Yamcs between the ground station and the
 # vehicle. YAMCS_HOME is where a Yamcs release is unpacked;
-# thermostat_yamcs.py starts Yamcs, tcssim and tcspecial, and opens a window
+# thermostat_yamcs.py starts Yamcs, tcs-sim and tcspecial, and opens a window
 # of the zone's temperature, the three readings, the thermostat's decision
 # and the heaters it drives, each read from Yamcs. Closing the window stops
-# them all. tcssim draws a window of its own, so this wants a display. With
+# them all. tcs-sim draws a window of its own, so this wants a display. With
 # no window of the program's own,
 #   python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs <yamcs> \
 #       --seconds 120
@@ -294,8 +294,8 @@ run-thermostat-yamcs: check-tkinter
 			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
 		exit 1; \
 	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcssim \
-		--bin tcsverify --bin segsend
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-sim \
+		--bin tcs-verify --bin segsend
 	rm -rf $(TELEMETRY)
 	mkdir $(TELEMETRY)
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \

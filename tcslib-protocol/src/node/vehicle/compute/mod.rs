@@ -10,9 +10,9 @@
 //! what they agree about, beside the protocol. And the range it can carry is a
 //! rule about what a configuration may say -- a setpoint no reading can reach
 //! is a thermostat that will hold its heaters on for ever -- which is checked
-//! on a desk by `tcsverify` and must therefore be stated on this side.
+//! on a desk by `tcs-verify` and must therefore be stated on this side.
 //!
-//! They are here for one reason: `tcsverify` checks a configuration on a desk,
+//! They are here for one reason: `tcs-verify` checks a configuration on a desk,
 //! and it cannot check what it cannot see. The rules used to live beside the
 //! arithmetic, inside the flight program, so a thermostat with no `below` or a
 //! program with no `timeout` passed the ground check in silence and was
@@ -783,7 +783,7 @@ pub fn functions() -> &'static str {
 ///
 /// The list every computation is held to: `params_of` refuses an attribute
 /// that is not on it, and this is the same list said out loud so that a tool
-/// can ask. tcsgui's description tree is what asks -- a description of a
+/// can ask. tcs-gui's description tree is what asks -- a description of a
 /// computation names the attributes its panel offers, and a test holds those
 /// against this -- because a description that asked for something else would
 /// be a panel filling in a field the checking then refuses.

@@ -22,7 +22,7 @@ use crate::{DHConfig, DHMode, EndpointConfig, NetworkProtocol};
 ///
 /// * `dh`  - The payload, as the configuration settled it.
 /// * `sim` - What the simulator configuration settled for this payload, where
-///           the program has it. Tcssim always does; tcsmoc reads the file if
+///           the program has it. Tcs-sim always does; tcs-moc reads the file if
 ///           it is there, and says plainly when it is not rather than leaving
 ///           the simulation half of the set unexplained.
 ///
@@ -106,7 +106,7 @@ pub fn payload_parameters(dh: &DHConfig, sim: Option<&ResolvedSim>) -> String {
     }
 
     // And from the simulator configuration: how this payload behaves when
-    // tcssim simulates it. None of it reaches tcspecial.
+    // tcs-sim simulates it. None of it reaches tcspecial.
     let _ = writeln!(out);
     match sim {
         Some(sim) => simulator_parameters(&mut out, dh, sim),
@@ -415,7 +415,7 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
         sim.segment_interval.as_millis()
     );
     // A segment is a piece of a packet: equal to the packet is one piece, and
-    // larger than the packet is a pair that cannot be sent -- which tcssim
+    // larger than the packet is a pair that cannot be sent -- which tcs-sim
     // will not start, so it is said here rather than left to be found by a
     // button that does nothing.
     let _ = writeln!(
@@ -622,7 +622,7 @@ mod tests {
 
     /// A program that has not read the simulator file says so.
     ///
-    /// Tcsmoc controls payloads and does not simulate them, so the file may
+    /// Tcs-moc controls payloads and does not simulate them, so the file may
     /// not be there to read. Showing the payload half alone would leave the
     /// other half looking like a set that stated nothing.
     #[test]

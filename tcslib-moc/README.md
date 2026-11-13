@@ -31,8 +31,8 @@ part for each:
   connected. It says which build is running, which configuration it is serving and the
   digest of the files it read. It is the one thing a ground station can know
   about a spacecraft without having asked it anything.
-- **Waiting for the simulator.** `simulator::wait` asks tcssim, at the
-  address its simulator file gives as `tcssim.ready`, until it has made its
+- **Waiting for the simulator.** `simulator::wait` asks tcs-sim, at the
+  address its simulator file gives as `tcs-sim.ready`, until it has made its
   simulated devices and is set up for the same configuration, simulator file and
   `--simulate` mode, so that a harness starts tcspecial only once there is
   something for it to find. It says what it last heard when it gives up.
@@ -42,7 +42,7 @@ part for each:
   on a thread of its own, which turns the bus back into loopback UDP links:
   `command_links_of`, `beacon::open` and `GatewayReceiver::open` use it
   themselves for a configuration that answers to cFS, so a station is written
-  the same either way. `bus::SimulatedCfs` is the cFS end, as tcssim
+  the same either way. `bus::SimulatedCfs` is the cFS end, as tcs-sim
   simulates it: the vehicle and the station are both its peers. Only the
   simulated cFS end takes a station: SBN on a real cFS sends no peer what
   another published, so a station commands a vehicle behind a real cFS
@@ -55,7 +55,7 @@ publishes each one.
 ## What tcslib-moc is not
 
 tcslib-moc has no windows. Showing what it receives is the job of the programs
-built on it: `tcsui` holds the panels the ground programs share, and `tcsmoc`
+built on it: `tcs-ui` holds the panels the ground programs share, and `tcs-moc`
 is the test ground station that puts them on the screen.
 
 tcslib-moc does not define the link either. The commands, the telemetry, and the
@@ -65,9 +65,9 @@ only tcslib-moc.
 
 ## Who uses it
 
-- `tcsmoc`, the test ground station.
-- `tcssim`, whose `--wait` waits through `simulator`.
-- `tcsui`, the window pieces shared by the ground programs.
+- `tcs-moc`, the test ground station.
+- `tcs-sim`, whose `--wait` waits through `simulator`.
+- `tcs-ui`, the window pieces shared by the ground programs.
 - `examples/simple-app`, whose ground station `lorem_gateway` gets its data with
   one call to `GatewayReceiver::receive_into`, into a buffer it made beforehand.
 - `examples/beacon`, whose window watches the beacon through `beacon`.

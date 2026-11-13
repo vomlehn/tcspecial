@@ -58,10 +58,10 @@
             </gateway>
         </type>
     </gateways>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="ping-common" x="34" y="34"/>
             <node name="gateway" x="469" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

@@ -5,7 +5,7 @@ spacecraft's payloads as nodes in a configured graph, together with the ground
 software that commands it and the tools that write and check its
 configuration. Each program has a design document, its specification, and a
 manual, its user's guide: `docs/design.rst` and `docs/manual.rst` list them
-(`docs/tcspecial-design.rst`, `docs/tcsgui.rst` and so on).
+(`docs/tcspecial-design.rst`, `docs/tcs-gui.rst` and so on).
 
 ## What decides a design
 
@@ -23,23 +23,23 @@ argue from this order and say so.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib-moc` -- what a ground station is built on (only in the MOC):
   `TcsClient` for commands, `gateway::GatewayReceiver` for the vehicle's data,
-  `beacon` for its beacons, `simulator` for waiting until tcssim has made its
+  `beacon` for its beacons, `simulator` for waiting until tcs-sim has made its
   simulated devices, `bus` for a vehicle on a cFS software bus (the station's
-  SBN peer, and `SimulatedCfs`, the cFS end as tcssim simulates it).
+  SBN peer, and `SimulatedCfs`, the cFS end as tcs-sim simulates it).
 - `tcslib-moc-c` -- tcslib-moc for C and C++: beacons, data and commands behind
   one hand-written header, `include/tcslib-moc-c.h`, which `tests/c_and_cpp.rs`
   holds to the library by compiling a ground station against it with gcc and
   g++.
 - `tcspecial` -- the flight software.
-- `tcsmoc` -- the test ground station (GUI).
-- `tcssim` -- the payload simulator (GUI).
-- `tcsgui` -- the graphical configuration editor.
-- `tcsverify` -- checks a configuration and prints every problem with its file
-  and line. tcspecial, tcsmoc, tcssim and tcsgui all check through its
+- `tcs-moc` -- the test ground station (GUI).
+- `tcs-sim` -- the payload simulator (GUI).
+- `tcs-gui` -- the graphical configuration editor.
+- `tcs-verify` -- checks a configuration and prints every problem with its file
+  and line. tcspecial, tcs-moc, tcs-sim and tcs-gui all check through its
   `verify`, so they agree about what is wrong.
-- `tcsui` -- window pieces the ground programs share.
-- `tcsdiagram` -- how a configuration is drawn: the working panes, node
-  shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcsgui
+- `tcs-ui` -- window pieces the ground programs share.
+- `tcs-diagram` -- how a configuration is drawn: the working panes, node
+  shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcs-gui
   draws with it, and so does tcspecial's visual window (`--visual`, in a
   build with the `visual` feature, which never flies).
 - `tcsapp` and the `app_*` crates -- the file interfaces an app node's program
@@ -48,7 +48,7 @@ argue from this order and say so.
 
 A node type is three modules with the same name in three crates: its
 attributes and checks in `tcslib_protocol::node`, the flight-side node in
-`tcspecial::node`, and the simulator's simulated device in `tcssim::node`.
+`tcspecial::node`, and the simulator's simulated device in `tcs_sim::node`.
 
 ## Vocabulary
 
@@ -62,7 +62,7 @@ attributes and checks in `tcslib_protocol::node`, the flight-side node in
   of these were `moc` once; a file still saying so is refused, told the new
   word (`tcslib_protocol::graph::renamed`).
 - **MOC**: the mission operations center, on the ground. Still the word for
-  the ground itself -- tcsmoc, "the MOC sends" -- and for the terminals
+  the ground itself -- tcs-moc, "the MOC sends" -- and for the terminals
   below, but never for a node.
 - **terminals**: `world-in` (upper left), `world-out` (upper right),
   `moc-out` (lower left), `moc-in` (lower right). `world-` carries a
@@ -88,9 +88,9 @@ attributes and checks in `tcslib_protocol::node`, the flight-side node in
   is built, tested and documented as C/C++.
 - Configurations are YAML or XML, chosen by the file's extension. The two
   spellings of a configuration must say the same thing, so change both
-  together. `tcsverify a.xtcs a.ytcs a-sim.yaml` compares them, and
+  together. `tcs-verify a.xtcs a.ytcs a-sim.yaml` compares them, and
   `make comparespellings`, part of `make check`, compares every shipped
-  pair. tcsgui writes both spellings when both exist; an edit by hand
+  pair. tcs-gui writes both spellings when both exist; an edit by hand
   is made to both.
 
 ## Building and testing
@@ -99,23 +99,23 @@ attributes and checks in `tcslib_protocol::node`, the flight-side node in
 cargo build --workspace
 cargo test --workspace          # before claiming anything works
 cargo clippy --workspace --all-targets
-cargo run -q --bin tcsverify -- <configuration> [simulator file]
+cargo run -q --bin tcs-verify -- <configuration> [simulator file]
 make html-check                 # every committed page made again, and current
 ```
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
 `tcslib-moc/`, `tcslib-moc-c/` and `tcslib-protocol/` builds their HTML pages.
 
-tcspecial, tcssim and tcsmoc take `--simulate=none|some|all`. Left out it is
+tcspecial, tcs-sim and tcs-moc take `--simulate=none|some|all`. Left out it is
 `none`, the flight setting, under which tcspecial refuses every simulated
-and dummy device and tcssim will not start, so a run on a desk gives
+and dummy device and tcs-sim will not start, so a run on a desk gives
 `--simulate=all`, as the Makefiles' run targets do. tcspecial judges each
-payload a simulated device (tcssim's: a pseudo-terminal, a socket), a dummy
+payload a simulated device (tcs-sim's: a pseudo-terminal, a socket), a dummy
 device (the kernel's: i2c-stub, gpio-sim, vcan, iio_dummy) or a real device
 from what is at its endpoint (`tcslib_protocol::simulate`), never from a file.
 `network` and `device-file` nodes are always real devices and not judged.
 Which payloads are meant to be simulated is the simulator file's `simulate`,
-which tcssim holds to the same judgement; tcspecial never reads that file.
+which tcs-sim holds to the same judgement; tcspecial never reads that file.
 An hdlc, spi, rpmsg, iio, i2c_tmass or spi_tmass node may give
 `sim_address`, a loopback UDP address it is reached at instead of its device
 under `some` and `all`; the old name, `stand_in`, is refused.
@@ -123,7 +123,7 @@ under `some` and `all`; the old name, `stand_in`, is refused.
 The GUIs and tcspecial may be launched when what is being checked can only be
 seen by running them, but `cargo test` comes first. They bind fixed ports:
 commands on 4000, payload commands on 4200, beacons on 5550 and 5650, payload
-telemetry on 6000 and 6100. tcsmoc starts tcspecial and tcssim itself, and
+telemetry on 6000 and 6100. tcs-moc starts tcspecial and tcs-sim itself, and
 they are sent SIGTERM when it ends, however it ends, even by `kill -9`. Ones
 started some other way are not, so look for strays on those ports afterwards.
 

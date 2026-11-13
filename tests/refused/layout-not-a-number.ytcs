@@ -1,4 +1,4 @@
 # Refused: a position that is not a whole number.
-tcsgui:
+tcs-gui:
   nodes:
     - { node: a, x: 1, y: up }

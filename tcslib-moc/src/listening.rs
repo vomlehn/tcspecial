@@ -80,7 +80,7 @@ impl Listening {
     /// ground's end, `tcs_cmd.send`.
     ///
     /// The one address the vehicle takes commands from, so a station that
-    /// commands, tcsmoc among them, cannot be started beside this on the
+    /// commands, tcs-moc among them, cannot be started beside this on the
     /// same configuration: one of the two would not bind it.
     ///
     /// # Arguments

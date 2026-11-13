@@ -67,10 +67,10 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="gateway-1" x="790" y="129"/>
             <node name="lorem" x="15" y="204"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

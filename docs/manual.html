@@ -430,24 +430,24 @@ that has come down from the vehicle.</p>
 <h2>On a desktop</h2>
 <div class="figure">
 <object data="tcs-desktop.svg" style="width: 100%;" type="image/svg+xml">One desktop computer, with no vehicle and no hardware. make runmocy
-starts tcsmoc, which starts tcspecial and tcssim on the same
-configuration. tcsmoc sends tcspecial commands and shows the
+starts tcs-moc, which starts tcspecial and tcs-sim on the same
+configuration. tcs-moc sends tcspecial commands and shows the
 telemetry and beacons it sends back, over sockets on 127.0.0.1.
-tcspecial reads and writes the devices tcssim simulates, behind
+tcspecial reads and writes the devices tcs-sim simulates, behind
 pseudo-terminals and loopback sim_addresses, as it would real ones.</object>
 <p class="caption">The same software, every connection made on one desktop.</p>
 </div>
-<p>None of it needs a vehicle. On one desktop, <strong>tcsmoc</strong> stands in for the
-mission operations center and <strong>tcssim</strong> for the payloads, and between them
+<p>None of it needs a vehicle. On one desktop, <strong>tcs-moc</strong> stands in for the
+mission operations center and <strong>tcs-sim</strong> for the payloads, and between them
 runs the same tcspecial that flies. <tt class="docutils literal">make runmocy</tt> starts all three on one
 configuration, and every connection in the figure above is made on the
 desktop: commands, telemetry and beacons over sockets on the loopback
 interface, and the devices as pseudo-terminals and loopback addresses that
-tcssim answers on a physics model of the payloads. A configuration can be
+tcs-sim answers on a physics model of the payloads. A configuration can be
 developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.</p>
-<p>A configuration is written with <strong>tcsgui</strong>, which draws it as a diagram of
-nodes and links, and checked with <strong>tcsverify</strong>, which says what is wrong
+<p>A configuration is written with <strong>tcs-gui</strong>, which draws it as a diagram of
+nodes and links, and checked with <strong>tcs-verify</strong>, which says what is wrong
 with it without running any of it. Both read it through <strong>tcslib-protocol</strong>, the
 library the vehicle and the ground share, so the error a person sees on the
 desktop is the one the vehicle would refuse the file with.</p>
@@ -466,19 +466,19 @@ configuration files and what each payload, computation and gateway in
 them says, the shipped examples, installing, running the programs
 together, the commands the vehicle answers to, the crates used and
 the license.</dd>
-<dt><a class="reference external" href="tcsgui.html">The tcsgui manual</a></dt>
-<dd>The editor. tcsgui draws a configuration and its simulator
+<dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
+<dd>The editor. tcs-gui draws a configuration and its simulator
 configuration as diagrams of nodes and links, checks them as they are
 edited, and writes them back.</dd>
-<dt><a class="reference external" href="tcsmoc.html">The tcsmoc manual</a></dt>
-<dd>The simulated operations center. tcsmoc shows what the vehicle sends
+<dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
+<dd>The simulated operations center. tcs-moc shows what the vehicle sends
 the ground, panel by panel and in plots, and sends it commands.</dd>
-<dt><a class="reference external" href="tcssim.html">The tcssim manual</a></dt>
-<dd>The payload simulator. tcssim answers for a vehicle's payloads as their
+<dt><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a></dt>
+<dd>The payload simulator. tcs-sim answers for a vehicle's payloads as their
 devices would; its manual also describes the simulator configuration
 that says how.</dd>
-<dt><a class="reference external" href="tcsverify.html">The tcsverify manual</a></dt>
-<dd>The checker. tcsverify reads a configuration and says what is wrong
+<dt><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a></dt>
+<dd>The checker. tcs-verify reads a configuration and says what is wrong
 with it, running none of it.</dd>
 </dl>
 <p>The other documents beside these:</p>

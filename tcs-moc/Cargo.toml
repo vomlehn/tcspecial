@@ -1,0 +1,43 @@
+[package]
+name = "tcs-moc"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = "TCSpecial Mission Operations Center test GUI"
+build = "build.rs"
+
+[dependencies]
+tcslib-moc = { path = "../tcslib-moc" }
+# The panels this window is made of, and what to show on them.
+tcs-ui = { path = "../tcs-ui" }
+tcslib-protocol = { path = "../tcslib-protocol" }
+# No payload types: nothing here reaches a payload through tcspecial's code.
+# With its defaults this would turn every type back on in any build that
+# named tcs-moc and tcspecial together, which is how a vehicle's build would
+# come to contain types it was built without.
+tcspecial = { path = "../tcspecial", default-features = false }
+# Asked about the payload set before anything opens: see main.
+tcs-verify = { path = "../tcs-verify" }
+slint = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+libc = "0.2"
+#log = "0.4"
+#env_logger = "0.10"
+
+[dev-dependencies]
+# Lays the window out headlessly, so a test can measure it. Slint's own
+# testing backend; it uses real font metrics unless a component asks for the
+# fixed test font, which none of these do.
+i-slint-backend-testing = "1.18"
+# A directory a test can write a configuration of its own into: the ping
+# window's test, whose gateway node binds a socket the test holds.
+tempfile = "3"
+# Writes the manual's screenshots, which the window draws into memory: see
+# src/vehicle/screenshots.rs and make screenshots-tcs-moc.
+png = "0.18"
+
+[build-dependencies]
+slint-build = "1.3"
+
+[lints]
+workspace = true

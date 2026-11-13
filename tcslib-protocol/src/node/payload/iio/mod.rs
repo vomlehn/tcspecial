@@ -69,10 +69,10 @@ pub(crate) fn group_kind_of(
 /// What `--simulate` asks to change on an IIO node that is a real device.
 const TO_SIMULATE: &str =
     "point path at the iio_dummy sensor, which bin/mkiio makes, or at a \
-     pseudo-terminal tcssim makes";
+     pseudo-terminal tcs-sim makes";
 
 /// Judges whether an IIO device is a dummy or a simulated device: a sensor of
-/// the kernel's `iio_dummy`, or a pseudo-terminal tcssim made. See
+/// the kernel's `iio_dummy`, or a pseudo-terminal tcs-sim made. See
 /// [`crate::simulate`].
 ///
 /// A dummy sensor is made through configfs, under
@@ -176,12 +176,12 @@ mod judged_tests {
             sys: sys.path().to_path_buf(),
         };
         std::fs::create_dir_all(
-            sys.path().join("kernel/config/iio/devices/dummy/tcssim"),
+            sys.path().join("kernel/config/iio/devices/dummy/tcs-sim"),
         )
         .unwrap();
         let dummy = sys.path().join("devices/iio:device0");
         std::fs::create_dir_all(&dummy).unwrap();
-        std::fs::write(dummy.join("name"), "tcssim\n").unwrap();
+        std::fs::write(dummy.join("name"), "tcs-sim\n").unwrap();
         let real = sys.path().join("devices/iio:device1");
         std::fs::create_dir_all(&real).unwrap();
         std::fs::write(real.join("name"), "bmp280\n").unwrap();

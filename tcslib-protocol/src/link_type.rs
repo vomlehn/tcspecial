@@ -298,7 +298,7 @@ impl LinkType {
     /// following the one before with nothing between them.
     ///
     /// The one statement of a structure's width, which [`LinkType::accepts`]
-    /// holds a datum to and `tcsverify --summary` counts a link's bytes by.
+    /// holds a datum to and `tcs-verify --summary` counts a link's bytes by.
     ///
     /// # Returns
     ///

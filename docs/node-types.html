@@ -383,7 +383,7 @@ described here.</p>
 <li><a class="reference internal" href="#adding-a-payload-type" id="toc-entry-6">Adding a Payload Type</a><ul>
 <li><a class="reference internal" href="#in-tcslib-protocol" id="toc-entry-7">In <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt></a></li>
 <li><a class="reference internal" href="#in-tcspecial" id="toc-entry-8">In <tt class="docutils literal">tcspecial</tt></a></li>
-<li><a class="reference internal" href="#in-tcssim" id="toc-entry-9">In <tt class="docutils literal">tcssim</tt></a></li>
+<li><a class="reference internal" href="#in-tcs-sim" id="toc-entry-9">In <tt class="docutils literal"><span class="pre">tcs-sim</span></tt></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#adding-a-vehicle-type" id="toc-entry-10">Adding a Vehicle Type</a></li>
@@ -450,12 +450,12 @@ crates:</p>
 <dt><tt class="docutils literal"><span class="pre">tcslib_protocol::node</span></tt></dt>
 <dd>Its attributes, and every rule about what a configuration may say about it.
 tcslib-protocol is shared by the ground and the vehicle, so a rule written
-here is the one tcspecial, tcssim, tcsmoc, tcsgui and tcsverify all apply,
+here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all apply,
 and they all report it alike. A rule about what a configuration may say
 belongs here and nowhere else.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial::node</span></tt></dt>
 <dd>The flight side: opening the device, reading and writing it.</dd>
-<dt><tt class="docutils literal"><span class="pre">tcssim::node</span></tt></dt>
+<dt><tt class="docutils literal"><span class="pre">tcs_sim::node</span></tt></dt>
 <dd>The simulator's simulated device, which plays the payload on a desk.</dd>
 </dl>
 <p>Payloads are under <tt class="docutils literal"><span class="pre">node/payload/&lt;type&gt;/mod.rs</span></tt> in each crate, and vehicle
@@ -540,7 +540,7 @@ the node at the edge turns them into the type it sends.</p>
 of its own, is sent the ground after a count of its bytes, chosen for each
 source by <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> in <tt class="docutils literal"><span class="pre">tcslib-protocol/src/graph/telemetry.rs</span></tt>
 and written by <tt class="docutils literal">counted</tt> in <tt class="docutils literal"><span class="pre">tcslib-protocol/src/link_type.rs</span></tt>. A node never
-writes the count itself. Each configuration's own XTCE, which <tt class="docutils literal">tcsverify
+writes the count itself. Each configuration's own XTCE, which <tt class="docutils literal"><span class="pre">tcs-verify</span>
 <span class="pre">--xtce</span></tt> writes, says what each node sends the ground, and it takes that from
 <tt class="docutils literal">carries</tt>, so a new type that answers <tt class="docutils literal">carries</tt> needs nothing more there.</p>
 </div>
@@ -557,7 +557,7 @@ a <tt class="docutils literal">pub mod</tt> in <tt class="docutils literal">node
 into the endpoint the vehicle opens. Its errors name the attribute and say
 what to write instead;</li>
 <li><tt class="docutils literal">judged</tt>, which looks at what is at the node's endpoint and says whether
-it is a simulated device (tcssim's), a dummy device (the kernel's) or a
+it is a simulated device (tcs-sim's), a dummy device (the kernel's) or a
 real one. The judgement is made from what is there, never from a file,
 and <tt class="docutils literal"><span class="pre">--simulate</span></tt> decides which are allowed;</li>
 <li>its tests.</li>
@@ -592,13 +592,13 @@ follows.</dd>
 <dd><tt class="docutils literal">claims_of</tt>, which says what the node holds that no other node may,
 and the minimum attributes the tests' <tt class="docutils literal">node</tt> gives it.</dd>
 <dt><tt class="docutils literal">src/simulate.rs</tt></dt>
-<dd><tt class="docutils literal">judged_at</tt>, and <tt class="docutils literal">tcssim_makes</tt> if the kernel makes a dummy device
+<dd><tt class="docutils literal">judged_at</tt>, and <tt class="docutils literal">tcs_sim_makes</tt> if the kernel makes a dummy device
 for it.</dd>
 <dt><tt class="docutils literal">src/sim_config.rs</tt> and <tt class="docutils literal">src/parameters.rs</tt></dt>
 <dd><tt class="docutils literal">simulable</tt>, and <tt class="docutils literal">endpoint_parameters</tt>, the text of its panel.</dd>
 </dl>
 <p>Several of these are lists written by hand that repeat <tt class="docutils literal">DHType</tt>:
-<tt class="docutils literal">spellings</tt>, <tt class="docutils literal"><span class="pre">reach::kind_of</span></tt>, <tt class="docutils literal"><span class="pre">interface::sends</span></tt>, <tt class="docutils literal">tcssim_makes</tt>
+<tt class="docutils literal">spellings</tt>, <tt class="docutils literal"><span class="pre">reach::kind_of</span></tt>, <tt class="docutils literal"><span class="pre">interface::sends</span></tt>, <tt class="docutils literal">tcs_sim_makes</tt>
 and the <tt class="docutils literal">sim_address</tt> texts. A <tt class="docutils literal">match</tt> on <tt class="docutils literal">DHType</tt> or
 <tt class="docutils literal">EndpointConfig</tt> that misses the new variant is a compile error, but these
 are not, so go through them by name.</p>
@@ -628,14 +628,14 @@ and an arm in both <tt class="docutils literal">bind_endpoint_pair</tt> and <tt 
 once for each type with that type's feature alone. So every <tt class="docutils literal">use</tt> and
 every arm for the type must be gated by its feature, or that build fails.</p>
 </div>
-<div class="section" id="in-tcssim">
-<h2><a class="toc-backref" href="#toc-entry-9">In <tt class="docutils literal">tcssim</tt></a></h2>
-<p>The module, <tt class="docutils literal"><span class="pre">tcssim/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds a function
+<div class="section" id="in-tcs-sim">
+<h2><a class="toc-backref" href="#toc-entry-9">In <tt class="docutils literal"><span class="pre">tcs-sim</span></tt></a></h2>
+<p>The module, <tt class="docutils literal"><span class="pre">tcs-sim/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds a function
 <tt class="docutils literal">run_&lt;type&gt;_node</tt>, which plays the device: it answers as the device would,
 from the simulator file's settings and, for a sensor joined to the physics
-model, from the world. There is no trait. <tt class="docutils literal">tcssim/src/payload.rs</tt> runs it
+model, from the world. There is no trait. <tt class="docutils literal"><span class="pre">tcs-sim/src/payload.rs</span></tt> runs it
 from <tt class="docutils literal">run_kind</tt>, by a <tt class="docutils literal">PayloadProtocol</tt> variant, and
-<tt class="docutils literal">tcssim/src/endpoint.rs</tt> maps the node's endpoint and <tt class="docutils literal">sim_address</tt> to
+<tt class="docutils literal"><span class="pre">tcs-sim/src/endpoint.rs</span></tt> maps the node's endpoint and <tt class="docutils literal">sim_address</tt> to
 that protocol in <tt class="docutils literal">payload_config_attached</tt>, and describes it in
 <tt class="docutils literal">endpoint_description</tt>.</p>
 <p>A simulated device must behave as the real one does where tcspecial can
@@ -681,8 +681,8 @@ of its own as <tt class="docutils literal">vote</tt> and <tt class="docutils lit
 which types it takes, as <tt class="docutils literal">process</tt> takes only types with a text form
 (<tt class="docutils literal"><span class="pre">tcslib-protocol/src/link_text.rs</span></tt>), refuses the others in <tt class="docutils literal">params_of</tt>,
 naming the attribute and the types it may be.</p>
-<p>tcsgui offers a function as a node of its own, from
-<tt class="docutils literal"><span class="pre">tcsgui/share/nodes/vehicle/compute/&lt;function&gt;.yaml</span></tt> with
+<p>tcs-gui offers a function as a node of its own, from
+<tt class="docutils literal"><span class="pre">tcs-gui/share/nodes/vehicle/compute/&lt;function&gt;.yaml</span></tt> with
 <tt class="docutils literal">sets: {function: &lt;function&gt;}</tt>. The Python ground needs nothing for it:
 how it shows what a node sends follows from the type, in <tt class="docutils literal">form.py</tt>.</p>
 </div>
@@ -694,19 +694,19 @@ its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
 string or bytes must be XTCE's, so <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> must give it
 <tt class="docutils literal"><span class="pre">Count::Xtce</span></tt>. The Python ground lists gateway types by hand, in
 <tt class="docutils literal">GATEWAY_BASES</tt> and <tt class="docutils literal">ON_BUS</tt> in <tt class="docutils literal">python/tcslib_protocol/configuration.py</tt>.
-Its description in tcsgui is at the top of <tt class="docutils literal">tcsgui/share/nodes/</tt>, and since it
+Its description in tcs-gui is at the top of <tt class="docutils literal"><span class="pre">tcs-gui/share/nodes/</span></tt>, and since it
 has no node module, it is one of the exemptions in
-<tt class="docutils literal">every_description_has_its_rust</tt> in <tt class="docutils literal">tcsgui/src/nodes.rs</tt>.</p>
+<tt class="docutils literal">every_description_has_its_rust</tt> in <tt class="docutils literal"><span class="pre">tcs-gui/src/nodes.rs</span></tt>.</p>
 </div>
 <div class="section" id="the-editor-and-the-schemas">
 <h1><a class="toc-backref" href="#toc-entry-13">The Editor and the Schemas</a></h1>
-<p>A node type is offered in tcsgui's palette from a description,
-<tt class="docutils literal"><span class="pre">tcsgui/share/nodes/&lt;family&gt;/&lt;type&gt;.yaml</span></tt>: its <tt class="docutils literal">node</tt> and <tt class="docutils literal">type</tt>, an
+<p>A node type is offered in tcs-gui's palette from a description,
+<tt class="docutils literal"><span class="pre">tcs-gui/share/nodes/&lt;family&gt;/&lt;type&gt;.yaml</span></tt>: its <tt class="docutils literal">node</tt> and <tt class="docutils literal">type</tt>, an
 <tt class="docutils literal">about</tt> sentence, which terminals it has, and its <tt class="docutils literal">attributes</tt>, each with
 <tt class="docutils literal">name</tt>, <tt class="docutils literal">required</tt>, an optional <tt class="docutils literal">kind</tt> and its own <tt class="docutils literal">about</tt>. The
 terminal flags are still spelled by their old names, <tt class="docutils literal"><span class="pre">payload-sink</span></tt>,
 <tt class="docutils literal"><span class="pre">payload-source</span></tt>, <tt class="docutils literal"><span class="pre">gateway-sink</span></tt> and <tt class="docutils literal"><span class="pre">gateway-source</span></tt>, which
-<tt class="docutils literal">tcsgui/src/nodes.rs</tt> reads as <tt class="docutils literal"><span class="pre">world-in</span></tt>, <tt class="docutils literal"><span class="pre">world-out</span></tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>
+<tt class="docutils literal"><span class="pre">tcs-gui/src/nodes.rs</span></tt> reads as <tt class="docutils literal"><span class="pre">world-in</span></tt>, <tt class="docutils literal"><span class="pre">world-out</span></tt>, <tt class="docutils literal"><span class="pre">moc-in</span></tt>
 and <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Attributes that state a terminal's type, such as
 <tt class="docutils literal"><span class="pre">world-out-type</span></tt>, are listed as any other attribute is. The description
 is checked against <tt class="docutils literal">share/schema/node.schema.json</tt> and <tt class="docutils literal">node.xsd</tt>, and
@@ -721,7 +721,7 @@ The Python ground reads its type lists from the JSON schema, so it follows.</p>
 </div>
 <div class="section" id="drawing-it">
 <h1><a class="toc-backref" href="#toc-entry-14">Drawing It</a></h1>
-<p>How a type is drawn is in <tt class="docutils literal">tcsdiagram/src/style.rs</tt>: a <tt class="docutils literal">NodeType</tt>
+<p>How a type is drawn is in <tt class="docutils literal"><span class="pre">tcs-diagram/src/style.rs</span></tt>: a <tt class="docutils literal">NodeType</tt>
 variant, in <tt class="docutils literal">ALL</tt> with its length, <tt class="docutils literal">spelling</tt>, <tt class="docutils literal">family</tt>,
 <tt class="docutils literal">is_payload</tt>, <tt class="docutils literal">attributes</tt> (which must be the description's, in the
 same order and with the same <tt class="docutils literal">required</tt>), and <tt class="docutils literal">appearance</tt>, its edge,
@@ -759,11 +759,11 @@ is out of date.</p>
 <p>Each module has its tests beside it, in all three crates. A test for a fix
 should fail without the fix: check that it does.</p>
 <p>Many tests enumerate every type, and a new type that was missed somewhere
-fails one of them: the schema tests in <tt class="docutils literal">tcsgui/tests/schema.rs</tt>, which
+fails one of them: the schema tests in <tt class="docutils literal"><span class="pre">tcs-gui/tests/schema.rs</span></tt>, which
 hold the schemas to <tt class="docutils literal">types_in</tt> and <tt class="docutils literal"><span class="pre">DHType::ALL</span></tt>; the description tests
-in <tt class="docutils literal">tcsgui/src/nodes.rs</tt>; the drawing tests in <tt class="docutils literal">tcsdiagram</tt>;
+in <tt class="docutils literal"><span class="pre">tcs-gui/src/nodes.rs</span></tt>; the drawing tests in <tt class="docutils literal"><span class="pre">tcs-diagram</span></tt>;
 <tt class="docutils literal">the_features_are_the_optional_types</tt> and <tt class="docutils literal">tcspecial/tests/types.rs</tt>;
-and <tt class="docutils literal">tcsverify/tests/examples.rs</tt>. No test holds <tt class="docutils literal"><span class="pre">NodeType::ALL</span></tt> to
+and <tt class="docutils literal"><span class="pre">tcs-verify/tests/examples.rs</span></tt>. No test holds <tt class="docutils literal"><span class="pre">NodeType::ALL</span></tt> to
 <tt class="docutils literal">types_in</tt>, so a type missing from the drawing is caught only through the
 description tests.</p>
 <p>Before a new type is committed:</p>
@@ -794,11 +794,11 @@ fixed or any.</li>
 <li>tcspecial: the endpoint, the feature in <tt class="docutils literal">Cargo.toml</tt>, <tt class="docutils literal">BUILT</tt> and
 the rest of <tt class="docutils literal">node/payload/mod.rs</tt>, and both dispatchers in
 <tt class="docutils literal">endpoint.rs</tt>, every one gated by the feature.</li>
-<li>tcssim: <tt class="docutils literal">run_foo_node</tt>, <tt class="docutils literal">PayloadProtocol</tt> and <tt class="docutils literal">run_kind</tt>, and
+<li>tcs-sim: <tt class="docutils literal">run_foo_node</tt>, <tt class="docutils literal">PayloadProtocol</tt> and <tt class="docutils literal">run_kind</tt>, and
 <tt class="docutils literal">endpoint.rs</tt>.</li>
-<li>tcsgui: the description, its place in the list of descriptions, both
+<li>tcs-gui: the description, its place in the list of descriptions, both
 configuration schemas and both simulator schemas.</li>
-<li>tcsdiagram: <tt class="docutils literal">NodeType</tt> and its <tt class="docutils literal">appearance</tt>, two ways unlike every
+<li>tcs-diagram: <tt class="docutils literal">NodeType</tt> and its <tt class="docutils literal">appearance</tt>, two ways unlike every
 other type that are not colour.</li>
 <li>The design, the manual, <tt class="docutils literal">CLAUDE.md</tt> and the examples, and their HTML.</li>
 <li>The checks above.</li>

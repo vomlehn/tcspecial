@@ -28,7 +28,7 @@ from tcslib_protocol import yamcs as generated  # noqa: E402
 
 def options(**changed):
     """The options ping_yamcs reads, for the example's configuration, with
-    no tcsverify asked for: the digest is not what these tests are about.
+    no tcs-verify asked for: the digest is not what these tests are about.
 
     Args:
         changed: Options to change.
@@ -36,7 +36,7 @@ def options(**changed):
     Returns:
         A namespace like the one :func:`ping_yamcs.arguments` gives.
     """
-    said = dict(configuration=str(HERE / "ping-yamcs.xtcs"), tcsverify=None)
+    said = dict(configuration=str(HERE / "ping-yamcs.xtcs"), tcs_verify=None)
     said.update(changed)
     return types.SimpleNamespace(**said)
 
@@ -207,7 +207,7 @@ def with_more_nodes(directory):
         The copy's path.
 
     Raises:
-        unittest.SkipTest: Its own XTCE cannot be written: tcsverify is not
+        unittest.SkipTest: Its own XTCE cannot be written: tcs-verify is not
                            built.
     """
     text = (HERE / "ping-yamcs.xtcs").read_text()
@@ -233,8 +233,8 @@ def with_more_nodes(directory):
             </type>
         </payloads>
         """), " " * 4)
-    if text.count("    <tcsgui>") != 1:
-        raise ValueError("the example has no one tcsgui section")
+    if text.count("    <tcs-gui>") != 1:
+        raise ValueError("the example has no one tcs-gui section")
     # The gateway node lists the name pong's line arrives by, as every node
     # a line reaches does.
     arrives = "<world-in>ping</world-in>"
@@ -247,7 +247,7 @@ def with_more_nodes(directory):
     shutil.copy(HERE.parent / "ping-common" / "ping.xtcs", common)
     (directory / "ping-yamcs").mkdir(exist_ok=True)
     path = directory / "ping-yamcs" / "with-more-nodes.xtcs"
-    path.write_text(text.replace("    <tcsgui>", payloads + "    <tcsgui>"))
+    path.write_text(text.replace("    <tcs-gui>", payloads + "    <tcs-gui>"))
     written, why = configuration.write_own_xtce(path)
     if not written:
         raise unittest.SkipTest(f"no own XTCE for the copy: {why}")

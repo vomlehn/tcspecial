@@ -8,14 +8,14 @@ from a gateway node, and commands to the vehicle, behind one header,
 
 It is not a second implementation of anything. Each function is a call into
 [tcslib-moc](../tcslib-moc/README.md), so a C or C++ ground station reads the
-configuration, counts ports and ages beacons exactly as tcsmoc does, and the
+configuration, counts ports and ages beacons exactly as tcs-moc does, and the
 two cannot come to disagree.
 
 C and C++ alike: the header is C, includable from C++ as it stands, with C
 linkage throughout, and nothing in it that C++ will not compile.
 
 A configuration that answers to cFS is used through the same calls: tcslib-moc
-joins the cFS end as tcssim simulates it as an SBN peer, on a
+joins the cFS end as tcs-sim simulates it as an SBN peer, on a
 thread of its own, and the beacons, the data and the commands go over that
 peer (see "A vehicle on a cFS software bus" in
 [tcslib-moc's README](../tcslib-moc/README.md)). Nothing in the header changes.
@@ -186,7 +186,7 @@ header alone is also compiled as C99 and as C++11.
   nothing in the library locks one. `tcs_last_error()` is per thread.
 - **A beacon pass may wait for ever.** Before any beacon has arrived,
   `tcs_beacons_pass` waits for one, with no timeout: run it on a thread of
-  its own, as tcsmoc does. To stop that thread, make a waker with
+  its own, as tcs-moc does. To stop that thread, make a waker with
   `tcs_beacons_waker_open` before starting it, and call `tcs_beacons_wake`
   from the thread stopping it, then join it: the pass it is in ends,
   finding nothing. The F´ bridge stops its beacon thread this way.

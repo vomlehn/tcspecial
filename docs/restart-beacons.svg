@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="940" height="1035" viewBox="0 0 940 1035" role="img" aria-labelledby="title desc">
 <title id="title">A commanded restart, every beacon heard</title>
-<desc id="desc">The vehicle runs A, matched, beaconing every default interval; beacon 41 says normal. The station arms and sends RESTART. The vehicle takes it, sets the restart flag, answers Success, and sends beacon 42 at once with the flag set, which ends the station&#x27;s match. While it cleans up it beacons every reset interval, the number still going up. After the exec the new start&#x27;s first beacon, number 1, goes at once with the flag set; the number going back says a new start, and tcsmoc takes its link down. The station sends CONNECT with A, which matches: the vehicle clears the flag, answers, and sends beacon 2, normal, at once, and from then beacons every default interval.</desc>
+<desc id="desc">The vehicle runs A, matched, beaconing every default interval; beacon 41 says normal. The station arms and sends RESTART. The vehicle takes it, sets the restart flag, answers Success, and sends beacon 42 at once with the flag set, which ends the station&#x27;s match. While it cleans up it beacons every reset interval, the number still going up. After the exec the new start&#x27;s first beacon, number 1, goes at once with the flag set; the number going back says a new start, and tcs-moc takes its link down. The station sends CONNECT with A, which matches: the vehicle clears the flag, answers, and sends beacon 2, normal, at once, and from then beacons every default interval.</desc>
 <rect width="940" height="1035" fill="#ffffff"/>
 <text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">A commanded restart, every beacon heard</text>
 <line x1="40" y1="46" x2="110" y2="46" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
@@ -45,7 +45,7 @@
 <line x1="300" y1="660" x2="626" y2="690" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
 <polygon points="640,690 630,685 630,695" fill="#555555"/>
 <text x="408.8" y="663.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon #1, restart</text>
-<text x="652" y="694" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">number went back: a new start;</tspan><tspan x="652" dy="14">tcsmoc takes the link down: press</tspan><tspan x="652" dy="14">Connect</tspan></text>
+<text x="652" y="694" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">number went back: a new start;</tspan><tspan x="652" dy="14">tcs-moc takes the link down: press</tspan><tspan x="652" dy="14">Connect</tspan></text>
 <line x1="640" y1="750" x2="314" y2="780" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
 <polygon points="300,780 310,775 310,785" fill="#555555"/>
 <text x="531.2" y="753.6" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] CONNECT with A</text>

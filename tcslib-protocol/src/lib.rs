@@ -8,7 +8,7 @@
 //! definitions live here. Every configuration file format is parsed in this
 //! library, the simulator's included, so that no program reads a file in a
 //! way of its own; and a time or a sample of a transfer is formatted here, so
-//! that a panel in tcsmoc and a panel in tcssim show the one transfer the
+//! that a panel in tcs-moc and a panel in tcs-sim show the one transfer the
 //! same way.
 
 /// The beacon, as it goes on the link.
@@ -62,14 +62,14 @@ pub mod parameters;
 #[cfg(test)]
 mod ping_packet;
 pub mod protocol;
-/// Whether the simulator is ready: what a harness and tcssim say on tcssim's
+/// Whether the simulator is ready: what a harness and tcs-sim say on tcs-sim's
 /// readiness socket.
 pub mod ready;
 /// SBN, the Software Bus Network, as one peer of a cFS software bus speaks it.
 pub mod sbn;
 /// The simulator's own configuration language.
 ///
-/// Here with the other three rather than in tcssim: both GUIs read it now --
+/// Here with the other three rather than in tcs-sim: both GUIs read it now --
 /// one to simulate payloads and one to show what a payload set says -- and a
 /// configuration language read by two programs cannot live inside one of
 /// them.
@@ -80,7 +80,7 @@ pub mod sim_grouped;
 /// The shapes simulator files and physics models were written in before
 /// that, refused by line.
 pub mod sim_reshaped;
-/// The simulation mode, `--simulate`, as tcspecial, tcssim and tcsmoc take it.
+/// The simulation mode, `--simulate`, as tcspecial, tcs-sim and tcs-moc take it.
 pub mod simulate;
 /// Configurations kept on board, named by their checksum.
 pub mod store;
@@ -137,10 +137,10 @@ pub use verify::*;
 #[doc(hidden)]
 pub const MANUALS: [&str; 5] = [
     "tcspecial.rst",
-    "tcsgui.rst",
-    "tcsmoc.rst",
-    "tcssim.rst",
-    "tcsverify.rst",
+    "tcs-gui.rst",
+    "tcs-moc.rst",
+    "tcs-sim.rst",
+    "tcs-verify.rst",
 ];
 
 /// The design documents in `docs/`, one for each program, as the manuals
@@ -149,8 +149,8 @@ pub const MANUALS: [&str; 5] = [
 #[doc(hidden)]
 pub const DESIGNS: [&str; 5] = [
     "tcspecial-design.rst",
-    "tcsgui-design.rst",
-    "tcsmoc-design.rst",
-    "tcssim-design.rst",
-    "tcsverify-design.rst",
+    "tcs-gui-design.rst",
+    "tcs-moc-design.rst",
+    "tcs-sim-design.rst",
+    "tcs-verify-design.rst",
 ];

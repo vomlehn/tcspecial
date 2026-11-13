@@ -8,7 +8,7 @@
 //!
 //! # Checked before anything opens
 //!
-//! `Graph::check` is run here even though `tcsverify` runs it on the ground.
+//! `Graph::check` is run here even though `tcs-verify` runs it on the ground.
 //! The same code, on the same file, in both places: a configuration that
 //! reached a vehicle unchecked is the one case where the ground tool cannot
 //! help, and a bus opened on the strength of a file nobody checked is worse

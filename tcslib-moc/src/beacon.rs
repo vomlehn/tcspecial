@@ -16,8 +16,8 @@
 //! * The look: a colour, an indicator that blinks, a line of text in a box.
 //!
 //! Only the first is here. The second needs a toolkit and a window to put it
-//! in, and lives in `tcsui`, whose panel shows what this reports. They are
-//! separated because the facts outlast any one window: tcsmoc shows them in a
+//! in, and lives in `tcs-ui`, whose panel shows what this reports. They are
+//! separated because the facts outlast any one window: tcs-moc shows them in a
 //! panel beside its command link, the `beacon` example shows the same panel
 //! and nothing else, and a ground station with no window at all -- a logger, a
 //! test -- wants them with no toolkit linked in.
@@ -258,7 +258,7 @@ impl Schedule {
         Schedule::for_interval(STANDARD_INTERVAL)
     }
 
-    /// What tcsmoc shows, and what the `beacon` and `ping` examples show, for
+    /// What tcs-moc shows, and what the `beacon` and `ping` examples show, for
     /// a vehicle that beacons every `interval`.
     ///
     /// Counted in beacons missed -- see [`missed`] -- because that is what

@@ -1,5 +1,5 @@
 # TcsBridge: the component, built from its own FPP and C++ and from the model
-# tcsverify --fprime-model writes into model/, and linked with tcslib-moc-c.
+# tcs-verify --fprime-model writes into model/, and linked with tcslib-moc-c.
 #
 # tcslib-moc-c is cargo's: libtcs_moc_c.a, from the tree this directory is
 # in, as `cargo build -p tcslib-moc-c` leaves it. TCS_LIBRARY names another,
@@ -16,7 +16,7 @@ set(TCS_LIBRARY "${TCSPECIAL_ROOT}/target/debug/libtcs_moc_c.a"
 if (NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/model/TcsBridgeModel.fppi")
 	message(FATAL_ERROR
 		"${CMAKE_CURRENT_LIST_DIR}/model holds no model: write it with "
-		"`tcsverify --fprime-model=${CMAKE_CURRENT_LIST_DIR}/model "
+		"`tcs-verify --fprime-model=${CMAKE_CURRENT_LIST_DIR}/model "
 		"<configuration>`, or run `make` in fprime/, which does")
 endif()
 

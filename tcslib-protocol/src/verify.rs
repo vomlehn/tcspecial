@@ -4,7 +4,7 @@
 //! loading a file wants the first answer and nothing else: it cannot run, and
 //! which of several mistakes it names hardly matters. A person checking a file
 //! wants all of them, each beside the line that has to change -- which is what
-//! `tcsverify` is for.
+//! `tcs-verify` is for.
 //!
 //! So the rules are stated once and collect their answers. The loaders --
 //! [`crate::graph::Graph::check`] and [`crate::SimConfigFile::resolve`] --
@@ -14,7 +14,7 @@
 //! A problem says what it is about rather than where it is. Nothing here has
 //! seen the file: a parser hands up a document, and by then the lines are
 //! gone. Naming the payload or the group is enough, because a name is what a
-//! reader looks for in the file, and it is what `tcsverify` looks for too.
+//! reader looks for in the file, and it is what `tcs-verify` looks for too.
 
 /// What a problem is about, which is how the line it belongs to is found.
 #[derive(Debug, Clone, PartialEq, Eq)]

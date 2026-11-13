@@ -15,9 +15,9 @@ tcslib-protocol = { path = "../tcslib-protocol" }
 # one: see tcsapp. The same crate an app itself is written against, so that the
 # protocol is stated once.
 tcsapp = { path = "../tcsapp" }
-# The checks tcsverify makes, asked of the configuration before anything is
-# opened, so that what this refuses to start on is what tcsverify reports.
-tcsverify = { path = "../tcsverify" }
+# The checks tcs-verify makes, asked of the configuration before anything is
+# opened, so that what this refuses to start on is what tcs-verify reports.
+tcs-verify = { path = "../tcs-verify" }
 serde = { version = "1.0", features = ["derive"] }
 libc = "0.2"
 thiserror = "1.0"
@@ -28,7 +28,7 @@ socket2 = "0.6.2"
 tcslog = "0.3.1"
 # For the visual window only: see the `visual` feature.
 slint = { version = "1.18", optional = true }
-tcsdiagram = { path = "../tcsdiagram", optional = true }
+tcs-diagram = { path = "../tcs-diagram", optional = true }
 
 [build-dependencies]
 # Compiles the visual window's markup, and only for a build that has it.
@@ -65,11 +65,11 @@ default = [
     "hdlc",
     "raw",
 ]
-# The visual window, `tcspecial --visual`: the graph drawn as tcsgui draws it,
+# The visual window, `tcspecial --visual`: the graph drawn as tcs-gui draws it,
 # each link lit as data crosses it. Not a default and never in a build that
 # flies -- it brings a window toolkit into the flight software -- so a
 # tcspecial without it says so when it is asked for one. See src/visual.
-visual = ["dep:slint", "dep:slint-build", "dep:tcsdiagram"]
+visual = ["dep:slint", "dep:slint-build", "dep:tcs-diagram"]
 device-file = []
 serial = []
 i2c = []

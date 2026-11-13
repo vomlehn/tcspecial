@@ -1,0 +1,3573 @@
+import {
+    Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit
+} from "std-widgets.slint";
+import { Copyable, CopyButton } from "../../tcs-verify/ui/copy.slint";
+import { Fonts } from "../../tcs-ui/ui/fonts.slint";
+import { Colors } from "../../tcs-ui/ui/colors.slint";
+// How a configuration is drawn, shared with tcspecial's visual window: the
+// node shapes, the link lines, the ground they are drawn on, and the globals
+// and structs they take. See tcs-diagram. Exported again from here so that this
+// program's Rust sees them as its own.
+import {
+    Session, Space, Type, TerminalView, NodeView, LinkView, NodeShape,
+    LinkLine, SheetGround, PhysicsGround, Terminal
+} from "../../tcs-diagram/ui/diagram.slint";
+export { Session, Space, Type, TerminalView, NodeView, LinkView }
+
+// One thing that might be wrong, as the concerns window shows it.
+// A part of the sheet a window is zoomed to show, in the coordinates of the
+// whole sheet: see Surface's zoom-onto. Nothing, a width of nought.
+export struct Extent {
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
+export struct ConcernRow {
+    // The sentence: which node, and what about it.
+    said: string,
+    // The node it is about, which is what "go to it" goes to.
+    node: string,
+}
+
+// One problem a configuration opened with, and what is offered for it.
+// One thing a line in hand can be made into at the node it was taken to,
+// as the menu there offers it: what choosing it does, and whether it can be
+// chosen. One that cannot is shown greyed and says why in its words, so the
+// grey is never the only thing that says so.
+export struct JoinOffer {
+    said: string,
+    open: bool,
+}
+
+// One of a subdiagram's edge terminals, where its box would have it: its
+// name, where it is drawn in the working panes' own coordinates, and which
+// way its arrow points. See tcs_diagram::style::edge_box.
+export struct EdgeView {
+    terminal: string,
+    x: length,
+    y: length,
+    rightward: bool,
+}
+
+// One row of the palette: a family's heading, or a type to place.
+//
+// Headings in the list rather than a nested model: Slint's `for` takes one
+// model, and a list with a flag in it is simpler to build and to read than a
+// model of models.
+export struct PaletteEntry {
+    heading: string,
+    node: NodeView,
+    is-heading: bool,
+    // What the editor fills in on a node placed from this entry, as
+    // `name=value` pairs separated by semicolons.
+    //
+    // What makes one node type into several things to place: `compute` is one
+    // type, and `process`, `thermostat`, `to_kelvin`, `to_value` and `vote` are
+    // five entries, each a compute node with its `function` already answered.
+    // The pairs come from the description tree -- see tcs-gui/share/nodes -- and
+    // travel as text because a callback's arguments do.
+    sets: string,
+}
+
+// One field of the panel: an attribute of the selected node.
+export struct FieldView {
+    name: string,
+    value: string,
+    // What the description tree says about this attribute: one line, shown at
+    // the foot of a node's window while its field has the focus. Empty where
+    // nothing describes it -- a section parameter, a simulator setting, an
+    // attribute this build does not know.
+    about: string,
+    // Whether the configuration must state this one, which the panel says
+    // with a mark beside the name.
+    //
+    // Said and not insisted on. The editor is lazy: a field left empty is a
+    // question not yet answered, and an editor that marked it in red would be
+    // calling an unfinished node a broken one. What must be answered before a
+    // configuration flies is checked on the ground and aboard, where the
+    // complaint can name the file and the line.
+    required: bool,
+    // A rule across the panel with this name on it, rather than a field.
+    //
+    // What divides a node's own attributes from the settings the simulator
+    // file gives it: two files, one panel, and a line to say where one ends
+    // and the other begins.
+    is-heading: bool,
+    // Whether this field belongs to the simulator's file rather than to the
+    // configuration.
+    //
+    // The panel shows both and they are written to different files, so each
+    // row has to say which it is: the two go to different callbacks and are
+    // recorded as different edits.
+    simulated: bool,
+    // What kind of value this one takes, which decides what it is offered
+    // with: "boolean" is a control with two states, and everything else is a
+    // box to write in.
+    //
+    // From the description tree -- see `tcs_gui::nodes::KINDS`, which is the
+    // list of the words -- because what an attribute takes is a property of
+    // the node type and is written down beside the node type. An empty kind
+    // is text, which is what a field whose description says nothing is and
+    // what every simulator setting is for now.
+    kind: string,
+}
+
+// One attribute a group sets on every payload in it.
+//
+// Apart from FieldView because the question is different. A node's field is
+// filled in or not; a group's field is filled in, not filled in, or filled in
+// differently on different payloads -- and the third is worth saying, because
+// typing into the field will overwrite all of them.
+export struct GroupFieldView {
+    name: string,
+    value: string,
+    differs: bool,
+}
+
+// One selection pane: a heading, and one of every node type it offers.
+//
+// There are two of these -- the vehicle selection pane and the payload
+// selection pane -- and they are the same list of the same shapes drawn the
+// same way. A component rather than the markup twice, because two copies of a
+// list are two places a row's height or a heading's weight gets changed in.
+component SelectionPane inherits Rectangle {
+    // How large a shape is drawn here, against its size on the canvas. In
+    // the markup because it is a property of the list and not of the shape;
+    // tcs-gui's tests read it from here. See NodeShape's transform below.
+    property <float> shrink: 0.75;
+    in property <string> heading: "";
+    in property <[PaletteEntry]> palette: [];
+    // The ground of the working pane these go in, which is what the shapes in
+    // this list are coloured against: a reader picking a shape out of a list
+    // on a blush ground and putting it on a blush pane has been told where it
+    // goes twice, by the colour of the shape and by the colour under it.
+    in property <color> ground: #f2f2f0;
+    // Whether anything here may be placed, and if not, why: the physics list
+    // places into the simulator file, and a session given none has nowhere
+    // to put a component. Greyed and said, rather than hidden: a list that
+    // came and went would be a list somebody has to discover is there.
+    in property <bool> enabled: true;
+    in property <string> note: "";
+    callback place-node(string, string, string);
+    // An entry carried out of the list rather than clicked: where the pointer
+    // is while it is carried, and where it was let go, in the window's
+    // coordinates; or the carrying given up by the window system. See
+    // Surface's carry and put-down, which say what the sheet makes of it.
+    callback carry(PaletteEntry, length, length);
+    callback put-down(PaletteEntry, length, length);
+    callback carry-stopped();
+
+    background: root.ground;
+    border-width: 1px;
+    border-color: #d8d8d4;
+
+    ScrollView {
+        VerticalLayout {
+            padding: Space.step;
+            spacing: Space.step;
+            Text {
+                text: root.heading;
+                font-size: Type.body;
+                font-weight: Type.bold;
+                height: 18px;
+            }
+            if !root.enabled && root.note != "": Text {
+                text: root.note;
+                font-size: Type.small;
+                font-italic: true;
+                color: #6b7280;
+                wrap: word-wrap;
+            }
+            // A row as tall as the shape in it. A fixed height clipped the
+            // taller shapes into the row below them, which made a list of
+            // fourteen types read as a list of ten and a tangle.
+            for p in root.palette: Rectangle {
+                height: p.is-heading
+                    ? 22px
+                    : p.node.height * root.shrink + Space.step;
+                background: transparent;
+
+                // A family's heading. Quiet: it is there to group the shapes
+                // below it, not to be read first.
+                if p.is-heading: Text {
+                    x: 0;
+                    y: 6px;
+                    text: p.heading;
+                    font-size: Type.small;
+                    font-weight: Type.bold;
+                    color: #6b7280;
+                }
+
+                // At three quarters of the size it is drawn on the canvas, the
+                // whole of it -- outline, terminals and name -- so a list is a
+                // list of the shapes rather than a column of the canvas, and
+                // more of it is in view at once. Shrunk from its top left
+                // corner, which is where the row starts.
+                if !p.is-heading: NodeShape {
+                    node: p.node;
+                    transform-scale: root.shrink;
+                    opacity: root.enabled ? 1 : 0.4;
+                }
+                // The whole row, so the hit area is the row and not only the
+                // shape: a rounded end's corners are not part of the shape,
+                // and a press there should still place one.
+                //
+                // A press that stays put places one where it fits, as it
+                // always has; one that moves carries the shape out to the
+                // sheet, to be put down where it is let go. Told apart by
+                // the distance and not the time, as a node's click and drag
+                // are: a gesture that depends on how long it took does the
+                // wrong thing under pressure.
+                if !p.is-heading: TouchArea {
+                    // Whether this press has moved far enough to be a carry,
+                    // and whether the one just ended was one: a carry let go
+                    // over its own row is not a click as well.
+                    property <bool> carrying: false;
+                    property <bool> carried: false;
+                    // Nothing placed in a read-only session, or where this
+                    // list has nowhere to place.
+                    enabled: !Session.read-only && root.enabled;
+                    mouse-cursor: self.carrying
+                        ? MouseCursor.grabbing
+                        : MouseCursor.pointer;
+                    pointer-event(event) => {
+                        if (event.kind == PointerEventKind.down) {
+                            self.carrying = false;
+                            self.carried = false;
+                        }
+                        if (event.kind == PointerEventKind.up
+                            && self.carrying) {
+                            self.carrying = false;
+                            self.carried = true;
+                            root.put-down(p,
+                                self.absolute-position.x + self.mouse-x,
+                                self.absolute-position.y + self.mouse-y);
+                        }
+                        if (event.kind == PointerEventKind.cancel
+                            && self.carrying) {
+                            self.carrying = false;
+                            self.carried = true;
+                            root.carry-stopped();
+                        }
+                    }
+                    moved => {
+                        if (self.pressed && !self.carrying
+                            && (abs(self.mouse-x - self.pressed-x) > 4px
+                                || abs(self.mouse-y - self.pressed-y)
+                                    > 4px)) {
+                            self.carrying = true;
+                        }
+                        if (self.carrying) {
+                            root.carry(p,
+                                self.absolute-position.x + self.mouse-x,
+                                self.absolute-position.y + self.mouse-y);
+                        }
+                    }
+                    clicked => {
+                        if (!self.carrying && !self.carried) {
+                            root.place-node(p.node.name, p.node.node-type,
+                                p.sets);
+                        }
+                    }
+                }
+            }
+            Rectangle { }
+        }
+    }
+}
+
+// One field of a node's window: its name beside the box it is typed into, or
+// the tick box for a true or false. Beside rather than above, so that a row
+// is one line tall and a node's every attribute is in view at once.
+component FieldRow inherits HorizontalLayout {
+    in property <FieldView> field;
+    // The box took the focus, or lost it; something was typed; Enter; the
+    // tick box ticked or not.
+    callback came();
+    callback went();
+    callback typed(string);
+    callback done();
+    callback ticked(bool);
+    spacing: Space.step;
+
+    Text {
+        // A field the configuration must state says so, and says it
+        // quietly: an empty one is unanswered and not wrong.
+        text: root.field.required ? root.field.name + " *" : root.field.name;
+        font-size: Type.small;
+        // Italic for a setting of the simulator's file. The column says
+        // which file it is; this says it again on every row. Two channels
+        // for one distinction, as the node shapes have.
+        font-italic: root.field.simulated;
+        color: #6b7280;
+        // Wide enough for the longest name, ignore_trigger_percent.
+        width: 180px;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+    // A true or false, which is a control with two states rather than a
+    // box to write the word in: the two answers are the whole of what the
+    // attribute takes, so offering anything else to type is offering a way
+    // to be wrong.
+    //
+    // Unticked is both "false" and a file that says nothing, those meaning the
+    // same thing -- see `tcslib_protocol::node::vehicle::Restart::of` -- and
+    // ticking it writes the word, so what the file ends up saying is a word
+    // somebody chose and not a box they left alone.
+    if root.field.kind == "boolean": CheckBox {
+        enabled: !Session.read-only;
+        text: root.field.value == "true" ? "true" : "false";
+        checked: root.field.value == "true";
+        horizontal-stretch: 1;
+        changed has-focus => {
+            if (self.has-focus) {
+                root.came();
+            } else {
+                root.went();
+            }
+        }
+        toggled => { root.ticked(self.checked); }
+    }
+    if root.field.kind != "boolean": LineEdit {
+        read-only: Session.read-only;
+        text: root.field.value;
+        font-size: Type.body;
+        min-width: 180px;
+        horizontal-stretch: 1;
+        // Named for a screen reader, and so a test can find it, by the
+        // attribute it is a box for.
+        accessible-label: root.field.name;
+        changed has-focus => {
+            if (self.has-focus) {
+                root.came();
+            } else {
+                root.went();
+            }
+        }
+        edited => { root.typed(self.text); }
+        accepted => { root.done(); }
+    }
+}
+
+// A name, as every window with something named in it shows it: a field to
+// type a new one in, and beside it a small "x" that clears the field to type
+// the new one from nothing. One component, so that a node's window and a
+// physics component's offer the one control the one way.
+//
+// Renamed when somebody is done with the name, as a field's value is taken:
+// on Enter, on leaving the field, and, in a node's window, on Close or the
+// window closed. Not on every keystroke: a name is what every line to the
+// thing is drawn by, so each letter typed would be a rename to undo. A name
+// cleared and left empty renames nothing, and the field shows the name again.
+component NameField inherits HorizontalLayout {
+    in property <string> name: "";
+    callback renamed(string);
+    spacing: Space.tight;
+
+    // Takes what is in the field. The name it already had is taken too,
+    // which renames nothing and clears a complaint about a name typed
+    // before it and since put back.
+    public function take() {
+        if (field.text == "") {
+            field.text = root.name;
+        }
+        root.renamed(field.text);
+    }
+
+    // The field follows the name it shows, so a rename made here, undone or
+    // redone, is what it says afterwards.
+    changed name => {
+        field.text = root.name;
+    }
+
+    field := LineEdit {
+        text: root.name;
+        read-only: Session.read-only;
+        font-size: Fonts.window;
+        accessible-label: "name";
+        horizontal-stretch: 1;
+        accepted => { root.take(); }
+        changed has-focus => {
+            if (!self.has-focus && !Session.read-only) {
+                root.take();
+            }
+        }
+    }
+    // Small and plainly a clearing: the letter, not a word, and named for a
+    // screen reader.
+    Button {
+        text: "x";
+        enabled: !Session.read-only;
+        accessible-label: "clear the name";
+        clicked => {
+            field.text = "";
+            field.focus();
+        }
+    }
+}
+
+// One divider between two working panes: the line, its handle, and what a
+// press lands on.
+//
+// A component because there are two of them and they are the same control. The
+// line follows the pointer while the handle is held and the divider settles
+// when the gesture ends: one change for one gesture, as a node's drag is.
+// One line between two selection lists: a handle that reports how far it was
+// dragged, downwards.
+//
+// The horizontal twin of PaneDivider, and the same arrangement for the same
+// reason: the grip is a sibling of the line, so its coordinates stay where the
+// line was for as long as the gesture lasts.
+//
+// It reports the whole column's height along with the distance, because what a
+// share is depends on what it is a share of, and the arithmetic that turns the
+// two into a percentage belongs in Rust where it can be tested: see
+// tcs_gui::drag_list_divider.
+component ListDivider inherits Rectangle {
+    callback moved(length, length);
+
+    height: 7px;
+    background: transparent;
+
+    Rectangle {
+        y: parent.height / 2
+            + (grip.pressed ? grip.mouse-y - grip.pressed-y : 0px);
+        x: 0;
+        width: 100%;
+        height: grip.has-hover || grip.pressed ? 2px : 1px;
+        background: grip.has-hover || grip.pressed ? #6b7280 : #cbcdd1;
+
+        // The handle: a grooved pill in the middle of the line, so that a line
+        // which can be dragged does not look like one which cannot.
+        Rectangle {
+            x: parent.width / 2 - 20px;
+            y: -6px;
+            width: 40px;
+            height: 13px;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: grip.has-hover || grip.pressed ? #6b7280 : #b4b7bd;
+            background: grip.pressed ? #e8e9eb : white;
+
+            for groove in 3: Rectangle {
+                x: 14px + groove * 6px;
+                y: 4px;
+                width: 1px;
+                height: 5px;
+                background: #9ca3af;
+            }
+        }
+    }
+
+    grip := TouchArea {
+        width: 100%;
+        height: 100%;
+        mouse-cursor: MouseCursor.row-resize;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.up) {
+                root.moved(self.mouse-y - self.pressed-y, root.parent-height);
+            }
+        }
+    }
+
+    // How tall the column is, which the parent passes in: an element cannot
+    // ask its parent's height without the parent saying so.
+    in property <length> parent-height: 0px;
+}
+
+component PaneDivider inherits Rectangle {
+    // Where the divider is, in the window's own coordinates.
+    in property <length> at: 0px;
+    // How far the handle was dragged, said once when the gesture ends.
+    callback moved(length);
+
+    // The grip is a sibling of the line and not a child, so its coordinates
+    // stay where the line was for as long as the gesture lasts -- an offset
+    // measured in a frame the offset moves cancels itself, which is a mistake
+    // this file has made once already.
+    x: 0;
+    y: 0;
+    width: 100%;
+    height: 100%;
+
+    Rectangle {
+        x: at + (grip.pressed ? grip.mouse-x - grip.pressed-x : 0px);
+        y: 0;
+        width: grip.has-hover || grip.pressed ? 2px : 1px;
+        height: 100%;
+        background: grip.has-hover || grip.pressed ? #6b7280 : #cbcdd1;
+
+        // The handle: a grooved pill halfway down the line. A line that can be
+        // dragged and one that cannot look identical without it, and a control
+        // nobody can see is a control nobody uses.
+        Rectangle {
+            x: -6px;
+            y: parent.height / 2 - 20px;
+            width: 13px;
+            height: 40px;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: grip.has-hover || grip.pressed ? #6b7280 : #b4b7bd;
+            background: grip.pressed ? #e8e9eb : white;
+
+            for groove in 3: Rectangle {
+                x: 4px;
+                y: 14px + groove * 6px;
+                width: 5px;
+                height: 1px;
+                background: #9ca3af;
+            }
+        }
+    }
+
+    // What a press lands on. Wider than the line, because a line a pixel wide
+    // is a line nobody can hit; before the nodes in the surface, so that a
+    // node held against a divider takes a press on itself rather than losing
+    // it to the divider.
+    grip := TouchArea {
+        x: at - 7px;
+        y: 0;
+        width: 15px;
+        height: 100%;
+        mouse-cursor: MouseCursor.col-resize;
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.up) {
+                root.moved(self.mouse-x - self.pressed-x);
+            }
+        }
+    }
+}
+
+// The editing surface: a bar, three selection panes and three working panes.
+//
+// One component because there are two windows that need it -- the top diagram
+// and each open subdiagram -- and two copies of a canvas would be two places
+// for a drawing rule to be changed in. What differs between the windows is
+// only what they are given: a subdiagram's window is handed its own nodes and
+// its own name, and is otherwise this.
+component Surface inherits Rectangle {
+    in property <[NodeView]> nodes: [];
+    in property <[LinkView]> links: [];
+    // The line a gesture is drawing, as SVG path data in canvas coordinates,
+    // and empty when no gesture is running. Dashed, and in pieces because a
+    // path here has no dash pattern: see tcs_diagram::route::drawing.
+    in property <string> drawing-route: "";
+    // The two selection panes' contents, and the two working panes' geometry.
+    //
+    // All four come from Rust -- see style.rs and main.rs -- because which
+    // types are payloads and where the divider falls are facts about a
+    // configuration rather than about a window, and they are checked by tests
+    // there. Stating the divider in this file as well would be stating it
+    // twice.
+    in property <[PaletteEntry]> gateway-palette: [];
+    in property <[PaletteEntry]> vehicle-palette: [];
+    in property <[PaletteEntry]> payload-palette: [];
+    // The physics components a simulator file's world may hold, which the
+    // physics list offers; and whether there is a simulator file to put one
+    // in. See tcs_diagram::physics.
+    in property <[PaletteEntry]> physics-palette: [];
+    in property <bool> has-world: false;
+    // The Physics pane, left of the payloads: how wide it is, what its
+    // heading is painted, and its nodes and links, in the coordinates of the
+    // whole canvas, whose nought is the Physics pane's left edge. Every
+    // window shows it, a subdiagram's too: the physics model is the
+    // simulator file's and one world, so each page shows the same one and
+    // joins its own payloads to it. See tcs_diagram::pane.
+    in property <length> physics-width: 0px;
+    in property <color> physics-ground: white;
+    in property <[NodeView]> physics-nodes: [];
+    in property <[LinkView]> physics-links: [];
+    in property <int> physics-list-percent: 20;
+    in property <length> payload-divider: 0px;
+    in property <length> vehicle-divider: 0px;
+    in property <length> working-width: 0px;
+    // How long the sheet is, in the coordinates the file holds: one length
+    // for all three panes, which is what makes them scroll together. From
+    // Rust -- see tcs_diagram::pane::WORKING_HEIGHT -- as the width is.
+    in property <length> working-height: 0px;
+    // What each pane's own tint is: light, neutral, and the light end of the
+    // hue family its own nodes are drawn in, so that a node's colour says which
+    // pane it belongs in. It paints two things -- the heading band at the top
+    // of that working pane, and the selection pane a node of its is taken from
+    // -- and not the working pane itself, which is one sheet with the other
+    // two. From Rust -- see tcs_diagram::style::Ground -- for the reason the
+    // tints come from there: what a colour means is a rule with tests on it,
+    // and this file paints.
+    in property <color> gateway-ground: white;
+    in property <color> vehicle-ground: white;
+    in property <color> payload-ground: white;
+
+    // How deep undo currently goes, shown rather than guessed at: a person
+    // about to abandon an afternoon's work deserves to know how much of it is
+    // still reachable. One history for the whole configuration, so every
+    // window shows the same two numbers.
+    in property <int> undo-depth: 0;
+    in property <int> redo-depth: 0;
+    in property <string> undo-label: "";
+    in property <string> redo-label: "";
+    // What went wrong with saving, if anything. The window's one red text.
+    // Where the sheet is scrolled to, and how much of it is in view.
+    //
+    // Two-way, because both ends of it have something to say: a person
+    // scrolling moves it, and placing a node sets it so the new node is at the
+    // top of the view -- see tcs_diagram::pane::place_in. The offset is the
+    // viewport's, which is negative as it scrolls down, but in the sheet's
+    // own pixels rather than the window's, so that Rust reads it back as the
+    // top of the view whatever the sheet is drawn at: see `zoom`.
+    in-out property <length> canvas-offset: 0px;
+    // How much of the sheet the window is showing, which is what decides
+    // whether a place is in view; in the sheet's pixels, likewise.
+    out property <length> canvas-view-height: sheet.visible-height / zoom;
+
+    // How large the sheet is drawn: whole, or smaller, so that a window too
+    // narrow for all of it shows some of every pane rather than none of the
+    // last. Drawn smaller rather than with narrower panes because a node's
+    // place is in its file, in the sheet's pixels; narrower panes would put
+    // nodes outside them that nobody had moved. Never under a half, below
+    // which a node's type cannot be read, and the window is never made
+    // narrower than the sheet at a half: see MainWindow's min-width. Only
+    // the drawing scales -- a node dragged, a line drawn and a node placed
+    // are all in the sheet's pixels, which the window toolkit maps a press
+    // into -- so nothing that reads a position knows it.
+    //
+    // That is the zoom a window starts at, and goes back to when the View
+    // menu says to fit the width. The menu's other entries choose one
+    // instead, which is kept in `zoom-chosen` until the next; nought is
+    // none chosen. A chosen zoom may be under a half, a person who asked to
+    // see the whole page being shown it, types too small to read and all.
+    in-out property <float> zoom-chosen: 0;
+    out property <float> zoom: root.zoom-chosen > 0 ? root.zoom-chosen
+        : max(0.5, min(1.0, sheet.visible-width
+            / max(1px, root.sheet-width)));
+
+    // The sheet zoomed so that `area` fills the view, with a margin round
+    // it, and scrolled so that it is in the middle. Never past twice the
+    // size, at which one node fills a window, nor under a quarter, at which
+    // a node is a dot. Nothing for an empty area.
+    //
+    // The view's top is said as canvas-offset, in the sheet's pixels, and
+    // not only as the viewport's offset: the change of zoom moves the
+    // viewport back to canvas-offset, so that is the one that must be right.
+    public function zoom-onto(area: Extent) {
+        if (area.width <= 0) {
+            return;
+        }
+        let margin = 2 * Space.room;
+        let z = max(0.25, min(2.0, min(
+            sheet.visible-width / (area.width + 2 * margin),
+            sheet.visible-height / (area.height + 2 * margin))));
+        root.zoom-chosen = z;
+        root.look-at(area.x + area.width / 2, area.y + area.height / 2, z);
+    }
+    // The zoom chosen outright, keeping whatever is in the middle of the
+    // view there.
+    public function zoom-to(z: float) {
+        let middle-x = (sheet.visible-width / 2 - sheet.content-x)
+            / root.zoom;
+        let middle-y = (sheet.visible-height / 2 - sheet.content-y)
+            / root.zoom;
+        root.zoom-chosen = z;
+        root.look-at(middle-x, middle-y, z);
+    }
+    // And the zoom the window would choose for itself, back.
+    public function zoom-to-width() {
+        root.zoom-chosen = 0;
+    }
+    // The view scrolled so that a point on the sheet is in its middle at
+    // zoom `z`, or as near as the sheet's edges let it be.
+    function look-at(x: length, y: length, z: float) {
+        sheet.content-x = min(0px, max(
+            sheet.visible-width - root.sheet-width * z,
+            sheet.visible-width / 2 - x * z));
+        let top = min(0px, max(
+            sheet.visible-height - root.working-height * z,
+            sheet.visible-height / 2 - y * z));
+        root.canvas-offset = top / z;
+        sheet.content-y = top;
+    }
+    // A subdiagram's page: how wide the margin either side of what is
+    // inside it is -- the Physics pane and the working panes -- which holds
+    // the page's edge, and the edge's terminals, in the working panes' own
+    // coordinates. Nought and none on the top page, which has nothing
+    // outside it. See tcs_diagram::style::edge_box.
+    in property <length> edge-width: 0px;
+    in property <[EdgeView]> edge-terminals: [];
+    // A line taken from one of the edge's terminals, by name.
+    callback edge-started(string);
+    // Where the working panes begin on the sheet, past the left margin and
+    // the Physics pane, in that order; and how wide the whole sheet is.
+    property <length> left: root.physics-width + root.edge-width;
+    property <length> sheet-width: root.physics-width + 2 * root.edge-width
+        + root.working-width;
+
+    // The view's place kept as the sheet's, both ways: a person scrolling
+    // moves the viewport, and Rust or a change of zoom moves it back to the
+    // same place on the sheet. Each is set only from the other, so the two
+    // settle at once rather than chasing each other.
+    changed canvas-offset => { sheet.content-y = root.canvas-offset * zoom; }
+    changed zoom => { sheet.content-y = root.canvas-offset * zoom; }
+
+    // The configuration's errors, one line each, and which was chosen from
+    // the errors button's menu: see the bar.
+    in property <[string]> error-rows: [];
+    callback error-chosen(int);
+    // How many concerns there are, and how many were set aside: see the two
+    // buttons in the bar.
+    in property <int> concern-count: 0;
+    in property <int> aside-count: 0;
+    callback show-concerns();
+    callback show-aside();
+    // How many of this page's nodes lie outside their own panes, across,
+    // and the button that lays them out again: see the bar.
+    in property <int> outside-count: 0;
+    callback arrange();
+
+    in property <string> trouble: "";
+    // And what the last command did, where it did something worth saying:
+    // Save as writes files somebody named, and a history put back or set
+    // aside at the start changes what the window holds without an edit, so
+    // silence would leave them wondering what had happened. Not red, and in
+    // the same place as "saved", that line already meaning "what has just
+    // happened".
+    in property <string> said: "";
+    // Whether there are edits the files do not have, which with Autosave off
+    // is every edit until Save: the line then says so rather than "saved".
+    in property <bool> unsaved: false;
+    // What this surface is editing: empty for the top diagram, the
+    // subdiagram's name otherwise. Shown in the bar so that two windows side
+    // by side cannot be confused for one another.
+    in property <string> editing: "";
+
+    callback undo-clicked();
+    callback redo-clicked();
+    callback place-node(string, string, string);
+    callback node-moved(string, length, length);
+    // One of the two dividers between the three working panes was dragged by
+    // this much. Two callbacks and not one with a name in it: which divider
+    // moved is known where the gesture happened, and a string crossing the
+    // boundary would be a name to keep in step in two files.
+    // How the selection column is divided, as the gateway and vehicle lists'
+    // shares of it, the payload list taking what is left. From Rust, where the
+    // settings file keeps them: see tcs_gui::Views::lists.
+    in property <int> gateway-list-percent: 20;
+    in property <int> vehicle-list-percent: 35;
+    // And the two lines between the lists, dragged: how far it went and how
+    // tall the whole column is. See tcs_gui::drag_list_divider.
+    callback payload-list-divider-moved(length, length);
+    callback vehicle-list-divider-moved(length, length);
+    callback payload-divider-moved(length);
+    callback vehicle-divider-moved(length);
+    // The line between the Physics pane and the payloads, dragged; and the
+    // line under the physics list.
+    callback physics-divider-moved(length);
+    callback physics-list-divider-moved(length, length);
+    // A physics component placed from the list, by its type; and one on the
+    // canvas, asked to be edited or deleted, by its name.
+    callback place-physics(string);
+    // An entry carried out of a list and put down on the sheet: a node by
+    // what was carried, its type and what its entry sets, or a physics
+    // component by its type; with where its top left corner goes, in the
+    // coordinates of the whole sheet, whose nought is the Physics pane's
+    // left edge. Kept to its own pane by tcs-gui, as a node dragged is.
+    callback drop-node(string, string, string, length, length);
+    callback drop-physics(string, length, length);
+
+    // The entry being carried out of a list, if one is, and where the pointer
+    // is, in this surface's coordinates: its shape is drawn there, so that
+    // what will be put down, and where, is seen before it is.
+    property <bool> carrying: false;
+    property <NodeView> carried;
+    property <length> carry-x;
+    property <length> carry-y;
+
+    function carry(entry: PaletteEntry, x: length, y: length) {
+        root.carried = entry.node;
+        root.carry-x = x - root.absolute-position.x;
+        root.carry-y = y - root.absolute-position.y;
+        root.carrying = true;
+    }
+
+    // Where an entry was let go, in the window's coordinates, made a place on
+    // the sheet: the shape centred on the pointer, as it was drawn while it
+    // was carried. Let go anywhere but over the sheet -- back over the lists,
+    // say -- it is put back, and nothing is placed.
+    //
+    // A point on the sheet is drawn at the zoom times its place, plus the
+    // scroll, as the dividers over the sheet are placed; so the point is
+    // taken off the scroll and then the scale undone.
+    function put-down(entry: PaletteEntry, physics: bool, x: length,
+                      y: length) {
+        root.carrying = false;
+        if (x < sheet.absolute-position.x
+            || x > sheet.absolute-position.x + sheet.visible-width
+            || y < sheet.absolute-position.y
+            || y > sheet.absolute-position.y + sheet.visible-height) {
+            return;
+        }
+        if (physics) {
+            root.drop-physics(entry.node.node-type,
+                (x - sheet.absolute-position.x - sheet.content-x)
+                    / root.zoom
+                    - entry.node.width / 2,
+                (y - sheet.absolute-position.y - sheet.content-y)
+                    / root.zoom
+                    - entry.node.height / 2);
+        } else {
+            root.drop-node(entry.node.name, entry.node.node-type, entry.sets,
+                (x - sheet.absolute-position.x - sheet.content-x)
+                    / root.zoom
+                    - entry.node.width / 2,
+                (y - sheet.absolute-position.y - sheet.content-y)
+                    / root.zoom
+                    - entry.node.height / 2);
+        }
+    }
+    callback physics-edit(string);
+    callback physics-delete(string);
+    // A component dragged by this much, by its name, as node-moved is.
+    callback physics-moved(string, length, length);
+    // A line taken from a component's terminal -- `moc-out` for its one
+    // output, `world-in` for its one input -- followed while the hand moves
+    // and clicked down on the canvas, as link-started, link-moved and
+    // link-clicked are for a configuration's node; in the coordinates of the
+    // whole canvas, whose nought is the Physics pane's left edge.
+    callback physics-link-started(string, string);
+    callback physics-link-moved(length, length);
+    callback physics-link-clicked(length, length);
+    // Which of join-offers was chosen, by its place in the list.
+    callback physics-chosen(int);
+    // The line put down with nothing made of it.
+    callback physics-link-stopped();
+    callback open-subdiagram(string);
+    // Write every file of the configuration now.
+    callback save-clicked();
+    // Drawing a link, in three clicks: a terminal, which takes a line in
+    // hand; a node, which offers what the line can be made into there; and
+    // one of those offers. See join-offers.
+    callback link-started(string, string);
+    callback link-clicked(length, length);
+    // Which of join-offers was chosen, by its place in the list.
+    callback link-chosen(int);
+    // The line put down with nothing made of it: Escape, a right click, a
+    // click on bare sheet, or Cancel.
+    callback link-stopped();
+    // The line in hand, which was picked up off a terminal, taken out: the
+    // Delete key.
+    callback link-removed();
+    // Where the pointer is while a line is in hand. See drawing-route.
+    callback link-moved(length, length);
+    // Which kind of line is in hand: "node" for one from a configuration's
+    // node, "physics" for one from a physics component, and empty for none.
+    // While there is one, a click anywhere on the sheet is about the line --
+    // see the TouchArea that takes them -- and not about what is under it.
+    in property <string> joining: "";
+    // What the window says about the line in hand: what to click next, and
+    // how to put it down.
+    in property <string> join-hint: "";
+    // What can be made of the line at the node just clicked, and that node's
+    // name, which heads the menu. Empty when nothing is being asked.
+    in property <[JoinOffer]> join-offers: [];
+    in property <string> join-heading: "";
+    // Where the menu is shown: where the node was clicked, in the
+    // coordinates of the whole canvas.
+    property <length> join-x: 0px;
+    property <length> join-y: 0px;
+    // The line put down, whichever kind it is.
+    function stop-joining() {
+        if (root.joining == "physics") {
+            root.physics-link-stopped();
+        } else {
+            root.link-stopped();
+        }
+    }
+    callback node-selected(string);
+    // What a node's own menu asks for: see NodeShape's menu.
+    callback node-edit(string);
+    callback node-delete(string);
+
+    // Which node is drawn as chosen. What it says about itself is in a window
+    // of its own -- see NodeWindow -- so this is all the canvas needs.
+    in property <string> selected: "";
+    // Which line is selected instead, by its place in `links`, or -1; and
+    // which physics component, by name. At most one of the three is set:
+    // whatever is selected is what the Delete key takes.
+    in property <int> selected-link: -1;
+    in property <string> selected-physics: "";
+    // A line selected by a click of either button on it, by its place in
+    // `links`; a
+    // physics component selected by a press on it; and nothing selected, by
+    // a click on neither a line nor a shape.
+    callback link-picked(int);
+    callback physics-picked(string);
+    callback unpicked();
+    // A line deleted, by its place in `links`: from the menu a right click
+    // on it opens, or by the Delete key while it is selected.
+    callback link-delete(int);
+    // Which line is under a point, in the working panes' coordinates, by its
+    // place in `links`, or -1 for none: worked out in Rust, which has the
+    // lines' routes as points. See tcs_diagram::route::distance_to.
+    pure callback link-at(length, length) -> int;
+    // What a pointer resting on the sheet is told about the line under it,
+    // or nothing for none: a configuration's line by the point in the
+    // working panes' coordinates, and a physics line, failing that, by the
+    // point in the whole sheet's. See tcs_diagram::view::tip_of.
+    pure callback tip-at(length, length, length) -> string;
+    // What the tip says now: nothing while no line is pointed at, and
+    // nothing while a line is being drawn, whose pointer is busy.
+    property <string> tip: ground.has-hover && root.drawing-route == ""
+        ? root.tip-at(ground.mouse-x - root.left, ground.mouse-y,
+            ground.mouse-x)
+        : "";
+    // The line the menu a right click opened is about.
+    property <int> menu-link: -1;
+
+    // A node chosen, by a press on it of either button, and the keys given
+    // to the selection so that Delete reaches it.
+    function pick-node(name: string) {
+        root.node-selected(name);
+        picks.focus();
+    }
+    function pick-physics(name: string) {
+        root.physics-picked(name);
+        picks.focus();
+    }
+
+    background: Colors.window;
+
+    VerticalLayout {
+        padding: Space.step;
+        spacing: Space.step;
+
+        // The bar: what can be taken back, and anything wrong.
+        bar := HorizontalLayout {
+            spacing: Space.step;
+            min-height: 34px;
+
+            if editing != "": Text {
+                text: editing;
+                font-size: Type.strong;
+                font-weight: Type.bold;
+                vertical-alignment: center;
+            }
+            // The arrow says what the button does and the words say what it
+            // will do it to, which is the half worth keeping: "Undo" on a
+            // button is a label anybody could have guessed, and `move
+            // "payload"` is a thing only this session knows. Colourised, so
+            // the icons follow the platform's foreground and go grey with the
+            // button when there is nothing to take back.
+            Button {
+                icon: @image-url("undo.svg");
+                colorize-icon: true;
+                text: undo-label;
+                enabled: undo-depth > 0 && !Session.read-only;
+                clicked => { undo-clicked(); }
+            }
+            Button {
+                icon: @image-url("redo.svg");
+                colorize-icon: true;
+                text: redo-label;
+                enabled: redo-depth > 0 && !Session.read-only;
+                clicked => { redo-clicked(); }
+            }
+            // Saving needs no button -- every edit is written as it is made --
+            // and there is one anyway. It writes every file of the
+            // configuration now, which is what retries a write that failed
+            // and what puts right a set of files left half new by a power
+            // failure between two of them. It is also an answer to somebody
+            // who has been taught by every other program to save their work:
+            // "it is already saved" is true and unconvincing.
+            //
+            // A floppy disk and no word, where undo and redo keep their words:
+            // theirs say what they would be undoing, which is a thing only
+            // this session knows, and this one would say "Save" beside a mark
+            // every program uses for it.
+            Button {
+                icon: @image-url("save.svg");
+                colorize-icon: true;
+                accessible-label: "Save";
+                enabled: !Session.read-only;
+                clicked => { root.save-clicked(); }
+            }
+            // Every node laid out afresh, the way its data flows: see
+            // Document::arranged. On the bar as well as in the Edit menu,
+            // because the time it is wanted is when nodes have gone off the
+            // side of the window, and a command in a menu is one somebody
+            // has to know to look for. Emphasised then, and saying why in
+            // words, so the emphasis is never colour alone; down the sheet
+            // nothing is ever off, the sheet scrolling.
+            Button {
+                text: outside-count == 0 ? "Arrange"
+                    : "Arrange: " + outside-count
+                        + (outside-count == 1
+                            ? " node is outside its pane"
+                            : " nodes are outside their panes");
+                primary: outside-count > 0;
+                enabled: !Session.read-only;
+                clicked => { root.arrange(); }
+            }
+
+            // What might be wrong, and what somebody has decided not to act
+            // on. Counted rather than listed here: the list is a window, and
+            // a bar that held it would be a bar with a paragraph in it.
+            //
+            // Two buttons because they are two questions. The first is "is
+            // there anything I have not looked at"; the second is "what did I
+            // decide to leave", which is worth being able to ask again -- a
+            // decision somebody cannot find is a decision they cannot change.
+            // The errors, attribute values and links alike, and the way to
+            // each: a menu of them, one line each, under the button, which is
+            // there only while there are some. Choosing one goes to it -- the
+            // node in the middle of its page with its window open, the line
+            // in the middle of its page and lit -- and one put right leaves
+            // the menu. Primary, so it is the first thing on the bar seen,
+            // and saying how many in words, so it is not colour alone.
+            if root.error-rows.length > 0: Rectangle {
+                min-width: errors-button.min-width;
+                preferred-width: errors-button.preferred-width;
+                min-height: errors-button.min-height;
+                errors-menu := ContextMenuArea {
+                    Menu {
+                        for row[i] in root.error-rows: MenuItem {
+                            title: row;
+                            activated => { root.error-chosen(i); }
+                        }
+                    }
+                }
+                errors-button := Button {
+                    width: 100%;
+                    height: 100%;
+                    text: root.error-rows.length
+                        + (root.error-rows.length == 1 ? " error" : " errors");
+                    primary: true;
+                    clicked => {
+                        errors-menu.show({ x: 0, y: self.height });
+                    }
+                }
+            }
+            if concern-count > 0: Button {
+                text: concern-count
+                    + (concern-count == 1 ? " concern" : " concerns");
+                clicked => { root.show-concerns(); }
+            }
+            if aside-count > 0: Button {
+                text: aside-count + " set aside";
+                clicked => { root.show-aside(); }
+            }
+
+            Text {
+                text: undo-depth
+                    + (undo-depth == 1 ? " edit can" : " edits can")
+                    + " be undone";
+                font-size: Type.body;
+                vertical-alignment: center;
+            }
+            // Saving needs no button: every edit is written as it is made.
+            // What it needs is somewhere to say when that failed -- and,
+            // with Autosave off, that there are edits waiting for Save, which
+            // "saved" would deny. In words, and not green, since nothing is
+            // safe yet; red is kept for what failed.
+            Text {
+                text: trouble != "" ? trouble
+                    : said != "" ? said
+                    : unsaved ? "not saved"
+                    : "saved";
+                color: trouble != "" ? #c0392b
+                    : unsaved && said == "" ? #333333
+                    : #2d6a4f;
+                font-size: Type.body;
+                font-weight: trouble == "" ? 400 : 700;
+                vertical-alignment: center;
+                wrap: no-wrap;
+                overflow: elide;
+                horizontal-stretch: 1;
+            }
+            Rectangle { }
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+
+            // The three selection panes: one of every node type, drawn as
+            // it will be drawn on the canvas, so that what a shape means can
+            // be looked up rather than remembered.
+            //
+            // Three of them because the canvas has three working panes, and a
+            // shape's pane is decided by which list it came from: everything
+            // the vehicle carries is a payload and goes on the left, the
+            // ground link goes on the right, and the rest of the graph goes
+            // in between. A single list would leave that rule to be
+            // discovered by placing something and watching where it lands.
+            //
+            // Top to bottom in the order the panes are left to right, so the
+            // two readings of the same rule agree.
+            // Each list as tall as its own share of the column, with a line
+            // between each pair that can be dragged to change the two it is
+            // between. A Rectangle and placed children rather than a
+            // VerticalLayout: a layout hands out what is left over, where a
+            // share is a share of the whole -- and a share of the whole is
+            // what somebody chose and what the settings file keeps.
+            //
+            // Top to bottom in the order the working panes are left to right --
+            // payloads, vehicle, gateway -- so the two readings of the same
+            // rule agree. The payload list takes what is left, being the
+            // longest: ten of the fifteen types are payloads.
+            lists := Rectangle {
+                width: 180px;
+                // What the shares are of. Named so the dividers can report it:
+                // see ListDivider.
+                property <length> whole: self.height;
+                // The physics list at the top, its pane being the leftmost.
+                property <length> physics-tall:
+                    whole * root.physics-list-percent / 100;
+                property <length> payload-tall:
+                    whole - physics-tall - gateway-tall - vehicle-tall;
+                property <length> gateway-tall:
+                    whole * root.gateway-list-percent / 100;
+                property <length> vehicle-tall:
+                    whole * root.vehicle-list-percent / 100;
+
+                SelectionPane {
+                    x: 0;
+                    y: 0;
+                    width: 100%;
+                    height: lists.physics-tall - 4px;
+                    heading: "Physics node types";
+                    ground: root.physics-ground;
+                    palette: root.physics-palette;
+                    enabled: root.has-world;
+                    note: "Open a simulator file to place physics.";
+                    place-node(name, t, sets) => {
+                        root.place-physics(t);
+                    }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, true, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
+                }
+                ListDivider {
+                    x: 0;
+                    y: lists.physics-tall - 7px;
+                    width: 100%;
+                    parent-height: lists.whole;
+                    moved(dy, tall) => {
+                        root.physics-list-divider-moved(dy, tall);
+                    }
+                }
+                SelectionPane {
+                    x: 0;
+                    y: lists.physics-tall;
+                    width: 100%;
+                    height: lists.payload-tall - 4px;
+                    heading: "Payload node types";
+                    ground: root.payload-ground;
+                    palette: root.payload-palette;
+                    place-node(name, t, sets) => {
+                        root.place-node(name, t, sets);
+                    }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, false, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
+                }
+                ListDivider {
+                    x: 0;
+                    y: lists.physics-tall + lists.payload-tall - 7px;
+                    width: 100%;
+                    parent-height: lists.whole;
+                    moved(dy, tall) => {
+                        root.payload-list-divider-moved(dy, tall);
+                    }
+                }
+                SelectionPane {
+                    x: 0;
+                    y: lists.physics-tall + lists.payload-tall;
+                    width: 100%;
+                    height: lists.vehicle-tall - 4px;
+                    heading: "Vehicle node types";
+                    ground: root.vehicle-ground;
+                    palette: root.vehicle-palette;
+                    place-node(name, t, sets) => {
+                        root.place-node(name, t, sets);
+                    }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, false, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
+                }
+                ListDivider {
+                    x: 0;
+                    y: lists.physics-tall + lists.payload-tall
+                        + lists.vehicle-tall - 7px;
+                    width: 100%;
+                    parent-height: lists.whole;
+                    moved(dy, tall) => {
+                        root.vehicle-list-divider-moved(dy, tall);
+                    }
+                }
+                SelectionPane {
+                    x: 0;
+                    y: lists.physics-tall + lists.payload-tall
+                        + lists.vehicle-tall;
+                    width: 100%;
+                    height: lists.gateway-tall;
+                    heading: "Gateway node types";
+                    ground: root.gateway-ground;
+                    palette: root.gateway-palette;
+                    place-node(name, t, sets) => {
+                        root.place-node(name, t, sets);
+                    }
+                    carry(entry, x, y) => { root.carry(entry, x, y); }
+                    put-down(entry, x, y) => {
+                        root.put-down(entry, false, x, y);
+                    }
+                    carry-stopped => { root.carrying = false; }
+                }
+            }
+
+            // The canvas: one sheet, scrolled.
+            //
+            // The three working panes are three columns of this one sheet
+            // rather than three panes of their own, which is what makes them
+            // the same length and makes them scroll together. Three that
+            // scrolled separately would put a link's two ends at two heights
+            // that have nothing to do with each other, and a diagram whose
+            // lines go off the top of one column and in at the middle of
+            // another cannot be read.
+            //
+            // The bars are the ScrollView's own, so the horizontal one sits
+            // along the bottom of all three panes and the vertical one down
+            // the right of them.
+            // The sheet, and over it the dividers, which stay in view
+            // however far it is scrolled: see below.
+            Rectangle {
+                horizontal-stretch: 1;
+                // Clipped, so a divider whose place is scrolled out of the
+                // view -- off to the left, zoomed in -- is not drawn over
+                // the lists beside it.
+                clip: true;
+                sheet := ScrollView {
+                width: 100%;
+                height: 100%;
+                    content-width: root.sheet-width
+                        * root.zoom;
+                    content-height: root.working-height * root.zoom;
+                    changed content-y => {
+                        root.canvas-offset = self.content-y / root.zoom;
+                    }
+
+                    // One ground for all three panes, with a heading band at
+                    // the top of each: the panes are columns of one sheet, so
+                    // one sheet is what they are painted. Which pane a reader
+                    // is looking at is said by the band at its head and by the
+                    // dividers between them, and the tints are kept for the two
+                    // places they say something -- those bands, and the
+                    // selection panes a node is taken from.
+                    // The Physics pane, left of the configuration's sheet, and
+                    // the sheet itself beside it, in the coordinates its file
+                    // holds: see tcs_diagram::pane. The physics links under
+                    // everything, the sheet being transparent, and the physics
+                    // nodes over it, in their own pane.
+                    page := Rectangle {
+                        width: root.sheet-width;
+                        height: root.working-height;
+                        transform-scale: root.zoom;
+                        background: white;
+                        border-width: 1px;
+                        border-color: #d8d8d4;
+
+                        // What a line offers on a right click: being taken
+                        // out. Shown by the TouchArea below at the point
+                        // pressed, which takes the presses its own
+                        // right-click handling would otherwise see.
+                        link-menu := ContextMenuArea {
+                            width: 100%;
+                            height: 100%;
+                            Menu {
+                                MenuItem {
+                                    title: "Delete";
+                                    enabled: !Session.read-only;
+                                    activated => {
+                                        root.link-delete(root.menu-link);
+                                    }
+                                }
+                            }
+                        }
+
+                        // A press on the page that no shape took: on a
+                        // line, either button selects it and a right click
+                        // offers its menu too; anywhere else, either button
+                        // selects nothing, and any menu open is closed by
+                        // the press itself. Under everything on the page,
+                        // so that the shapes and terminals take their own
+                        // presses first; a line, being drawn by a Path,
+                        // takes none, and is found by where it runs. The
+                        // pointer resting here is how a line's tip is
+                        // found, likewise.
+                        ground := TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            pointer-event(event) => {
+                                if (event.kind != PointerEventKind.down) {
+                                    return;
+                                }
+                                if (event.button != PointerEventButton.left
+                                    && event.button
+                                        != PointerEventButton.right) {
+                                    return;
+                                }
+                                let line = root.link-at(
+                                    self.mouse-x - root.left, self.mouse-y);
+                                if (line < 0) {
+                                    root.unpicked();
+                                } else {
+                                    root.link-picked(line);
+                                    picks.focus();
+                                    if (event.button
+                                        == PointerEventButton.right) {
+                                        root.menu-link = line;
+                                        link-menu.show({
+                                            x: self.mouse-x,
+                                            y: self.mouse-y
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        // Right of the left margin, against the payloads it
+                        // joins, so that a line from a sensor to the zone
+                        // does not cross the page's edge.
+                        if root.physics-width > 0: PhysicsGround {
+                            x: root.edge-width;
+                            y: 0;
+                            physics-width: root.physics-width;
+                            physics-ground: root.physics-ground;
+                            note: root.has-world ? ""
+                                : "Open a simulator file to place physics.";
+                        }
+                        for l in root.physics-links: LinkLine {
+                            link: l;
+                            captioned: false;
+                        }
+
+                    canvas := Rectangle {
+                        x: root.left;
+                        width: root.working-width;
+                        height: root.working-height;
+                        background: transparent;
+
+                        SheetGround {
+                            working-width: root.working-width;
+                            payload-divider: root.payload-divider;
+                            vehicle-divider: root.vehicle-divider;
+                            payload-ground: root.payload-ground;
+                            vehicle-ground: root.vehicle-ground;
+                            gateway-ground: root.gateway-ground;
+                        }
+
+
+                    // An empty canvas looks broken rather than new, so it says
+                    // which way out.
+                    if nodes.length == 0: Text {
+                        x: Space.room;
+                        y: Space.room;
+                        text:
+                            "Click a node type on the left, or drag one here.";
+                        font-size: Type.body;
+                        font-italic: true;
+                        color: #9ca3af;
+                    }
+
+                    // Links under nodes, so a line never crosses a label.
+                    // Uncaptioned: a line's label and comment are in its
+                    // tip, which is drawn over everything, where written
+                    // beside it they ran into the next line's and over
+                    // nodes.
+                    for l[i] in links: LinkLine {
+                        link: l;
+                        captioned: false;
+                        selected: i == root.selected-link;
+                    }
+                    // And the line being drawn, under them as well: it is a
+                    // link that is not one yet, and it follows the pointer, so
+                    // it is redrawn as the hand moves rather than when the
+                    // document changes.
+                    if root.drawing-route != "": Path {
+                        width: 100%;
+                        height: 100%;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: self.width / 1px;
+                        viewbox-height: self.height / 1px;
+                        commands: root.drawing-route;
+                        stroke: #6b7280;
+                        stroke-width: 1.25px;
+                        fill: transparent;
+                    }
+                    for n in nodes: NodeShape {
+                        node: n;
+                        draggable: true;
+                        selected: n.name == root.selected;
+                        dragged(dx, dy) => { node-moved(n.name, dx, dy); }
+                        open-requested => { open-subdiagram(n.name); }
+                        link-from(terminal) => {
+                            link-started(n.name, terminal);
+                        }
+                        link-dragging(x, y) => { link-moved(x, y); }
+                        chosen => { root.pick-node(n.name); }
+                        edit-requested => { node-edit(n.name); }
+                        delete-requested => { node-delete(n.name); }
+                    }
+                    }
+
+                        // Moved, edited, deleted and joined as a
+                        // configuration's nodes are: a press that stays put
+                        // offers the menu, one that moves drags the component,
+                        // and a press on a terminal draws a line.
+                        for n in root.physics-nodes: NodeShape {
+                            node: n;
+                            draggable: true;
+                            selected: n.name == root.selected-physics;
+                            chosen => { root.pick-physics(n.name); }
+                            dragged(dx, dy) => {
+                                root.physics-moved(n.name, dx, dy);
+                            }
+                            edit-requested => { root.physics-edit(n.name); }
+                            delete-requested => { root.physics-delete(n.name); }
+                            link-from(terminal) => {
+                                root.physics-link-started(n.name, terminal);
+                            }
+                            link-dragging(x, y) => {
+                                root.physics-link-moved(x, y);
+                            }
+                        }
+
+                        // A subdiagram's edge: a margin either side of the
+                        // working panes, each named as what it is, holding
+                        // the terminals a line from another file arrives at
+                        // or leaves by -- the subdiagram's box seen from
+                        // inside. In the margins rather than over the panes,
+                        // which are where nodes go. Pale and named, so that
+                        // what the margin is does not rest on its colour.
+                        for side in root.edge-width > 0 ? [0, 1] : []:
+                        Rectangle {
+                            x: side == 0 ? 0
+                                : root.left + root.working-width;
+                            width: root.edge-width;
+                            height: root.working-height;
+                            background: #f3f4f6;
+                            border-width: 1px;
+                            border-color: #d1d5db;
+                            Text {
+                                x: (parent.width - self.width) / 2;
+                                y: 140px;
+                                text: "outside";
+                                font-size: Type.small;
+                                font-italic: true;
+                                color: #4b5563;
+                            }
+                        }
+                        for edge in root.edge-terminals: Terminal {
+                            x: root.left + edge.x;
+                            y: edge.y;
+                            rightward: edge.rightward;
+                            sink: edge.terminal == "world-in"
+                                || edge.terminal == "moc-in";
+                            ink: #4b5563;
+                            mark: #374151;
+                            grabbed => { root.edge-started(edge.terminal); }
+                            dragged(x, y) => {
+                                root.link-moved(edge.x + x, edge.y + y);
+                            }
+                        }
+
+                        // While a line is in hand, every click on the sheet
+                        // is about the line: on a node, what the line can be
+                        // made into there; on bare sheet, putting it down.
+                        // Over everything else on the sheet, so that a click
+                        // on a node asks about the line rather than opening
+                        // the node's own menu or starting a drag of it.
+                        //
+                        // Clicks rather than a drag held down from the
+                        // terminal to the node, because a click leaves the
+                        // hand free between the two: to scroll to a node out
+                        // of view, and to rest, which a long drag across a
+                        // tall sheet does not.
+                        if root.joining != "": TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            mouse-cursor: MouseCursor.crosshair;
+                            pointer-event(event) => {
+                                // The line follows the pointer, and stays
+                                // where it was clicked while that node's menu
+                                // is asked.
+                                if (event.kind == PointerEventKind.move
+                                    && root.join-offers.length == 0) {
+                                    if (root.joining == "physics") {
+                                        root.physics-link-moved(
+                                            self.mouse-x, self.mouse-y);
+                                    } else {
+                                        root.link-moved(
+                                            self.mouse-x - root.left,
+                                            self.mouse-y);
+                                    }
+                                }
+                                if (event.kind == PointerEventKind.down
+                                    && event.button
+                                        == PointerEventButton.left) {
+                                    root.join-x = self.mouse-x;
+                                    root.join-y = self.mouse-y;
+                                    if (root.joining == "physics") {
+                                        root.physics-link-clicked(
+                                            self.mouse-x, self.mouse-y);
+                                    } else {
+                                        root.link-clicked(
+                                            self.mouse-x - root.left,
+                                            self.mouse-y);
+                                    }
+                                }
+                                // A right click puts the line down, as it
+                                // closes a menu everywhere else.
+                                if (event.kind == PointerEventKind.down
+                                    && event.button
+                                        == PointerEventButton.right) {
+                                    root.stop-joining();
+                                }
+                            }
+                        }
+
+                        // What the line can be made into at the node just
+                        // clicked: one button each, greyed where it cannot be
+                        // and saying why, and one to put the line down. A
+                        // question rather than a guess, because which input
+                        // a reading arrives at is what the line says, and a
+                        // heater's heat and its heating are both outputs.
+                        if root.join-offers.length > 0: Rectangle {
+                            // Kept on the sheet: a menu that ran off its
+                            // right edge would hide the offers it was for.
+                            x: min(root.join-x, parent.width - self.width);
+                            y: min(root.join-y, parent.height - self.height);
+                            width: asked.preferred-width;
+                            height: asked.preferred-height;
+                            background: Colors.window;
+                            border-width: 1px;
+                            border-color: #6b7280;
+                            border-radius: 4px;
+                            drop-shadow-blur: 8px;
+                            drop-shadow-color: #00000044;
+                            // Takes the presses that miss its buttons, so that
+                            // none reaches the sheet underneath.
+                            TouchArea { }
+                            asked := VerticalLayout {
+                                padding: Space.tight;
+                                spacing: Space.tight;
+                                Text {
+                                    text: root.join-heading;
+                                    font-size: Type.small;
+                                    font-weight: 700;
+                                }
+                                for offer[i] in root.join-offers: Button {
+                                    text: offer.said;
+                                    enabled: offer.open;
+                                    clicked => {
+                                        if (root.joining == "physics") {
+                                            root.physics-chosen(i);
+                                        } else {
+                                            root.link-chosen(i);
+                                        }
+                                    }
+                                }
+                                Button {
+                                    text: "Cancel";
+                                    clicked => { root.stop-joining(); }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // The two lines between the three working panes, drawn over
+                // the sheet rather than on it.
+                //
+                // Over it because a divider is a property of the panes and not
+                // of what is drawn in them: on the sheet, its handle sat
+                // halfway down two thousand four hundred pixels and could not
+                // be reached, and the line scrolled away from the panes it
+                // divides. Here each is as tall as the window shows and its
+                // handle is halfway down *that*, wherever the sheet has been
+                // scrolled to.
+                //
+                // Shifted by the sheet's own horizontal offset, so a divider
+                // stays over the column it divides when the sheet is scrolled
+                // sideways; and at the sheet's zoom, being outside it, with
+                // a drag said back in the sheet's pixels.
+                if root.physics-width > 0: PaneDivider {
+                    width: 100%;
+                    height: 100%;
+                    at: root.left * root.zoom + sheet.content-x;
+                    moved(dx) => { root.physics-divider-moved(dx / root.zoom); }
+                }
+                PaneDivider {
+                    width: 100%;
+                    height: 100%;
+                    at: (root.left + root.payload-divider) * root.zoom
+                        + sheet.content-x;
+                    moved(dx) => { root.payload-divider-moved(dx / root.zoom); }
+                }
+                PaneDivider {
+                    width: 100%;
+                    height: 100%;
+                    at: (root.left + root.vehicle-divider) * root.zoom
+                        + sheet.content-x;
+                    moved(dx) => { root.vehicle-divider-moved(dx / root.zoom); }
+                }
+
+                // The tip of the line pointed at, below and right of the
+                // pointer so as not to cover what is pointed at, and kept
+                // inside the view. Over the sheet rather than on it, so it
+                // is drawn over every node and is read at the window's own
+                // size whatever the sheet's zoom. Takes no presses, having
+                // no TouchArea: the sheet under it takes them.
+                if root.tip != "": Rectangle {
+                    property <length> at-x: ground.mouse-x * root.zoom
+                        + sheet.content-x + Space.wide;
+                    property <length> at-y: ground.mouse-y * root.zoom
+                        + sheet.content-y + Space.room;
+                    width: min(28rem, tip-text.preferred-width
+                        + 2 * Space.step);
+                    height: tip-text.preferred-height + 2 * Space.tight;
+                    x: max(0px, min(self.at-x, parent.width - self.width));
+                    y: self.at-y + self.height > parent.height
+                        ? max(0px, self.at-y - 2 * Space.room - self.height)
+                        : self.at-y;
+                    background: #fffff0;
+                    border-width: 1px;
+                    border-color: #6b7280;
+                    border-radius: 3px;
+                    tip-text := Text {
+                        x: Space.step;
+                        y: Space.tight;
+                        width: parent.width - 2 * Space.step;
+                        text: root.tip;
+                        wrap: word-wrap;
+                        font-size: Type.small;
+                        color: #1f2937;
+                    }
+                }
+
+                // The keys a line in hand answers: Escape puts it down, and
+                // Delete takes out the line it was picked up from, which is
+                // the one way left to remove a line by hand now that letting
+                // go of it on bare sheet is not a gesture.
+                //
+                // Out here and not on the sheet, because taking the focus
+                // inside a ScrollView scrolls it to whatever took it, and a
+                // sheet that jumped when a line was picked up would throw the
+                // node somebody was aiming at out from under the pointer.
+                // The key the selection answers: Delete, or Backspace,
+                // takes whatever is selected -- a line at once, a node after
+                // asking, as its menu's Delete does, and a physics
+                // component as its menu's does. Given the focus when
+                // something is selected; out here for the reason the keys
+                // below are.
+                picks := FocusScope {
+                    width: 0px;
+                    height: 0px;
+                    key-pressed(event) => {
+                        if (event.text != Key.Delete
+                            && event.text != Key.Backspace) {
+                            return reject;
+                        }
+                        if (Session.read-only || root.joining != "") {
+                            return reject;
+                        }
+                        if (root.selected-link >= 0) {
+                            root.link-delete(root.selected-link);
+                        } else if (root.selected-physics != "") {
+                            root.physics-delete(root.selected-physics);
+                        } else if (root.selected != "") {
+                            root.node-delete(root.selected);
+                        } else {
+                            return reject;
+                        }
+                        return accept;
+                    }
+                }
+
+                if root.joining != "": keys := FocusScope {
+                    width: 0px;
+                    height: 0px;
+                    init => { self.focus(); }
+                    key-pressed(event) => {
+                        if (event.text == Key.Escape) {
+                            root.stop-joining();
+                            return accept;
+                        }
+                        if ((event.text == Key.Delete
+                             || event.text == Key.Backspace)
+                            && root.joining == "node") {
+                            root.link-removed();
+                            return accept;
+                        }
+                        return reject;
+                    }
+                }
+
+                // What to do with the line in hand: along the bottom of the
+                // sheet, where it covers neither the pane headings nor the
+                // top row of nodes, which is where a configuration starts,
+                // and kept there however far the sheet is scrolled, as the
+                // dividers are. A gesture that
+                // spans three clicks has to say it is still going on, or a
+                // click on a node that asks about the line instead of opening
+                // the node's menu looks like a fault.
+                if root.join-hint != "": Rectangle {
+                    x: Space.step;
+                    y: parent.height - self.height - 3 * Space.step;
+                    width: told.preferred-width + 2 * Space.step;
+                    height: told.preferred-height + Space.step;
+                    background: Colors.window;
+                    border-width: 1px;
+                    border-color: #6b7280;
+                    border-radius: 4px;
+                    told := Text {
+                        text: root.join-hint;
+                        font-size: Type.small;
+                    }
+                }
+            }
+
+        }
+    }
+
+    // The entry being carried, drawn under the pointer at the sheet's scale,
+    // over everything, and faint, because it is not placed until it is let
+    // go. Scaled about its middle, which stays on the pointer.
+    if root.carrying: NodeShape {
+        x: root.carry-x - root.carried.width / 2;
+        y: root.carry-y - root.carried.height / 2;
+        node: root.carried;
+        transform-scale: root.zoom;
+        opacity: 0.6;
+    }
+}
+
+component AlertPanel inherits Rectangle {
+    // What the alert says, as a panel: the alert window's whole contents,
+    // and the dialog the main window shows over its veil when what went
+    // wrong is the file the editor started on. See AlertWindow and
+    // MainWindow.
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 140px;
+    preferred-width: 460px;
+
+    // What went wrong, in the words the thing that failed used: a path, a
+    // reason from the operating system, the attribute a rule refused.
+    in property <string> trouble: "";
+    // What kind of thing it is, in one line, and what to do about it.
+    //
+    // Two kinds reach this window and they want different sentences: a command
+    // that failed -- a write -- and something wrong with the
+    // configuration itself. Both are errors and neither has thrown anything
+    // away, but "press Save" is advice about the first and nonsense about the
+    // second.
+    in property <string> heading: "Something did not work.";
+    in property <string> advice: "";
+
+    callback acknowledged();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: root.heading;
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        if root.advice != "": Copyable {
+            // The one thing worth saying beside the reason, because it is the
+            // thing a person wants to know first and the answer is usually
+            // yes: the editor is still holding the session, so whatever the
+            // message says, nothing has been thrown away.
+            text: root.advice;
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            CopyButton {
+                said: root.heading + "\n" + root.trouble
+                    + (root.advice != "" ? "\n" + root.advice : "");
+            }
+            Rectangle { }
+            Button {
+                text: "OK";
+                clicked => { root.acknowledged(); }
+            }
+        }
+    }
+}
+
+/// The warning a configuration with errors opens with.
+///
+/// It says what kinds of error there are -- attribute values, links, others
+/// -- and not each one: each is in the errors button's menu on the bar,
+/// which goes to it, and a list read once at startup is a list nobody has to
+/// hand when they come to put the errors right. Ignore takes the warning
+/// away and leaves the errors as they are, drawn in red; Quit leaves the
+/// editor. See warn_of_errors in main.rs.
+component ProblemsPanel inherits Rectangle {
+    // A dialog drawn inside the main window, over the veil that greys the
+    // rest of it: see MainWindow. Inside rather than a window of its own,
+    // because a window of its own cannot be kept in front of the main one
+    // on every desktop -- Wayland lets no program hold its windows on top --
+    // and a warning behind the window waiting for it is one nobody finds.
+    background: Colors.window;
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    min-width: 420px;
+    preferred-width: 520px;
+    preferred-height: whole.preferred-height;
+
+    // What kinds of error there are, a sentence a line. Set from Rust: see
+    // errors_said in main.rs.
+    in property <string> said: "";
+
+    // Leaving the errors as they are, which is what somebody opening a file
+    // to look at it wants.
+    callback ignored();
+    // Out of the editor, which is the one answer that is not about the
+    // configuration at all.
+    callback quit();
+
+    whole := VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "This configuration has errors the vehicle would not "
+                + "fly with";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: root.said;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            CopyButton {
+                said: "This configuration has errors the vehicle would not "
+                    + "fly with\n" + root.said;
+            }
+            Rectangle { }
+            // Leftmost of the two, away from the one that is pressed most,
+            // because it is the one press here that cannot be undone by
+            // pressing something else.
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+            Button {
+                text: "Ignore";
+                primary: true;
+                clicked => { root.ignored(); }
+            }
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    default-font-size: Fonts.window;
+    // Saying in the title bar when this session changes nothing, and which
+    // file it is editing, which is where somebody looks to see what a window
+    // is. The path is shortened to the window's width in Rust -- see
+    // tcs_gui::title -- so a narrow window still names the file.
+    title: root.titled(
+        (Session.read-only
+            ? "TCSpecial Configuration (read-only)"
+            : "TCSpecial Configuration")
+            + (root.editing != "" ? " -- " + root.editing : ""),
+        root.path, root.width / 1px);
+    // The configuration's top file, as the session knows it.
+    in property <string> path: "";
+    // The subdiagram this window draws, or empty for the top page.
+    //
+    // A subdiagram's window is this window, drawing that subdiagram's page:
+    // the same panes, lists, bar, menus and edits, so that what can be done
+    // on one page can be done on every page. Several may be open at once,
+    // and they cannot disagree with each other or with the top page: there
+    // is one document behind all of them, and each window is redrawn from it
+    // after every edit.
+    in property <string> editing: "";
+    pure callback titled(string, string, float) -> string;
+    background: Colors.window;
+    // Wide enough for both working panes and both selection panes, which is
+    // what the preferred width is: 960 of working area, 180 of selection
+    // panes and the gaps between them, and the Physics pane beside the
+    // working area, so that the window opens with some of every pane in
+    // view. There was a 260-pixel panel here as well, and what a node says
+    // about itself is a window of its own now -- so the working panes have
+    // those pixels.
+    //
+    // The minimum is smaller because a window that cannot be made to fit a
+    // screen is a window that cannot be used on it. Squeezed, the sheet is
+    // drawn smaller to keep every pane in view -- see Surface's `zoom` --
+    // down to a half, and the minimum is what holds the whole sheet at a
+    // half beside the selection panes: narrower, the last pane went off the
+    // edge of the window, and a pane nobody can see is one nobody knows is
+    // there. 40 is the selection panes' gaps and the sheet's scroll bar.
+    min-width: max(760px, 180px + 40px
+        + (root.physics-width + root.working-width) / 2);
+    min-height: 600px;
+    preferred-width: 1180px + root.physics-width;
+    preferred-height: 820px;
+
+    in property <[NodeView]> nodes: [];
+    in property <[LinkView]> links: [];
+    // Whether this window takes no presses: true while a window that came up
+    // as the editor started is still being read.
+    //
+    // Shown and inert rather than held back. The drawing is what the question
+    // is about -- somebody deciding what to do about a group nothing is in
+    // wants to see the diagram it belongs to -- so the window is there to be
+    // looked at from the first moment, and nothing in it can be edited behind
+    // the window that is asking. Set from Rust, which knows what came up: see
+    // `startup_waiting` and `listen_when_read` in main.rs. Presses are held by
+    // the veil over the window, at the end of it, which greys everything
+    // under it so that it looks as inactive as it is; the menu's items are
+    // disabled as well, the keyboard being another way to reach them.
+    in property <bool> inert: false;
+
+    // The warning about the errors the file opened with, given in front of
+    // the drawing inside this window: see ProblemsPanel. Its properties and
+    // callbacks are the panel's, by the same names with "problems-" in
+    // front. Set and answered from Rust: see warn_of_errors in main.rs.
+    in property <bool> problems-up: false;
+    in property <string> problems-said: "";
+    callback problems-ignored();
+    callback problems-quit();
+
+    // And the alert, when what went wrong is the file the editor started on:
+    // said in front of the drawing in the same way. What goes wrong later is
+    // said in the alert's own window. See Views::say in main.rs.
+    in property <bool> alert-up: false;
+    in property <string> alert-heading: "";
+    in property <string> alert-trouble: "";
+    in property <string> alert-advice: "";
+    callback alert-acknowledged();
+    // The line a gesture is drawing, as SVG path data in canvas coordinates,
+    // and empty when no gesture is running. Dashed, and in pieces because a
+    // path here has no dash pattern: see tcs_diagram::route::drawing.
+    in property <string> drawing-route: "";
+    // The two selection panes' contents, and the two working panes' geometry.
+    //
+    // All four come from Rust -- see style.rs and main.rs -- because which
+    // types are payloads and where the divider falls are facts about a
+    // configuration rather than about a window, and they are checked by tests
+    // there. Stating the divider in this file as well would be stating it
+    // twice.
+    in property <[PaletteEntry]> gateway-palette: [];
+    in property <[PaletteEntry]> vehicle-palette: [];
+    in property <[PaletteEntry]> payload-palette: [];
+    // The physics list and the Physics pane: see Surface.
+    in property <[PaletteEntry]> physics-palette: [];
+    in property <length> physics-width: 0px;
+    in property <color> physics-ground: white;
+    in property <[NodeView]> physics-nodes: [];
+    in property <[LinkView]> physics-links: [];
+    in property <int> physics-list-percent: 20;
+    callback physics-divider-moved(length);
+    callback physics-list-divider-moved(length, length);
+    callback place-physics(string);
+    // An entry carried out of a list and put down on the sheet: see
+    // Surface.
+    callback drop-node(string, string, string, length, length);
+    callback drop-physics(string, length, length);
+    callback physics-edit(string);
+    callback physics-delete(string);
+    // A component dragged by this much, by its name, as node-moved is.
+    callback physics-moved(string, length, length);
+    // A line taken from a component's terminal -- `moc-out` for its one
+    // output, `world-in` for its one input -- followed while the hand moves
+    // and clicked down on the canvas, as link-started, link-moved and
+    // link-clicked are for a configuration's node; in the coordinates of the
+    // whole canvas, whose nought is the Physics pane's left edge.
+    callback physics-link-started(string, string);
+    callback physics-link-moved(length, length);
+    callback physics-link-clicked(length, length);
+    // Which of join-offers was chosen, by its place in the list.
+    callback physics-chosen(int);
+    // The line put down with nothing made of it.
+    callback physics-link-stopped();
+    in property <length> payload-divider: 0px;
+    in property <length> vehicle-divider: 0px;
+    in property <length> working-width: 0px;
+    // How long the sheet is, in the coordinates the file holds: one length
+    // for all three panes, which is what makes them scroll together. From
+    // Rust -- see tcs_diagram::pane::WORKING_HEIGHT -- as the width is.
+    in property <length> working-height: 0px;
+    // Where the sheet is scrolled to, and how much of it is in view: two-way,
+    // because a person scrolling moves it and placing a node sets it.
+    in-out property <length> canvas-offset: 0px;
+    out property <length> canvas-view-height: surface.canvas-view-height;
+    // How large the sheet is drawn, and how narrow the window may be, for
+    // the tests: see Surface's `zoom`.
+    out property <float> sheet-zoom: surface.zoom;
+    out property <length> narrowest: root.min-width;
+    in property <color> gateway-ground: white;
+    in property <color> vehicle-ground: white;
+    in property <color> payload-ground: white;
+    // Whether every edit is written as it is made: the File menu's
+    // Autosave, and the setting of that name.
+    in property <bool> autosave: true;
+    callback autosave-toggled(bool);
+    in property <int> undo-depth: 0;
+    in property <int> redo-depth: 0;
+    in property <string> undo-label: "";
+    in property <string> redo-label: "";
+    // How many concerns there are, and how many were set aside: see the two
+    // buttons in the bar.
+    // The errors, for the button on the bar: see Surface's.
+    in property <[string]> error-rows: [];
+    callback error-chosen(int);
+    in property <int> concern-count: 0;
+    in property <int> aside-count: 0;
+    callback show-concerns();
+    callback show-aside();
+    // How many of this page's nodes lie outside their own panes, across,
+    // and the button that lays them out again: see the bar.
+    in property <int> outside-count: 0;
+
+    in property <string> trouble: "";
+    in property <string> said: "";
+    in property <bool> unsaved: false;
+    in property <string> selected: "";
+
+    callback undo-clicked();
+    callback redo-clicked();
+    callback place-node(string, string, string);
+    callback node-moved(string, length, length);
+    // One of the two dividers between the three working panes was dragged by
+    // this much. Two callbacks and not one with a name in it: which divider
+    // moved is known where the gesture happened, and a string crossing the
+    // boundary would be a name to keep in step in two files.
+    // How the selection column is divided, as the gateway and vehicle lists'
+    // shares of it, the payload list taking what is left. From Rust, where the
+    // settings file keeps them: see tcs_gui::Views::lists.
+    in property <int> gateway-list-percent: 20;
+    in property <int> vehicle-list-percent: 35;
+    // And the two lines between the lists, dragged: how far it went and how
+    // tall the whole column is. See tcs_gui::drag_list_divider.
+    callback payload-list-divider-moved(length, length);
+    callback vehicle-list-divider-moved(length, length);
+    callback payload-divider-moved(length);
+    callback vehicle-divider-moved(length);
+    callback open-subdiagram(string);
+    callback save-clicked();
+    callback save-as-clicked();
+    callback link-started(string, string);
+    callback link-clicked(length, length);
+    callback link-chosen(int);
+    callback link-stopped();
+    callback link-removed();
+    // Where the pointer is while a line is in hand. See drawing-route.
+    callback link-moved(length, length);
+    // The line in hand, and what can be made of it: see Surface's.
+    in property <string> joining: "";
+    in property <string> join-hint: "";
+    in property <[JoinOffer]> join-offers: [];
+    in property <string> join-heading: "";
+    // A subdiagram's edge: see Surface's. The top page has none.
+    in property <length> edge-width: 0px;
+    in property <[EdgeView]> edge-terminals: [];
+    callback edge-started(string);
+    callback node-selected(string);
+    // What a node's own menu asks for: see NodeShape's menu.
+    callback node-edit(string);
+    callback node-delete(string);
+    // A line or a physics component selected instead of a node, nothing
+    // selected, a line deleted, and which line is under a point: see
+    // Surface's.
+    in property <int> selected-link: -1;
+    in property <string> selected-physics: "";
+    callback link-picked(int);
+    callback physics-picked(string);
+    callback unpicked();
+    callback link-delete(int);
+    pure callback link-at(length, length) -> int;
+    pure callback tip-at(length, length, length) -> string;
+    // Where the drawing is on the sheet, every node and component of it,
+    // or only what is selected: what the View menu zooms to. A width of
+    // nought for nothing. Worked out in Rust, which can look a node up by
+    // its name.
+    pure callback extent(bool) -> Extent;
+    // The zoom the View menu chose, and none, which is the window's own.
+    out property <float> zoom-chosen: surface.zoom-chosen;
+    // The menu asked for what tcspecial is configured with.
+    callback edit-parameters();
+    // Every node to the top of its own pane: see the menu item.
+    callback arrange();
+    // And for the groups, the simulator's groups of settings, and the way
+    // out.
+    callback edit-groups();
+    callback edit-simulator-groups();
+    callback exit-requested();
+    // Whether this session was given a simulator configuration at all.
+    in property <bool> has-simulator: false;
+
+    // The menu bar.
+    //
+    // What is in it is what belongs to the configuration as a whole rather
+    // than to anything on the canvas: there is nothing to press on a diagram
+    // that would mean "the configuration", or "the groups", or "the way out",
+    // so a command is how each is reached.
+    MenuBar {
+        Menu {
+            title: "File";
+            // Saving needs no command while Autosave is on -- every edit is
+            // written as it is made -- and there is one anyway, for when it
+            // is off, and for the three things the ordinary case does not
+            // cover: retrying a write that failed once whatever
+            // stopped it is put right, rewriting a set of files left half new
+            // by a failure between two of them, and answering somebody who
+            // has been taught by every other program to save their work. Both
+            // files of a session go together, each written atomically.
+            MenuItem {
+                enabled: !root.inert && !Session.read-only;
+                title: "Save";
+                activated => { root.save-clicked(); }
+            }
+            // Every file of the session written somewhere else, and the
+            // session carried on there: for files that cannot be written
+            // where they are, and for a copy. See Editor::save_as.
+            MenuItem {
+                enabled: !root.inert && !Session.read-only;
+                title: "Save as...";
+                activated => { root.save-as-clicked(); }
+            }
+            // Whether every edit is written as it is made. Off, the files
+            // are written by Save and as the editor exits; the undo history
+            // is written after every edit either way, and what was not saved
+            // when the editor stopped is put back the next time it opens the
+            // configuration. Kept as a setting.
+            MenuItem {
+                enabled: !root.inert && !Session.read-only;
+                title: "Autosave";
+                checkable: true;
+                checked: root.autosave;
+                activated => { root.autosave-toggled(self.checked); }
+            }
+            MenuSeparator { }
+            // The groups, which are not on the canvas either: a group is a set
+            // of payloads read together, and which payloads those are is
+            // written on the nodes rather than drawn between them.
+            MenuItem {
+                enabled: !root.inert;
+                title: "Edit payload groups";
+                activated => { root.edit-groups(); }
+            }
+            // The simulator's groups, where this session was given its file.
+            // Disabled rather than hidden when it was not: a menu whose
+            // entries come and go is a menu nobody learns, and "this needs a
+            // second argument" is better said by a greyed entry than by its
+            // absence.
+            //
+            // There is no entry for the simulated payloads themselves. A
+            // payload's settings belong to a payload that is already on the
+            // canvas, so they are in its own window under a rule: a window of
+            // their own would be a second place to look for what one node
+            // says about itself.
+            MenuItem {
+                title: "Edit simulated payload groups";
+                enabled: root.has-simulator && !root.inert;
+                activated => { root.edit-simulator-groups(); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                enabled: !root.inert;
+                title: "Exit";
+                activated => { root.exit-requested(); }
+            }
+        }
+        Menu {
+            title: "Edit";
+            MenuItem {
+                enabled: !root.inert;
+                title: "Edit tcspecial parameters";
+                activated => { root.edit-parameters(); }
+            }
+            MenuSeparator { }
+            // Every node to the top of its own pane, nothing covering
+            // anything. For a configuration read out of a file that is spread
+            // over more sheet than the window shows, and for a morning's
+            // dragging that has left one nobody can read.
+            MenuItem {
+                enabled: !root.inert && !Session.read-only;
+                title: "Arrange the nodes";
+                activated => { root.arrange(); }
+            }
+        }
+        // How large the sheet is drawn. The window chooses for itself to
+        // begin with, drawing it as wide as the window and no larger; these
+        // are for a diagram too big for that to show at once, and for one
+        // part of it looked at closely.
+        Menu {
+            title: "View";
+            MenuItem {
+                enabled: !root.inert;
+                title: "Zoom to the drawing";
+                activated => { surface.zoom-onto(root.extent(false)); }
+            }
+            // Disabled with nothing selected, rather than doing nothing.
+            MenuItem {
+                enabled: !root.inert && (root.selected != ""
+                    || root.selected-link >= 0
+                    || root.selected-physics != "");
+                title: "Zoom to the selection";
+                activated => { surface.zoom-onto(root.extent(true)); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                enabled: !root.inert;
+                title: "Actual size";
+                activated => { surface.zoom-to(1.0); }
+            }
+            MenuItem {
+                enabled: !root.inert;
+                title: "Fit the width";
+                activated => { surface.zoom-to-width(); }
+            }
+        }
+    }
+
+    surface := Surface {
+        width: 100%;
+        height: 100%;
+        editing: root.editing;
+        nodes: root.nodes;
+        links: root.links;
+        drawing-route: root.drawing-route;
+        gateway-palette: root.gateway-palette;
+        vehicle-palette: root.vehicle-palette;
+        payload-palette: root.payload-palette;
+        physics-palette: root.physics-palette;
+        has-world: root.has-simulator;
+        physics-width: root.physics-width;
+        physics-ground: root.physics-ground;
+        physics-nodes: root.physics-nodes;
+        physics-links: root.physics-links;
+        physics-list-percent: root.physics-list-percent;
+        physics-divider-moved(dx) => { root.physics-divider-moved(dx); }
+        physics-list-divider-moved(dy, tall) => {
+            root.physics-list-divider-moved(dy, tall);
+        }
+        place-physics(t) => { root.place-physics(t); }
+        drop-physics(t, x, y) => { root.drop-physics(t, x, y); }
+        drop-node(name, t, sets, x, y) => {
+            root.drop-node(name, t, sets, x, y);
+        }
+        physics-edit(n) => { root.physics-edit(n); }
+        physics-delete(n) => { root.physics-delete(n); }
+        physics-moved(n, dx, dy) => { root.physics-moved(n, dx, dy); }
+        physics-link-started(n, t) => { root.physics-link-started(n, t); }
+        physics-link-moved(x, y) => { root.physics-link-moved(x, y); }
+        physics-link-clicked(x, y) => { root.physics-link-clicked(x, y); }
+        physics-link-stopped => { root.physics-link-stopped(); }
+        physics-chosen(i) => { root.physics-chosen(i); }
+        payload-divider: root.payload-divider;
+        vehicle-divider: root.vehicle-divider;
+        gateway-list-percent: root.gateway-list-percent;
+        vehicle-list-percent: root.vehicle-list-percent;
+        payload-list-divider-moved(dy, tall) => {
+            root.payload-list-divider-moved(dy, tall);
+        }
+        vehicle-list-divider-moved(dy, tall) => {
+            root.vehicle-list-divider-moved(dy, tall);
+        }
+        working-width: root.working-width;
+        working-height: root.working-height;
+        gateway-ground: root.gateway-ground;
+        vehicle-ground: root.vehicle-ground;
+        payload-ground: root.payload-ground;
+        save-clicked => { root.save-clicked(); }
+        undo-depth: root.undo-depth;
+        redo-depth: root.redo-depth;
+        undo-label: root.undo-label;
+        redo-label: root.redo-label;
+        trouble: root.trouble;
+        error-rows: root.error-rows;
+        error-chosen(which) => { root.error-chosen(which); }
+        concern-count: root.concern-count;
+        aside-count: root.aside-count;
+        outside-count: root.outside-count;
+        arrange => { root.arrange(); }
+        show-concerns => { root.show-concerns(); }
+        show-aside => { root.show-aside(); }
+        said: root.said;
+        unsaved: root.unsaved;
+        canvas-offset <=> root.canvas-offset;
+        undo-clicked => { root.undo-clicked(); }
+        redo-clicked => { root.redo-clicked(); }
+        place-node(name, t, sets) => {
+            root.place-node(name, t, sets);
+        }
+        node-moved(n, dx, dy) => { root.node-moved(n, dx, dy); }
+        payload-divider-moved(dx) => { root.payload-divider-moved(dx); }
+        vehicle-divider-moved(dx) => { root.vehicle-divider-moved(dx); }
+        open-subdiagram(n) => { root.open-subdiagram(n); }
+        link-started(n, terminal) => { root.link-started(n, terminal); }
+        link-clicked(x, y) => { root.link-clicked(x, y); }
+        link-chosen(i) => { root.link-chosen(i); }
+        link-stopped => { root.link-stopped(); }
+        link-removed => { root.link-removed(); }
+        link-moved(x, y) => { root.link-moved(x, y); }
+        joining: root.joining;
+        join-hint: root.join-hint;
+        join-offers: root.join-offers;
+        join-heading: root.join-heading;
+        edge-width: root.edge-width;
+        edge-terminals: root.edge-terminals;
+        edge-started(terminal) => { root.edge-started(terminal); }
+        selected: root.selected;
+        selected-link: root.selected-link;
+        selected-physics: root.selected-physics;
+        node-selected(n) => { root.node-selected(n); }
+        link-picked(i) => { root.link-picked(i); }
+        physics-picked(n) => { root.physics-picked(n); }
+        unpicked => { root.unpicked(); }
+        link-delete(i) => { root.link-delete(i); }
+        link-at(x, y) => { return root.link-at(x, y); }
+        tip-at(x, y, page-x) => { return root.tip-at(x, y, page-x); }
+        node-edit(n) => { root.node-edit(n); }
+        node-delete(n) => { root.node-delete(n); }
+    }
+
+    // What makes it inert: a veil over the whole window that takes presses
+    // and does nothing with them. Last but for the dialogs, so it is over the
+    // surface and over the menus -- a menu is a way of editing too -- and
+    // there only while it is wanted, so the ordinary window has nothing in
+    // front of it.
+    //
+    // Grey and part clear, so that everything under it is greyed: still
+    // there to be read, the drawing being what the question is about, and
+    // plainly not taking presses.
+    if root.inert: Rectangle {
+        x: 0;
+        y: 0;
+        width: 100%;
+        height: 100%;
+        background: #e5e7ebb3;
+
+        TouchArea { }
+    }
+
+    // And in front of the veil, whichever is asking: never behind the window
+    // waiting for it, being in it. Centred, and no larger than the window
+    // leaves room for.
+    if root.problems-up: ProblemsPanel {
+        width: min(self.preferred-width, root.width - 2 * Space.wide);
+        height: min(self.preferred-height, root.height - 2 * Space.wide);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        said: root.problems-said;
+        ignored => { root.problems-ignored(); }
+        quit => { root.problems-quit(); }
+    }
+    if root.alert-up: AlertPanel {
+        width: min(self.preferred-width, root.width - 2 * Space.wide);
+        height: min(max(self.min-height, self.preferred-height),
+                    root.height - 2 * Space.wide);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-width: 1px;
+        border-color: #808080;
+        border-radius: 4px;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: #00000040;
+        drop-shadow-offset-y: 4px;
+        heading: root.alert-heading;
+        trouble: root.alert-trouble;
+        advice: root.alert-advice;
+        acknowledged => { root.alert-acknowledged(); }
+    }
+}
+
+// One group's own window.
+//
+// A window and not a panel on the canvas, because a group is not on the
+// canvas: it is a set of payloads read together, and which payloads those are
+// is written on the nodes rather than drawn between them. Its own window is
+// also what lets it be left open while the diagram is worked on, which is how
+// a bus address gets typed once and watched arrive on six sensors.
+//
+// Everything here is an edit like any other -- journalled, written as it is
+// made, and taken back by Undo in the main window. The one that is not like
+// any other is the list at the bottom: setting one of those writes the value
+// to every payload in the group, as one edit, so that undo takes back the
+// gesture and not the first of twelve consequences.
+export component GroupWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "Group -- " + root.group;
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 320px;
+    preferred-width: 420px;
+    preferred-height: 480px;
+
+    // Which group this is. The name as it stands; renaming goes through the
+    // callback and comes back here.
+    in property <string> group: "";
+    // Every group there is, for choosing between them.
+    //
+    // Here rather than in a menu in the bar, which is where it was: a list of
+    // what a configuration happens to contain is data, and a control that
+    // holds data belongs with the form that edits it. The menu now says
+    // "Edit payload groups" and this says which.
+    in property <[string]> choices: [];
+    in property <string> interval: "";
+    // How many payloads are in it, and what they are called: a group with
+    // nothing in it reads nothing on its interval, and a field set on no
+    // payloads at all is a field worth saying nothing happened to.
+    in property <[string]> members: [];
+    in property <[GroupFieldView]> fields: [];
+    // What went wrong with the last write, shown here as well as in the main
+    // window: somebody typing into this one should not have to look at the
+    // other to find out that nothing is reaching the disk.
+    in property <string> trouble: "";
+
+    callback renamed(string);
+    callback interval-set(string);
+    // One attribute, for every payload in the group.
+    callback attribute-set(string, string);
+    callback choose(string);
+    callback add();
+    callback removed();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: root.group == "" ? "a group" : root.group;
+            font-size: Type.title;
+            font-weight: Type.bold;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            ComboBox {
+                model: root.choices;
+                current-value: root.group;
+                horizontal-stretch: 1;
+                selected(value) => { root.choose(value); }
+            }
+            Button {
+                text: "New";
+                enabled: !Session.read-only;
+                clicked => { root.add(); }
+            }
+        }
+        Text {
+            text: root.members.length == 0
+                ? "no payloads are in this group, so it reads nothing"
+                : root.members.length + " payload"
+                    + (root.members.length == 1 ? "" : "s")
+                    + ": " + root.members-text;
+            font-size: Type.small;
+            color: root.members.length == 0 ? #c0392b : #6b7280;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: "name";
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        LineEdit {
+            text: root.group;
+            read-only: Session.read-only;
+            font-size: Fonts.window;
+            // On accept and not on every keystroke: a group's name is what
+            // its payloads refer to, so each letter typed would be a rename
+            // of the group and of every member -- a dozen edits to undo, and
+            // a document briefly naming a group that nothing is in.
+            accepted => { root.renamed(self.text); }
+        }
+
+        Text {
+            text: "interval";
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        LineEdit {
+            text: root.interval;
+            read-only: Session.read-only;
+            placeholder-text: "500ms, 3s";
+            font-size: Fonts.window;
+            edited => { root.interval-set(self.text); }
+        }
+        Text {
+            text: "How often the payloads of this group are read. It belongs "
+                + "to the group and not to its members: a payload stating one "
+                + "of its own is refused.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            wrap: word-wrap;
+        }
+
+        if root.fields.length > 0: Text {
+            text: "every payload in this group";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+        }
+        if root.fields.length > 0: Text {
+            text: "Typing here writes the value to all " + root.members.length
+                + " of them, as one edit. Only the attributes they all have "
+                + "are offered.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for f in root.fields: VerticalLayout {
+                    spacing: 1px;
+                    Text {
+                        // A field whose payloads disagree says so: typing in
+                        // it will overwrite six different values with one,
+                        // and that is worth knowing before it happens.
+                        text: f.differs ? f.name + " (they differ)" : f.name;
+                        font-size: Type.small;
+                        color: #6b7280;
+                        font-italic: f.differs;
+                    }
+                    LineEdit {
+                        text: f.value;
+                        read-only: Session.read-only;
+                        placeholder-text: f.differs ? "different on each" : "";
+                        font-size: Fonts.window;
+                        edited => { root.attribute-set(f.name, self.text); }
+                    }
+                }
+                Rectangle { }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Rectangle { }
+            Button {
+                text: "Remove this group";
+                enabled: root.group != "" && !Session.read-only;
+                clicked => { root.removed(); }
+            }
+        }
+    }
+
+    // The members, as one line. Slint has no join, and a `for` inside a
+    // sentence would lay the names out as separate elements that wrap
+    // independently of the words around them.
+    in property <string> members-text: "";
+}
+
+// What tcspecial itself is configured with.
+//
+// A window and not part of the canvas, because this is the one part of a
+// configuration that is about the whole of it rather than about anything in
+// it: where commands are taken, where beacons go, where the telemetry log is
+// written. There is nothing to press on the diagram that would mean "the
+// configuration", so it is reached from the menu instead.
+//
+// Required, which is why the fields that must be stated are marked and marked
+// in red when they are empty. A graph describes what the vehicle carries and
+// what is done with it, and none of that reaches the ground until these are
+// answered -- so an unanswered one is a fault and not a blank.
+export component ParametersWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "tcspecial parameters";
+    background: Colors.window;
+    min-width: 380px;
+    min-height: 360px;
+    preferred-width: 440px;
+    preferred-height: 560px;
+
+    // One per attribute of the section, in the order tcslib-protocol lists
+    // them: what must be stated first, and the rest after.
+    in property <[FieldView]> fields: [];
+    // What went wrong with the last write, if anything. Shown here as well as
+    // in the main window, so that somebody typing in this one is not left to
+    // find out elsewhere that nothing is reaching the disk.
+    in property <string> trouble: "";
+    // What is wrong with what has been entered, if anything.
+    //
+    // Here because it belongs to no node: the section is about the
+    // configuration as a whole, so there is nothing on the canvas to draw it
+    // on. Empty while anything is still unanswered -- the editor says what is
+    // wrong and not what is unfinished.
+    in property <string> complaint: "";
+
+    callback parameter-set(string, string);
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: "tcspecial parameters";
+            font-size: Type.title;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: "Where commands are taken, where beacons go, and where the "
+                + "telemetry log is written. Every configuration must say "
+                + "these: a graph says nothing about how any of it reaches "
+                + "the ground until it does.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+        if root.complaint != "": Text {
+            text: root.complaint;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Text {
+            text: "Two ports, because there are two command links: a command "
+                + "about the spacecraft -- ping it, arm it, restart it -- is "
+                + "taken on port, and one about a payload on payload_port, so "
+                + "what the ground needs in a hurry is never queued behind "
+                + "what it asked for at leisure.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for f in root.fields: VerticalLayout {
+                    spacing: 1px;
+                    Text {
+                        text: f.required ? f.name + " *" : f.name;
+                        font-size: Type.small;
+                        color: #6b7280;
+                    }
+                    LineEdit {
+                        text: f.value;
+                        read-only: Session.read-only;
+                        font-size: Fonts.window;
+                        edited => { root.parameter-set(f.name, self.text); }
+                    }
+                }
+                Rectangle { }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// The simulator's settings for one simulated payload, or for one of its
+// groups.
+//
+// One window shape for both, because they are the same list of settings: a
+// group carries what several simulated payloads share and a payload overrides
+// any of it for itself. What differs is what the chooser at the top holds --
+// the payloads of the configuration, or the groups the simulator file declares
+// -- and whether there is a way to make a new one.
+//
+// Nothing here is drawn on the canvas, and that is not a shortcut: the
+// simulator file introduces no nodes and no connections, so a drawing of it
+// would be the same drawing with numbers on it. See sim.rs.
+export component SimWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: root.editing;
+    background: Colors.window;
+    // As tall as what it holds, every setting in view, as a node's window.
+    min-width: 380px;
+    preferred-width: 440px;
+
+    // "Simulated payloads" or "Simulator payload groups", which is also the
+    // window's title.
+    in property <string> editing: "";
+    // A line saying what these settings are and are not.
+    in property <string> about: "";
+    // What there is to choose from, and which one is chosen.
+    in property <[string]> choices: [];
+    in property <string> chosen: "";
+    // The settings of whatever is chosen.
+    in property <[FieldView]> fields: [];
+    // Whether this window can make a new one, which the groups can and the
+    // payloads cannot: a simulated payload is a payload of the
+    // configuration, so its name is the configuration's and not this file's.
+    in property <bool> can-add: false;
+    // And whether what is chosen can be renamed here, which a physics
+    // component can, as a node can in its own window: a simulated payload is
+    // named by its payload, and a group's name by the groups' own window.
+    in property <bool> can-rename: false;
+    // Why the name last typed was refused, if it was.
+    in property <string> name-trouble: "";
+    in property <string> trouble: "";
+
+    callback choose(string);
+    // A new name for what is chosen, typed and accepted.
+    callback renamed(string);
+    callback add();
+    callback remove();
+    callback setting-set(string, string);
+
+    // What is being typed into a setting and has not been taken yet, taken
+    // when somebody is done with it, as a node's window takes its fields:
+    // see NodeWindow.
+    property <string> draft-setting: "";
+    property <string> draft-value: "";
+
+    // Takes what has been typed and not yet taken. Public so that the
+    // window closed by the window system takes it too.
+    public function take() {
+        if (root.draft-setting != "") {
+            root.setting-set(root.draft-setting, root.draft-value);
+            root.draft-setting = "";
+        }
+    }
+
+    // How tall what it holds wants to be, which tcs-gui grows the window to
+    // when what is shown changes: a window sized for the settings it opened
+    // on would cut off those of a component that has more.
+    out property <length> wanted-height: whole.preferred-height;
+    // And how wide: the window's own width and not the layout's, which
+    // would set the description above the settings on one line.
+    out property <length> wanted-width: root.preferred-width;
+
+    whole := VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Text {
+            text: root.editing;
+            font-size: Type.title;
+            font-weight: Type.bold;
+        }
+        Text {
+            text: root.about;
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            // Which one, for the simulated payloads and the groups, which a
+            // window holds all of. A physics component's window is opened
+            // from the component, and is about it: its name is in the
+            // chooser's place, as a field to rename it by, as a node's is.
+            if !root.can-rename: ComboBox {
+                model: root.choices;
+                current-value: root.chosen;
+                horizontal-stretch: 1;
+                // What was typed for the one chosen before is that one's.
+                selected(value) => {
+                    root.take();
+                    root.choose(value);
+                }
+            }
+            // Renamed on accept; a name another component or any node has
+            // is refused, and said why under it.
+            if root.can-rename: NameField {
+                name: root.chosen;
+                horizontal-stretch: 1;
+                renamed(said) => { root.renamed(said); }
+            }
+            if root.can-add: Button {
+                text: "New";
+                enabled: !Session.read-only;
+                clicked => {
+                    root.take();
+                    root.add();
+                }
+            }
+            // A group is taken away here; a physics component is taken away
+            // from its menu on the canvas, as a node is, its window having
+            // the name's "x" beside the name, which clears the field.
+            if root.can-add: Button {
+                text: "Remove";
+                enabled: root.chosen != "" && !Session.read-only;
+                // Nothing typed for what is removed is kept.
+                clicked => {
+                    root.draft-setting = "";
+                    root.remove();
+                }
+            }
+        }
+
+        if root.can-rename && root.name-trouble != "": Text {
+            text: root.name-trouble;
+            color: #c0392b;
+            font-size: Type.small;
+            wrap: word-wrap;
+        }
+
+        if root.chosen == "": Text {
+            text: root.choices.length == 0
+                ? "There is nothing here yet."
+                : "Choose one above.";
+            font-size: Type.small;
+            font-italic: true;
+            color: #9ca3af;
+            vertical-stretch: 1;
+        }
+
+        // Every setting in view, none scrolled out of it, each its name
+        // beside its box: see NodeWindow.
+        if root.chosen != "": VerticalLayout {
+            spacing: Space.tight;
+            alignment: start;
+            for f in root.fields: FieldRow {
+                field: f;
+                typed(text) => {
+                    root.draft-setting = f.name;
+                    root.draft-value = text;
+                }
+                done => { root.take(); }
+                went => { root.take(); }
+            }
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// What one node says about itself.
+//
+// A window per node, and several open at once. It was a panel down the
+// right-hand side, which showed whichever node was last pressed: that made
+// comparing two nodes a matter of pressing one, reading, pressing the other
+// and remembering -- and the one thing somebody filling in a configuration
+// does constantly is compare two sensors on the same bus.
+//
+// So each node's attributes are a window, and the window stays until it is
+// closed. Pressing another node opens another window rather than replacing
+// this one, which is why closing takes a press of its own: a window that went
+// away when something else was pressed would be the panel again.
+//
+// Two files in one window, where the editor was given the simulator's: the
+// node's own attributes, a rule, and the settings the simulator file gives it.
+// Each row says which file it belongs to, because they are written to
+// different ones.
+export component NodeWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: root.node == "" ? "a node" : root.node;
+    background: Colors.window;
+    // As tall as what it holds, every field in view: see the fields below.
+    // And never narrower than what it holds, so no field is cut off at the
+    // side: the simulator's two columns are the widest thing in it.
+    min-width: max(360px, whole.min-width);
+
+    in property <string> node: "";
+    // Its own name, which is what its field shows and what renaming it
+    // changes: `node` is the name a line uses, qualified by its page.
+    in property <string> name: "";
+    // Why the name last typed was refused, if it was.
+    in property <string> name-trouble: "";
+    in property <string> node-type: "";
+    in property <string> comment: "";
+    in property <[FieldView]> fields: [];
+    // Where the simulator's settings go on into their second column: the
+    // first field drawn there, by its place in `fields`. See the columns.
+    in property <int> split: 0;
+    // What the description tree says about this kind of node, shown at the
+    // foot of the window while no field with something said about it has the
+    // focus.
+    in property <string> about: "";
+    // What is wrong with what this node says, if anything. The one red text
+    // here, as on the canvas.
+    in property <string> fault: "";
+    in property <string> trouble: "";
+
+    // Which field has the focus, and what is said about it. The name as well
+    // as the sentence, so that a field losing the focus clears only what it
+    // put there: when the focus moves from one field to the next, the order
+    // the two hear of it in is not something to depend on.
+    property <string> focused: "";
+    property <string> focused-about: "";
+    out property <string> about-shown:
+        root.focused-about != "" ? root.focused-about : root.about;
+
+    callback attribute-set(string, string);
+    callback sim-attribute-set(string, string);
+    callback comment-set(string);
+
+    // What is being typed into a field, and into the comment, and has not
+    // been taken yet. A value is taken when somebody is done with it: Enter,
+    // leaving the field, Close, or the window closed. Taken a keystroke at a
+    // time it was an edit a keystroke -- an Undo a letter, the file written
+    // and the node judged half typed, its complaint about "0x4" coming and
+    // going above the field and moving the field under the hand.
+    property <string> draft-field: "";
+    property <string> draft-value: "";
+    property <bool> draft-simulated: false;
+    property <bool> comment-drafted: false;
+    property <string> comment-draft: "";
+
+    // A field took the focus or lost it, was typed in, or was ticked: one
+    // place for what each means, which both columns call.
+    function came(f: FieldView) {
+        root.focused = f.name;
+        root.focused-about = f.about;
+    }
+    function went(f: FieldView) {
+        // Left: what was typed here is taken.
+        root.take();
+        if (root.focused == f.name) {
+            root.focused = "";
+            root.focused-about = "";
+        }
+    }
+    // Held until it is taken: see take. Two files, two edits: a node's
+    // attribute goes to the configuration and a simulated payload's setting
+    // to the simulator's own file, which the draft remembers.
+    function typed(f: FieldView, text: string) {
+        root.draft-field = f.name;
+        root.draft-value = text;
+        root.draft-simulated = f.simulated;
+    }
+    function ticked(f: FieldView, on: bool) {
+        if (f.simulated) {
+            root.sim-attribute-set(f.name, on ? "true" : "false");
+        } else {
+            root.attribute-set(f.name, on ? "true" : "false");
+        }
+    }
+
+    // Takes what has been typed and not yet taken; nothing, where nothing
+    // has. Public so that the window closed by the window system takes it
+    // too: see tcs-gui's show_node.
+    public function take() {
+        if (root.draft-field != "") {
+            if (root.draft-simulated) {
+                root.sim-attribute-set(root.draft-field, root.draft-value);
+            } else {
+                root.attribute-set(root.draft-field, root.draft-value);
+            }
+            root.draft-field = "";
+        }
+        if (root.comment-drafted) {
+            root.comment-drafted = false;
+            root.comment-set(root.comment-draft);
+        }
+        // The name last, so the values above go to the node they were typed
+        // for under the name they were typed under.
+        name-field.take();
+    }
+    // A name typed and done with, which may be the one it had.
+    callback renamed(string);
+    callback closed();
+
+    // How large what it holds wants to be, which tcs-gui grows the window to
+    // when what is shown grows: see SimWindow. The width its narrowest, the
+    // layout's preferred one being the description at the foot on one line.
+    out property <length> wanted-height: whole.preferred-height;
+    out property <length> wanted-width: root.min-width;
+
+    // Every label here as tall as its own font needs, and none given a
+    // height: a label held to fourteen pixels was clipped in half once the
+    // window's one size grew to twelve points, and the box under it was
+    // drawn over what was left.
+    whole := VerticalLayout {
+        padding: Space.step;
+        spacing: Space.tight;
+
+        // A name another node has is refused, and said why, and the old
+        // name stays.
+        name-field := NameField {
+            name: root.name;
+            renamed(said) => { root.renamed(said); }
+        }
+        if root.name-trouble != "": Text {
+            text: root.name-trouble;
+            color: #c0392b;
+            font-size: Type.small;
+            wrap: word-wrap;
+        }
+        Text {
+            text: root.node-type;
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        if root.fault != "": Text {
+            text: root.fault;
+            color: #c0392b;
+            font-size: Type.small;
+            font-italic: true;
+            wrap: word-wrap;
+        }
+
+        // Every field in view, and none scrolled out of it: the window is as
+        // tall as its fields. A field scrolled out of sight was one Tab never
+        // reached, the toolkit's order leaving out what is clipped, and one a
+        // reader did not know was there.
+        //
+        // The node's own attributes first, and under them the simulator's
+        // settings for it, which are written to a different file -- the
+        // heading over them names it -- in two columns of their own, there
+        // being as many as twenty of them. Under and not beside: three
+        // columns side by side made a window wider than a screen's share,
+        // and its last column was cut off. One model and not three, each
+        // part drawing its own rows of it, so that Tab goes down the node's
+        // fields, then the first column, then the second.
+        VerticalLayout {
+            alignment: start;
+            for f in root.fields: VerticalLayout {
+                padding-bottom: !f.simulated && !f.is-heading
+                    ? Space.tight : 0px;
+                if !f.simulated && !f.is-heading: FieldRow {
+                    field: f;
+                    came => { root.came(f); }
+                    went => { root.went(f); }
+                    typed(text) => { root.typed(f, text); }
+                    done => { root.take(); }
+                    ticked(on) => { root.ticked(f, on); }
+                }
+            }
+        }
+        // The heading: what file these go to. In a layout of its own, with
+        // no spacing, so the rows of the model that are not the heading take
+        // no room between the node's fields and the simulator's.
+        VerticalLayout {
+            spacing: 0px;
+            for f in root.fields: VerticalLayout {
+                padding-top: f.is-heading ? Space.step : 0px;
+                if f.is-heading: Text {
+                    text: f.name;
+                    font-size: Type.small;
+                    font-weight: Type.bold;
+                    color: #6b7280;
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: Space.wide;
+            VerticalLayout {
+                alignment: start;
+                for f[i] in root.fields: VerticalLayout {
+                    padding-bottom: f.simulated && !f.is-heading
+                        && i < root.split ? Space.tight : 0px;
+                    if f.simulated && !f.is-heading && i < root.split:
+                    FieldRow {
+                        field: f;
+                        came => { root.came(f); }
+                        went => { root.went(f); }
+                        typed(text) => { root.typed(f, text); }
+                        done => { root.take(); }
+                        ticked(on) => { root.ticked(f, on); }
+                    }
+                }
+            }
+            VerticalLayout {
+                alignment: start;
+                for f[i] in root.fields: VerticalLayout {
+                    padding-bottom: f.simulated && !f.is-heading
+                        && i >= root.split ? Space.tight : 0px;
+                    if f.simulated && !f.is-heading && i >= root.split:
+                    FieldRow {
+                        field: f;
+                        came => { root.came(f); }
+                        went => { root.went(f); }
+                        typed(text) => { root.typed(f, text); }
+                        done => { root.take(); }
+                        ticked(on) => { root.ticked(f, on); }
+                    }
+                }
+            }
+        }
+
+        // What somebody wrote about this node, at the bottom and always
+        // there: several lines of it, scrolling on its own.
+        //
+        // Out of the list of fields above rather than at the end of it, which
+        // is where it was. Two reasons. A note is not an attribute -- it is
+        // not written as one, it is not checked as one, and a rule between
+        // them says so; and a note is the field most likely to be long, so a
+        // person typing one had to scroll the whole window to see what they
+        // were writing. Here it keeps its place while the attributes scroll
+        // past above it.
+        //
+        // Several lines because that is what a note is: "0x49 after the
+        // rework" and the reason for it, which the file writes as a run of
+        // comment lines above the node and reads back the same way.
+        Text {
+            text: "comment";
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        TextEdit {
+            read-only: Session.read-only;
+            height: 72px;
+            text: root.comment;
+            font-size: Fonts.window;
+            wrap: word-wrap;
+            // Several lines, so Enter is a new line and not done: taken on
+            // leaving it, on Close and when the window is closed.
+            edited => {
+                root.comment-draft = self.text;
+                root.comment-drafted = true;
+            }
+            changed has-focus => {
+                if (!self.has-focus) {
+                    root.take();
+                }
+            }
+        }
+
+        // What the description tree says: about the field being typed into,
+        // or about the node while no field is. At the foot of the window, and
+        // not beside each field, so that the rows stay a row each however
+        // long a sentence is; read-only, because it is the tree's to say and
+        // not this node's.
+        Text {
+            text: "about";
+            font-size: Type.small;
+            color: #6b7280;
+        }
+        // Words and not a box: nothing is typed here, so Tab passes it by.
+        // As tall as three lines, so the window does not change height as
+        // the focus moves from a field described in one line to one in three.
+        Text {
+            text: root.about-shown;
+            font-size: Fonts.window;
+            wrap: word-wrap;
+            min-height: 3 * Fonts.window * 1.4;
+        }
+
+        if root.trouble != "": Text {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.small;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+
+        // Closing takes a press, which is the whole point of a window per
+        // node: one that closed itself when another node was pressed would be
+        // the panel this replaced.
+        HorizontalLayout {
+            Rectangle { }
+            Button {
+                text: "Close";
+                clicked => {
+                    root.take();
+                    root.closed();
+                }
+            }
+        }
+    }
+}
+
+// The offer to write what the files do not have, on the way out.
+//
+// Normally never seen: every edit is written as it is made, so there is
+// nothing to offer and Exit simply exits. What this is for is the session
+// where a write failed -- a full device, a directory somebody had made
+// read-only -- because leaving a session's work in a process that is ending is
+// the one way this editor could lose anything.
+//
+// Three answers and not two. "Leave without saving" is there because somebody
+// who has just been told the device is full may want to go and deal with it,
+// and a program that insisted on writing first would be a program they cannot
+// get out of. "Stay" is there because the menu is next to everything else and
+// gets pressed by accident.
+// What went wrong, said where it cannot be missed.
+//
+// A window and not only the red line in the bar, because the red line is the
+// *state* -- "saved", or what is wrong with the last save -- and somebody
+// typing into a node's own window is not looking at the bar of another. An
+// error that nobody sees is an error that gets worse: a full device stays full,
+// and every edit after it is one more edit the files do not have.
+//
+// One window, re-pointed, rather than one per error. Two of them side by side
+// would be two copies of the same sentence, and the sentence is always about
+// the same session.
+export component AlertWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "tcs-gui";
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 140px;
+    preferred-width: 460px;
+
+    // In front of the main window while the editor is starting: set from
+    // Rust for as long as the main window takes no presses, so the window
+    // asking is never behind the one waiting for it. See `on_top` in main.rs.
+    in property <bool> on-top: false;
+    always-on-top: root.on-top;
+
+    in property <string> trouble: "";
+    in property <string> heading: "Something did not work.";
+    in property <string> advice: "";
+    callback acknowledged();
+
+    // What it says, which the main window also shows in front of itself
+    // when the editor is starting: see AlertPanel.
+    AlertPanel {
+        trouble: root.trouble;
+        heading: root.heading;
+        advice: root.advice;
+        acknowledged => { root.acknowledged(); }
+    }
+}
+
+/// What might be wrong with the drawing, listed, with somewhere to go.
+///
+/// A concern is a shape that might be a mistake and might be meant: a payload
+/// whose readings reach nothing, a vehicle node a stream stops at. The editor
+/// will not refuse a configuration for one -- that is what a fault is for --
+/// so what it owes instead is a way to find them: a count on a button, a list
+/// behind it, and a press that takes you to the node.
+///
+/// One window for both lists, pointed at either by `aside`: what has not been
+/// looked at, and what somebody looked at and left. Two windows saying almost
+/// the same thing would be two windows to keep in step.
+export component ConcernsWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "tcs-gui";
+    background: Colors.window;
+    min-width: 420px;
+    min-height: 200px;
+    preferred-width: 560px;
+    preferred-height: 320px;
+
+    in property <[ConcernRow]> rows: [];
+    // Every row as one text, for the Copy button. Set from Rust beside the
+    // rows, where joining them is a line rather than a loop in markup.
+    in property <string> everything: "";
+    // Whether this is the list of what was set aside, which decides what the
+    // second button on a row offers.
+    in property <bool> aside: false;
+
+    // Which row: the index into `rows`, which is what the editor holds them
+    // by. A name would be a second thing to keep in step with the list.
+    callback go-to(int);
+    callback decided(int);
+    callback closed();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: root.aside
+                ? "Set aside"
+                : "Things that might be wrong";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+        }
+        Copyable {
+            text: root.aside
+                ? "You decided to leave these. Take one up again to have it "
+                    + "counted with the rest."
+                : "None of these stops a configuration being read or flown. "
+                    + "Set one aside if it is what you meant.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: Space.tight;
+                for row[i] in root.rows: HorizontalLayout {
+                    spacing: Space.step;
+                    Copyable {
+                        text: row.said;
+                        font-size: Type.body;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        wrap: word-wrap;
+                    }
+                    Button {
+                        text: "Go to it";
+                        clicked => { root.go-to(i); }
+                    }
+                    Button {
+                        text: root.aside ? "Take up again" : "Set aside";
+                        enabled: !Session.read-only;
+                        clicked => { root.decided(i); }
+                    }
+                }
+                if root.rows.length == 0: Copyable {
+                    text: root.aside
+                        ? "Nothing has been set aside."
+                        : "Nothing to look at.";
+                    font-size: Type.body;
+                    font-italic: true;
+                    color: #6b7280;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            CopyButton { said: root.everything; }
+            Rectangle { }
+            Button {
+                text: "Close";
+                clicked => { root.closed(); }
+            }
+        }
+    }
+}
+
+/// The question a node's Delete asks before anything goes.
+///
+/// Asked rather than done, because a node is not one word: it is its
+/// attributes and every line that touches it, and a press next to Edit in a
+/// menu is a press somebody may have meant for Edit. Undo would put it back --
+/// a removal is one edit -- but an undo that has to be *discovered* is no
+/// answer to a node that has gone and taken four lines with it.
+export component DeleteWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "Delete a node";
+    background: Colors.window;
+    min-width: 320px;
+    min-height: 150px;
+    preferred-width: 400px;
+
+    // The node this is about, and what goes with it: how many lines touch it,
+    // said in words by the editor.
+    in property <string> node: "";
+    in property <string> carries: "";
+
+    callback confirmed();
+    callback cancelled();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "Delete \"" + root.node + "\"?";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        if root.carries != "": Copyable {
+            text: root.carries;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: "Undo takes it back, with its attributes and its lines.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Button {
+                text: "Cancel";
+                clicked => { root.cancelled(); }
+            }
+            CopyButton {
+                said: "Delete \"" + root.node + "\"?"
+                    + (root.carries != "" ? "\n" + root.carries : "");
+            }
+            Rectangle { }
+            Button {
+                text: "Delete";
+                clicked => { root.confirmed(); }
+            }
+        }
+    }
+}
+
+// The question Save as asks before it writes over files that are there
+// already: which they are, and whether to go on. Nothing is written until it
+// is answered.
+export component ReplaceWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "Replace files";
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 160px;
+    preferred-width: 480px;
+
+    // The files that would be replaced, one to a line.
+    in property <string> files: "";
+
+    callback confirmed();
+    callback cancelled();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "Save as would replace files that are already there:";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: root.files;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: "Each would hold this configuration's file of that name "
+                + "instead.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Button {
+                text: "Cancel";
+                clicked => { root.cancelled(); }
+            }
+            CopyButton {
+                said: "Save as would replace files that are already there:\n"
+                    + root.files;
+            }
+            Rectangle { }
+            Button {
+                text: "Replace";
+                clicked => { root.confirmed(); }
+            }
+        }
+    }
+}
+
+export component LeaveWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "Leave tcs-gui";
+    background: Colors.window;
+    min-width: 360px;
+    min-height: 160px;
+    preferred-width: 420px;
+
+    // Why the last write failed, which is why there is anything to offer.
+    in property <string> trouble: "";
+
+    callback saved();
+    callback saved-as();
+    callback left();
+    callback stayed();
+
+    VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "There are changes the files do not have.";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        if root.trouble != "": Copyable {
+            text: root.trouble;
+            color: #c0392b;
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: "Saving writes the configuration and, where this session "
+                + "was given one, the simulator's file beside it.";
+            font-size: Type.small;
+            color: #6b7280;
+            wrap: word-wrap;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            Button {
+                text: "Stay";
+                clicked => { root.stayed(); }
+            }
+            CopyButton {
+                said: "There are changes the files do not have."
+                    + (root.trouble != "" ? "\n" + root.trouble : "");
+            }
+            Rectangle { }
+            Button {
+                text: "Leave without saving";
+                clicked => { root.left(); }
+            }
+            // For files that cannot be written where they are: every file
+            // of the session somewhere else, and then out.
+            Button {
+                text: "Save as and leave...";
+                clicked => { root.saved-as(); }
+            }
+            Button {
+                text: "Save and leave";
+                primary: true;
+                clicked => { root.saved(); }
+            }
+        }
+    }
+}

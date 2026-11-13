@@ -174,7 +174,7 @@ payloads:
       # The probe's heater switch, line 4 of /dev/gpiochip1: 1 for on and 0 for
       # off, as probe_thermostat decides. A gpio_inout reports as well as
       # drives: every second it tells the ground what it was last told, so a
-      # report lost on the way is made good by the next. On a desk tcssim
+      # report lost on the way is made good by the next. On a desk tcs-sim
       # answers for it over UDP at its sim_address, so that no dummy chip is
       # needed; flown, the chip is opened.
       - payload: probe_heater
@@ -191,7 +191,7 @@ payloads:
       # One of three sensors of the same place, the deck's hull, so that its
       # temperature survives one of them going wrong. Two bytes, signed, most
       # significant first, in sixteenths of a degree Celsius. On a desk it is
-      # reached over UDP at its sim_address, where tcssim answers with the
+      # reached over UDP at its sim_address, where tcs-sim answers with the
       # hull's temperature, so that no bus and no dummy device is needed;
       # flown, the bus is opened.
       - payload: hull_temp_1
@@ -265,7 +265,7 @@ commands:
   # attribute no binding names is refused.
   - { from: gateway, sets: probe_thermostat.setpoint }
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: gateway, x: 790, y: 34 }
     - { node: hull_kelvin_1, x: 299, y: 336 }

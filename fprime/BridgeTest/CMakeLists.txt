@@ -1,5 +1,5 @@
 # BridgeTest: the F´ deployment the bridge is tested in, against tcspecial
-# and tcssim. See the test target in fprime/Makefile.
+# and tcs-sim. See the test target in fprime/Makefile.
 
 add_fprime_subdirectory("${CMAKE_CURRENT_LIST_DIR}/Top/")
 

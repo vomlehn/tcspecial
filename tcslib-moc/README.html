@@ -207,12 +207,12 @@ serving and the digest of the files it read. It is the one thing a
 ground station can know about a spacecraft without having asked it
 anything.</p></li>
 <li><p><strong>Waiting for the simulator.</strong>
-<code>simulator::wait</code> asks tcssim, at the address its simulator
-file gives as <code>tcssim.ready</code>, until it has made its simulated
-devices and is set up for the same configuration, simulator file and
-<code>--simulate</code> mode, so that a harness starts tcspecial only
-once there is something for it to find. It says what it last heard when
-it gives up.</p></li>
+<code>simulator::wait</code> asks tcs-sim, at the address its simulator
+file gives as <code>tcs-sim.ready</code>, until it has made its
+simulated devices and is set up for the same configuration, simulator
+file and <code>--simulate</code> mode, so that a harness starts
+tcspecial only once there is something for it to find. It says what it
+last heard when it gives up.</p></li>
 <li><p><strong>A vehicle on a cFS software bus.</strong>
 <code>bus</code> is the ground’s end of a vehicle that answers to cFS.
 <code>bus::Ground</code> is a station’s one SBN peer of the bus, on a
@@ -220,7 +220,7 @@ thread of its own, which turns the bus back into loopback UDP links:
 <code>command_links_of</code>, <code>beacon::open</code> and
 <code>GatewayReceiver::open</code> use it themselves for a configuration
 that answers to cFS, so a station is written the same either way.
-<code>bus::SimulatedCfs</code> is the cFS end, as tcssim simulates it:
+<code>bus::SimulatedCfs</code> is the cFS end, as tcs-sim simulates it:
 the vehicle and the station are both its peers. Only the simulated cFS
 end takes a station: SBN on a real cFS sends no peer what another
 published, so a station commands a vehicle behind a real cFS through
@@ -231,8 +231,8 @@ sends its commands through a <code>UdpConnection</code> – on a bus, to
 the station’s peer of it, which publishes each one.</p>
 <h2 id="what-tcslib-moc-is-not">What tcslib-moc is not</h2>
 <p>tcslib-moc has no windows. Showing what it receives is the job of the
-programs built on it: <code>tcsui</code> holds the panels the ground
-programs share, and <code>tcsmoc</code> is the test ground station that
+programs built on it: <code>tcs-ui</code> holds the panels the ground
+programs share, and <code>tcs-moc</code> is the test ground station that
 puts them on the screen.</p>
 <p>tcslib-moc does not define the link either. The commands, the
 telemetry, and the configuration files both ends read belong to
@@ -240,10 +240,10 @@ telemetry, and the configuration files both ends read belong to
 re-exports all of it, so a ground program needs only tcslib-moc.</p>
 <h2 id="who-uses-it">Who uses it</h2>
 <ul>
-<li><code>tcsmoc</code>, the test ground station.</li>
-<li><code>tcssim</code>, whose <code>--wait</code> waits through
+<li><code>tcs-moc</code>, the test ground station.</li>
+<li><code>tcs-sim</code>, whose <code>--wait</code> waits through
 <code>simulator</code>.</li>
-<li><code>tcsui</code>, the window pieces shared by the ground
+<li><code>tcs-ui</code>, the window pieces shared by the ground
 programs.</li>
 <li><code>examples/simple-app</code>, whose ground station
 <code>lorem_gateway</code> gets its data with one call to

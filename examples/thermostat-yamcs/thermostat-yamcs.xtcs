@@ -82,10 +82,10 @@
             </gateway>
         </type>
     </gateways>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="thermostat-common" x="242" y="166"/>
             <node name="gateway" x="790" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

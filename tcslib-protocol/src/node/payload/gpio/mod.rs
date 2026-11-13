@@ -48,7 +48,7 @@ use crate::endpoint_config::{
     EndpointConfigResult, GroupKind, LinkTerms, Scalar,
 };
 
-/// Says a state of a node's lines as a datagram, as tcspecial and tcssim
+/// Says a state of a node's lines as a datagram, as tcspecial and tcs-sim
 /// send one another simulated lines' states over UDP: an ASCII `1` or `0` for
 /// each line, in the order of the node's lines, lowest offset first -- `10`
 /// for lines 4 and 5 with 4 asserted.
@@ -507,7 +507,7 @@ pub const SIM_DEVICES: &str = "/sys/devices/platform";
 /// Lists the chips of the kernel's `gpio-sim`, with the directory each one's
 /// lines are in.
 ///
-/// The one statement of where those are, which tcssim, the tests and the
+/// The one statement of where those are, which tcs-sim, the tests and the
 /// scripts in `bin/` all follow. A `gpio-sim` device is a platform device,
 /// `gpio-sim.<n>`; under it is one directory per bank, named after the chip
 /// that bank became -- `gpiochip1` for `/dev/gpiochip1` -- and in that one

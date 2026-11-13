@@ -135,7 +135,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         rest
     });
     // A ground station that cannot digest its configuration says so first,
-    // and the usual reason is that nothing has built tcsverify: this test's
+    // and the usual reason is that nothing has built tcs-verify: this test's
     // own package does not, a program of another package being nothing cargo
     // builds for it.
     assert!(

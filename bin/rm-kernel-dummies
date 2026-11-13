@@ -11,7 +11,7 @@
 # order they are made in, which costs nothing and reads as undoing.
 #
 # Each takes its device out from under anything using it, so do not run this
-# while a test, tcspecial or tcssim is running on one.
+# while a test, tcspecial or tcs-sim is running on one.
 
 set -euo pipefail
 

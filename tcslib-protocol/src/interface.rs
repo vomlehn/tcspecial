@@ -15,7 +15,7 @@
 //! beacon in `tcslib-protocol/xtce/beacon.xtce`, which are not part of the
 //! interface: no change to the interface can touch them. A configuration names
 //! the interface it was written for as the `tcspecial` section's `interface`,
-//! and every program refuses one that is not its build's own; `tcsverify
+//! and every program refuses one that is not its build's own; `tcs-verify
 //! --interface-digest` prints it. A ground station reads its own copy with
 //! [`InterfaceDigest::of_files`] and compares the two. See "The configuration
 //! names its interface" in `docs/tcspecial-design.rst`.
@@ -115,7 +115,7 @@ impl InterfaceDigest {
     /// hex digits. A configuration's checksum is read by the same rule, in
     /// [`crate::ConfigDigest::of_hex`].
     ///
-    /// Lower-case only, as tcsverify prints it and the beacon carries it, so
+    /// Lower-case only, as tcs-verify prints it and the beacon carries it, so
     /// that one interface has one spelling and a search of the files for it
     /// finds every one.
     ///

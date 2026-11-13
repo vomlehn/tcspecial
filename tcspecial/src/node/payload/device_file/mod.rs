@@ -56,7 +56,7 @@ impl DeviceEndpoint {
             .read(true)
             .write(true)
             // Not this process's terminal. A device that is a tty -- a real
-            // serial port, or a pty tcssim made to simulate one -- becomes the
+            // serial port, or a pty tcs-sim made to simulate one -- becomes the
             // controlling terminal of a process that opens it without this, and
             // then a read from a background process group raises SIGTTIN and a
             // hangup raises SIGHUP: a handler stopped or killed for reasons

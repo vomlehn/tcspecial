@@ -76,27 +76,27 @@ On a desktop
 
 .. figure:: tcs-desktop.svg
    :alt: One desktop computer, with no vehicle and no hardware. make runmocy
-         starts tcsmoc, which starts tcspecial and tcssim on the same
-         configuration. tcsmoc sends tcspecial commands and shows the
+         starts tcs-moc, which starts tcspecial and tcs-sim on the same
+         configuration. tcs-moc sends tcspecial commands and shows the
          telemetry and beacons it sends back, over sockets on 127.0.0.1.
-         tcspecial reads and writes the devices tcssim simulates, behind
+         tcspecial reads and writes the devices tcs-sim simulates, behind
          pseudo-terminals and loopback sim_addresses, as it would real ones.
    :width: 100%
 
    The same software, every connection made on one desktop.
 
-None of it needs a vehicle. On one desktop, **tcsmoc** stands in for the
-mission operations center and **tcssim** for the payloads, and between them
+None of it needs a vehicle. On one desktop, **tcs-moc** stands in for the
+mission operations center and **tcs-sim** for the payloads, and between them
 runs the same tcspecial that flies. ``make runmocy`` starts all three on one
 configuration, and every connection in the figure above is made on the
 desktop: commands, telemetry and beacons over sockets on the loopback
 interface, and the devices as pseudo-terminals and loopback addresses that
-tcssim answers on a physics model of the payloads. A configuration can be
+tcs-sim answers on a physics model of the payloads. A configuration can be
 developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.
 
-A configuration is written with **tcsgui**, which draws it as a diagram of
-nodes and links, and checked with **tcsverify**, which says what is wrong
+A configuration is written with **tcs-gui**, which draws it as a diagram of
+nodes and links, and checked with **tcs-verify**, which says what is wrong
 with it without running any of it. Both read it through **tcslib-protocol**, the
 library the vehicle and the ground share, so the error a person sees on the
 desktop is the one the vehicle would refuse the file with.
@@ -117,22 +117,22 @@ TCSpecial is several programs, each with a manual of its own:
     together, the commands the vehicle answers to, the crates used and
     the license.
 
-`The tcsgui manual <tcsgui.html>`__
-    The editor. tcsgui draws a configuration and its simulator
+`The tcs-gui manual <tcs-gui.html>`__
+    The editor. tcs-gui draws a configuration and its simulator
     configuration as diagrams of nodes and links, checks them as they are
     edited, and writes them back.
 
-`The tcsmoc manual <tcsmoc.html>`__
-    The simulated operations center. tcsmoc shows what the vehicle sends
+`The tcs-moc manual <tcs-moc.html>`__
+    The simulated operations center. tcs-moc shows what the vehicle sends
     the ground, panel by panel and in plots, and sends it commands.
 
-`The tcssim manual <tcssim.html>`__
-    The payload simulator. tcssim answers for a vehicle's payloads as their
+`The tcs-sim manual <tcs-sim.html>`__
+    The payload simulator. tcs-sim answers for a vehicle's payloads as their
     devices would; its manual also describes the simulator configuration
     that says how.
 
-`The tcsverify manual <tcsverify.html>`__
-    The checker. tcsverify reads a configuration and says what is wrong
+`The tcs-verify manual <tcs-verify.html>`__
+    The checker. tcs-verify reads a configuration and says what is wrong
     with it, running none of it.
 
 The other documents beside these:

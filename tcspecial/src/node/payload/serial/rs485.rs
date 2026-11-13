@@ -18,7 +18,7 @@
 //! transmitters. A handler whose line will not take what its file asked for
 //! is refused rather than started; see `apply`.
 //!
-//! Not asked of a simulated device. tcssim's pseudo-terminal carries the bus's
+//! Not asked of a simulated device. tcs-sim's pseudo-terminal carries the bus's
 //! bytes both ways and has no transceiver to turn around, so the serial handler
 //! leaves these terms unapplied there: see `apply_line_terms` in the serial
 //! module.

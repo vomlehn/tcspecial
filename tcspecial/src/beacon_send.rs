@@ -58,7 +58,7 @@ pub struct BeaconSend {
     /// taken also keeps the beacons fast until the process ends: see
     /// [`BeaconSend::restart_initiated`].
     matched: Matched,
-    /// Where beacons go, for saying so: `beacon_recv`, which is what tcsmoc
+    /// Where beacons go, for saying so: `beacon_recv`, which is what tcs-moc
     /// makes its receiving socket out of, or the message ID they are
     /// published under on a software bus.
     dest_addr: String,

@@ -117,7 +117,7 @@
             </compute>
         </type>
     </vehicle>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="dropped" x="234" y="134"/>
             <node name="echo" x="34" y="34"/>
@@ -128,5 +128,5 @@
             <node name="spare" x="34" y="234"/>
             <node name="unheard" x="34" y="234"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

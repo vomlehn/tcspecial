@@ -5,7 +5,7 @@
 //! real array's current falls a little as its bus's voltage rises; the bus
 //! of a spacecraft without a regulator sits where its battery holds it, on
 //! the flat of the array's curve, where the current is very nearly the
-//! array's short-circuit figure. The arithmetic is tcssim's
+//! array's short-circuit figure. The arithmetic is tcs-sim's
 //! `physics::solar_array`.
 
 use serde::{Deserialize, Serialize};

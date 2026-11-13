@@ -194,10 +194,10 @@
 XML.</li>
 <li><code>&lt;name&gt;.xtce</code> is the configuration’s own XTCE: what
 the vehicle sends the ground, each node a parameter of the type it
-sends. tcsverify writes it from the configuration
+sends. tcs-verify writes it from the configuration
 (<code>make xtce</code> writes every example’s), and nobody edits
 it.</li>
-<li><code>&lt;name&gt;-sim.yaml</code> is the tcssim configuration that
+<li><code>&lt;name&gt;-sim.yaml</code> is the tcs-sim configuration that
 simulates its payloads.</li>
 </ul>
 <p>An example whose payload is a program of its own holds that program
@@ -232,24 +232,24 @@ tests of the examples through Yamcs share.</p>
 <p>A configuration and its simulator file are matched by payload name.
 The simulator file can’t name a payload the configuration doesn’t have,
 nor one the simulator would not simulate: a payload that is a program,
-which tcspecial runs itself. <code>tcsverify</code> refuses either, as
-tcssim does. A payload that is only driven, such as <code>tees</code>’
-heater, is simulated like any other: tcssim counts what the vehicle
+which tcspecial runs itself. <code>tcs-verify</code> refuses either, as
+tcs-sim does. A payload that is only driven, such as <code>tees</code>’
+heater, is simulated like any other: tcs-sim counts what the vehicle
 sends it.</p>
 <p>The YAML and XML files must say the same thing, so change both
 together.</p>
 <p>Every payload a simulator file names says <code>simulate: true</code>
-– itself or in its group, not both – for tcssim to simulate it;
+– itself or in its group, not both – for tcs-sim to simulate it;
 <code>simulate: false</code> would leave it to the real device. Every
-simulator file also has a <code>tcssim</code> section giving the address
-at which tcssim says it has made its simulated devices, a port no other
-example uses, so that tcsmoc starts tcspecial only once they are there.
-The <code>make run-*</code> targets give every program
+simulator file also has a <code>tcs-sim</code> section giving the
+address at which tcs-sim says it has made its simulated devices, a port
+no other example uses, so that tcs-moc starts tcspecial only once they
+are there. The <code>make run-*</code> targets give every program
 <code>--simulate=all</code>, the run being one with simulated and dummy
 devices only: a program started without <code>--simulate</code> gets the
 flight setting, <code>none</code>, and refuses every simulated and dummy
 device. A <code>network</code> or <code>device-file</code> payload is a
-real device under any mode, whether or not tcssim answers at its far
+real device under any mode, whether or not tcs-sim answers at its far
 end. See “Simulated, Dummy or Real Devices: –simulate” in the
 manual.</p>
 <p>The examples’ programs – <code>beacon</code>,
@@ -270,11 +270,11 @@ and a vehicle the program starts reads the same file.</p>
 adding its directory here, and a row to the table of its section below;
 there’s no list in the tests to update:</p>
 <ul>
-<li><code>tcsverify/tests/examples.rs</code> runs <code>tcsverify</code>
-on each configuration and its simulator file (any error or warning
-fails), and checks that the YAML and XML read as the same
-configuration.</li>
-<li><code>tcsgui/tests/schema.rs</code> validates each XML file against
+<li><code>tcs-verify/tests/examples.rs</code> runs
+<code>tcs-verify</code> on each configuration and its simulator file
+(any error or warning fails), and checks that the YAML and XML read as
+the same configuration.</li>
+<li><code>tcs-gui/tests/schema.rs</code> validates each XML file against
 <code>tcspecial.xsd</code>, checks each YAML key against
 <code>tcspecial.schema.json</code>, and checks that every file names its
 schema (<code>../../tcslib-protocol/schema/...</code>).</li>
@@ -311,7 +311,7 @@ goes straight to the ground (MOC).</td>
 <td>The one thing a ground station knows without asking: a window
 showing the spacecraft’s beacon, built from the two halves any ground
 station would use – <code>tcslib_moc::beacon</code> to listen and
-<code>tcsui</code>’s panel to show it.</td>
+<code>tcs_ui</code>’s panel to show it.</td>
 </tr>
 <tr>
 <td><code>ping</code></td>
@@ -357,7 +357,7 @@ software bus as an SBN peer, a <code>gateway_cfs</code> node publishes
 each reading as its <code>tlm_base</code> plus the reading’s device id,
 and a command published as its <code>cmd_msgid</code> goes on to a
 heater. Every link is carried over the one peer, as message IDs.
-<code>make run-cfs</code> runs tcsmoc on it, tcssim simulating the cFS
+<code>make run-cfs</code> runs tcs-moc on it, tcs-sim simulating the cFS
 side; <code>tcspecial/tests/cfs.rs</code> flies it against a test
 playing the cFS side, and <code>tcspecial/tests/cfs_ground.rs</code>
 commands it from tcslib_moc.</td>
@@ -372,17 +372,17 @@ drawn from it, so its readings go to the ground over the
 <code>tcspecial</code> section’s <code>payload_telemetry</code>:
 tcspecial sends each one to <code>dest_base</code> plus the payload’s
 device id, <code>127.0.0.1:6100</code> for <code>sensor</code>, which is
-device 0. tcssim simulates <code>sensor</code>, sending a packet every
+device 0. tcs-sim simulates <code>sensor</code>, sending a packet every
 second.</p>
 <pre><code>make run-simple</code></pre>
-<p>That runs tcsmoc on the example, which starts tcspecial and tcssim
+<p>That runs tcs-moc on the example, which starts tcspecial and tcs-sim
 itself and shows a panel for <code>sensor</code>: when its last packet
 arrived, what it said, and how many there have been.</p>
 <p>Languages:</p>
 <ul>
-<li>MOC: Rust – tcsmoc.</li>
+<li>MOC: Rust – tcs-moc.</li>
 <li>Vehicle: Rust – tcspecial.</li>
-<li>Payload: Rust – tcssim simulates <code>sensor</code>, a network
+<li>Payload: Rust – tcs-sim simulates <code>sensor</code>, a network
 payload.</li>
 </ul>
 <h3 id="beacon">beacon</h3>
@@ -401,7 +401,7 @@ datagram, counts the beacons that did not arrive, compares the digest in
 each one with the ground’s own and says how stale the last one is. No
 window, no toolkit: a ground station with no screen – a logger, a test –
 uses exactly this.</li>
-<li><code>tcsui</code> holds the panel, as markup other windows import,
+<li><code>tcs-ui</code> holds the panel, as markup other windows import,
 and works out what to show on it: which colour the indicator is, and the
 two lines beside it.</li>
 <li><code>beacon</code>, the program here, reads the configuration to
@@ -441,7 +441,7 @@ binary beside <code>beacon</code>, run directly rather than through
 the window stops it as well, and so does the watcher dying, which the
 kernel is told to see to; and a tcspecial that stops by itself puts the
 button back to <code>Start tcspecial</code>.</p>
-<p>tcsmoc shows the same panel from the same library, in a row beside
+<p>tcs-moc shows the same panel from the same library, in a row beside
 its command link, which is the point of their being apart: an operator
 who has read one has read the other.</p>
 <p>The beacon’s ports are this example’s own – a hundred above the ones
@@ -457,9 +457,9 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – the <code>beacon</code> program, on
-<code>tcslib_moc::beacon</code> and <code>tcsui</code>.</li>
+<code>tcslib_moc::beacon</code> and <code>tcs_ui</code>.</li>
 <li>Vehicle: Rust – tcspecial.</li>
-<li>Payload: Rust – tcssim simulates <code>sensor</code>, a network
+<li>Payload: Rust – tcs-sim simulates <code>sensor</code>, a network
 payload.</li>
 </ul>
 <h3 id="ping">ping</h3>
@@ -484,10 +484,10 @@ until its own answer, matched by count, arrives.</p>
 two halves written again in Python:
 <code>python/tcslib_moc/beacon.py</code> after
 <code>tcslib_moc::beacon</code>,
-<code>python/tcsui/beacon_panel.py</code> after <code>tcsui</code>, and
-<code>python/tcslib_protocol</code> for the ping format, the beacon and
-the configuration. The interface digest beacons are checked against is
-worked out with tcs-xtce’s Python runtime, from the tcs-xtce checkout
+<code>python/tcs_ui/beacon_panel.py</code> after <code>tcs_ui</code>,
+and <code>python/tcslib_protocol</code> for the ping format, the beacon
+and the configuration. The interface digest beacons are checked against
+is worked out with tcs-xtce’s Python runtime, from the tcs-xtce checkout
 beside this tree. <code>ping-common/ping_ground.py</code> is the ping’s
 own part, with no window, and <code>ping-common/ping_window.py</code>
 the window, both shared with <code>ping-yamcs</code>. The Rust crate
@@ -503,7 +503,7 @@ the vehicle answers with that checksum: a vehicle sends nothing down,
 the ping node’s answers included, until it has taken one.
 <code>--pings</code> waits for it before the first ping; <code>-v</code>
 says when it is matched. It is sent from the configuration’s
-<code>tcs_cmd.send</code>, so tcsmoc cannot be run on the same
+<code>tcs_cmd.send</code>, so tcs-moc cannot be run on the same
 configuration beside it.</p>
 <p><code>ping_gateway.py</code> starts the vehicle itself: tcspecial
 from the build, on the same configuration. It kills it when it exits,
@@ -516,7 +516,7 @@ run the vehicle yourself, in another terminal, say
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another</code></pre>
 <p>Its ports are all in the seven thousands, which no other example
 uses.</p>
-<p>tcsmoc pings it too:
+<p>tcs-moc pings it too:
 <code>make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping</code>, then
 the <code>Ping node</code> button beside <code>Command</code>. It is the
 same panel, kept by <code>tcslib_moc::ping</code>, which
@@ -524,7 +524,7 @@ same panel, kept by <code>tcslib_moc::ping</code>, which
 <p>Languages:</p>
 <ul>
 <li>MOC: Python 3 – <code>ping_gateway.py</code>, on
-<code>python/</code>; or Rust, in tcsmoc.</li>
+<code>python/</code>; or Rust, in tcs-moc.</li>
 <li>Vehicle: Rust – tcspecial, whose <code>ping</code> node
 answers.</li>
 <li>Payload: none. The <code>ping</code> node is the vehicle’s own, and
@@ -669,7 +669,7 @@ uses.</p>
 <h2 id="payloads-on-the-kernels-dummy-devices">Payloads on the kernel’s
 dummy devices</h2>
 <p>Each is one of the payload types whose far end is a device the kernel
-makes rather than a file or a socket tcssim can make, and each is flown
+makes rather than a file or a socket tcs-sim can make, and each is flown
 against the kernel’s dummy device for it by
 <code>tcspecial/tests/kernel-dummies.rs</code>, which plays the device’s
 far end through the kernel: that is what makes CAN and GPIO supported.
@@ -725,7 +725,7 @@ up: a buffer is read and never written.</td>
 <h3 id="can">can</h3>
 <p><code>vcan0</code> is the kernel’s virtual CAN bus: a bus with no
 wire, whose members are the sockets bound to it. tcspecial joins it as
-two of them, one for each identifier, and tcssim joins it as the motor,
+two of them, one for each identifier, and tcs-sim joins it as the motor,
 sending a status frame a second and counting the commands. On a vehicle
 the interface is the controller’s, such as <code>can0</code>, and
 nothing else changes.</p>
@@ -736,7 +736,7 @@ lamp a <code>gpio_out</code>, whose line is driven: see “A GPIO Payload”
 in the manual. The chip is one of the kernel’s <code>gpio-sim</code>,
 whose lines exist in memory: a line’s <code>pull</code> file sets what
 an input is pulled to, which tcspecial reads as the line’s level, and
-its <code>value</code> file says what an output is driven to. tcssim
+its <code>value</code> file says what an output is driven to. tcs-sim
 pulls the switch’s line the other way every second and counts the lamp’s
 changes. The configuration names <code>/dev/gpiochip1</code>, which is
 what the simulated chip is on a host with one chip of its own; the
@@ -746,7 +746,7 @@ number is given as chips appear, so write the one
 <h3 id="iio">iio</h3>
 <p>The sensor is one of the kernel’s <code>iio_dummy</code>, whose
 buffer a software trigger fills a hundred times a second: the dummy
-device is the whole payload, and tcssim makes nothing. Its buffer is
+device is the whole payload, and tcs-sim makes nothing. Its buffer is
 there only where the kernel’s <code>iio_dummy</code> was built with
 <code>CONFIG_IIO_SIMPLE_DUMMY_BUFFER</code>, which a stock distribution
 kernel’s is not; <code>bin/mk-kernel-dummies iio</code> says so where it
@@ -757,10 +757,10 @@ dummy is on a host with one sensor of its own; write the number
 <pre><code>make run-iio</code></pre>
 <p>Languages, for all three:</p>
 <ul>
-<li>MOC: Rust – tcsmoc.</li>
+<li>MOC: Rust – tcs-moc.</li>
 <li>Vehicle: Rust – tcspecial.</li>
-<li>Payload: the kernel’s dummy device, with tcssim playing the device’s
-far end for CAN and GPIO.</li>
+<li>Payload: the kernel’s dummy device, with tcs-sim playing the
+device’s far end for CAN and GPIO.</li>
 </ul>
 <h2 id="more-complex-examples">More complex examples</h2>
 <p>Each puts the vehicle to work on its payloads: what they send, and
@@ -781,8 +781,8 @@ what is done with it aboard and on the ground.</p>
 <td><code>thermostat</code></td>
 <td>Three temperature sensors on a thermal mass, two on I2C and one on
 SPI, converted to kelvin, voted on, and fed to a thermostat that drives
-two heaters, every one simulated by tcssim, so that it runs on any desk.
-The setpoint is commanded from the ground, and tcsmoc plots the
+two heaters, every one simulated by tcs-sim, so that it runs on any
+desk. The setpoint is commanded from the ground, and tcs-moc plots the
 temperatures and the heaters.</td>
 </tr>
 <tr>
@@ -797,16 +797,16 @@ them.</td>
 <td><code>battery</code></td>
 <td>A power bus through an orbit: a power monitor asked over a serial
 line, a shunt, the battery’s charge counted by a Python 3 program, and
-the science load shed in eclipse by a thermostat. tcssim simulates every
-payload, joined to a physics model of a sun, a solar array, loads, a bus
-and a battery.</td>
+the science load shed in eclipse by a thermostat. tcs-sim simulates
+every payload, joined to a physics model of a sun, a solar array, loads,
+a bus and a battery.</td>
 </tr>
 <tr>
 <td><code>descent</code></td>
 <td>A lander’s terminal descent: a radar altimeter’s altitude flown down
 by a Python 3 guidance program throttling the engine, a Doppler
 velocimeter, and a touchdown switch that speaks the moment the lander is
-down. tcssim simulates every payload, joined to a physics model of an
+down. tcs-sim simulates every payload, joined to a physics model of an
 engine and the body it brakes.</td>
 </tr>
 <tr>
@@ -843,13 +843,13 @@ of type <code>spi_tmass</code>. The heaters’ switches are lines 4 and 5
 of <code>/dev/gpiochip1</code>. On a desk every one of them is a
 simulated device: each is reached over UDP at its
 <code>sim_address</code> – the sensors at 127.0.0.1:5201 to 5203, where
-tcssim answers with the zone’s temperature, and the switches at 5204 and
-5205, where tcssim takes what the vehicle drives them to – so the
+tcs-sim answers with the zone’s temperature, and the switches at 5204
+and 5205, where tcs-sim takes what the vehicle drives them to – so the
 example needs no dummy device, no sudo and no hardware. Flown, the buses
 and the chip are opened. The buses themselves are flown against
 simulated devices by <code>make simulated-devices-test</code>, with
 <code>tests/manual/thermostat.ytcs</code>.</p>
-<p>tcssim joins the simulated payloads to the vehicle’s physics model,
+<p>tcs-sim joins the simulated payloads to the vehicle’s physics model,
 in the world section of <code>thermostat-sim.yaml</code>, a link to
 <code>thermostat-common/thermostat-sim.yaml</code>, which
 thermostat-yamcs’s simulator file is a link to too: a zone with two
@@ -864,28 +864,28 @@ over a ninety minute orbit; each heater’s switch is joined to
 warm it while the vehicle has them on: the loop closes through
 tcspecial. The heaters are four watts each, and either alone holds the
 band, the thermostat cycling whichever are working; a heater disabled in
-tcssim shows in the temperature, and with both disabled the zone falls
+tcs-sim shows in the temperature, and with both disabled the zone falls
 into the plot’s lower red.</p>
-<p>A heater whose switch’s panel in tcssim is not enabled is unpowered,
+<p>A heater whose switch’s panel in tcs-sim is not enabled is unpowered,
 or failed: it stays off whatever the thermostat decides, and enabled
 again it takes the latest decision at once. The ground sees it in the
 temperature: its switch goes on reporting what it was told.</p>
 <pre><code>make run-thermostat</code></pre>
-<p>That runs tcsmoc on the example, as <code>run-simple</code> does, and
-tcsmoc opens its plot window beside its own: each sensor’s temperature
-and their vote over the last ten seconds, a dot at each reading, with
-the setpoint’s rule and the thermostat’s band, and under them a strip
-for each heater’s switch, <code>gpio-out-tmass1</code> and
+<p>That runs tcs-moc on the example, as <code>run-simple</code> does,
+and tcs-moc opens its plot window beside its own: each sensor’s
+temperature and their vote over the last ten seconds, a dot at each
+reading, with the setpoint’s rule and the thermostat’s band, and under
+them a strip for each heater’s switch, <code>gpio-out-tmass1</code> and
 <code>gpio-out-tmass2</code>, on while it was told on. Press Connect in
-tcsmoc, and Enable on each payload in tcssim, to start the data and the
-heating; press Disable on a heater’s switch in tcssim to take it away,
-and the zone falls behind in the cold part of the orbit.</p>
+tcs-moc, and Enable on each payload in tcs-sim, to start the data and
+the heating; press Disable on a heater’s switch in tcs-sim to take it
+away, and the zone falls behind in the cold part of the orbit.</p>
 <p>Languages:</p>
 <ul>
-<li>MOC: Rust – tcsmoc.</li>
+<li>MOC: Rust – tcs-moc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions, vote, thermostat and
 log are its own nodes.</li>
-<li>Payload: Rust – tcssim simulates the three sensors, with the zone
+<li>Payload: Rust – tcs-sim simulates the three sensors, with the zone
 they read, and the heaters’ switches, on the kernel’s simulated GPIO
 chip.</li>
 </ul>
@@ -948,7 +948,7 @@ and from the ground carries a CCSDS primary header:</p>
 <code>python/tcslib_protocol/yamcs.py</code>. That gives each node drawn
 into the gateway node a parameter of the type the example’s own XTCE,
 <code>thermostat-yamcs.xtce</code>, says its data are, copied from
-there: tcsverify writes that file from the configuration
+there: tcs-verify writes that file from the configuration
 (<code>make xtce</code>), so the Python works out nothing of its own. A
 conversion’s or a vote’s value is a float in its unit, with the unit in
 a <code>UnitSet</code>, read from its four bytes of a signed count of
@@ -963,28 +963,28 @@ Beside them is <code>world_ambient_temp</code>, the simulated world’s
 ambient temperature, which the vehicle does not send: a local parameter
 in K, which <code>thermostat_yamcs.py</code> sets from the simulator
 file’s <code>ambient_temp</code>, read by
-<code>tcsverify --ambient</code>, once the vehicle has answered
+<code>tcs-verify --ambient</code>, once the vehicle has answered
 CONNECT.</p>
-<p>It starts Yamcs, then tcssim – every payload sending from the start,
-as though its panel’s button had been pressed – and, once tcssim says it
-is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs
+<p>It starts Yamcs, then tcs-sim – every payload sending from the start,
+as though its panel’s button had been pressed – and, once tcs-sim says
+it is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs
 send CONNECT until the vehicle answers with the configuration’s
 checksum; and reads the parameters back over Yamcs’s REST API. Its
 window shows the beacon panel above the thermostat’s: the zone’s
 temperature, each reading, and each line sensing a heater, on or off.
 With <code>--seconds</code> there is no window: it prints every value
 each <code>--every</code> seconds, and a line each time a heater’s line
-changes, and stops. tcssim draws a window of its own, so either wants a
+changes, and stops. tcs-sim draws a window of its own, so either wants a
 display. Every payload sending from the start includes the heaters’
-switches, so both start enabled; press Disable on one in tcssim’s window
-to take its heater away, and its line goes low and stays low while the
-zone falls behind in the cold part of the orbit. Its GPIO lines are the
-thermostat example’s, so the two are not run at once.</p>
+switches, so both start enabled; press Disable on one in tcs-sim’s
+window to take its heater away, and its line goes low and stays low
+while the zone falls behind in the cold part of the orbit. Its GPIO
+lines are the thermostat example’s, so the two are not run at once.</p>
 <pre><code>make run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0   # the window
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs ~/yamcs-5.14.0 \
     --seconds 120
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --describe</code></pre>
-<p>Yamcs, tcssim and tcspecial are stopped when it ends and killed with
+<p>Yamcs, tcs-sim and tcspecial are stopped when it ends and killed with
 it if it is killed or crashes.</p>
 <p>The Rust crate beside it is its tests: <code>agrees.rs</code> holds
 the ports, APIDs, forms and checksum
@@ -1010,7 +1010,7 @@ to 5205, so the two are not run at once.</p>
 or XML (<code>thermostat-yamcs.xtcs</code>)</li>
 <li>ground program: Python 3 (<code>thermostat_yamcs.py</code>), with
 Yamcs (Java)</li>
-<li>payloads: Rust – tcssim, as in the thermostat example</li>
+<li>payloads: Rust – tcs-sim, as in the thermostat example</li>
 </ul>
 <h3 id="battery">battery</h3>
 <p>A spacecraft’s power bus through an orbit: the example of a payload
@@ -1029,8 +1029,8 @@ charge, a ratio, and sets itself full whenever the current falls to
 nought. <code>shedding</code>, a thermostat around 0.4, sheds the
 science instrument below three tenths by driving <code>science</code>,
 port 5302, and restores it above half.</p>
-<p>tcssim simulates all three, joined to the vehicle’s physics model, in
-the world section of <code>battery-sim.yaml</code>: a sun, a solar
+<p>tcs-sim simulates all three, joined to the vehicle’s physics model,
+in the world section of <code>battery-sim.yaml</code>: a sun, a solar
 array, two loads, a bus and a battery, each a part simulated alone and
 joined under <code>connections</code>. The orbit is six minutes and the
 battery small, so that a run sees, in one orbit, the battery charge and
@@ -1038,15 +1038,15 @@ fill, the eclipse drain it, the science load shed and the sun bring it
 back. Going into shadow and out, and the battery reaching full, are
 events of the model’s, met at their moments.</p>
 <pre><code>make run-battery</code></pre>
-<p>Press Connect in tcsmoc, and Enable on each payload in tcssim, to
+<p>Press Connect in tcs-moc, and Enable on each payload in tcs-sim, to
 start the data.</p>
 <p>Languages:</p>
 <ul>
-<li>MOC: Rust – tcsmoc.</li>
+<li>MOC: Rust – tcs-moc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions, thermostat and log are
 its own nodes – and Python 3, the charge count, which is a program of
 the example’s.</li>
-<li>Payload: Rust – tcssim simulates the power monitor, with a
+<li>Payload: Rust – tcs-sim simulates the power monitor, with a
 pseudo-terminal at its path, the shunt and the science switch.</li>
 </ul>
 <h3 id="descent">descent</h3>
@@ -1059,29 +1059,29 @@ altitude ten times a second, which <code>altitude</code> makes metres.
 <code>guidance.py</code>, a Python 3 program beside the configuration
 that works out the rate of descent from the altitudes, flies a rate that
 slows as the ground nears, and answers a throttle, a ratio, which drives
-<code>engine</code>, port 5404: four bytes of a value, which tcssim’s
+<code>engine</code>, port 5404: four bytes of a value, which tcs-sim’s
 engine reads as the ratio it is. <code>doppler</code>, port 5402, sends
 the velocity for the ground, and <code>touchdown</code>, port 5403, a
 switch on a landing leg, says <code>1</code> when the lander is
 down.</p>
-<p>tcssim simulates all four, joined to the vehicle’s physics model, in
+<p>tcs-sim simulates all four, joined to the vehicle’s physics model, in
 the world section of <code>descent-sim.yaml</code>: an engine and the
 body it brakes, five hundred metres up and falling at twenty metres a
 second. The body falls by the rocket equation, and the moment it reaches
-the ground is found ahead of time and met exactly; tcssim’s touchdown
+the ground is found ahead of time and met exactly; tcs-sim’s touchdown
 switch waits on the model for it, and speaks then. A run lands in about
 seventy-five seconds.</p>
 <pre><code>make run-descent</code></pre>
-<p>Press Connect in tcsmoc, and Enable on each payload in tcssim,
+<p>Press Connect in tcs-moc, and Enable on each payload in tcs-sim,
 <code>engine</code> and <code>radar</code> first: the lander does not
 start falling until a simulated payload starts.</p>
 <p>Languages:</p>
 <ul>
-<li>MOC: Rust – tcsmoc.</li>
+<li>MOC: Rust – tcs-moc.</li>
 <li>Vehicle: Rust – tcspecial, whose conversions and log are its own
 nodes – and Python 3, the guidance, which is a program of the
 example’s.</li>
-<li>Payload: Rust – tcssim simulates the radar, the velocimeter, the
+<li>Payload: Rust – tcs-sim simulates the radar, the velocimeter, the
 switch and the engine.</li>
 </ul>
 <h3 id="simple-app">simple-app</h3>
@@ -1109,7 +1109,7 @@ its own, carrying the configuration’s checksum, with
 <code>tcslib_moc::listening</code>, and sends it again each second until
 the vehicle answers with that checksum: a vehicle sends nothing down
 until it has taken one, and nothing else in this example sends one. It
-sends it from the configuration’s <code>tcs_cmd.send</code>, so tcsmoc
+sends it from the configuration’s <code>tcs_cmd.send</code>, so tcs-moc
 cannot be run on the same configuration beside it; <code>-v</code> says
 when it is matched.</li>
 </ul>

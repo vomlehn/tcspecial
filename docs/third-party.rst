@@ -97,7 +97,7 @@ Devices are configured at run time
 
 A configuration is refused when it is loaded, saying where
     Every rule about what a configuration may say is checked in one place,
-    ``tcsverify``, and tcspecial, the simulator, the graphical editor and the
+    ``tcs-verify``, and tcspecial, the simulator, the graphical editor and the
     ground station all check through it. A configuration the vehicle would
     refuse is refused in the editor, with the same message, naming the file
     and the line. A table validation function in cFS, as usually written,
@@ -109,7 +109,7 @@ The ground can see which configuration is flying
     running without having to ask.
 
 The simulator is built from the same file
-    tcssim reads the configuration and simulates its payloads, so a
+    tcs-sim reads the configuration and simulates its payloads, so a
     device change can be tried on the ground, against the ground station,
     before it is uplinked.
 
@@ -252,7 +252,7 @@ b. **A library.** tcspecial split in three:
    link onto the Software Bus, and an F´ component does the same from a rate
    group and its ports.
 
-   In cFS the configuration can be a table, with ``tcsverify`` as its
+   In cFS the configuration can be a table, with ``tcs-verify`` as its
    validation function. A device is then reconfigured with the table-load
    commands cFS operators already use, and a configuration that would fail
    is refused when it is loaded, saying why.

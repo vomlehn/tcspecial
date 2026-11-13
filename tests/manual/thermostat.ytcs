@@ -165,7 +165,7 @@ commands:
   # the zone temperature the heaters are held at, in kelvin
   - { from: gateway, sets: thermostat.setpoint }
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: ambient, x: 469, y: 166 }
     - { node: gateway, x: 790, y: 34 }

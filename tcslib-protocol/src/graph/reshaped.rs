@@ -112,7 +112,7 @@ fn in_yaml(text: &str) -> Option<String> {
         let Some(key) = key.as_str() else {
             continue;
         };
-        if key == "tcsgui" {
+        if key == "tcs-gui" {
             let placed = value
                 .get("nodes")
                 .and_then(serde_norway::Value::as_sequence)
@@ -121,7 +121,7 @@ fn in_yaml(text: &str) -> Option<String> {
                 .find(|entry| entry.get("name").is_some());
             if let Some(entry) = placed {
                 let name = scalar(entry.get("name"));
-                let line = line_of_key(text, "tcsgui", "name", &name);
+                let line = line_of_key(text, "tcs-gui", "name", &name);
                 found.push((
                     line,
                     format!(
@@ -272,7 +272,7 @@ fn has_attribute(tag: &BytesStart, name: &str) -> bool {
 struct Old {
     /// Its line.
     line: usize,
-    /// The section, or `tcsgui`, it is in.
+    /// The section, or `tcs-gui`, it is in.
     section: String,
     /// What its `name` and `type` elements say, as far as they are read.
     name: Option<String>,
@@ -305,7 +305,7 @@ fn in_xml(text: &str) -> Option<String> {
     // The section a node of the old shape would be: a child of the root.
     let mut node: Option<Old> = None;
     // Inside the editor's section, and inside one of its lists.
-    let mut in_tcsgui = false;
+    let mut in_tcs_gui = false;
     let mut list: Option<(String, usize)> = None;
     // The element whose text is being read, as name or type.
     let mut reading: Option<String> = None;
@@ -318,7 +318,7 @@ fn in_xml(text: &str) -> Option<String> {
                 let element = tag.name().as_ref().to_string();
                 let level = depth + 1;
                 if level == 2 {
-                    in_tcsgui = element == "tcsgui";
+                    in_tcs_gui = element == "tcs-gui";
                     if now_of(&element).is_some() {
                         node = Some(Old {
                             line: at,
@@ -340,7 +340,7 @@ fn in_xml(text: &str) -> Option<String> {
                             reading = (!empty).then(|| element.clone());
                         }
                     }
-                    if in_tcsgui
+                    if in_tcs_gui
                         && (element == "nodes" || element == "set-aside")
                     {
                         list = Some((element.clone(), at));
@@ -387,7 +387,7 @@ fn in_xml(text: &str) -> Option<String> {
                     if let Some(old) = node.take().filter(|old| old.old) {
                         return Some(node_refused(&old));
                     }
-                    in_tcsgui = false;
+                    in_tcs_gui = false;
                 }
                 depth = depth.saturating_sub(1);
             }
@@ -444,7 +444,7 @@ fn layout_refused(what: &str, line: usize) -> String {
         "<set-aside><node name=\"...\" concern=\"...\"/></set-aside>"
     };
     format!(
-        "at line {line}, <{what}> in the tcsgui section is written as it was \
+        "at line {line}, <{what}> in the tcs-gui section is written as it was \
          before the editor's section named nodes as the sections do: one \
          <{what}> holds an entry for each node now, as {now}; {CONVERTER}"
     )
@@ -488,20 +488,20 @@ mod tests {
     /// A position in the old shape is refused, in either language.
     #[test]
     fn a_position_of_the_old_shape_is_refused() {
-        let text = "tcsgui:\n  nodes:\n    - { name: a, x: 1, y: 2 }\n";
+        let text = "tcs-gui:\n  nodes:\n    - { name: a, x: 1, y: 2 }\n";
         let why = refused(text, ConfigFormat::Yaml).expect("refused");
         assert!(why.starts_with("at line 3,"), "{why}");
         assert!(why.contains("node: a"), "{why}");
 
-        let text = "<configuration>\n<tcsgui>\n\
+        let text = "<configuration>\n<tcs-gui>\n\
                     <nodes><name>a</name><x>1</x><y>2</y></nodes>\n\
-                    </tcsgui>\n</configuration>\n";
+                    </tcs-gui>\n</configuration>\n";
         let why = refused(text, ConfigFormat::Xml).expect("refused");
         assert!(why.starts_with("at line 3,"), "{why}");
 
-        let text = "<configuration>\n<tcsgui>\n\
+        let text = "<configuration>\n<tcs-gui>\n\
                     <set-aside><node>a</node><concern>c</concern>\
-                    </set-aside>\n</tcsgui>\n</configuration>\n";
+                    </set-aside>\n</tcs-gui>\n</configuration>\n";
         let why = refused(text, ConfigFormat::Xml).expect("refused");
         assert!(why.starts_with("at line 3,"), "{why}");
     }
@@ -536,7 +536,7 @@ mod tests {
                     gateways:\n  - type gateway_radio:\n      \
                     - gateway: g\n\
                     payloads:\n  - type i2c:\n      - payload: a\n\
-                    tcsgui:\n  nodes:\n    - { node: a, x: 1, y: 2 }\n  \
+                    tcs-gui:\n  nodes:\n    - { node: a, x: 1, y: 2 }\n  \
                     set-aside:\n    - { node: a, concern: c }\n";
         assert_eq!(refused(yaml, ConfigFormat::Yaml), None);
 
@@ -546,9 +546,9 @@ mod tests {
                    <gateway name=\"g\"/></type></gateways>\n\
                    <payloads><type name=\"i2c\"><payload name=\"a\">\
                    <address>0x48</address></payload></type></payloads>\n\
-                   <tcsgui><nodes><node name=\"a\" x=\"1\" y=\"2\"/></nodes>\
+                   <tcs-gui><nodes><node name=\"a\" x=\"1\" y=\"2\"/></nodes>\
                    <set-aside><node name=\"a\" concern=\"c\"/></set-aside>\
-                   </tcsgui>\n</configuration>\n";
+                   </tcs-gui>\n</configuration>\n";
         assert_eq!(refused(xml, ConfigFormat::Xml), None);
     }
 }

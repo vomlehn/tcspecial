@@ -2,13 +2,13 @@
 <!--
   A tcspecial simulator configuration, written in XML.
 
-  What tcssim needs in order to simulate the payloads of a configuration:
+  What tcs-sim needs in order to simulate the payloads of a configuration:
   how fast each one sends, and what it does wrong. Nothing here describes a
   payload; the configuration does that, and the two are joined by name.
 
   As with the configuration schema, this checks the shape of the file and not
   whether it can be run: which settings a given kind of payload may state is
-  that kind's own rule, and tcsverify is where those live.
+  that kind's own rule, and tcs-verify is where those live.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
            elementFormDefault="qualified">
@@ -131,12 +131,12 @@
     </xs:sequence>
   </xs:complexType>
 
-  <!-- What tcssim itself is told: the UDP address, as address:port, at
+  <!-- What tcs-sim itself is told: the UDP address, as address:port, at
        which it answers whether it has made its simulated devices, required
-       by tcssim to start and by a harness to wait for it; the thermostat node
+       by tcs-sim to start and by a harness to wait for it; the thermostat node
        it plays, if any, which is never stated with tcspecial running;
        and the seed its random numbers start from. -->
-  <xs:complexType name="tcssim">
+  <xs:complexType name="tcs-sim">
     <xs:all>
       <xs:element name="ready" type="xs:string"/>
       <xs:element name="thermostat" type="xs:string" minOccurs="0"/>
@@ -144,14 +144,14 @@
     </xs:all>
   </xs:complexType>
 
-  <!-- The file: each section once at most, in any order, as tcssim reads
-       it. None is required as the file is read: tcssim refuses to start
-       without a tcssim section, which is its rule and not the shape's. -->
+  <!-- The file: each section once at most, in any order, as tcs-sim reads
+       it. None is required as the file is read: tcs-sim refuses to start
+       without a tcs-sim section, which is its rule and not the shape's. -->
   <xs:element name="simulator">
     <xs:complexType>
       <xs:all>
         <xs:element name="description" type="xs:string" minOccurs="0"/>
-        <xs:element name="tcssim" type="tcssim" minOccurs="0"/>
+        <xs:element name="tcs-sim" type="tcs-sim" minOccurs="0"/>
         <xs:element name="simulated_payload_groups" type="groups"
                     minOccurs="0"/>
         <!-- No world: the world the payloads are joined to, its ambient

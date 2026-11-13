@@ -109,7 +109,7 @@ impl SerialEndpoint {
             .read(true)
             .write(true)
             // Not this process's terminal. A line that is a tty -- a real
-            // serial port, or a pty tcssim made to simulate one -- becomes the
+            // serial port, or a pty tcs-sim made to simulate one -- becomes the
             // controlling terminal of a process that opens it without this, and
             // then a read from a background process group raises SIGTTIN and a
             // hangup raises SIGHUP: a handler stopped or killed for reasons
@@ -156,7 +156,7 @@ impl SerialEndpoint {
 /// parity is read back once set, because a port may take the call and keep
 /// less than it was given.
 ///
-/// A simulated line -- a pseudo-terminal, which tcssim makes -- has no
+/// A simulated line -- a pseudo-terminal, which tcs-sim makes -- has no
 /// transceiver and no RTS to drive, so the RS-485 terms are left unapplied
 /// there and the bytes go both ways as on any line: the bus is simulated by
 /// what is at the far end, and only its electrical turnaround is not.
@@ -307,7 +307,7 @@ fn apply_line_terms(
     // already set up; and refused rather than reported, for the reason
     // serial::rs485::apply gives. Not on a simulated device: under the flight
     // setting none is allowed to start, so a pseudo-terminal here is a run
-    // against tcssim, which carries the bus's bytes and has no turnaround.
+    // against tcs-sim, which carries the bus's bytes and has no turnaround.
     if let Some(terms) = &config.rs485 {
         if tcslib_protocol::node::payload::serial::judged(&config.path)
             .is_simulated()
@@ -633,11 +633,11 @@ mod tests {
     /// A pty's slave is a port as far as this endpoint is concerned: it takes
     /// the terms and carries the bytes.
     ///
-    /// Which is the whole of what tcssim simulates a serial line with. The
+    /// Which is the whole of what tcs-sim simulates a serial line with. The
     /// terms are stored and ignored by the kernel -- a pty has no cable to run
     /// at 9600 -- so what this shows is that a handler configured for a line
     /// opens one, sets it, and reads what the far end sends, with no hardware
-    /// Makes a pseudo-terminal, as tcssim makes one for a serial payload.
+    /// Makes a pseudo-terminal, as tcs-sim makes one for a serial payload.
     ///
     /// # Returns
     ///
@@ -693,7 +693,7 @@ mod tests {
     /// A pty's slave is a port as far as this endpoint is concerned: it takes
     /// the terms and carries the bytes.
     ///
-    /// Which is the whole of what tcssim simulates a serial line with. The
+    /// Which is the whole of what tcs-sim simulates a serial line with. The
     /// terms are stored and ignored by the kernel -- a pty has no cable to run
     /// at 9600 -- so what this shows is that a handler configured for a line
     /// opens one, sets it, and reads what the far end sends, with no hardware
@@ -751,7 +751,7 @@ mod tests {
     ///
     /// A pty has no transceiver and no RTS to drive, and refuses the mode
     /// (see rs485's own test), so a handler that applied it would never open
-    /// against tcssim; the far end, not the kernel, is what simulates the bus.
+    /// against tcs-sim; the far end, not the kernel, is what simulates the bus.
     #[test]
     fn a_pty_stands_in_for_an_rs485_line() {
         use std::io::{Read, Write};

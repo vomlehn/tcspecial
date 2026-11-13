@@ -1,7 +1,7 @@
 """The programs a ground station starts, each killed when it exits.
 
 A ground station on a desk often starts what it talks to: tcspecial on its
-configuration, tcssim simulating the payloads, Yamcs between the two.
+configuration, tcs-sim simulating the payloads, Yamcs between the two.
 Each is started here told to die with the station -- however it exits, the
 kernel being asked to see to it where the station is killed or crashes, so
 that nothing is left beaconing, or holding an example's ports, with no
@@ -114,7 +114,7 @@ def built(program, hint):
     """A program of this tree's build.
 
     Args:
-        program: Its name: ``tcspecial``, ``tcssim``.
+        program: Its name: ``tcspecial``, ``tcs-sim``.
         hint:    What to do where it is missing, for the complaint.
 
     Returns:

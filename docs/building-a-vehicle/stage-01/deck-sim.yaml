@@ -1,19 +1,19 @@
 # yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial-sim.schema.json
 
-# How tcssim simulates the payloads of deck.ytcs. The two files are joined
+# How tcs-sim simulates the payloads of deck.ytcs. The two files are joined
 # by name, and nothing here names a payload that file does not have.
 
 description: Simulator settings for stage 1 of Building a Vehicle
 
-# Where tcssim answers whether it has made its simulated devices, which
+# Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no
 # example and no other stage uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7920"
 
 simulated_payloads:
   - type network:
-      # A reading a second. There is no ground motion in tcssim's physics,
+      # A reading a second. There is no ground motion in tcs-sim's physics,
       # so what it sends is bytes of its own making, as for examples/minimal.
       - payload: seismometer
         packet_interval: 1 s

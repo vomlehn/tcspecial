@@ -2,7 +2,7 @@
 //!
 //! What opens the real thing and moves bytes through it. The attributes come
 //! from `tcslib_protocol::node`, which checks them, and the simulated device
-//! the simulator puts at the far end is `tcssim::node`; the three trees carry
+//! the simulator puts at the far end is `tcs_sim::node`; the three trees carry
 //! the same names so that a type is `node/payload/i2c` wherever you are
 //! standing.
 //!

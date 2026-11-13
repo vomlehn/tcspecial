@@ -2,7 +2,7 @@
 
 The Python spelling of ``tcslib-moc/src/beacon.rs``: the half of a ground
 station's beacon that is not a window. The other half, the panel, is
-``python/tcsui/beacon_panel.py``, as it is ``tcsui`` in Rust. Everything here
+``python/tcs_ui/beacon_panel.py``, as it is ``tcs_ui`` in Rust. Everything here
 is said there first, in the same words, and ``python/tests/test_beacon.py``
 holds the two to one another with the same examples the Rust tests use.
 
@@ -190,7 +190,7 @@ class Schedule:
 
     @staticmethod
     def for_interval(interval):
-        """What tcsmoc shows, and what the beacon and ping examples show, for
+        """What tcs-moc shows, and what the beacon and ping examples show, for
         a vehicle that beacons every ``interval`` nanoseconds.
 
         Counted in beacons missed -- see :func:`missed` -- because that is

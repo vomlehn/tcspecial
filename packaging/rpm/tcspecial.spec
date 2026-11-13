@@ -7,7 +7,7 @@ Group:          Applications/System
 tcspecial, the TCSpecial Flight Executive, runs a spacecraft's payloads as
 nodes in a configured graph and relays their data and commands to and from the
 mission operations center over UDP. This package is what flies: tcspecial
-itself, tcsverify, the five test app programs under /opt/tcs/libexec, the
+itself, tcs-verify, the five test app programs under /opt/tcs/libexec, the
 manual, and the example configurations. A systemd unit, tcspecial.service, is
 installed but not enabled.
 
@@ -41,7 +41,7 @@ fi
 %dir /etc/opt/tcs
 %dir /var/opt/tcs
 /opt/tcs/bin/tcspecial
-/opt/tcs/bin/tcsverify
+/opt/tcs/bin/tcs-verify
 /opt/tcs/libexec/app_pl
 /opt/tcs/libexec/app_all_pl
 /opt/tcs/libexec/app_gateway_veh

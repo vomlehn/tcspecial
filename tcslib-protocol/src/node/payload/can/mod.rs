@@ -43,7 +43,7 @@ pub struct CanParams {
     /// Whether the controller loops frames back to every socket on the host.
     ///
     /// Applied. On by default in the kernel, which is what lets two programs
-    /// on one host talk over a virtual bus -- the arrangement tcssim and
+    /// on one host talk over a virtual bus -- the arrangement tcs-sim and
     /// tcspecial are in -- and what a real bus does not need.
     pub loopback: bool,
 }

@@ -8,7 +8,7 @@
 //! -- see [`gateway`] -- how it listens for the spacecraft's beacons, which is
 //! the one thing it can know without asking: see [`beacon`] -- and how it pings
 //! a `ping` node and times the answer: see [`ping`]. A harness that starts
-//! tcssim before tcspecial waits for it to be ready through [`simulator`].
+//! tcs-sim before tcspecial waits for it to be ready through [`simulator`].
 //! Whether a station and the vehicle are using the same configuration, which
 //! its commands and its data wait for, and what it has received, are
 //! [`matched`]'s. A station that only listens sends its own CONNECT

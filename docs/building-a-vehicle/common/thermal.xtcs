@@ -88,7 +88,7 @@
                  so that its temperature survives one of them going wrong.
                  Two bytes, signed, most significant first, in sixteenths
                  of a degree Celsius. On a desk it is reached over UDP at
-                 its sim_address, where tcssim answers with the hull's
+                 its sim_address, where tcs-sim answers with the hull's
                  temperature, so that no bus and no dummy device is needed;
                  flown, the bus is opened. -->
             <payload name="hull_temp_1">
@@ -123,7 +123,7 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="hull_kelvin_1" x="299" y="336"/>
             <node name="hull_kelvin_2" x="299" y="412"/>
@@ -133,5 +133,5 @@
             <node name="hull_temp_2" x="34" y="412"/>
             <node name="hull_temp_3" x="34" y="488"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

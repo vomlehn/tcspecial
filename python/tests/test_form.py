@@ -146,8 +146,8 @@ class FormTest(unittest.TestCase):
             self.assertEqual(str(form_of(config, "c")),
                              "Value(MetrePerSecond)")
 
-    def test_what_tcsverify_refuses_has_no_own_xtce_to_read(self):
-        # A type that is none, and none stated: tcsverify writes no own
+    def test_what_tcs_verify_refuses_has_no_own_xtce_to_read(self):
+        # A type that is none, and none stated: tcs-verify writes no own
         # XTCE for either, and what each node sends is not guessed at.
         for c in (to_value("furlongs"), 'function: "to_value"'):
             with tempfile.TemporaryDirectory() as directory:

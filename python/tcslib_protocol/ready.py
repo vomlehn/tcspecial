@@ -1,8 +1,8 @@
-"""Whether the simulator is ready: the messages on tcssim's readiness socket.
+"""Whether the simulator is ready: the messages on tcs-sim's readiness socket.
 
 The Python spelling of ``tcslib-protocol/src/ready.rs``, in the same words: a
 harness sends a request carrying a sequence number to the address the simulator
-file states as ``tcssim.ready``, and tcssim answers with the same number, its
+file states as ``tcs_sim.ready``, and tcs-sim answers with the same number, its
 state -- starting, ready or failed -- what it is set up for, and why it failed
 where it did. Both messages are fixed in size and big-endian.
 """
@@ -81,7 +81,7 @@ class Answer:
 
 
 def encode_answer(answer):
-    """An answer, as tcssim writes it: for a test playing the simulator.
+    """An answer, as tcs-sim writes it: for a test playing the simulator.
 
     A reason too long for the answer is cut short, at a whole character.
 
@@ -110,7 +110,7 @@ def encode_answer(answer):
 
 
 def decode_answer(data):
-    """An answer from tcssim.
+    """An answer from tcs-sim.
 
     Args:
         data: The datagram, as bytes.

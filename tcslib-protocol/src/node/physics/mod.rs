@@ -9,7 +9,7 @@
 //! payloads; but a model in another file is a second file to find, to keep and
 //! to send with the first, and a simulated payload's `connects` names a
 //! terminal that only the other file says is there. One file says the whole of
-//! what tcssim simulates. A simulator file that still names a model, and a
+//! what tcs-sim simulates. A simulator file that still names a model, and a
 //! model written as a file of its own, are refused, told where it goes now: see
 //! [`crate::sim_reshaped`].
 //!
@@ -632,7 +632,7 @@ impl WorldSection {
         self.built().1
     }
 
-    /// The world's ambient temperature, in kelvin: what tcsmoc draws its
+    /// The world's ambient temperature, in kelvin: what tcs-moc draws its
     /// zones' readings against, the vehicle sending nothing of it.
     ///
     /// # Returns

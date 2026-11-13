@@ -74,8 +74,8 @@ def run_the_window(setup, beacons, pinger, title="tcspecial ping",
 
     from tkinter import ttk
 
-    from tcsui import fonts, theme
-    from tcsui.beacon_panel import BeaconPanel, Shown
+    from tcs_ui import fonts, theme
+    from tcs_ui.beacon_panel import BeaconPanel, Shown
 
     reports = queue.Queue()
 
@@ -109,17 +109,17 @@ def run_the_window(setup, beacons, pinger, title="tcspecial ping",
     window.resizable(False, False)
 
     # Two boxes, the beacon's and the ping's, with one size of space between
-    # them and round them: see tcsui.theme.
+    # them and round them: see tcs_ui.theme.
     between = theme.BETWEEN
     beacon = BeaconPanel(window)
     beacon.pack(fill="x", padx=between, pady=(between, between // 2))
 
-    # The rows of PingPanel in tcsui/ui/ping.slint, which tcsmoc shows, laid
+    # The rows of PingPanel in tcs-ui/ui/ping.slint, which tcs-moc shows, laid
     # out as the beacon box is: a label on the left of each row at its own
     # width and every value starting at one place after them, all left
     # justified, so that the two boxes read alike. Under them a line about the
     # times, and under that the button, centred. Titled with the node, as
-    # tcsmoc's is, so that the box says what it is pinging.
+    # tcs-moc's is, so that the box says what it is pinging.
     panel = ttk.LabelFrame(
         window,
         text=f"Pinging {setup.node}" if setup else "Ping",

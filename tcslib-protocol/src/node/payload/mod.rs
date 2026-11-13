@@ -12,7 +12,7 @@
 //! and that rule is written once for both families.
 //!
 //! What opens one is `tcspecial::node::payload`, and what simulates one when
-//! there is no hardware is `tcssim::node::payload`. How a simulated or dummy
+//! there is no hardware is `tcs_sim::node::payload`. How a simulated or dummy
 //! device of each type is told from hardware is here, as each module's
 //! `judged`: see `crate::simulate`. That is the one thing `network` holds, what
 //! a network node may say being `crate::graph::reach`'s; a `network` or

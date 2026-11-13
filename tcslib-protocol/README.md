@@ -17,9 +17,9 @@ configuration describes the vehicle as a graph of nodes and the links between
 them (`graph`), and every program that opens one reads it through this crate:
 
 - tcspecial runs it aboard.
-- tcsmoc and tcssim build their panels from it.
-- tcsgui edits it.
-- tcsverify checks it.
+- tcs-moc and tcs-sim build their panels from it.
+- tcs-gui edits it.
+- tcs-verify checks it.
 
 So no program reads a file in a way of its own, and the error a person sees in
 the editor is the one the vehicle would have refused the file with.
@@ -55,7 +55,7 @@ the editor is the one the vehicle would have refused the file with.
 - `interface`: the digest of `xtce/link.xtce`, which every beacon carries,
   and which every configuration names as its `tcspecial` section's
   `interface`, so that a configuration written for another interface is
-  refused by every program. `tcsverify --interface-digest` prints it. `make
+  refused by every program. `tcs-verify --interface-digest` prints it. `make
   interface-digest` here regenerates `src/interface_digest.rs` after
   `link.xtce` changes; every configuration is then given the new digest.
 - `crc`: the CCSDS CRC-16, for what is kept on storage rather than carried
@@ -65,15 +65,15 @@ the editor is the one the vehicle would have refused the file with.
 - `graph`: the configuration, a graph of nodes, with its checks, and the
   ports each link to the ground arrives at.
 - `node`: one module per node type, giving each type's attributes and how
-  they are checked. tcspecial and tcssim have trees of the same shape, one
+  they are checked. tcspecial and tcs-sim have trees of the same shape, one
   for the node aboard and one for the simulator's simulated device.
 - `format`, `config`, `types`, `endpoint_config`, `whole`, `trigger`: reading
   the files. One parser per format, one set of types for both, one grammar
   for whole numbers, one for trigger bytes.
 - `sim_config`: the simulator's own configuration file.
-- `verify`: what a problem in a configuration is about, so that tcsverify and
+- `verify`: what a problem in a configuration is about, so that tcs-verify and
   the editor can put it beside the line that has to change.
-- `parameters`, `display`: what both test windows, tcsmoc and tcssim, show
+- `parameters`, `display`: what both test windows, tcs-moc and tcs-sim, show
   about a payload, and where on the screen each window goes.
 - `error`: the errors all of the above return.
 
@@ -87,7 +87,7 @@ itself is `tcspecial`.
 ## Who uses it
 
 Every crate in the workspace that has anything to do with the link or a
-configuration: tcspecial, tcslib-moc, tcsmoc, tcssim, tcsgui and tcsverify, and
+configuration: tcspecial, tcslib-moc, tcs-moc, tcs-sim, tcs-gui and tcs-verify, and
 `examples/beacon`.
 
 ## Building and testing

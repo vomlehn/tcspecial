@@ -5,7 +5,7 @@
  * the vehicle's data from a gateway node, data up to a gateway node, and
  * commands to the vehicle. The same library the Rust ground programs use --
  * tcslib-moc -- so a C or C++ station reads the configuration, counts ports and
- * ages beacons exactly as tcsmoc does.
+ * ages beacons exactly as tcs-moc does.
  *
  * C and C++ alike. The header is C, includable from C++ as it stands; every
  * declaration has C linkage, and nothing in it is C that C++ will not compile.
@@ -568,7 +568,7 @@ int tcs_client_query_node(tcs_client *client, uint32_t node,
  * @param client  The client.
  * @param key     The key, which the RESTART that follows must carry.
  * @param target  The checksum of the configuration to restart onto, as 32
- *                lower-case hex digits, as tcsverify prints it; or NULL for
+ *                lower-case hex digits, as tcs-verify prints it; or NULL for
  *                this configuration's, which is a plain restart.
  * @param status  Where what the vehicle answered is written.
  * @return        0, or -1 on an error. */

@@ -7,15 +7,15 @@
 # socket, but a device on a bus has to answer when a master addresses it, and
 # nothing in user space can. What the kernel offers instead is `i2c-stub`: an
 # adapter whose chips are a bank of registers in memory, so the bank is the
-# payload -- tcssim writes it and tcspecial reads it.
+# payload -- tcs-sim writes it and tcspecial reads it.
 #
-# The module is the kernel's and loading it needs root, so tcssim does not make
+# The module is the kernel's and loading it needs root, so tcs-sim does not make
 # the bus: it finds one and says how to make one if there is none. This is
 # that, as bin/mkgpio, bin/mkiio and bin/mkvcan are for the other three.
 #
 # What it does not do is let the unit tests cover any more than they do now.
 # The scan that finds a stub is given the tree to look at -- see find_stub() in
-# tcssim/src/payload_i2c.rs -- so it passes with no module loaded and would
+# tcs-sim/src/payload_i2c.rs -- so it passes with no module loaded and would
 # pass with one. This is for running a payload set that names an I2C payload,
 # which is the part that needs the real thing.
 #
@@ -66,8 +66,8 @@ for address in "${addresses[@]}"; do
 done
 chip_addr="$(IFS=,; echo "${addresses[*]}")"
 
-# What find_stub() in tcssim matches an adapter's name against. The same
-# string, because a stub this script made and a stub tcssim will not recognise
+# What find_stub() in tcs-sim matches an adapter's name against. The same
+# string, because a stub this script made and a stub tcs-sim will not recognise
 # is worse than no stub at all.
 stub_name="SMBus stub driver"
 
@@ -99,7 +99,7 @@ modprobe i2c-dev
 echo "mki2c: loading i2c-stub with chips at ${addresses[*]}"
 modprobe i2c-stub "chip_addr=$chip_addr"
 
-# Find what it became, the way tcssim finds it: the adapter whose name is the
+# Find what it became, the way tcs-sim finds it: the adapter whose name is the
 # stub's, lowest number first. Numeric names only -- some adapters are called
 # things like i2c-ELAN2097:00, which is not a number and not a stub.
 stub=""
@@ -125,7 +125,7 @@ fi
 
 # Give the stub's node to whoever asked for it, where that was someone running
 # this under sudo, for the reason bin/mkgpio gives its chip: the kernel makes
-# the node root's, and tcssim and tcspecial are run as the user. udev is let
+# the node root's, and tcs-sim and tcspecial are run as the user. udev is let
 # finish first, so that it does not set the owner back afterwards.
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
 	if command -v udevadm > /dev/null; then
@@ -142,4 +142,4 @@ echo "                    address: one of ${addresses[*]}"
 echo
 echo "The bus number is assigned as adapters appear, so it can differ from one"
 echo "run of this to the next; a payload set that names it has to name this,"
-echo "or name a path tcssim may make, which it links to the stub."
+echo "or name a path tcs-sim may make, which it links to the stub."

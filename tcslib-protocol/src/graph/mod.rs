@@ -41,7 +41,7 @@
 //! refused as it would be for any field a configuration does not have.
 //!
 //! Reading a file is not accepting it. [`Graph::check`] is what says whether a
-//! configuration can be flown, and `tcsverify` runs it on the ground against
+//! configuration can be flown, and `tcs-verify` runs it on the ground against
 //! the same code that runs again aboard.
 
 pub mod built;
@@ -279,7 +279,7 @@ pub struct GraphFile {
     /// closed, two people reading one configuration should see one drawing,
     /// and a second file to keep in step is a second file to lose.
     #[serde(default)]
-    pub tcsgui: Option<Tcsgui>,
+    pub tcs_gui: Option<TcsGui>,
     /// The sections a configuration file used to have, kept to be refused.
     ///
     /// Declared so that a file written against the earlier shape is refused by
@@ -310,7 +310,7 @@ impl<'de> Deserialize<'de> for Gone {
 
 /// What the editor keeps about a configuration that a vehicle does not need.
 ///
-/// Only the positions so far, which is what `tcsgui` means: the editor's own
+/// Only the positions so far, which is what `tcs-gui` means: the editor's own
 /// section of the file. Anything else it comes to keep about a drawing belongs
 /// here too, so that the question "does the flight software read this" has one
 /// answer for the whole section.
@@ -320,7 +320,7 @@ impl<'de> Deserialize<'de> for Gone {
 /// y="34"/>` in XML. See [`grouped::layout`].
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
-pub struct Tcsgui {
+pub struct TcsGui {
     /// Where each node was drawn, by name.
     #[serde(default, deserialize_with = "grouped::layout")]
     pub nodes: Vec<Placed>,
@@ -461,7 +461,7 @@ const VEHICLE_TYPES: &[&str] = &[
 /// from where its types are defined -- the interfaces from
 /// [`crate::types::DHType`], the programs from [`crate::node::app::Kind`] --
 /// so a type added there is a type here. The checking refuses a node whose
-/// type is in none of them, and the schemas beside tcsgui are tested against
+/// type is in none of them, and the schemas beside tcs-gui are tested against
 /// them, so a file an editor accepts is one this reader knows.
 ///
 /// # Arguments
@@ -1168,7 +1168,7 @@ pub struct Graph {
     pub files: Vec<PathBuf>,
     /// Which file each node was read from, by node name.
     pub homes: BTreeMap<String, PathBuf>,
-    /// Where each node was drawn, by node name: the `tcsgui` sections of the
+    /// Where each node was drawn, by node name: the `tcs-gui` sections of the
     /// files, merged.
     ///
     /// Apart from the nodes here as it is in the file, and for the same
@@ -1180,7 +1180,7 @@ pub struct Graph {
     ///
     /// The editor's own, as `placed` is: the flight software never looks at it
     /// -- a concern is a question about a drawing and not about a vehicle --
-    /// and the one reader is tcsgui. See [`Tcsgui::set_aside`].
+    /// and the one reader is tcs-gui. See [`Tcs-gui::set_aside`].
     pub set_aside: std::collections::BTreeSet<(String, String)>,
     /// What the files call the arriving ends of their links: each node's
     /// names, and the name each link was written to.
@@ -1457,7 +1457,7 @@ impl Graph {
         // nowhere else is a position left behind by a node somebody deleted:
         // kept rather than refused, because it says nothing about the vehicle
         // and the editor writes the section out again from the nodes it has.
-        if let Some(said) = &file.tcsgui {
+        if let Some(said) = &file.tcs_gui {
             for placed in &said.nodes {
                 self.placed.insert(placed.name.clone(), placed.clone());
             }
@@ -2291,7 +2291,7 @@ mod tests {
     /// The shipped example reads, in both formats, and says the same thing.
     ///
     /// The real test of the reader: tests/manual/thermostat.ytcs and .xtcs are
-    /// written by tcsgui, not by hand here, so this is the editor and the
+    /// written by tcs-gui, not by hand here, so this is the editor and the
     /// flight-side reader agreeing about a file rather than two pieces of this
     /// module agreeing with each other.
     #[test]

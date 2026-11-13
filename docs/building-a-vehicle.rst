@@ -17,7 +17,7 @@ what no single example shows.
 This guide builds one vehicle, a small lunar lander's science deck, a stage
 at a time, from the minimal example to a configuration a mission could start
 from. Each stage adds one thing and says why it is added the way it is. Every
-stage is a configuration that ``tcsverify`` passes and that runs on a desk
+stage is a configuration that ``tcs-verify`` passes and that runs on a desk
 under ``--simulate=all``, and a test holds every one of them to that, so the
 files the guide shows are the files that work.
 
@@ -32,18 +32,18 @@ about what it adds.
 
 .. figure:: shots/vehicle-stage-09.png
    :width: 100%
-   :alt: tcsgui showing the finished deck: the top file, with two subsystem
+   :alt: tcs-gui showing the finished deck: the top file, with two subsystem
          boxes, science and thermal, the camera, and the gateway node, joined
          by lines to the gateway.
 
-   Where the guide ends: the deck of stage 9 as tcsgui draws it, its two
+   Where the guide ends: the deck of stage 9 as tcs-gui draws it, its two
    subsystems collapsed into boxes, the camera beside them, and every line
    ending at the gateway node.
 
 The vehicle
 ===========
 A lander's science deck, chosen so that each stage needs a different part of
-TCSpecial, and so that every payload has a simulated device tcssim already
+TCSpecial, and so that every payload has a simulated device tcs-sim already
 provides:
 
 ==========================  =========================  =====
@@ -74,8 +74,8 @@ Any stage can be started from, and two compared with ``diff``:
    $ diff docs/building-a-vehicle/stage-02/deck.ytcs \
           docs/building-a-vehicle/stage-03/deck.ytcs
 
-Every stage runs the way an example does, tcsmoc starting tcspecial and
-tcssim itself:
+Every stage runs the way an example does, tcs-moc starting tcspecial and
+tcs-sim itself:
 
 .. code-block:: console
 
@@ -94,7 +94,7 @@ science computer that sends each reading over UDP of its own accord.
 .. include:: building-a-vehicle/stage-01/deck.ytcs
    :literal:
    :start-after: payloads:
-   :end-before: tcsgui:
+   :end-before: tcs-gui:
 
 Nothing is drawn from the seismometer to anywhere, so tcspecial sends what it
 reads straight to the ground over the ``tcspecial`` section's
@@ -105,19 +105,19 @@ and the ground hears it on 127.0.0.1:6100.
 
 .. figure:: shots/vehicle-stage-01.png
    :width: 100%
-   :alt: tcsgui showing one network payload, seismometer, in the Payloads
+   :alt: tcs-gui showing one network payload, seismometer, in the Payloads
          column, with no lines.
 
-   Stage 1 in tcsgui: one payload, nothing drawn from it.
+   Stage 1 in tcs-gui: one payload, nothing drawn from it.
 
 Check it, then run it:
 
 .. code-block:: console
 
-   $ tcsverify docs/building-a-vehicle/stage-01/deck.ytcs \
+   $ tcs-verify docs/building-a-vehicle/stage-01/deck.ytcs \
                docs/building-a-vehicle/stage-01/deck-sim.yaml
 
-tcsmoc shows the beacon, which says the vehicle is alive and which
+tcs-moc shows the beacon, which says the vehicle is alive and which
 configuration it runs, and a panel for the seismometer.
 
 *See:* "A Network Payload" in the tcspecial manual.
@@ -131,7 +131,7 @@ It is asked once a second, by its own ``trigger_interval``.
 .. include:: building-a-vehicle/stage-02/deck.ytcs
    :literal:
    :start-after:   - type serial:
-   :end-before: tcsgui:
+   :end-before: tcs-gui:
 
 The simulator file gains a device for it too, a pseudo-terminal at
 ``/tmp/tcs-deck-regolith`` that answers when asked.
@@ -148,13 +148,13 @@ Node                      Device id  Port, stage 1  Port, stage 2
 
 A ground station written for stage 1 now listens to the thermometer on the
 seismometer's old port. This is why a ground station should take its ports from
-the configuration -- tcslib-moc's and tcsmoc's do -- rather than from a list
-written beside it, and why ``tcsverify --summary`` (`Checking the whole
+the configuration -- tcslib-moc's and tcs-moc's do -- rather than from a list
+written beside it, and why ``tcs-verify --summary`` (`Checking the whole
 vehicle`_) lists every port a configuration uses.
 
 .. figure:: shots/vehicle-stage-02.png
    :width: 100%
-   :alt: tcsgui showing two payloads, seismometer and regolith_thermometer,
+   :alt: tcs-gui showing two payloads, seismometer and regolith_thermometer,
          with no lines.
 
    Stage 2: two payloads, each still reporting straight to the ground.
@@ -205,7 +205,7 @@ one place to receive everything from:
 
 .. figure:: shots/vehicle-stage-03.png
    :width: 100%
-   :alt: tcsgui showing the thermometer feeding regolith_kelvin, and
+   :alt: tcs-gui showing the thermometer feeding regolith_kelvin, and
          regolith_kelvin and the seismometer feeding the gateway node.
 
    Stage 3: the first computation, and the gateway node on the right.
@@ -226,7 +226,7 @@ thermostat's decision leaves at its ``moc-out`` and arrives at the heater's
 
 The heater reports to the gateway every second what it was last told, so the
 ground follows it on a beat and a lost report is made good by the next. On a
-desk, tcssim answers for the line over UDP at its ``sim_address``; flown, the
+desk, tcs-sim answers for the line over UDP at its ``sim_address``; flown, the
 GPIO chip is opened instead, and nothing in the configuration changes.
 
 The ground does not switch the heater itself: the thermostat decides again on
@@ -238,16 +238,16 @@ the vehicle runs:
 .. include:: building-a-vehicle/stage-04/deck.ytcs
    :literal:
    :start-after:           - regolith_kelvin.regolith_thermometer
-   :end-before: tcsgui:
+   :end-before: tcs-gui:
 
 .. figure:: shots/vehicle-stage-04.png
    :width: 100%
-   :alt: tcsgui showing probe_thermostat fed by regolith_kelvin, with a line
+   :alt: tcs-gui showing probe_thermostat fed by regolith_kelvin, with a line
          from its lower left back to probe_heater.
 
    Stage 4: the thermostat's decision travelling back to the heater.
 
-From here on tcsgui's toolbar says *2 concerns*. A concern is a shape that
+From here on tcs-gui's toolbar says *2 concerns*. A concern is a shape that
 may be a mistake and may be meant, never something that stops the
 configuration being read or flown, and these two are meant:
 
@@ -261,8 +261,8 @@ configuration being read or flown, and these two are meant:
 Each can be set aside in the concerns window, as the window says, if it is
 what was meant.
 
-*See:* "A GPIO Payload" in the tcspecial manual, and the `tcsmoc manual
-<tcsmoc.html>`__ for sending the setpoint.
+*See:* "A GPIO Payload" in the tcspecial manual, and the `tcs-moc manual
+<tcs-moc.html>`__ for sending the setpoint.
 
 Stage 5: rates and groups
 =========================
@@ -282,7 +282,7 @@ its group's or its own, never both.
 A rate costs link. Each payload read on a schedule sends that many data a
 second, each node fed by it at most as many, and the beacon one every
 ``default_interval``; their sum is what the link must carry, with margin.
-``tcsverify --summary`` adds it up (`Checking the whole vehicle`_).
+``tcs-verify --summary`` adds it up (`Checking the whole vehicle`_).
 
 The drawing is stage 4's: a group changes when nodes are read, not how they
 are joined. When they are read is this:
@@ -314,12 +314,12 @@ conversion, and a ``vote`` that takes the three and sends one value on:
 The vote takes the median, so one sensor that drifts or stops is outvoted
 rather than averaged in, and it produces a value on every arrival, so one
 sensor that stops reporting does not stop the deck from knowing its
-temperature. In tcssim, fail one sensor and watch ``hull_temp`` hold while
+temperature. In tcs-sim, fail one sensor and watch ``hull_temp`` hold while
 the failed sensor's own reading goes astray.
 
 .. figure:: shots/vehicle-stage-06.png
    :width: 100%
-   :alt: tcsgui showing three hull_temp payloads, each feeding a hull_kelvin
+   :alt: tcs-gui showing three hull_temp payloads, each feeding a hull_kelvin
          conversion, the three conversions feeding hull_temp, and everything
          reaching the gateway.
 
@@ -353,10 +353,10 @@ node is known by its name in every file.
 
 .. figure:: shots/vehicle-stage-07.png
    :width: 100%
-   :alt: tcsgui showing two subdiagram boxes, science and thermal, each with
+   :alt: tcs-gui showing two subdiagram boxes, science and thermal, each with
          several lines to the gateway node.
 
-   Stage 7: the same graph as stage 6, drawn as tcsgui draws included
+   Stage 7: the same graph as stage 6, drawn as tcs-gui draws included
    files: a box each, whose corners are its exports.
 
 Two vehicles may include one file, as the thermostat examples share
@@ -403,7 +403,7 @@ other node:
 .. include:: building-a-vehicle/stage-09/deck.ytcs
    :literal:
    :start-after:   - type app_pl:
-   :end-before: tcsgui:
+   :end-before: tcs-gui:
 
 The program is joined to tcspecial by three file interfaces it inherits, so
 a program in any language that can read its standard input can take part:
@@ -425,12 +425,12 @@ checks its own.
 
 .. figure:: shots/vehicle-stage-09.png
    :width: 100%
-   :alt: tcsgui showing the science and thermal boxes and the camera, all
+   :alt: tcs-gui showing the science and thermal boxes and the camera, all
          reaching the gateway.
 
    Stage 9: the whole deck.
 
-tcsgui draws each included file as a box, which is the right size for
+tcs-gui draws each included file as a box, which is the right size for
 editing and the wrong one for seeing what reaches what. Opened, the deck is
 this:
 
@@ -512,10 +512,10 @@ command binding leaving a ``gateway_cfs`` node needs one, so that the
 ground's setpoint has a message ID to arrive on. ``diff`` stage 9 with each
 of the three to see the whole of each difference.
 
-The F´ and cFS stages run as the others do, tcsmoc playing the F´ bridge or
+The F´ and cFS stages run as the others do, tcs-moc playing the F´ bridge or
 joining the simulated software bus as the ground, as the ``fprime`` and
 ``cfs`` examples do. The Yamcs stage is checked as every stage is, but its
-ground is Yamcs, which tcsmoc is not; ``thermostat-yamcs`` shows a vehicle
+ground is Yamcs, which tcs-moc is not; ``thermostat-yamcs`` shows a vehicle
 run with Yamcs.
 
 *See:* "The fprime example", "The cfs example" and "The thermostat-yamcs
@@ -523,18 +523,18 @@ example" in the tcspecial manual.
 
 Checking the whole vehicle
 ==========================
-``tcsverify`` checks the whole configuration, every file it includes, and
+``tcs-verify`` checks the whole configuration, every file it includes, and
 the simulator file beside it:
 
 .. code-block:: console
 
-   $ tcsverify docs/building-a-vehicle/stage-09/deck.ytcs \
+   $ tcs-verify docs/building-a-vehicle/stage-09/deck.ytcs \
                docs/building-a-vehicle/stage-09/deck-sim.yaml
 
-``tcsverify a.xtcs a.ytcs a-sim.yaml`` holds the two spellings to saying the
+``tcs-verify a.xtcs a.ytcs a-sim.yaml`` holds the two spellings to saying the
 same thing.
 
-``tcsverify --summary`` adds, after the problems, everything the vehicle
+``tcs-verify --summary`` adds, after the problems, everything the vehicle
 uses of what must not clash or overflow: each address and port, and who
 binds it; the device ids; message IDs and APIDs, where there are any; and
 the rates that reach the ground, added up. Two things on one socket fail the
@@ -562,7 +562,7 @@ A ``?`` is what the configuration does not say: the seismometer sends bytes
 of no fixed length, and the camera sends whenever it has a frame. A mission
 fills those in from what it knows of its instruments.
 
-*See:* the `tcsverify manual <tcsverify.html>`__.
+*See:* the `tcs-verify manual <tcs-verify.html>`__.
 
 From the desk to flight
 =======================
@@ -578,7 +578,7 @@ Where to go next
 * The `tcspecial manual <tcspecial.html>`__, for every payload type and
   attribute.
 * `Writing node types <node-types.html>`__, for what no shipped type does.
-* The `tcsgui manual <tcsgui.html>`__, for drawing and editing the
+* The `tcs-gui manual <tcs-gui.html>`__, for drawing and editing the
   configuration.
 * The `examples <../examples/README.html>`__, which the stages drew on.
 
@@ -586,11 +586,11 @@ How this guide is kept true
 ===========================
 * The excerpts above are read from the stage files when the page is made, so
   they cannot say other than the files do.
-* ``tcsverify/tests/vehicle_guide.rs`` verifies every stage with its
+* ``tcs-verify/tests/vehicle_guide.rs`` verifies every stage with its
   simulator file, holds the two spellings to each other, and checks each
   names the interface of the build; ``make set-interfaces`` and ``make
   comparespellings`` take in the stages with the examples.
-* The tcsgui drawings are made by ``docs/building-a-vehicle/screenshots.sh``,
-  which opens each stage in tcsgui on an X display of its own and captures
+* The tcs-gui drawings are made by ``docs/building-a-vehicle/screenshots.sh``,
+  which opens each stage in tcs-gui on an X display of its own and captures
   it. The other figures are SVG drawn by hand, their colours the Okabe-Ito
   palette's, each paired with a label, a shape or a line style.

@@ -89,7 +89,7 @@ payloads:
         world-out:
           - fsw.thermometer
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: fsw, x: 469, y: 34 }
     - { node: heater, x: 34, y: 34 }

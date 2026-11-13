@@ -320,7 +320,7 @@ pub fn handlers(
     }
 
     // Those whose simulate is true. One that is false is the real device,
-    // which tcssim makes nothing for; one whose simulate is missing or stated
+    // which tcs-sim makes nothing for; one whose simulate is missing or stated
     // twice is refused where the file is checked, and is not simulated here.
     let named = |name: &str| sim_file.simulates(name);
     let mut handlers = Vec::new();

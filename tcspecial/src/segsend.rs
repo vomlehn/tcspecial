@@ -427,7 +427,7 @@ fn run(program: &CStr, name: &Name) -> std::io::Result<i32> {
 }
 
 /// Finds `segsend`: beside tcspecial's own executable, where a build puts
-/// both and where tcsmoc finds tcspecial.
+/// both and where tcs-moc finds tcspecial.
 ///
 /// Found once, as the vehicle starts, and refused then if it is not there: a
 /// vehicle that discovered at its first full segment that it had nothing to

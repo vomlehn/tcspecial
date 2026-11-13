@@ -96,11 +96,11 @@
             </gateway>
         </type>
     </gateways>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="gateway" x="790" y="34"/>
             <node name="science" x="299" y="53"/>
             <node name="thermal" x="299" y="336"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

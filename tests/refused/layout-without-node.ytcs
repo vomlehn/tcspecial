@@ -1,4 +1,4 @@
 # Refused: a position that names no node.
-tcsgui:
+tcs-gui:
   nodes:
     - { x: 1, y: 2 }

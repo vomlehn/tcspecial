@@ -65,6 +65,6 @@ payloads:
         port: "5401"
         protocol: "udp"
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: seismometer, x: 34, y: 34 }

@@ -1,0 +1,40 @@
+# Discrete lines, driven.
+#
+# A payload: what the vehicle carries this flight. What arrives at moc-in --
+# a thermostat's decision, a command from the ground, 1 or 0 -- is what its
+# lines are driven to, and a value that changes them goes on by moc-out to
+# whatever they drive. Its Rust is tcspecial/src/node/payload/gpio/, which
+# it shares with gpio_in and gpio_inout.
+node: gpio_out
+type: gpio_out
+about: Discrete lines, driven by what the vehicle decides or the ground sends.
+payload-sink: false
+payload-source: false
+gateway-sink: true
+gateway-source: true
+attributes:
+  - name: path
+    required: true
+    kind: path
+    about: >
+      The GPIO chip the lines are on: /dev/gpiochip0.
+  - name: lines
+    required: true
+    about: Which lines of that chip it drives, comma separated.
+  - name: init
+    required: false
+    kind: bytes
+    about: >
+      What to write to it as the vehicle opens it -- at startup, and whenever
+      the ground starts it again -- written as a trigger is: a C string in
+      quotes, bytes in brackets, or both one after another. A heater that must
+      start off. A write that fails stops the node from starting. Driven
+      lines only: it is what they are driven to first.
+  - name: sim_address
+    required: false
+    about: >
+      Where tcs-sim answers for the lines over UDP when they are simulated, as
+      a loopback address and port: 127.0.0.1:5204. Under --simulate=some or
+      all tcspecial drives and watches the lines there instead of on the
+      chip, so no dummy chip is needed; under --simulate=none, the flight
+      setting, it is not used and the chip is opened.

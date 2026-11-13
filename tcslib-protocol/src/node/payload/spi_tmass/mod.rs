@@ -4,7 +4,7 @@
 //! it is, which the type says: see [`super::i2c_tmass`], which is the same
 //! thing on an I2C bus and says why the two are types of their own. A run that
 //! simulates it may reach it over UDP at its `sim_address`, as it may a `spi`
-//! node, where tcssim answers with the temperature of the thermal mass it is
+//! node, where tcs-sim answers with the temperature of the thermal mass it is
 //! joined to.
 
 use crate::endpoint_config::{EndpointConfigResult, GroupKind, LinkTerms};

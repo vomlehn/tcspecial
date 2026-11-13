@@ -71,7 +71,7 @@ impl ConfigFormat {
 
     /// Finds the format a path's extension names, for a file that is YAML
     /// or XML but not a configuration: a payload simulator file, or one of
-    /// tcsgui's node descriptions, which keep their languages' extensions.
+    /// tcs-gui's node descriptions, which keep their languages' extensions.
     ///
     /// # Arguments
     ///
@@ -368,7 +368,7 @@ pub fn load_config_file<T: DeserializeOwned, P: AsRef<Path>>(
 
 /// Reads and parses a file that is YAML or XML but not a configuration,
 /// choosing the parser from its extension: a payload simulator file, or one
-/// of tcsgui's node descriptions.
+/// of tcs-gui's node descriptions.
 ///
 /// Those keep the extensions of their languages, `.yaml` or `.yml` and
 /// `.xml`, which a configuration no longer has: see [`ConfigFormat::of_file`]

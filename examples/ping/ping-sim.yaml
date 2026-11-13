@@ -3,10 +3,10 @@
 description: Simulator settings for ping.ytcs, which has no payloads to stand
   in for
 
-# Where tcssim answers whether it has made its simulated devices, which
+# Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7904"
 
 # The ping node is the vehicle's own, and what it answers is the ground

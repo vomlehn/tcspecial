@@ -47,6 +47,6 @@ payloads:
         port: "5101"
         protocol: "udp"
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: sensor, x: 34, y: 34 }

@@ -5,8 +5,8 @@ Two halves borrowed and one of its own, as the beacon example is put together
 in Rust:
 
 * the beacon, from ``python/tcslib_moc/beacon.py`` and
-  ``python/tcsui/beacon_panel.py`` -- the Python spellings of
-  ``tcslib_moc::beacon`` and ``tcsui`` -- so the window says whether the vehicle
+  ``python/tcs_ui/beacon_panel.py`` -- the Python spellings of
+  ``tcslib_moc::beacon`` and ``tcs_ui`` -- so the window says whether the vehicle
   is alive before anybody presses anything;
 * the ping, from ``examples/ping-common/ping_ground.py``, which sends each
   ping up to the ``gateway`` node and times the ``ping`` node's answer, and
@@ -22,7 +22,7 @@ pings cannot count on a commanding one's being there. It sends it again each
 second no answer comes, or the answer carries another configuration's
 checksum, until the vehicle answers with this one's, and says so; see
 ``python/tcslib_moc/listening.py``. It is sent from the configuration's
-``tcs_cmd.send``, so nothing else -- tcsmoc -- may be using that address
+``tcs_cmd.send``, so nothing else -- tcs-moc -- may be using that address
 meanwhile. ``--pings`` waits for the match before its first ping.
 
 It starts the vehicle as well: tcspecial, from the repository's build, on the
@@ -128,7 +128,7 @@ def arguments(argv):
         "--node", help="the ping node to ping, where there is more than one"
     )
     parser.add_argument(
-        "--tcsverify", help="the tcsverify to digest the configuration with"
+        "--tcs-verify", help="the tcs-verify to digest the configuration with"
     )
     parser.add_argument(
         "--tcspecial",
@@ -191,7 +191,7 @@ class Setup:
         self.beacon = self.config.beacon_link()
         self.beacon_interval = self.config.beacon_interval()
         self.digest, self.why_no_digest = configuration.digest(
-            options.configuration, options.tcsverify
+            options.configuration, options.tcs_verify
         )
         # Where the CONNECT goes from and to, where the section says:
         # ``None`` for a section that states no command link.

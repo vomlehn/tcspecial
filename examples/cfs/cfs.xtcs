@@ -106,11 +106,11 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="fsw" x="469" y="34"/>
             <node name="heater" x="34" y="34"/>
             <node name="thermometer" x="34" y="134"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

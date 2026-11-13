@@ -555,7 +555,7 @@ mod tests {
         let path = a_path("stream");
         std::fs::remove_file(&path).ok();
 
-        // Playing tcssim: the device listens at its path.
+        // Playing tcs-sim: the device listens at its path.
         let device = UnixListener::bind(&path).expect("the device listens");
 
         let mut endpoint = UnixStreamEndpoint::connect_retrying(
@@ -610,7 +610,7 @@ mod tests {
             "it wrote somewhere without having been written to"
         );
 
-        // Playing tcssim: the device binds a path of its own, so that it can be
+        // Playing tcs-sim: the device binds a path of its own, so that it can be
         // answered, and speaks first.
         let device =
             UnixDatagram::bind(&device_path).expect("the device binds");
@@ -652,7 +652,7 @@ mod tests {
         let device_path = a_path("driven-device");
         std::fs::remove_file(&device_path).ok();
 
-        // The device, playing tcssim: it binds the path the configuration names
+        // The device, playing tcs-sim: it binds the path the configuration names
         // and waits to be driven, saying nothing.
         let device =
             UnixDatagram::bind(&device_path).expect("the device binds");

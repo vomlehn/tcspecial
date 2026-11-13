@@ -72,14 +72,14 @@ crates:
 ``tcslib_protocol::node``
     Its attributes, and every rule about what a configuration may say about it.
     tcslib-protocol is shared by the ground and the vehicle, so a rule written
-    here is the one tcspecial, tcssim, tcsmoc, tcsgui and tcsverify all apply,
+    here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all apply,
     and they all report it alike. A rule about what a configuration may say
     belongs here and nowhere else.
 
 ``tcspecial::node``
     The flight side: opening the device, reading and writing it.
 
-``tcssim::node``
+``tcs_sim::node``
     The simulator's simulated device, which plays the payload on a desk.
 
 Payloads are under ``node/payload/<type>/mod.rs`` in each crate, and vehicle
@@ -171,7 +171,7 @@ Only towards the ground is anything added: a string or bytes, which has no width
 of its own, is sent the ground after a count of its bytes, chosen for each
 source by ``Telemetered::count`` in ``tcslib-protocol/src/graph/telemetry.rs``
 and written by ``counted`` in ``tcslib-protocol/src/link_type.rs``. A node never
-writes the count itself. Each configuration's own XTCE, which ``tcsverify
+writes the count itself. Each configuration's own XTCE, which ``tcs-verify
 --xtce`` writes, says what each node sends the ground, and it takes that from
 ``carries``, so a new type that answers ``carries`` needs nothing more there.
 
@@ -188,7 +188,7 @@ a ``pub mod`` in ``node/payload/mod.rs``, holds:
   into the endpoint the vehicle opens. Its errors name the attribute and say
   what to write instead;
 - ``judged``, which looks at what is at the node's endpoint and says whether
-  it is a simulated device (tcssim's), a dummy device (the kernel's) or a
+  it is a simulated device (tcs-sim's), a dummy device (the kernel's) or a
   real one. The judgement is made from what is there, never from a file,
   and ``--simulate`` decides which are allowed;
 - its tests.
@@ -231,14 +231,14 @@ The type is then made known to the rest of tcslib-protocol:
     and the minimum attributes the tests' ``node`` gives it.
 
 ``src/simulate.rs``
-    ``judged_at``, and ``tcssim_makes`` if the kernel makes a dummy device
+    ``judged_at``, and ``tcs_sim_makes`` if the kernel makes a dummy device
     for it.
 
 ``src/sim_config.rs`` and ``src/parameters.rs``
     ``simulable``, and ``endpoint_parameters``, the text of its panel.
 
 Several of these are lists written by hand that repeat ``DHType``:
-``spellings``, ``reach::kind_of``, ``interface::sends``, ``tcssim_makes``
+``spellings``, ``reach::kind_of``, ``interface::sends``, ``tcs_sim_makes``
 and the ``sim_address`` texts. A ``match`` on ``DHType`` or
 ``EndpointConfig`` that misses the new variant is a compile error, but these
 are not, so go through them by name.
@@ -271,14 +271,14 @@ and an arm in both ``bind_endpoint_pair`` and ``hearing_endpoint_pair``.
 once for each type with that type's feature alone. So every ``use`` and
 every arm for the type must be gated by its feature, or that build fails.
 
-In ``tcssim``
--------------
-The module, ``tcssim/src/node/payload/<type>/mod.rs``, holds a function
+In ``tcs-sim``
+--------------
+The module, ``tcs-sim/src/node/payload/<type>/mod.rs``, holds a function
 ``run_<type>_node``, which plays the device: it answers as the device would,
 from the simulator file's settings and, for a sensor joined to the physics
-model, from the world. There is no trait. ``tcssim/src/payload.rs`` runs it
+model, from the world. There is no trait. ``tcs-sim/src/payload.rs`` runs it
 from ``run_kind``, by a ``PayloadProtocol`` variant, and
-``tcssim/src/endpoint.rs`` maps the node's endpoint and ``sim_address`` to
+``tcs-sim/src/endpoint.rs`` maps the node's endpoint and ``sim_address`` to
 that protocol in ``payload_config_attached``, and describes it in
 ``endpoint_description``.
 
@@ -326,8 +326,8 @@ which types it takes, as ``process`` takes only types with a text form
 (``tcslib-protocol/src/link_text.rs``), refuses the others in ``params_of``,
 naming the attribute and the types it may be.
 
-tcsgui offers a function as a node of its own, from
-``tcsgui/share/nodes/vehicle/compute/<function>.yaml`` with
+tcs-gui offers a function as a node of its own, from
+``tcs-gui/share/nodes/vehicle/compute/<function>.yaml`` with
 ``sets: {function: <function>}``. The Python ground needs nothing for it:
 how it shows what a node sends follows from the type, in ``form.py``.
 
@@ -339,19 +339,19 @@ its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
 string or bytes must be XTCE's, so ``Telemetered::count`` must give it
 ``Count::Xtce``. The Python ground lists gateway types by hand, in
 ``GATEWAY_BASES`` and ``ON_BUS`` in ``python/tcslib_protocol/configuration.py``.
-Its description in tcsgui is at the top of ``tcsgui/share/nodes/``, and since it
+Its description in tcs-gui is at the top of ``tcs-gui/share/nodes/``, and since it
 has no node module, it is one of the exemptions in
-``every_description_has_its_rust`` in ``tcsgui/src/nodes.rs``.
+``every_description_has_its_rust`` in ``tcs-gui/src/nodes.rs``.
 
 The Editor and the Schemas
 ==========================
-A node type is offered in tcsgui's palette from a description,
-``tcsgui/share/nodes/<family>/<type>.yaml``: its ``node`` and ``type``, an
+A node type is offered in tcs-gui's palette from a description,
+``tcs-gui/share/nodes/<family>/<type>.yaml``: its ``node`` and ``type``, an
 ``about`` sentence, which terminals it has, and its ``attributes``, each with
 ``name``, ``required``, an optional ``kind`` and its own ``about``. The
 terminal flags are still spelled by their old names, ``payload-sink``,
 ``payload-source``, ``gateway-sink`` and ``gateway-source``, which
-``tcsgui/src/nodes.rs`` reads as ``world-in``, ``world-out``, ``moc-in``
+``tcs-gui/src/nodes.rs`` reads as ``world-in``, ``world-out``, ``moc-in``
 and ``moc-out``. Attributes that state a terminal's type, such as
 ``world-out-type``, are listed as any other attribute is. The description
 is checked against ``share/schema/node.schema.json`` and ``node.xsd``, and
@@ -367,7 +367,7 @@ The Python ground reads its type lists from the JSON schema, so it follows.
 
 Drawing It
 ==========
-How a type is drawn is in ``tcsdiagram/src/style.rs``: a ``NodeType``
+How a type is drawn is in ``tcs-diagram/src/style.rs``: a ``NodeType``
 variant, in ``ALL`` with its length, ``spelling``, ``family``,
 ``is_payload``, ``attributes`` (which must be the description's, in the
 same order and with the same ``required``), and ``appearance``, its edge,
@@ -408,11 +408,11 @@ Each module has its tests beside it, in all three crates. A test for a fix
 should fail without the fix: check that it does.
 
 Many tests enumerate every type, and a new type that was missed somewhere
-fails one of them: the schema tests in ``tcsgui/tests/schema.rs``, which
+fails one of them: the schema tests in ``tcs-gui/tests/schema.rs``, which
 hold the schemas to ``types_in`` and ``DHType::ALL``; the description tests
-in ``tcsgui/src/nodes.rs``; the drawing tests in ``tcsdiagram``;
+in ``tcs-gui/src/nodes.rs``; the drawing tests in ``tcs-diagram``;
 ``the_features_are_the_optional_types`` and ``tcspecial/tests/types.rs``;
-and ``tcsverify/tests/examples.rs``. No test holds ``NodeType::ALL`` to
+and ``tcs-verify/tests/examples.rs``. No test holds ``NodeType::ALL`` to
 ``types_in``, so a type missing from the drawing is caught only through the
 description tests.
 
@@ -444,11 +444,11 @@ For a payload type ``foo``:
 5. tcspecial: the endpoint, the feature in ``Cargo.toml``, ``BUILT`` and
    the rest of ``node/payload/mod.rs``, and both dispatchers in
    ``endpoint.rs``, every one gated by the feature.
-6. tcssim: ``run_foo_node``, ``PayloadProtocol`` and ``run_kind``, and
+6. tcs-sim: ``run_foo_node``, ``PayloadProtocol`` and ``run_kind``, and
    ``endpoint.rs``.
-7. tcsgui: the description, its place in the list of descriptions, both
+7. tcs-gui: the description, its place in the list of descriptions, both
    configuration schemas and both simulator schemas.
-8. tcsdiagram: ``NodeType`` and its ``appearance``, two ways unlike every
+8. tcs-diagram: ``NodeType`` and its ``appearance``, two ways unlike every
    other type that are not colour.
 9. The design, the manual, ``CLAUDE.md`` and the examples, and their HTML.
 10. The checks above.

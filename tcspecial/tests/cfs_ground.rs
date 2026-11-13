@@ -1,5 +1,5 @@
 //! The cfs example, commanded from the ground: tcslib-moc's peer of the bus,
-//! through the simulated cFS end that tcssim runs, against the vehicle itself.
+//! through the simulated cFS end that tcs-sim runs, against the vehicle itself.
 //!
 //! What `tests/cfs.rs` checks byte by byte, as the cFS end, this checks as a
 //! ground station sees it: through `tcslib_moc::bus`, with the station's own

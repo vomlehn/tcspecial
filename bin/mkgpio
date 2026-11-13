@@ -5,16 +5,16 @@
 # A discrete line is one of the payload types the simulator cannot simply be
 # the far end of: a line is a wire, and nothing in user space can drive one.
 # What the kernel offers instead is `gpio-sim`: a chip whose lines exist in
-# memory, with a file per line saying what the line is pulled to, so tcssim
+# memory, with a file per line saying what the line is pulled to, so tcs-sim
 # writes that file and a handler watching the same chip sees an edge.
 #
-# The module is the kernel's and configuring it needs root, so tcssim does not
+# The module is the kernel's and configuring it needs root, so tcs-sim does not
 # make a chip: it finds one and says how to make one if there is none. This is
 # that, as bin/mki2c, bin/mkiio and bin/mkvcan are for the other three.
 #
 # What it does not do is let the unit tests cover any more than they do now.
 # The scan that finds a chip is given the tree to look at -- see lines_of() in
-# tcssim/src/payload_gpio.rs -- so it passes with no module loaded and would
+# tcs-sim/src/payload_gpio.rs -- so it passes with no module loaded and would
 # pass with one. This is for running a payload set that names a GPIO payload.
 #
 # Nothing here survives a reboot.
@@ -33,7 +33,7 @@ lines="${1:-8}"
 #
 # A name of its own so that cleanup can be its own and not everybody's: a
 # gpio-sim device another program made is left alone.
-sim_device="tcssim"
+sim_device="tcs-sim"
 sim_bank="bank0"
 
 configfs="/sys/kernel/config"
@@ -95,7 +95,7 @@ fi
 
 # Give the chip and its lines' pulls to whoever asked for them, where that was
 # someone running this under sudo. The kernel makes both root's, so without
-# this only root could open the chip -- and the tests, tcspecial and tcssim
+# this only root could open the chip -- and the tests, tcspecial and tcs-sim
 # are run as the user, not as root. udev is let finish first, because it sets
 # a new node's owner itself and would otherwise undo this after the fact.
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then

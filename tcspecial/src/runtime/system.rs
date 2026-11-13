@@ -316,7 +316,7 @@ pub struct System {
 impl System {
     /// Opens everything this configuration describes.
     ///
-    /// The graph is expected checked -- `Graph::check` first, or `tcsverify`
+    /// The graph is expected checked -- `Graph::check` first, or `tcs-verify`
     /// on the ground -- so what fails here is the hardware rather than the
     /// file. Every failure is reported, not the first: an operator holding a
     /// list of what is wrong can fix a vehicle in one pass of the hangar,

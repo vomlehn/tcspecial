@@ -19,7 +19,7 @@
 //! surroundings may swing, as a sine wave of `swing` either side of it over
 //! `period` -- an orbit's sun and shadow -- and wander at random by
 //! `wander`, over `wander_time`. It starts at its surroundings, or at
-//! `start` where that is stated. The arithmetic is tcssim's
+//! `start` where that is stated. The arithmetic is tcs-sim's
 //! `physics::thermal_mass`.
 
 use std::time::Duration;

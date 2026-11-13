@@ -13,20 +13,20 @@ document of its own, as it has a manual of its own:
     restarts, payloads and their link terms, platforms and porting, testing
     with simulated devices, and the requirements.
 
-`The tcsgui design <tcsgui-design.html>`__
+`The tcs-gui design <tcs-gui-design.html>`__
     The editor: how it draws, reads and writes a configuration, its
     descriptions of the node types, its undo history, autosave and
     recovery.
 
-`The tcsmoc design <tcsmoc-design.html>`__
+`The tcs-moc design <tcs-moc-design.html>`__
     The simulated operations center: its window, what it reads, and where
     the addresses it talks to come from.
 
-`The tcssim design <tcssim-design.html>`__
+`The tcs-sim design <tcs-sim-design.html>`__
     The payload simulator: its configuration files, the physics model,
     fault injection, and the program.
 
-`The tcsverify design <tcsverify-design.html>`__
+`The tcs-verify design <tcs-verify-design.html>`__
     The configuration checker.
 
 How to use each program is in its manual: see `the TCSpecial manuals

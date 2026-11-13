@@ -190,7 +190,7 @@
         <from>gateway</from>
         <sets>thermostat.setpoint</sets>
     </commands>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="ambient" x="469" y="166"/>
             <node name="gateway" x="790" y="34"/>
@@ -205,5 +205,5 @@
             <node name="temp_3" x="34" y="280"/>
             <node name="thermostat" x="601" y="242"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

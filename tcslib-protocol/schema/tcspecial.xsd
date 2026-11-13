@@ -7,7 +7,7 @@
   configuration can be flown. Which attributes a node of a given type must
   state, whether two payloads claim one socket, whether a link arrives by a
   name its far end lists: those are rules about meaning, they are tested against
-  real buses, and tcsverify is the one place they live. A file this accepts may
+  real buses, and tcs-verify is the one place they live. A file this accepts may
   still be refused, and the refusal will say why.
 
   Two consequences worth knowing before reading further.
@@ -61,7 +61,7 @@
   </xs:simpleType>
 
   <!-- Where the editor drew one node, which the flight software ignores.
-       In the tcsgui section at the end of the file rather than on the node:
+       In the tcs-gui section at the end of the file rather than on the node:
        the node sections say what the vehicle carries, and this says where
        somebody put the boxes on a screen. Named as a node is, by its name
        attribute. -->
@@ -92,7 +92,7 @@
     </xs:sequence>
   </xs:complexType>
 
-  <xs:complexType name="tcsgui">
+  <xs:complexType name="tcs-gui">
     <xs:all>
       <xs:element name="nodes" type="layout" minOccurs="0"/>
       <xs:element name="set-aside" type="setAside" minOccurs="0"/>
@@ -103,7 +103,7 @@
        name attribute of a <type>. One list per section, so that a type
        written in the wrong section is refused here as it is where the file
        is read; held against the software's own lists
-       (tcslib_protocol::graph::types_in) by tcsgui's schema tests. -->
+       (tcslib_protocol::graph::types_in) by tcs-gui's schema tests. -->
   <!-- A ground link. -->
   <xs:simpleType name="gatewayType">
     <xs:restriction base="xs:token">
@@ -409,7 +409,7 @@
 
        Everything optional, because the editor has to be able to write a
        section somebody is halfway through filling in. What must be answered
-       before a configuration flies is tcsverify's to say. -->
+       before a configuration flies is tcs-verify's to say. -->
   <xs:complexType name="tcspecial">
     <xs:all>
       <!-- What the vehicle answers to: radio, the ground over UDP; yamcs,
@@ -430,7 +430,7 @@
       </xs:element>
       <!-- The interface the configuration was written for: the digest of
            the tcslib-protocol/xtce/link.xtce its commands are laid out by, as
-           32 lower-case hex digits, which tcsverify prints when asked with its
+           32 lower-case hex digits, which tcs-verify prints when asked with its
            interface-digest option. Required, and refused unless it is the
            build's own. -->
       <xs:element name="interface" minOccurs="0">
@@ -581,7 +581,7 @@
            before a matching CONNECT before it is given up: 1 or more, 3
            where it is not stated. -->
       <xs:element name="load_trials" type="xs:string" minOccurs="0"/>
-      <!-- Where tcsgui writes the Rust it generates from this configuration.
+      <!-- Where tcs-gui writes the Rust it generates from this configuration.
            The one attribute of this section about building the software rather
            than about running it: nothing aboard reads it. -->
     </xs:all>
@@ -617,7 +617,7 @@
        section is written once at most. The description is held to that
        here, by the identity constraint below: a field may find one node at
        most, so a second description is refused. The tcspecial section, the
-       three node sections and the tcsgui section are held to it where the
+       three node sections and the tcs-gui section are held to it where the
        file is read and not here, because XSD 1.0 cannot say it: xs:all
        holds no list, and an identity constraint's field must find a value,
        which a section of child elements is not. Nothing is required here,
@@ -637,7 +637,7 @@
         <xs:element name="vehicle" type="vehicle"/>
         <xs:element name="payloads" type="payloads"/>
         <xs:element name="commands" type="command"/>
-        <xs:element name="tcsgui" type="tcsgui"/>
+        <xs:element name="tcs-gui" type="tcs-gui"/>
       </xs:choice>
     </xs:complexType>
     <xs:unique name="one-description">

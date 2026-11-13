@@ -70,7 +70,7 @@ payloads:
         path: "/dev/gpiochip1"
         moc-in: [moc]
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: moc, x: 469, y: 34 }
     - { node: lamp, x: 34, y: 134 }

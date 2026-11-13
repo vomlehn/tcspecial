@@ -58,7 +58,7 @@ payloads:
         world-out:
           - moc.sensor
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: moc, x: 469, y: 34 }
     - { node: sensor, x: 34, y: 34 }

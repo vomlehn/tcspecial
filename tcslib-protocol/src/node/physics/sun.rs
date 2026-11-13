@@ -5,7 +5,7 @@
 //! shadow, a low orbit a third or so, and the change between the two is
 //! sudden, the penumbra lasting seconds of an orbit's ninety minutes. So
 //! each change is an event of the world's, foreseen from the orbit: the
-//! arithmetic is tcssim's `physics::sun`.
+//! arithmetic is tcs-sim's `physics::sun`.
 //!
 //! It starts at the beginning of the sunlit part of its orbit, or `start`
 //! of the way round from it.

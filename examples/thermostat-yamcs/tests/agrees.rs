@@ -11,7 +11,7 @@
 //! temperature as something else. So this holds the Python's answers for
 //! `thermostat-yamcs.xtcs` to the Rust's for `thermostat-yamcs.ytcs`, and the
 //! Python's form of every node of every example, read from its own XTCE, to
-//! `tcslib_protocol::graph::fprime::Form::of`, which tcsmoc's plot window and
+//! `tcslib_protocol::graph::fprime::Form::of`, which tcs-moc's plot window and
 //! the F´ bridge go by, so that the two cannot drift.
 
 use std::path::{Path, PathBuf};
@@ -170,12 +170,12 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
     assert_eq!(ours.len(), rust.len(), "{python:?}\n{rust:?}");
     for ((name, mine), (said, theirs)) in ours.into_iter().zip(&rust) {
         assert_eq!(name, said, "the Python and the Rust say different things");
-        // The digest is tcsverify's, which the Python asks for and does not
-        // work out: a build that has not made tcsverify yet leaves it to say
+        // The digest is tcs-verify's, which the Python asks for and does not
+        // work out: a build that has not made tcs-verify yet leaves it to say
         // so, and there is then nothing of the Python's to compare.
         if name == "digest" && mine == "None" {
             eprintln!(
-                "tcsverify is not built, so the Python had no digest to \
+                "tcs-verify is not built, so the Python had no digest to \
                  compare"
             );
             continue;

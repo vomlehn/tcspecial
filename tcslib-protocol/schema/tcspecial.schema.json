@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial.schema.json",
   "title": "tcspecial configuration",
-  "description": "The shape of a configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a link arrives by a name its far end lists are rules about meaning, tested against real buses, and tcsverify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
+  "description": "The shape of a configuration: which sections there are, what an entry may say, and which words are words. Not whether it can be flown -- which attributes a node of a given type must state, whether two payloads claim one socket, whether a link arrives by a name its far end lists are rules about meaning, tested against real buses, and tcs-verify is the one place they live. A file this accepts may still be refused, and the refusal will say why.",
   "$defs": {
     "destination": {
       "description": "One line out of a node: the node it reaches and the name it arrives there by, separated by a dot, `gateway.readings`. The name is one the node it reaches lists under the sink the line arrives at.",
@@ -609,7 +609,7 @@
           ]
         },
         "carries": {
-          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslib-protocol/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcsgui-design.rst.",
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslib-protocol/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcs-gui-design.rst.",
           "type": [
             "string",
             "number",
@@ -1269,7 +1269,7 @@
           ]
         },
         "carries": {
-          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslib-protocol/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcsgui-design.rst.",
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslib-protocol/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcs-gui-design.rst.",
           "type": [
             "string",
             "number",
@@ -1953,7 +1953,7 @@
           ]
         },
         "carries": {
-          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslib-protocol/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcsgui-design.rst.",
+          "description": "For a `vote` or a tee: the type it takes and sends, one of tcslib-protocol/xtce/types.xtce's -- `kelvin`, `u8`, `bytes` -- or a structure of them, `x: i16, y: i16`. See \"Typed links\" in docs/tcs-gui-design.rst.",
           "type": [
             "string",
             "number",
@@ -2164,7 +2164,7 @@
       }
     },
     "tcspecial": {
-      "description": "What tcspecial itself is configured with: where commands are taken, where beacons go, where the telemetry log is written. Everything optional here, because the editor has to be able to write a section somebody is halfway through filling in; what must be answered before a configuration flies is tcsverify's to say.",
+      "description": "What tcspecial itself is configured with: where commands are taken, where beacons go, where the telemetry log is written. Everything optional here, because the editor has to be able to write a section somebody is halfway through filling in; what must be answered before a configuration flies is tcs-verify's to say.",
       "type": "object",
       "properties": {
         "gateway": {
@@ -2178,7 +2178,7 @@
           ]
         },
         "interface": {
-          "description": "The interface the configuration was written for: the digest of the tcslib-protocol/xtce/link.xtce its commands are laid out by, as 32 lower-case hex digits, which `tcsverify --interface-digest` prints. Required, and refused unless it is the build's own.",
+          "description": "The interface the configuration was written for: the digest of the tcslib-protocol/xtce/link.xtce its commands are laid out by, as 32 lower-case hex digits, which `tcs-verify --interface-digest` prints. Required, and refused unless it is the build's own.",
           "type": "string",
           "pattern": "^[0-9a-f]{32}$"
         },
@@ -2306,7 +2306,7 @@
               "pattern": "^[^:]+:[0-9]+$"
             },
             "recv": {
-              "description": "The socket tcsmoc receives them on.",
+              "description": "The socket tcs-moc receives them on.",
               "type": "string",
               "pattern": "^[^:]+:[0-9]+$"
             },
@@ -2585,7 +2585,7 @@
         "additionalProperties": false
       }
     },
-    "tcsgui": {
+    "tcs-gui": {
       "description": "What the editor arranged: where each node was drawn. Last in the file and in a section of its own, because the sections above say what the vehicle carries and this says where somebody put the boxes on a screen. The flight software ignores it. Each entry names the node it is about by its first key, `node: <name>`, as the sections name theirs.",
       "type": "object",
       "properties": {

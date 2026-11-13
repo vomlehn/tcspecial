@@ -1,16 +1,16 @@
 # yaml-language-server: $schema=tcslib-protocol/schema/tcspecial-sim.schema.json
 
-# How tcssim simulates the one payload of example.ytcs.
+# How tcs-sim simulates the one payload of example.ytcs.
 #
 # There is no SPI device to open on most hosts, so spi-1 gives a sim_address
 # address in example.ytcs: under --simulate=some or all tcspecial reads it
-# there over UDP, and tcssim answers there.
+# there over UDP, and tcs-sim answers there.
 description: Simulator settings for the payload of example.ytcs
 
-# Where tcssim answers whether it has made its simulated devices, which
+# Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7900"
 
 simulated_payloads:

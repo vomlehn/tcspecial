@@ -1,4 +1,4 @@
-"""Tests of thermostat_yamcs.py that need neither Yamcs, tcssim nor a
+"""Tests of thermostat_yamcs.py that need neither Yamcs, tcs-sim nor a
 vehicle: what it reads from the configuration, the mission database it has
 generated -- a typed parameter for every node drawn into the gateway node --
 and what it shows of a Yamcs played here.
@@ -36,7 +36,7 @@ SWITCH = Form("Whole", whole="u8")
 
 def options(**changed):
     """The options thermostat_yamcs reads, for the example's configuration,
-    with no tcsverify asked for: the digest is not what these tests are
+    with no tcs-verify asked for: the digest is not what these tests are
     about.
 
     Args:
@@ -46,7 +46,7 @@ def options(**changed):
         A namespace like the one :func:`thermostat_yamcs.arguments` gives.
     """
     said = dict(configuration=str(HERE / "thermostat-yamcs.xtcs"),
-                tcsverify=None)
+                tcs_verify=None)
     said.update(changed)
     return types.SimpleNamespace(**said)
 

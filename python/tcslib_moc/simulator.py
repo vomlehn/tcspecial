@@ -104,12 +104,12 @@ def wait(at, ours, patience):
                     "starting",
                     f"the simulator at {at[0]}:{at[1]} was still making its "
                     f"simulated devices after {waited:.1f} s: look at what "
-                    "tcssim says, or give it longer",
+                    "tcs-sim says, or give it longer",
                 )
             raise NotReady(
                 "silent",
                 f"nothing answered at {at[0]}:{at[1]} in {waited:.1f} s: "
-                "tcssim is not running, or tcssim.ready in the simulator file "
+                "tcs-sim is not running, or tcs_sim.ready in the simulator file "
                 "is not where it is",
             )
         answer = ask(at, left)

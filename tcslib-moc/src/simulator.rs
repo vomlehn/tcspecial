@@ -1,7 +1,7 @@
-//! Waiting for the simulator: how a harness learns that tcssim has made its
+//! Waiting for the simulator: how a harness learns that tcs-sim has made its
 //! simulated devices before it starts tcspecial.
 //!
-//! The one way every harness waits -- tcsmoc, `tcssim --wait`, and a test --
+//! The one way every harness waits -- tcs-moc, `tcs-sim --wait`, and a test --
 //! so that there is one statement of what the exchange is and of what each
 //! answer means. The messages are `tcslib_protocol::ready`; the Python ground
 //! station's library has the same function as `tcslib_moc.simulator.wait`.
@@ -41,14 +41,14 @@ impl std::fmt::Display for NotReady {
         match self {
             NotReady::Silent { at, waited } => write!(
                 f,
-                "nothing answered at {at} in {} s: tcssim is not running, or \
-                 tcssim.ready in the simulator file is not where it is",
+                "nothing answered at {at} in {} s: tcs-sim is not running, or \
+                 tcs-sim.ready in the simulator file is not where it is",
                 waited.as_secs_f32()
             ),
             NotReady::StillStarting { at, waited } => write!(
                 f,
                 "the simulator at {at} was still making its simulated \
-                 devices after {} s: look at what tcssim says, or give it \
+                 devices after {} s: look at what tcs-sim says, or give it \
                  longer",
                 waited.as_secs_f32()
             ),
@@ -81,7 +81,7 @@ impl std::fmt::Display for NotReady {
 ///
 /// # Arguments
 ///
-/// * `at`       - Where the simulator answers, its `tcssim.ready`.
+/// * `at`       - Where the simulator answers, its `tcs-sim.ready`.
 /// * `patience` - How long it is given to answer.
 ///
 /// # Returns
@@ -164,7 +164,7 @@ pub fn ask(
 ///
 /// # Arguments
 ///
-/// * `at`       - Where the simulator answers, its `tcssim.ready`.
+/// * `at`       - Where the simulator answers, its `tcs-sim.ready`.
 /// * `ours`     - The run the simulator must be set up for.
 /// * `patience` - How long to wait in all.
 ///
@@ -245,7 +245,7 @@ mod tests {
     }
 
     /// Starts a simulator that answers with whatever state `state` holds, as
-    /// tcssim does, on a thread of its own.
+    /// tcs-sim does, on a thread of its own.
     ///
     /// # Arguments
     ///

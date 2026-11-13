@@ -1,18 +1,18 @@
 #!/bin/bash
 #
-# bridge-test -- runs the F´ bridge against tcspecial and tcssim, and tests
+# bridge-test -- runs the F´ bridge against tcspecial and tcs-sim, and tests
 # it from F´'s own ground system.
 #
 #   FPRIME_BIN=<venv>/bin bridge-test <tree> <configuration> \
 #       <simulator file> <deployment> <run directory>
 #
-# <tree> is the tcspecial tree, whose target/debug holds tcssim and
+# <tree> is the tcspecial tree, whose target/debug holds tcs-sim and
 # tcspecial; <deployment> is where F´ installed BridgeTest, its bin/ and
 # dict/; <run directory> is where what the run leaves is kept, emptied
 # first. `make test` in fprime/ runs this with the right arguments.
 #
 # Started in the order a test harness starts a run (see "Waiting for the
-# Simulator" in docs/tcspecial-design.rst): tcssim, which is waited for until it
+# Simulator" in docs/tcspecial-design.rst): tcs-sim, which is waited for until it
 # has made its simulated devices; tcspecial on the configuration,
 # --simulate=all; and F´'s ground system. Then pytest, with F´'s test API,
 # starts BridgeTest, which opens the same configuration and connects to the
@@ -78,13 +78,13 @@ stop_all() {
 }
 trap stop_all EXIT
 
-echo "tcssim, on $configuration..."
+echo "tcs-sim, on $configuration..."
 export PAYLOAD_SIM_YAML=$sim
 # Every payload sending from the start, there being nobody at its window to
 # press its button.
-start "$run" "$run/tcssim.log" "$top/target/debug/tcssim" \
+start "$run" "$run/tcs-sim.log" "$top/target/debug/tcs-sim" \
 	--simulate=all --sending "$configuration"
-"$top/target/debug/tcssim" --simulate=all --wait="$patience" \
+"$top/target/debug/tcs-sim" --simulate=all --wait="$patience" \
 	"$configuration"
 
 echo "tcspecial, on $configuration..."
@@ -100,7 +100,7 @@ start "$here/BridgeTest" "$run/fprime-gds.log" "$FPRIME_BIN/fprime-gds" \
 	--file-storage-directory "$run/files" --zmq-transport "${zmq[@]}"
 
 echo "The bridge's tests..."
-digest=$("$top/target/debug/tcsverify" --digest "$configuration" |
+digest=$("$top/target/debug/tcs-verify" --digest "$configuration" |
 	sed -n 's/.*: md5 //p')
 # BridgeTest is started by the tests, once they are listening: see
 # BridgeTest/test/conftest.py.

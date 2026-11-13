@@ -529,7 +529,7 @@ should cite.</p>
 <p><strong>Reliability.</strong> The whole of what a vehicle will do is one artifact, and it is
 checked before any of it runs. Every link must name nodes that exist; a node
 that computes a mean must have its inputs bound, all of them; a set of discrete
-lines driven as outputs may not also be read as inputs. <tt class="docutils literal">tcsverify</tt> performs
+lines driven as outputs may not also be read as inputs. <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> performs
 those checks on the ground, against the same code that will perform them again
 aboard, so a configuration that does not make sense is refused on a desk rather
 than discovered in flight. What did fly is not a matter of memory either: the
@@ -670,12 +670,12 @@ line may arrive there by -- <tt class="docutils literal"><span class="pre">world
 vote's world-in is its inputs, <tt class="docutils literal"><span class="pre">world-in:</span> [in0, in1, in2]</tt>. A line to a
 name its far end does not list is refused where the file is read, saying
 which names it does list. A name is one word with no dot in it, and may be
-listed with nothing arriving at it yet. tcsgui names a line it draws after
+listed with nothing arriving at it yet. tcs-gui names a line it draws after
 the node it leaves, and adds the name to the list for you.</p>
 <p>Each terminal may be linked to one other: a <tt class="docutils literal"><span class="pre">world-out</span></tt> to a
 <tt class="docutils literal"><span class="pre">world-in</span></tt>, a <tt class="docutils literal"><span class="pre">world-in</span></tt> to a <tt class="docutils literal"><span class="pre">world-out</span></tt>, a <tt class="docutils literal"><span class="pre">moc-out</span></tt> to
 a <tt class="docutils literal"><span class="pre">moc-in</span></tt>, a <tt class="docutils literal"><span class="pre">moc-in</span></tt> to a <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Anything else would
-carry one stream into the other. In tcsgui the terminals are drawn as small
+carry one stream into the other. In tcs-gui the terminals are drawn as small
 boxes in a node's corners, each with an arrow saying which way its data
 goes: the payload's own data along the top pointing right, towards the
 ground, and what the ground sends along the bottom pointing left, towards
@@ -705,7 +705,7 @@ main one, with the same panes, lists, Physics pane and edits.
 A node with no terminal of that stream offers nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
 <tt class="docutils literal"><span class="pre">world-in</span></tt> in its upper left, and what it sends leaves by the
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> in its lower left.</p>
-<p class="last">A line's names are not written beside it in tcsgui. Resting the pointer
+<p class="last">A line's names are not written beside it in tcs-gui. Resting the pointer
 on a line shows a tip: the node it leaves, the node it reaches and the
 input there where it names one, and under them whatever comment the
 file has for it. A physics line's tip names the component's terminal,
@@ -861,8 +861,8 @@ to one schema:</p>
 <p>Both schemas are in <tt class="docutils literal"><span class="pre">tcslib-protocol/schema</span></tt>, installed under
 <tt class="docutils literal">share/tcspecial/schema</tt>, beside the pair for the simulator's own file.
 They check a file's shape -- which sections there are and which words are
-words -- and not whether it can be flown, which is tcsverify's to say: a file
-a schema accepts may still be refused. tcsgui writes either spelling, and
+words -- and not whether it can be flown, which is tcs-verify's to say: a file
+a schema accepts may still be refused. tcs-gui writes either spelling, and
 writes into each file a reference to its schema, so that another editor can
 check it.</p>
 <p>The format is taken from the file's extension, which is a configuration's
@@ -902,13 +902,13 @@ command interpreter's own settings -- the ports it takes commands on, where
 beacons go and how often, and where the telemetry log goes -- and its
 <tt class="docutils literal">gateways</tt>, <tt class="docutils literal">vehicle</tt> and <tt class="docutils literal">payloads</tt> sections say which nodes there
 are, what each of them does and how the lines between them run. Named on the
-command line of every program that reads it, which is tcspecial, tcsmoc,
-tcssim and tcsverify.</dd>
+command line of every program that reads it, which is tcspecial, tcs-moc,
+tcs-sim and tcs-verify.</dd>
 <dt>the simulator configuration file</dt>
 <dd>How a simulated payload behaves: how often it produces a packet, how it
 divides one into segments, and what in the physics model it is joined
-to if it is. Read only by tcssim, which takes it from <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>, and by
-tcsmoc, which shows it and acts on none of it. There is nothing in it
+to if it is. Read only by tcs-sim, which takes it from <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>, and by
+tcs-moc, which shows it and acts on none of it. There is nothing in it
 about the payloads themselves.</dd>
 </dl>
 <p>A configuration may be written as several files. The one named on the command
@@ -922,7 +922,7 @@ subdiagram, with a name of its own and its file's path under it:</p>
 </pre>
 <p>In XML it is one element with the two as attributes, <tt class="docutils literal">&lt;include
 <span class="pre">name=&quot;thermostat-common&quot;</span> <span class="pre">path=&quot;../thermostat-common/thermostat&quot;/&gt;</span></tt>. The name
-is the subdiagram's, the name tcsgui draws its box under, and is no node's
+is the subdiagram's, the name tcs-gui draws its box under, and is no node's
 and no other subdiagram's, with no dot or slash in it. An include written as a
 bare path, as includes once were, is refused, saying how to write it now.</p>
 <p>An include's path is relative to the top file's directory: it is the file's path from
@@ -945,7 +945,7 @@ refused, saying which list to add the node to:</p>
 </pre>
 <p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-out&gt;to_k1&lt;/world-out&gt;</span></tt>,
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
-section. tcsgui draws an included file as a box whose corner terminals are
+section. tcs-gui draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
 include, name and path, as it is written, so a set of files digests alike from
 wherever it is read. Two examples that fly one vehicle include it from a directory of their
@@ -1004,7 +1004,7 @@ lines, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">g
 dummy device for it, which is what supported means for them: tcspecial's
 node code is run against a CAN bus of the kernel's <tt class="docutils literal">vcan</tt> and a chip of its
 <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, the far end of each played through the kernel and not by
-tcssim, by <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>. Each test checks that the
+tcs-sim, by <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>. Each test checks that the
 device's data reaches the ground and that the ground's commands reach the
 device. Each type has an example that the test flies, in <tt class="docutils literal">examples/can</tt> and
 <tt class="docutils literal">examples/gpio</tt>.
@@ -1061,7 +1061,7 @@ trigger        what to send to make it answer, as one or more parts: text
 group, or the payload's own <tt class="docutils literal">trigger_interval</tt>, is the clock.</p>
 <p>A payload with no <tt class="docutils literal">trigger</tt> sends on its own, or holds a value to be read,
 so there is nothing to send it. A simulated one that sends is driven at the
-rate its simulator configuration gives it, which is how fast tcssim
+rate its simulator configuration gives it, which is how fast tcs-sim
 produces data rather than how fast the payload would.</p>
 <p>A payload's name -- <tt class="docutils literal">payload: temp_1</tt> -- belongs to a handler and never to a
 group: it is what tells one handler of a group from another, and what every
@@ -1182,7 +1182,7 @@ the ground, and a <tt class="docutils literal">udp</tt> or <tt class="docutils l
 <tt class="docutils literal">trigger</tt>. That last is the payload that speaks first: the vehicle learns
 where it is from what arrives, and as the node opens nothing has. Give it a
 trigger and it is reached at its address, init and all.</p>
-<p>tcssim takes an init as something received. A simulated payload that is asked
+<p>tcs-sim takes an init as something received. A simulated payload that is asked
 answers it as it would any request, which a real part would not: the vehicle
 then reads one reading more than it asked for, on the pass after the node
 opened.</p>
@@ -1595,7 +1595,7 @@ where the handler waits. It is refused on a stream or a raw socket, which are
 connected and so know their other end already, and on a datagram payload that
 is asked or only driven, which is reached at its address and read only from
 there. Without it, a payload that restarts from a new port is heard again at
-once; with it, the payload must send from the address it names. tcssim sends
+once; with it, the payload must send from the address it names. tcs-sim sends
 from there when it simulates the payload, and a simulator file that names a
 <tt class="docutils literal">payload_address</tt> or <tt class="docutils literal">payload_port</tt> for it as well is refused.</p>
 </div>
@@ -1650,7 +1650,7 @@ tcspecial opens a raw socket of that protocol, connected to the address, so it
 hears only that payload and sends only to it, and a datagram read is handed
 on without its IP header. A raw socket needs <tt class="docutils literal">CAP_NET_RAW</tt>, which tcspecial
 must be given (<tt class="docutils literal">setcap cap_net_raw+ep</tt>); without it, the node is refused as
-it opens, saying so. tcssim does not simulate a raw payload -- on one host
+it opens, saying so. tcs-sim does not simulate a raw payload -- on one host
 every raw socket of a protocol hears every datagram of it, its own included --
 and refuses a simulator file that asks it to.</p>
 <pre class="code yaml literal-block">
@@ -1676,13 +1676,13 @@ at <tt class="docutils literal">path</tt> and adds a packet of lorem ipsum to it
 pace and with the faults its simulator file gives, until the text runs out,
 about 2900 bytes of it. tcspecial reads what has been added each time it looks,
 so the data comes for a while and then stops. The file is removed when the
-simulator stops, whether by its <tt class="docutils literal">Quit All</tt> button or by a signal (see <a class="reference external" href="tcssim.html#the-tcssim-window">The
-tcssim window</a>); a file left by one killed
+simulator stops, whether by its <tt class="docutils literal">Quit All</tt> button or by a signal (see <a class="reference external" href="tcs-sim.html#the-tcs-sim-window">The
+tcs-sim window</a>); a file left by one killed
 outright holds a prefix of the text, and the next start replaces it. Where
 something else is already at <tt class="docutils literal">path</tt> -- a real device, or a file the simulator
 did not write -- the simulator leaves it alone and says so, rather than writing
 over it. A device-file payload is a real device under every <tt class="docutils literal"><span class="pre">--simulate</span></tt> mode,
-whether or not tcssim's file of text is what it opens: see <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy or
+whether or not tcs-sim's file of text is what it opens: see <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy or
 Real Devices: --simulate</a>.</p>
 <p>Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
@@ -1702,7 +1702,7 @@ can_fd         true | false, default false -- CAN FD frames rather than
                than eight bytes
 loopback       true | false, default true -- whether the controller gives
                frames to other sockets on this host, which is what lets
-               tcssim simulate the payload
+               tcs-sim simulate the payload
 </pre>
 <p>Both halves of where it is are required. Several payloads commonly share one
 bus and differ only in the identifier, which is the arrangement an
@@ -1725,7 +1725,7 @@ What it cannot do is make the bus: a virtual one needs</p>
 <span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>ip<span class="whitespace"> </span>link<span class="whitespace"> </span>add<span class="whitespace"> </span>dev<span class="whitespace"> </span>vcan0<span class="whitespace"> </span><span class="name builtin">type</span><span class="whitespace"> </span>vcan<span class="whitespace">
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>ip<span class="whitespace"> </span>link<span class="whitespace"> </span><span class="name builtin">set</span><span class="whitespace"> </span>dev<span class="whitespace"> </span>vcan0<span class="whitespace"> </span>up
 </pre>
-<p>and tcssim says exactly that if the interface is not there, as it does for the
+<p>and tcs-sim says exactly that if the interface is not there, as it does for the
 I<sup>2</sup>C stub module. <tt class="docutils literal">bin/mkvcan</tt> runs both, after removing any
 virtual bus left from a previous run, so</p>
 <pre class="code console literal-block">
@@ -1750,7 +1750,7 @@ prints in the angle brackets:</p>
 </pre>
 <p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies <a class="reference internal" href="#the-can-example">The can example</a> on such a
 bus, playing the motor itself with a socket of its own rather than with
-tcssim: a frame it puts on the bus reaches the ground, and a command the
+tcs-sim: a frame it puts on the bus reaches the ground, and a command the
 ground sends reaches it as a frame. <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span> can</tt>
 makes the bus; see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>.</p>
 </div>
@@ -1797,7 +1797,7 @@ state_interval how often to report what the watched lines are, or what
                gpio_in and a gpio_inout
 init           what driven lines start at, as a trigger is written:
                '&quot;0&quot;'. gpio_out and gpio_inout only
-sim_address    where tcssim answers for the lines over UDP when they
+sim_address    where tcs-sim answers for the lines over UDP when they
                are simulated, a loopback address and port:
                127.0.0.1:5204. Optional; used under --simulate=some or
                all instead of the chip, and not under none
@@ -1841,7 +1841,7 @@ still sees when the heaters actually switched.</p>
 <tt class="docutils literal">state_interval</tt> and are asked by what arrives at <tt class="docutils literal"><span class="pre">world-in</span></tt>, and driven
 lines are set by what arrives at <tt class="docutils literal"><span class="pre">moc-in</span></tt>.</p>
 <p>The simulator moves lines through the kernel's <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, which it finds
-rather than makes: loading the module and making a chip need root, and tcssim
+rather than makes: loading the module and making a chip need root, and tcs-sim
 says so if there is none. <tt class="docutils literal">bin/mkgpio</tt> makes one and prints the node it
 became, which is numbered as chips appear and so has to be read off the run
 rather than assumed; <tt class="docutils literal">bin/rmgpio</tt> takes it away again. The packet and segment sizes mean nothing to a
@@ -1850,18 +1850,18 @@ drop or corrupt; what it does is pull each of its watched lines the other
 way every packet interval, and watch its driven lines for what the vehicle
 drives them to.</p>
 <p>A node that gives <tt class="docutils literal">sim_address</tt> needs no chip in a simulated run: tcspecial
-drives and watches its lines over UDP at that address, and tcssim answers
+drives and watches its lines over UDP at that address, and tcs-sim answers
 there, by the same rules. One datagram is one state of the lines, an ASCII
 <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> for each in the order of <tt class="docutils literal">lines</tt>, lowest first -- <tt class="docutils literal">10</tt> for
 lines 4 and 5 with 4 asserted -- both ways: what the vehicle drives its lines
-to, and what watched lines are, which tcssim sends whenever they change.
-tcspecial says hello with an empty datagram, so that tcssim knows where to
-answer, and keeps the last state tcssim sent as what the lines are.
+to, and what watched lines are, which tcs-sim sends whenever they change.
+tcspecial says hello with an empty datagram, so that tcs-sim knows where to
+answer, and keeps the last state tcs-sim sent as what the lines are.
 Everything else -- reports, <tt class="docutils literal">state_interval</tt>, what is passed on by
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> -- is as it is on a chip. Under <tt class="docutils literal">none</tt>, the
 flight setting, the chip is opened.</p>
 <p><tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies <a class="reference internal" href="#the-gpio-example">The gpio example</a> on such a
-chip, pulling and reading its lines itself rather than through tcssim: the
+chip, pulling and reading its lines itself rather than through tcs-sim: the
 switch's line reaches the ground in its reports as bit 0 of a <tt class="docutils literal">u8</tt>, and the
 <tt class="docutils literal">u8</tt> 1 or 0 from the ground is what the lamp's line becomes. <tt class="docutils literal">sudo
 <span class="pre">bin/mk-kernel-dummies</span> gpio</tt> makes the chip and gives it, and its lines'
@@ -1917,8 +1917,8 @@ bus device, <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> 
 generic HDLC has none: the line itself needs a card, a <tt class="docutils literal">wanxl</tt>, a
 <tt class="docutils literal">pci200syn</tt>, a <tt class="docutils literal">pc300too</tt> or a FarSync. A node that gives <tt class="docutils literal">sim_address</tt>,
 a loopback address and port, is reached there over UDP instead under
-<tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, and tcssim sends its frames there; one that
-does not is hardware, and tcssim refuses to simulate it. See <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy
+<tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, and tcs-sim sends its frames there; one that
+does not is hardware, and tcs-sim refuses to simulate it. See <a class="reference internal" href="#simulated-dummy-or-real-devices-simulate">Simulated, Dummy
 or Real Devices: --simulate</a>.</p>
 </div>
 <div class="section" id="an-rpmsg-payload">
@@ -2018,7 +2018,7 @@ line's words are refused on it by name.</p>
 after it is set, and a parity the port did not take is an error rather than a
 handler quietly checking nothing. And a simulated line is a pseudo-terminal,
 which will not take a parity at all -- it rejects <tt class="docutils literal">even</tt> outright and drops
-the others silently -- so a payload meant to be run against tcssim states
+the others silently -- so a payload meant to be run against tcs-sim states
 <tt class="docutils literal">parity: none</tt>, which is what a payload link commonly runs anyway.</p>
 <p><strong>RS-485: a two-wire bus</strong> -- experimental, not yet supported</p>
 <p>A start-stop line may be a half-duplex RS-485 bus rather than a point-to-point
@@ -2059,12 +2059,12 @@ line that will not take what the file asked for is refused rather than
 started.</p>
 <p>A simulated line is a pseudo-terminal, which has no transceiver and no RTS
 and would refuse the mode. On a simulated line tcspecial leaves the
-RS-485 terms unapplied, and says so as it starts; tcssim, at the far end,
+RS-485 terms unapplied, and says so as it starts; tcs-sim, at the far end,
 receives and sends the bus's bytes as on any line. So a set that states
-<tt class="docutils literal">rs485</tt> runs against tcssim as it is, and what goes unexercised is only the
+<tt class="docutils literal">rs485</tt> runs against tcs-sim as it is, and what goes unexercised is only the
 turnaround and its delays, which are the transceiver's. Parity is another
 matter: a pseudo-terminal takes no parity but <tt class="docutils literal">none</tt>, so a set meant to be
-run against tcssim states <tt class="docutils literal">parity: none</tt>.</p>
+run against tcs-sim states <tt class="docutils literal">parity: none</tt>.</p>
 <p><strong>Where a read ends</strong></p>
 <p>A line delivers bytes with no frame boundaries of its own, so a node on one
 says where one read of it ends. The vehicle holds what has arrived until the
@@ -2172,10 +2172,10 @@ can answer to one of those. With ten-bit addressing the whole range 0x000
 through 0x3FF is usable.</p>
 <p>There is no parity or byte length. I<sup>2</sup>C fixes the framing at
 eight data bits, most significant first, followed by an acknowledge bit.</p>
-<p>Such a payload cannot be triggered by tcssim: the master's own
+<p>Such a payload cannot be triggered by tcs-sim: the master's own
 read is the request, and a second master on the bus cannot see it.</p>
 <p>The dummy device for it is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, an adapter whose
-chips are a bank of registers in memory: tcssim writes the bank and tcspecial
+chips are a bank of registers in memory: tcs-sim writes the bank and tcspecial
 reads it. The simulator finds that adapter rather than making one -- loading a
 module needs root -- and says how to make one if there is none.
 <tt class="docutils literal">bin/mki2c</tt> makes it. There is a script per type -- <tt class="docutils literal">bin/mki2c</tt>,
@@ -2224,7 +2224,7 @@ read the same way; what the type adds is what it is, and one attribute:</p>
 <pre class="code text literal-block">
 sim_address    a loopback address and port: 127.0.0.1:5201. Under
                --simulate=some or all tcspecial reaches the sensor there
-               over UDP instead of opening its bus, and tcssim answers
+               over UDP instead of opening its bus, and tcs-sim answers
                with the temperature of the thermal mass the simulator
                file joins it to; under none, the flight setting, the bus
                is opened. Its old name, stand_in, is refused, naming
@@ -2252,7 +2252,7 @@ chip of <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> with
 written the same way, against a sensor of <tt class="docutils literal">iio_dummy</tt> whose buffer an
 <tt class="docutils literal">hrtimer</tt> trigger fills a hundred times a second, where the kernel's
 <tt class="docutils literal">iio_dummy</tt> has a buffer. Making any of them needs root, so neither the
-tests nor tcssim do; one command does, run once with sudo from the account
+tests nor tcs-sim do; one command does, run once with sudo from the account
 that runs the tests:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>bin/mk-kernel-dummies<span class="whitespace">
@@ -2372,7 +2372,7 @@ produced them, so it applies to every type of payload alike.</p>
 bus and one on SPI, read together as a group, and two sets of heater lines
 driven by what the vehicle decides. It is <tt class="docutils literal">tests/manual/thermostat.ytcs</tt>;
 the shipped <tt class="docutils literal">examples/thermostat</tt> has the same sensors, which on a desk
-tcssim plays on the kernel's dummy I<sup>2</sup>C bus and, for
+tcs-sim plays on the kernel's dummy I<sup>2</sup>C bus and, for
 <tt class="docutils literal">temp_3</tt>, over UDP (see <a class="reference internal" href="#the-thermostat-example">The thermostat example</a>). Each payload is named for what it is,
 which is what a panel in the MOC shows.</p>
 <pre class="code yaml literal-block">
@@ -2441,22 +2441,22 @@ bidirectional           whether a handler carries data both ways; every
 </div>
 <div class="section" id="starting-and-stopping-a-payload">
 <h1><a class="toc-backref" href="#toc-entry-31">Starting and stopping a payload</a></h1>
-<p>In tcsmoc each panel has a button per command: <tt class="docutils literal">Enable</tt> sends
+<p>In tcs-moc each panel has a button per command: <tt class="docutils literal">Enable</tt> sends
 <tt class="docutils literal">START_NODE</tt> and <tt class="docutils literal">Disable</tt> sends <tt class="docutils literal">STOP_NODE</tt>. Both are pressable
 whatever the node is doing -- tcspecial takes a <tt class="docutils literal">START_NODE</tt> for one already
 running and a <tt class="docutils literal">STOP_NODE</tt> for one already stopped without harm -- and the
 status beside the name says which of the two has taken effect.</p>
-<p>In tcssim a payload that is sending offers <tt class="docutils literal">Disable</tt>, which stops it, and
+<p>In tcs-sim a payload that is sending offers <tt class="docutils literal">Disable</tt>, which stops it, and
 one that is not offers <tt class="docutils literal">Enable</tt>, which starts it: one button, labelled with
 what pressing it will do, since a simulated payload is either sending or not
-and there is nothing else to ask of it. The words are tcsmoc's, so that a
+and there is nothing else to ask of it. The words are tcs-moc's, so that a
 payload disabled in one window is disabled in the other rather than silent in
 one and disabled in the other; they were the payload's own, <tt class="docutils literal">Send</tt> and
 <tt class="docutils literal">Silent</tt>, which left the reader of two windows translating.</p>
-<p>A payload starts disabled in tcssim, as though nobody had pressed
+<p>A payload starts disabled in tcs-sim, as though nobody had pressed
 <tt class="docutils literal">Enable</tt>, unless the simulator configuration says <tt class="docutils literal">enable: true</tt> for it
 (<tt class="docutils literal">&lt;enable <span class="pre">value=&quot;true&quot;/&gt;</span></tt> in XML), in its own entry or its group's, a
-payload's own overriding its group's; or unless tcssim is given
+payload's own overriding its group's; or unless tcs-sim is given
 <tt class="docutils literal"><span class="pre">--sending</span></tt>, which starts every payload whatever the file says. The two
 add up: a payload starts enabled if either asks, and <tt class="docutils literal">enable: false</tt> does
 not hold one back from <tt class="docutils literal"><span class="pre">--sending</span></tt>. Either way it is started as a press of
@@ -2464,16 +2464,16 @@ not hold one back from <tt class="docutils literal"><span class="pre">--sending<
 disabled, and its panel says why. tcspecial never reads the simulator
 configuration, so <tt class="docutils literal">enable</tt> says nothing about what a configuration that
 flies does.</p>
-<p>A heater, or any part the vehicle drives, sends nothing, so in tcssim the
+<p>A heater, or any part the vehicle drives, sends nothing, so in tcs-sim the
 same button is its power. Disabled -- as every payload starts, unless the
-simulator configuration's <tt class="docutils literal">enable</tt> or tcssim's <tt class="docutils literal"><span class="pre">--sending</span></tt> says
+simulator configuration's <tt class="docutils literal">enable</tt> or tcs-sim's <tt class="docutils literal"><span class="pre">--sending</span></tt> says
 otherwise -- it is unpowered, or failed, and stays off whatever
-the vehicle, or a thermostat tcssim plays, decides: it gives the
+the vehicle, or a thermostat tcs-sim plays, decides: it gives the
 simulated world no heat. What it is sent meanwhile is kept, the latest
 replacing the one before, and <tt class="docutils literal">Enable</tt> applies that latest at once, since
 the vehicle sends a decision only when it changes. Nothing aboard changes:
 the ground sees a disabled heater only through the temperature.</p>
-<p>tcsmoc had one button that way too. It said <tt class="docutils literal">Receive</tt> or <tt class="docutils literal">Discard</tt>
+<p>tcs-moc had one button that way too. It said <tt class="docutils literal">Receive</tt> or <tt class="docutils literal">Discard</tt>
 according to the status, which meant a press could not be made until the
 handler was in the state that offered it -- and when a panel looks wrong,
 what the spacecraft says to the command is the thing worth finding out.</p>
@@ -2484,7 +2484,7 @@ what the spacecraft says to the command is the thing worth finding out.</p>
 and spelled the same way in each. It shows every
 parameter read for that payload: what the tcspecial configuration said about
 the payload and how it is reached, and what the simulator configuration said
-about how tcssim simulates it, each under the name of the file it came
+about how tcs-sim simulates it, each under the name of the file it came
 from.</p>
 <p>It shows nothing but what the files said. What a payload has actually done is
 on the panel itself, and only the attributes of that payload's own type appear
@@ -2492,7 +2492,7 @@ on the panel itself, and only the attributes of that payload's own type appear
 that were asked for. Where a file stated nothing, the line says what the
 program will use instead rather than passing it off as a statement: a handler
 with no OC address is shown as one that cannot be started.</p>
-<p>In tcsmoc the simulator half is shown when that file can be read. The MOC
+<p>In tcs-moc the simulator half is shown when that file can be read. The MOC
 simulates nothing, so a simulator configuration that is missing or written for
 different payloads costs it that half and nothing else; the panel says so in
 place of the settings.</p>
@@ -2515,7 +2515,7 @@ or <tt class="docutils literal">runmocx</tt>; every other target takes the file 
 configuration in both formats -- <tt class="docutils literal"><span class="pre">&lt;name&gt;.ytcs</span></tt> and <tt class="docutils literal"><span class="pre">&lt;name&gt;.xtcs</span></tt>, which a
 test holds to describing the same configuration -- and the simulator
 configuration beside it, <tt class="docutils literal"><span class="pre">&lt;name&gt;-sim.yaml</span></tt>. Every example is checked by
-<tt class="docutils literal">tcsverify</tt> on every test run and must pass with no errors and no warnings,
+<tt class="docutils literal"><span class="pre">tcs-verify</span></tt> on every test run and must pass with no errors and no warnings,
 so an example is always a configuration that can be copied.</p>
 <p>Every node has a <em>device id</em>: its position among the names of all the
 configuration's nodes, sorted, counting from nought -- whatever section or
@@ -2535,20 +2535,20 @@ and allocates nothing. What it does with the data then -- process it, display
 it, log it -- is its own business. A gateway node that the ground sends commands
 or other data through also states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> tcspecial binds
 to receive them.</p>
-<p>tcsmoc runs a configuration as a ground station for that data: one panel per
+<p>tcs-moc runs a configuration as a ground station for that data: one panel per
 source, filled through <tt class="docutils literal"><span class="pre">tcslib_moc::gateway</span></tt>, with tcspecial started on the
-same file and tcssim where the simulator file simulates anything. Both it and
+same file and tcs-sim where the simulator file simulates anything. Both it and
 tcspecial digest the configuration files they read, and tcspecial sends its
-digest in every beacon. If tcspecial's digest is not the one tcsmoc computed --
+digest in every beacon. If tcspecial's digest is not the one tcs-moc computed --
 the vehicle is serving a different configuration, so its sources may not send
-where the panels say -- tcsmoc says so and asks whether to continue anyway, in
+where the panels say -- tcs-moc says so and asks whether to continue anyway, in
 front of its panels, which are greyed and take no presses until it is answered;
-Quit stops tcspecial and tcssim and exits.</p>
+Quit stops tcspecial and tcs-sim and exits.</p>
 <p>It also commands the vehicle, on the two links the <tt class="docutils literal">tcspecial</tt> section states.
 Connect brings the link up and sends a <tt class="docutils literal">CONNECT</tt>, which is how the two ends
-compare what they read and how they are <em>matched</em>: see <a class="reference external" href="tcsmoc.html#matching-the-configurations">Matching the
+compare what they read and how they are <em>matched</em>: see <a class="reference external" href="tcs-moc.html#matching-the-configurations">Matching the
 configurations</a>. Until they are,
-tcspecial sends nothing down but its beacons and its answers, and tcsmoc sends
+tcspecial sends nothing down but its beacons and its answers, and tcs-moc sends
 nothing but <tt class="docutils literal">CONNECT</tt>, <tt class="docutils literal">ARM Restart</tt> and <tt class="docutils literal">Initiate restart</tt>. Ping says the
 link reaches the vehicle, which is a different fact from the beacon's. Each
 panel's Enable and Disable start and stop that panel's node -- any node, so a
@@ -2615,7 +2615,7 @@ converted to kelvin, voted on and sent to the ground, with a
 thermostat driving two heaters, each through a GPIO line whose
 switch reports what it was told to the ground. Two sensors are on
 an I2C bus and one on SPI, and each line is one of the kernel's
-dummy chip, which tcssim watches.</object>
+dummy chip, which tcs-sim watches.</object>
 <p class="caption"><tt class="docutils literal">examples/thermostat</tt>: a trio of sensors, a vote, a thermostat, its two
 heaters, and the lines that say what the heaters are doing.</p>
 </div>
@@ -2632,8 +2632,8 @@ them: <tt class="docutils literal">temp_1</tt> and <tt class="docutils literal">
 with the rest of the vehicle. The heaters' switches are GPIO lines 4 and 5 of
 <tt class="docutils literal">/dev/gpiochip1</tt>. On a desk every one of them is a simulated device, reached
 over UDP at its <tt class="docutils literal">sim_address</tt>: the sensors at <tt class="docutils literal">127.0.0.1:5201</tt> to
-<tt class="docutils literal">5203</tt>, where tcssim answers with the zone's temperature, and the switches
-at <tt class="docutils literal">5204</tt> and <tt class="docutils literal">5205</tt>, where tcssim takes what the vehicle drives them to
+<tt class="docutils literal">5203</tt>, where tcs-sim answers with the zone's temperature, and the switches
+at <tt class="docutils literal">5204</tt> and <tt class="docutils literal">5205</tt>, where tcs-sim takes what the vehicle drives them to
 -- see <a class="reference internal" href="#a-gpio-payload">A GPIO Payload</a>. So the example needs no dummy device, no root and no
 hardware. Flown, the buses and the chip are opened. The thermostat-yamcs
 example has the same sensors and switches as this, at the same addresses, so
@@ -2686,7 +2686,7 @@ the heaters are held at what the vehicle last decided and a decision that went
 missing is corrected on the next sample.</p>
 <p>No payload here has a telemetry link of its own: the sensors' readings reach
 the ground through their conversions, and the heaters' switches are drawn
-into the gateway node. Tcssim counts each decision the vehicle drives the
+into the gateway node. Tcs-sim counts each decision the vehicle drives the
 switches to, and switches the heater each is joined to -- <tt class="docutils literal">connects:
 zone.heater_1</tt> -- by it.</p>
 <p>The command binding on the gateway node says the ground may set the
@@ -2694,12 +2694,12 @@ thermostat's setpoint, and the running vehicle applies it: a <tt class="docutils
 naming that node and that attribute is taken on the node command link, the
 value reaches the thermostat between stages of a pass, and the next pass
 decides by it. The value goes as the setpoint's type, a kelvin -- the type of
-what the thermostat reads -- and not as text: tcsmoc turns what is typed in
+what the thermostat reads -- and not as text: tcs-moc turns what is typed in
 its panel into that, and refuses, without sending anything, text that is not
 a temperature. The example's own XTCE, <tt class="docutils literal">thermostat.xtce</tt>, has the
 command, <tt class="docutils literal">set_thermostat_setpoint</tt>, for a ground station that reads XTCE.
 An attribute no binding mentions is refused, which is the point of writing
-the bindings down, and the refusal says why: tcsmoc shows
+the bindings down, and the refusal says why: tcs-moc shows
 the reason the vehicle sends -- <tt class="docutils literal">no command binding says the ground may set
 <span class="pre">&quot;thermostat.half-band&quot;:</span> it is spelled half_band</tt> -- beside the status.</p>
 <p>The simulator file beside it, <tt class="docutils literal"><span class="pre">thermostat-sim.yaml</span></tt>, is a link to
@@ -2708,10 +2708,10 @@ the same vehicle with Yamcs as its ground station, links to too. Its world
 holds the vehicle's physics model: a zone with two heaters of its own.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
-noise, which is what the model is for; tcssim switches each heater while the
+noise, which is what the model is for; tcs-sim switches each heater while the
 vehicle has its switch on. So the loop closes through tcspecial: see
 <strong>The Simulator Configuration</strong> below. Naming the <tt class="docutils literal">thermostat</tt> node in the file's
-<tt class="docutils literal">tcssim</tt> section closes it in tcssim alone instead, with no tcspecial
+<tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section closes it in tcs-sim alone instead, with no tcspecial
 running.</p>
 <p>The heaters are four watts each, and the zone's surroundings are 288.15 K,
 just inside the plot's lower red, two half bands and a kelvin below the
@@ -2720,14 +2720,14 @@ and wander a quarter of a kelvin. The zone starts at 292.15 K, a kelvin below
 the setpoint and inside the band, every run alike. Either
 heater alone settles the zone ten kelvin above its surroundings, above the
 band, so one heater holds it and the thermostat cycles whichever are
-working. So a heater disabled in tcssim's window -- an unpowered or failed
+working. So a heater disabled in tcs-sim's window -- an unpowered or failed
 heater, see <a class="reference internal" href="#starting-and-stopping-a-payload">Starting and stopping a payload</a> -- shows in the temperature:
 its switch goes on reporting what it is told, while the other heater, on
 twice as long, holds the band; with both disabled, the zone falls
 out of the band to its surroundings. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-thermostat</span></tt>
 starts every payload disabled, so press <tt class="docutils literal">Enable</tt> on each, and <tt class="docutils literal">Disable</tt> on a heater to take
 it away. A run of the model with its sensors' errors, three orbits from each
-of three seeds -- tcssim's tests
+of three seeds -- tcs-sim's tests
 <tt class="docutils literal">the_thermostat_example_holds_the_zone_with_both_heaters</tt> and
 <tt class="docutils literal">the_thermostat_example_holds_the_zone_with_a_heater_disabled</tt> -- has, with
 both heaters, the zone never more than two half bands from the setpoint and
@@ -2788,7 +2788,7 @@ science load is shed, halving the drain; and the sun returns, the battery
 recovers, and the load comes back above half. Each change -- into shadow and
 out, full, empty -- is an event of the model's, foreseen and met at its
 moment: see <strong>How the world moves</strong> below.</p>
-<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-battery</span></tt> runs it, on any desk: tcssim makes a
+<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-battery</span></tt> runs it, on any desk: tcs-sim makes a
 pseudo-terminal for the power monitor at its path, and sockets for the rest.</p>
 </div>
 <div class="section" id="the-descent-example">
@@ -2813,7 +2813,7 @@ to the altitude -- six hundredths of it a second, between twenty and one --
 and answers the throttle that holds the lander's weight and closes the gap
 between the rate it has and the rate it wants, as a <tt class="docutils literal">ratio</tt>. Its answers go
 by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> link to <tt class="docutils literal">engine</tt>, the engine's throttle, which is
-driven with a value: four bytes of millionths, read by tcssim as the
+driven with a value: four bytes of millionths, read by tcs-sim as the
 ratio guidance answered. Half a metre up guidance cuts the engine for good,
 and the lander drops the rest.</p>
 <p><tt class="docutils literal">doppler</tt>, a Doppler velocimeter, sends the velocity five times a second,
@@ -2827,14 +2827,14 @@ and a half, five hundred metres up and falling at twenty metres a second in
 the Moon's gravity, the engine's force and the fuel it burns joined to it. The
 body falls by the rocket equation in closed form, and the moment it reaches
 the ground -- which no closed form gives -- is found ahead of time and met
-exactly. tcssim's touchdown switch waits on the model for that moment
+exactly. tcs-sim's touchdown switch waits on the model for that moment
 rather than for its next turn to send, so the vehicle hears of the landing
 when it happens. A run lands in about seventy-five seconds, at a metre and a
 half a second, with a third of the fuel left.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-descent</span></tt> runs it, on any desk. The lander does not
 start falling until a simulated payload is started -- the run begins when
 one first
-asks the model anything -- so enable <tt class="docutils literal">engine</tt> and <tt class="docutils literal">radar</tt> in tcssim first,
+asks the model anything -- so enable <tt class="docutils literal">engine</tt> and <tt class="docutils literal">radar</tt> in tcs-sim first,
 and the rest after.</p>
 </div>
 <div class="section" id="the-simple-app-example">
@@ -2865,7 +2865,7 @@ carrying the configuration's checksum, and sends it again each second until
 the vehicle answers with that checksum: a vehicle sends nothing down until it
 has taken one, and a station that only listens cannot count on another
 station's having sent it. It sends from the configuration's <tt class="docutils literal">tcs_cmd.send</tt>,
-so tcsmoc cannot be run on the same configuration beside it. <tt class="docutils literal"><span class="pre">-v</span></tt> says when
+so tcs-moc cannot be run on the same configuration beside it. <tt class="docutils literal"><span class="pre">-v</span></tt> says when
 it is matched; a vehicle answering with another configuration's checksum is
 said whatever the flag. <tt class="docutils literal">ping_gateway.py</tt> does the same as soon as it has
 started the vehicle, and <tt class="docutils literal"><span class="pre">--pings</span></tt> waits for the match before its first
@@ -2907,7 +2907,7 @@ beacons that did not arrive, compares the digest each one carries with the
 ground's own, and says how stale the last one is as a stage: Unheard, Heard,
 Aging or Waiting. There is no toolkit in it, so a ground station with no
 screen -- a logger, a test -- uses exactly this.</li>
-<li><tt class="docutils literal">tcsui</tt> holds the panel, as markup other windows import, and works out
+<li><tt class="docutils literal"><span class="pre">tcs-ui</span></tt> holds the panel, as markup other windows import, and works out
 what to show on it: which colour the indicator is, and the two lines beside
 it.</li>
 <li><tt class="docutils literal">beacon</tt>, the program in the example, reads the configuration to
@@ -2937,13 +2937,13 @@ digest. tcspecial writes each beacon, and <tt class="docutils literal"><span cla
 in their tests. The example's test writes the beacon it sends the same way. A
 beacon is read strictly: anything with a field out of its form, a seventh field,
 a trailing colon or newline, or more than 106 bytes, is not a beacon.</p>
-<p>tcsmoc shows that same panel from that same library, in a row beside its
+<p>tcs-moc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
 read the other.</p>
 <p>After the indicator, on the panel's <tt class="docutils literal">Status:</tt> row, is the stage the indicator
 is at, in a word -- Unheard, Heard, Aging or Waiting, as the table under
-<a class="reference external" href="tcsmoc.html#beaconing">Beaconing</a> gives them -- which changes as the stage
+<a class="reference external" href="tcs-moc.html#beaconing">Beaconing</a> gives them -- which changes as the stage
 does.</p>
 <p>Under the panel is a button that starts and stops tcspecial, so that the
 indicator can be watched coming on with the first beacon and going out after
@@ -3003,7 +3003,7 @@ three times, with a line about the times under them and the <tt class="docutils 
 button centred at the bottom. Every field and button is in 12-point plain
 type. Before there is anything to show, each field shows the shape of what
 will be there -- <tt class="docutils literal">&lt;none&gt;</tt>, <tt class="docutils literal"><span class="pre">--:--:--.---------</span></tt>, <tt class="docutils literal"><span class="pre">--.------</span> ms</tt> -- as the
-beacon box does. tcsmoc's ping window shows the same rows, laid out as its
+beacon box does. tcs-moc's ping window shows the same rows, laid out as its
 own. <tt class="docutils literal">Send ping</tt> is the default button: Enter or Space presses it.</p>
 <p>Pressing <tt class="docutils literal">Send ping</tt> clears the time received and the three
 times until that ping's own answer arrives -- an answer is matched to its ping
@@ -3012,10 +3012,10 @@ received, and changes none of the times.</p>
 <p>The ground station is built the way the <tt class="docutils literal">beacon</tt> program is, from two halves
 and a little of its own, and the halves are the same ones in Python:
 <tt class="docutils literal">python/tcslib_moc/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt>,
-<tt class="docutils literal">python/tcsui/beacon_panel.py</tt> is <tt class="docutils literal">tcsui</tt>'s panel, and
+<tt class="docutils literal">python/tcs_ui/beacon_panel.py</tt> is <tt class="docutils literal">tcs_ui</tt>'s panel, and
 <tt class="docutils literal">python/tcslib_protocol</tt> holds the ping format and what a ground station reads
 out of a configuration. It reads the XML spelling, the standard library having
-no YAML, and asks <tt class="docutils literal">tcsverify <span class="pre">--digest</span></tt> for the digest it compares each
+no YAML, and asks <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--digest</span></tt> for the digest it compares each
 beacon's with rather than working it out a second time. The rules are then
 written twice, in Rust and in Python, and the example's tests hold them to one
 another: the Python's own tests use the Rust tests' examples, one test checks
@@ -3035,12 +3035,12 @@ two configuration files to read: they say the same thing. With neither,
 A file named on the command line beside one of the two has to be the spelling it
 asks for, and the vehicle the program starts reads the same file.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-ping</span></tt> checks for Python 3 and tkinter, builds the
-vehicle and tcsverify, and runs the ground station, which starts the vehicle
+vehicle and tcs-verify, and runs the ground station, which starts the vehicle
 and stops it when the window is closed. With no display, <tt class="docutils literal">python3
 examples/ping/ping_gateway.py <span class="pre">--pings</span> 3</tt> starts the vehicle, sends three pings,
 prints each answer and its times, and stops both. Every port the example uses is in
 the seven thousands, which no other example uses.</p>
-<p>tcsmoc pings it too. <tt class="docutils literal">make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping</tt>
+<p>tcs-moc pings it too. <tt class="docutils literal">make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping</tt>
 runs the MOC on the example, and a configuration with a <tt class="docutils literal">ping</tt> node the
 ground can reach both ways -- a gateway node binding an address and port with a
 link to it, and its link back down -- gives the MOC a <tt class="docutils literal">Ping node</tt> button
@@ -3142,7 +3142,7 @@ between the ground station and the vehicle, over CCSDS packets.</p>
 </div>
 <p>The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
-simulator file, with the physics model tcssim joins its simulated payloads
+simulator file, with the physics model tcs-sim joins its simulated payloads
 to: each
 example's is a link to <tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>,
 so that each is found beside its configuration by name. The vehicle is
@@ -3152,7 +3152,7 @@ conversions, the vote, the thermostat and its log, the heaters' switches,
 the <tt class="docutils literal">zone_temps</tt> group and the setpoint's binding. Each example's own file
 has its <tt class="docutils literal">tcspecial</tt> section and its gateway node, called <tt class="docutils literal">gateway</tt> in
 both. The two cannot run at once, their sensors and their heaters being
-the same, so they answer whether tcssim is ready at one address. What differs is the
+the same, so they answer whether tcs-sim is ready at one address. What differs is the
 gateway, <tt class="docutils literal">yamcs</tt>: the beacon is telemetry of APID <tt class="docutils literal">0x110</tt>, CONNECT and
 its answer are on <tt class="docutils literal">0x111</tt>, and each source drawn into the gateway node
 comes down as telemetry of its <tt class="docutils literal">apid_base</tt>, <tt class="docutils literal">0x400</tt>, plus the source's
@@ -3163,15 +3163,15 @@ device id -- <tt class="docutils literal">consensus_temp</tt> on <tt class="docu
 configuration says its data are (see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>): the
 conversions and the vote are temperatures in kelvin, and each heater's
 switch, which reports what it was told, is a decision, on or off. Nothing is
-added to the configuration for it: the type is what tcsmoc's plot window and
+added to the configuration for it: the type is what tcs-moc's plot window and
 the F´ bridge already read there.
 Yamcs's web interface, at <tt class="docutils literal"><span class="pre">http://localhost:17090</span></tt>, shows them so.</p>
 <p>Beside them is one parameter the vehicle does not send:
 <tt class="docutils literal">world_ambient_temp</tt>, the simulated world's ambient temperature, the
 <tt class="docutils literal">ambient_temp</tt> under <tt class="docutils literal">world:</tt> in the simulator file. It is a local
 parameter, in kelvin, with no packet to read it from; <tt class="docutils literal">thermostat_yamcs.py</tt>
-reads the figure with <tt class="docutils literal">tcsverify <span class="pre">--ambient</span></tt>, which finds the simulator file
-beside the configuration as tcssim does, and sets it in Yamcs once the vehicle
+reads the figure with <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--ambient</span></tt>, which finds the simulator file
+beside the configuration as tcs-sim does, and sets it in Yamcs once the vehicle
 has answered CONNECT. So Yamcs has the zone's surroundings beside the zone,
 and the configuration's diagram has nothing called ambient. A simulator file
 whose world states no ambient temperature gives the run none, and the
@@ -3183,8 +3183,8 @@ make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples
 </span>python3<span class="whitespace"> </span>examples/thermostat-yamcs/thermostat_yamcs.py<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--seconds<span class="whitespace"> </span><span class="literal number">120</span>
 </pre>
-<p>It starts Yamcs, tcssim, with every payload sending from the start, and
-tcspecial once tcssim is ready, each killed with it; has Yamcs send CONNECT
+<p>It starts Yamcs, tcs-sim, with every payload sending from the start, and
+tcspecial once tcs-sim is ready, each killed with it; has Yamcs send CONNECT
 until the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon above
 the zone's temperature, each reading, and each heater's switch, on or off.
@@ -3196,13 +3196,13 @@ read: consensus_temp &lt;T&gt; K, to_k1 &lt;T&gt; K, to_k2 &lt;T&gt; K, to_k3 &l
 world ambient 288.150 K, gpio-out-tmass1 off, gpio-out-tmass2 off
 switched: gpio-out-tmass1 off -&gt; on; consensus_temp &lt;T&gt; K, ...
 </pre>
-<p>tcssim draws a window of its own, so it wants a display. Its own ports are
+<p>tcs-sim draws a window of its own, so it wants a display. Its own ports are
 in the seventeen thousands, apart from the thermostat example's, but its
 sensors and its heaters' switches are thermostat-common's, simulated at the
 thermostat example's ports -- 5201 to 5203 for the sensors, 5204 and 5205
 for the switches -- so the two are not run at once.
-Because tcssim is given <tt class="docutils literal"><span class="pre">--sending</span></tt>, both heaters start enabled; press
-<tt class="docutils literal">Disable</tt> on a heater's switch in tcssim's window to take it away, and its
+Because tcs-sim is given <tt class="docutils literal"><span class="pre">--sending</span></tt>, both heaters start enabled; press
+<tt class="docutils literal">Disable</tt> on a heater's switch in tcs-sim's window to take it away, and its
 line goes low and stays low, which Yamcs shows, while the zone falls behind
 in the cold part of the orbit.</p>
 </div>
@@ -3232,8 +3232,8 @@ payload's data goes to <tt class="docutils literal">unheard</tt>, a <tt class="d
 <p>A link cannot carry one stream into the other, so the tees are what the
 copies cross by. Each tee has two data sources, so each link out of one is
 written under the source it leaves by.</p>
-<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-tees</span></tt> runs tcsmoc on the example, which starts
-tcspecial and tcssim. <tt class="docutils literal">tcspecial/tests/tees.rs</tt> flies it, with its sockets
+<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-tees</span></tt> runs tcs-moc on the example, which starts
+tcspecial and tcs-sim. <tt class="docutils literal">tcspecial/tests/tees.rs</tt> flies it, with its sockets
 moved to ports nothing holds: a command sent up reaches the heater and comes
 back down, and a reading reaches the ground. Every port the example uses is in
 the eight thousands, which no other example uses.</p>
@@ -3270,15 +3270,15 @@ the <tt class="docutils literal">heater</tt>.</p>
 node that makes each a temperature, and that goes to <tt class="docutils literal">fsw</tt> as well: device
 id 4, <tt class="docutils literal">127.0.0.1:9704</tt>, channel <tt class="docutils literal">0x3004</tt>. In the simulator file the
 thermometer reports a zone of the physics model, in the encoding <tt class="docutils literal">zone_temp</tt>
-reads back, and tcssim's heater switches a heater warming it, so that what the
+reads back, and tcs-sim's heater switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.</p>
 <p><tt class="docutils literal">zone_temp</tt>'s temperatures go on to <tt class="docutils literal">heater_wanted</tt>, a <tt class="docutils literal">thermostat</tt>
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
 to <tt class="docutils literal">fsw</tt>: device id 2, <tt class="docutils literal">127.0.0.1:9702</tt>, channel <tt class="docutils literal">0x3002</tt>. It is
 advice and drives nothing, the heater being the flight computer's to drive,
 and it shows the bridge a node that sends decisions.</p>
-<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-fprime</span></tt> runs tcsmoc on the example, which starts
-tcspecial and tcssim; tcsmoc plays the bridge's part, the two speaking the one
+<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-fprime</span></tt> runs tcs-moc on the example, which starts
+tcspecial and tcs-sim; tcs-moc plays the bridge's part, the two speaking the one
 protocol. <tt class="docutils literal">tcspecial/tests/fprime.rs</tt> flies it, with its sockets moved to
 ports nothing holds: a reading reaches the bridge as it is and as a
 temperature, and a command from the bridge reaches the heater. Every port the example uses is in the nine
@@ -3302,7 +3302,7 @@ worktree of the tree looks in the same place (<tt class="docutils literal">besid
 hand. <tt class="docutils literal"><span class="pre">fprime-build</span></tt> writes the bridge's model from <tt class="docutils literal">FPRIME_CONFIG</tt>, the
 fprime example unless told otherwise, with</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcsverify<span class="whitespace"> </span>--fprime-model<span class="operator">=</span>fprime/Tcs/TcsBridge/model<span class="whitespace"> </span>examples/fprime/fprime.ytcs
+<span class="generic prompt">$ </span>tcs-verify<span class="whitespace"> </span>--fprime-model<span class="operator">=</span>fprime/Tcs/TcsBridge/model<span class="whitespace"> </span>examples/fprime/fprime.ytcs
 </pre>
 <p>which checks the configuration first and writes nothing from one with errors.
 Each node drawn into the <tt class="docutils literal">gateway_fprime</tt> node is a channel named after it,
@@ -3341,7 +3341,7 @@ CONNECT itself, once for each beacon heard while it is unmatched, and says
 <tt class="docutils literal">START_NODE</tt>, <tt class="docutils literal">STOP_NODE</tt> and <tt class="docutils literal">QUERY_NODE</tt>, each given a node's name;
 each is answered as tcspecial answers it, with an event saying what tcspecial
 said. <tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt> take a key and a target, the checksum
-of the configuration to restart onto as tcsverify prints it, or nothing for
+of the configuration to restart onto as tcs-verify prints it, or nothing for
 this one's; the vehicle's answer is a <tt class="docutils literal">RestartAnswered</tt> event, and after a
 restart the bridge connects to the start that comes back by itself, saying
 <tt class="docutils literal">Matched</tt> again. <tt class="docutils literal">SEND_DATA</tt> sends its text up to the gateway node, which leaves it
@@ -3359,8 +3359,8 @@ instance tcsBridge: Tcs.TcsBridge base id Tcs.TcsBridge.ID_BASE \
 <p>and <tt class="docutils literal"><span class="pre">tcsBridge.configure(&quot;&lt;configuration&gt;&quot;)</span></tt> before the tasks start, with
 its <tt class="docutils literal">schedIn</tt> on a rate group: each tick takes what has arrived and writes
 the channels. <tt class="docutils literal">fprime/BridgeTest</tt> is a deployment that does all of that.</p>
-<p><tt class="docutils literal"><span class="pre">fprime-test</span></tt> starts tcssim on the fprime example with every payload sending
-(<tt class="docutils literal">tcssim <span class="pre">--sending</span></tt>), waits for it, starts tcspecial and F´'s ground system,
+<p><tt class="docutils literal"><span class="pre">fprime-test</span></tt> starts tcs-sim on the fprime example with every payload sending
+(<tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--sending</span></tt>), waits for it, starts tcspecial and F´'s ground system,
 and runs the tests in <tt class="docutils literal">fprime/BridgeTest/test</tt>, which start <tt class="docutils literal">BridgeTest</tt>
 and hold it to connecting and matching, hearing beacons, a simulated reading
 arriving as the thermometer's channel and as <tt class="docutils literal">zone_temp</tt>'s temperature, a
@@ -3369,7 +3369,7 @@ started again, <tt class="docutils literal">SEND_DATA 1</tt> warming the zone un
 and <tt class="docutils literal">heater_wanted</tt> says off,
 an unknown node refused unsent, a restart onto a configuration the vehicle
 does not hold refused, a plain restart taken and the start that comes back
-matched again, and stopping cleanly. tcssim's
+matched again, and stopping cleanly. tcs-sim's
 window is open while it runs. What a run leaves -- each program's log, and
 F´'s ground system's -- is in <tt class="docutils literal"><span class="pre">fprime/build-test</span></tt>. F´'s ground system
 listens on TCP port 50000.</p>
@@ -3435,7 +3435,7 @@ that, with a cFS packet's sixteen bytes of headers, is refused.</li>
 <li><tt class="docutils literal">msgid_range</tt> is the block the mission allotted tcspecial. Every message
 ID the configuration states, or counts to from a base, must lie in it, be
 used once, and be a command's (<tt class="docutils literal">0x80</tt> set) where tcspecial takes it and
-telemetry's (<tt class="docutils literal">0x80</tt> clear) where it publishes it; tcsverify says which
+telemetry's (<tt class="docutils literal">0x80</tt> clear) where it publishes it; tcs-verify says which
 one is not, and why. The cFS side must accept every ID in the block:
 cFE refuses one above <tt class="docutils literal">CFE_PLATFORM_SB_HIGHEST_VALID_MSGID</tt>, which is
 <tt class="docutils literal">0x1FFF</tt> unless the build raises it, so for <tt class="docutils literal">0x4200</tt> to <tt class="docutils literal">0x42FF</tt> it
@@ -3460,7 +3460,7 @@ and <tt class="docutils literal">sbn.local</tt> give it, and must be the side at
 <tt class="docutils literal">sbn.peer_processor_id</tt>. Nothing on this side can check that table: a
 mismatch is a vehicle that announces itself to a bus that does not answer,
 or whose every datagram is refused as from a stranger, with nothing in
-tcsverify's report to say so. Check the two against each other whenever
+tcs-verify's report to say so. Check the two against each other whenever
 either changes.</p>
 </div>
 <p>The gateway node says where what is drawn into it is published, <tt class="docutils literal">tlm_base</tt>,
@@ -3487,18 +3487,18 @@ and announced to again. A peer of another protocol version, or one whose
 subscriptions carry another ident, is refused and disconnected, and the
 refusal is logged with what was expected and what arrived each time it
 connects again.</p>
-<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-cfs</span></tt> runs tcsmoc on the example as
-<tt class="docutils literal"><span class="pre">run-fprime</span></tt> does on its own. tcssim simulates the cFS side as well as
+<p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-cfs</span></tt> runs tcs-moc on the example as
+<tt class="docutils literal"><span class="pre">run-fprime</span></tt> does on its own. tcs-sim simulates the cFS side as well as
 the payloads: it binds <tt class="docutils literal">sbn.peer</tt> and is the software bus, with the
-vehicle and tcsmoc both its peers, so tcsmoc's beacon light, its panels and
-its commands work as they do for a vehicle on the radio. tcsmoc joins as
+vehicle and tcs-moc both its peers, so tcs-moc's beacon light, its panels and
+its commands work as they do for a vehicle on the radio. tcs-moc joins as
 processor 3, one more than the larger of <tt class="docutils literal">processor_id</tt> and
 <tt class="docutils literal">peer_processor_id</tt>, and needs nothing more in the file. Everything built
 on tcslib-moc -- the C/C++ library included -- does the same with no change to
 the station.</p>
-<p>Two things follow. tcssim simulates the cFS side whenever it runs on a
+<p>Two things follow. tcs-sim simulates the cFS side whenever it runs on a
 configuration that answers to cFS, so it is not run beside a real cFS, which
-would be holding <tt class="docutils literal">sbn.peer</tt> itself; tcssim says so and stops if it finds
+would be holding <tt class="docutils literal">sbn.peer</tt> itself; tcs-sim says so and stops if it finds
 the address taken. And a ground station can join only the simulated cFS
 side: SBN on a
 real cFS never sends one peer what another published, so behind a real cFS
@@ -3551,8 +3551,8 @@ binds <tt class="docutils literal">127.0.0.1:3600</tt>, leaves it by its <tt cla
 bytes.</p>
 <p><tt class="docutils literal">vcan0</tt> is the kernel's virtual bus, which <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span></tt>
 makes; on a vehicle the interface is the controller's, such as <tt class="docutils literal">can0</tt>, and
-nothing else changes. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-can</span></tt> runs tcsmoc on the example,
-with tcssim on the bus as the motor. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>
+nothing else changes. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-can</span></tt> runs tcs-moc on the example,
+with tcs-sim on the bus as the motor. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt>
 flies it with the test as the motor. Every port the example uses is in the
 thirty-two to thirty-seven hundreds, ending in 00 or 10, which no other
 example uses.</p>
@@ -3577,8 +3577,8 @@ out.</p>
 <span class="pre">bin/mk-kernel-dummies</span></tt> makes. The configuration names <tt class="docutils literal">/dev/gpiochip1</tt>,
 which is what that chip is on a host with one chip of its own; the number is
 given as chips appear, so a host with another number writes the one the
-script printed. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-gpio</span></tt> runs tcsmoc on the example,
-with tcssim pulling the switch's line every second and counting the lamp's
+script printed. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-gpio</span></tt> runs tcs-moc on the example,
+with tcs-sim pulling the switch's line every second and counting the lamp's
 changes. <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> flies it, pulling and
 reading the lines itself. Every port is in the thirty-two to thirty-seven
 hundreds, ending in 20 or 30.</p>
@@ -3601,10 +3601,10 @@ made in <tt class="docutils literal">sysfs</tt> by whoever brings it up, and not
 see <a class="reference internal" href="#an-iio-payload">An IIO Payload</a>. The sensor is one of the kernel's <tt class="docutils literal">iio_dummy</tt>, which
 <tt class="docutils literal">sudo <span class="pre">bin/mk-kernel-dummies</span> iio</tt> makes where the kernel's has a buffer,
 its buffer filled by a timer, so the dummy device
-is the whole payload and tcssim makes nothing. The configuration names
+is the whole payload and tcs-sim makes nothing. The configuration names
 <tt class="docutils literal">/dev/iio:device1</tt>, which is what the dummy is on a host with one sensor of
 its own; write the number the script printed. <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-iio</span></tt>
-runs tcsmoc on the example, and <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> is
+runs tcs-moc on the example, and <tt class="docutils literal"><span class="pre">tcspecial/tests/kernel-dummies.rs</span></tt> is
 written to fly it, checking that what arrives is whole sample sets. Every port
 is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.</p>
 </div>
@@ -3622,7 +3622,7 @@ be told of.</p>
 <p>There are three, because three kinds of machine take them:</p>
 <dl class="docutils">
 <dt><tt class="docutils literal">tcspecial</tt></dt>
-<dd>What flies. <tt class="docutils literal">bin/tcspecial</tt> and <tt class="docutils literal">bin/tcsverify</tt>; the
+<dd>What flies. <tt class="docutils literal">bin/tcspecial</tt> and <tt class="docutils literal"><span class="pre">bin/tcs-verify</span></tt>; the
 five test app programs, in <tt class="docutils literal">libexec</tt> because tcspecial runs them rather
 than a person -- a configuration names one as <tt class="docutils literal">executable:
 /opt/tcs/libexec/app_pl</tt>; the manual and design in
@@ -3636,14 +3636,14 @@ go</a>).</dd>
 <dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs_moc_c.so.4</tt> and
 <tt class="docutils literal">lib/libtcs_moc_c.a</tt> with <tt class="docutils literal"><span class="pre">include/tcslib-moc-c.h</span></tt> and
 <tt class="docutils literal"><span class="pre">lib/pkgconfig/tcslib-moc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
-<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcsui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; <tt class="docutils literal">bin/tcsgui</tt>
-with its descriptions in <tt class="docutils literal">share/tcsgui</tt>; and the XTCS, YTCS and simulator
+<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt>
+with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS, YTCS and simulator
 schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
-<dd><tt class="docutils literal">bin/tcsmoc</tt> and <tt class="docutils literal">bin/tcssim</tt>, which never fly, and <tt class="docutils literal">bin/segsend</tt>,
+<dd><tt class="docutils literal"><span class="pre">bin/tcs-moc</span></tt> and <tt class="docutils literal"><span class="pre">bin/tcs-sim</span></tt>, which never fly, and <tt class="docutils literal">bin/segsend</tt>,
 the test one, which deletes each segment it is given. It depends on
-<tt class="docutils literal">tcspecial</tt>, because an installed tcsmoc starts the tcspecial and the
-tcssim installed beside it. The test <tt class="docutils literal">segsend</tt> is here rather than in
+<tt class="docutils literal">tcspecial</tt>, because an installed tcs-moc starts the tcspecial and the
+tcs-sim installed beside it. The test <tt class="docutils literal">segsend</tt> is here rather than in
 <tt class="docutils literal">tcspecial</tt> because a vehicle that flew it would throw its telemetry
 away, and because a package that owned <tt class="docutils literal">/opt/tcs/bin/segsend</tt> would
 overwrite a mission's own on every upgrade.</dd>
@@ -3773,13 +3773,13 @@ another directory.</p>
 <div class="section" id="the-python-alone">
 <h2><a class="toc-backref" href="#toc-entry-55">The Python alone</a></h2>
 <p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcslib_protocol</tt>, <tt class="docutils literal">tcslib_moc</tt> and
-<tt class="docutils literal">tcsui</tt> one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>:</p>
+<tt class="docutils literal"><span class="pre">tcs-ui</span></tt> one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./python<span class="whitespace">
 </span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span>
 </pre>
 <p>The extra brings PyYAML, which a station reading a YAML configuration
-needs. <tt class="docutils literal">tcsui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
+needs. <tt class="docutils literal">tcs_ui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
 Debian, <tt class="docutils literal"><span class="pre">python3-tkinter</span></tt> on Fedora. The XTCE documents the interface
 digest is taken over, and the part of tcs-xtce that takes it, are inside
 <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt>, so an installed station needs nothing from the source tree.</p>
@@ -3789,12 +3789,12 @@ digest is taken over, and the part of tcs-xtce that takes it, are inside
 <p>Each program's crate installs with cargo, into the prefix's <tt class="docutils literal">bin</tt>:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcsverify<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcsgui<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcs-verify<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcs-gui<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs
 </pre>
-<p>cargo installs programs and nothing else, so tcsgui installed this way has
+<p>cargo installs programs and nothing else, so tcs-gui installed this way has
 no descriptions or schemas until <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts them in
-<tt class="docutils literal">/opt/tcs/share/tcsgui</tt> and <tt class="docutils literal">/opt/tcs/share/tcspecial/schema</tt>, and an app program installed this way is in
+<tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-gui</span></tt> and <tt class="docutils literal">/opt/tcs/share/tcspecial/schema</tt>, and an app program installed this way is in
 <tt class="docutils literal">bin</tt> rather than <tt class="docutils literal">libexec</tt>. The library crates -- <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt>,
 <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> and the rest -- are taken by a Rust ground station as path or git
 dependencies, and are not installed.</p>
@@ -3836,7 +3836,7 @@ flew an example in place of its own would be flying the wrong payloads.
 So, as root:</p>
 <pre class="code console literal-block">
 <span class="generic prompt"># </span>cp<span class="whitespace"> </span>vehicle.ytcs<span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.ytcs<span class="whitespace">
-</span><span class="generic prompt"># </span>tcsverify<span class="whitespace"> </span>--types<span class="operator">=</span><span class="keyword">$(</span>tcspecial<span class="whitespace"> </span>--types<span class="keyword">)</span><span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.ytcs<span class="whitespace">
+</span><span class="generic prompt"># </span>tcs-verify<span class="whitespace"> </span>--types<span class="operator">=</span><span class="keyword">$(</span>tcspecial<span class="whitespace"> </span>--types<span class="keyword">)</span><span class="whitespace"> </span>/etc/opt/tcs/tcspecial/tcspecial.ytcs<span class="whitespace">
 </span><span class="generic prompt"># </span>systemctl<span class="whitespace"> </span><span class="name builtin">enable</span><span class="whitespace"> </span>--now<span class="whitespace"> </span>tcspecial
 </pre>
 <p>The configuration's <tt class="docutils literal">state_file</tt> and <tt class="docutils literal">log.directory</tt> belong under
@@ -3848,8 +3848,8 @@ that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils li
 <div class="section" id="running-the-programs">
 <h1><a class="toc-backref" href="#toc-entry-59">Running the Programs</a></h1>
 <p>The Makefile names a configuration once and gives it to every program that needs
-it, which is the point: tcsmoc builds its panels from the tcspecial
-configuration and hands that same file to the tcspecial and tcssim it starts,
+it, which is the point: tcs-moc builds its panels from the tcspecial
+configuration and hands that same file to the tcspecial and tcs-sim it starts,
 so a program
 reading a different one would serve or simulate payloads the panels do not
 describe.</p>
@@ -3857,21 +3857,21 @@ describe.</p>
 <tt class="docutils literal"><span class="pre">$(TCSPECIAL_CONFIG_FILE).ytcs</span></tt> is the tcspecial configuration, which
 reaches every program as a command line argument. It defaults to
 <tt class="docutils literal">tests/manual/thermostat</tt>. <tt class="docutils literal">TCSPECIAL_SIM_FILE</tt> is the simulator
-configuration, which reaches tcssim through the environment -- and tcsmoc
-too, which it inherits the same way: tcsmoc acts on none of it, and reads it
-only so a panel can show what the tcssim it started is simulating. It
+configuration, which reaches tcs-sim through the environment -- and tcs-moc
+too, which it inherits the same way: tcs-moc acts on none of it, and reads it
+only so a panel can show what the tcs-sim it started is simulating. It
 defaults to the file beside the configuration, <tt class="docutils literal"><span class="pre">$(TCSPECIAL_CONFIG_FILE)-sim.yaml</span></tt>,
 as the examples and the thermostat fixture name theirs.</p>
 <p>The fixture lives under <tt class="docutils literal">tests/manual</tt> because running it is something a
 person does at a terminal: it opens sockets and device nodes, so it does not
 belong in a test that runs on every build.</p>
-<p>The two windows open at opposite edges of the display -- tcsmoc at the top and
-tcssim at the bottom -- because they are read together and would otherwise
+<p>The two windows open at opposite edges of the display -- tcs-moc at the top and
+tcs-sim at the bottom -- because they are read together and would otherwise
 land on top of each other. It is a request to the window system: X11 honours
 it, Wayland may ignore it, and a tiling window manager will do as it likes.</p>
 <div class="section" id="everything-at-once">
 <h2><a class="toc-backref" href="#toc-entry-60">Everything at once</a></h2>
-<p><tt class="docutils literal">make runmocy</tt> runs tcsmoc, which starts a tcspecial and a tcssim of its own:</p>
+<p><tt class="docutils literal">make runmocy</tt> runs tcs-moc, which starts a tcspecial and a tcs-sim of its own:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">TCSPECIAL_CONFIG_FILE</span><span class="operator">=</span>examples/minimal/minimal<span class="whitespace">
@@ -3881,13 +3881,13 @@ it, Wayland may ignore it, and a tiling window manager will do as it likes.</p>
 <tt class="docutils literal">runmocy</tt> the YAML and <tt class="docutils literal">runmocx</tt> the XML. Both take the same
 <tt class="docutils literal">TCSPECIAL_CONFIG_FILE</tt>, and add the suffix themselves, so the two are one
 configuration read two ways rather than two configurations. The simulator configuration is not
-spelled by it: only tcssim reads that one, and tcsmoc merely passes it on.</p>
-<p>Both files are named because tcsmoc passes the tcspecial configuration on to
-its children and never reads the simulator configuration, which reaches tcssim
-by being in tcsmoc's environment. Naming only one of a pair is how the two
+spelled by it: only tcs-sim reads that one, and tcs-moc merely passes it on.</p>
+<p>Both files are named because tcs-moc passes the tcspecial configuration on to
+its children and never reads the simulator configuration, which reaches tcs-sim
+by being in tcs-moc's environment. Naming only one of a pair is how the two
 files come to describe different sets, which is reported rather than run:
 every data handler must have a simulated payload naming it.</p>
-<p>If a tcspecial is already running, tcsmoc attaches to it instead of starting a
+<p>If a tcspecial is already running, tcs-moc attaches to it instead of starting a
 second -- it asks by PING -- and leaves it running when the window is closed.
 One it starts itself is started on the address it will send commands to, so
 that half of the question never arises.
@@ -3895,17 +3895,17 @@ Starting a second never worked: the command interpreter's address can be bound
 once. What it is serving, though, is the configuration it was started with: one
 left over from an earlier configuration goes on serving that one's nodes,
 and a payload the new file plainly contains is then answered <tt class="docutils literal">NotFound</tt>.
-Stopping it and letting tcsmoc start a fresh one is the fix; tcspecial's log
+Stopping it and letting tcs-moc start a fresh one is the fix; tcspecial's log
 says which handlers it does serve.</p>
-<p>Run out of the source tree, tcsmoc starts its tcspecial and tcssim with
+<p>Run out of the source tree, tcs-moc starts its tcspecial and tcs-sim with
 <tt class="docutils literal">cargo run</tt>, which builds each first, so a child is never older than the
-source. An installed tcsmoc -- one with no cargo build directory beside it,
-such as <tt class="docutils literal">/opt/tcs/bin/tcsmoc</tt> -- starts the <tt class="docutils literal">tcspecial</tt> and <tt class="docutils literal">tcssim</tt>
+source. An installed tcs-moc -- one with no cargo build directory beside it,
+such as <tt class="docutils literal"><span class="pre">/opt/tcs/bin/tcs-moc</span></tt> -- starts the <tt class="docutils literal">tcspecial</tt> and <tt class="docutils literal"><span class="pre">tcs-sim</span></tt>
 in its own directory instead, so a ground station needs neither cargo nor
 the source to run one; see <a class="reference internal" href="#installing">Installing</a>. Where either is not there it
 starts neither, and says which program is missing, where it looked, and
 which package puts it there: <tt class="docutils literal">tcspecial</tt> for tcspecial, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>
-for tcssim. It never looks for them anywhere else, as a program found on
+for tcs-sim. It never looks for them anywhere else, as a program found on
 <tt class="docutils literal">PATH</tt> could be another install's, at another version.</p>
 </div>
 <div class="section" id="one-program-at-a-time">
@@ -3918,11 +3918,11 @@ disturbing the others, or watched with its own logging.</p>
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">TCSPECIAL_CONFIG_FILE</span><span class="operator">=</span>tests/manual/thermostat
 </pre>
 <p><tt class="docutils literal">make run</tt> passes only the tcspecial configuration: tcspecial does not
-simulate anything. <tt class="docutils literal">make runsim</tt> passes both, because tcssim run on its own
+simulate anything. <tt class="docutils literal">make runsim</tt> passes both, because tcs-sim run on its own
 needs the payloads as well as the simulator configuration -- and one variable
 names both, so they cannot be given for different sets. Started in that order,
-tcsmoc finds the tcspecial already running and attaches to it.</p>
-<p><tt class="docutils literal">make runmocy</tt> runs tcsmoc on the YAML spelling of the set and
+tcs-moc finds the tcspecial already running and attaches to it.</p>
+<p><tt class="docutils literal">make runmocy</tt> runs tcs-moc on the YAML spelling of the set and
 <tt class="docutils literal">make runmocx</tt> on the XML:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocx<span class="whitespace"> </span><span class="name variable">TCSPECIAL_CONFIG_FILE</span><span class="operator">=</span>tests/manual/thermostat
@@ -3941,18 +3941,18 @@ spellings the same way.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcs-sim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcs-moc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs
 </pre>
 <p>Every tcspecial configuration above may end in <tt class="docutils literal">.xtcs</tt> instead, and the same
 commands then run the same set in the other format:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcssim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs<span class="whitespace">
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcs-sim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs
+</span><span class="whitespace">    </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcs-moc<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.xtcs
 </pre>
 <p>The extension is what says how to read a file -- see <a class="reference internal" href="#configuration-file-formats">Configuration File
 Formats</a> -- and it is read rather than guessed at, so a name ending in
@@ -3963,10 +3963,10 @@ simulator configuration may be XML as well, and the variable's name is older
 than that.</p>
 <p>An argument naming the configuration file beats any environment variable
 naming one.
-Failing an argument, tcspecial reads <tt class="docutils literal">PAYLOAD_CONFIG_PATH</tt> and tcssim reads
+Failing an argument, tcspecial reads <tt class="docutils literal">PAYLOAD_CONFIG_PATH</tt> and tcs-sim reads
 <tt class="docutils literal">SIM_PAYLOAD_CONFIG_PATH</tt>; failing that, every program reads
-<tt class="docutils literal">tests/manual/thermostat.ytcs</tt>. Tcsmoc has no variable of its own, because the programs it
-starts inherit its environment: a variable naming tcsmoc's file would name
+<tt class="docutils literal">tests/manual/thermostat.ytcs</tt>. Tcs-moc has no variable of its own, because the programs it
+starts inherit its environment: a variable naming tcs-moc's file would name
 theirs as well.</p>
 <p>The configuration file is the only argument tcspecial takes. Where it serves
 commands is in <tt class="docutils literal">tcspecial.ytcs</tt>:</p>
@@ -4134,7 +4134,7 @@ its <tt class="docutils literal">Data</tt> argument whole, <tt class="docutils l
 nothing touches, a container <tt class="docutils literal">&lt;node&gt;Packet</tt> on its APID, holding the
 fields of its interface document's container, where its type has one,
 and otherwise a parameter named after the node of the type the
-configuration says its data are, as tcsmoc's plot window and the F´
+configuration says its data are, as tcs-moc's plot window and the F´
 bridge read it: a compute node's value a float in its unit (<tt class="docutils literal">K</tt>,
 <tt class="docutils literal">V</tt>, ...), read from its four bytes through a calibrator, with the unit
 in a <tt class="docutils literal">UnitSet</tt>; a thermostat's decision a boolean, read from its <tt class="docutils literal">1</tt>
@@ -4209,9 +4209,9 @@ one whose checksum is not its name -- cut short as it was written, or
 damaged -- is not loaded, nor is one whose top file is not as far down
 its tree as its includes climb, which would read a file from outside it.</p>
 <p>To put one there, on the ground or at first provisioning, check and keep it
-with tcsverify:</p>
+with tcs-verify:</p>
 <pre class="code text literal-block">
-$ tcsverify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
+$ tcs-verify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 vehicle.ytcs: md5 0123456789abcdef0123456789abcdef, kept as
 /var/lib/tcspecial/configurations/0123456789abcdef0123456789abcdef/0123456789abcdef0123456789abcdef.ytcs
 </pre>
@@ -4247,13 +4247,13 @@ for, and every configuration states it:</p>
 <p>It is the digest of the <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce/link.xtce</span></tt> a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
 lower-case hex digits. A build speaks only the interface it was made from, so
-tcsverify, tcspecial, tcsmoc and the libraries all refuse a configuration whose
+tcs-verify, tcspecial, tcs-moc and the libraries all refuse a configuration whose
 <tt class="docutils literal">interface</tt> is not their build's, saying both digests: a vehicle reading
 commands with other layouts than the ground's would be doing whatever each
 command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>
 <pre class="code text literal-block">
-$ tcsverify --interface-digest
+$ tcs-verify --interface-digest
 c7820f9bfe585feab72247ece0a2261d
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
@@ -4261,7 +4261,7 @@ sends, so a person with only a packet capture can read it there too.</p>
 <p>To write it into a configuration, rather than copy it by hand, give the
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
-$ tcsverify --set-interface vehicle.ytcs vehicle.xtcs
+$ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
 vehicle.ytcs: interface set to c7820f9bfe585feab72247ece0a2261d, from 0123...
 vehicle.xtcs: interface is c7820f9bfe585feab72247ece0a2261d already
 </pre>
@@ -4299,17 +4299,17 @@ which decodes what it is sent by XTCE, the count is the 32 bits the document
 states. Everywhere else it is in groups of seven bits, least significant first,
 each in a byte whose top bit says another follows: one byte for a datum shorter
 than 128 bytes, two for the longest. A ground program reading through tcslib-moc
--- tcsmoc, the C library, the F´ bridge -- is given each datum without its
+-- tcs-moc, the C library, the F´ bridge -- is given each datum without its
 count; one reading a link's socket itself takes the count off, as
 <tt class="docutils literal">python/tcslib_protocol/count.py</tt> does.</p>
-<p>Nobody writes it by hand. tcsverify writes it from the configuration, and
+<p>Nobody writes it by hand. tcs-verify writes it from the configuration, and
 writes the same from either spelling:</p>
 <pre class="code text literal-block">
-$ tcsverify --xtce vehicle.ytcs
+$ tcs-verify --xtce vehicle.ytcs
 vehicle.xtce: written from vehicle.ytcs
 </pre>
 <p>Commit it beside the configuration, and write it again whenever the
-configuration changes. <tt class="docutils literal">tcsverify <span class="pre">--xtce-check</span></tt> names each configuration
+configuration changes. <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--xtce-check</span></tt> names each configuration
 whose document is not what <tt class="docutils literal"><span class="pre">--xtce</span></tt> would write, and fails where there is
 one. In the tree, <tt class="docutils literal">make xtce</tt> writes every shipped configuration's, and
 <tt class="docutils literal">make check</tt> fails while one is stale.</p>
@@ -4396,7 +4396,7 @@ configuration that has not been asked where to send them has not answered.
 file's are what place a set whose configuration states no section at all.</p>
 <p><tt class="docutils literal">beacon.send</tt> is where beacons come from: tcspecial makes the socket it
 sends them on out of it, binding that address and port, so every beacon leaves
-from there. <tt class="docutils literal">beacon.recv</tt> is where they are received: tcsmoc makes the socket
+from there. <tt class="docutils literal">beacon.recv</tt> is where they are received: tcs-moc makes the socket
 it receives them on out of it, binding that address and port, and it is where
 tcspecial sends. Both are an address and a port, like the links above, and both
 ends read both of them out of the same file -- which is how the two come to
@@ -4415,7 +4415,7 @@ configured rather than a thing the network did silently.</p>
 <p><tt class="docutils literal">0.0.0.0:5550</tt> and <tt class="docutils literal">127.0.0.1:5650</tt> are what the shipped files state, both
 programs being run on one machine; a real ground link names the interface
 facing it on each end.</p>
-<p>Tcsmoc reads both addresses from the configuration tcspecial reads, the same
+<p>Tcs-moc reads both addresses from the configuration tcspecial reads, the same
 way, so moving a beacon moves both ends of it -- and so does moving a command
 link, which both ends read from the same <tt class="docutils literal">tcs_cmd</tt> and <tt class="docutils literal">payload_command</tt>.</p>
 <p>Tcspecial says both as it starts, on the terminal:</p>
@@ -4466,9 +4466,9 @@ overrides the quieter default as well.</p>
 <h2><a class="toc-backref" href="#toc-entry-69">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
 <p>Nothing in a configuration says whether a payload is a real device, a dummy
 device the kernel makes under a real device's name or a simulated device
-tcssim makes, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
+tcs-sim makes, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
 and a real bus on the next. So each run says which kind of run it is, with
-<tt class="docutils literal"><span class="pre">--simulate</span></tt>, given to tcspecial, tcssim and tcsmoc alike:</p>
+<tt class="docutils literal"><span class="pre">--simulate</span></tt>, given to tcspecial, tcs-sim and tcs-moc alike:</p>
 <dl class="docutils">
 <dt><tt class="docutils literal"><span class="pre">--simulate=none</span></tt></dt>
 <dd>Every payload must be a real device. This is the flight setting, and it
@@ -4493,16 +4493,16 @@ named with what it reaches, what is there, and what would satisfy the mode.</p>
 <p>A payload is a dummy device when its endpoint is one the scripts in <tt class="docutils literal">bin/</tt>
 have the kernel make: an I2C bus whose adapter is the kernel's <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>,
 a GPIO chip of <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, a virtual CAN interface, an IIO sensor of
-<tt class="docutils literal">iio_dummy</tt>. It is a simulated device when its endpoint is one tcssim
-makes: a path that leads to a pseudo-terminal, which is what tcssim makes
+<tt class="docutils literal">iio_dummy</tt>. It is a simulated device when its endpoint is one tcs-sim
+makes: a path that leads to a pseudo-terminal, which is what tcs-sim makes
 for a serial, SPI, rpmsg or IIO payload, or a loopback <tt class="docutils literal">sim_address</tt>,
 below. A synchronous HDLC line with no <tt class="docutils literal">sim_address</tt> is always hardware,
 and anything that cannot be told -- nothing at the path -- is taken for
 hardware.</p>
 <p>A <tt class="docutils literal">network</tt> or <tt class="docutils literal"><span class="pre">device-file</span></tt> payload is a real device under every mode,
 and the mode does not count it: a socket or a file is the same node whether
-tcssim answers at its far end or something else does, so there is nothing
-to tell apart. tcssim answers there when the simulator file says
+tcs-sim answers at its far end or something else does, so there is nothing
+to tell apart. tcs-sim answers there when the simulator file says
 <tt class="docutils literal">simulate: true</tt> for it. A run whose only payloads are of these types
 satisfies <tt class="docutils literal">none</tt> and <tt class="docutils literal">all</tt> alike, and <tt class="docutils literal">some</tt> never.</p>
 <p>Four types have nothing in the operating system to simulate them
@@ -4511,11 +4511,11 @@ pseudo-terminal carries a SPI peripheral's, an rpmsg channel's or an IIO
 sensor's bytes without its clock, its channel or its sysfs. Two more, the
 temperature sensors <tt class="docutils literal">i2c_tmass</tt> and <tt class="docutils literal">spi_tmass</tt>, are simulated as the
 thermal mass they are fixed to. And the three GPIO types, whose dummy chip
-needs root to make, may be simulated without it: tcssim answers for their
+needs root to make, may be simulated without it: tcs-sim answers for their
 lines over UDP, see <a class="reference internal" href="#a-gpio-payload">A GPIO Payload</a>. A node of one of those types may give
 <tt class="docutils literal">sim_address</tt>, a loopback address and port. Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or
 <tt class="docutils literal">all</tt> tcspecial reaches it there over UDP instead of opening the device,
-and tcssim answers there, a simulated device; under <tt class="docutils literal">none</tt> the device is
+and tcs-sim answers there, a simulated device; under <tt class="docutils literal">none</tt> the device is
 opened, so the configuration that flies is the one that was tested. The
 attribute was once called <tt class="docutils literal">stand_in</tt>, which is refused, naming
 <tt class="docutils literal">sim_address</tt>:</p>
@@ -4536,53 +4536,53 @@ which is <tt class="docutils literal">all</tt> unless the command line says othe
 <div class="section" id="waiting-for-the-simulator">
 <h3><a class="toc-backref" href="#toc-entry-70">Waiting for the simulator</a></h3>
 <p>A simulated device has to exist before tcspecial looks for it, so in a run
-with simulated devices tcssim is started first, and tcspecial only once
-tcssim has said it has made them all. tcssim makes every simulated device as
+with simulated devices tcs-sim is started first, and tcspecial only once
+tcs-sim has said it has made them all. tcs-sim makes every simulated device as
 it starts; a panel's button
 decides only whether that payload sends.</p>
-<p>tcssim says whether it is ready at the UDP address its simulator file gives
-in a <tt class="docutils literal">tcssim</tt> section, which every simulator file needs:</p>
+<p>tcs-sim says whether it is ready at the UDP address its simulator file gives
+in a <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section, which every simulator file needs:</p>
 <pre class="code yaml literal-block">
-<span class="name tag">tcssim</span><span class="punctuation">:</span><span class="whitespace">
+<span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7903&quot;</span>
 </pre>
-<p>Use an address no other run uses: a tcssim left running holds it, and a second
-one started on the same address is refused, naming it. tcssim does not start
+<p>Use an address no other run uses: a tcs-sim left running holds it, and a second
+one started on the same address is refused, naming it. tcs-sim does not start
 under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, there being nothing for it to do.</p>
-<p>tcsmoc does the waiting itself. Under <tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt> it asks at that
+<p>tcs-moc does the waiting itself. Under <tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt> it asks at that
 address first; a simulator already running on the same configuration,
 simulator file and mode is used and left running, one set up for anything
-else is refused, saying what differs, and otherwise tcsmoc starts tcssim and
+else is refused, saying what differs, and otherwise tcs-moc starts tcs-sim and
 waits for it. The simulator file is compared as the configuration is, by a
 digest of what it says rather than of its bytes: of its settings and of its
 world, in one order, so that a comment or another order is the same file and
 a figure changed in the model is not. Under <tt class="docutils literal">none</tt> it
-starts tcspecial alone. For a run started by hand, <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> is the
+starts tcspecial alone. For a run started by hand, <tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--wait</span></tt> is the
 waiting:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="punctuation">&amp;</span><span class="whitespace">
-</span><span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs
+<span class="generic prompt">$ </span>tcs-sim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="punctuation">&amp;</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>tcs-sim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs
 </pre>
 <p><tt class="docutils literal"><span class="pre">--wait</span></tt> waits thirty seconds, or as many as <tt class="docutils literal"><span class="pre">--wait=&lt;seconds&gt;</span></tt> says, and
-exits with a failure saying what it last heard: nothing, which is a tcssim not
+exits with a failure saying what it last heard: nothing, which is a tcs-sim not
 running or an address that is wrong, or a simulator still starting, or one that
 failed or is set up for another run. A ground station of its own waits through
 <tt class="docutils literal"><span class="pre">tcslib_moc::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib_moc.simulator.wait</tt> in Python.</p>
 <p>Each payload starts silent, until its panel's button is pressed, unless the
 simulator file says <tt class="docutils literal">enable: true</tt> of it or of its group, and then it starts
-sending as though the button had been pressed. <tt class="docutils literal">tcssim <span class="pre">--sending</span></tt> starts
+sending as though the button had been pressed. <tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--sending</span></tt> starts
 every one sending, for a test with nobody at the window: the F´ bridge's is
 one (see <a class="reference internal" href="#the-f-bridge">The F´ bridge</a>).</p>
 </div>
 <div class="section" id="every-simulated-device-at-once">
 <h3><a class="toc-backref" href="#toc-entry-71">Every simulated device at once</a></h3>
-<p><tt class="docutils literal">make <span class="pre">simulated-devices-test</span></tt> runs tcspecial against tcssim with a payload
-of each type tcssim simulates, and checks that each one's data reaches the
+<p><tt class="docutils literal">make <span class="pre">simulated-devices-test</span></tt> runs tcspecial against tcs-sim with a payload
+of each type tcs-sim simulates, and checks that each one's data reaches the
 ground:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>simulated-devices-test<span class="whitespace">
 </span><span class="generic output">...
-  ok   text: 50 datagrams, 800 bytes, part of tcssim's text
+  ok   text: 50 datagrams, 800 bytes, part of tcs-sim's text
   ok   line: 50 datagrams, 800 bytes
   ok   bus: 50 datagrams, 800 bytes
   ...
@@ -4591,17 +4591,17 @@ ground:</p>
 <p>It writes its configuration into <tt class="docutils literal"><span class="pre">tests/simulated-devices/run</span></tt>, where the
 simulated devices' paths are: a device file, a serial line, a serial line that
 is an RS-485 bus, a SPI peripheral, an rpmsg channel and an IIO buffer, each a
-file or pseudo-terminal tcssim makes, and an HDLC line reached at its
+file or pseudo-terminal tcs-sim makes, and an HDLC line reached at its
 <tt class="docutils literal">sim_address</tt>. A CAN payload is added where a virtual CAN bus is up, and a
 GPIO payload where a <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> chip is there for the user running it; the
 test makes neither, since both need root, and says which it left out. It starts
-tcssim with <tt class="docutils literal"><span class="pre">--sending</span></tt>, waits for it, starts tcspecial, connects as a ground
-station does, and listens for ten seconds. Then it stops tcssim with a signal,
-as a harness does, and checks that every simulated device is gone. tcssim's
+tcs-sim with <tt class="docutils literal"><span class="pre">--sending</span></tt>, waits for it, starts tcspecial, connects as a ground
+station does, and listens for ten seconds. Then it stops tcs-sim with a signal,
+as a harness does, and checks that every simulated device is gone. tcs-sim's
 window opens for the length of the test, so a display is needed.</p>
 <p>Its ports are 47000 to 47999, and it holds <tt class="docutils literal"><span class="pre">tcs-ports.lock</span></tt>, beside the
 main checkout (<tt class="docutils literal">TCS_PORTS_LOCK</tt>, from <tt class="docutils literal">beside.mk</tt>), while it runs, so that it never runs at the same time as another
-test that starts tcspecial and tcssim and holds the same lock.</p>
+test that starts tcspecial and tcs-sim and holds the same lock.</p>
 </div>
 </div>
 <div class="section" id="building-tcspecial-for-a-vehicle">
@@ -4639,8 +4639,8 @@ with a node of a type the build lacks is refused before anything is opened:</p>
 gpio: build tcspecial with --features gpio, or take the node out of the
 configuration</span>
 </pre>
-<p><tt class="docutils literal">tcsverify <span class="pre">--types=</span></tt> asks the same question on the ground, without the
-vehicle; see the <a class="reference external" href="tcsverify.html">tcsverify manual</a>.</p>
+<p><tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--types=</span></tt> asks the same question on the ground, without the
+vehicle; see the <a class="reference external" href="tcs-verify.html">tcs-verify manual</a>.</p>
 </div>
 <div class="section" id="watching-tcspecial-work">
 <h2><a class="toc-backref" href="#toc-entry-73">Watching tcspecial work</a></h2>
@@ -4653,16 +4653,16 @@ programs, not for embedded systems.</p>
 </span><span class="generic prompt">$ </span>target/debug/tcspecial<span class="whitespace"> </span>--visual<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>examples/simple-app/simple-app.ytcs
 </pre>
-<p>The window draws the configuration as tcsgui does -- the three working panes,
+<p>The window draws the configuration as tcs-gui does -- the three working panes,
 every node where the editor puts it, every link along its route, and the
 simulator file's physics in the Physics pane to their left, the simulator file
-being the one tcssim would read for the configuration, <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> or
+being the one tcs-sim would read for the configuration, <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> or
 the one beside it, read for the drawing and nothing else -- and lights
 a link each time data is sent over it: a wide line, a shade lighter than the
 link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.</p>
 <p>A configuration that includes other files opens a window for each of them as
-well, drawn as tcsgui draws that subdiagram's page, with its edge in the
+well, drawn as tcs-gui draws that subdiagram's page, with its edge in the
 margins and its own physics; on the top page, each is a box. A link that
 crosses a subdiagram's edge blinks on both pages.</p>
 <p>Nothing in the windows can be pressed. Close any of them to stop tcspecial,
@@ -4682,12 +4682,12 @@ build one that has it.</p>
 <p>Testing is done with two programs, and a third that checks the files they
 read, each with a manual of its own:</p>
 <ul class="simple">
-<li>tcsmoc - Simulates an operations center/mission control application. It
-communicates to TCSpecial via UDP datagrams: see the <a class="reference external" href="tcsmoc.html">tcsmoc manual</a>.</li>
-<li>tcssim - Simulates payloads using various types of communication protocols
-and errors: see the <a class="reference external" href="tcssim.html">tcssim manual</a>.</li>
-<li>tcsverify - Checks a configuration and prints what is wrong with it, without
-running any of it: see the <a class="reference external" href="tcsverify.html">tcsverify manual</a>.</li>
+<li>tcs-moc - Simulates an operations center/mission control application. It
+communicates to TCSpecial via UDP datagrams: see the <a class="reference external" href="tcs-moc.html">tcs-moc manual</a>.</li>
+<li>tcs-sim - Simulates payloads using various types of communication protocols
+and errors: see the <a class="reference external" href="tcs-sim.html">tcs-sim manual</a>.</li>
+<li>tcs-verify - Checks a configuration and prints what is wrong with it, without
+running any of it: see the <a class="reference external" href="tcs-verify.html">tcs-verify manual</a>.</li>
 </ul>
 </div>
 <div class="section" id="crates-used">
@@ -4734,14 +4734,14 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/i-slint-backend-testing">i-slint-backend-testing</a></td>
 <td>1.18</td>
 <td><a class="reference external" href="https://docs.rs/i-slint-backend-testing/1.18.1">1.18.1</a></td>
-<td>tcsgui, tcsmoc, tcssim, examples/beacon (tests only)</td>
+<td>tcs-gui, tcs-moc, tcs-sim, examples/beacon (tests only)</td>
 <td>Runs the windows with no display, so their tests can press buttons.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/libc">libc</a></td>
 <td>0.2</td>
 <td><a class="reference external" href="https://docs.rs/libc/0.2.190">0.2.190</a></td>
-<td>tcsapp, tcsgui, tcslib-moc, tcslib-protocol, tcsmoc, tcspecial, tcssim</td>
+<td>tcsapp, tcs-gui, tcslib-moc, tcslib-protocol, tcs-moc, tcspecial, tcs-sim</td>
 <td>The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.</td>
 <td><a class="reference external" href="https://github.com/rust-lang/libc">repository</a></td>
 </tr>
@@ -4769,49 +4769,49 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/path-clean">path-clean</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/path-clean/1.0.1">1.0.1</a></td>
-<td>tcsgui</td>
+<td>tcs-gui</td>
 <td>Where a name with <tt class="docutils literal">..</tt> in it leads, for the files Save as writes.</td>
 <td><a class="reference external" href="https://github.com/danreeves/path-clean">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/quick-xml">quick-xml</a></td>
 <td>0.42</td>
 <td><a class="reference external" href="https://docs.rs/quick-xml/0.42.0">0.42.0</a></td>
-<td>tcsgui, tcslib-protocol</td>
+<td>tcs-gui, tcslib-protocol</td>
 <td>Reads configuration files written in XML.</td>
 <td><a class="reference external" href="https://github.com/tafia/quick-xml">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/rand">rand</a></td>
 <td>0.8</td>
 <td><a class="reference external" href="https://docs.rs/rand/0.8.8">0.8.8</a></td>
-<td>tcssim</td>
+<td>tcs-sim</td>
 <td>What a simulated payload sends, and the faults it is told to make.</td>
 <td><a class="reference external" href="https://github.com/rust-random/rand">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/rfd">rfd</a></td>
 <td>0.17</td>
 <td><a class="reference external" href="https://docs.rs/rfd/0.17.2">0.17.2</a></td>
-<td>tcsgui</td>
+<td>tcs-gui</td>
 <td>The desktop's own Save dialog, for Save as, through the XDG desktop portal.</td>
 <td><a class="reference external" href="https://github.com/PolyMeilex/rfd">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde">serde</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/serde/1.0.229">1.0.229</a></td>
-<td>tcsgui, tcslib-moc, tcslib-protocol, tcsmoc, tcspecial, tcssim</td>
+<td>tcs-gui, tcslib-moc, tcslib-protocol, tcs-moc, tcspecial, tcs-sim</td>
 <td>Turns the configuration, the commands and the telemetry into Rust types and back.</td>
 <td><a class="reference external" href="https://github.com/serde-rs/serde">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde_json">serde_json</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/serde_json/1.0.151">1.0.151</a></td>
-<td>tcsgui (tests only), tcslib-protocol, tcsverify</td>
+<td>tcs-gui (tests only), tcslib-protocol, tcs-verify</td>
 <td>The value tree a configuration's digest is taken over and its two spellings are compared as, and the schema tests. Nothing on the link is JSON.</td>
 <td><a class="reference external" href="https://github.com/serde-rs/json">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde_norway">serde_norway</a></td>
 <td>0.9.42</td>
 <td><a class="reference external" href="https://docs.rs/serde_norway/0.9.42">0.9.42</a></td>
-<td>tcsgui, tcslib-protocol</td>
+<td>tcs-gui, tcslib-protocol</td>
 <td>Reads configuration files written in YAML, and the editor's undo
 history, which it keeps on disk.</td>
 <td><a class="reference external" href="https://github.com/cafkafk/serde-yaml">repository</a></td>
@@ -4819,14 +4819,14 @@ history, which it keeps on disk.</td>
 <tr><td><a class="reference external" href="https://crates.io/crates/similar">similar</a></td>
 <td>3.2</td>
 <td><a class="reference external" href="https://docs.rs/similar/3.2.1">3.2.1</a></td>
-<td>tcsgui</td>
+<td>tcs-gui</td>
 <td>The line diffs a save is merged from, so a file changes only where it was edited.</td>
 <td><a class="reference external" href="https://github.com/mitsuhiko/similar">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/slint">slint</a></td>
 <td>1.3, 1.18</td>
 <td><a class="reference external" href="https://docs.rs/slint/1.18.1">1.18.1</a></td>
-<td>tcsgui, tcsmoc, tcssim, tcsui, examples/beacon, and tcspecial built
+<td>tcs-gui, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial built
 with <tt class="docutils literal">visual</tt></td>
 <td>The toolkit every window is drawn with.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
@@ -4834,7 +4834,7 @@ with <tt class="docutils literal">visual</tt></td>
 <tr><td><a class="reference external" href="https://crates.io/crates/slint-build">slint-build</a></td>
 <td>1.3, 1.18</td>
 <td><a class="reference external" href="https://docs.rs/slint-build/1.18.1">1.18.1</a></td>
-<td>tcsgui, tcsmoc, tcssim, examples/beacon, and tcspecial built with
+<td>tcs-gui, tcs-moc, tcs-sim, examples/beacon, and tcspecial built with
 <tt class="docutils literal">visual</tt> (build scripts)</td>
 <td>Compiles the <tt class="docutils literal">.slint</tt> files that describe the windows.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
@@ -4904,13 +4904,13 @@ dual licensed as above, without any additional terms or conditions.</p>
 <dl class="docutils">
 <dt><a class="reference external" href="manual.html">The TCSpecial manuals</a></dt>
 <dd>What each of TCSpecial's manuals covers.</dd>
-<dt><a class="reference external" href="tcsgui.html">The tcsgui manual</a></dt>
+<dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
 <dd>The editor of configurations and simulator configurations.</dd>
-<dt><a class="reference external" href="tcsmoc.html">The tcsmoc manual</a></dt>
+<dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
 <dd>The simulated operations center.</dd>
-<dt><a class="reference external" href="tcssim.html">The tcssim manual</a></dt>
+<dt><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a></dt>
 <dd>The payload simulator and its configuration.</dd>
-<dt><a class="reference external" href="tcsverify.html">The tcsverify manual</a></dt>
+<dt><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a></dt>
 <dd>Checking a configuration without running it.</dd>
 <dt><a class="reference external" href="https://vomlehn.github.io/tcs-xtce/docs/tcs-xtce.html">tcs-xtce manual</a></dt>
 <dd>tcs-xtce turns an XTCE description of telemetry and command packets

@@ -87,7 +87,7 @@ vehicle:
 
 payloads:
   # The heaters' switches, on the thermal mass: lines 4 and 5 of
-  # /dev/gpiochip1. On a desk tcssim answers for them over UDP at their
+  # /dev/gpiochip1. On a desk tcs-sim answers for them over UDP at their
   # sim_address, so that no dummy chip is needed; flown, the chip is
   # opened.
   - type gpio_inout:
@@ -115,7 +115,7 @@ payloads:
   # The three sensors of the zone, two on an I2C bus and one on a SPI bus,
   # as a vehicle would carry them, each converted to kelvin for the
   # vote. On a desk each is reached over UDP at its sim_address, where
-  # tcssim answers with the zone's temperature, so that no bus and no dummy
+  # tcs-sim answers with the zone's temperature, so that no bus and no dummy
   # device is needed; flown, the buses are opened.
   - type i2c_tmass:
       # One of three sensors of the same place, a trio, so that the
@@ -160,7 +160,7 @@ commands:
   # the zone temperature the heaters are held at, in kelvin
   - { from: gateway, sets: thermostat.setpoint }
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: consensus_temp, x: 525, y: 204 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }

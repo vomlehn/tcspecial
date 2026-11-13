@@ -8,7 +8,7 @@
 //! worse rather than information, for a program that starts tcspecial to
 //! show something else. What stops a start is said either way.
 //!
-//! `--visual` opens a window showing the graph as tcsgui draws it, each link
+//! `--visual` opens a window showing the graph as tcs-gui draws it, each link
 //! lit as data crosses it, in a tcspecial built with the `visual` feature;
 //! one built without it says so and exits. Never in flight: see
 //! `tcspecial::visual`. It is refused under `--simulate=none`, the flight
@@ -20,9 +20,9 @@
 //! mode does not allow is refused: see `tcspecial::runtime::start`.
 //!
 //! `--types` prints the payload types this build contains, separated by
-//! commas, and exits: what `tcsverify --types=` takes, so that a
+//! commas, and exits: what `tcs-verify --types=` takes, so that a
 //! configuration can be checked on the ground against the binary that will
-//! fly, with `tcsverify --types=$(tcspecial --types) <configuration>`.
+//! fly, with `tcs-verify --types=$(tcspecial --types) <configuration>`.
 
 use std::env;
 use std::process;
@@ -163,10 +163,10 @@ fn main() {
         }
     ));
 
-    // What tcsverify says about this file, asked before anything else is read
-    // from it and said in tcsverify's own words: every problem at once, each
+    // What tcs-verify says about this file, asked before anything else is read
+    // from it and said in tcs-verify's own words: every problem at once, each
     // with its file and line, rather than whichever of them a loader below
-    // happened to meet first. The same lines tcsmoc, tcssim and tcsgui show
+    // happened to meet first. The same lines tcs-moc, tcs-sim and tcs-gui show
     // as they start.
     //
     // Refused on a warning as well: a node whose attributes are not all in is
@@ -175,11 +175,11 @@ fn main() {
     //
     // Against the types this build contains, so that a configuration with a
     // node of another type is refused here, before anything is opened, in
-    // the words tcsverify's `--types` uses on the ground.
-    let report = tcsverify::verify_built(
+    // the words tcs-verify's `--types` uses on the ground.
+    let report = tcs_verify::verify_built(
         std::path::Path::new(&payload_path),
         None,
-        tcsverify::Limits::EVERYTHING,
+        tcs_verify::Limits::EVERYTHING,
         built,
     );
     for (_, line) in report.lines() {
@@ -195,7 +195,7 @@ fn main() {
 
     // The configuration is a graph, which is the only thing it can be: see
     // `runtime::start`. A file that is not one is refused above, by the same
-    // checks tcsverify runs, so by here there is nothing to choose between.
+    // checks tcs-verify runs, so by here there is nothing to choose between.
     //
     // With the window, where one was asked for: the vehicle on a thread of
     // its own beside it, and each stopping the other. See tcspecial::visual.

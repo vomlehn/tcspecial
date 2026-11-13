@@ -37,7 +37,7 @@
 //! tree kept then loads as it did.
 //!
 //! The rules about what may be kept and what may be loaded are here, once,
-//! for tcspecial, which loads from the store, and tcsverify, which puts a
+//! for tcspecial, which loads from the store, and tcs-verify, which puts a
 //! configuration into it for testing and first provisioning:
 //!
 //! * the name it is kept under is the checksum computed from it, never one
@@ -491,7 +491,7 @@ impl Store {
     /// half of one. A directory left beside its name by a keep cut short
     /// like that is the store's own, and is removed first.
     ///
-    /// What makes a configuration fit to fly is not decided here: tcsverify
+    /// What makes a configuration fit to fly is not decided here: tcs-verify
     /// checks it before it keeps it, and the vehicle checks it again as it
     /// loads it.
     ///

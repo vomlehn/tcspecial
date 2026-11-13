@@ -33,7 +33,7 @@ the document is copied rather than referred to, and the copy is held to
 what the document says by refusing anything of it the copy would not say
 the same (:data:`COPIED`). Every other node's container holds what follows
 the header as a parameter named after the node, of the type the
-configuration's own XTCE gives it -- the file ``tcsverify --xtce`` writes
+configuration's own XTCE gives it -- the file ``tcs-verify --xtce`` writes
 beside the configuration -- copied from there as a node's document is: a
 value as a number in its unit, read from its four bytes, a decision as a
 boolean, read from its one byte, a whole number as an integer as wide as

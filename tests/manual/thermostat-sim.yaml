@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial-sim.schema.json
 
-# How tcssim simulates the payloads of thermostat.ytcs, the manual's
+# How tcs-sim simulates the payloads of thermostat.ytcs, the manual's
 # fixture: the thermostat example as it would be aboard, its sensors on I2C
 # and SPI and its heaters on GPIO. The example itself puts each on a UDP
 # socket instead, so that it runs on any desk; see
@@ -16,21 +16,21 @@
 # the thermostat decides on it.
 #
 # The heaters are discrete lines on the kernel's gpio-sim, which the vehicle
-# drives and tcssim watches: each time the vehicle switches them, their panel
+# drives and tcs-sim watches: each time the vehicle switches them, their panel
 # counts it, and the heater each is joined to is switched. So the loop closes
 # through tcspecial: the sensors report the zone, the vehicle decides, and
 # the heaters warm it.
 #
-# To close it in tcssim alone, with no tcspecial running, add
-# "thermostat: thermostat" to the tcssim section below: tcssim then plays the
+# To close it in tcs-sim alone, with no tcspecial running, add
+# "thermostat: thermostat" to the tcs-sim section below: tcs-sim then plays the
 # thermostat node of that name, with its setpoint and band. Never
 # with tcspecial running, whose own thermostat switches the same heaters.
 description: Simulator settings for the payloads of thermostat.ytcs
 
-# Where tcssim answers whether it has made its simulated devices, which whatever
+# Where tcs-sim answers whether it has made its simulated devices, which whatever
 # starts the run asks before it starts tcspecial. A port no other example
 # uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7907"
 
 # The physics of the vehicle: the zone its sensors read, and the two
@@ -64,7 +64,7 @@ world:
           # fifth of a kelvin a second.
           #
           # Its two heaters are four watt films, and either alone holds the
-          # zone in the band, so a heater disabled in tcssim's window --
+          # zone in the band, so a heater disabled in tcs-sim's window --
           # unpowered, or failed -- is seen on its line's strip, which stays
           # off while the other does the work, and both disabled let the zone
           # fall out of the band.
@@ -106,7 +106,7 @@ simulated_payload_groups:
 
 simulated_payloads:
   - type gpio_out:
-      # Driven and never read: tcssim sends nothing for them, counts each time
+      # Driven and never read: tcs-sim sends nothing for them, counts each time
       # the vehicle moves their lines, and switch the heater of the
       # zone each is joined to.
       - payload: heaters_1

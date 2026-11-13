@@ -8,7 +8,7 @@
 #
 # Which channels it has, and their IDs, are the configuration's: the model
 # included at the end is written from it by
-#     tcsverify --fprime-model=fprime/Tcs/TcsBridge/model <configuration>
+#     tcs-verify --fprime-model=fprime/Tcs/TcsBridge/model <configuration>
 # and never by hand. See "F´: gateway_fprime" in docs/tcspecial-design.rst.
 
 module Tcs {
@@ -86,7 +86,7 @@ module Tcs {
     @ the RESTART that follows must name with the same key
     async command RESTART_ARM(
       key: U64 @< The key, which the RESTART must carry
-      $target: string size 32 @< The configuration's checksum, as tcsverify prints it, or empty for this one's
+      $target: string size 32 @< The configuration's checksum, as tcs-verify prints it, or empty for this one's
     ) opcode 5
 
     @ Restart the vehicle onto the configuration the last RESTART_ARM
@@ -115,13 +115,13 @@ module Tcs {
       format "The bridge does nothing: {}"
 
     @ The configuration opened is not the one the model was written from:
-    @ write the model again with tcsverify --fprime-model and rebuild, or
+    @ write the model again with tcs-verify --fprime-model and rebuild, or
     @ open the configuration it was written from
     event ModelDiffers(
       opened: string size 40 @< The digest of the configuration opened
       model: string size 40 @< The digest the model was written from
     ) severity warning high id 1 \
-      format "Opened md5 {}, model of md5 {}: run tcsverify --fprime-model"
+      format "Opened md5 {}, model of md5 {}: run tcs-verify --fprime-model"
 
     @ The base ID the deployment gave the bridge is not the gateway node's
     @ fprime_id_base: give the instance base id Tcs.TcsBridge.ID_BASE
@@ -207,7 +207,7 @@ module Tcs {
 
     @ A datum came from a source the model has no channel for, which a
     @ model written from this configuration never lacks: write the model
-    @ again with tcsverify --fprime-model and rebuild
+    @ again with tcs-verify --fprime-model and rebuild
     event NoChannel(
       source: string size NODE_NAME_BYTES @< The node that produced it
     ) severity warning high id 13 \

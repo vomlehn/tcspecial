@@ -1,9 +1,9 @@
-//! Whether the simulator is ready: the messages a harness and tcssim exchange
-//! on tcssim's readiness socket.
+//! Whether the simulator is ready: the messages a harness and tcs-sim exchange
+//! on tcs-sim's readiness socket.
 //!
 //! A simulated device has to exist before tcspecial looks for it, so whatever
-//! starts a simulated run -- the harness -- starts tcssim first and asks it, at
-//! the UDP address its simulator file states as `tcssim.ready`, whether it has
+//! starts a simulated run -- the harness -- starts tcs-sim first and asks it, at
+//! the UDP address its simulator file states as `tcs-sim.ready`, whether it has
 //! made them. tcspecial takes no part: flight software that knows nothing of a
 //! simulator cannot wait for the wrong one. See "Waiting for the Simulator" in
 //! `docs/tcspecial-design.rst`.
@@ -14,7 +14,7 @@
 //! likes, and a lost request is simply sent again.
 //!
 //! Both messages are fixed in size and read and written in fixed buffers, so
-//! answering is no allocation in tcssim's running loop. Big-endian, as the
+//! answering is no allocation in tcs-sim's running loop. Big-endian, as the
 //! rest of the link is.
 
 use crate::config_digest::ConfigDigest;

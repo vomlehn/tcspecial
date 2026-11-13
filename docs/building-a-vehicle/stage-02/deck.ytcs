@@ -83,7 +83,7 @@ payloads:
         trigger_interval: "1 s"
         world-out-type: "i16"
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: regolith_thermometer, x: 34, y: 129 }
     - { node: seismometer, x: 34, y: 34 }

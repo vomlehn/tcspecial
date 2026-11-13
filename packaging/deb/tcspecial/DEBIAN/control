@@ -11,7 +11,7 @@ Description: telemetry and control, special: spacecraft flight software
  tcspecial, the TCSpecial Flight Executive, runs a spacecraft's payloads as
  nodes in a configured graph and relays their data and commands to and from the
  mission operations center over UDP. This package is what flies: tcspecial
- itself, tcsverify, which checks a configuration, the five test app programs
+ itself, tcs-verify, which checks a configuration, the five test app programs
  under /opt/tcs/libexec, the manual, and the example configurations. Everything
  is under /opt/tcs. /etc/profile.d/tcspecial.sh puts /opt/tcs/bin on a login
  shell's search path, and /opt/tcs/sbin/tcspecial-links links the programs into

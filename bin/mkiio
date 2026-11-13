@@ -13,7 +13,7 @@
 # makes it the more faithful of the two ways to run an IIO payload with no
 # sensor, the other being the simulated device, a pty, the tests use.
 #
-# The modules are the kernel's and configuring them needs root, so tcssim does
+# The modules are the kernel's and configuring them needs root, so tcs-sim does
 # not make a sensor: it finds one and says how to make one if there is none.
 # This is that, as bin/mki2c, bin/mkgpio and bin/mkvcan are for the other
 # three.
@@ -36,8 +36,8 @@ iio_length="${2:-128}"
 # commonly has a real IIO device or two -- an ambient light sensor, an
 # accelerometer -- and those are not ours to touch, so nothing here goes by
 # device number: a device is ours if its name is this one.
-iio_device="tcssim"
-iio_trigger="tcssim-hr"
+iio_device="tcs-sim"
+iio_trigger="tcs-sim-hr"
 
 configfs="/sys/kernel/config"
 iio_devices="$configfs/iio/devices/dummy"

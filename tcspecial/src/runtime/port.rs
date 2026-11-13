@@ -2003,7 +2003,7 @@ mod tests {
     /// A serial node on a real line hands over whole reads, however the
     /// bytes arrive.
     ///
-    /// End to end: a pseudo-terminal, which is the line tcssim simulates with,
+    /// End to end: a pseudo-terminal, which is the line tcs-sim simulates with,
     /// a node on it as a configuration states one, opened as the vehicle opens
     /// it. The line is raw, so the kernel hands over whatever bytes have
     /// arrived; a sentence written in pieces comes out whole only because the

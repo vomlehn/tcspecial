@@ -11,7 +11,7 @@
 //! Its supply is not steady. Where `ripple` is stated the voltage wanders by
 //! that fraction of nominal, slowly, as `ripple_time` says; a resistance's
 //! power goes as the square of its voltage and its current as the voltage,
-//! so both follow. The arithmetic is tcssim's `physics::heater`.
+//! so both follow. The arithmetic is tcs-sim's `physics::heater`.
 
 use serde::{Deserialize, Serialize};
 

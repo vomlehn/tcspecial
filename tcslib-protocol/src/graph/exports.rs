@@ -1,6 +1,6 @@
 //! What of an included file may be joined from outside it.
 //!
-//! An included file is a page of the configuration -- tcsgui draws it as a
+//! An included file is a page of the configuration -- tcs-gui draws it as a
 //! box on the top page, opened into a page of its own -- and its `exports`
 //! section is the box's edge: for each of the four terminals, the nodes in
 //! the file whose terminal of that name a line from another file may reach.

@@ -18,7 +18,7 @@ It reads either spelling, chosen by the file's extension as the Rust's
 the YAML with PyYAML, which is imported only when a YAML file is read, so that
 a station reading XML needs nothing outside the standard library. Both are
 read into the same :class:`Configuration`, and the two spellings say the same
-thing, which ``make comparespellings`` and tcsverify hold them to;
+thing, which ``make comparespellings`` and tcs-verify hold them to;
 ``examples/ping/tests/agrees.rs`` holds what this reads to what the Rust
 reads. A configuration's ``include`` list is followed as the Rust follows it
 (``graph::Graph::load``), so that a node's device id is counted among the
@@ -27,9 +27,9 @@ same names: see :func:`load`.
 The digest is not worked out here. It is taken over what a configuration says
 rather than over its bytes -- see ``tcslib_protocol::config_digest`` -- and a
 second statement of that in Python would be a second digest on the day the first
-changes. :func:`digest` asks ``tcsverify --digest``, which is the Rust one.
+changes. :func:`digest` asks ``tcs-verify --digest``, which is the Rust one.
 
-This reads only what it needs, and checks nothing: tcsverify is what says
+This reads only what it needs, and checks nothing: tcs-verify is what says
 whether a configuration is sound, and a ground station should run on one it
 has passed.
 """
@@ -62,7 +62,7 @@ SINKS = ("world-in", "moc-in")
 #: The attributes a node writes as a list: ``tcslib_protocol::graph::LISTED``.
 LISTED = ("terminators",)
 
-#: Where the schemas are: a link to tcsgui's ``share/schema``, the one copy,
+#: Where the schemas are: a link to tcs-gui's ``share/schema``, the one copy,
 #: beside this module so that an installed package has them too, as the
 #: XTCE documents are (see :mod:`tcslib_protocol.interface`).
 SCHEMAS = Path(__file__).resolve().parent / "schema"
@@ -1352,7 +1352,7 @@ def _with_includes(path):
 
 def node_types(section):
     """The node types a section may hold, as a file spells them: the
-    schema's list, which tcsgui's schema tests hold to
+    schema's list, which tcs-gui's schema tests hold to
     ``tcslib_protocol::graph::types_in``.
 
     Args:
@@ -1578,7 +1578,7 @@ def _xml_old(reader, root):
            "vehicle": ("vehicle", "compute"),
            "payloads": ("payloads", "payload")}
     for element in root.children:
-        if element.tag == "tcsgui":
+        if element.tag == "tcs-gui":
             for child in element.children:
                 if child.tag == "nodes":
                     stale = child.find("name") is not None
@@ -1590,7 +1590,7 @@ def _xml_old(reader, root):
                     stale = False
                 if stale:
                     raise reader.refuse(child.line,
-                                        f"<{child.tag}> in the tcsgui section "
+                                        f"<{child.tag}> in the tcs-gui section "
                                         "is written as it was before the "
                                         "editor's section named nodes as the "
                                         "sections do; " + CONVERTER)
@@ -1896,11 +1896,11 @@ def _load_xml(path):
                                 "arrives on, <from>, and what it sets, <sets>")
         reader.commands.append((came.text.strip(), sets.text.strip()))
 
-    layout = root.find("tcsgui")
+    layout = root.find("tcs-gui")
     for part in layout.children if layout is not None else []:
         if part.tag not in ("nodes", "set-aside"):
             raise reader.refuse(part.line,
-                                f"the tcsgui section has no <{part.tag}>")
+                                f"the tcs-gui section has no <{part.tag}>")
         seen = set()
         for entry in part.children:
             if entry.tag != "node":
@@ -1996,7 +1996,7 @@ def _yaml_old(reader, root):
     for key_node, value in root.value:
         key = str(key_node.value)
         items = value.value if isinstance(value, yaml.SequenceNode) else []
-        if key == "tcsgui" and isinstance(value, yaml.MappingNode):
+        if key == "tcs-gui" and isinstance(value, yaml.MappingNode):
             for part, placed in value.value:
                 if (part.value != "nodes"
                         or not isinstance(placed, yaml.SequenceNode)):
@@ -2233,11 +2233,11 @@ def _load_yaml(path):
                                     _scalar(binding["sets"]).strip()))
 
     for key, value, at in sections:
-        if key != "tcsgui":
+        if key != "tcs-gui":
             continue
-        for part, entries, line in _yaml_mapping(reader, value, "tcsgui"):
+        for part, entries, line in _yaml_mapping(reader, value, "tcs-gui"):
             if part not in ("nodes", "set-aside"):
-                raise reader.refuse(line, f"the tcsgui section has no {part}")
+                raise reader.refuse(line, f"the tcs-gui section has no {part}")
             seen = set()
             for entry in _yaml_list(reader, entries, part):
                 said = {
@@ -2302,7 +2302,7 @@ def find_built(program):
     there, or worse, an older one that is.
 
     Args:
-        program: The program's file name, as ``tcsverify``.
+        program: The program's file name, as ``tcs-verify``.
 
     Returns:
         Its path, or ``None`` where it is in neither.
@@ -2319,30 +2319,30 @@ def find_built(program):
     return shutil.which(program)
 
 
-def find_tcsverify():
-    """Where tcsverify is: see :func:`find_built`."""
-    return find_built("tcsverify")
+def find_tcs_verify():
+    """Where tcs-verify is: see :func:`find_built`."""
+    return find_built("tcs-verify")
 
 
-def ambient(path, tcsverify=None):
+def ambient(path, tcs_verify=None):
     """The simulated world's ambient temperature, in kelvin, from the
-    simulator file beside a configuration, as tcsverify reads it: by the
-    rule tcssim reads it by, which is not restated here.
+    simulator file beside a configuration, as tcs-verify reads it: by the
+    rule tcs-sim reads it by, which is not restated here.
 
     ``None`` is not a failure. A run whose world states none shows none.
 
     Args:
         path:      The configuration file.
-        tcsverify: The tcsverify program to run, or ``None`` to find one with
-                   :func:`find_tcsverify`.
+        tcs-verify: The tcs-verify program to run, or ``None`` to find one with
+                   :func:`find_tcs_verify`.
 
     Returns:
         A pair: the temperature and ``None``; or ``None`` and the reason it
         cannot be had.
     """
-    program = tcsverify or find_tcsverify()
+    program = tcs_verify or find_tcs_verify()
     if program is None:
-        return None, "tcsverify is not built or on the PATH"
+        return None, "tcs-verify is not built or on the PATH"
     try:
         done = subprocess.run([program, "--ambient", str(path)],
                               capture_output=True, text=True, timeout=30)
@@ -2355,15 +2355,15 @@ def ambient(path, tcsverify=None):
                       or f"{program} gave no temperature")
 
 
-def write_own_xtce(path, tcsverify=None):
-    """Writes a configuration's own XTCE beside it, as tcsverify does:
-    ``tcsverify --xtce``. For a configuration made where none is committed,
+def write_own_xtce(path, tcs_verify=None):
+    """Writes a configuration's own XTCE beside it, as tcs-verify does:
+    ``tcs-verify --xtce``. For a configuration made where none is committed,
     as a test makes one; a shipped configuration's is committed beside it.
 
     Args:
         path:      The configuration file.
-        tcsverify: The tcsverify program to run, or ``None`` to find one with
-                   :func:`find_tcsverify`.
+        tcs-verify: The tcs-verify program to run, or ``None`` to find one with
+                   :func:`find_tcs_verify`.
 
     Returns:
         A pair: ``True`` and ``None``; or ``False`` and the reason it was
@@ -2371,9 +2371,9 @@ def write_own_xtce(path, tcsverify=None):
         removed, so that what the configuration no longer says is not read.
     """
     Path(path).with_suffix(".xtce").unlink(missing_ok=True)
-    program = tcsverify or find_tcsverify()
+    program = tcs_verify or find_tcs_verify()
     if program is None:
-        return False, "tcsverify is not built or on the PATH"
+        return False, "tcs-verify is not built or on the PATH"
     try:
         done = subprocess.run([program, "--xtce", str(path)],
                               capture_output=True, text=True, timeout=60)
@@ -2384,8 +2384,8 @@ def write_own_xtce(path, tcsverify=None):
     return True, None
 
 
-def digest(path, tcsverify=None):
-    """The configuration's digest, as tcsverify works it out.
+def digest(path, tcs_verify=None):
+    """The configuration's digest, as tcs-verify works it out.
 
     ``None`` is not a failure. A station that cannot digest its own
     configuration compares nothing, as the Rust ground programs do, and says
@@ -2393,16 +2393,16 @@ def digest(path, tcsverify=None):
 
     Args:
         path:      The configuration file.
-        tcsverify: The tcsverify program to run, or ``None`` to find one with
-                   :func:`find_tcsverify`.
+        tcs-verify: The tcs-verify program to run, or ``None`` to find one with
+                   :func:`find_tcs_verify`.
 
     Returns:
         A pair: the digest, as thirty-two hex digits, and ``None``; or
         ``None`` and the reason it cannot be had.
     """
-    program = tcsverify or find_tcsverify()
+    program = tcs_verify or find_tcs_verify()
     if program is None:
-        return None, "tcsverify is not built or on the PATH"
+        return None, "tcs-verify is not built or on the PATH"
     try:
         done = subprocess.run(
             [program, "--digest", "--error-limit=0", str(path)],

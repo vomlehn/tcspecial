@@ -6,7 +6,7 @@
 //! includable from C and C++ alike. Nothing here is a second implementation of
 //! anything: each function is the C spelling of a call into `tcslib-moc`, so a
 //! C or C++ station reads the configuration, counts ports and ages beacons
-//! exactly as tcsmoc does.
+//! exactly as tcs-moc does.
 //!
 //! Every function keeps the header's conventions. A handle is a `Box` handed
 //! out as a pointer and taken back by its `_close`; a function that cannot do
@@ -1936,7 +1936,7 @@ unsafe fn target_of(
     ConfigDigest::of_hex(said).ok_or_else(|| {
         fail(format_args!(
             "the target checksum is \"{said}\", which is not one: give the \
-             32 lower-case hex digits tcsverify prints for the configuration \
+             32 lower-case hex digits tcs-verify prints for the configuration \
              to restart onto, or NULL for this configuration's"
         ))
     })

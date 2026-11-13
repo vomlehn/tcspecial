@@ -20,7 +20,7 @@
 //!   within the component is the device id itself.
 //!
 //! The model is written out as FPP and C++ for the component's build -- see
-//! [`Model::fppi`] and [`Model::cpp`] -- by `tcsverify --fprime-model`, and
+//! [`Model::fppi`] and [`Model::cpp`] -- by `tcs-verify --fprime-model`, and
 //! never by hand. What it would get wrong is refused where the file is read,
 //! by [`Graph::check`](super::Graph::check) through [`every`]: a source whose
 //! name is not one F´ can name a channel by, or one named as a channel of the
@@ -749,7 +749,7 @@ impl Model {
 /// The comment, three lines.
 fn generated_by(comment: &str, from: &str, digest: &str) -> String {
     format!(
-        "{comment} The F´ model of a TcsBridge, written by tcsverify \
+        "{comment} The F´ model of a TcsBridge, written by tcs-verify \
          --fprime-model from\n{comment} {from}, md5 {digest}.\n{comment} Not \
          to be edited: change the configuration and write it again."
     )

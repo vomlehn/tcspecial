@@ -78,9 +78,9 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="seismometer" x="34" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

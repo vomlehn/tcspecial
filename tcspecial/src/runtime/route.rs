@@ -71,7 +71,7 @@ pub struct Delivery {
     /// Which line of the drawing this is: the configuration's links counted
     /// one per destination, in the order the configuration holds them -- by
     /// the node each leaves, and then by where it goes -- which is the order
-    /// tcsgui draws them in and tcspecial's visual window lights them by.
+    /// tcs-gui draws them in and tcspecial's visual window lights them by.
     /// `None` for a delivery that is not a line anyone drew -- a payload
     /// nothing touches, to its link over `payload_telemetry`.
     pub line: Option<usize>,
@@ -255,7 +255,7 @@ impl Routes {
             })
             .collect();
 
-        // The lines of the drawing, counted as tcsgui reads them: one per
+        // The lines of the drawing, counted as tcs-gui reads them: one per
         // destination, in the order the configuration holds them.
         let mut line = 0;
         for link in &graph.links {

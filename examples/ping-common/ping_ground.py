@@ -1,6 +1,6 @@
 """The ground's half of a ping, with no window.
 
-The Python spelling of ``tcslib-moc/src/ping.rs``, which is what tcsmoc pings a
+The Python spelling of ``tcslib-moc/src/ping.rs``, which is what tcs-moc pings a
 ``ping`` node with: the same rules for what is kept and the same three times,
 shown the same way. Here between the two halves it borrows: the ping format
 (``python/tcslib_protocol/ping.py``, after ``tcslib_protocol``) and the
@@ -28,7 +28,7 @@ Whether anything at all has arrived since the last ping is kept too, so that
 a ground station with no window (:func:`report`) prints what came that did
 not answer it -- an earlier ping's answer, or what is no answer at all --
 rather than saying nothing came. It is the one thing kept here that
-``tcslib_moc::ping`` does not keep: tcsmoc always shows its pings in a window,
+``tcslib_moc::ping`` does not keep: tcs-moc always shows its pings in a window,
 which shows the last thing received whatever it was, and has no use for it.
 
 The three times

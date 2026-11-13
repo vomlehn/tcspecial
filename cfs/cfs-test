@@ -14,7 +14,7 @@
 # Started in the order the link comes up in flight: cFS, whose SBN binds
 # the address its table gives processor 1 and waits, since SBN on cFS
 # speaks first only to a peer on another spacecraft; then tcspecial, which
-# announces itself to it. tcssim is not needed: the test plays the
+# announces itself to it. tcs-sim is not needed: the test plays the
 # example's two payloads over UDP itself, as tests/cfs.rs does. Then the
 # test, tcspecial/tests/cfs_flight.rs, commands through CI_LAB and reads
 # through TO_LAB. Whatever was started is stopped however the run ends, so

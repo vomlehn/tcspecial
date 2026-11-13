@@ -85,7 +85,7 @@ pub struct Chosen {
 ///
 /// The same checks the ground tool runs, against the same code, and whether
 /// this build contains every type the configuration has, which is
-/// tcsverify's `--types` with the types this was built with. A
+/// tcs-verify's `--types` with the types this was built with. A
 /// configuration that arrived here unchecked is exactly the configuration
 /// that should not open a bus.
 ///

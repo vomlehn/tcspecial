@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
-"""simulated-devices-test -- runs tcspecial against tcssim for each type of
-payload tcssim simulates, and checks that each one's data reaches the ground.
+"""simulated-devices-test -- runs tcspecial against tcs-sim for each type of
+payload tcs-sim simulates, and checks that each one's data reaches the ground.
 
     simulated-devices-test <tree> <run directory>
 
-<tree> is the tcspecial tree, whose target/debug holds tcssim, tcspecial and
-tcsverify, and whose python/ holds tcslib_protocol; <run directory> is where
+<tree> is the tcspecial tree, whose target/debug holds tcs-sim, tcspecial and
+tcs-verify, and whose python/ holds tcslib_protocol; <run directory> is where
 what the run leaves is kept, emptied first. `make simulated-devices-test` runs
 this with the right arguments.
 
 One configuration with a payload of each type, written into the run
 directory, since a simulated device's path is there: a device file, a serial
 line, a serial line that is an RS-485 bus, a SPI peripheral, an rpmsg channel
-and an IIO buffer, each a file or pseudo-terminal tcssim makes, and an HDLC line
+and an IIO buffer, each a file or pseudo-terminal tcs-sim makes, and an HDLC line
 reached at its sim_address over UDP. A CAN payload is added where a virtual CAN
 bus is up, and a GPIO payload where a gpio-sim chip is there for this user
 to use; neither is made here, since both need root (see bin/mkvcan and
 bin/mkgpio), and the run says which it left out and why.
 
 Started in the order a test harness starts a run (see "Waiting for the
-Simulator" in docs/tcspecial-design.rst): tcssim with every payload sending,
+Simulator" in docs/tcspecial-design.rst): tcs-sim with every payload sending,
 waited for until it has made its simulated devices; then tcspecial,
 --simulate=all. The ground sends CONNECT until it is answered, and then listens
 at each payload's telemetry port. A payload passes if its data arrives, and the
-device file's must be the start of tcssim's text. When tcssim is stopped, by a
+device file's must be the start of tcs-sim's text. When tcs-sim is stopped, by a
 signal as a harness stops it, every simulated device it made must be gone.
 Whatever was started is stopped however the run ends, so that nothing is left
 holding the ports.
 
 The ports are 47000 to 47999, which nothing else in the tree uses, so that
-this can run beside the other tests. tcssim opens its window for the length
+this can run beside the other tests. tcs-sim opens its window for the length
 of the run, so a display is needed.
 """
 
@@ -173,7 +173,7 @@ def write_configuration(run, made):
         The configuration's path.
     """
     lines = [
-        'description: "A payload of each type tcssim simulates"',
+        'description: "A payload of each type tcs-sim simulates"',
         "",
         "tcspecial:",
         "  beacon:",
@@ -209,7 +209,7 @@ def write_configuration(run, made):
 
     sim = [
         "description: Simulator settings for simulated-devices.ytcs",
-        "tcssim:",
+        "tcs-sim:",
         f'  ready: "127.0.0.1:{READY}"',
         "simulated_payloads:",
     ]
@@ -271,7 +271,7 @@ def connect(tcslib_protocol, digest):
 
     Args:
         tcslib_protocol: The ground's library, for the command's layout.
-        digest:   The configuration's checksum, as tcsverify prints it.
+        digest:   The configuration's checksum, as tcs-verify prints it.
 
     Returns:
         True if it was answered within PATIENCE seconds.
@@ -331,7 +331,7 @@ def judged(made, got, lorem):
     Args:
         made:  The payloads, as payloads() gives them.
         got:   What arrived for each, as listen() gives it.
-        lorem: tcssim's text, which the device file's data must start.
+        lorem: tcs-sim's text, which the device file's data must start.
 
     Returns:
         A list of (name, passed, what was seen).
@@ -358,8 +358,8 @@ def judged(made, got, lorem):
             # What arrived before CONNECT was taken is not sent, so the data
             # is a run of the text, from wherever the ground came in.
             passed = text in lorem
-            seen += ", part of tcssim's text" if passed else \
-                ", not tcssim's text"
+            seen += ", part of tcs-sim's text" if passed else \
+                ", not tcs-sim's text"
         if passed and kind == "gpio":
             # One line's level, as the u8 a set of up to eight lines is.
             passed = all(len(datum) == 1 and datum[0] <= 1 for datum in data)
@@ -373,7 +373,7 @@ def main():
     """Runs the test.
 
     Returns:
-        0 if every payload passed and tcssim cleared its simulated devices,
+        0 if every payload passed and tcs-sim cleared its simulated devices,
         else 1;
         2 for wrong arguments.
     """
@@ -391,27 +391,27 @@ def main():
     os.makedirs(os.path.join(run, "log"))
     made, left_out = payloads(run)
     configuration = write_configuration(run, made)
-    with open(os.path.join(top, "tcssim", "src", "node", "payload",
+    with open(os.path.join(top, "tcs-sim", "src", "node", "payload",
                            "device_file", "lorem.txt"), "rb") as text:
         lorem = text.read()
 
     started = []
     failed = []
     try:
-        print(f"tcssim, on {configuration}...")
-        sim = start(started, run, "tcssim.log", f"{debug}/tcssim",
+        print(f"tcs-sim, on {configuration}...")
+        sim = start(started, run, "tcs-sim.log", f"{debug}/tcs-sim",
                     "--simulate=all", "--sending", configuration)
-        waited = subprocess.run([f"{debug}/tcssim", "--simulate=all",
+        waited = subprocess.run([f"{debug}/tcs-sim", "--simulate=all",
                                  f"--wait={PATIENCE}", configuration])
         if waited.returncode != 0:
-            print(f"tcssim did not get ready: see {run}/tcssim.log")
+            print(f"tcs-sim did not get ready: see {run}/tcs-sim.log")
             return 1
 
         print(f"tcspecial, on {configuration}...")
         flight = start(started, run, "tcspecial.log", f"{debug}/tcspecial",
                        "--simulate=all", configuration)
 
-        said = subprocess.run([f"{debug}/tcsverify", "--digest",
+        said = subprocess.run([f"{debug}/tcs-verify", "--digest",
                                configuration], capture_output=True,
                               text=True, check=True).stdout
         digest = said.rsplit("md5 ", 1)[1].split()[0]
@@ -432,14 +432,14 @@ def main():
         stop(flight)
         status = stop(sim)
         if status != 128 + signal.SIGTERM:
-            print(f"  FAIL tcssim stopped with status {status}, not "
+            print(f"  FAIL tcs-sim stopped with status {status}, not "
                   f"{128 + signal.SIGTERM}")
-            failed.append("tcssim's stop")
+            failed.append("tcs-sim's stop")
         for name, kind, terms in made:
             path = next((term.split('"')[1] for term in terms
                          if term.startswith("path:")), None)
             if path and path.startswith(run) and os.path.lexists(path):
-                print(f"  FAIL {name}: tcssim left {path}")
+                print(f"  FAIL {name}: tcs-sim left {path}")
                 failed.append(f"{name}'s simulated device")
     finally:
         for process in reversed(started):

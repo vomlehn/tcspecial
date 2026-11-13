@@ -736,7 +736,7 @@ fn at_least_one(
 
 /// Reads the section's `interface`, and refuses one that is not this build's.
 ///
-/// The one place the rule is stated. tcspecial, tcsverify, tcsmoc, tcslib-moc
+/// The one place the rule is stated. tcspecial, tcs-verify, tcs-moc, tcslib-moc
 /// and the C/C++ library all read the section through [`ci_config_of`], so
 /// all of them refuse a configuration written for another interface, saying
 /// both digests: a build can speak only the interface it was compiled from,
@@ -760,7 +760,7 @@ pub fn interface_of(said: &str) -> Result<crate::InterfaceDigest, String> {
     let named = crate::InterfaceDigest::of_hex(said).ok_or_else(|| {
         format!(
             "interface is \"{said}\", which is not an interface digest: \
-             write the 32 lower-case hex digits `tcsverify \
+             write the 32 lower-case hex digits `tcs-verify \
              --interface-digest` prints, which for this build are {ours}"
         )
     })?;
@@ -781,7 +781,7 @@ pub fn interface_of(said: &str) -> Result<crate::InterfaceDigest, String> {
 /// the `tcspecial` section's `beacon.send` and `beacon.recv`.
 ///
 /// Here rather than in each ground program because every ground program needs
-/// it and the answer is the file's: tcsmoc reads it to put a beacon panel in
+/// it and the answer is the file's: tcs-moc reads it to put a beacon panel in
 /// its window, the `beacon` example reads it to show the same panel, and a
 /// station that worked the pair out for itself would be a second reading of
 /// one file.

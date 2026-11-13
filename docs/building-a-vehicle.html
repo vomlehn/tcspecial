@@ -395,7 +395,7 @@ what no single example shows.</p>
 <p>This guide builds one vehicle, a small lunar lander's science deck, a stage
 at a time, from the minimal example to a configuration a mission could start
 from. Each stage adds one thing and says why it is added the way it is. Every
-stage is a configuration that <tt class="docutils literal">tcsverify</tt> passes and that runs on a desk
+stage is a configuration that <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> passes and that runs on a desk
 under <tt class="docutils literal"><span class="pre">--simulate=all</span></tt>, and a test holds every one of them to that, so the
 files the guide shows are the files that work.</p>
 <p>It is a companion to the manuals, not a replacement: each stage names the
@@ -408,8 +408,8 @@ their own to describe.</li>
 manual's &quot;Installing&quot;), and the reader has run the minimal example once.</li>
 </ul>
 <div class="figure">
-<img alt="tcsgui showing the finished deck: the top file, with two subsystem boxes, science and thermal, the camera, and the gateway node, joined by lines to the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
-<p class="caption">Where the guide ends: the deck of stage 9 as tcsgui draws it, its two
+<img alt="tcs-gui showing the finished deck: the top file, with two subsystem boxes, science and thermal, the camera, and the gateway node, joined by lines to the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
+<p class="caption">Where the guide ends: the deck of stage 9 as tcs-gui draws it, its two
 subsystems collapsed into boxes, the camera beside them, and every line
 ending at the gateway node.</p>
 </div>
@@ -417,7 +417,7 @@ ending at the gateway node.</p>
 <div class="section" id="the-vehicle">
 <h1><a class="toc-backref" href="#toc-entry-2">The vehicle</a></h1>
 <p>A lander's science deck, chosen so that each stage needs a different part of
-TCSpecial, and so that every payload has a simulated device tcssim already
+TCSpecial, and so that every payload has a simulated device tcs-sim already
 provides:</p>
 <table border="1" class="docutils">
 <colgroup>
@@ -469,8 +469,8 @@ Any stage can be started from, and two compared with <tt class="docutils literal
 <span class="generic prompt">$ </span>diff<span class="whitespace"> </span>docs/building-a-vehicle/stage-02/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">       </span>docs/building-a-vehicle/stage-03/deck.ytcs
 </pre>
-<p>Every stage runs the way an example does, tcsmoc starting tcspecial and
-tcssim itself:</p>
+<p>Every stage runs the way an example does, tcs-moc starting tcspecial and
+tcs-sim itself:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>run<span class="whitespace"> </span><span class="name variable">TCSPECIAL_CONFIG_FILE</span><span class="operator">=</span>docs/building-a-vehicle/stage-04/deck<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">       </span><span class="name variable">TCSPECIAL_SIM_FILE</span><span class="operator">=</span>docs/building-a-vehicle/stage-04/deck-sim.yaml
@@ -508,15 +508,15 @@ reads straight to the ground over the <tt class="docutils literal">tcspecial</tt
 sorted, counting from nought. The seismometer is the only node, so it is 0,
 and the ground hears it on 127.0.0.1:6100.</p>
 <div class="figure">
-<img alt="tcsgui showing one network payload, seismometer, in the Payloads column, with no lines." src="shots/vehicle-stage-01.png" style="width: 100%;" />
-<p class="caption">Stage 1 in tcsgui: one payload, nothing drawn from it.</p>
+<img alt="tcs-gui showing one network payload, seismometer, in the Payloads column, with no lines." src="shots/vehicle-stage-01.png" style="width: 100%;" />
+<p class="caption">Stage 1 in tcs-gui: one payload, nothing drawn from it.</p>
 </div>
 <p>Check it, then run it:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcsverify<span class="whitespace"> </span>docs/building-a-vehicle/stage-01/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
+<span class="generic prompt">$ </span>tcs-verify<span class="whitespace"> </span>docs/building-a-vehicle/stage-01/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">            </span>docs/building-a-vehicle/stage-01/deck-sim.yaml
 </pre>
-<p>tcsmoc shows the beacon, which says the vehicle is alive and which
+<p>tcs-moc shows the beacon, which says the vehicle is alive and which
 configuration it runs, and a panel for the seismometer.</p>
 <p><em>See:</em> &quot;A Network Payload&quot; in the tcspecial manual.</p>
 </div>
@@ -579,11 +579,11 @@ sorted names, and <tt class="docutils literal">regolith_thermometer</tt> sorts b
 </table>
 <p>A ground station written for stage 1 now listens to the thermometer on the
 seismometer's old port. This is why a ground station should take its ports from
-the configuration -- tcslib-moc's and tcsmoc's do -- rather than from a list
-written beside it, and why <tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole
+the configuration -- tcslib-moc's and tcs-moc's do -- rather than from a list
+written beside it, and why <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt> (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole
 vehicle</a>) lists every port a configuration uses.</p>
 <div class="figure">
-<img alt="tcsgui showing two payloads, seismometer and regolith_thermometer, with no lines." src="shots/vehicle-stage-02.png" style="width: 100%;" />
+<img alt="tcs-gui showing two payloads, seismometer and regolith_thermometer, with no lines." src="shots/vehicle-stage-02.png" style="width: 100%;" />
 <p class="caption">Stage 2: two payloads, each still reporting straight to the ground.</p>
 </div>
 <p><em>See:</em> &quot;A Serial Payload&quot; in the tcspecial manual.</p>
@@ -651,7 +651,7 @@ one place to receive everything from:</p>
 
 </pre>
 <div class="figure">
-<img alt="tcsgui showing the thermometer feeding regolith_kelvin, and regolith_kelvin and the seismometer feeding the gateway node." src="shots/vehicle-stage-03.png" style="width: 100%;" />
+<img alt="tcs-gui showing the thermometer feeding regolith_kelvin, and regolith_kelvin and the seismometer feeding the gateway node." src="shots/vehicle-stage-03.png" style="width: 100%;" />
 <p class="caption">Stage 3: the first computation, and the gateway node on the right.</p>
 </div>
 <p><em>See:</em> &quot;The vocabulary&quot; and the computations in the tcspecial manual.</p>
@@ -667,7 +667,7 @@ thermostat's decision leaves at its <tt class="docutils literal"><span class="pr
       # The probe's heater switch, line 4 of /dev/gpiochip1: 1 for on and 0 for
       # off, as probe_thermostat decides. A gpio_inout reports as well as
       # drives: every second it tells the ground what it was last told, so a
-      # report lost on the way is made good by the next. On a desk tcssim
+      # report lost on the way is made good by the next. On a desk tcs-sim
       # answers for it over UDP at its sim_address, so that no dummy chip is
       # needed; flown, the chip is opened.
       - payload: probe_heater
@@ -682,7 +682,7 @@ thermostat's decision leaves at its <tt class="docutils literal"><span class="pr
 </pre>
 <p>The heater reports to the gateway every second what it was last told, so the
 ground follows it on a beat and a lost report is made good by the next. On a
-desk, tcssim answers for the line over UDP at its <tt class="docutils literal">sim_address</tt>; flown, the
+desk, tcs-sim answers for the line over UDP at its <tt class="docutils literal">sim_address</tt>; flown, the
 GPIO chip is opened instead, and nothing in the configuration changes.</p>
 <p>The ground does not switch the heater itself: the thermostat decides again on
 every reading, and a command to the heater would be overruled within a
@@ -701,10 +701,10 @@ commands:
 
 </pre>
 <div class="figure">
-<img alt="tcsgui showing probe_thermostat fed by regolith_kelvin, with a line from its lower left back to probe_heater." src="shots/vehicle-stage-04.png" style="width: 100%;" />
+<img alt="tcs-gui showing probe_thermostat fed by regolith_kelvin, with a line from its lower left back to probe_heater." src="shots/vehicle-stage-04.png" style="width: 100%;" />
 <p class="caption">Stage 4: the thermostat's decision travelling back to the heater.</p>
 </div>
-<p>From here on tcsgui's toolbar says <em>2 concerns</em>. A concern is a shape that
+<p>From here on tcs-gui's toolbar says <em>2 concerns</em>. A concern is a shape that
 may be a mistake and may be meant, never something that stops the
 configuration being read or flown, and these two are meant:</p>
 <ul class="simple">
@@ -717,7 +717,7 @@ for it to command.</li>
 </ul>
 <p>Each can be set aside in the concerns window, as the window says, if it is
 what was meant.</p>
-<p><em>See:</em> &quot;A GPIO Payload&quot; in the tcspecial manual, and the <a class="reference external" href="tcsmoc.html">tcsmoc manual</a> for sending the setpoint.</p>
+<p><em>See:</em> &quot;A GPIO Payload&quot; in the tcspecial manual, and the <a class="reference external" href="tcs-moc.html">tcs-moc manual</a> for sending the setpoint.</p>
 </div>
 <div class="section" id="stage-5-rates-and-groups">
 <h1><a class="toc-backref" href="#toc-entry-7">Stage 5: rates and groups</a></h1>
@@ -740,7 +740,7 @@ its group's or its own, never both.</p>
 <p>A rate costs link. Each payload read on a schedule sends that many data a
 second, each node fed by it at most as many, and the beacon one every
 <tt class="docutils literal">default_interval</tt>; their sum is what the link must carry, with margin.
-<tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> adds it up (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole vehicle</a>).</p>
+<tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt> adds it up (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole vehicle</a>).</p>
 <p>The drawing is stage 4's: a group changes when nodes are read, not how they
 are joined. When they are read is this:</p>
 <div class="figure">
@@ -841,10 +841,10 @@ conversion, and a <tt class="docutils literal">vote</tt> that takes the three an
 <p>The vote takes the median, so one sensor that drifts or stops is outvoted
 rather than averaged in, and it produces a value on every arrival, so one
 sensor that stops reporting does not stop the deck from knowing its
-temperature. In tcssim, fail one sensor and watch <tt class="docutils literal">hull_temp</tt> hold while
+temperature. In tcs-sim, fail one sensor and watch <tt class="docutils literal">hull_temp</tt> hold while
 the failed sensor's own reading goes astray.</p>
 <div class="figure">
-<img alt="tcsgui showing three hull_temp payloads, each feeding a hull_kelvin conversion, the three conversions feeding hull_temp, and everything reaching the gateway." src="shots/vehicle-stage-06.png" style="width: 100%;" />
+<img alt="tcs-gui showing three hull_temp payloads, each feeding a hull_kelvin conversion, the three conversions feeding hull_temp, and everything reaching the gateway." src="shots/vehicle-stage-06.png" style="width: 100%;" />
 <p class="caption">Stage 6: the deck in one file, at the size where one file stops being
 comfortable.</p>
 </div>
@@ -876,8 +876,8 @@ says which of its nodes a line from another file may reach, in its
 which list to add the node to. Device ids, and so ports, do not change: a
 node is known by its name in every file.</p>
 <div class="figure">
-<img alt="tcsgui showing two subdiagram boxes, science and thermal, each with several lines to the gateway node." src="shots/vehicle-stage-07.png" style="width: 100%;" />
-<p class="caption">Stage 7: the same graph as stage 6, drawn as tcsgui draws included
+<img alt="tcs-gui showing two subdiagram boxes, science and thermal, each with several lines to the gateway node." src="shots/vehicle-stage-07.png" style="width: 100%;" />
+<p class="caption">Stage 7: the same graph as stage 6, drawn as tcs-gui draws included
 files: a box each, whose corners are its exports.</p>
 </div>
 <p>Two vehicles may include one file, as the thermostat examples share
@@ -957,10 +957,10 @@ for a camera, sending a numbered frame every ten seconds.</p>
 rebuilding the flight software; write a node type (see <a class="reference external" href="node-types.html">Writing node types</a>) for what many vehicles will need, checked as tcspecial
 checks its own.</p>
 <div class="figure">
-<img alt="tcsgui showing the science and thermal boxes and the camera, all reaching the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
+<img alt="tcs-gui showing the science and thermal boxes and the camera, all reaching the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
 <p class="caption">Stage 9: the whole deck.</p>
 </div>
-<p>tcsgui draws each included file as a box, which is the right size for
+<p>tcs-gui draws each included file as a box, which is the right size for
 editing and the wrong one for seeing what reaches what. Opened, the deck is
 this:</p>
 <div class="figure">
@@ -1101,25 +1101,25 @@ the vehicle is one more SBN peer:</p>
 command binding leaving a <tt class="docutils literal">gateway_cfs</tt> node needs one, so that the
 ground's setpoint has a message ID to arrive on. <tt class="docutils literal">diff</tt> stage 9 with each
 of the three to see the whole of each difference.</p>
-<p>The F´ and cFS stages run as the others do, tcsmoc playing the F´ bridge or
+<p>The F´ and cFS stages run as the others do, tcs-moc playing the F´ bridge or
 joining the simulated software bus as the ground, as the <tt class="docutils literal">fprime</tt> and
 <tt class="docutils literal">cfs</tt> examples do. The Yamcs stage is checked as every stage is, but its
-ground is Yamcs, which tcsmoc is not; <tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> shows a vehicle
+ground is Yamcs, which tcs-moc is not; <tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> shows a vehicle
 run with Yamcs.</p>
 <p><em>See:</em> &quot;The fprime example&quot;, &quot;The cfs example&quot; and &quot;The thermostat-yamcs
 example&quot; in the tcspecial manual.</p>
 </div>
 <div class="section" id="checking-the-whole-vehicle">
 <h1><a class="toc-backref" href="#toc-entry-13">Checking the whole vehicle</a></h1>
-<p><tt class="docutils literal">tcsverify</tt> checks the whole configuration, every file it includes, and
+<p><tt class="docutils literal"><span class="pre">tcs-verify</span></tt> checks the whole configuration, every file it includes, and
 the simulator file beside it:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcsverify<span class="whitespace"> </span>docs/building-a-vehicle/stage-09/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
+<span class="generic prompt">$ </span>tcs-verify<span class="whitespace"> </span>docs/building-a-vehicle/stage-09/deck.ytcs<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">            </span>docs/building-a-vehicle/stage-09/deck-sim.yaml
 </pre>
-<p><tt class="docutils literal">tcsverify a.xtcs a.ytcs <span class="pre">a-sim.yaml</span></tt> holds the two spellings to saying the
+<p><tt class="docutils literal"><span class="pre">tcs-verify</span> a.xtcs a.ytcs <span class="pre">a-sim.yaml</span></tt> holds the two spellings to saying the
 same thing.</p>
-<p><tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> adds, after the problems, everything the vehicle
+<p><tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt> adds, after the problems, everything the vehicle
 uses of what must not clash or overflow: each address and port, and who
 binds it; the device ids; message IDs and APIDs, where there are any; and
 the rates that reach the ground, added up. Two things on one socket fail the
@@ -1144,7 +1144,7 @@ Rates to the ground
 <p>A <tt class="docutils literal">?</tt> is what the configuration does not say: the seismometer sends bytes
 of no fixed length, and the camera sends whenever it has a frame. A mission
 fills those in from what it knows of its instruments.</p>
-<p><em>See:</em> the <a class="reference external" href="tcsverify.html">tcsverify manual</a>.</p>
+<p><em>See:</em> the <a class="reference external" href="tcs-verify.html">tcs-verify manual</a>.</p>
 </div>
 <div class="section" id="from-the-desk-to-flight">
 <h1><a class="toc-backref" href="#toc-entry-14">From the desk to flight</a></h1>
@@ -1160,7 +1160,7 @@ ground's agreeing to the configuration.</p>
 <li>The <a class="reference external" href="tcspecial.html">tcspecial manual</a>, for every payload type and
 attribute.</li>
 <li><a class="reference external" href="node-types.html">Writing node types</a>, for what no shipped type does.</li>
-<li>The <a class="reference external" href="tcsgui.html">tcsgui manual</a>, for drawing and editing the
+<li>The <a class="reference external" href="tcs-gui.html">tcs-gui manual</a>, for drawing and editing the
 configuration.</li>
 <li>The <a class="reference external" href="../examples/README.html">examples</a>, which the stages drew on.</li>
 </ul>
@@ -1170,12 +1170,12 @@ configuration.</li>
 <ul class="simple">
 <li>The excerpts above are read from the stage files when the page is made, so
 they cannot say other than the files do.</li>
-<li><tt class="docutils literal">tcsverify/tests/vehicle_guide.rs</tt> verifies every stage with its
+<li><tt class="docutils literal"><span class="pre">tcs-verify/tests/vehicle_guide.rs</span></tt> verifies every stage with its
 simulator file, holds the two spellings to each other, and checks each
 names the interface of the build; <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> and <tt class="docutils literal">make
 comparespellings</tt> take in the stages with the examples.</li>
-<li>The tcsgui drawings are made by <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/screenshots.sh</span></tt>,
-which opens each stage in tcsgui on an X display of its own and captures
+<li>The tcs-gui drawings are made by <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/screenshots.sh</span></tt>,
+which opens each stage in tcs-gui on an X display of its own and captures
 it. The other figures are SVG drawn by hand, their colours the Okabe-Ito
 palette's, each paired with a label, a shape or a line style.</li>
 </ul>

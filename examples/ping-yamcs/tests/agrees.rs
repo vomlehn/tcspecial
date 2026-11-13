@@ -69,12 +69,12 @@ fn the_python_reads_the_configuration_as_the_rust_does() {
             .unwrap_or_else(|| {
                 panic!("the Python says nothing of {name}: {python:?}")
             });
-        // The digest is tcsverify's, which the Python asks for and does not
-        // work out: a build that has not made tcsverify yet leaves it to say
+        // The digest is tcs-verify's, which the Python asks for and does not
+        // work out: a build that has not made tcs-verify yet leaves it to say
         // so, and there is then nothing of the Python's to compare.
         if name == "digest" && ours == "None" {
             eprintln!(
-                "tcsverify is not built, so the Python had no digest to \
+                "tcs-verify is not built, so the Python had no digest to \
                  compare"
             );
             continue;
@@ -150,9 +150,9 @@ fn the_python_counts_payload_telemetry_apids_as_the_rust_does() {
         \x20           </payload>\n\
         \x20       </type>\n\
         \x20   </payloads>\n\
-        \x20   <tcsgui>";
-    assert_eq!(text.matches("    <tcsgui>").count(), 1, "one tcsgui");
-    let text = text.replace("    <tcsgui>", payloads);
+        \x20   <tcs-gui>";
+    assert_eq!(text.matches("    <tcs-gui>").count(), 1, "one tcs-gui");
+    let text = text.replace("    <tcs-gui>", payloads);
     // In a directory of its own, with the file it includes beside it, as in
     // `examples`.
     let dir = tempfile::tempdir().expect("a directory");

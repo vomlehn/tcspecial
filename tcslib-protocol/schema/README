@@ -1,7 +1,7 @@
 Schemas for TCSpecial's configuration files: XTCS, a configuration written in
 XML, and YTCS, the same configuration written in YAML, and the simulator's own
 file in each spelling. Every program that reads a configuration reads one of
-these formats, and tcsgui writes them; the schemas are here, beside
+these formats, and tcs-gui writes them; the schemas are here, beside
 tcslib-protocol's XTCE documents, rather than with any one program.
 
     tcspecial.xsd            XTCS: a configuration, written in XML (.xtcs)
@@ -21,12 +21,12 @@ simulator file may simulate.
 What they do not check is whether a configuration can be flown. Which attributes
 a node of a given type must state, whether two payloads claim one socket,
 whether a vote's inputs are the ones its links bind: those are rules about
-meaning rather than shape, they are tested against real buses, and `tcsverify`
+meaning rather than shape, they are tested against real buses, and `tcs-verify`
 is the one place they live. A file these schemas accept may still be refused,
 and the refusal will say why. See `docs/tcspecial-design.rst`, "What is checked
 before anything runs".
 
-A configuration written by tcsgui already says which schema describes it, so
+A configuration written by tcs-gui already says which schema describes it, so
 an editor opening one needs no setting up: the XML carries
 `xsi:noNamespaceSchemaLocation` on its root element and the YAML carries a
 `# yaml-language-server: $schema=` comment at the top. So does the simulator's

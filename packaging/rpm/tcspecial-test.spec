@@ -5,9 +5,9 @@ Group:          Applications/Engineering
 Requires:       tcspecial = %{version}-%{release}
 
 %description
-tcsmoc, a test mission operations center with a window per payload, and
-tcssim, which simulates the payloads a configuration describes. tcsmoc
-starts the tcspecial installed beside it and tcssim. Also the test segsend,
+tcs-moc, a test mission operations center with a window per payload, and
+tcs-sim, which simulates the payloads a configuration describes. tcs-moc
+starts the tcspecial installed beside it and tcs-sim. Also the test segsend,
 which deletes each filled telemetry log segment it is given. Test software,
 never flown.
 
@@ -30,8 +30,8 @@ fi
 %dir /opt/tcs/sbin
 %dir /opt/tcs/share
 %dir /opt/tcs/share/doc
-/opt/tcs/bin/tcsmoc
-/opt/tcs/bin/tcssim
+/opt/tcs/bin/tcs-moc
+/opt/tcs/bin/tcs-sim
 /opt/tcs/bin/segsend
 %doc /opt/tcs/share/doc/tcspecial-test
 %config(noreplace) /etc/profile.d/tcspecial-test.sh

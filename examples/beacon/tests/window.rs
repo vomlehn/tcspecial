@@ -5,7 +5,7 @@
 //! while the program behind it works perfectly. So it is opened headlessly,
 //! through Slint's testing backend, and the text in it is read back.
 //!
-//! What the panel looks like is `tcsui`'s business and what a beacon means is
+//! What the panel looks like is `tcs-ui`'s business and what a beacon means is
 //! `tcslib_moc::beacon`'s; this is the join.
 
 use std::time::{Duration, SystemTime};
@@ -16,7 +16,7 @@ use slint::ComponentHandle;
 use beacon_example::{show, WatchWindow};
 use tcslib_moc::beacon::{Schedule, NO_BEACON_MESSAGE};
 use tcslib_protocol::NO_TRANSFER_TIME;
-use tcsui::{palette, Shown};
+use tcs_ui::{palette, Shown};
 
 /// What the window has on it, as an operator would read it.
 ///

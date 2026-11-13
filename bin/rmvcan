@@ -12,7 +12,7 @@
 # nothing to undo there; a kernel is left with the module and no buses.
 #
 # Note this takes the bus out from under anything using it. A tcspecial or
-# tcssim still running on vcan0 loses its socket, so do not run this while one
+# tcs-sim still running on vcan0 loses its socket, so do not run this while one
 # of them is up.
 
 set -euo pipefail

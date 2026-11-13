@@ -21,7 +21,7 @@ print(sysconfig.get_path("purelib", "posix_prefix", {"base": "/usr"}))')}
 What a ground station for tcspecial is built on: libtcs_moc_c, the TCSpecial
 MOC Correspondent (tcslib-moc) for C and C++, with its header tcslib-moc-c.h
 and pkg-config file tcslib-moc-c.pc; the Python packages tcslib_protocol (TCS
-Link Support), tcslib_moc (the Correspondent) and tcsui; and tcsgui, the
+Link Support), tcslib_moc (the Correspondent) and tcs_ui; and tcs-gui, the
 graphical configuration editor, with its node descriptions and schemas.
 
 %install
@@ -59,13 +59,13 @@ fi
 %dir /opt/tcs/lib/python3
 %dir /opt/tcs/share
 %dir /opt/tcs/share/doc
-/opt/tcs/bin/tcsgui
+/opt/tcs/bin/tcs-gui
 /opt/tcs/include/tcslib-moc-c.h
 /opt/tcs/lib/libtcs_moc_c.so*
 /opt/tcs/lib/libtcs_moc_c.a
 /opt/tcs/lib/pkgconfig/tcslib-moc-c.pc
 /opt/tcs/lib/python3/site-packages
-/opt/tcs/share/tcsgui
+/opt/tcs/share/tcs-gui
 /opt/tcs/share/tcspecial
 %doc /opt/tcs/share/doc/tcspecial-moc
 %config(noreplace) /etc/ld.so.conf.d/tcspecial-moc.conf

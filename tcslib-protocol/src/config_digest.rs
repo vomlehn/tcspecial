@@ -1,6 +1,6 @@
 //! What the two ends say to each other about the configuration they read.
 //!
-//! Both ends of a link read a payload set: tcsmoc builds its panels from one
+//! Both ends of a link read a payload set: tcs-moc builds its panels from one
 //! and tcspecial serves the handlers of one. Nothing made them prove it was
 //! the same one, and when it was not, the only sign was a command answered
 //! `NotFound` for a payload the operator could see on the screen -- a
@@ -112,7 +112,7 @@ impl std::fmt::Display for ConfigVersion {
 pub struct ConfigDigest(pub [u8; 16]);
 
 impl ConfigDigest {
-    /// Reads a checksum as tcsverify prints it and a beacon carries it: 32
+    /// Reads a checksum as tcs-verify prints it and a beacon carries it: 32
     /// lower-case hex digits.
     ///
     /// # Arguments
@@ -208,13 +208,13 @@ pub fn digest_of_simulator_file<P: AsRef<Path>>(
 /// Writes out what a simulator file is read as: the thing its digest is
 /// taken over.
 ///
-/// The `tcssim` section; the groups of settings, by name, each with every
+/// The `tcs-sim` section; the groups of settings, by name, each with every
 /// setting it states; the simulated payloads, by name, each with its type,
 /// the group it names and every setting it states; and the world, as read:
 /// its ambient temperature, and its physics model's components by name,
 /// each with its type and figures, and its connections in the order of what
 /// they join. Not in it: the description,
-/// which changes nothing tcssim does. Every list is in one order whatever order the file
+/// which changes nothing tcs-sim does. Every list is in one order whatever order the file
 /// wrote it in, nothing in a simulator file or a model being in an order
 /// that means anything, and the keys of a map are put in order as the
 /// digest is taken.
@@ -234,7 +234,7 @@ pub fn interpretation_of_simulator(
     let settings = |settings: &crate::sim_config::SimSettings| -> Value {
         serde_json::to_value(settings).unwrap_or(Value::Null)
     };
-    let tcssim = file.tcssim.as_ref().map(|section| {
+    let tcs_sim = file.tcs_sim.as_ref().map(|section| {
         // The names as one text, as a file writes them, and nothing where
         // there are none: one thermostat interprets as it did before a file
         // could name several.
@@ -292,7 +292,7 @@ pub fn interpretation_of_simulator(
         })
     });
     json!({
-        "tcssim": tcssim,
+        "tcs-sim": tcs_sim,
         "simulated_payload_groups": groups,
         "simulated_payloads": payloads,
         "world": world,
@@ -306,7 +306,7 @@ pub fn interpretation_of_simulator(
 /// format each is written in -- their digests are the same, and every program
 /// that reads them acts on the same thing. Two whose interpretations differ
 /// differ where the trees do, which is what a program comparing two spellings
-/// of one configuration needs to say: see `tcsverify`.
+/// of one configuration needs to say: see `tcs-verify`.
 pub fn interpretation_of_file<P: AsRef<Path>>(
     path: P,
 ) -> TcsResult<serde_json::Value> {
@@ -841,7 +841,7 @@ mod tests {
             dir.path(),
             "one-sim.yaml",
             &format!(
-                "description: one\ntcssim:\n  ready: 127.0.0.1:7999\n\
+                "description: one\ntcs-sim:\n  ready: 127.0.0.1:7999\n\
                  {model}\
                  simulated_payload_groups:\n  - group: g\n    \
                  simulate: true\n  - group: f\n    packet_interval: 1 s\n    \
@@ -861,7 +861,7 @@ mod tests {
              simulated_payload_groups:\n  - group: f\n    simulate: true\n    \
              packet_interval: 1 s\n  - group: g\n    simulate: true\n\
              {reordered}\
-             tcssim:\n  ready: 127.0.0.1:7999\ndescription: two\n"
+             tcs-sim:\n  ready: 127.0.0.1:7999\ndescription: two\n"
         );
         let two = written(dir.path(), "two-sim.yaml", &text);
         let first = digest_of_simulator_file(&one).expect("one digests");

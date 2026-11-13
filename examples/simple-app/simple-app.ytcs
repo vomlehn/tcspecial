@@ -57,7 +57,7 @@ payloads:
         world-out:
           - gateway-1.lorem
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: gateway-1, x: 790, y: 129 }
     - { node: lorem, x: 15, y: 204 }

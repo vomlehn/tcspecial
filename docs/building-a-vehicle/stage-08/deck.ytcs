@@ -86,7 +86,7 @@ gateways:
           - regolith_kelvin
           - seismometer
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: gateway, x: 790, y: 34 }
     - { node: science, x: 299, y: 53 }

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial-sim.schema.json
 
-# How tcssim simulates the payloads of battery.ytcs.
+# How tcs-sim simulates the payloads of battery.ytcs.
 #
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
@@ -14,10 +14,10 @@
 # the shedding changes the current.
 description: Simulator settings for the payloads of battery.ytcs
 
-# Where tcssim answers whether it has made its simulated devices, which
+# Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7910"
 
 # The physics of the battery example's vehicle: its power system, as the
@@ -85,7 +85,7 @@ world:
 
 simulated_payloads:
   - type network:
-      # Driven and never read: tcssim sends nothing, counts each decision the
+      # Driven and never read: tcs-sim sends nothing, counts each decision the
       # vehicle sends it, and sheds the science load while it is told to.
       - payload: science
         connects: science.shed

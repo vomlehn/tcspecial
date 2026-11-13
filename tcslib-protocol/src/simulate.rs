@@ -1,7 +1,7 @@
 //! The simulation mode: how many of a run's payloads may be simulated or
 //! dummy devices.
 //!
-//! Given to tcspecial, tcssim and tcsmoc as `--simulate=<mode>` and never
+//! Given to tcspecial, tcs-sim and tcs-moc as `--simulate=<mode>` and never
 //! written in a configuration, so that the file flown is the file tested,
 //! byte for byte. Read here, once, so that the three programs take the flag
 //! the same way and refuse the same mistakes in the same words. See
@@ -12,7 +12,7 @@
 //! what is at the end of its endpoint and not from what any file says, and
 //! whether a run's payloads are what its mode allows, [`refusals`].
 //!
-//! A simulated device is one tcssim makes: a pseudo-terminal, a socket. A
+//! A simulated device is one tcs-sim makes: a pseudo-terminal, a socket. A
 //! dummy device is one the kernel makes under a real device's name: the
 //! i2c-stub's adapter, a gpio-sim chip, a vcan interface, an iio_dummy
 //! sensor, which the scripts in `bin/` make. How each type's are told apart
@@ -154,7 +154,7 @@ pub fn take_mode(args: Vec<String>) -> Result<(Mode, Vec<String>), String> {
 /// What a payload was found to be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verdict {
-    /// A simulated device: one tcssim makes, a pseudo-terminal or a socket.
+    /// A simulated device: one tcs-sim makes, a pseudo-terminal or a socket.
     Simulated,
     /// A dummy device: one the kernel makes under a real device's name, such
     /// as the i2c-stub's adapter, which the scripts in `bin/` make.
@@ -169,7 +169,7 @@ pub enum Verdict {
     CannotTell,
     /// Nothing is there at all: no file at the path, no interface of the
     /// name. Counted as hardware for the mode, as what cannot be told is; and
-    /// told apart from it for tcssim, for which nothing at a path is where a
+    /// told apart from it for tcs-sim, for which nothing at a path is where a
     /// simulated device it makes is about to go.
     Absent,
 }
@@ -531,11 +531,11 @@ fn split_device(device: u64) -> (u64, u64) {
 const PTY_SLAVE_MAJORS: std::ops::RangeInclusive<u64> = 136..=143;
 
 /// Judges whether a path resolves to a pseudo-terminal's slave, which is what
-/// tcssim makes for a payload reached through a device node: the one
+/// tcs-sim makes for a payload reached through a device node: the one
 /// judgement of serial, spi, rpmsg and device-file payloads, and the second
 /// of an iio one.
 ///
-/// By the device's numbers, after following every link: tcssim links the
+/// By the device's numbers, after following every link: tcs-sim links the
 /// payload's path to the slave it made, and a name under `/dev/pts` is only a
 /// name.
 ///
@@ -584,7 +584,7 @@ pub(crate) fn pseudo_terminal(
 /// simulate -- an app node's program is the thing itself -- and the
 /// gateway is the link the run is commanded over, set up by whoever started
 /// the ground station. A `network` or `device-file` node is a real device,
-/// a socket or a file, whatever answers at its far end: tcssim may be what
+/// a socket or a file, whatever answers at its far end: tcs-sim may be what
 /// does, where the simulator file says so, but the node is the same node
 /// either way, so there is nothing for the mode to tell apart.
 ///
@@ -637,7 +637,7 @@ pub fn judge(host: &Host, node: &Node, mode: Mode) -> Option<Judged> {
         }
     };
     // A node reached at its sim_address, the only network endpoint a counted
-    // node opens -- a GPIO node too, whose lines are then tcssim's.
+    // node opens -- a GPIO node too, whose lines are then tcs-sim's.
     let judged = match reach.simulated_at(mode) {
         Some(at) => payload::network::judged(&at),
         None => judged_at(host, &reach.endpoint),
@@ -775,12 +775,12 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
     }
 }
 
-/// Whether tcssim makes a simulated device of this type for itself -- a
+/// Whether tcs-sim makes a simulated device of this type for itself -- a
 /// pseudo-terminal, a socket -- rather than finding a dummy device the kernel
 /// made, as it does for an I2C bus, a GPIO chip and a CAN interface, which the
 /// scripts in `bin/` make.
 ///
-/// Nothing at the path of one tcssim makes for itself is where it is about to
+/// Nothing at the path of one tcs-sim makes for itself is where it is about to
 /// go; nothing where the kernel's should be is a script that was not run.
 ///
 /// # Arguments
@@ -789,8 +789,8 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
 ///
 /// # Returns
 ///
-/// Whether tcssim makes what it simulates the payload at.
-pub fn tcssim_makes(node_type: &str) -> bool {
+/// Whether tcs-sim makes what it simulates the payload at.
+pub fn tcs_sim_makes(node_type: &str) -> bool {
     !matches!(
         node_type,
         "i2c" | "gpio_in" | "gpio_out" | "gpio_inout" | "can" | "hdlc"
@@ -798,7 +798,7 @@ pub fn tcssim_makes(node_type: &str) -> bool {
 }
 
 /// Says what is wrong, if anything, with a payload's `simulate` against what
-/// is at its endpoint: for tcssim, which compares the two before it
+/// is at its endpoint: for tcs-sim, which compares the two before it
 /// simulates anything. See "Saying Which Payloads Are Simulated" in
 /// docs/tcspecial-design.rst.
 ///
@@ -807,16 +807,16 @@ pub fn tcssim_makes(node_type: &str) -> bool {
 /// false` where it is a simulated or dummy device is a payload meant to be
 /// real that the run would in fact simulate. Nothing at the path is a
 /// disagreement only for a dummy device, which the kernel has to have made
-/// before tcssim starts.
+/// before tcs-sim starts.
 ///
 /// A payload the simulator file does not name is the real device; one whose
 /// endpoint is a simulated or dummy device all the same is refused, so that
-/// every payload simulated is one tcssim controls and shows.
+/// every payload simulated is one tcs-sim controls and shows.
 ///
 /// # Arguments
 ///
 /// * `name`      - The payload's name.
-/// * `node_type` - Its node type, which says whether tcssim makes a
+/// * `node_type` - Its node type, which says whether tcs-sim makes a
 ///                 simulated device for it or finds a dummy device.
 /// * `simulate`  - Its `simulate`, or `None` where the simulator file does
 ///                 not name it.
@@ -836,7 +836,7 @@ pub fn disagreement(
         return judged.is_simulated_or_dummy().then(|| {
             format!(
                 "{name}: {found}, {}, and the simulator file does not name \
-                 it: name it with simulate: true, for tcssim to control it \
+                 it: name it with simulate: true, for tcs-sim to control it \
                  and show it as every other simulated payload is, or point {} \
                  at the real device",
                 judged.kind(),
@@ -848,7 +848,7 @@ pub fn disagreement(
         (true, Verdict::Simulated | Verdict::Dummy)
         | (false, Verdict::Hardware | Verdict::CannotTell) => None,
         (false, Verdict::Absent) => None,
-        (true, Verdict::Absent) if tcssim_makes(node_type) => None,
+        (true, Verdict::Absent) if tcs_sim_makes(node_type) => None,
         (true, _) => Some(format!(
             "{name}: {found}, and the simulator file says simulate: true: {}, \
              or say simulate: false for the real device",
@@ -950,7 +950,7 @@ mod tests {
         )
     }
 
-    /// Makes the judgement of a serial payload on tcssim's pseudo-terminal.
+    /// Makes the judgement of a serial payload on tcs-sim's pseudo-terminal.
     ///
     /// # Returns
     ///
@@ -1057,13 +1057,13 @@ mod tests {
             "a dummy device, and the simulator file says simulate: false"
         ));
 
-        // Nothing yet where tcssim makes the simulated device itself is where
+        // Nothing yet where tcs-sim makes the simulated device itself is where
         // it is about to go; nothing where the kernel's dummy should be is
         // not.
         assert_eq!(disagreement("a", "serial", Some(true), &absent), None);
         assert!(disagreement("a", "i2c", Some(true), &absent).is_some());
 
-        // A dummy device the file leaves out is one tcssim would not
+        // A dummy device the file leaves out is one tcs-sim would not
         // control.
         let said = disagreement("a", "gpio_in", None, &s).expect("refused");
         assert!(said.contains("does not name it"), "{said}");

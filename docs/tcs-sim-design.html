@@ -1,0 +1,1745 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
+<title>tcs-sim Design</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 9511 2024-01-13 09:50:07Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+Despite the name, some widely supported CSS2 features are used.
+
+See https://docutils.sourceforge.io/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: gray; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic, pre.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="tcs-sim-design">
+<h1 class="title">tcs-sim Design</h1>
+
+<div class="contents local topic" id="contents">
+<p class="topic-title"><a class="reference internal" href="#top">Contents</a></p>
+<ul class="simple">
+<li><a class="reference internal" href="#simulator-configuration-files" id="toc-entry-1">Simulator Configuration Files</a><ul>
+<li><a class="reference internal" href="#file-structure" id="toc-entry-2">File Structure</a></li>
+<li><a class="reference internal" href="#what-a-simulated-payload-simulates" id="toc-entry-3">What a Simulated Payload Simulates</a></li>
+<li><a class="reference internal" href="#the-physics-model" id="toc-entry-4">The Physics Model</a></li>
+<li><a class="reference internal" href="#fault-injection" id="toc-entry-5">Fault Injection</a></li>
+<li><a class="reference internal" href="#matching" id="toc-entry-6">Matching</a></li>
+<li><a class="reference internal" href="#example" id="toc-entry-7">Example</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#the-tcs-sim-program" id="toc-entry-8">The tcs-sim program</a><ul>
+<li><a class="reference internal" href="#which-types-can-be-simulated" id="toc-entry-9">Which Types Can Be Simulated</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-10">See Also</a></li>
+</ul>
+</div>
+<p>How tcs-sim, the payload simulator, works and why: the simulator
+configuration it reads, and the program. How a simulated payload is told
+from a real one, and how tcspecial waits for tcs-sim, are in Testing, in
+<a class="reference external" href="tcspecial-design.html#testing">the tcspecial design</a>.</p>
+<div class="section" id="simulator-configuration-files">
+<h1><a class="toc-backref" href="#toc-entry-1">Simulator Configuration Files</a></h1>
+<p>The tcspecial configuration describes payloads. Simulating one takes more than
+that description holds, and the extra is not payload configuration: how often a
+payload produces a packet, and how it divides a packet into segments, are
+choices about a simulation. They are stated in a separate file, which only
+tcs-sim acts on. A shipped pair is <tt class="docutils literal">examples/minimal/minimal.ytcs</tt> and
+<tt class="docutils literal"><span class="pre">minimal-sim.yaml</span></tt> beside it; the parser is <tt class="docutils literal"><span class="pre">tcslib_protocol::sim_config</span></tt>.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The parser lives with the other three configuration languages rather than
+inside tcs-sim. Both GUIs read this file now -- one to simulate payloads
+and one to show what a payload set says about them -- and a configuration
+language read by two programs cannot live inside one of them.</dd>
+</dl>
+<p>The format is chosen from the extension exactly as every other configuration
+file's is, so a simulator configuration may be written in YAML or XML.</p>
+<div class="section" id="file-structure">
+<h2><a class="toc-backref" href="#toc-entry-2">File Structure</a></h2>
+<p>A simulator configuration file has a description of its own, a <tt class="docutils literal"><span class="pre">tcs-sim</span></tt>
+section, which is required, and two sections that are optional.</p>
+<dl class="docutils">
+<dt>tcs-sim</dt>
+<dd><p class="first">What the simulator itself is configured with. Today that is one address:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:4800&quot;</span>
+</pre>
+<p class="last"><tt class="docutils literal">ready</tt> is the UDP address of the readiness socket, where the simulator
+says whether it has made its simulated devices; see <a class="reference external" href="tcspecial-design.html#waiting-for-the-simulator">Waiting for the
+Simulator</a>. It is required, and every shipped simulator file states one.</p>
+</dd>
+<dt>simulated payload groups</dt>
+<dd>Named groups of settings, each named by <tt class="docutils literal">group</tt>. A group carries what
+several simulated payloads have in common, and may say whether they are
+simulated, with <tt class="docutils literal">simulate</tt>.</dd>
+<dt>simulated payloads</dt>
+<dd>The simulated payloads themselves, grouped by type as a configuration's
+nodes are. Each names the data handler it simulates, by <tt class="docutils literal">payload</tt>,
+may name a group, and may state settings of its own. Each
+has <tt class="docutils literal">simulate</tt>, from itself or from its group but not both: see
+<a class="reference external" href="tcspecial-design.html#saying-which-payloads-are-simulated">Saying Which Payloads Are Simulated</a>.</dd>
+</dl>
+<pre class="code yaml literal-block">
+<span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">100 ms</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+
+</span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span>
+</pre>
+<p>In XML a group is <tt class="docutils literal">&lt;group <span class="pre">name=&quot;zone_temps&quot;&gt;</span></tt> in one
+<tt class="docutils literal">&lt;simulated_payload_groups&gt;</tt>, and a payload <tt class="docutils literal">&lt;payload <span class="pre">name=&quot;temp_1&quot;&gt;</span></tt> in
+a <tt class="docutils literal">&lt;type <span class="pre">name=&quot;network&quot;&gt;</span></tt> in one <tt class="docutils literal">&lt;simulated_payloads&gt;</tt>.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload's type is said once, by the entry it is written
+under: <tt class="docutils literal">- type network:</tt> in YAML, <tt class="docutils literal">&lt;type <span class="pre">name=&quot;network&quot;&gt;</span></tt> in XML. A
+payload that says a type of its own is refused, and so is a group that
+says one, a group's payloads each having the type they are written
+under. A type is written once in a file, with at least one payload
+under it, and a word that is no type of payload is refused, listing the
+types.</dd>
+<dt>Requirement</dt>
+<dd>An entry is named by its word -- <tt class="docutils literal">payload</tt> for a simulated payload,
+<tt class="docutils literal">group</tt> for a group, the <tt class="docutils literal">name</tt> attribute of its element in XML --
+and one named by <tt class="docutils literal">name:</tt> is refused, saying how one is named.</dd>
+<dt>Requirement</dt>
+<dd>Nothing in a simulator file is in an order that means anything: not the
+types, not the payloads of one, not the groups, and not the settings of
+an entry. Each list is held in name order, whatever order the file
+wrote it in, and tcs-sim makes and shows its simulated payloads in the
+configuration's order, which is by name.</dd>
+<dt>Requirement</dt>
+<dd>A simulator file in the shape before this one, each payload an entry of
+its own with <tt class="docutils literal">name:</tt> and <tt class="docutils literal">type:</tt> and each group named by <tt class="docutils literal">name:</tt>,
+is refused at the line of its first entry, shown that entry in the shape
+it has now and told that <tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites the file,
+keeping its comments.</dd>
+</dl>
+<p><strong>Settings</strong></p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="28%" />
+<col width="11%" />
+<col width="61%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Attribute</th>
+<th class="head">Type</th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>simulate</td>
+<td>bool</td>
+<td>Whether the payload is simulated: <tt class="docutils literal">true</tt>
+for tcs-sim to simulate it, <tt class="docutils literal">false</tt>
+for the real device. Required, from the
+payload or its group and not both</td>
+</tr>
+<tr><td>packet_interval</td>
+<td>length
+of
+time</td>
+<td>How long between packets, as a length of
+time -- <tt class="docutils literal">1 s</tt>, <tt class="docutils literal">500 ms</tt> -- or
+<tt class="docutils literal">continuous</tt> for as fast as the payload
+can be driven</td>
+</tr>
+<tr><td>segment_interval</td>
+<td>length
+of
+time</td>
+<td>How long between the segments of one
+packet, <tt class="docutils literal">continuous</tt> included. Defaults
+to the packet interval</td>
+</tr>
+<tr><td>segment_size</td>
+<td>number</td>
+<td>Bytes in one segment. Defaults to the whole
+packet, whose size the payload configuration
+gives</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What it simulates.</strong> Neither of these is a setting of the simulation.
+The payload configuration decides both, and they are stated here again only so
+that the two files can be checked against each other.</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="28%" />
+<col width="11%" />
+<col width="61%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Attribute</th>
+<th class="head">Type</th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>type</td>
+<td>string</td>
+<td>The type of payload this simulates, in the
+payload configuration's own word:
+<tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>,
+<tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>,
+<tt class="docutils literal">rpmsg</tt>, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt>,
+<tt class="docutils literal">gpio_inout</tt> or <tt class="docutils literal">hdlc</tt>. Not a
+setting of the entry: the type it is
+written under</td>
+</tr>
+<tr><td>protocol</td>
+<td>string</td>
+<td>Which transport, for a network payload.
+Refused for every other type</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The payload's own end of the link</strong>, which nothing else states:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="28%" />
+<col width="11%" />
+<col width="61%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Attribute</th>
+<th class="head">Type</th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>payload_address</td>
+<td>string</td>
+<td>The socket the payload answers from: a host
+for a UDP payload, a path for a Unix
+datagram one. Optional, and only for those</td>
+</tr>
+<tr><td>payload_port</td>
+<td>number</td>
+<td>The port it answers from. Optional, and
+refused for a Unix datagram payload</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fault injection settings</strong>, each defaulting to no fault at all:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="32%" />
+<col width="11%" />
+<col width="57%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Attribute</th>
+<th class="head">Type</th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>drop_percent</td>
+<td>number</td>
+<td>Packets in a hundred that are never sent</td>
+</tr>
+<tr><td>corrupt_percent</td>
+<td>number</td>
+<td>Packets in a hundred with one byte
+altered</td>
+</tr>
+<tr><td>truncate_percent</td>
+<td>number</td>
+<td>Packets in a hundred sent short of their
+size</td>
+</tr>
+<tr><td>jitter</td>
+<td>length
+of
+time</td>
+<td>How late a packet may be, as a length
+of time, chosen afresh for each one</td>
+</tr>
+<tr><td>silent_after</td>
+<td>number</td>
+<td>Packets after which the payload sends no
+more, the link still open. 0 is never</td>
+</tr>
+<tr><td>close_after</td>
+<td>number</td>
+<td>Packets after which the payload hangs
+up. 0 is never</td>
+</tr>
+<tr><td>ignore_trigger_percent</td>
+<td>number</td>
+<td>Requests in a hundred a triggered
+payload leaves unanswered</td>
+</tr>
+</tbody>
+</table>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload takes each setting it does not state from the group it
+names.</dd>
+<dt>Requirement</dt>
+<dd>A simulated periodic payload has a packet interval, from itself or from
+its group. One with none is an error rather than a payload driven at a
+rate nobody chose.</dd>
+<dt>Requirement</dt>
+<dd>A simulated triggered payload has no packet interval, and stating one is
+an error. It sends when tcspecial asks and at no rate of its own, so an
+interval here would govern nothing -- and a file that gave one has not
+understood which type of payload it is simulating. The segment settings
+still apply: how a payload divides an answer is its own business whichever
+way it was prompted.</dd>
+<dt>Requirement</dt>
+<dd>A simulated triggered payload sends one packet for each request it is
+sent, and nothing otherwise. A payload that answered on a clock as well
+would be two types at once, and no file could say which rate was which.</dd>
+<dt>Requirement</dt>
+<dd>The simulator refuses a triggered payload it cannot hear a request on.
+Tcspecial opens a device and reads it, so there is nothing for the
+simulator to be written to; and an I2C master's own read is the trigger,
+which a second master on the bus cannot see. A payload that answered
+nothing would look exactly like a handler whose polling had stopped
+working.</dd>
+</dl>
+</div>
+<div class="section" id="what-a-simulated-payload-simulates">
+<h2><a class="toc-backref" href="#toc-entry-3">What a Simulated Payload Simulates</a></h2>
+<p>The two files are joined by handler name and by nothing else, and a name is
+exactly what survives a payload set copied from another one. Two sets that
+differ only in how their payload is reached -- one a datagram socket, one a
+stream -- therefore have simulator files that each parse perfectly well
+against the other's payloads, and the run that follows looks like a
+payload that never sends. So each simulated payload says what it simulates,
+and the statement is compared rather than used.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload states the type of payload it simulates, by the type
+it is written under, and a network payload the transport as well.
+Neither is taken from this file: the payload configuration decides both,
+and a payload that stated neither could not be checked against anything.</dd>
+<dt>Requirement</dt>
+<dd>The two files cannot disagree about a payload's type or its transport. A
+disagreement is an error naming the payload and what each file says of it,
+rather than one file overriding the other: both describe the one payload,
+so a disagreement means one of them is not the file that was meant.</dd>
+<dt>Requirement</dt>
+<dd>A transport is stated by a network payload and refused for every other
+type. A line, a bus or a peripheral is not reached by a transport, so one
+stated for it would govern nothing.</dd>
+<dt>Requirement</dt>
+<dd>The type and the transport are written in the same words the payload
+configuration uses, and the error that refuses a word that is neither
+lists the words that would have worked. The spellings are one table read
+from both files, so the two cannot come to disagree about what a type is
+called.</dd>
+<dt>Requirement</dt>
+<dd>Where the payload is is not stated here. The simulator takes it from the
+payload configuration, which decides it, so this file stating it again
+would be a second place to keep in step and nothing gained:
+<tt class="docutils literal">payload_interface</tt> written here -- or <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>, which
+that file spelled it before -- is refused with the file it belongs in, and
+with the pair this file does have.</dd>
+</dl>
+<p>What this file may say about an address is the other end of the same link: the
+socket the simulated payload answers from.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload may be given the socket it binds for itself, as
+<tt class="docutils literal">payload_address</tt> and <tt class="docutils literal">payload_port</tt>. Nothing in the link needs it --
+a handler learns where its payload is from the first packet it gets -- but
+something outside the simulation may: a rule on a firewall, or a capture
+being read afterwards. Stated by neither file otherwise, so there is
+nothing for this to disagree with.</dd>
+<dt>Requirement</dt>
+<dd>Only a datagram payload has an address of its own to bind. A stream
+payload is the end that waits, so it binds the address the payload
+configuration gives it, and a second address stated here would be two
+answers to where it is; a device, a line, a bus or a peripheral has no
+address at all.</dd>
+<dt>Requirement</dt>
+<dd>A Unix datagram payload answers from a path, so it takes a
+<tt class="docutils literal">payload_address</tt> and no <tt class="docutils literal">payload_port</tt>.</dd>
+<dt>Requirement</dt>
+<dd>Neither end may be the other. A payload told to bind its handler's own
+socket is refused here rather than left to fail at the bind, which says
+nothing about which file was wrong: two sockets cannot be one, and the two
+ends of a link are two sockets.</dd>
+<dt>Requirement</dt>
+<dd>A file that states neither gets what every simulator file asked for before
+this existed: any interface and a port the system chooses, or for a Unix
+datagram payload a path beside the handler's.</dd>
+<dt>Requirement</dt>
+<dd>A group may carry the transport, like every other setting a payload does
+not state, and never the type, which is the one a payload is written
+under. A group whose payloads are not all reached the same way leaves the
+transport with the payloads: the thermostat's sensors share a rate and a
+terminal, and two of the three are on a different kind of bus from the
+third.</dd>
+</dl>
+</div>
+<div class="section" id="the-physics-model">
+<h2><a class="toc-backref" href="#toc-entry-4">The Physics Model</a></h2>
+<p>Every other simulated payload makes its bytes up. A buffer filled from a
+random number generator exercises a link and nothing at all of a control loop:
+three sensors sending noise never agree, so the vote over them produces
+nothing anybody can check, and a thermostat downstream of it cannot be watched
+holding a band.</p>
+<p>A physics model is what makes them agree. It is the vehicle's physical parts --
+a zone, the heaters that warm it -- each simulated alone and joined to the
+others, and the simulated payloads are joined to it: the sensors report the
+zone's temperature, each in its own encoding, and the heaters' simulated
+payloads switch the heaters -- so what the vehicle reads is a consequence of
+what the vehicle drove, and the whole loop can be watched closing.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The model is in the simulator file, under <tt class="docutils literal">world: physics:</tt>, beside the
+simulated payloads joined to it, so that one file says the whole of what the
+simulator simulates and a simulated payload's <tt class="docutils literal">connects</tt> names a terminal
+the same file says is there. The world also states <tt class="docutils literal">ambient_temp</tt>, the one
+temperature every thermal mass's surroundings are about, required where
+there is a zone. The world is YAML only: a simulator file written in XML has
+none, and one with a <tt class="docutils literal">world</tt> or a <tt class="docutils literal">physics</tt> element is refused.</dd>
+<dt>Requirement</dt>
+<dd>The shapes a model had before are refused, each told where it goes: a
+simulator file naming a model in a file of its own,
+<tt class="docutils literal">physics: <span class="pre">zone-physics.yaml</span></tt>; such a file given as a simulator file;
+a <tt class="docutils literal">physics</tt> section at the top of a simulator file; a zone stating
+its own <tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt> now; and
+a simulator file that still declares masses itself.</dd>
+<dt>Requirement</dt>
+<dd>The model is the components it is made of, grouped by type as a
+configuration's nodes are, and a list of connections between them, as a
+configuration has links: <tt class="docutils literal">components</tt> and <tt class="docutils literal">connections</tt>, under
+<tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type, <tt class="docutils literal">- type
+heater:</tt>, holding the components of that type, each named by <tt class="docutils literal">component</tt>.
+The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>,
+<tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and <tt class="docutils literal">body</tt>, and a type of any
+other is refused; a <tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was
+called before, is told the name it has now. A type is written once, with a
+component under it. Each type's settings, terminals and rules are stated
+once, in <tt class="docutils literal"><span class="pre">tcslib_protocol::node::physics</span></tt>; its arithmetic is the
+simulator's, in <tt class="docutils literal"><span class="pre">tcs_sim::physics</span></tt>.</dd>
+<dt>Requirement</dt>
+<dd>A <tt class="docutils literal">thermal_mass</tt> has two heaters of its own, <tt class="docutils literal">heater_1</tt> and
+<tt class="docutils literal">heater_2</tt>: inputs taking a decision, each adding its stated
+<tt class="docutils literal">heater_1_power</tt> or <tt class="docutils literal">heater_2_power</tt> to the mass's heat while it is
+on. A heater's switch -- a <tt class="docutils literal">gpio_out</tt> or a <tt class="docutils literal">gpio_inout</tt> -- may then be
+joined straight to the zone it warms, with no heater component between
+them, where nothing about the heater needs modelling but its power. A
+zone whose <tt class="docutils literal">heater_N</tt> is joined and which states no power for it is
+refused, told what to write: a heater that switched and warmed nothing
+would be a model that looked right. Two, and fixed, because a
+component's terminals are its type's, and two heaters on one zone is what
+a vehicle that must not lose its only way to warm it carries.</dd>
+<dt>Requirement</dt>
+<dd>Nothing in a model is in an order that means anything: not the types,
+the components of one, or the connections. The components are held in
+name order and the connections in the order of the names of the
+terminals they join, so that what tcs-sim does with a model is the same
+however it is written: an input that sums is given its outputs in that
+order, and of two events due at one moment, the one whose component's
+name sorts first happens first.</dd>
+<dt>Requirement</dt>
+<dd>A model in the shape before this one, each component with a <tt class="docutils literal">name</tt> and
+a <tt class="docutils literal">type</tt> of its own, is refused at the line of its first component,
+shown it in the shape it has now and told that
+<tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites the file.</dd>
+<dt>Requirement</dt>
+<dd>Each type is one simple part, with its own words for what goes in and
+what comes out, rather than a whole assembly: a heater is switched
+<tt class="docutils literal">on</tt>, gives out <tt class="docutils literal">heat</tt>, draws <tt class="docutils literal">current</tt>, and says whether it is
+<tt class="docutils literal">heating</tt> -- what a line sensing it reads, which is what it is doing
+rather than what it was told; a zone takes
+<tt class="docutils literal">heat</tt> and has a <tt class="docutils literal">temperature</tt>. A vehicle is made by joining parts,
+so a part is written once and a different vehicle is different
+connections.</dd>
+<dt>Requirement</dt>
+<dd>Each type's terminals are fixed. A terminal is an input or an output,
+and carries a value in one unit or a decision: a heater's <tt class="docutils literal">heat</tt> is in
+watts and its <tt class="docutils literal">on</tt> a decision, a zone's <tt class="docutils literal">temperature</tt> in kelvin. A
+connection goes from an output to an input of the same kind, written
+<tt class="docutils literal">from: heater_1.heat</tt> and <tt class="docutils literal">to: zone.heat</tt>, and one joining two
+outputs, two inputs or two kinds is refused, naming both.</dd>
+<dt>Requirement</dt>
+<dd>An input takes one output, or the sum of every output joined to it where
+its type says so: a zone's <tt class="docutils literal">heat</tt> is the sum of its heaters'. A second
+output on an input that takes one, or a connection made twice, is
+refused. An input that must be joined -- a heater's <tt class="docutils literal">on</tt> -- and is
+not, is refused: it is a part nothing can switch.</dd>
+<dt>Requirement</dt>
+<dd>Every figure is written with its unit -- <tt class="docutils literal">&quot;283.15 K&quot;</tt>, <tt class="docutils literal">&quot;60 W&quot;</tt>,
+<tt class="docutils literal">&quot;20 J/K&quot;</tt> -- and one without it, or in another unit, is refused,
+saying what to write. A bare <tt class="docutils literal">60</tt> could be watts or kelvin a second,
+which differ by the zone's heat capacity. A fraction, which has no unit,
+is written bare.</dd>
+<dt>Requirement</dt>
+<dd>A heater states its power at its nominal voltage and that voltage. A
+thermal mass sits in surroundings about the world's <tt class="docutils literal">ambient_temp</tt>,
+and states its time constant -- how long it takes to lose a given
+fraction of the difference between itself and its surroundings -- and
+its heat capacity, which turns a heater's watts into kelvin a second.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload is joined to one terminal by <tt class="docutils literal">connects</tt>, written
+as a connection's end is: <tt class="docutils literal">connects: zone.temperature</tt>. Joined to an
+output, it reports it; joined to an input, it drives it. A terminal the
+model does not have is refused, naming what it has.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload reporting a value sends it in the encoding of the
+conversion its readings go to. One reporting a decision sends the text <tt class="docutils literal">1</tt>
+or <tt class="docutils literal">0</tt>, again every packet interval and at once when it changes: it waits
+on the world for the change, and the world advances itself to each event it
+foresees at that event's moment on the wall clock, so the vehicle hears of a
+touchdown when it happens and not at the simulated payload's next turn.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload driving a decision takes <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, as a thermostat
+sends it. One driving a value takes four bytes of its unit's steps, as every
+value on a link is, and what reaches it must be values in that unit: a node
+sending another is refused, naming both units, since an engine reading
+newtons as a ratio would be at full throttle. The settings that joined a
+payload to a thermal mass, <tt class="docutils literal">reads</tt>, <tt class="docutils literal">heats</tt>, <tt class="docutils literal">output</tt>, <tt class="docutils literal">input</tt> and
+<tt class="docutils literal">rate</tt>, are refused, told what says it now.</dd>
+<dt>Requirement</dt>
+<dd>An input is driven by one simulated payload, and not by a simulated payload
+and a connection. Two would each switch it over the other, and which was in
+force would depend on which the vehicle drove last.</dd>
+<dt>Requirement</dt>
+<dd>A component nothing is joined to -- no connection and no simulated payload
+-- is refused. It would be a state nothing reads and nothing changes, and
+the likeliest cause is a misspelled <tt class="docutils literal">connects</tt>.</dd>
+<dt>Requirement</dt>
+<dd><tt class="docutils literal"><span class="pre">tcs-verify</span></tt> reports every problem with a component at its line in
+the simulator file, a problem with the connections at the world's
+<tt class="docutils literal">connections</tt> line, and one with the ambient temperature at its
+<tt class="docutils literal">ambient_temp</tt> line.</dd>
+</dl>
+<p><strong>How the world advances</strong></p>
+<p>The simulator makes one world of the model, which every simulated payload joined
+to it shares, and nothing ticks.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The world is brought up to a moment only when something needs it there: a
+simulated payload reading an output, or driving an input. A world nobody
+asks about costs nothing.</dd>
+<dt>Requirement</dt>
+<dd>Simulated time tracks the wall clock, a second for a second, because the
+vehicle at the other end of every link runs on the wall clock. It starts
+when the run begins -- the first time a running simulated payload asks the
+world anything -- and not when the world is made: the simulated payloads
+start stopped, and a world running on with nobody joined to it would have a
+lander on the ground before its radar was enabled. The mapping has a rate,
+so that a world can run faster than the wall clock where nothing at the
+other end needs it to keep pace; a run with tcspecial keeps it at one.</dd>
+<dt>Requirement</dt>
+<dd>Between two moments every component is advanced with its inputs held, by
+its type's closed form where there is one, which is exact. The world is
+advanced whenever it is asked, so its intervals are whatever length the
+traffic makes them, and a method whose error grew with the interval
+would make the simulated values depend on how often somebody looked.</dd>
+<dt>Requirement</dt>
+<dd>Where a component's behaviour changes inside an interval -- a battery
+reaching full, a body reaching the ground -- it foresees the moment, as
+its next event. The events wait in a queue, soonest first, one for each
+component, set again whenever the component's inputs change; the world
+advances to each in its order, lets it happen and goes on, so nothing is
+stepped across. The queue's room is the number of components, fixed
+when the world is made, and nothing is allocated once it runs.</dd>
+<dt>Requirement</dt>
+<dd>What is at each input is worked out from every output as it stands at
+the start of an interval, and given again until it settles, so that a
+heater switched on is a zone warmed from that moment and not from the
+next one.</dd>
+<dt>Requirement</dt>
+<dd>A component that foresees its next event at the moment it is already at,
+time after time, is stopped after ten thousand and the log says so: the
+world falls behind rather than every simulated payload waiting on it for
+ever.</dd>
+</dl>
+<p><strong>A thermal mass and its heaters</strong></p>
+<p>A heater's heat goes as the square of its supply voltage and its current as
+the voltage, <tt class="docutils literal">power * (1 + <span class="pre">v)^2</span></tt> and <tt class="docutils literal">power / voltage * (1 + v)</tt> with
+<tt class="docutils literal">v</tt> the supply's departure from nominal, nought while it is off. A zone's
+arithmetic is Newton's cooling with that heat held,</p>
+<pre class="code text literal-block">
+dT/dt = -(T - environment) / time_constant + heat / capacity
+</pre>
+<p>which over an interval has a closed form, and the zone is advanced by that
+rather than integrated:</p>
+<pre class="code text literal-block">
+T(t + dt) = rest + (T - rest) * exp(-dt / time_constant)
+rest      = environment + heat / capacity * time_constant
+</pre>
+<p><tt class="docutils literal">rest</tt> is where the zone would settle with that heat on for ever, and it is
+the figure that says whether the heaters can win at all: with a fifty second
+constant, twenty joules a kelvin and a hundred and twenty watts, it is three
+hundred kelvin above the environment, which is the zone's surroundings: the
+world's <tt class="docutils literal">ambient_temp</tt>, swinging and wandering as the zone says.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A zone starts at the world's <tt class="docutils literal">ambient_temp</tt>, and a heater off, unless the model
+states <tt class="docutils literal">start</tt>, and then there. Coming up cold is the case a
+thermostat exists for, and its first climb is worth watching; a model
+that would rather show the thermostat holding its band from the first
+reading states a start in the band, as the thermostat example's does.
+The start is one fixed figure and never drawn at random, so that every
+run of a model starts alike and two runs can be compared.</dd>
+</dl>
+<p><strong>A power bus</strong></p>
+<p>A sun lights a solar array, the array supplies a bus, loads draw on it, and
+what is left over charges a battery, or, in shadow, what the array cannot give
+the battery makes up.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A sun gives out <tt class="docutils literal">light</tt>, a ratio: one in sunlight and nought in
+shadow. Its orbit's <tt class="docutils literal">period</tt> and the fraction of it in shadow,
+<tt class="docutils literal">eclipse</tt>, are stated, and where round it it starts. The light changes
+all at once, so each change is an event, foreseen from the orbit.</dd>
+<dt>Requirement</dt>
+<dd>A solar array takes <tt class="docutils literal">light</tt> and gives out its full-sun <tt class="docutils literal">current</tt>
+times it, in amperes. The bus of a spacecraft without a regulator sits
+where its battery holds it, on the flat of the array's curve, where its
+current is very nearly its short-circuit figure.</dd>
+<dt>Requirement</dt>
+<dd>A load gives out the <tt class="docutils literal">current</tt> it draws, nought while its decision
+<tt class="docutils literal">shed</tt> is asserted. A load nothing sheds is never shed.</dd>
+<dt>Requirement</dt>
+<dd>A bus takes the sum of the sources joined to its <tt class="docutils literal">supply</tt> and of the
+loads joined to its <tt class="docutils literal">demand</tt>, and gives out what is left over as its
+<tt class="docutils literal">current</tt>. It has no settings: a bus is its connections.</dd>
+<dt>Requirement</dt>
+<dd>A battery takes what the bus has left over, <tt class="docutils literal">offered</tt>, and gives out
+its <tt class="docutils literal">voltage</tt>, the <tt class="docutils literal">current</tt> that actually flows into it, and its
+<tt class="docutils literal">charge</tt>, the fraction of its <tt class="docutils literal">capacity</tt> it holds. Its charge moves
+in a straight line with the current, and its voltage runs straight from
+<tt class="docutils literal">empty</tt> to <tt class="docutils literal">full</tt> with its charge, plus what its <tt class="docutils literal">resistance</tt>
+drops. A straight line reaches full or empty at a moment it can foresee,
+which is its next event, so it is never stepped past either.</dd>
+<dt>Requirement</dt>
+<dd>A full battery takes no current: what would charge it is shunted, as a
+spacecraft's regulator does. An empty one is held at empty, and what is
+drawn is still drawn, its voltage below <tt class="docutils literal">empty</tt> showing it: a cell past
+what it is rated for is outside what the model says.</dd>
+</dl>
+<p><strong>An engine and a body</strong></p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>An engine takes its <tt class="docutils literal">throttle</tt>, a ratio held within nought and one,
+and gives out its <tt class="docutils literal">force</tt>, its full <tt class="docutils literal">thrust</tt> times the throttle, and
+the <tt class="docutils literal">flow</tt> of fuel that burns, the force over its specific impulse
+<tt class="docutils literal">isp</tt> times standard gravity, in kilograms a second. Its <tt class="docutils literal">fuel</tt>
+falls in a straight line with the throttle held, and reaches nought at a
+moment it foresees, its next event; from then on it gives out nothing.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">A body takes the sum of the forces joined to its <tt class="docutils literal">force</tt> and of the
+flows joined to its <tt class="docutils literal">flow</tt>, and gives out its <tt class="docutils literal">altitude</tt>, its
+<tt class="docutils literal">velocity</tt>, up more than nought, and <tt class="docutils literal">contact</tt>, a decision asserted
+on the ground. It falls by the rocket equation with <tt class="docutils literal">gravity</tt>, whose
+closed form with the force and the flow held is</p>
+<pre class="code text literal-block">
+v(t) = v - (F / q) ln(1 - q t / m) - g t
+x(t) = x + v t - g t^2 / 2 + (F m / q^2) h(q t / m)
+h(u) = (1 - u) ln(1 - u) + u
+</pre>
+<p class="last">with <tt class="docutils literal">h</tt> taken by its series where <tt class="docutils literal">u</tt> is small, where its two terms
+would cancel; with no flow it is the constant acceleration's.</p>
+</dd>
+<dt>Requirement</dt>
+<dd>Where a body reaches the ground has no closed form, and is found ahead
+of time, as its next event, by stepping that never passes it: the
+acceleration it has is the least it will have while the force and the
+flow are held, so the earliest it could reach the ground is where it
+would with that acceleration, and each step goes there. The steps close
+on the ground from above until within a micrometre. There it is set
+down, altitude and velocity nought and <tt class="docutils literal">contact</tt> asserted, and stays
+until a force beating its weight lifts it.</dd>
+</dl>
+<p><strong>What the bytes are</strong></p>
+<p>A sensor has to send bytes the vehicle will read back as what it reports, and
+the format, the scale and the offset are not the sensor's own: they are on the
+conversion, <tt class="docutils literal">to_kelvin</tt> or <tt class="docutils literal">to_value</tt>, its readings go to.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The encoding is taken from that node and not stated here. A scale written
+in both files is a scale that can disagree with itself, which would show
+up as a simulated temperature the vehicle reads back as a different one,
+with both files looking right.</dd>
+<dt>Requirement</dt>
+<dd>A sensor whose readings reach no conversion is refused, and so is one
+whose readings reach two, and one whose conversion is in another unit
+than the terminal it reports. The first has no encoding to borrow, the
+second has no single answer, and the third would have a zone's
+temperature read back as volts.</dd>
+<dt>Requirement</dt>
+<dd>A value the format cannot hold is clamped and not wrapped. A wrapped
+count is a sensor reporting the other end of its range, which is a fault
+the vehicle has no way to tell from a reading.</dd>
+</dl>
+<p><strong>What a heater's simulated payload is</strong></p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload that drives sends nothing. Being driven is the whole of
+what it is for, so a packet of its own would be bytes nothing reads.</dd>
+<dt>Requirement</dt>
+<dd>Its packet interval is how often it looks for what the vehicle decided.
+It is the one thing pacing still means for a payload that sends nothing,
+and it is part of how promptly the loop responds: the vehicle cannot see
+a band crossed until its next sample, and the heaters cannot hear about
+it until they next look, so the overshoot is their heat over the sum of
+the two.</dd>
+<dt>Requirement</dt>
+<dd>It acts on the last thing the vehicle said and not on the next thing in the
+queue. A decision is not a reading -- it says what the device should be now
+-- so a vehicle deciding faster than the simulated payload looks must not
+leave it acting on a decision that is older every pass.</dd>
+<dt>Requirement</dt>
+<dd>It must be a kind of payload the simulator can be driven through: a
+socket, or discrete lines on <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, whose simulated payload
+watches the lines the vehicle drives.</dd>
+</dl>
+<p><strong>Physically Realistic Noise</strong></p>
+<p>A simulated sensor that reports the zone exactly agrees with the others to
+the count, and a vote over sensors that always agree is never exercised.
+Real readings go wrong in two places, and a loop treats them differently:
+what goes wrong at a sensor is its own, and a vote can outvote it; what goes
+wrong in the zone every sensor sees, and the heaters must work against it.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A sensor may state the noise on each reading, the accuracy its fixed
+calibration error is drawn within, a slow drift and its time, and its
+own lag, each as a datasheet gives it and in the unit of the terminal it
+reports, which is checked. The calibration error is drawn once a run,
+normally distributed with a third of the accuracy as its standard
+deviation and clamped to the accuracy, which is a bound most parts sit
+well inside.</dd>
+<dt>Requirement</dt>
+<dd>A sensor may state how far the place it is on sits from what its
+terminal says, as its <tt class="docutils literal">offset</tt>: a body warmed in one place is not one
+temperature throughout.</dd>
+<dt>Requirement</dt>
+<dd>A heater may state how its supply voltage varies, and how slowly.</dd>
+<dt>Requirement</dt>
+<dd>A zone may state how its surroundings swing about the world's
+<tt class="docutils literal">ambient_temp</tt> as a sine wave, and over what period, and how they
+wander at random, and how slowly.</dd>
+<dt>Requirement</dt>
+<dd>Everything that wanders is an Ornstein-Uhlenbeck process stepped by its
+exact transition, so that its statistics do not depend on how often it
+is stepped, and starts where a settled one would be. The swing is in
+the zone's equation, whose closed form gains the swing's steady
+response, so it is advanced as exactly as the rest. A wander is held for
+an interval, which is exact for intervals much shorter than its time
+constant.</dd>
+<dt>Requirement</dt>
+<dd>Each component and each sensor draws from a generator of its own, seeded
+from the run's seed and its name, so that a run with the same seed
+varies the same way whatever order the payloads' threads ask in. The
+seed is the <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section's; without one tcs-sim chooses it and
+says which.</dd>
+<dt>Requirement</dt>
+<dd>Every one of these is off unless stated, so a file that states none
+simulates the zone and its sensors exactly.</dd>
+</dl>
+<p><strong>A Simulated Thermostat</strong></p>
+<p>The loop closes through tcspecial when the heaters are joined: the sensors
+report the zone, the vehicle decides, the heaters warm it. To watch the zone and
+the heaters with no tcspecial running, tcs-sim can simulate the vehicle's
+thermostat too. It is <tt class="docutils literal"><span class="pre">tcs_sim::node::vehicle::thermostat</span></tt>, the one vehicle
+node the simulator has: everything else a vehicle computes runs on a workstation
+as it runs aboard.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The simulator file's <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section may name a thermostat node of
+the configuration. tcs-sim then simulates it, taking its <tt class="docutils literal">setpoint</tt>
+and <tt class="docutils literal">half_band</tt> from the configuration, which states them once.</dd>
+<dt>Requirement</dt>
+<dd>Its sensors are the simulated payloads reporting the world whose data
+reaches the node, and its heaters the simulated payloads driving it that
+data from the node reaches. A node that is not a thermostat node, or
+that no such sensor reaches, or that reaches no such heater, is refused.</dd>
+<dt>Requirement</dt>
+<dd>It reads what each sensor's simulated payload sends, as it leaves: a dropped
+reading never arrives, and a truncated or corrupted one arrives as the
+vehicle would see it. The bytes are read as the conversion the sensor feeds
+reads them, <tt class="docutils literal"><span class="pre">Format::counts</span></tt> in tcslib-protocol being the one reading both
+use, and a reading that conversion would refuse is ignored.</dd>
+<dt>Requirement</dt>
+<dd>It decides on the median of each sensor's latest reading, as the example
+votes them, and asserts the decision to every heater on every reading,
+as the thermostat node does aboard.</dd>
+<dt>Requirement</dt>
+<dd>It is never named with tcspecial running, whose own thermostat switches
+the same heaters.</dd>
+</dl>
+</div>
+<div class="section" id="fault-injection">
+<h2><a class="toc-backref" href="#toc-entry-5">Fault Injection</a></h2>
+<p>A payload that always works exercises only the path where everything works.
+The settings above have a simulated payload misbehave in the ways a real one
+does, so that a handler's own counting, framing, timeouts and reconnection can
+be made to happen on purpose rather than waited for.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>Fault injection settings appear in the simulator configuration file only.
+A tcspecial configuration file describes the payloads a mission flies, and
+nothing flying is configured to drop a tenth of its packets; a fault
+stated there would also be read by tcspecial, which must be told what the
+payload is meant to do rather than what the simulator is doing to it.</dd>
+<dt>Requirement</dt>
+<dd>A fault setting is inherited from a group exactly as every other setting
+is. A group of flaky payloads is as much a thing several payloads share as
+a rate is.</dd>
+<dt>Requirement</dt>
+<dd>A percentage is nought to a hundred. A larger number is an error naming
+the setting and the value, because it is a misunderstanding of the unit
+rather than a request for a severer fault.</dd>
+<dt>Requirement</dt>
+<dd>A dropped packet is not counted as sent. The simulator's counters and the
+handler's are what tell a dropped packet from a lost one, and counters
+that agreed about a packet that never existed could not.</dd>
+<dt>Requirement</dt>
+<dd>A corrupted byte is never the byte it was, and a truncated packet is
+always shorter than its size and never empty. A fault that left the data
+as it found it would have a file asking for a tenth of its packets
+corrupted quietly get fewer. A packet of one byte is the exception to
+truncation: there is no length both shorter than one and not empty, so it
+is sent whole, an empty packet being the dropping fault instead.</dd>
+<dt>Requirement</dt>
+<dd>Jitter is waited out before a packet is sent and inside its interval,
+never added to it. A payload told to send every second still sends every
+second, with the packet late within that second. Late and never early:
+early would be the simulator sending sooner than its own configuration
+asked for.</dd>
+<dt>Requirement</dt>
+<dd>A payload that has gone silent keeps its link open. That is what makes it
+worth simulating separately from one that closed: a wedged instrument
+looks to the handler exactly like a healthy link carrying nothing.</dd>
+<dt>Requirement</dt>
+<dd>A payload that hangs up listens again. The handler has to reconnect, which
+is the path being exercised, and a payload gone for the rest of the run
+would exercise it once at most.</dd>
+<dt>Requirement</dt>
+<dd>The simulator refuses a fault the payload could not have. Only a stream
+has a connection to close, so <tt class="docutils literal">close_after</tt> is refused for every other
+type; only a triggered payload is asked for anything, so
+<tt class="docutils literal">ignore_trigger_percent</tt> is refused for a periodic one. Either would
+otherwise sit in the file looking as though it governed something.</dd>
+<dt>Requirement</dt>
+<dd>A payload starting with any fault set says so once, in a line of log. A
+run whose payload was dropping a tenth of its packets should not have to
+be guessed at from the results afterwards.</dd>
+</dl>
+</div>
+<div class="section" id="matching">
+<h2><a class="toc-backref" href="#toc-entry-6">Matching</a></h2>
+<p>The two files are joined by name, not by position: the order of one file has no
+bearing on the other, and a data handler's id is not a row number.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload names a data handler of the tcspecial configuration
+file. A name matching no data handler is an error, because a line that
+matched nothing would otherwise be indistinguishable from a misspelled
+name.</dd>
+<dt>Requirement</dt>
+<dd>Every data handler of the tcspecial configuration file has a simulated
+payload naming it. A handler nothing names is an error, because the
+simulator would otherwise start with a payload that never produces
+anything.</dd>
+<dt>Requirement</dt>
+<dd>A name is defined once in a file. Two groups or two simulated payloads
+sharing a name is an error rather than one silently shadowing the other,
+and as in the payload configuration the rule reaches no further than the
+file: a simulator file names the payloads of the set it belongs to, and
+two sets may name their payloads alike.</dd>
+<dt>Requirement</dt>
+<dd>A word that is not a setting is an error, in a payload, in a group, and in
+the file's own sections. A misspelled setting that was ignored would have
+the simulator do something other than what the file asked for and say
+nothing: a payload asked through a misspelling to drop a tenth of its
+packets drops none, and looks exactly like one that was never asked. A
+group is where such a word hides best, being read once and applying to
+every payload that names it.</dd>
+<dt>Requirement</dt>
+<dd>A group is named by a simulated payload. A group no payload names is an
+error rather than a group with no effect, for the same reason a payload
+configuration's unnamed group is: it is also what a misspelled group name
+looks like. As there, the error is reported from the payload's end.</dd>
+</dl>
+</div>
+<div class="section" id="example">
+<h2><a class="toc-backref" href="#toc-entry-7">Example</a></h2>
+<p>This is the shipped <tt class="docutils literal"><span class="pre">examples/thermostat/thermostat-sim.yaml</span></tt>, a link to
+<tt class="docutils literal"><span class="pre">examples/thermostat-common/thermostat-sim.yaml</span></tt>, which thermostat-yamcs's
+simulator file is a link to too. It simulates the three sensors and the
+two heaters' switches of <tt class="docutils literal">thermostat.ytcs</tt>, joined to its world: one zone
+with two heaters of its own.</p>
+<p>The three sensors are read together and so share a group, which carries
+their rate and the terminal they report; the zone is what makes three
+sensors agree about a temperature, each from a place of its own on it. Each
+heater's switch drives the zone's <tt class="docutils literal">heater_1</tt> or <tt class="docutils literal">heater_2</tt>, which adds
+that heater's power to the zone's heat while the vehicle has it on. Every one
+of them is reached over UDP at its <tt class="docutils literal">sim_address</tt>, where tcs-sim answers, so
+no dummy device is needed. Shortened:</p>
+<pre class="code yaml literal-block">
+<span class="name tag">description</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">Simulator settings for the payloads of thermostat.ytcs and</span><span class="whitespace">
+  </span><span class="literal scalar plain">thermostat-yamcs.ytcs</span><span class="whitespace">
+
+</span><span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;288.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
+  </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
+    </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
+          </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
+            </span><span class="name tag">capacity</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;20</span><span class="name variable"> </span><span class="literal string">J/K&quot;</span><span class="whitespace">
+            </span><span class="name tag">heater_1_power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+            </span><span class="name tag">heater_2_power</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;4</span><span class="name variable"> </span><span class="literal string">W&quot;</span><span class="whitespace">
+            </span><span class="name tag">time_constant</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;50</span><span class="name variable"> </span><span class="literal string">s&quot;</span><span class="whitespace">
+
+</span><span class="name tag">simulated_payload_groups</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+    </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.temperature</span><span class="whitespace">
+    </span><span class="name tag">packet_interval</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span><span class="whitespace">
+    </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+
+</span><span class="name tag">simulated_payloads</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gpio_inout</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio-out-tmass1</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_1</span><span class="whitespace">
+        </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">gpio-out-tmass2</span><span class="whitespace">
+        </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone.heater_2</span><span class="whitespace">
+        </span><span class="name tag">simulate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">true</span><span class="whitespace">
+
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type i2c_tmass</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_1</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_2</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">+0.2 K</span><span class="whitespace">
+
+  </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type spi_tmass</span><span class="punctuation">:</span><span class="whitespace">
+      </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">temp_3</span><span class="whitespace">
+        </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone_temps</span><span class="whitespace">
+        </span><span class="name tag">offset</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">-0.3 K</span>
+</pre>
+</div>
+</div>
+<div class="section" id="the-tcs-sim-program">
+<h1><a class="toc-backref" href="#toc-entry-8">The tcs-sim program</a></h1>
+<p>Tcs-sim is a GUI simulating the payloads. It reads two files. The payload
+definition comes from the configuration, named by the <tt class="docutils literal">SIM_PAYLOAD_CONFIG_PATH</tt>
+environment variable when that is set, and says which payloads exist, how each
+is reached, and how big its packets are. What simulating them takes comes from
+the simulator file beside it, named by <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>; see <a class="reference internal" href="#simulator-configuration-files">Simulator Configuration
+Files</a>.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A tcspecial configuration file describes payloads and says nothing about
+simulating them. How often a payload produces a packet, and how a packet is
+divided into segments, are properties of a simulation rather than of a
+payload, and are stated in the simulator configuration file.</dd>
+</dl>
+<p>The two are joined by name: a simulated payload names the data handler it stands
+in for. Neither file is read in the order of the other.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>Every simulated payload names a data handler of the tcspecial
+configuration. A name that matches none is reported rather than simulated
+around, because a misspelled name is otherwise indistinguishable from a
+payload deliberately left out.</dd>
+<dt>Requirement</dt>
+<dd>A data handler the simulator file does not name is not simulated, and
+whether a run may have one is for the simulation mode to say: under
+<tt class="docutils literal">all</tt> every payload must be a simulated or dummy device, and under
+<tt class="docutils literal">none</tt> tcs-sim does
+not run. See <a class="reference external" href="tcspecial-design.html#simulation-modes">Simulation Modes</a>. Every handler was once required to be
+named, which left no way to write a configuration that is part hardware
+and part simulation.</dd>
+</dl>
+<div class="section" id="which-types-can-be-simulated">
+<h2><a class="toc-backref" href="#toc-entry-9">Which Types Can Be Simulated</a></h2>
+<p>A simulated payload has to be whatever is at the far end of its handler's
+payload endpoint, and the types of endpoint are not equally easy to be. The
+<tt class="docutils literal">can</tt>, <tt class="docutils literal">iio</tt>, <tt class="docutils literal">rpmsg</tt> and GPIO types are covered where each of them
+is: a CAN bus of peers, a sensor's buffer, a channel to another core and a set
+of discrete lines.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A synchronous line is the one type nothing can simulate at its own
+endpoint. Every other type has a dummy device in the kernel to be --
+<tt class="docutils literal">vcan</tt>, <tt class="docutils literal"><span class="pre">i2c-stub</span></tt>, <tt class="docutils literal"><span class="pre">gpio-sim</span></tt>, <tt class="docutils literal">iio_dummy</tt> -- or a
+pseudo-terminal to be simulated on, and generic HDLC has nothing: there
+is no virtual HDLC interface, so such a payload needs a card. One whose
+node gives a <tt class="docutils literal">sim_address</tt> is simulated over UDP there (see <a class="reference external" href="tcspecial-design.html#saying-which-payloads-are-simulated">Saying
+Which Payloads Are Simulated</a>); one that gives none is refused where
+the simulator is asked to simulate it, naming the interface and what a
+card would be, rather than becoming a payload that looks simulated and
+is not.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload of a network endpoint is a socket of the configured
+protocol, for all four of them. A stream payload listens; a datagram
+payload sends to where the handler waits.</dd>
+</dl>
+<p>The four divide in two, and which end binds divides with them. A TCP or
+Unix-stream payload listens at the configured address and the handler connects
+to it. A UDP or Unix-datagram payload that is read and not asked sends first,
+so the handler binds that address and the payload reaches out to it; one that
+is asked or driven is spoken to first, so it binds the address and the
+handler reaches out.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A Unix-domain socket's address is a path, which outlives the process that
+bound it, so what is already at that path is looked at before binding. A
+socket nothing answers was left by a run that was killed rather than
+stopped and is replaced; a socket something answers belongs to something
+running and is left alone, with what is there reported; anything that is
+not a socket is left alone too.</dd>
+<dt>Requirement</dt>
+<dd>A simulated Unix-datagram payload binds a path of its own, beside the
+handler's, so that the handler can answer it. A datagram socket with no
+path of its own cannot be sent to, where a UDP one gets an address for
+nothing from its port. The path is derived from the handler's rather than
+configured, since nothing need name it: the handler learns where its
+payload is from the first datagram, as it does over UDP.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload of a device endpoint produces data and counts it.
+Tcspecial opens and reads the device itself, so there is nothing for the
+simulator to write to and the pacing is the whole of the behaviour.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload of a serial endpoint is a pseudo-terminal. Its slave
+is a device file with a line discipline behind it, so the handler opens it,
+sets it to the rate and framing its configuration gives, and reads and
+writes it as it would a real port; the simulator holds the master.</dd>
+</dl>
+<p>A pty is a line in every respect but the one it cannot be: the kernel accepts
+a data rate and ignores it, so bytes cross at memory speed whatever the
+configuration says. A simulated line therefore exercises the handler's reading,
+its writing and the terms it sets, and says nothing about whether the rate is
+one the cable would carry.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The path the handler was told to open is made a symbolic link to the pty's
+slave for as long as the simulated payload runs, the slave's own name being
+the kernel's to choose. The link is removed when the payload stops.</dd>
+<dt>Requirement</dt>
+<dd>A path that is anything other than a link the simulator itself made is left
+alone, and what is there is reported. A simulator that unlinked
+<tt class="docutils literal">/dev/ttyS0</tt> to simulate it would be worse than one that could not,
+and a tcspecial configuration meant for simulation can name a path the
+simulator may create.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload of an I2C endpoint is a chip of the kernel's
+<tt class="docutils literal"><span class="pre">i2c-stub</span></tt>. That adapter's chips are a bank of registers in memory and
+every master on the bus reads and writes the same bank, so the bank is the
+payload: the simulator writes packets into it and the handler reads them
+out.</dd>
+</dl>
+<p>Nothing in user space can answer an address on a bus, which is why this is the
+one type of simulated payload that is not the far end of anything. It has two
+consequences worth stating.</p>
+<p>The first is that a bus is a register and not a stream. Bytes do not queue: a
+handler reads whatever is in the register now, so it may read one packet twice
+or miss one altogether, depending on how its reading falls against the packet
+interval. That is also true of a real sensor read over a bus, and is why a
+payload link over a bus is a different thing from one over a line.</p>
+<p>The second is that the simulator does not create the bus. <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> is a
+kernel module, loading it needs root, and the addresses its chips answer at are
+fixed when it is loaded.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The simulator finds a stub bus by name among the kernel's adapters, since
+their numbers are assigned as they are found and a tcspecial configuration
+cannot know which number the stub will have. With none loaded, or with no
+chip at the configured address, what is reported is the command that would
+put it there.</dd>
+<dt>Requirement</dt>
+<dd>A handler asks the adapter behind its bus what transfers it can do, and
+uses raw I2C where that is offered and SMBus block transfers to a single
+register where it is not. <tt class="docutils literal"><span class="pre">i2c-stub</span></tt> has no raw transfer at all -- a
+plain read of it fails -- so a handler that assumed raw transfers could
+talk to real hardware and never to a simulated bus.</dd>
+</dl>
+<p>A block transfer carries at most thirty-two bytes, so a segment of a packet on
+a bus is capped at that: the packet size is a property of the payload and the
+thirty-two is a property of SMBus, and the smaller of the two wins without the
+file being refused.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulated payload of a SPI endpoint is a pseudo-terminal, as a serial
+one is, and carries a peripheral's bytes and none of its clocking.</dd>
+</dl>
+<p>This is the weakest of the simulated devices and the one place the simulator is
+openly not the thing it simulates. Nothing emulates a SPI peripheral: a
+peripheral is what a controller clocks, and nothing in user space can be
+clocked. What a pty offers is the bytes -- a packet, in its segments, at its
+pace -- and no clock, no mode, no chip select and no word width.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A handler takes a terminal at the end of a SPI path as a simulated
+peripheral: it carries bytes on it, says once in the log that it is doing
+so, and does not apply the configured clocking to it, there being nothing
+to apply it to. Anything else that is not a spidev node is refused.</dd>
+</dl>
+<p>The narrowness is the point. A terminal is what a simulated device is, and a
+handler
+that accepted any node it could open would open a wrongly configured path
+confidently -- which is the fault the types were separated to prevent.</p>
+<p>What such a link tests is a handler's reading and writing of a peripheral and
+the pacing of a payload that produces data in blocks. What it cannot test is
+whether the peripheral would stand being clocked that way, which is a question
+for the peripheral.</p>
+<p>So every type of endpoint, and every protocol of the network type, can be
+simulated. The simulated devices are not all of one quality, and that is the
+thing to keep in view rather than the coverage: a socket is a socket and a pty
+is a line in all but its rate, while a bus is a register bank that every master
+shares and a SPI peripheral is a pty with no clock behind it. Each type's own
+file says which it is.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A handler opens a payload device with <tt class="docutils literal">O_NOCTTY</tt>. A device that is a
+terminal -- a real serial port, or a pty simulating one -- otherwise
+becomes the controlling terminal of the process that opened it, and then a
+read from a background process group stops the handler with <tt class="docutils literal">SIGTTIN</tt>
+and a hangup kills it with <tt class="docutils literal">SIGHUP</tt>, for reasons that have nothing to do
+with the payload.</dd>
+</dl>
+<p>The window is built from the two files. Nothing in the GUI names a payload or
+fixes how many there are, so a payload added to or removed from the files adds
+or removes a panel.</p>
+<p>Each payload occupies a portion of the window, displaying its name, configuration,
+and statistics. It also displays when a packet last went each way.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A panel shows the time of the last packet sent and the time of the last
+packet received, and the head of each. A count says how much has moved
+since the payload started, and only a time says whether any of it is
+moving now: a payload stopped ten minutes ago and one sending every
+second look identical by their counts a moment after either is looked at.
+The bytes are what say the traffic is the traffic that was expected
+rather than merely traffic.</dd>
+<dt>Requirement</dt>
+<dd>The time is taken when the packet moves, not when the window next looks.
+A time stamped by the refresh would creep forward on a payload that had
+stopped sending, which is the fault tcs-moc's samples avoid for the same
+reason.</dd>
+<dt>Requirement</dt>
+<dd>A payload counts a packet and times it in one operation, so a count
+cannot move without the time moving with it.</dd>
+<dt>Requirement</dt>
+<dd>A direction nothing has gone in shows <tt class="docutils literal"><span class="pre">--:--:--</span></tt>, as tcs-moc's panels do.
+A payload that has sent nothing has no time to show, which is a different
+thing from one that sent something at midnight.</dd>
+<dt>Requirement</dt>
+<dd>A panel shows a line for a direction only where that direction can carry
+something. A simulated payload that sends of its own accord is never
+spoken to, so tcs-sim shows it no received line; a handler whose payload
+sends of its own accord is never asked anything, so tcs-moc shows it no
+sent line. Either would otherwise read the same from the first packet of
+a run to the last, which is a row of a panel spent saying that nothing
+can happen there.</dd>
+<dt>Requirement</dt>
+<dd>The line stays and the items on it go. Every panel is then the same shape,
+and the rows below do not move from one panel to the next -- a grid of
+ragged panels is harder to read across than a grid with a blank line in
+it.</dd>
+<dt>Requirement</dt>
+<dd>Every panel of a row is the same width, whatever type of payload it is
+for.</dd>
+</dl>
+<p>The items go by their text going empty rather than by each of them being
+conditional, and that is the whole of why. A layout whose children come and go
+is measured differently from one whose children are always there: with the
+three texts of tcs-moc's sent line behind an <tt class="docutils literal">if</tt>, the two payloads of set 2
+came out 196 and 458 pixels wide -- the triggered one taking every pixel of
+slack in the row and the other sitting at its minimum, which says nothing
+about either payload and reads as a window that has gone wrong. Empty text
+draws nothing, so the line still shows no label and no reading. A test
+measures the widths of a mixed row and of a row of each type alone.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A payload keeps the same sample of a transfer that a data handler keeps:
+the time, the head of the data, and the whole length. The two programs
+show the one transfer from opposite ends of a link, so a payload keeping
+something else would have the two panels disagree about what moved.</dd>
+<dt>Requirement</dt>
+<dd>Both programs show a time and a sample the same way: the time of day, in
+UTC, with the date and the fraction of a second dropped, and the bytes as
+hex pairs with an ellipsis where the transfer was longer than the sample.
+Tcs-moc's panels and tcs-sim's are read side by side while a link is being
+watched, so one of them showing local time would make a transfer look an
+hour old, and a byte written differently would look like a difference in
+the data. The formatting is one function both call.</dd>
+</dl>
+<p>The packet size and interval can be changed, as can the segment size and
+interval. Each starts at what the files gave it: the packet size from the
+tcspecial configuration, the rest from the simulator file.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A segment is a piece of a packet, so a segment larger than the packet is
+refused. Equal is the ordinary case -- a packet sent in one segment, which
+is what a simulator file stating no segment size asks for -- so only a
+segment strictly larger than the packet is wrong.</dd>
+<dt>Requirement</dt>
+<dd>A pair of sizes that cannot be sent is said at once and the button that
+would start the payload is taken away until they can be. Either alone
+would be worse: a message with the button still there invites a press that
+does something nobody asked for, and a button that had quietly stopped
+working would leave someone pressing it and wondering.</dd>
+<dt>Requirement</dt>
+<dd>What is said names both sizes and both ways out of it. The two spin boxes
+are side by side and either can be the one that was meant to change, so a
+message naming only one of them answers half the question.</dd>
+<dt>Requirement</dt>
+<dd>The message is taken back by the edit that makes the sizes sendable
+again. An open popup still saying the sizes cannot be sent, after they
+can, is the wrong answer left on the screen.</dd>
+<dt>Requirement</dt>
+<dd>The two sizes are checked when the files are read, not only when a spin box
+is touched. A simulator file may state a segment larger than the packet the
+tcspecial configuration gives, and a panel that said nothing until it was
+edited would have the payload refuse to start for no stated reason.</dd>
+<dt>Requirement</dt>
+<dd>Only starting is refused. A payload already sending when its sizes stop
+agreeing offers <tt class="docutils literal">Disable</tt> as ever, and a press of it stops the
+payload. The button was taken away whatever the payload was doing, so a
+payload running when its sizes went wrong could not be stopped until
+they were put right, and went on sending them meanwhile -- the one
+thing the refusal is there to prevent.</dd>
+<dt>Requirement</dt>
+<dd>A payload that <tt class="docutils literal"><span class="pre">--sending</span></tt> or its simulator file's <tt class="docutils literal">enable</tt> would
+start is not started while its files give sizes that cannot be sent.
+It is started as though its <tt class="docutils literal">Enable</tt> had been pressed, and that press
+would be refused; tcs-sim says so as it starts, and the panel says why.</dd>
+<dt>Requirement</dt>
+<dd>The window decides neither. It asks for the two sizes to be judged and
+obeys the answer -- showing what it says and disabling the button that
+starts the payload while it says anything -- so there is one rule
+rather than one in each place that acts on it. Rust holds a press to
+the same answer, so an <tt class="docutils literal">Enable</tt> that reached it while the sizes cannot
+be sent starts nothing.</dd>
+<dt>Requirement</dt>
+<dd>The popup that says the sizes cannot be sent is as tall as what it
+says, and hangs under the panel's buttons, so that it hides neither the
+two sizes nor whether the payload can be started. It was a fixed size
+that the sentence ran out of, hung over the spin box just stepped.</dd>
+</dl>
+<p>Each panel has two buttons: one that starts and stops the payload, and one
+that shows the whole of what the two files said about it.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>The button that starts and stops a payload is labelled with what pressing
+it will do. A payload that is sending offers <tt class="docutils literal">Disable</tt>, which stops it;
+a payload that is not offers <tt class="docutils literal">Enable</tt>, which starts it. There were two
+buttons, Start and Stop, and either was pressable whatever the payload was
+doing: a Stop on a payload that was not sending did nothing and read as
+though it had.</dd>
+<dt>Requirement</dt>
+<dd>One button here where the MOC's panels have two, because a press in this
+window is the act itself: it starts or stops a payload in this same
+program, so it cannot be lost and there is never a reason to make it
+twice. The status the label is built from is this program's own knowledge
+of its own payload, so the press it offers is the press that is wanted.
+The MOC presses across a link to a spacecraft, where a command may not
+arrive and may have to be sent again; see the MOC's panels for why that
+takes two buttons.</dd>
+<dt>Requirement</dt>
+<dd>Both windows label those two presses the same way. <tt class="docutils literal">Enable</tt> and
+<tt class="docutils literal">Disable</tt> in the MOC's panels and in the simulator's, so that one state
+is said one way in the two windows an operator reads side by side. The
+simulator said <tt class="docutils literal">Send</tt> and <tt class="docutils literal">Silent</tt> -- the payload's own words, the
+payload being the thing that sends -- which read well in one window alone
+and left the reader of both translating.</dd>
+<dt>Requirement</dt>
+<dd>Which way a press goes is decided by the status the label was made from.
+The window builds the label and the program decides what to do, so the two
+are checked against each other: a button that offered one thing and did
+the other would be worse than either button alone.</dd>
+<dt>Requirement</dt>
+<dd>A payload starts disabled unless its simulator file's <tt class="docutils literal">enable</tt> is
+<tt class="docutils literal">true</tt>, its own or its group's, a payload's own overriding the group's:
+<tt class="docutils literal">enable: true</tt> in YAML and <tt class="docutils literal">&lt;enable <span class="pre">value=&quot;true&quot;/&gt;</span></tt> in XML. Then it
+starts as though its <tt class="docutils literal">Enable</tt> had been pressed. Disabled is the
+default, so that a simulator never starts sending what nobody asked for,
+and a run that wants a payload sending from the start says which in the
+file it is run with rather than in a flag for every payload at once.
+<tt class="docutils literal"><span class="pre">--sending</span></tt> still starts every payload. <tt class="docutils literal">enable</tt> is the simulator's
+alone: tcspecial never reads the simulator file, and a configuration
+that flies says nothing of what a simulator does.</dd>
+<dt>Requirement</dt>
+<dd>A payload that failed to start offers <tt class="docutils literal">Enable</tt> again. It is not
+sending, which is what its status says, and the useful thing to offer is
+the start that failed rather than a stop of something that never began.</dd>
+<dt>Requirement</dt>
+<dd>For a part the vehicle drives -- a heater -- the same button is the
+part's power. Disabled, it is unpowered, or has failed, and stays off
+whatever the vehicle or a thermostat tcs-sim simulates decides: it
+gives the world nothing. What it is sent meanwhile is kept, the latest
+replacing the one before, and <tt class="docutils literal">Enable</tt> applies that at once, because
+the vehicle sends a decision only when it changes and a heater waiting
+for the next one would sit cold through a whole band. One button and not
+a second control: a heater sends nothing, so its button had nothing else
+to mean. Nothing aboard changes, and the ground sees a disabled heater
+only through the temperature, which is the point of being able to
+disable one.</dd>
+<dt>Requirement</dt>
+<dd>A heater's panel says what it is doing in words -- <tt class="docutils literal">heating</tt>,
+<tt class="docutils literal">off</tt>, or <tt class="docutils literal">disabled, so off</tt> -- on the line where another payload's
+says what it last sent, a heater sending nothing. Words, so that the
+state is never told by a colour alone.</dd>
+<dt>Requirement</dt>
+<dd>The words follow the name of the heater the panel switches, so that no
+two panels say the same thing of different heaters. A switch joined to
+a <tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt> names the component, <tt class="docutils literal">heater_1:
+heating</tt>; one joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or
+<tt class="docutils literal">heater_2</tt> names the mass and the input, <tt class="docutils literal">zone.heater_2: off</tt>. The
+thermostat example's two switches both named the zone they are joined
+to, and said <tt class="docutils literal">on</tt> rather than <tt class="docutils literal">heating</tt>, so that its two heaters'
+panels read <tt class="docutils literal">zone: on</tt> alike.</dd>
+<dt>Requirement</dt>
+<dd>A row of text in a panel is the height of its text, which is the window's
+type. Rows told a height of their own, fourteen and eighteen pixels in
+type of twelve points, cut off every descender and underscore --
+<tt class="docutils literal">temp_1</tt> read <tt class="docutils literal">temp 1</tt> -- and left the packet count half under the
+next row of panels.</dd>
+<dt>Requirement</dt>
+<dd>Each panel has a button that shows every parameter read from the two
+configuration files for that payload, in both programs. What a panel has
+room for is a name, a size and what has moved; a payload set says a good
+deal more than that -- a trigger, a line rate, a slave address, a clock
+mode, a fault -- and until this there was nowhere to see it but the files
+themselves, which is no use for telling what the program actually read.</dd>
+<dt>Requirement</dt>
+<dd>That button is labelled <tt class="docutils literal">Configuration</tt> in both programs and sits to the
+right of the button that starts and stops the payload. The press a panel
+is opened to make comes first, and one word for one button means an
+operator reading the two windows side by side is not told that a <tt class="docutils literal">Config</tt>
+and a <tt class="docutils literal">Configuration</tt> are the same thing. The MOC's was abbreviated while
+its panel was narrower than the word; the panel is wider now, which is
+what that cost.</dd>
+<dt>Requirement</dt>
+<dd>Both halves are shown and each is said to come from the file it came from.
+One is flight configuration, which tcspecial serves and the ground
+controls; the other is how a simulated payload behaves and reaches no
+spacecraft at
+all. A list that mixed them would have someone reading a drop percentage
+as something a payload does.</dd>
+<dt>Requirement</dt>
+<dd>Nothing shown is a measurement. What a payload has done is on the panel
+itself, and a list that mixed the two would leave no way to tell a
+configured value from an observed one.</dd>
+<dt>Requirement</dt>
+<dd>What it shows scrolls, so the foot of a list longer than the popup --
+where the faults are -- can be reached.</dd>
+<dt>Requirement</dt>
+<dd>Only the attributes of the payload's own type are shown, and only the
+faults that were asked for. A device has no protocol and a bus no port;
+six faults of nought say less about a payload than the one that was set.</dd>
+<dt>Requirement</dt>
+<dd>A value the files did not state is shown as what the program will use
+instead, said to be that rather than passed off as a statement. A handler
+with no OC address says it cannot be started, since that is what the
+absence means.</dd>
+<dt>Requirement</dt>
+<dd>Both programs describe a payload with one function. They show the same
+payload set from opposite ends of a link, so two descriptions would be two
+things to keep in step and a difference between them would read as a
+difference in the configuration.</dd>
+<dt>Requirement</dt>
+<dd>Tcs-moc reads the simulator configuration to show it, and does not require
+it. The MOC controls payloads and simulates nothing, so a simulator file
+that is missing, unreadable, or written for another tcspecial configuration
+costs it that half of what a panel can show and nothing else; it says so
+once on the way past, and the panel says so where the parameters are shown.</dd>
+</dl>
+<p>The panels are laid out in a grid whose shape follows from how many there are.
+A row is filled before another is started under it, three panels across, which
+is the rule tcs-moc follows and for the same reasons given there.</p>
+<p>It replaced one that kept the window wider than tall and chose the shape
+nearest square among those that were. The claim here used to be that the two
+rules came to the same thing for the counts the shipped sets have. They did
+not: five payloads went into two columns and three rows, because a 680x620
+window is squarer than a 1062x476 one, so the set went down the window instead
+of across it. Squareness was never the thing wanted either -- it was a proxy
+for a window that fits a screen, and a column count says that directly.</p>
+<p>How many columns there are is worked out in the window rather than handed over
+by Rust, from the width the window has at the time, so dragging a window wider
+reflows the grid into the room that appeared. Rust opens the window wide enough
+for the columns the payload count calls for, and because it opens it at exactly
+that many panels' width plus the chrome, the window arrives at the same count.</p>
+<p>The five sources of the thermostat example give a row of three and a row of two in a
+1206x764 window. The size is the one <tt class="docutils literal">window_size</tt> gives, which a test reads
+out of this document so that the number here cannot quietly stop being the one
+the program opens at.</p>
+</div>
+</div>
+<div class="section" id="see-also">
+<h1><a class="toc-backref" href="#toc-entry-10">See Also</a></h1>
+<dl class="docutils">
+<dt><a class="reference external" href="design.html">The TCSpecial design documents</a></dt>
+<dd>What each of TCSpecial's design documents covers.</dd>
+<dt><a class="reference external" href="tcspecial-design.html">The tcspecial design</a></dt>
+<dd>The flight software and what the programs share: the node architecture,
+the link, fault resiliency and the requirements.</dd>
+<dt><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a></dt>
+<dd>Using tcs-sim and writing its configuration.</dd>
+</dl>
+</div>
+</div>
+</body>
+</html>

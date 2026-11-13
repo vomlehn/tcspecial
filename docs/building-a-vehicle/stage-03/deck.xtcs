@@ -136,12 +136,12 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="gateway" x="790" y="34"/>
             <node name="regolith_kelvin" x="299" y="129"/>
             <node name="regolith_thermometer" x="34" y="129"/>
             <node name="seismometer" x="34" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

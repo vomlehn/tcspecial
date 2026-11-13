@@ -6,7 +6,7 @@
 # one rather than through a device file, and a host with no CAN hardware has
 # none at all. The kernel's vcan driver supplies one: a bus with no wire, no
 # bitrate and no carrier, whose members are the sockets bound to it. That is
-# enough for both ends to be real -- tcssim joins the bus as one member and
+# enough for both ends to be real -- tcs-sim joins the bus as one member and
 # tcspecial's handler as another -- which is why the CAN kind is the one
 # experimental payload whose dummy device is as faithful as a socket.
 #
@@ -21,7 +21,7 @@ set -euo pipefail
 # The bus to end up with, overridable as the first argument.
 #
 # vcan0 by default because that is the name the tests look for: a_virtual_bus()
-# in tcssim/src/payload_can.rs and tcspecial/src/endpoint_can.rs probes vcan0
+# in tcs-sim/src/payload_can.rs and tcspecial/src/endpoint_can.rs probes vcan0
 # through vcan3 and takes the first one that is up, so a bus under any other
 # name is a bus the tests will not find unless it is in that range.
 interface="${1:-vcan0}"

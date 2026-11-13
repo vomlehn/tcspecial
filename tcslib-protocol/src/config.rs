@@ -10,23 +10,23 @@ use crate::{ConfigFormat, TcsError};
 /// Which environment variable names each program's payload configuration, and
 /// what every one of them reads when its variable is unset.
 ///
-/// Each program has its own variable because tcsmoc starts the other two as
+/// Each program has its own variable because tcs-moc starts the other two as
 /// subprocesses, which inherit its environment: one shared name could not
-/// point tcsmoc at one file and its children at another. Tcsmoc itself takes
+/// point tcs-moc at one file and its children at another. Tcs-moc itself takes
 /// its file as a command line argument, for the same reason, and then sets
 /// each child's variable on that child's own command.
 ///
 /// They live here, in the library every one of them reads its configuration
-/// through, rather than in the programs: the name tcsmoc sets for a child is
+/// through, rather than in the programs: the name tcs-moc sets for a child is
 /// then the same constant the child reads, checked by the compiler rather than
 /// by two string literals being kept equal by hand.
 pub const PAYLOAD_CONFIG_PATH_VAR: &str = "PAYLOAD_CONFIG_PATH";
 
-/// Which environment variable names tcssim's payload configuration.
+/// Which environment variable names tcs-sim's payload configuration.
 ///
-/// See [`PAYLOAD_CONFIG_PATH_VAR`]. Tcssim's simulator configuration is a
-/// separate file, named by a variable of its own that only tcssim knows:
-/// tcsmoc never reads it, so there is nothing here to keep in step.
+/// See [`PAYLOAD_CONFIG_PATH_VAR`]. Tcs-sim's simulator configuration is a
+/// separate file, named by a variable of its own that only tcs-sim knows:
+/// tcs-moc never reads it, so there is nothing here to keep in step.
 pub const SIM_PAYLOAD_CONFIG_PATH_VAR: &str = "SIM_PAYLOAD_CONFIG_PATH";
 
 /// The configuration read when nothing names one.
@@ -42,7 +42,7 @@ pub const DEFAULT_PAYLOAD_CONFIG_PATH: &str = "tests/manual/thermostat.ytcs";
 /// and the older `<stem>sim.yaml`. The stem is the configuration's name
 /// without `.ytcs` or `.xtcs`, so either spelling of a configuration finds
 /// the same simulator file, which is YAML and named `.yaml` whichever it is.
-/// One function for every program that looks, so that tcsmoc and the tcssim
+/// One function for every program that looks, so that tcs-moc and the tcs-sim
 /// it starts cannot pick different files.
 ///
 /// # Arguments
@@ -68,7 +68,7 @@ pub fn sim_path_beside(payload_path: &str) -> Option<String> {
 /// pointed at one, and they are all pointed the same way: a command line
 /// argument first, then the program's own environment variable, then
 /// [`DEFAULT_PAYLOAD_CONFIG_PATH`]. The argument comes first because it is
-/// the unambiguous one -- tcsmoc starts the other two as subprocesses and
+/// the unambiguous one -- tcs-moc starts the other two as subprocesses and
 /// they inherit its environment, so a variable can reach further than it was
 /// meant to, where an argument cannot.
 ///
@@ -80,7 +80,7 @@ pub fn sim_path_beside(payload_path: &str) -> Option<String> {
 ///
 /// * `args` - The program's arguments, its own name first.
 /// * `var`  - The program's environment variable, or `None` for a program
-///            that has none: tcsmoc deliberately has no variable of its own,
+///            that has none: tcs-moc deliberately has no variable of its own,
 ///            for the reason above.
 ///
 /// # Returns

@@ -2,7 +2,7 @@
 From the Desk to Flight
 =======================
 
-A configuration that has run on a desk, against tcssim, is most of the way
+A configuration that has run on a desk, against tcs-sim, is most of the way
 to one that flies, and on purpose: the configuration flown is meant to be
 the configuration tested, byte for byte, so that its checksum is the one the
 ground has agreed to. What changes between the two is mostly not in the
@@ -34,7 +34,7 @@ configuration, so the checksum is the same under every mode.
 
 2. Leave ``sim_address`` where it is
 ====================================
-*Do:* nothing. A node's ``sim_address`` says where tcssim answers for it
+*Do:* nothing. A node's ``sim_address`` says where tcs-sim answers for it
 under ``some`` and ``all``; under ``none`` tcspecial ignores it and opens the
 node's real bus, line or chip.
 
@@ -56,7 +56,7 @@ send goes to loopback. Flown, those datagrams must reach the radio, the
 flight computer or the ground station. The addresses tcspecial binds,
 ``0.0.0.0`` in the examples, may be narrowed to one interface.
 
-*Check:* ``tcsverify --summary`` lists every address and port the vehicle
+*Check:* ``tcs-verify --summary`` lists every address and port the vehicle
 uses, and warns where two claim one.
 
 4. Keep the state and the log where a power cycle leaves them
@@ -88,25 +88,25 @@ systems. A build that has it says so as a warning every time it starts.
 
 6. Check the configuration against the build that flies
 =======================================================
-*Do:* run tcsverify with the node types the flying tcspecial was built with:
+*Do:* run tcs-verify with the node types the flying tcspecial was built with:
 
 .. code-block:: console
 
-   $ tcsverify --types=$(tcspecial --types) vehicle.ytcs
+   $ tcs-verify --types=$(tcspecial --types) vehicle.ytcs
 
 *Why:* a tcspecial built without a node type refuses a configuration that
 uses it, and the place to find that out is on the ground. The configuration's
-``interface`` must also be the interface this build speaks, which tcsverify
+``interface`` must also be the interface this build speaks, which tcs-verify
 checks.
 
-*See:* the `tcsverify manual <tcsverify.html>`__.
+*See:* the `tcs-verify manual <tcs-verify.html>`__.
 
 7. Install the flight package, and only it
 ==========================================
 *Do:* install the ``tcspecial`` package on the vehicle; ``tcspecial-moc``
 on the ground station; ``tcspecial-test`` on neither.
 
-*Why:* ``tcspecial-test`` holds tcsmoc and tcssim, which never fly, and the
+*Why:* ``tcspecial-test`` holds tcs-moc and tcs-sim, which never fly, and the
 test ``segsend``, which deletes each segment it is given: a vehicle that flew
 it would throw its telemetry away. A vehicle that keeps a log puts its own
 ``segsend`` beside tcspecial.

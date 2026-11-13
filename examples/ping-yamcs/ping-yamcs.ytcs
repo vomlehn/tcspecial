@@ -68,7 +68,7 @@ gateways:
           - ping.gateway
         world-in: [ping]
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: ping-common, x: 34, y: 34 }
     - { node: gateway, x: 469, y: 34 }

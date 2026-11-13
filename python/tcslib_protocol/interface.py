@@ -97,14 +97,14 @@ def of_configuration(said):
     if not said:
         raise ValueError(
             "interface is not stated, and it has no default: write the 32 "
-            "lower-case hex digits `tcsverify --interface-digest` prints, "
+            "lower-case hex digits `tcs-verify --interface-digest` prints, "
             f"which for this tree are {ours.hex()}"
         )
     named = of_hex(said)
     if named is None:
         raise ValueError(
             f'interface is "{said}", which is not an interface digest: write '
-            "the 32 lower-case hex digits `tcsverify --interface-digest` "
+            "the 32 lower-case hex digits `tcs-verify --interface-digest` "
             f"prints, which for this tree are {ours.hex()}"
         )
     if named != ours:

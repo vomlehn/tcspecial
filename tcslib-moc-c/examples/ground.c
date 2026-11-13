@@ -293,7 +293,7 @@ int main(int argc, char **argv)
 			   restarted = TCS_STATUS_FAILURE;
 		/* Onto this configuration, NULL saying so: a plain restart.
 		 * Another configuration the vehicle holds is named by its
-		 * checksum, as tcsverify prints it. */
+		 * checksum, as tcs-verify prints it. */
 		if (tcs_client_restart_arm(client, ARM_KEY, NULL, &armed) != 0
 		    || tcs_client_restart(client, ARM_KEY, NULL,
 					  &restarted) != 0) {

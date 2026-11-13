@@ -1,7 +1,7 @@
 //! Network payloads: a socket, of one of the four protocols or a raw one.
 //!
 //! Only how a simulated device reached over the network is told apart is here:
-//! the UDP socket at a node's `sim_address`, where tcssim answers. A `network`
+//! the UDP socket at a node's `sim_address`, where tcs-sim answers. A `network`
 //! node itself is a real device, whatever answers at its far end, and the mode
 //! does not count it: see [`crate::simulate::counted`]. What a network node may
 //! say is shared with the ground link, and is `crate::graph::reach`'s: see
@@ -18,7 +18,7 @@ const TO_SIMULATE: &str =
     "give address as a loopback address, such as 127.0.0.1";
 
 /// Judges whether the far end of a network endpoint is on this host: for a node
-/// reached at its `sim_address`, whether it is tcssim's simulated device. See
+/// reached at its `sim_address`, whether it is tcs-sim's simulated device. See
 /// [`crate::simulate`].
 ///
 /// The weakest of the judgements, and said to be: an address on this host says

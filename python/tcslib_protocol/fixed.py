@@ -29,7 +29,7 @@ def connect(sequence, checksum):
         sequence: The command's sequence number, 0 to 2**32 - 1.
         checksum: The checksum of the configuration this station read: the
                   sixteen bytes, as ``bytes.fromhex`` gives them from what
-                  tcsverify prints.
+                  tcs-verify prints.
 
     Returns:
         The datagram: opcode, sequence and checksum, 21 bytes.

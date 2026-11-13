@@ -6,7 +6,7 @@
 //! `tcspecial::node::payload::BUILT`. The rule about what a build can fly is
 //! here, beside the other rules about configurations, because two programs ask
 //! it: tcspecial of the configuration it is about to load, with the types it
-//! was built with, and tcsverify of a configuration on the ground, with the
+//! was built with, and tcs-verify of a configuration on the ground, with the
 //! types `--types` names. One rule and one sentence, so the ground is told
 //! what the vehicle would say.
 //!
@@ -93,7 +93,7 @@ pub fn not_built(nodes: &[Node], built: &[&str]) -> Vec<Problem> {
 /// Says what is said of a node whose type a build does not contain.
 ///
 /// The one sentence for it, which tcspecial says as it refuses a configuration
-/// at load, tcsverify says of a configuration checked with `--types`, and the
+/// at load, tcs-verify says of a configuration checked with `--types`, and the
 /// open says if a node ever reaches it unchecked.
 ///
 /// # Arguments

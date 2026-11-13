@@ -1,5 +1,5 @@
 //! The ground's end of a cFS software bus: a ground station's SBN peer, and the
-//! simulated cFS end that tcssim runs.
+//! simulated cFS end that tcs-sim runs.
 //!
 //! A vehicle that answers to cFS has no command socket, no beacon socket and no
 //! telemetry sockets: everything it takes and sends crosses one SBN peer as cFS
@@ -10,7 +10,7 @@
 //!
 //! # The simulated cFS end
 //!
-//! [`SimulatedCfs`] is the far end of the bus as tcssim plays it: it binds
+//! [`SimulatedCfs`] is the far end of the bus as tcs-sim plays it: it binds
 //! `sbn.peer`, is processor `sbn.peer_processor_id` to the vehicle, and is a
 //! bus to every ground station that joins it -- what the vehicle publishes goes
 //! to each station that subscribed to it, and what a station publishes goes to
@@ -20,7 +20,7 @@
 //! station is a peer of the simulated end and of nothing else, and the ground
 //! commands a vehicle behind a real cFS through that cFS's own ground system.
 //!
-//! It is kept here, beside the station's peer, rather than in tcssim, so
+//! It is kept here, beside the station's peer, rather than in tcs-sim, so
 //! that the two ends are tested together and against the vehicle itself.
 //!
 //! # The station's peer
@@ -947,7 +947,7 @@ impl Hub {
                 Due::Heartbeat => self.say(who, kind::HEARTBEAT, 0),
                 Due::Disconnect => {
                     eprintln!(
-                        "tcssim: the cFS end's {} has been silent for {:?}: \
+                        "tcs-sim: the cFS end's {} has been silent for {:?}: \
                          disconnected",
                         Self::named(who),
                         sbn::SILENCE
@@ -1011,7 +1011,7 @@ impl Hub {
             let free = || self.stations.iter().position(|s| s.at.is_none());
             let Some(at) = known.or_else(free) else {
                 eprintln!(
-                    "tcssim: a ground station at {from} is not taken: the \
+                    "tcs-sim: a ground station at {from} is not taken: the \
                      cFS end keeps {STATIONS_AT_ONCE} at once"
                 );
                 return;
@@ -1024,7 +1024,7 @@ impl Hub {
 
         if self.kept(who).liveness.heard(now) {
             eprintln!(
-                "tcssim: the cFS end's {} at {from} is connected",
+                "tcs-sim: the cFS end's {} at {from} is connected",
                 Self::named(who)
             );
             self.out[sbn::HEADER_BYTES] = self.release.protocol_version;
@@ -1049,7 +1049,7 @@ impl Hub {
                     self.kept(who).verified = true;
                 } else {
                     eprintln!(
-                        "tcssim: the cFS end's {} says its protocol version \
+                        "tcs-sim: the cFS end's {} says its protocol version \
                          is {:?}, and SBN {} speaks {}: refused",
                         Self::named(who),
                         &self.room[sbn::HEADER_BYTES..size],
@@ -1079,7 +1079,7 @@ impl Hub {
                         let (mut arrived, mut expected) =
                             ([0u8; 96], [0u8; 96]);
                         eprintln!(
-                            "tcssim: the cFS end's {} subscribed with the \
+                            "tcs-sim: the cFS end's {} subscribed with the \
                              ident \"{}\", and sbn.ident says \"{}\": refused",
                             Self::named(who),
                             sbn::ident_text(carried, &mut arrived),
@@ -1096,7 +1096,7 @@ impl Hub {
             kind::APPLICATION => self.application(who, body),
             kind::DISCONNECT => {
                 eprintln!(
-                    "tcssim: the cFS end's {} disconnected",
+                    "tcs-sim: the cFS end's {} disconnected",
                     Self::named(who)
                 );
                 self.forget(who);

@@ -5,7 +5,7 @@
 //! decision: while it is asserted the load is switched off and draws nothing.
 //! Unjoined, a load is never shed, as an essential one is not; joined to a
 //! simulated payload, the vehicle sheds it by driving that, as a thermostat
-//! node does when the battery runs low. The arithmetic is tcssim's
+//! node does when the battery runs low. The arithmetic is tcs-sim's
 //! `physics::load`.
 
 use serde::{Deserialize, Serialize};

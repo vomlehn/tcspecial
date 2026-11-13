@@ -4,7 +4,7 @@ number, or bytes.
 The Python spelling of ``tcslib_protocol::graph::fprime::Form``, with
 ``tcslib_protocol::unit``'s table of units behind it. What each node sends is
 not worked out here from what the configuration says of it: it is read from the
-configuration's own XTCE, which ``tcsverify --xtce`` writes beside it from the
+configuration's own XTCE, which ``tcs-verify --xtce`` writes beside it from the
 configuration and ``tcslib-protocol/xtce/types.xtce`` (see "The configuration's
 own XTCE" in ``docs/tcspecial-design.rst``), so the rules are the Rust's alone.
 
@@ -18,7 +18,7 @@ own XTCE" in ``docs/tcspecial-design.rst``), so the rules are the Rust's alone.
 * Every other node's data is bytes, as they came: a string, bytes, or a
   structure.
 
-tcsmoc's plot window and the F´ bridge's dictionary know a node's data by
+tcs-moc's plot window and the F´ bridge's dictionary know a node's data by
 this, and so does the Yamcs mission database :mod:`tcslib_protocol.yamcs`
 generates; ``examples/thermostat-yamcs/tests/agrees.rs`` holds the answers
 here to the Rust's for every node that reaches the ground, and this table
@@ -155,7 +155,7 @@ DECISION = Form("Decision")
 
 
 def own_xtce(config):
-    """Names a configuration's own XTCE: ``tcsverify::own_xtce::path_of``.
+    """Names a configuration's own XTCE: ``tcs_verify::own_xtce::path_of``.
 
     Args:
         config: The :class:`tcslib_protocol.configuration.Configuration`.
@@ -189,7 +189,7 @@ def type_of(config, source):
     try:
         root = ET.parse(path).getroot()
     except FileNotFoundError:
-        raise ValueError(f"{path}: not there: tcsverify --xtce "
+        raise ValueError(f"{path}: not there: tcs-verify --xtce "
                          f"{config.path} writes it") from None
     except ET.ParseError as why:
         raise ValueError(f"{path}: {why}") from None

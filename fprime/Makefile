@@ -9,7 +9,7 @@
 #   make test FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
 #
 # The model -- which channels the bridge has, and their IDs -- is written from
-# FPRIME_CONFIG by tcsverify, and the component is built for that configuration
+# FPRIME_CONFIG by tcs-verify, and the component is built for that configuration
 # and no other: see "F´: gateway_fprime" in docs/tcspecial-design.rst.
 
 # The tcspecial tree this directory is in, and what sits beside it: see
@@ -61,7 +61,7 @@ help:
 	@echo "  make build    - Write the bridge's model from FPRIME_CONFIG"
 	@echo "                  and build the component and its deployment"
 	@echo "  make test     - Build, then run the deployment against"
-	@echo "                  tcspecial and tcssim and test the bridge"
+	@echo "                  tcspecial and tcs-sim and test the bridge"
 	@echo "  make model    - Write the model alone"
 	@echo "  make clean    - Remove what the build and the test left"
 	@echo ""
@@ -85,19 +85,19 @@ check-fprime:
 		exit 1; \
 	fi
 
-# tcslib-moc-c, which the bridge is linked with, and tcsverify, which writes
-# its model. tcspecial and tcssim too for the test, which runs them.
+# tcslib-moc-c, which the bridge is linked with, and tcs-verify, which writes
+# its model. tcspecial and tcs-sim too for the test, which runs them.
 .PHONY: cargo
 cargo:
-	cd $(TOP) && cargo build -q -p tcslib-moc-c -p tcsverify -p tcspecial \
-		-p tcssim
+	cd $(TOP) && cargo build -q -p tcslib-moc-c -p tcs-verify -p tcspecial \
+		-p tcs-sim
 
-# The model, written from the configuration once tcsverify has checked it.
+# The model, written from the configuration once tcs-verify has checked it.
 # A file that already says what would be written is left alone, so this
 # does not make the bridge build again for nothing.
 .PHONY: model
 model: cargo
-	$(TOP)/target/debug/tcsverify --fprime-model=$(MODEL) $(FPRIME_CONFIG)
+	$(TOP)/target/debug/tcs-verify --fprime-model=$(MODEL) $(FPRIME_CONFIG)
 
 # settings.ini, which fprime-util reads to find the framework. Written here
 # rather than kept, because the framework is wherever FPRIME_FRAMEWORK says,
@@ -137,7 +137,7 @@ build: settings model
 	cd $(CURDIR) && PATH=$(FPRIME_BIN):$$PATH $(FPRIME_UTIL) build \
 		-j$(JOBS)
 
-# The bridge's test: tcssim simulating the configuration's payloads,
+# The bridge's test: tcs-sim simulating the configuration's payloads,
 # tcspecial flying it, BridgeTest running the bridge, and F´'s ground system
 # commanding it and reading its channels, holding the ports' lock while it
 # runs. See bridge-test.

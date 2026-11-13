@@ -62,7 +62,7 @@ payloads:
       # The probe's heater switch, line 4 of /dev/gpiochip1: 1 for on and 0 for
       # off, as probe_thermostat decides. A gpio_inout reports as well as
       # drives: every second it tells the ground what it was last told, so a
-      # report lost on the way is made good by the next. On a desk tcssim
+      # report lost on the way is made good by the next. On a desk tcs-sim
       # answers for it over UDP at its sim_address, so that no dummy chip is
       # needed; flown, the chip is opened.
       - payload: probe_heater
@@ -114,7 +114,7 @@ commands:
   # attribute no binding names is refused.
   - { from: gateway, sets: probe_thermostat.setpoint }
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: probe_heater, x: 34, y: 224 }
     - { node: probe_thermostat, x: 525, y: 224 }

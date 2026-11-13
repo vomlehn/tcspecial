@@ -69,10 +69,10 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="moc" x="469" y="34"/>
             <node name="sensor" x="34" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

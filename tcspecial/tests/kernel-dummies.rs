@@ -7,7 +7,7 @@
 //! Each test flies an example -- `examples/can`, `examples/gpio` or
 //! `examples/iio` -- with its sockets moved to ports nothing holds and its
 //! device moved to the one this host has, and plays the device's far end
-//! itself, through the kernel and not through tcssim: frames on the virtual
+//! itself, through the kernel and not through tcs-sim: frames on the virtual
 //! bus `vcan`, pulls and values of a `gpio-sim` chip's lines, and the buffer
 //! of an `iio_dummy` sensor, which the kernel fills itself. What is checked
 //! is that the device's data reaches the ground, and that the ground's

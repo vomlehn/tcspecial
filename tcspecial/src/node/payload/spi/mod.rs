@@ -52,7 +52,7 @@ const SPI_CS_HIGH: u8 = 0x04;
 ///
 /// A spidev node takes the requests above and clocks a peripheral on the terms
 /// they set. A terminal takes none of them -- it has no clock to set -- and is
-/// what tcssim simulates a peripheral with, there being no module that emulates
+/// what tcs-sim simulates a peripheral with, there being no module that emulates
 /// one. The bytes of such a link are real and its clocking does not exist, so a
 /// handler on one is told what it has, once, rather than left to infer it from
 /// transfers that work while the terms did not take.
@@ -164,7 +164,7 @@ impl SpiEndpoint {
             .read(true)
             .write(true)
             // Not this process's terminal. A device that is a tty -- a real
-            // serial port, or a pty tcssim made to simulate one -- becomes the
+            // serial port, or a pty tcs-sim made to simulate one -- becomes the
             // controlling terminal of a process that opens it without this, and
             // then a read from a background process group raises SIGTTIN and a
             // hangup raises SIGHUP: a handler stopped or killed for reasons
@@ -469,7 +469,7 @@ mod tests {
 
     /// A terminal is taken as a simulated peripheral, and carries bytes.
     ///
-    /// Which is what tcssim offers: nothing emulates a SPI peripheral, so what
+    /// Which is what tcs-sim offers: nothing emulates a SPI peripheral, so what
     /// it puts at the end of the path is a pty. The terms do not take -- a pty
     /// has no clock to set -- and the handler says so and carries the bytes
     /// anyway, because the bytes are the part a simulation can be honest about.

@@ -1164,7 +1164,7 @@ pub(crate) fn parse_flag(
 /// And the word `none`, which a length of time cannot say: a read that does
 /// not time out at all. `Ok(None)` is that word. It is the difference between
 /// a timeout and an interval, and the reason the two are different kinds of
-/// value rather than one -- see `tcsgui::nodes::KINDS`, where an attribute
+/// value rather than one -- see `tcs_gui::nodes::KINDS`, where an attribute
 /// says which it takes.
 ///
 /// Nought is refused, as it is of any interval: a read that times out at once

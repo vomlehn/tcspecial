@@ -26,7 +26,7 @@
 //! which is the world's next event. Full, a charging current is shunted --
 //! the regulator a spacecraft has for the purpose turns it into heat -- and
 //! nothing flows in; empty, it is held there, a cell past what it is rated
-//! for being outside what this models. The arithmetic is tcssim's
+//! for being outside what this models. The arithmetic is tcs-sim's
 //! `physics::battery`.
 
 use serde::{Deserialize, Serialize};

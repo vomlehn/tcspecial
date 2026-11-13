@@ -1,15 +1,15 @@
 # yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial-sim.schema.json
 
-# How tcssim simulates the payloads of gpio.ytcs.
+# How tcs-sim simulates the payloads of gpio.ytcs.
 description: Simulator settings for the payloads of gpio.ytcs
 
-# Where tcssim answers whether it has made its simulated devices, which
+# Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7910"
 
-# tcssim moves the lines of the kernel's gpio-sim chip, which it finds and
+# tcs-sim moves the lines of the kernel's gpio-sim chip, which it finds and
 # does not make: bin/mk-kernel-dummies makes it, and gives its lines to the
 # user who ran that.
 simulated_payloads:
@@ -20,7 +20,7 @@ simulated_payloads:
         packet_interval: 1 s
         simulate: true
   - type gpio_out:
-      # Driven and never read: tcssim watches the dummy chip's line and
+      # Driven and never read: tcs-sim watches the dummy chip's line and
       # counts each change the vehicle drives it to, so that its panel shows
       # each command reaching it.
       - payload: lamp

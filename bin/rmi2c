@@ -12,7 +12,7 @@
 # chip and leave another, where bin/rmgpio and bin/rmiio each remove their own
 # device and leave the module alone.
 #
-# Note this takes the bus out from under anything using it. A tcssim still
+# Note this takes the bus out from under anything using it. A tcs-sim still
 # writing that register bank loses it, so do not run this while one is up.
 
 set -euo pipefail

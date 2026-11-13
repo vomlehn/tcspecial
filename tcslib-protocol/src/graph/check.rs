@@ -1,7 +1,7 @@
 //! What is checked before a configuration is allowed to run.
 //!
 //! The reliability argument for the whole architecture is that a graph is
-//! checkable, and this is the check. `tcsverify` runs it on the ground and
+//! checkable, and this is the check. `tcs-verify` runs it on the ground and
 //! tcspecial runs the same code again aboard, so a configuration that is
 //! refused is refused in the same words at a desk and in flight.
 //!
@@ -35,8 +35,8 @@ use crate::verify::About;
 /// with any of them: a sensor whose device nobody named cannot be opened, so
 /// it is not a question of degree aboard. What the split is for is the person:
 /// a graph halfway through being drawn should not bury the mistakes in it under
-/// the things they have not typed yet. `tcsverify` says which is which and
-/// exits nought where only warnings were found; tcsgui refuses to generate
+/// the things they have not typed yet. `tcs-verify` says which is which and
+/// exits nought where only warnings were found; tcs-gui refuses to generate
 /// code while any remain, warnings included, because code generated from an
 /// unfinished configuration would not compile into anything that flies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,7 +72,7 @@ pub enum Problem {
     /// A group nothing is in, which reads nothing on its interval.
     ///
     /// What a group whose name a node misspelled looks like from the group's
-    /// end. tcsgui marked this as a fault long before anything aboard refused
+    /// end. tcs-gui marked this as a fault long before anything aboard refused
     /// it, which made the editor and the flight software disagree about the one
     /// file.
     EmptyGroup { group: String },
@@ -90,7 +90,7 @@ pub enum Problem {
     ///
     /// Not found by [`Graph::check`](super::Graph::check), which knows nothing
     /// of any build: asked of a graph with the types a build contains, by
-    /// tcspecial as it loads and by tcsverify's `--types`. See
+    /// tcspecial as it loads and by tcs-verify's `--types`. See
     /// [`crate::graph::built`].
     NotBuilt {
         node: String,
@@ -226,7 +226,7 @@ pub enum Problem {
     /// configuration whose every field is answered and which cannot be flown
     /// as it stands: two sources on one port of the ground arrive
     /// interleaved, and a port past 65535 is a socket that cannot be. So it
-    /// is an error, which fails tcsverify, rather than the warning an
+    /// is an error, which fails tcs-verify, rather than the warning an
     /// unfinished node is. `node` is the one the clash is reported on, and
     /// `why` names what it shares and with whom.
     Clash { node: String, why: String },
@@ -322,7 +322,7 @@ impl Problem {
     /// What this problem is about, for working out which line to report it on.
     ///
     /// The same `About` the simulator file's problems use, because the question
-    /// is the same: where in the file is the thing called this. `tcsverify`
+    /// is the same: where in the file is the thing called this. `tcs-verify`
     /// scans the text for it -- a line number cannot be had from a parsed
     /// document, and carrying one through every struct here would put the
     /// file's shape into types that exist so two formats can describe one
@@ -2150,7 +2150,7 @@ fn claim_text(claim: &Claim) -> String {
 /// and so must state one: every payload but a program, asked by what
 /// arrives on its interface, and a set of discrete lines, which is driven by
 /// what arrives or asked by it for a report. See the rule in `Graph::check`
-/// this is the one statement of, which tcsgui marks a drawing by too.
+/// this is the one statement of, which tcs-gui marks a drawing by too.
 ///
 /// # Arguments
 ///
@@ -3091,7 +3091,7 @@ mod tests {
 
     /// Every node that is opened says what opening it takes.
     ///
-    /// The check the editor's laziness rests on. tcsgui requires nothing to be
+    /// The check the editor's laziness rests on. tcs-gui requires nothing to be
     /// entered -- an editor that did would fight a person working out what
     /// they are describing -- so this is where a configuration is held to
     /// saying it all, and it says which node and what to add. A sensor with no
@@ -3123,7 +3123,7 @@ mod tests {
                 })
                 .unwrap_or_else(|| panic!("{node}: {problems:?}"));
             // The complaint names the node and the attribute to add, so that
-            // tcsverify can put a line number on it and a reader knows what to
+            // tcs-verify can put a line number on it and a reader knows what to
             // type.
             assert!(said.contains(node), "{said}");
             assert!(said.contains(expected), "{said}");
@@ -4082,7 +4082,7 @@ mod tests {
             .any(|p| matches!(p, Problem::BadInterval { .. })));
     }
 
-    /// A group nothing is in is refused, as tcsgui has always marked it.
+    /// A group nothing is in is refused, as tcs-gui has always marked it.
     #[test]
     fn a_group_with_nothing_in_it_is_refused() {
         let mut g = graph(

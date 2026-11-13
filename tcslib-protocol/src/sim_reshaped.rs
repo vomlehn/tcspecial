@@ -380,7 +380,7 @@ mod tests {
     /// is shown under that.
     #[test]
     fn a_yaml_payload_of_the_old_shape_is_refused_at_its_line() {
-        let text = "tcssim:\n  ready: 127.0.0.1:7900\n\
+        let text = "tcs-sim:\n  ready: 127.0.0.1:7900\n\
                     simulated_payloads:\n  \
                     # a sensor\n  \
                     - name: temp_1\n    \
@@ -449,7 +449,7 @@ mod tests {
     fn a_model_of_its_own_is_told_to_move_in() {
         for (text, said) in [
             (
-                "description: d\ntcssim:\n  ready: 127.0.0.1:7900\n\
+                "description: d\ntcs-sim:\n  ready: 127.0.0.1:7900\n\
                  physics: ../common/zone-physics.yaml\n",
                 "physics names ../common/zone-physics.yaml",
             ),
@@ -471,7 +471,7 @@ mod tests {
             assert!(!why.contains("{{"), "{why}");
         }
         let why = sim_refused(
-            "description: d\ntcssim:\n  ready: 127.0.0.1:7900\n\
+            "description: d\ntcs-sim:\n  ready: 127.0.0.1:7900\n\
              physics: zone-physics.yaml\n",
             ConfigFormat::Yaml,
         )

@@ -18,8 +18,8 @@ set -euo pipefail
 
 # The same names bin/mkiio makes, because only what it made is this script's
 # to remove. A host's own sensors sit in the same numbering and are not ours.
-iio_device="tcssim"
-iio_trigger="tcssim-hr"
+iio_device="tcs-sim"
+iio_trigger="tcs-sim-hr"
 
 configfs="/sys/kernel/config"
 iio_devices="$configfs/iio/devices/dummy"

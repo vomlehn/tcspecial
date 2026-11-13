@@ -1,4 +1,4 @@
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7999"
 simulated_payload_groups:
   - name: steady

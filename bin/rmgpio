@@ -11,14 +11,14 @@
 # goes by name and the module stays unless nothing is left for it to hold.
 # bin/rmi2c cannot be so careful: there, the module is the adapter.
 #
-# Note this takes the lines out from under anything using them. A tcssim still
+# Note this takes the lines out from under anything using them. A tcs-sim still
 # pulling them loses them, so do not run this while one is up.
 
 set -euo pipefail
 
 # The same names bin/mkgpio makes, because only what it made is this script's
 # to remove. A gpio-sim chip another program created is left alone.
-sim_device="tcssim"
+sim_device="tcs-sim"
 sim_bank="bank0"
 
 configfs="/sys/kernel/config"

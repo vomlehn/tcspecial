@@ -28,7 +28,7 @@
 //! [`Shared`] -- so that nothing is allocated as data passes.
 //!
 //! In a run that simulates them, a node that gives a `sim_address` has its
-//! lines answered for by tcssim over UDP rather than by a chip: see
+//! lines answered for by tcs-sim over UDP rather than by a chip: see
 //! [`UdpLines`]. Everything above is the same either way -- the reports,
 //! what is passed on -- and only where a level comes from and where a drive
 //! goes differ.
@@ -189,7 +189,7 @@ struct Shared {
     passes: AtomicBool,
 }
 
-/// Where the lines are: a chip's, or tcssim's over UDP.
+/// Where the lines are: a chip's, or tcs-sim's over UDP.
 enum Lines {
     /// A chip's.
     Chip {
@@ -200,39 +200,39 @@ enum Lines {
         /// the line states driven through.
         request: File,
     },
-    /// tcssim's, at the node's `sim_address`.
+    /// tcs-sim's, at the node's `sim_address`.
     Udp(UdpLines),
 }
 
-/// Lines tcssim answers for over UDP, in a run that simulates them.
+/// Lines tcs-sim answers for over UDP, in a run that simulates them.
 ///
 /// One datagram is one state of the lines: an ASCII `1` or `0` for each line
 /// of the node, in the order of the request, lowest offset first -- `10` for
 /// lines 4 and 5 with 4 asserted. The vehicle sends what it drives its lines
-/// to; tcssim sends what watched lines are, whenever that changes. An empty
+/// to; tcs-sim sends what watched lines are, whenever that changes. An empty
 /// datagram from the vehicle, sent when it opens and again while it has heard
 /// nothing, says where to answer.
 ///
-/// What the kernel does for a chip is done here from the levels tcssim sends,
+/// What the kernel does for a chip is done here from the levels tcs-sim sends,
 /// so that what goes out is what a chip's would be: the levels when a report
 /// is due.
 struct UdpLines {
     /// Connected to the `sim_address`, so that nothing else's datagrams are
     /// taken for the lines'.
     socket: UdpSocket,
-    /// Where tcssim answers, for what a complaint says.
+    /// Where tcs-sim answers, for what a complaint says.
     at: SocketAddr,
-    /// The levels tcssim last sent, which both halves of the node read.
+    /// The levels tcs-sim last sent, which both halves of the node read.
     seen: Arc<Seen>,
 }
 
-/// What tcssim last said the lines are.
+/// What tcs-sim last said the lines are.
 #[derive(Debug, Default)]
 struct Seen {
     /// A bit for each line by its place in the request, set where it is
     /// asserted.
     levels: AtomicU64,
-    /// Whether tcssim has said anything yet.
+    /// Whether tcs-sim has said anything yet.
     known: AtomicBool,
 }
 
@@ -333,7 +333,7 @@ fn levels_of(what: &str, fd: RawFd, mask: u64) -> TcsResult<u64> {
 }
 
 impl UdpLines {
-    /// Reaches tcssim's lines at a node's `sim_address`, and says where to
+    /// Reaches tcs-sim's lines at a node's `sim_address`, and says where to
     /// answer.
     ///
     /// # Arguments
@@ -367,7 +367,7 @@ impl UdpLines {
         Ok(lines)
     }
 
-    /// The same lines, on a duplicate of the socket, with what tcssim said
+    /// The same lines, on a duplicate of the socket, with what tcs-sim said
     /// shared rather than copied.
     ///
     /// # Returns
@@ -385,13 +385,13 @@ impl UdpLines {
         })
     }
 
-    /// Tells tcssim where to answer: an empty datagram. Lost if tcssim is
-    /// not there yet, which is why it is said again until tcssim answers.
+    /// Tells tcs-sim where to answer: an empty datagram. Lost if tcs-sim is
+    /// not there yet, which is why it is said again until tcs-sim answers.
     fn hello(&self) {
         let _ = self.socket.send(&[]);
     }
 
-    /// What the lines are, as tcssim last said.
+    /// What the lines are, as tcs-sim last said.
     ///
     /// # Arguments
     ///
@@ -399,7 +399,7 @@ impl UdpLines {
     ///
     /// # Returns
     ///
-    /// A bit per line, set where it is asserted; none, until tcssim has said.
+    /// A bit per line, set where it is asserted; none, until tcs-sim has said.
     fn levels(&self, mask: u64) -> u64 {
         if !self.seen.known.load(Ordering::Acquire) {
             self.hello();
@@ -434,7 +434,7 @@ impl UdpLines {
         Ok(())
     }
 
-    /// Takes what tcssim has sent: the latest is what the lines are.
+    /// Takes what tcs-sim has sent: the latest is what the lines are.
     ///
     /// # Arguments
     ///
@@ -450,7 +450,7 @@ impl UdpLines {
         loop {
             let n = match self.socket.recv(&mut datagram) {
                 Ok(n) => n,
-                // Nothing yet, or tcssim not there yet: the hello was
+                // Nothing yet, or tcs-sim not there yet: the hello was
                 // refused, and is said again until it is answered.
                 Err(ref e)
                     if matches!(
@@ -507,7 +507,7 @@ impl Lines {
 impl GpioEndpoint {
     /// Asks the chip for the configured lines: the watched ones with edge
     /// detection where it is asked for, and the driven ones as outputs. Or,
-    /// where the run simulates them, reaches tcssim's at the node's
+    /// where the run simulates them, reaches tcs-sim's at the node's
     /// `sim_address`: see [`UdpLines`].
     ///
     /// # Arguments
@@ -973,7 +973,7 @@ impl EndpointReadable for GpioEndpoint {
             return Ok(0);
         }
 
-        // What tcssim has said of simulated lines, taken whether or not a
+        // What tcs-sim has said of simulated lines, taken whether or not a
         // report is due, so that what is reported is the latest.
         if let Lines::Udp(udp) = &self.lines {
             udp.take(&self.what, count)?;
@@ -1457,7 +1457,7 @@ mod tests {
         close(end);
     }
 
-    /// tcssim's end of simulated lines: a socket on the loopback interface,
+    /// tcs-sim's end of simulated lines: a socket on the loopback interface,
     /// and the lines' configuration at it.
     ///
     /// # Arguments
@@ -1469,12 +1469,12 @@ mod tests {
     /// The socket, waiting at most a second for what it is sent, and the
     /// configuration.
     fn simulated(mut config: GpioConfig) -> (UdpSocket, GpioConfig) {
-        let tcssim = UdpSocket::bind("127.0.0.1:0").expect("a socket");
-        tcssim
+        let tcs_sim = UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        tcs_sim
             .set_read_timeout(Some(Duration::from_secs(1)))
             .expect("a timeout");
-        config.sim_address = Some(tcssim.local_addr().expect("an address"));
-        (tcssim, config)
+        config.sim_address = Some(tcs_sim.local_addr().expect("an address"));
+        (tcs_sim, config)
     }
 
     /// Reads from an endpoint until something arrives, for at most a second:
@@ -1500,22 +1500,22 @@ mod tests {
         Vec::new()
     }
 
-    /// Simulated watched lines say hello, keep the last state tcssim sends,
+    /// Simulated watched lines say hello, keep the last state tcs-sim sends,
     /// and report it as one number when asked or when the report is due; a
     /// datagram that is not a state is refused.
     #[test]
-    fn simulated_watched_lines_report_what_tcssim_last_said() {
-        let (tcssim, config) = simulated(watched(vec![3, 7]));
+    fn simulated_watched_lines_report_what_tcs_sim_last_said() {
+        let (tcs_sim, config) = simulated(watched(vec![3, 7]));
         let mut endpoint = GpioEndpoint::new("switches", &config)
             .expect("the lines are reached");
         let mut hello = [0u8; 8];
-        let (n, vehicle) = tcssim.recv_from(&mut hello).expect("a hello");
+        let (n, vehicle) = tcs_sim.recv_from(&mut hello).expect("a hello");
         assert_eq!(n, 0, "the hello is empty");
 
         // The first report is due as the node opens: the latest state, line
         // 3 high -- bit 0 of a u8 -- and not the one before it.
-        tcssim.send_to(b"00", vehicle).expect("sent");
-        tcssim.send_to(b"10", vehicle).expect("sent");
+        tcs_sim.send_to(b"00", vehicle).expect("sent");
+        tcs_sim.send_to(b"10", vehicle).expect("sent");
         std::thread::sleep(Duration::from_millis(50));
         assert_eq!(read_some(&mut endpoint), vec![0b01]);
         assert_eq!(endpoint.stream(), Some(Stream::Groundward));
@@ -1525,18 +1525,18 @@ mod tests {
         assert_eq!(endpoint.read(&mut buffer).expect("nothing due"), 0);
 
         // Line 3 falls and line 7 rises: bit 1.
-        tcssim.send_to(b"01", vehicle).expect("sent");
+        tcs_sim.send_to(b"01", vehicle).expect("sent");
         std::thread::sleep(Duration::from_millis(50));
         endpoint.shared.asked.store(true, Ordering::Release);
         assert_eq!(read_some(&mut endpoint), vec![0b10]);
 
-        tcssim.send_to(b"2", vehicle).expect("sent");
+        tcs_sim.send_to(b"2", vehicle).expect("sent");
         std::thread::sleep(Duration::from_millis(50));
         let refused = endpoint.read(&mut buffer).expect_err("not a state");
         assert!(refused.to_string().contains("not a 1 or a 0"), "{refused}");
     }
 
-    /// Simulated driven lines send tcssim what they are driven to, one
+    /// Simulated driven lines send tcs-sim what they are driven to, one
     /// character for each line, and pass on and report it as a chip's do.
     #[test]
     fn simulated_driven_lines_send_what_they_are_driven_to() {
@@ -1550,16 +1550,16 @@ mod tests {
             state_interval: Some(Duration::from_secs(60)),
             sim_address: None,
         };
-        let (tcssim, config) = simulated(config);
+        let (tcs_sim, config) = simulated(config);
         let mut endpoint = GpioEndpoint::new("heaters", &config)
             .expect("the lines are reached");
         let mut said = [0u8; 8];
-        assert_eq!(tcssim.recv(&mut said).expect("a hello"), 0);
+        assert_eq!(tcs_sim.recv(&mut said).expect("a hello"), 0);
 
-        // Both lines on: bits 0 and 1, which tcssim is sent a character
+        // Both lines on: bits 0 and 1, which tcs-sim is sent a character
         // each for.
         endpoint.write(&[0b11]).expect("driven");
-        let n = tcssim.recv(&mut said).expect("the drive");
+        let n = tcs_sim.recv(&mut said).expect("the drive");
         assert_eq!(&said[..n], b"11");
 
         let mut buffer = [0u8; 16];
@@ -1575,7 +1575,7 @@ mod tests {
         );
 
         endpoint.write(&[0]).expect("driven");
-        let n = tcssim.recv(&mut said).expect("the drive");
+        let n = tcs_sim.recv(&mut said).expect("the drive");
         assert_eq!(&said[..n], b"00");
     }
 }

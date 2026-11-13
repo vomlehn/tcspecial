@@ -125,7 +125,7 @@
                  on and 0 for off, as probe_thermostat decides. A
                  gpio_inout reports as well as drives: every second it
                  tells the ground what it was last told, so a report lost
-                 on the way is made good by the next. On a desk tcssim
+                 on the way is made good by the next. On a desk tcs-sim
                  answers for it over UDP at its sim_address, so that no
                  dummy chip is needed; flown, the chip is opened. -->
             <payload name="probe_heater">
@@ -180,7 +180,7 @@
         <from>gateway</from>
         <sets>probe_thermostat.setpoint</sets>
     </commands>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="gateway" x="790" y="34"/>
             <node name="probe_heater" x="34" y="224"/>
@@ -189,5 +189,5 @@
             <node name="regolith_thermometer" x="34" y="129"/>
             <node name="seismometer" x="34" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

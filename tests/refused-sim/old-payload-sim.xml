@@ -1,5 +1,5 @@
 <simulator>
-    <tcssim><ready>127.0.0.1:7999</ready></tcssim>
+    <tcs-sim><ready>127.0.0.1:7999</ready></tcs-sim>
     <simulated_payloads>
         <name>sensor</name>
         <simulate>true</simulate>

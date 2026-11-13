@@ -2,23 +2,23 @@
 // vehicle it watches.
 //
 // The point of the example: the panel is not this program's, and neither is
-// what it shows. The markup comes from tcsui, which tcsmoc shows the same
+// what it shows. The markup comes from tcs-ui, which tcs-moc shows the same
 // panel from, and what fills it in comes from tcslib_moc::beacon -- so this
 // window is the wiring and nothing more. The button is there so that what
 // the panel shows can be made to change: start the vehicle and its beacons
 // arrive, stop it and they cease.
 
-import { BeaconPanel } from "../../../tcsui/ui/beacon.slint";
-import { PlainButton } from "../../../tcsui/ui/button.slint";
-import { Fonts } from "../../../tcsui/ui/fonts.slint";
-import { Colors } from "../../../tcsui/ui/colors.slint";
+import { BeaconPanel } from "../../../tcs-ui/ui/beacon.slint";
+import { PlainButton } from "../../../tcs-ui/ui/button.slint";
+import { Fonts } from "../../../tcs-ui/ui/fonts.slint";
+import { Colors } from "../../../tcs-ui/ui/colors.slint";
 
 export component WatchWindow inherits Window {
     default-font-size: Fonts.window;
     // Named for the program, as the ping example's window is, rather than
     // for the one box in it, which says Beacon itself.
     title: "tcspecial beacon";
-    // White, as every window is: see tcsui/ui/colors.slint.
+    // White, as every window is: see tcs-ui/ui/colors.slint.
     background: Colors.window;
     // Just large enough for what it holds -- the panel and the button below
     // it -- and the border round them, `content.padding`. The panel is as

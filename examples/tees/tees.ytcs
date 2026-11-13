@@ -99,7 +99,7 @@ vehicle:
           - moc.readings
         world-in: [sensor]
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: dropped, x: 234, y: 134 }
     - { node: echo, x: 34, y: 34 }

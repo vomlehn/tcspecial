@@ -22,7 +22,7 @@
 //! which is the rocket equation with gravity, and exact. Where it meets the
 //! ground has no closed form, so it is found: the moment is the body's next
 //! event, and the world stops there, sets it down and asserts `contact`. On
-//! the ground it stays until its force lifts it. The arithmetic is tcssim's
+//! the ground it stays until its force lifts it. The arithmetic is tcs-sim's
 //! `physics::body`.
 
 use serde::{Deserialize, Serialize};

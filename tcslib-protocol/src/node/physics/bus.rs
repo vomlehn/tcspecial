@@ -4,7 +4,7 @@
 //! `demand`, the sum of every load's, both in amperes, and gives out the
 //! `current` left over, which is what charges the battery joined to it, or,
 //! where it is less than nought, what the battery has to make up. It has no
-//! settings: a bus is its connections. The arithmetic is tcssim's
+//! settings: a bus is its connections. The arithmetic is tcs-sim's
 //! `physics::bus`.
 
 use serde::{Deserialize, Serialize};

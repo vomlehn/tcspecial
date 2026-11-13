@@ -27,9 +27,9 @@
             </compute>
         </type>
     </vehicle>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="ping" x="34" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

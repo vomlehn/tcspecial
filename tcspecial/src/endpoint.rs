@@ -93,7 +93,7 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
         TcsError::Config(format!(
             "cannot listen on {addr} for the {what}: address already in use. \
              Something else holds it -- most often another tcspecial, or a \
-             tcsmoc that starts one of its own"
+             tcs-moc that starts one of its own"
         ))
     } else {
         TcsError::Config(format!("cannot listen on {addr} for the {what}: {e}"))

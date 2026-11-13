@@ -1,21 +1,21 @@
 # yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial-sim.schema.json
 
-# How tcssim simulates the payloads of can.ytcs.
+# How tcs-sim simulates the payloads of can.ytcs.
 description: Simulator settings for the payloads of can.ytcs
 
-# Where tcssim answers whether it has made its simulated devices, which
+# Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
-tcssim:
+tcs-sim:
   ready: "127.0.0.1:7909"
 
-# tcssim joins the bus as one more member, as the motor would: it sends the
+# tcs-sim joins the bus as one more member, as the motor would: it sends the
 # status frames and counts the command frames, each by its identifier. It
 # makes no bus. vcan0 has to be up before it starts, which
 # bin/mk-kernel-dummies sees to.
 simulated_payloads:
   - type can:
-      # Driven and never read: tcssim sends nothing and counts what the
+      # Driven and never read: tcs-sim sends nothing and counts what the
       # vehicle sends it, so that its panel shows each command reaching it.
       - payload: motor_command
         simulate: true

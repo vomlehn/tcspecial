@@ -103,16 +103,16 @@ pub struct Reach {
 /// carries a SPI peripheral's bytes without its clock, an rpmsg channel's
 /// messages without its channel and a sensor's samples without its sysfs. And
 /// the two temperature sensors fixed to a thermal mass, `i2c_tmass` and
-/// `spi_tmass`, whose simulated device is the thermal mass itself: tcssim
+/// `spi_tmass`, whose simulated device is the thermal mass itself: tcs-sim
 /// answers at `sim_address` with the temperature of the one the sensor is
 /// joined to, which no register bank or pseudo-terminal at the device's path
-/// could follow. And the three GPIO types, whose lines tcssim answers for
+/// could follow. And the three GPIO types, whose lines tcs-sim answers for
 /// over UDP where the kernel's gpio-sim chip is not wanted -- a run that
 /// should need no root to set up -- with every line tcspecial drives or
 /// watches kept as it is: see [`crate::node::payload::gpio`].
 ///
 /// Every other type has a dummy device the kernel makes, or a simulated device
-/// tcssim makes, at the endpoint tcspecial opens, which is the better test: the
+/// tcs-sim makes, at the endpoint tcspecial opens, which is the better test: the
 /// code that runs is the code that flies.
 ///
 /// # Arguments
@@ -144,7 +144,7 @@ impl Reach {
     /// The one statement of the rule. Under the flight setting `sim_address` is
     /// never used, so the configuration that flies is the one that was tested
     /// and the device is what is opened; under `some` and `all` a node with one
-    /// is reached there, and tcssim answers. See "Saying Which Payloads Are
+    /// is reached there, and tcs-sim answers. See "Saying Which Payloads Are
     /// Simulated" in docs/tcspecial-design.rst.
     ///
     /// # Arguments
@@ -157,7 +157,7 @@ impl Reach {
     /// the flight setting and the node gives one, and its own endpoint
     /// otherwise. A GPIO node stays a GPIO node, carrying the address, so
     /// that what it drives, watches and reports is unchanged and only the
-    /// lines are tcssim's.
+    /// lines are tcs-sim's.
     pub fn opened(&self, mode: crate::simulate::Mode) -> EndpointConfig {
         match (self.simulated_at(mode), &self.endpoint) {
             (Some(_), EndpointConfig::Gpio(gpio)) => {
@@ -830,7 +830,7 @@ fn take(
             let at: std::net::SocketAddr = said_at.parse().map_err(|_| {
                 format!(
                     "\"{what}\": sim_address is \"{said_at}\", which is not \
-                     an address:port: give where tcssim answers for it, such \
+                     an address:port: give where tcs-sim answers for it, such \
                      as 127.0.0.1:7950"
                 )
             })?;
@@ -838,7 +838,7 @@ fn take(
                 return Err(format!(
                     "\"{what}\": sim_address is {at}, which is not on this \
                      host: give a loopback address, such as 127.0.0.1:{}, so \
-                     that what answers there can only be tcssim",
+                     that what answers there can only be tcs-sim",
                     at.port()
                 ));
             }

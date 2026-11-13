@@ -3,7 +3,7 @@
 //! A node type is three pieces of code in three crates: what its attributes are
 //! and how they are checked, which is here; the flight-side node, which is
 //! `tcspecial::node`; and the simulated device the simulator puts at the far
-//! end of it, which is `tcssim::node`. The three trees carry the same names, so
+//! end of it, which is `tcs_sim::node`. The three trees carry the same names, so
 //! a type is `node/payload/i2c` wherever you are standing and
 //! `grep -r node/payload/gpio` finds everything about discrete lines.
 //!

@@ -327,7 +327,7 @@ pub(crate) fn group_kind_named(
 }
 
 /// Judges whether a SPI device is a simulated device: a pseudo-terminal, which
-/// is what tcssim makes for a spi payload. See [`crate::simulate`].
+/// is what tcs-sim makes for a spi payload. See [`crate::simulate`].
 ///
 /// # Arguments
 ///
@@ -340,6 +340,6 @@ pub fn judged(path: &str) -> crate::simulate::Judged {
     crate::simulate::pseudo_terminal(
         path,
         "path",
-        "start tcssim first, which makes a pseudo-terminal at path",
+        "start tcs-sim first, which makes a pseudo-terminal at path",
     )
 }

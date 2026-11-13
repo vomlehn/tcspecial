@@ -54,7 +54,7 @@ pub struct CommandLinks {
 
 /// Reads the command links of a configuration.
 ///
-/// One reading of them, here, for every ground station: tcsmoc and the C/C++
+/// One reading of them, here, for every ground station: tcs-moc and the C/C++
 /// library alike.
 ///
 /// # Arguments
@@ -346,7 +346,7 @@ impl TcsClient {
     /// that came back. There is no generation to know beside it.
     ///
     /// Public so that a station can ask before it builds a command, and say
-    /// the refusal its own way -- tcsmoc in a pop-up -- by the one rule
+    /// the refusal its own way -- tcs-moc in a pop-up -- by the one rule
     /// every command sent here is held to.
     ///
     /// # Arguments

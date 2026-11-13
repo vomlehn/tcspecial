@@ -55,17 +55,17 @@ each for viewing.
 
 Everything installs under `/opt/tcs`, as three packages:
 
-* `tcspecial`, what flies: `bin/tcspecial`, `bin/tcsverify`,
+* `tcspecial`, what flies: `bin/tcspecial`, `bin/tcs-verify`,
   the five test app programs in `libexec/`, the documents and the example
   configurations, and a systemd unit, `tcspecial.service`, installed but not
   enabled.
 * `tcspecial-moc`, what a ground station is built on: `libtcs_moc_c` for C
   and C++ (`lib/libtcs_moc_c.so.4`, `lib/libtcs_moc_c.a`,
   `include/tcslib-moc-c.h`, `lib/pkgconfig/tcslib-moc-c.pc`), the Python
-  packages `tcslib_protocol`, `tcslib_moc` and `tcsui`, and `bin/tcsgui` with
+  packages `tcslib_protocol`, `tcslib_moc` and `tcs_ui`, and `bin/tcs-gui` with
   its data.
-* `tcspecial-test`, the test ground station and simulator: `bin/tcsmoc` and
-  `bin/tcssim`, and `bin/segsend`, the test one, which deletes each
+* `tcspecial-test`, the test ground station and simulator: `bin/tcs-moc` and
+  `bin/tcs-sim`, and `bin/segsend`, the test one, which deletes each
   telemetry log segment. A vehicle that keeps a log puts its own segsend in
   `/opt/tcs/bin` instead.
 
@@ -84,7 +84,7 @@ without them:
      make install-build && sudo make install-files HOOKS=1
      make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix
      pip install ./python                    # the Python alone
-     cargo install --path tcsverify --root /opt/tcs
+     cargo install --path tcs-verify --root /opt/tcs
      cc station.c $(pkg-config --cflags --libs tcslib-moc-c)
 
 `HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
@@ -203,7 +203,7 @@ See also
 * [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
   how to write a configuration, and how to run the flight software and the
-  programs that test it. tcsgui, tcsmoc, tcssim and tcsverify each have a
+  programs that test it. tcs-gui, tcs-moc, tcs-sim and tcs-verify each have a
   manual of their own, beside it.
 
 * [The tcspecial design](https://vomlehn.github.io/tcspecial/docs/design.html): the specification, and why
@@ -234,7 +234,7 @@ Each package lists the Rust crates compiled into its programs and
 libraries, with their licences and the notices those require, in
 `/opt/tcs/share/doc/<package>/THIRD-PARTY-NOTICES`.
 
-The graphical programs -- tcsgui, tcsmoc, tcssim and tcspecial's visual
+The graphical programs -- tcs-gui, tcs-moc, tcs-sim and tcspecial's visual
 window -- are built with [Slint](https://slint.dev), under its
 royalty-free licence for desktop applications, which asks for this
 attribution:

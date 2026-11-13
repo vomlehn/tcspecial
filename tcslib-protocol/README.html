@@ -187,9 +187,9 @@ nodes and the links between them (<code>graph</code>), and every program
 that opens one reads it through this crate:</p>
 <ul>
 <li>tcspecial runs it aboard.</li>
-<li>tcsmoc and tcssim build their panels from it.</li>
-<li>tcsgui edits it.</li>
-<li>tcsverify checks it.</li>
+<li>tcs-moc and tcs-sim build their panels from it.</li>
+<li>tcs-gui edits it.</li>
+<li>tcs-verify checks it.</li>
 </ul>
 <p>So no program reads a file in a way of its own, and the error a
 person sees in the editor is the one the vehicle would have refused the
@@ -234,7 +234,7 @@ is no part of the interface.</li>
 which every beacon carries, and which every configuration names as its
 <code>tcspecial</code> section’s <code>interface</code>, so that a
 configuration written for another interface is refused by every program.
-<code>tcsverify --interface-digest</code> prints it.
+<code>tcs-verify --interface-digest</code> prints it.
 <code>make interface-digest</code> here regenerates
 <code>src/interface_digest.rs</code> after <code>link.xtce</code>
 changes; every configuration is then given the new digest.</li>
@@ -247,7 +247,7 @@ files.</li>
 <li><code>graph</code>: the configuration, a graph of nodes, with its
 checks, and the ports each link to the ground arrives at.</li>
 <li><code>node</code>: one module per node type, giving each type’s
-attributes and how they are checked. tcspecial and tcssim have trees of
+attributes and how they are checked. tcspecial and tcs-sim have trees of
 the same shape, one for the node aboard and one for the simulator’s
 simulated device.</li>
 <li><code>format</code>, <code>config</code>, <code>types</code>,
@@ -257,10 +257,10 @@ grammar for whole numbers, one for trigger bytes.</li>
 <li><code>sim_config</code>: the simulator’s own configuration
 file.</li>
 <li><code>verify</code>: what a problem in a configuration is about, so
-that tcsverify and the editor can put it beside the line that has to
+that tcs-verify and the editor can put it beside the line that has to
 change.</li>
 <li><code>parameters</code>, <code>display</code>: what both test
-windows, tcsmoc and tcssim, show about a payload, and where on the
+windows, tcs-moc and tcs-sim, show about a payload, and where on the
 screen each window goes.</li>
 <li><code>error</code>: the errors all of the above return.</li>
 </ul>
@@ -271,8 +271,8 @@ sending a command, receiving data and listening for beacons are all in
 The flight software itself is <code>tcspecial</code>.</p>
 <h2 id="who-uses-it">Who uses it</h2>
 <p>Every crate in the workspace that has anything to do with the link or
-a configuration: tcspecial, tcslib-moc, tcsmoc, tcssim, tcsgui and
-tcsverify, and <code>examples/beacon</code>.</p>
+a configuration: tcspecial, tcslib-moc, tcs-moc, tcs-sim, tcs-gui and
+tcs-verify, and <code>examples/beacon</code>.</p>
 <h2 id="building-and-testing">Building and testing</h2>
 <pre><code>cargo build -p tcslib-protocol
 cargo test -p tcslib-protocol

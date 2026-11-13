@@ -115,7 +115,7 @@ payloads:
         world-out:
           - regolith_kelvin.regolith_thermometer
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: gateway, x: 790, y: 34 }
     - { node: regolith_kelvin, x: 299, y: 129 }

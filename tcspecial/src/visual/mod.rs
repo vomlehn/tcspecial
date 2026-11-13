@@ -1,8 +1,8 @@
 //! The visual window: what a running tcspecial is doing, drawn.
 //!
-//! The graph is drawn as tcsgui draws the configuration -- the three working
+//! The graph is drawn as tcs-gui draws the configuration -- the three working
 //! panes, every node where the editor would put it, every link along the
-//! route the editor gives it, all of it from `tcsdiagram` -- with the
+//! route the editor gives it, all of it from `tcs-diagram` -- with the
 //! simulator file's physics in the Physics pane to their left, as the editor
 //! draws it too. One window a page, as the editor has: the top file's, and
 //! one for each subdiagram it includes, with its edge. A link is lit
@@ -32,10 +32,10 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
-use tcsdiagram::look::{self, ground_of};
-use tcsdiagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
-use tcsdiagram::style;
-use tcsdiagram::view::{self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet};
+use tcs_diagram::look::{self, ground_of};
+use tcs_diagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
+use tcs_diagram::style;
+use tcs_diagram::view::{self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet};
 use tcslib_protocol::graph::{Destination, Graph};
 
 use crate::runtime;
@@ -200,7 +200,7 @@ pub fn run(path: &str, mode: tcslib_protocol::simulate::Mode) -> i32 {
     let lines = lines_of(&graph);
     watch(lines.len());
 
-    let settings = tcsdiagram::settings::read().settings;
+    let settings = tcs_diagram::settings::read().settings;
     let mut dividers =
         pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
     dividers.physics = pane::physics_width(settings.physics_percent);
@@ -326,10 +326,10 @@ struct Pages {
 impl Pages {
     /// Works out the pages of a configuration.
     ///
-    /// Where the panes are divided is the person's own tcsgui setting, read
+    /// Where the panes are divided is the person's own tcs-gui setting, read
     /// and never written, and every node and every subdiagram's box is
     /// settled into its pane as the editor settles a file it opens, all of
-    /// them together and in the order of their names -- see tcsgui's
+    /// them together and in the order of their names -- see tcs-gui's
     /// `Document::settle` -- so each is drawn where the editor would draw
     /// it.
     ///
@@ -424,7 +424,7 @@ impl Pages {
     }
 }
 
-/// Puts one page of the graph in a window, as tcsgui would draw it.
+/// Puts one page of the graph in a window, as tcs-gui would draw it.
 ///
 /// A node on another page is drawn as the editor draws it: on the top page,
 /// at its subdiagram's box; on a subdiagram's page, at the page's edge. Each
@@ -593,13 +593,13 @@ fn draw(
 
 /// Puts the simulator file's physics in the window's Physics pane.
 ///
-/// The simulator file is the one tcssim and tcsmoc would read for this
+/// The simulator file is the one tcs-sim and tcs-moc would read for this
 /// configuration -- the one `PAYLOAD_SIM_YAML` names, and otherwise the one
 /// named for it beside it -- read here for the drawing and for nothing else:
 /// the vehicle never reads it, and what it flies is not changed by it. With
 /// none, the Physics pane is drawn empty. With one that cannot be read, the
 /// pane is drawn empty and why is said: the window is to watch a vehicle by,
-/// and a simulator file tcssim would refuse is tcssim's to refuse.
+/// and a simulator file tcs-sim would refuse is tcs-sim's to refuse.
 ///
 /// # Arguments
 ///
@@ -639,7 +639,7 @@ fn draw_physics(
             return;
         }
     };
-    let drawn = tcsdiagram::physics::of_simulator(&file, page);
+    let drawn = tcs_diagram::physics::of_simulator(&file, page);
     // Drawn from where the working panes begin, past the edge and the
     // Physics pane.
     let (nodes, links) = drawn.looks(sheet, dividers, dividers.physics + edge);
@@ -651,7 +651,7 @@ fn draw_physics(
     )));
 }
 
-/// A hex colour as Slint's. See tcsdiagram::look::rgb.
+/// A hex colour as Slint's. See tcs_diagram::look::rgb.
 fn colour(hex: &str) -> slint::Color {
     let (red, green, blue) = look::rgb(hex);
     slint::Color::from_rgb_u8(red, green, blue)
@@ -659,13 +659,13 @@ fn colour(hex: &str) -> slint::Color {
 
 /// Turns a node's look into what this window's markup takes.
 ///
-/// The same mapping tcsgui makes of the same look, into its own build's
+/// The same mapping tcs-gui makes of the same look, into its own build's
 /// struct: a Slint struct of one program is not a type of the other, so each
 /// says it once. Never selected: nothing here can be.
 ///
 /// # Arguments
 ///
-/// * `look` - How tcsdiagram draws the node.
+/// * `look` - How tcs-diagram draws the node.
 ///
 /// # Returns
 ///
@@ -709,7 +709,7 @@ fn node_view(look: NodeLook) -> ui::NodeView {
         terminal_row: look.terminal_row,
         type_left: look.type_band.0,
         type_right: look.type_band.1,
-        type_size: tcsdiagram::style::TYPE_SIZE as f32,
+        type_size: tcs_diagram::style::TYPE_SIZE as f32,
     }
 }
 
@@ -718,7 +718,7 @@ fn node_view(look: NodeLook) -> ui::NodeView {
 ///
 /// # Arguments
 ///
-/// * `look` - How tcsdiagram draws the line.
+/// * `look` - How tcs-diagram draws the line.
 ///
 /// # Returns
 ///

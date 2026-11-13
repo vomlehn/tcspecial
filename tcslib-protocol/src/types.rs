@@ -185,7 +185,7 @@ impl Timestamp {
     ///
     /// UTC, and the date dropped: a panel has room for a time and wants it to
     /// be read at a glance, and every program here shows it the same way --
-    /// tcsmoc's panels and tcssim's are read side by side while a link is
+    /// tcs-moc's panels and tcs-sim's are read side by side while a link is
     /// being watched, so one of them showing local time would make a transfer
     /// look an hour old.
     ///
@@ -775,8 +775,8 @@ pub const DH_SAMPLE_BYTES: usize = 8;
 ///
 /// A direction that has carried nothing has no time to show, and showing one
 /// anyway -- the hour the window opened, or midnight -- would read as a
-/// transfer that never happened. One constant, because tcsmoc's panels and
-/// tcssim's are read side by side and have to say it the same way.
+/// transfer that never happened. One constant, because tcs-moc's panels and
+/// tcs-sim's are read side by side and have to say it the same way.
 pub const NO_TRANSFER_TIME: &str = "--:--:--";
 
 /// Bytes as a panel shows them: hex pairs, and an ellipsis if there were
@@ -1170,7 +1170,7 @@ pub struct GpioConfig {
     /// and what a `gpio_inout`'s were last told -- as one whole number with a
     /// bit per line: required of both, and `None` for a `gpio_out`.
     pub state_interval: Option<Duration>,
-    /// Where tcssim answers for the lines over UDP, in a run that simulates
+    /// Where tcs-sim answers for the lines over UDP, in a run that simulates
     /// them; `None` where the chip is opened, which is always under the
     /// flight setting. Set by [`crate::graph::reach::Reach::opened`] and never
     /// read from a file, so a node's lines are the same whichever it is.
@@ -1240,7 +1240,7 @@ pub struct CanConfig {
     /// than eight bytes.
     pub fd: bool,
     /// Whether the controller loops frames back to other sockets on this host,
-    /// which is what lets tcssim simulate the payload.
+    /// which is what lets tcs-sim simulate the payload.
     pub loopback: bool,
 }
 
@@ -1498,7 +1498,7 @@ pub struct DHConfig {
     /// never read, as a heater or a valve is.
     ///
     /// A simulated one sends nothing and watches what arrives, counting it, so
-    /// that tcssim shows a driven payload as it shows every other. Its
+    /// that tcs-sim shows a driven payload as it shows every other. Its
     /// simulator entry then needs no packet interval, there being nothing to
     /// send.
     #[serde(default)]
@@ -1852,7 +1852,7 @@ pub struct BeaconJson {
     pub send: Option<String>,
     /// And where they are received, as `address:port`.
     ///
-    /// tcsmoc makes the socket it receives beacons on out of this: it is the
+    /// tcs-moc makes the socket it receives beacons on out of this: it is the
     /// address and port that socket is bound to, and it is where tcspecial
     /// sends. Plain UDP between two stated ends.
     ///

@@ -101,7 +101,7 @@ private:
 	/** Writes a datum to the channel of the node that produced it, as
 	 * what the configuration says its data are: through asDatum(),
 	 * asValue(), asDecision(), asUnsigned() or asSigned(). In
-	 * model/TcsBridgeModel.cpp, which tcsverify --fprime-model writes.
+	 * model/TcsBridgeModel.cpp, which tcs-verify --fprime-model writes.
 	 *
 	 * @param datum  The datum, and the node that produced it.
 	 * @return       true, or false where the model has no channel for the
@@ -109,7 +109,7 @@ private:
 	bool writeDatum(const tcs_datum &datum);
 
 	/** Finds the device id of a node, by its name. In
-	 * model/TcsBridgeModel.cpp, which tcsverify --fprime-model writes.
+	 * model/TcsBridgeModel.cpp, which tcs-verify --fprime-model writes.
 	 *
 	 * @param name  The node's name.
 	 * @param id    Where its device id is written.

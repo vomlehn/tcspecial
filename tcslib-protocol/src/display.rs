@@ -1,10 +1,10 @@
 //! Where on the display a window is put.
 //!
-//! The two test windows are read together: tcsmoc shows what the ground sees
-//! of each payload and tcssim what the payload is doing about it, so a link
+//! The two test windows are read together: tcs-moc shows what the ground sees
+//! of each payload and tcs-sim what the payload is doing about it, so a link
 //! being watched is watched in both at once. Left where a window manager puts
 //! them they overlap, and an operator spends the session dragging one off the
-//! other -- so tcsmoc asks for the top of the display and tcssim for the
+//! other -- so tcs-moc asks for the top of the display and tcs-sim for the
 //! bottom.
 //!
 //! Here rather than in either program because both ask the same question, and
@@ -24,9 +24,9 @@ use std::fs;
 /// Which edge of the display a window asks for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
-    /// The top, where tcsmoc goes: it is the window commands are sent from.
+    /// The top, where tcs-moc goes: it is the window commands are sent from.
     Top,
-    /// The bottom, where tcssim goes.
+    /// The bottom, where tcs-sim goes.
     Bottom,
 }
 

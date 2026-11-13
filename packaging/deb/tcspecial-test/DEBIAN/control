@@ -8,9 +8,9 @@ Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
 Description: tcspecial's test ground station and payload simulator
- tcsmoc, a test mission operations center with a window per payload, and
- tcssim, which simulates the payloads a configuration describes. tcsmoc
- starts the tcspecial installed beside it and tcssim, both with the
+ tcs-moc, a test mission operations center with a window per payload, and
+ tcs-sim, which simulates the payloads a configuration describes. tcs-moc
+ starts the tcspecial installed beside it and tcs-sim, both with the
  simulation mode it was given. Also the test segsend, which deletes each
  filled telemetry log segment it is given. Test software, never flown.
  Everything is under /opt/tcs. /etc/profile.d/tcspecial-test.sh puts

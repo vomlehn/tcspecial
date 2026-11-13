@@ -1,0 +1,537 @@
+//! The examples in `examples/` are checked as tcs-verify checks any pair.
+//!
+//! Each example is a directory of `examples/` holding a tcspecial
+//! configuration, `<name>.ytcs` and the same in XML, `<name>.xtcs`, and the
+//! simulator configuration beside it, `<name>-sim.yaml`. They are discovered
+//! rather than listed, so an example added to the directory is checked
+//! without anyone having to remember to name it here. A file that an example
+//! includes -- the shared parts of two examples, in a `-common` directory --
+//! is not an example: it is checked as part of each that includes it.
+
+use std::path::{Path, PathBuf};
+
+use tcslib_protocol::graph::Graph;
+use tcs_verify::verify;
+
+const SIM_SUFFIX: &str = "-sim.yaml";
+
+fn examples_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples")
+}
+
+fn entries(dir: &Path) -> impl Iterator<Item = PathBuf> {
+    std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+        .map(|entry| entry.expect("a readable directory entry").path())
+}
+
+/// Finds every file of every example directory with the given extension.
+///
+/// # Arguments
+///
+/// * `extension` - The extension, without its dot.
+///
+/// # Returns
+///
+/// The files' paths, sorted.
+fn every_file(extension: &str) -> Vec<PathBuf> {
+    let mut files: Vec<PathBuf> = entries(&examples_dir())
+        .filter(|path| path.is_dir())
+        .flat_map(|dir| entries(&dir).collect::<Vec<_>>())
+        .filter(|path| path.extension().is_some_and(|ext| ext == extension))
+        .collect();
+    files.sort();
+    files
+}
+
+/// Finds every file an example includes, by what it is.
+///
+/// A file that does not load is passed over here: an included file need not
+/// load on its own, and an example that does not load is an example, which
+/// the tests below then refuse.
+///
+/// # Returns
+///
+/// Each included file's canonical path, once for each file that includes
+/// it.
+fn included() -> Vec<PathBuf> {
+    every_file("ytcs")
+        .into_iter()
+        .chain(every_file("xtcs"))
+        .filter_map(|path| Graph::load(path).ok())
+        .flat_map(|graph| graph.files.into_iter().skip(1))
+        .map(|file| file.canonicalize().expect("an included file is there"))
+        .collect()
+}
+
+/// Finds every example's file with the given extension: every file of an
+/// example directory but those an example includes.
+///
+/// # Arguments
+///
+/// * `extension` - The extension, without its dot.
+///
+/// # Returns
+///
+/// The files' paths, sorted.
+fn example_files(extension: &str) -> Vec<PathBuf> {
+    let included = included();
+    every_file(extension)
+        .into_iter()
+        .filter(|path| {
+            !included.contains(&path.canonicalize().expect("it is there"))
+        })
+        .collect()
+}
+
+/// Every file an example includes is included by at least two, which is
+/// what a file of its own is for, and is in a `-common` directory, which is
+/// where the README says shared parts are.
+#[test]
+fn every_included_file_is_shared() {
+    let included = included();
+    assert!(!included.is_empty(), "nothing is included");
+    for file in &included {
+        let times = included.iter().filter(|other| *other == file).count();
+        // Once for each example that includes it, in its own spelling.
+        assert!(times >= 2, "{} is included once", file.display());
+        let dir = file.parent().and_then(|d| d.file_name());
+        assert!(
+            dir.and_then(|d| d.to_str())
+                .is_some_and(|d| d.ends_with("-common")),
+            "{} is not in a -common directory",
+            file.display()
+        );
+    }
+}
+
+/// Lists the examples' configurations in YAML.
+///
+/// # Returns
+///
+/// Every `.ytcs` file there, sorted.
+fn yaml_files() -> Vec<PathBuf> {
+    example_files("ytcs")
+}
+
+/// Lists the examples' simulator files.
+///
+/// # Returns
+///
+/// The `-sim.yaml` files beside their configurations, sorted.
+fn sim_files() -> Vec<PathBuf> {
+    example_files("yaml")
+        .into_iter()
+        .filter(|p| is_sim(p))
+        .collect()
+}
+
+fn is_sim(path: &Path) -> bool {
+    path.to_str().is_some_and(|p| p.ends_with(SIM_SUFFIX))
+}
+
+fn sim_for(config: &Path) -> PathBuf {
+    let stem = config.file_stem().and_then(|s| s.to_str()).expect("a name");
+    config.with_file_name(format!("{stem}{SIM_SUFFIX}"))
+}
+
+/// Every shipped configuration names this build's interface: a change to
+/// `tcslib-protocol/xtce/link.xtce` that left one behind fails here, saying the
+/// one command that brings them all up to date.
+#[test]
+fn every_shipped_configuration_names_this_builds_interface() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files: Vec<PathBuf> = example_files("ytcs")
+        .into_iter()
+        .chain(example_files("xtcs"))
+        .collect();
+    for top in ["example.ytcs", "example.xtcs"] {
+        files.push(root.join(top));
+    }
+    files.extend(entries(&root.join("tests/manual")).filter(|path| {
+        path.extension().is_some_and(|e| e == "ytcs" || e == "xtcs")
+    }));
+    let ours = tcslib_protocol::InterfaceDigest::of_this_build().to_string();
+    let mut stale = Vec::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).expect("it reads");
+        let xml = path.extension().is_some_and(|e| e == "xtcs");
+        let (_, set) = tcs_verify::set_interface::set_in_text(&text, xml, &ours)
+            .unwrap_or_else(|why| panic!("{}: {why}", path.display()));
+        if set != tcs_verify::set_interface::Set::Already {
+            stale.push(path.display().to_string());
+        }
+    }
+    assert!(files.len() >= 18, "{files:?}");
+    assert!(
+        stale.is_empty(),
+        "these do not name this build's interface, {ours}: run `make \
+         set-interfaces` (tcs-verify --set-interface) and commit them: {stale:?}"
+    );
+}
+
+/// Every shipped configuration's own XTCE is what tcs-verify writes, in both
+/// spellings: a change to a configuration or to
+/// `tcslib-protocol/xtce/types.xtce` that left one behind fails here, saying
+/// the one command that brings them all up to date.
+#[test]
+fn every_shipped_configurations_own_xtce_is_current() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files: Vec<PathBuf> = example_files("ytcs")
+        .into_iter()
+        .chain(example_files("xtcs"))
+        .collect();
+    for top in ["example.ytcs", "example.xtcs"] {
+        files.push(root.join(top));
+    }
+    files.extend(entries(&root.join("tests/manual")).filter(|path| {
+        path.extension().is_some_and(|e| e == "ytcs" || e == "xtcs")
+    }));
+    let mut stale = Vec::new();
+    for path in &files {
+        match tcs_verify::own_xtce::of(path, false) {
+            Ok(tcs_verify::own_xtce::Found::Current) => {}
+            Ok(_) => stale.push(path.display().to_string()),
+            Err(why) => panic!("{why}"),
+        }
+    }
+    assert!(files.len() >= 18, "{files:?}");
+    assert!(
+        stale.is_empty(),
+        "the own XTCE of these is not what they say: run `make xtce` \
+         (tcs-verify --xtce) and commit it: {stale:?}"
+    );
+}
+
+/// Every example is a pair, and nothing is found wrong or unfinished in
+/// either file. Warnings count: an example is something to copy, and one
+/// that is not finished teaches somebody to leave theirs unfinished.
+#[test]
+fn every_example_verifies() {
+    let configs: Vec<PathBuf> = yaml_files().into_iter().collect();
+    assert!(
+        !configs.is_empty(),
+        "no examples in {}",
+        examples_dir().display()
+    );
+
+    for config in configs {
+        let sim = sim_for(&config);
+        assert!(
+            sim.is_file(),
+            "{} has no {}",
+            config.display(),
+            sim.display()
+        );
+
+        let report = verify(&config, Some(&sim), tcs_verify::Limits::EVERYTHING);
+        let findings: Vec<String> =
+            report.findings.iter().map(|f| f.to_string()).collect();
+        assert!(
+            findings.is_empty(),
+            "{}:\n{}",
+            config.display(),
+            findings.join("\n")
+        );
+        assert!(
+            report.joined,
+            "{} was not checked against {}",
+            sim.display(),
+            config.display()
+        );
+    }
+}
+
+/// Every example is written in both spellings, and the two read as one
+/// configuration.
+///
+/// Each is parsed by its own parser, and a change made to one and not the
+/// other leaves both files valid: nothing but this notices.
+#[test]
+fn every_example_reads_the_same_in_both_formats() {
+    for yaml in yaml_files().into_iter() {
+        let xml = yaml.with_extension("xtcs");
+        assert!(
+            xml.is_file(),
+            "{} has no {} beside it: an example is written in both formats",
+            yaml.display(),
+            xml.display()
+        );
+
+        // Where each was read from is the one thing the two differ in by
+        // rights.
+        let load = |path: &Path| {
+            let mut graph = Graph::load(path)
+                .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            graph.files.clear();
+            graph.homes.clear();
+            graph
+        };
+        assert_eq!(
+            load(&xml),
+            load(&yaml),
+            "{} and {} describe different configurations",
+            xml.display(),
+            yaml.display()
+        );
+    }
+}
+
+/// And every XML example has the YAML it is a spelling of, which is what the
+/// tests above discover examples by.
+#[test]
+fn every_xml_example_has_its_yaml() {
+    for xml in example_files("xtcs") {
+        let yaml = xml.with_extension("ytcs");
+        assert!(
+            yaml.is_file(),
+            "{} has no {}",
+            xml.display(),
+            yaml.display()
+        );
+    }
+}
+
+/// And every simulator file has a configuration to go with it. A lone one is
+/// usually a configuration renamed without its partner. One in a `-common`
+/// directory is shared by examples, each of whose own is a link to it, and
+/// has to be linked to by one.
+#[test]
+fn every_simulator_file_has_its_configuration() {
+    let every = sim_files();
+    for sim in &every {
+        let shared = sim
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|dir| dir.to_str())
+            .is_some_and(|dir| dir.ends_with("-common"));
+        if shared {
+            let real = sim.canonicalize().expect("it resolves");
+            assert!(
+                every.iter().any(|other| other != sim
+                    && other.canonicalize().ok().as_ref() == Some(&real)),
+                "{} is shared, and no example links to it",
+                sim.display()
+            );
+            continue;
+        }
+        let name = sim.to_str().expect("a UTF-8 path");
+        let config = PathBuf::from(format!(
+            "{}.ytcs",
+            &name[..name.len() - SIM_SUFFIX.len()]
+        ));
+        assert!(
+            config.is_file(),
+            "{} has no {}",
+            sim.display(),
+            config.display()
+        );
+    }
+}
+
+/// Every example has a diagram, `<name>.svg`, and the diagram names every node
+/// the configuration has.
+///
+/// The diagrams are drawn by hand, so nothing else keeps them true: a node
+/// added to an example and not to its picture fails here, naming both.
+#[test]
+fn every_example_has_a_diagram_of_its_nodes() {
+    for config in yaml_files().into_iter() {
+        let svg = config.with_extension("svg");
+        let drawn = std::fs::read_to_string(&svg).unwrap_or_else(|e| {
+            panic!(
+                "{} has no diagram, {}: {e}",
+                config.display(),
+                svg.display()
+            )
+        });
+        let graph = Graph::load(&config)
+            .unwrap_or_else(|e| panic!("{}: {e}", config.display()));
+        for node in &graph.nodes {
+            assert!(
+                drawn.contains(&format!(">{}<", node.name)),
+                "{} does not show the node \"{}\" of {}",
+                svg.display(),
+                node.name,
+                config.display()
+            );
+        }
+    }
+}
+
+/// And every example has a section in the tcspecial manual, which shows its
+/// diagram.
+#[test]
+fn every_example_is_in_the_manual() {
+    let manual =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/tcspecial.rst");
+    let text = std::fs::read_to_string(&manual)
+        .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
+    for config in yaml_files().into_iter() {
+        let name = config.file_stem().and_then(|s| s.to_str()).expect("a name");
+        let figure = format!(".. figure:: ../examples/{name}/{name}.svg");
+        assert!(
+            text.contains(&figure),
+            "{} has no section in {} showing its diagram: no \"{figure}\"",
+            config.display(),
+            manual.display()
+        );
+    }
+}
+
+/// And the manuals' examples of a node verify, as the examples do.
+///
+/// An example in the manual is copied as often as one in `examples/`, and a
+/// rule that changes leaves it behind without anything saying so: the manual
+/// once showed TCP payloads by attributes the reader had retired, which
+/// tcs-verify refused. So every YAML block of the manual that is a node --
+/// a section of them, a type and its nodes, or a node in the shape before
+/// nodes were grouped by type, which is refused -- or a set of them under
+/// `payload_groups`, is put in a file with the worked example's `tcspecial`
+/// section and checked, warnings counting.
+///
+/// Except a block that draws a link. It is a piece of a graph shown for the
+/// link, and the node at the other end is somewhere else in the text or
+/// nowhere, so a check of it alone would find a line to nothing.
+#[test]
+fn every_node_in_the_manual_verifies() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let worked =
+        std::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
+            .expect("the worked example");
+    let section = top_level_section(&worked, "tcspecial");
+    let dir = tempfile::tempdir().expect("a directory");
+
+    let mut checked = 0;
+    for name in tcslib_protocol::MANUALS {
+        let manual = root.join("docs").join(name);
+        let text = std::fs::read_to_string(&manual)
+            .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
+        for (line, block) in yaml_blocks(&text) {
+            let first = block.lines().next().unwrap_or_default();
+            let sections = tcslib_protocol::graph::Section::ALL;
+            let file = if first.starts_with("payload_groups:")
+                || sections
+                    .iter()
+                    .any(|s| first.starts_with(&format!("{}:", s.name())))
+            {
+                format!("{section}{block}")
+            } else if let Some(node_type) = first
+                .strip_prefix("- type ")
+                .and_then(|rest| rest.strip_suffix(':'))
+            {
+                // A type and its nodes, as a section groups them: put under the
+                // section that type belongs to.
+                let nested: String =
+                    block.lines().map(|l| format!("{l}\n")).collect();
+                let under =
+                    tcslib_protocol::graph::section_of(node_type.trim()).name();
+                format!("{section}{under}:\n{nested}")
+            } else if first.starts_with("- name:") {
+                let node_type = block
+                    .lines()
+                    .find_map(|l| l.trim().strip_prefix("type:"))
+                    .map(str::trim)
+                    .unwrap_or_else(|| {
+                        panic!("{name}:{line}: a node with no type")
+                    });
+                let nested: String =
+                    block.lines().map(|l| format!("  {l}\n")).collect();
+                let under =
+                    tcslib_protocol::graph::section_of(node_type).name();
+                format!("{section}{under}:\n{nested}")
+            } else {
+                continue;
+            };
+            if block.contains("-out:") {
+                continue;
+            }
+
+            let path = dir.path().join(format!("{name}-{line}.ytcs"));
+            std::fs::write(&path, &file).unwrap();
+            let report = verify(&path, None, tcs_verify::Limits::EVERYTHING);
+            assert!(
+                !report.found_anything(),
+                "the example at {name}:{line} does not verify: {:?}\n{file}",
+                report.findings
+            );
+            checked += 1;
+        }
+    }
+    // A change to how the manual marks its blocks would otherwise pass this
+    // by checking nothing.
+    assert!(
+        checked >= 5,
+        "only {checked} of the manual's nodes were found"
+    );
+}
+
+/// Cuts one top-level section out of a YAML file, its key line included.
+///
+/// # Arguments
+///
+/// * `yaml` - The file's text.
+/// * `key`  - The section's key.
+///
+/// # Returns
+///
+/// The section's lines, each ending in a newline.
+///
+/// # Panics
+///
+/// If there is no such section.
+fn top_level_section(yaml: &str, key: &str) -> String {
+    let mut lines = yaml.lines().skip_while(|l| *l != format!("{key}:"));
+    let mut section: String =
+        lines.next().map(|l| format!("{l}\n")).unwrap_or_default();
+    for l in lines.take_while(|l| l.is_empty() || l.starts_with(' ')) {
+        section.push_str(l);
+        section.push('\n');
+    }
+    assert!(!section.is_empty(), "no {key}: section");
+    section
+}
+
+/// Finds each `.. code-block:: yaml` of an RST text.
+///
+/// # Arguments
+///
+/// * `text` - The RST text.
+///
+/// # Returns
+///
+/// Each block's body, unindented and ending in one newline, with the line
+/// it starts on, from 1.
+fn yaml_blocks(text: &str) -> Vec<(usize, String)> {
+    let lines: Vec<&str> = text.lines().collect();
+    let indent = |l: &str| l.len() - l.trim_start().len();
+    let mut blocks = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if lines[i].trim() != ".. code-block:: yaml" {
+            i += 1;
+            continue;
+        }
+        // The body is indented past the directive, and ends at the first
+        // line that is not.
+        let deeper = indent(lines[i]) + 1;
+        i += 1;
+        let start = i;
+        while i < lines.len()
+            && (lines[i].trim().is_empty() || indent(lines[i]) >= deeper)
+        {
+            i += 1;
+        }
+        let body = &lines[start..i];
+        let Some(first) = body.iter().position(|l| !l.trim().is_empty()) else {
+            continue;
+        };
+        let margin = indent(body[first]);
+        let block: String = body[first..]
+            .iter()
+            .map(|l| format!("{}\n", l.get(margin..).unwrap_or_default()))
+            .collect();
+        blocks.push((start + first + 1, block.trim_end().to_string() + "\n"));
+    }
+    blocks
+}

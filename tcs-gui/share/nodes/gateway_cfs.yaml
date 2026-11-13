@@ -1,0 +1,31 @@
+# A link to a cFS flight computer's software bus, which the vehicle answers to
+# in place of the ground: tcspecial is one more peer of its Software Bus
+# Network, over SBN's UDP module, through the peer the tcspecial section's sbn
+# states.
+#
+# Like the other gateway nodes it has no Rust of its own under node/: what
+# the bus sends it and what it publishes go through the vehicle's one SBN
+# peer, tcspecial/src/runtime/bus.rs. See tcslib_protocol::gateway, and "cFS:
+# gateway_cfs" in docs/tcs-gui-design.rst.
+node: gateway_cfs
+type: gateway_cfs
+about: >
+  A cFS flight computer's software bus: what the vehicle answers to in place
+  of the ground.
+payload-sink: true
+payload-source: false
+gateway-sink: false
+gateway-source: true
+attributes:
+  - name: tlm_base
+    required: true
+    about: >
+      The first of the message IDs what arrives here is published under on
+      the bus: each node linked into this one is this ID plus its own device
+      id, inside the tcspecial section's msgid_range.
+  - name: cmd_msgid
+    required: false
+    about: >
+      The message ID tcspecial takes what this node sends on from: needed
+      when commands or a line come from this node. A command's ID, with 0x80
+      set.

@@ -5,7 +5,7 @@
 //! section's links, each gateway node's own address and its far end counted
 //! on by every source's device id, the `payload_telemetry` bases counted on
 //! by every payload nothing touches, each network payload's address, and
-//! each `sim_address` tcssim answers at. Some of those are held apart by
+//! each `sim_address` tcs-sim answers at. Some of those are held apart by
 //! rules of their own already -- two nodes at one address
 //! (`Problem::TwoNodesWantOneThing`), two sources landing on one port of the
 //! ground ([`crate::graph::telemetry::of`]), `tcs_cmd.recv` and
@@ -28,7 +28,7 @@
 //! compared.
 //!
 //! This is the one place the list is made: the check holds a configuration
-//! to it, and `tcsverify --summary` prints it.
+//! to it, and `tcs-verify --summary` prints it.
 
 use super::parameters::{ci_config_of, flatten};
 use super::telemetry::{self, Reaches, Via};
@@ -43,12 +43,12 @@ use crate::types::{
 pub enum BoundBy {
     /// tcspecial, aboard.
     Vehicle,
-    /// The ground station: tcsmoc, or whatever station reads the
+    /// The ground station: tcs-moc, or whatever station reads the
     /// configuration.
     Ground,
     /// A payload, at its own address.
     Payload,
-    /// tcssim, answering for a payload at its `sim_address` on a desk.
+    /// tcs-sim, answering for a payload at its `sim_address` on a desk.
     Simulator,
     /// The far end of a software bus link: the cFS computer's SBN.
     FarEnd,
@@ -65,7 +65,7 @@ impl BoundBy {
             BoundBy::Vehicle => "vehicle",
             BoundBy::Ground => "ground",
             BoundBy::Payload => "payload",
-            BoundBy::Simulator => "tcssim",
+            BoundBy::Simulator => "tcs-sim",
             BoundBy::FarEnd => "far end",
         }
     }
@@ -88,7 +88,7 @@ pub enum Kind {
     /// A node's own address, a gateway's or a network payload's. Two of
     /// these at one place are refused as `Problem::TwoNodesWantOneThing`.
     Node,
-    /// Where tcssim answers for a node on a desk.
+    /// Where tcs-sim answers for a node on a desk.
     SimAddress,
 }
 
@@ -301,7 +301,7 @@ pub fn of(graph: &Graph) -> Vec<Socket> {
     }
 
     // Each node's own address, where it has one at a port, and then where
-    // tcssim answers for one on a desk: by name, an order no file can
+    // tcs-sim answers for one on a desk: by name, an order no file can
     // change.
     let mut nodes: Vec<&super::Node> = graph.nodes.iter().collect();
     nodes.sort_by(|a, b| a.name.cmp(&b.name));

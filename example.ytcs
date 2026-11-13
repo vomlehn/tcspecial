@@ -39,7 +39,7 @@ payloads:
         world-out:
           - gateway-1.spi-1
 
-tcsgui:
+tcs-gui:
   nodes:
     - { node: gateway-1, x: 469, y: 34 }
     - { node: spi-1, x: 15, y: 34 }

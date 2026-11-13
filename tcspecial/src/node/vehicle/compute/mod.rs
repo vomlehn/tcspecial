@@ -362,7 +362,7 @@ pub fn make(
 // The form a value takes on a link is `tcslib-protocol`'s, with the range it
 // can carry: it is one fact the vehicle writes and the ground reads back, and
 // the range is also a rule about what a configuration may say, which
-// `tcsverify` checks on a desk. Named here because every computation in this
+// `tcs-verify` checks on a desk. Named here because every computation in this
 // tree calls these by their short names, and because this is where a reader of
 // the arithmetic looks for them.
 pub(crate) use tcslib_protocol::node::vehicle::compute::{

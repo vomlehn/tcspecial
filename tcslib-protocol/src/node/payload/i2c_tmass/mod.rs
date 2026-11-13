@@ -4,7 +4,7 @@
 //! address, the same terms, the same reads. What differs is what it is, which a
 //! configuration says by its type and a reader takes in at a glance, and one
 //! thing a desk needs: a simulated run may reach it over UDP at its
-//! `sim_address`, where tcssim answers with the temperature of the thermal mass
+//! `sim_address`, where tcs-sim answers with the temperature of the thermal mass
 //! it is joined to. See [`crate::graph::reach::simulated_over_udp`].
 //!
 //! So nothing here is a rule of its own. The terms are `i2c`'s, read by

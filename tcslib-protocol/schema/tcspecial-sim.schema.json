@@ -2,18 +2,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/tcspecial-sim.schema.json",
   "title": "tcspecial simulator configuration",
-  "description": "What tcssim needs in order to simulate the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
+  "description": "What tcs-sim needs in order to simulate the payloads of a tcspecial configuration: how fast each one sends, and what it does wrong. Nothing here describes a payload -- the configuration does that, and the two are joined by name.\n\nA setting written with nothing after it is a setting not stated, which is what the editor writes into the form it makes: every payload of the configuration and every setting a payload may state, so that a reader can see what there is to answer.",
   "type": "object",
   "properties": {
     "description": {
       "type": "string"
     },
-    "tcssim": {
-      "description": "What tcssim itself is told. Required: tcssim does not start without it, and a harness cannot wait for a simulator without knowing where to ask.",
+    "tcs-sim": {
+      "description": "What tcs-sim itself is told. Required: tcs-sim does not start without it, and a harness cannot wait for a simulator without knowing where to ask.",
       "type": "object",
       "properties": {
         "ready": {
-          "description": "The UDP address, as address:port, at which tcssim answers whether it has made its simulated devices. One no other run uses: a simulator left running holds it, and a second one started on the same address is refused.",
+          "description": "The UDP address, as address:port, at which tcs-sim answers whether it has made its simulated devices. One no other run uses: a simulator left running holds it, and a second one started on the same address is refused.",
           "type": "string"
         },
         "thermostat": {
@@ -21,7 +21,7 @@
             "string",
             "null"
           ],
-          "description": "The thermostat nodes of the configuration tcssim plays, one name or several separated by commas, as a vehicle of several zones, or a staged thermostat, has several: for each it reads the simulated sensors whose data reaches that node and switches the simulated heaters the node's data reaches, with the node's setpoint and band, so the loop closes with no tcspecial running. A name blank between commas, or written twice, is refused, and so are two of them switching one heater. Never with tcspecial running, whose own thermostat switches the same heaters."
+          "description": "The thermostat nodes of the configuration tcs-sim plays, one name or several separated by commas, as a vehicle of several zones, or a staged thermostat, has several: for each it reads the simulated sensors whose data reaches that node and switches the simulated heaters the node's data reaches, with the node's setpoint and band, so the loop closes with no tcspecial running. A name blank between commas, or written twice, is refused, and so are two of them switching one heater. Never with tcspecial running, whose own thermostat switches the same heaters."
         },
         "seed": {
           "type": [
@@ -29,7 +29,7 @@
             "string",
             "null"
           ],
-          "description": "What the simulation's random numbers start from, so that a run's noise can be had again. Unstated is a seed of tcssim's choosing, which it reports as it starts."
+          "description": "What the simulation's random numbers start from, so that a run's noise can be had again. Unstated is a seed of tcs-sim's choosing, which it reports as it starts."
         }
       },
       "required": [
@@ -167,7 +167,7 @@
               "string",
               "null"
             ],
-            "description": "Whether the payloads that name this group are simulated: true for tcssim to simulate them, false for the real devices. A payload in a group that states it does not state it too."
+            "description": "Whether the payloads that name this group are simulated: true for tcs-sim to simulate them, false for the real devices. A payload in a group that states it does not state it too."
           },
           "enable": {
             "type": [
@@ -189,7 +189,7 @@
             ]
           },
           "payload_address": {
-            "description": "Where tcssim answers from, where it has an address of its own to bind.",
+            "description": "Where tcs-sim answers from, where it has an address of its own to bind.",
             "type": [
               "string",
               "null"
@@ -351,7 +351,7 @@
       }
     },
     "simulated_payloads": {
-      "description": "The payloads tcssim simulates, grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's simulated payloads, each named by its first key, `payload: <name>`. The type is the kind of payload it is, the type the configuration writes that payload under: one of the interfaces a payload is reached over, a payload that is a program being the program itself and not simulated. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
+      "description": "The payloads tcs-sim simulates, grouped by type: each entry is one key, `type` and the type, whose value is the list of that type's simulated payloads, each named by its first key, `payload: <name>`. The type is the kind of payload it is, the type the configuration writes that payload under: one of the interfaces a payload is reached over, a payload that is a program being the program itself and not simulated. Said here as well as in the configuration so that a simulator file paired with the wrong configuration is caught rather than simulating the wrong thing.",
       "type": "array",
       "items": {
         "type": "object",
@@ -369,8 +369,8 @@
         }
       }
     },
-    "tcsgui": {
-      "description": "What the editor arranged: where each physics component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcssim simulates and this says where somebody put the boxes on a screen; tcssim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcsgui section names its nodes.",
+    "tcs-gui": {
+      "description": "What the editor arranged: where each physics component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcs-sim simulates and this says where somebody put the boxes on a screen; tcs-sim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcs-gui section names its nodes.",
       "type": "object",
       "properties": {
         "nodes": {
@@ -443,7 +443,7 @@
             "string",
             "null"
           ],
-          "description": "Whether this payload is simulated: true for tcssim to simulate it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
+          "description": "Whether this payload is simulated: true for tcs-sim to simulate it, false for the real device. Required, from this payload or from its group, and not from both: a payload does not override its group's. Empty is not stated."
         },
         "enable": {
           "type": [
@@ -472,7 +472,7 @@
           ]
         },
         "payload_address": {
-          "description": "Where tcssim answers from, where it has an address of its own to bind.",
+          "description": "Where tcs-sim answers from, where it has an address of its own to bind.",
           "type": [
             "string",
             "null"

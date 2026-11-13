@@ -2,7 +2,7 @@
 //! it opens anything, and refuses a run whose payloads its `--simulate` mode
 //! does not allow.
 //!
-//! A simulated device here is a pseudo-terminal, as tcssim makes for a serial
+//! A simulated device here is a pseudo-terminal, as tcs-sim makes for a serial
 //! payload; a network payload is a real device whatever answers it. Every
 //! address a configuration states is a port below 1024, which a test cannot
 //! bind: a run the mode refuses says so before it tries, and a run it allows
@@ -56,7 +56,7 @@ payloads:
     path
 }
 
-/// Opens a pseudo-terminal, which is what tcssim makes for a serial payload.
+/// Opens a pseudo-terminal, which is what tcs-sim makes for a serial payload.
 ///
 /// # Returns
 ///

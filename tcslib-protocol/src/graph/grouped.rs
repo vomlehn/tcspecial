@@ -693,11 +693,11 @@ impl<'de> Visitor<'de> for NodeSeed {
                 }
                 // Where this used to be, and said so rather than read as an
                 // attribute nothing knows: a position is the editor's own
-                // and lives in the `tcsgui` section at the end of the file.
+                // and lives in the `tcs-gui` section at the end of the file.
                 "editor" => {
                     return Err(de::Error::custom(
                         "a node's position is not written on the node any \
-                         more: it is in the tcsgui section at the end of the \
+                         more: it is in the tcs-gui section at the end of the \
                          file, as `- { node: <node>, x: <x>, y: <y> }`",
                     ))
                 }
@@ -810,7 +810,7 @@ impl<'de> Visitor<'de> for NodeSeed {
     }
 }
 
-/// Reads where the editor drew each node: the `nodes` of the `tcsgui`
+/// Reads where the editor drew each node: the `nodes` of the `tcs-gui`
 /// section.
 ///
 /// # Arguments
@@ -851,7 +851,7 @@ pub fn layout<'de, D: Deserializer<'de>>(
 }
 
 /// Reads the concerns the editor was told to set aside: the `set-aside` of
-/// the `tcsgui` section.
+/// the `tcs-gui` section.
 ///
 /// # Arguments
 ///
@@ -1209,7 +1209,7 @@ mod tests {
              payloads:\n  - type i2c:\n      - payload: t1\n        \
              address: \"0x48\"\n      - payload: t2\n  \
              - type network:\n      - { payload: n, port: \"1\" }\n\
-             tcsgui:\n  nodes:\n    - { node: t1, x: 1, y: 2 }\n  \
+             tcs-gui:\n  nodes:\n    - { node: t1, x: 1, y: 2 }\n  \
              set-aside:\n    - { node: t1, concern: c }\n",
         )
         .expect("YAML");
@@ -1221,14 +1221,14 @@ mod tests {
              <payload name=\"t1\"><address>0x48</address></payload>\
              <payload name=\"t2\"/></type><type name=\"network\">\
              <payload name=\"n\"><port>1</port></payload></type></payloads>\
-             <tcsgui><nodes><node name=\"t1\" x=\"1\" y=\"2\"/></nodes>\
+             <tcs-gui><nodes><node name=\"t1\" x=\"1\" y=\"2\"/></nodes>\
              <set-aside><node name=\"t1\" concern=\"c\"/></set-aside>\
-             </tcsgui></configuration>",
+             </tcs-gui></configuration>",
         )
         .expect("XML");
         assert_eq!(yaml.gateways, xml.gateways);
         assert_eq!(yaml.payloads, xml.payloads);
-        assert_eq!(yaml.tcsgui, xml.tcsgui);
+        assert_eq!(yaml.tcs_gui, xml.tcs_gui);
         assert_eq!(yaml.payloads.len(), 2);
         assert_eq!(yaml.payloads[0].node_type, "i2c");
         assert_eq!(yaml.payloads[0].nodes[1].node.name, "t2");
@@ -1441,29 +1441,29 @@ mod tests {
     fn a_position_names_its_node() {
         refused(
             ConfigFormat::Yaml,
-            "tcsgui:\n  nodes:\n    - { x: 1, y: 2 }\n",
+            "tcs-gui:\n  nodes:\n    - { x: 1, y: 2 }\n",
             &["names no node"],
         );
         refused(
             ConfigFormat::Yaml,
-            "tcsgui:\n  nodes:\n    - { node: a, x: 1 }\n",
+            "tcs-gui:\n  nodes:\n    - { node: a, x: 1 }\n",
             &["says no y"],
         );
         refused(
             ConfigFormat::Yaml,
-            "tcsgui:\n  nodes:\n    - { node: a, x: 1, y: up }\n",
+            "tcs-gui:\n  nodes:\n    - { node: a, x: 1, y: up }\n",
             &["not a whole number"],
         );
         refused(
             ConfigFormat::Yaml,
-            "tcsgui:\n  nodes:\n    - { node: a, x: 1, y: 2 }\n    \
+            "tcs-gui:\n  nodes:\n    - { node: a, x: 1, y: 2 }\n    \
              - { node: a, x: 3, y: 4 }\n",
             &["twice"],
         );
         refused(
             ConfigFormat::Xml,
-            "<configuration><tcsgui><nodes><node x=\"1\" y=\"2\"/></nodes>\
-             </tcsgui></configuration>",
+            "<configuration><tcs-gui><nodes><node x=\"1\" y=\"2\"/></nodes>\
+             </tcs-gui></configuration>",
             &["names no node"],
         );
     }

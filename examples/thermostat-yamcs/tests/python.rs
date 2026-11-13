@@ -2,7 +2,7 @@
 //!
 //! The suite beside `thermostat_yamcs.py`: what it reads, the mission
 //! database it has generated, and what it shows of a Yamcs played there.
-//! None needs Yamcs, tcssim or a vehicle, or opens a window. Run under
+//! None needs Yamcs, tcs-sim or a vehicle, or opens a window. Run under
 //! `cargo test` so that a change to the Rust that the Python has not
 //! followed fails where the Rust change is being tested.
 

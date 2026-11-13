@@ -83,11 +83,11 @@
             </payload>
         </type>
     </payloads>
-    <tcsgui>
+    <tcs-gui>
         <nodes>
             <node name="moc" x="469" y="34"/>
             <node name="lamp" x="34" y="134"/>
             <node name="switch" x="34" y="34"/>
         </nodes>
-    </tcsgui>
+    </tcs-gui>
 </configuration>

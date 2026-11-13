@@ -11,7 +11,7 @@
 //!
 //! and has `fuel` to burn. When it is gone the engine gives out nothing,
 //! whatever it is told: a moment foreseen from the flow, and an event of the
-//! world's. The arithmetic is tcssim's `physics::engine`.
+//! world's. The arithmetic is tcs-sim's `physics::engine`.
 
 use std::time::Duration;
 

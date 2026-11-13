@@ -28,13 +28,13 @@ build.out
 # Resume command written by the SessionEnd hook
 claude-resume
 
-# What tcsgui keeps beside a configuration it is editing: the history that
+# What tcs-gui keeps beside a configuration it is editing: the history that
 # makes undo survive a crash. Of a moment rather than of a configuration, so
 # it is not something to commit.
 # The editor's undo history, which used to live beside the configuration and
-# is now in the user's own state directory: $XDG_STATE_HOME/tcsgui. Kept here
+# is now in the user's own state directory: $XDG_STATE_HOME/tcs-gui. Kept here
 # for a while so that a checkout with an old one in it stays clean.
-*.tcsgui-history
+*.tcs-gui-history
 
 # What `make stage`, `make deb` and `make rpm` build: the staged installs and
 # the packages cut from them.

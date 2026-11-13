@@ -5,10 +5,10 @@ the indicator is and what the two lines say, and ``tcsui/ui/beacon.slint``,
 which is the panel itself. The panel is drawn with tkinter, which is the
 toolkit the Python standard library has.
 
-The other half of ``python/tcslib/beacon.py``. That one listens and says what
-is true of the spacecraft; this one says what that looks like. They are apart
-for the reason the Rust halves are: a ground station with no window wants the
-facts with no toolkit loaded, and two stations that do have windows want the
+The other half of ``python/tcslib_moc/beacon.py``. That one listens and says
+what is true of the spacecraft; this one says what that looks like. They are
+apart for the reason the Rust halves are: a ground station with no window wants
+the facts with no toolkit loaded, and two stations that do have windows want the
 same panel rather than two that have drifted -- the same indicator in the same
 place, the same labels in the same words.
 
@@ -22,7 +22,7 @@ import tkinter.font
 from tkinter import ttk
 from dataclasses import dataclass
 
-from tcslib.beacon import (
+from tcslib_moc.beacon import (
     NO_BEACON_MESSAGE,
     NO_TRANSFER_TIME,
     Stage,
@@ -62,7 +62,7 @@ def indicator(showing, heard):
     clock puts in the future.
 
     Args:
-        showing: The ``tcslib.beacon.Showing`` for the last beacon's age.
+        showing: The ``tcslib_moc.beacon.Showing`` for the last beacon's age.
         heard:   Whether a beacon has ever arrived: a pass's ``at`` having a
                  time in it, which it keeps for good once a beacon arrives.
 
@@ -99,7 +99,7 @@ class Shown:
         """What to show for a pass of the beacon loop.
 
         Args:
-            beacon_pass: The ``tcslib.beacon.Pass`` the loop returned.
+            beacon_pass: The ``tcslib_moc.beacon.Pass`` the loop returned.
 
         Returns:
             The :class:`Shown`.

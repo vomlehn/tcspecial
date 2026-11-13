@@ -43,7 +43,7 @@ In flight
          Compute nodes work on what they read, a gateway node sends it to
          the ground, and tcslog keeps a record aboard of what was sent.
          Telemetry and beacons go down the space link to the mission
-         operations center, where Yamcs uses tcslib for its end of the link,
+         operations center, where Yamcs uses tcslib-moc for its end of the link,
          and commands come back up.
    :width: 100%
 
@@ -59,8 +59,8 @@ record aboard of what it sent down, in a log written by **tcslog**, a
 library of its own.
 
 On the ground, a mission control system such as Yamcs (https://yamcs.org)
-holds the other end of the link through **tcslib**, the TCS ground library.
-tcslib sends the vehicle its commands, receives its telemetry and beacons,
+holds the other end of the link through **tcslib-moc**, the TCS ground library.
+tcslib-moc sends the vehicle its commands, receives its telemetry and beacons,
 and knows from the vehicle's configuration where each datum arrives and
 what it is; Yamcs's mission database is generated from the same
 configuration, so the two ends cannot disagree about the link. The link's
@@ -159,7 +159,8 @@ The other documents beside these:
 
 The libraries
     `tcslib-moc <../tcslib-moc/README.html>`__ in the MOC, in Rust, and
-    `tcslib-c <../tcslib-c/README.html>`__, its C interface; `tcslib-protocol
+    `tcslib-moc-c <../tcslib-moc-c/README.html>`__, its C interface;
+    `tcslib-protocol
     <../tcslib-protocol/README.html>`__, used aboard and in the MOC.
 
 The rest of the TCS software

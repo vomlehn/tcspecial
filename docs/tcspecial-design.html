@@ -507,7 +507,7 @@ ul.auto-toc {
 </ul>
 </li>
 <li><a class="reference internal" href="#the-visual-window" id="toc-entry-104">The Visual Window</a></li>
-<li><a class="reference internal" href="#tcslib" id="toc-entry-105">tcslib</a></li>
+<li><a class="reference internal" href="#tcslib-moc" id="toc-entry-105">tcslib-moc</a></li>
 <li><a class="reference internal" href="#tcslib-protocol" id="toc-entry-106">tcslib-protocol</a></li>
 <li><a class="reference internal" href="#what-each-end-read" id="toc-entry-107">What Each End Read</a></li>
 </ul>
@@ -558,13 +558,13 @@ ul.auto-toc {
 <li><a class="reference internal" href="#about-the-names-and-the-notes" id="toc-entry-141">About the names and the notes</a></li>
 <li><a class="reference internal" href="#the-name-of-the-project-is-tcspecial" id="toc-entry-142">The name of the project is TCSpecial</a></li>
 <li><a class="reference internal" href="#tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft" id="toc-entry-143">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslib-that-links-with-misssion-control-software" id="toc-entry-144">TCSpecial shall include a library named tcslib that links with misssion control software</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslib-protocol-that-is-shared-between-tcspecial-and-tcslib" id="toc-entry-145">TCSpecial shall include a library named tcslib-protocol that is shared between tcspecial and tcslib</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslib-protocol-and-tcslib" id="toc-entry-146">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslib-protocol, and tcslib</a></li>
-<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib" id="toc-entry-147">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslib-moc-that-links-with-misssion-control-software" id="toc-entry-144">TCSpecial shall include a library named tcslib-moc that links with misssion control software</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcslib-protocol-that-is-shared-between-tcspecial-and-tcslib-moc" id="toc-entry-145">TCSpecial shall include a library named tcslib-protocol that is shared between tcspecial and tcslib-moc</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslib-protocol-and-tcslib-moc" id="toc-entry-146">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslib-protocol, and tcslib-moc</a></li>
+<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib-moc" id="toc-entry-147">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib-moc</a></li>
 <li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands" id="toc-entry-148">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a><ul>
-<li><a class="reference internal" href="#ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-code-via-udp-ip" id="toc-entry-149">CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP</a></li>
-<li><a class="reference internal" href="#dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib" id="toc-entry-150">DH_UDP must implement DH and use UDP to send telemetry to tcslib</a></li>
+<li><a class="reference internal" href="#ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-moc-via-udp-ip" id="toc-entry-149">CI must be implemented by CI_UDP that communicates with tcslib-moc via UDP/IP</a></li>
+<li><a class="reference internal" href="#dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib-moc" id="toc-entry-150">DH_UDP must implement DH and use UDP to send telemetry to tcslib-moc</a></li>
 <li><a class="reference internal" href="#ci-must-have-an-element-named-dh-of-type-btreemap" id="toc-entry-151">CI must have an element named dh of type BTreeMap</a><ul>
 <li><a class="reference internal" href="#ci-must-support-sending-telemetry-responses-to-all-ci-commands" id="toc-entry-152">CI must support sending telemetry responses to all CI commands</a></li>
 <li><a class="reference internal" href="#each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication" id="toc-entry-153">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></li>
@@ -1465,7 +1465,7 @@ a type with a width of its own is sent with no count, and between nodes
 nothing is counted. Ground programs that read through
 <tt class="docutils literal"><span class="pre">tcslib_moc::gateway::GatewayReceiver</span></tt> are given each datum without its
 count; Python reading a link itself takes it off with
-<tt class="docutils literal">python/tcslibgs/count.py</tt>.</dd>
+<tt class="docutils literal">python/tcslib_protocol/count.py</tt>.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal">tcsverify <span class="pre">--xtce</span></tt> writes it from the configuration and
 <tt class="docutils literal">types.xtce</tt>, and nobody writes it by hand: everything it says is said
@@ -1475,12 +1475,11 @@ check</tt> fails when it is not what <tt class="docutils literal">tcsverify</tt>
 interface and the vehicle's configuration are reviewed together. <tt class="docutils literal">make
 xtce</tt> writes every shipped configuration's again.</dd>
 <dt>Requirement</dt>
-<dd>A ground station reads what each node sends from it, and works out
-nothing of its own: <tt class="docutils literal">python/tcslibgs/form.py</tt> reads each node's form
-there, and Yamcs's mission database is built on it, each source's
-parameter type copied from it into the wrapper that adds Yamcs's
-framing (<a class="reference internal" href="#framing-is-a-gateway-s">Framing is a gateway's</a>). So the rules for what each node
-sends are the Rust's alone.</dd>
+<dd>A ground station reads what each node sends from it, and works out nothing
+of its own: <tt class="docutils literal">python/tcslib_protocol/form.py</tt> reads each node's form there,
+and Yamcs's mission database is built on it, each source's parameter type
+copied from it into the wrapper that adds Yamcs's framing (<a class="reference internal" href="#framing-is-a-gateway-s">Framing is a
+gateway's</a>). So the rules for what each node sends are the Rust's alone.</dd>
 <dt>Requirement</dt>
 <dd>It is the ground's, and it does not go on the vehicle (<a class="reference internal" href="#what-goes-on-the-vehicle">What goes on the
 vehicle</a>). It needs no digest of its own: what it says is fixed by the
@@ -1683,9 +1682,9 @@ too: its F´ model is written from the configuration by <tt class="docutils lite
 <span class="pre">--fprime-model</span></tt>, and the <tt class="docutils literal">TcsBridge</tt> component in <tt class="docutils literal">fprime/</tt> is tested in an
 F´ deployment against tcspecial and tcssim, data both ways, the node commands
 and the restart -- see <a class="reference internal" href="#f-gateway-fprime">F´: gateway_fprime</a>. The ground's end of the bus is
-built too: tcssim simulates the cFS end, and tcslib's SBN transport,
-<tt class="docutils literal"><span class="pre">tcslib_moc::bus</span></tt>, lets tcsmoc and every station on tcslib command a vehicle
-that answers to cFS through it (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>).</p>
+built too: tcssim simulates the cFS end, and tcslib-moc's SBN transport,
+<tt class="docutils literal"><span class="pre">tcslib_moc::bus</span></tt>, lets tcsmoc and every station on tcslib-moc command a
+vehicle that answers to cFS through it (see <a class="reference internal" href="#what-crosses-the-bus">What crosses the bus</a>).</p>
 <p>The gateway nodes are written in the <tt class="docutils literal">gateways</tt> section, linked through
 <tt class="docutils literal"><span class="pre">moc-in</span></tt> and <tt class="docutils literal"><span class="pre">moc-out</span></tt>, with <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>, <tt class="docutils literal"><span class="pre">null-gateway</span></tt> and
 <tt class="docutils literal">app_gateway_veh</tt> beside them. Each of those was named for the MOC while the
@@ -2062,7 +2061,7 @@ comes from it, or a line leaves it -- states <tt class="docutils literal">cmd_ms
 drawn into it produces is published at <tt class="docutils literal">tlm_base</tt> plus the source's
 device id.</dd>
 <dt>Requirement</dt>
-<dd><p class="first">tcssim simulates the cFS end as an SBN peer, and tcslib gains an SBN
+<dd><p class="first">tcssim simulates the cFS end as an SBN peer, and tcslib-moc gains an SBN
 transport, so that tcsmoc can test a configuration that answers to cFS as
 it tests one that answers to the ground. A run against cFS's own Linux
 build, with SBN, is the test that the wire format is SBN's and not only
@@ -2077,15 +2076,15 @@ subscribed to it. Like SBN on a cFS it never speaks first. <tt class="docutils l
 station's one peer of it, kept on a thread of its own, which announces,
 sends heartbeats and refuses a far end of another protocol version or ident
 as the vehicle does, and turns the bus back into the loopback UDP links a
-station already speaks: tcslib's <tt class="docutils literal">command_links_of</tt>, <tt class="docutils literal"><span class="pre">beacon::open</span></tt> and
-<tt class="docutils literal"><span class="pre">GatewayReceiver::open</span></tt> use it themselves, so tcsmoc, the C/C++ library
-and every other station are written the same for a radio and a bus, and the
-bus is spoken in one place, from <tt class="docutils literal"><span class="pre">tcslib_protocol::sbn</span></tt> and
+station already speaks: tcslib-moc's <tt class="docutils literal">command_links_of</tt>, <tt class="docutils literal"><span class="pre">beacon::open</span></tt>
+and <tt class="docutils literal"><span class="pre">GatewayReceiver::open</span></tt> use it themselves, so tcsmoc, the C/C++
+library and every other station are written the same for a radio and a bus,
+and the bus is spoken in one place, from <tt class="docutils literal"><span class="pre">tcslib_protocol::sbn</span></tt> and
 <tt class="docutils literal"><span class="pre">tcslib_protocol::cfs</span></tt>. A station is processor
 <tt class="docutils literal"><span class="pre">tcslib_protocol::sbn::ground_processor_id</span></tt>, one more than the larger of
 the two the configuration states. <tt class="docutils literal">tcspecial/tests/cfs.rs</tt> still plays the
 cFS end byte by byte; <tt class="docutils literal">tcspecial/tests/cfs_ground.rs</tt> commands the vehicle
-flying <tt class="docutils literal">examples/cfs</tt> through the simulated cFS end from tcslib, and
+flying <tt class="docutils literal">examples/cfs</tt> through the simulated cFS end from tcslib_moc, and
 <tt class="docutils literal">make <span class="pre">run-cfs</span></tt> in <tt class="docutils literal">examples/</tt> runs tcsmoc on it.</p>
 <p>tcssim simulates the cFS end of every configuration that answers to cFS,
 whenever it runs, and so is not run beside a real cFS: the far end is one
@@ -2178,7 +2177,7 @@ is a later step.</dd>
 <div class="section" id="f-gateway-fprime">
 <h3><a class="toc-backref" href="#toc-entry-25">F´: <tt class="docutils literal">gateway_fprime</tt></a></h3>
 <p>The F´ end is a component in the F´ deployment, <tt class="docutils literal">TcsBridge</tt>, built on
-<tt class="docutils literal"><span class="pre">tcslib-c</span></tt> and so in C++ against the header every C and C++ ground station
+<tt class="docutils literal"><span class="pre">tcslib-moc-c</span></tt> and so in C++ against the header every C and C++ ground station
 uses. To tcspecial it is a MOC: it opens the same configuration, sends
 <tt class="docutils literal">CONNECT</tt> and compares digests, takes beacons, sends commands and data and
 receives data, all in the radio's own UDP protocol. To the rest of the deployment it
@@ -2219,7 +2218,7 @@ tools rather than cargo, and is tested by an F´ deployment that runs it
 against tcssim, as tcsmoc is tested against it.</dd>
 <dt>Requirement</dt>
 <dd>The bridge allocates nothing once the deployment is running, as a ground
-station's loop built on tcslib does not: a datum is taken into a buffer
+station's loop built on tcslib-moc does not: a datum is taken into a buffer
 made when the component was, and a channel is written from it.</dd>
 </dl>
 <p><strong>Built.</strong> What follows is how, and the choices the requirements left open,
@@ -2276,17 +2275,17 @@ beacon heard while it is not matched for commanding, because nothing comes down 
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
 command's response and an event.</p>
-<p><tt class="docutils literal">SEND_DATA</tt> is the one command that is not tcspecial's: it sends its text
-up to the gateway node, as one datum, by tcslib-c's <tt class="docutils literal">tcs_uplink</tt>, and the
-node leaves it by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> links for the nodes they reach -- in
-the fprime example, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> to the heater. Text, because what a
-gateway node's links drive here is a line or a program, which take text, and
-because a byte array is something nobody at F´'s ground system can type. It
-goes only while the bridge is matched for commanding, as tcslib-c holds every
-uplink to (see <a class="reference internal" href="#on-the-ground">On the ground</a>), and is refused, saying so, before. A
-gateway node that binds no address and port aboard has no way up; the
-bridge runs on one, as the far end of a bridge that only listens, and fails
-<tt class="docutils literal">SEND_DATA</tt> alone, saying why.</p>
+<p><tt class="docutils literal">SEND_DATA</tt> is the one command that is not tcspecial's: it sends its text up
+to the gateway node, as one datum, by tcslib-moc-c's <tt class="docutils literal">tcs_uplink</tt>, and the
+node leaves it by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> links for the nodes they reach -- in the
+fprime example, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt> to the heater. Text, because what a gateway
+node's links drive here is a line or a program, which take text, and because a
+byte array is something nobody at F´'s ground system can type. It goes only
+while the bridge is matched for commanding, as tcslib-moc-c holds every uplink
+to (see <a class="reference internal" href="#on-the-ground">On the ground</a>), and is refused, saying so, before. A gateway node
+that binds no address and port aboard has no way up; the bridge runs on one, as
+the far end of a bridge that only listens, and fails <tt class="docutils literal">SEND_DATA</tt> alone, saying
+why.</p>
 <p><tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt> each take the key and the target: the
 checksum of the configuration to restart onto, as tcsverify prints it, or
 nothing for this configuration's, a plain restart. They are plain commands
@@ -2314,13 +2313,13 @@ says. A node whose function makes a value -- <tt class="docutils literal">to_kel
 unit's steps (see <a class="reference internal" href="#compute-elements">Compute elements</a>), in the unit
 <tt class="docutils literal"><span class="pre">tcslib_protocol::graph::units</span></tt> gives it, which tcsmoc asks too. Such a
 source's channel is an <tt class="docutils literal">F64</tt> in that unit, formatted with its symbol so that
-F´'s ground system shows <tt class="docutils literal">293.15 K</tt>, read by tcslib-c's <tt class="docutils literal">tcs_value_in</tt> --
-<tt class="docutils literal">from_value</tt>, the one statement of what a value is -- and a datum from it that
-is not a value is written to no channel, counted in <tt class="docutils literal">DataNotValues</tt> and said
-in an event: four bytes made a number whatever they held would be a temperature
-nobody measured. A source that states it sends a <tt class="docutils literal">boolean</tt> -- a <tt class="docutils literal">thermostat</tt>
-whose <tt class="docutils literal"><span class="pre">type-out</span></tt> is one -- sends decisions, the one byte 1 or 0, and its
-channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
+F´'s ground system shows <tt class="docutils literal">293.15 K</tt>, read by tcslib-moc-c's <tt class="docutils literal">tcs_value_in</tt>
+-- <tt class="docutils literal">from_value</tt>, the one statement of what a value is -- and a datum from it
+that is not a value is written to no channel, counted in <tt class="docutils literal">DataNotValues</tt> and
+said in an event: four bytes made a number whatever they held would be a
+temperature nobody measured. A source that states it sends a <tt class="docutils literal">boolean</tt> -- a
+<tt class="docutils literal">thermostat</tt> whose <tt class="docutils literal"><span class="pre">type-out</span></tt> is one -- sends decisions, the one byte 1 or
+0, and its channel is a <tt class="docutils literal">bool</tt>, true for on, read by <tt class="docutils literal">tcs_decision_on</tt> --
 <tt class="docutils literal">from_decision</tt>, the one statement of what a decision is -- and a datum from
 it that is not one is written to no channel, counted in <tt class="docutils literal">DataNotDecisions</tt> and
 said in an event. A source that states a whole number -- a sensor's reading,
@@ -2356,7 +2355,7 @@ after; as the deployment stops, the beacon watch's thread is woken from its
 pass by <tt class="docutils literal">tcs_beacons_wake</tt> -- which ends a pass from another thread, finding
 nothing -- and joined, so that it is gone before the handles it uses are
 freed, beacon or no beacon. Both threads are given the stack a Rust thread has, 2 MiB:
-tcslib-c's calls need more than F´'s usual 64 KiB.</p>
+tcslib-moc-c's calls need more than F´'s usual 64 KiB.</p>
 <p>The test is <tt class="docutils literal">make <span class="pre">fprime-test</span></tt>: tcssim, waited for, simulating the fprime
 example's payloads with every one sending from the start (<tt class="docutils literal"><span class="pre">--sending</span></tt>, there
 being nobody at its window); tcspecial flying the example; F´'s ground system;
@@ -4617,9 +4616,9 @@ software runs the same graph whether a file exports or not; the check is
 <tt class="docutils literal"><span class="pre">tcslib_protocol::graph::Graph::check</span></tt>'s, which tcspecial runs as it loads, so
 a configuration that breaks it is refused before it flies.</p>
 <p><tt class="docutils literal"><span class="pre">tcslib_protocol::graph::Graph::load</span></tt> is the reader, and the Python ground
-reader, <tt class="docutils literal">python/tcslibgs/configuration.py</tt>, follows includes by the same
-rules, so that the two count a node's device id among the same names.
-How tcsgui opens and writes an included file is in the <a class="reference external" href="tcsgui-design.html#subdiagrams">tcsgui design</a>.</p>
+reader, <tt class="docutils literal">python/tcslib_protocol/configuration.py</tt>, follows includes by the
+same rules, so that the two count a node's device id among the same names. How
+tcsgui opens and writes an included file is in the <a class="reference external" href="tcsgui-design.html#subdiagrams">tcsgui design</a>.</p>
 <p>A small vehicle needs no split and should not have one. Where a split earns its
 place, the useful seam is who owns a file and how often it changes, not what
 type of data is in it:</p>
@@ -4847,7 +4846,8 @@ the transitions.</p>
 </li>
 <li><p class="first">Testing software is:</p>
 <ul class="simple">
-<li>tcsmoc: Simple interface using tcslib for visualizing tcspecial operation and doing testing.</li>
+<li>tcsmoc: Simple interface using tcslib-moc for visualizing tcspecial
+operation and doing testing.</li>
 <li>tcssim: Simulated payloads</li>
 </ul>
 </li>
@@ -4856,10 +4856,11 @@ configuration, which holds the payload configuration section, and the
 simulator configuration beside it:</p>
 <blockquote>
 <ul class="simple">
-<li>tcslib: ground software library providing simple integration with mission control software</li>
+<li>tcslib-moc: ground software library providing simple integration with
+mission control software</li>
 <li>tcslib-protocol: software library containing the commands, the telemetry,
-and the configuration languages -- what tcspecial and tcslib share, and
-what the two GUIs share with them: every configuration file format is
+and the configuration languages -- what tcspecial and tcslib-moc share,
+and what the two GUIs share with them: every configuration file format is
 parsed here, including the simulator's, and a time or a sample of a
 transfer is formatted here so that both windows show it the same way</li>
 <li>the configuration: the nodes tcspecial serves, tcsmoc watches and
@@ -4939,8 +4940,8 @@ systems as follows:</p>
 |       v               |  :   |  |  gateway nodes      |  |   | |Payload 0| |
 |  +-----------------+  |  :   |  |  vehicle nodes:     |  |   | +---------+ |
 |  | tcslib-moc      |&lt;-------&gt;|  |   compute, log,     |  |   | +---------+ |
-|  | tcslib-c        |  |  :   |  |   tee, null, ping,  |  |   | |Payload 1| |
-|  | python/tcslib   |  |  :   |  |   apps              |  |   | +---------+ |
+|  | tcslib-moc-c    |  |  :   |  |   tee, null, ping,  |  |   | |Payload 1| |
+|  |python/tcslib_moc|  |  :   |  |   apps              |  |   | +---------+ |
 |  |(tcslib-protocol)|  |  :   |  |  payload nodes  &lt;-------------&gt;   .     | |
 |  +-----------------+  |  :   |  +---------------------+  |   | +---------+ |
 |  |  configuration  |  |  :   |  |  configuration      |  |   | |Payload n| |
@@ -4948,11 +4949,12 @@ systems as follows:</p>
 +-----------------------+  :   +---------------------------+   +-------------+
 </pre>
 <p>On the ground, a mission's control software (such as YAMCS or MCT) is built on
-tcslib-moc -- or on tcslib-c from C and C++, or on the Python <tt class="docutils literal">tcslib</tt> -- to
-send commands, receive the vehicle's data and listen for its beacons. These are
-shown as a single communications link, though they could be using multiple
-frequencies or channels. Both ends read the same configuration, and a beacon
-carries its digest, so each can tell when the other is reading another one.</p>
+tcslib-moc -- or on tcslib-moc-c from C and C++, or on the Python <tt class="docutils literal">tcslib_moc</tt>
+-- to send commands, receive the vehicle's data and listen for its beacons.
+These are shown as a single communications link, though they could be using
+multiple frequencies or channels. Both ends read the same configuration, and a
+beacon carries its digest, so each can tell when the other is reading another
+one.</p>
 <p>Over IP the link is several sockets, each saying by the port it is on what it
 carries -- see <a class="reference external" href="tcsmoc-design.html#where-the-addresses-are">Where the Addresses Are</a>. Commands about the spacecraft
 go to the command interpreter on one port and commands about a payload on
@@ -4969,7 +4971,7 @@ where each datum goes. Every node runs in the one process, so a reading
 reaching two places is a link with two destinations rather than two programs
 talking to each other. See <a class="reference internal" href="#the-four-concepts">The four concepts</a>.</p>
 <p>The tcslib-protocol library contains definitions shared between the ground
-portion of the software, tcslib, and the space portion, tcspecial.</p>
+portion of the software, tcslib-moc, and the space portion, tcspecial.</p>
 </div>
 </div>
 <div class="section" id="commands-and-telemetry">
@@ -5203,9 +5205,9 @@ that end the datagram. It is packed and unpacked by the code tcs-xtce generates
 from that document, in Rust without allocating and in Python; what each field
 must say -- the name, decimal digits, lower-case hex -- and turning the text
 into numbers and digests and back is <tt class="docutils literal"><span class="pre">tcslib_protocol::beacon</span></tt>'s, which
-tcspecial and <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> use, and <tt class="docutils literal">python/tcslibgs/beacon.py</tt>'s; the two
-are held to each other by the same examples in their tests, and to what the
-hand-written packer that came before wrote, byte for byte. For example:</p>
+tcspecial and <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> use, and <tt class="docutils literal">python/tcslib_protocol/beacon.py</tt>'s;
+the two are held to each other by the same examples in their tests, and to what
+the hand-written packer that came before wrote, byte for byte. For example:</p>
 <pre class="code text literal-block">
 tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
 </pre>
@@ -5259,14 +5261,14 @@ ground may look at before any tool is set up, which is why its XTCE is
 of text fields and nothing else.</dd>
 <dt>Requirement</dt>
 <dd>A beacon is read strictly, by <tt class="docutils literal"><span class="pre">tcslib_protocol::Beacon::read</span></tt> in Rust and
-<tt class="docutils literal">tcslibgs.beacon.Beacon.read</tt> in Python, and by nothing else: exactly
-six fields, each in the form the table gives. A datagram longer than
-the longest beacon, 106 bytes (<tt class="docutils literal">BEACON_BYTES</tt>), that is not UTF-8, or
-that has a field out of its form, a seventh field, a trailing colon or a
-trailing newline, is not a beacon, and the ground shows what arrived
-rather than a beacon (<tt class="docutils literal"><span class="pre">BeaconError::Length</span></tt> or <tt class="docutils literal"><span class="pre">BeaconError::Field</span></tt>,
-naming the field). Something else sending to the beacon port is then
-seen for what it is.</dd>
+<tt class="docutils literal">tcslib_protocol.beacon.Beacon.read</tt> in Python, and by nothing else:
+exactly six fields, each in the form the table gives. A datagram longer than
+the longest beacon, 106 bytes (<tt class="docutils literal">BEACON_BYTES</tt>), that is not UTF-8, or that
+has a field out of its form, a seventh field, a trailing colon or a trailing
+newline, is not a beacon, and the ground shows what arrived rather than a
+beacon (<tt class="docutils literal"><span class="pre">BeaconError::Length</span></tt> or <tt class="docutils literal"><span class="pre">BeaconError::Field</span></tt>, naming the
+field). Something else sending to the beacon port is then seen for what it
+is.</dd>
 <dt>Requirement</dt>
 <dd>Writing a beacon allocates nothing: tcspecial's beacon thread makes one
 <tt class="docutils literal">BeaconPacker</tt> when it starts, and every beacon is written into its
@@ -5423,8 +5425,8 @@ taken for the other.</dd>
 into a packet and back, and every program goes through it: tcspecial,
 <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> and through it the C/C++ library and tcsmoc, and every test
 that plays the other end. A ground station in Python sends CONNECT through
-<tt class="docutils literal">tcslibgs.fixed</tt>, which packs it with the code tcs-xtce generates from
-<tt class="docutils literal">fixed.xtce</tt>.</dd>
+<tt class="docutils literal">tcslib_protocol.fixed</tt>, which packs it with the code tcs-xtce generates
+from <tt class="docutils literal">fixed.xtce</tt>.</dd>
 </dl>
 <p>No packet carries a check of its own: the transport beneath it checks it,
 which is one of the things <a class="reference internal" href="#what-is-assumed">What is assumed</a> assumes.</p>
@@ -5610,13 +5612,14 @@ it, so matching checksums means matching interfaces as well.</dd>
 <p>The rule is stated once, in
 <tt class="docutils literal"><span class="pre">tcslib_protocol::graph::parameters::interface_of</span></tt>, which every Rust program
 and the C/C++ library read the section through, and again in Python, in
-<tt class="docutils literal">tcslibgs.interface.of_configuration</tt>, which <tt class="docutils literal">tcslibgs.configuration.load</tt>
-calls. The value a configuration is to give is what <tt class="docutils literal">tcsverify
-<span class="pre">--interface-digest</span></tt> prints: the digest of the <tt class="docutils literal">link.xtce</tt> that build was made
-from, which is also the last field of every beacon it sends. A change to
-<tt class="docutils literal">link.xtce</tt> is a new interface, after which <tt class="docutils literal">make <span class="pre">interface-digest</span></tt> in
-<tt class="docutils literal"><span class="pre">tcslib-protocol/</span></tt> is run and every configuration given the new digest; a
-build refuses the old ones until it is. <tt class="docutils literal">tcsverify <span class="pre">--set-interface</span>
+<tt class="docutils literal">tcslib_protocol.interface.of_configuration</tt>, which
+<tt class="docutils literal">tcslib_protocol.configuration.load</tt> calls. The value a configuration is to
+give is what <tt class="docutils literal">tcsverify <span class="pre">--interface-digest</span></tt> prints: the digest of the
+<tt class="docutils literal">link.xtce</tt> that build was made from, which is also the last field of every
+beacon it sends. A change to <tt class="docutils literal">link.xtce</tt> is a new interface, after which
+<tt class="docutils literal">make <span class="pre">interface-digest</span></tt> in <tt class="docutils literal"><span class="pre">tcslib-protocol/</span></tt> is run and every configuration
+given the new digest; a build refuses the old ones until it is. <tt class="docutils literal">tcsverify
+<span class="pre">--set-interface</span>
 <span class="pre">&lt;configuration&gt;...</span></tt> gives a configuration its build's digest in place,
 rewriting that one value -- or adding the attribute where the section has none
 -- and every other byte of the file as it was, in YAML and XML alike; <tt class="docutils literal">make
@@ -5659,7 +5662,7 @@ as its type frames it, logging and counting it as malformed.</dd>
 </dl>
 <p>As built, <tt class="docutils literal">gateway_radio</tt> sends tcspecial's packets as they are. So does
 <tt class="docutils literal">gateway_fprime</tt>: as <a class="reference internal" href="#f-gateway-fprime">F´: gateway_fprime</a> has it, the F´ end is a bridge
-component built on <tt class="docutils literal"><span class="pre">tcslib-c</span></tt> that speaks the radio's own UDP protocol,
+component built on <tt class="docutils literal"><span class="pre">tcslib-moc-c</span></tt> that speaks the radio's own UDP protocol,
 playing the MOC, and what F´ itself frames is what the bridge passes on to the
 rest of its deployment, not what crosses the link to tcspecial. The framing of
 <tt class="docutils literal">gateway_cfs</tt> -- the CCSDS primary header, cFS's extended header and its
@@ -5668,48 +5671,45 @@ secondary header, around exactly what the UDP link carries -- is specified in
 frames and strips with, refusing and counting as malformed whatever arrives on
 the bus not framed so.</p>
 <p><tt class="docutils literal">gateway_yamcs</tt> is the radio's UDP links with a CCSDS Space Packet primary
-header on every packet, and no secondary header, so that a ground station
-that speaks CCSDS packets -- Yamcs -- tells them apart by APID. The kind
-frames every link in its section, as cFS's does: the beacon on
-<tt class="docutils literal">beacon.apid</tt>, the commands and their answers on <tt class="docutils literal">tcs_cmd.apid</tt>, each
-gateway node's uplink on its <tt class="docutils literal">apid_base</tt>, each source through it on
-<tt class="docutils literal">apid_base</tt> plus its device id, and the telemetry of each payload nothing
-touches on <tt class="docutils literal">payload_telemetry.apid_base</tt> plus its device id. An APID is
-counted as a port is, from a base by the device id, so the ground finds a
-payload's APID where it finds its port, and a node added moves both
-alike. The ground's packets are telecommands and
-the vehicle's telemetry, unsegmented, each sender counting its own sequence
-per APID; a packet with another type, another APID, a secondary header, a
-segment or a length field that is not its own is refused and counted, and
-the sequence count is not checked, a lost packet being no reason to refuse
-the next. The header is <tt class="docutils literal"><span class="pre">tcslib_protocol::ccsds</span></tt>. The APIDs are stated rather
-than fixed, because which a mission's ground expects is the mission's, and
-they are checked where the file is read: each counted APID at most
-<tt class="docutils literal">0x7FF</tt>, and no two links on one, a gateway node's uplink and its device
-id 0's downlink excepted, told apart by the packet type
-(<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::telemetry::apids</span></tt>). Yamcs's mission database
-is tcspecial's own XTCE with a wrapper that puts the header around it, which
-<tt class="docutils literal">python/tcslibgs/yamcs.py</tt> generates from the configuration, as it does
-Yamcs's links: a fixed part, <tt class="docutils literal">python/tcslibgs/yamcs.xtce</tt>, that says the
-header and the beacon's and the answers' layouts, with a container or a
-command added for every APID the configuration counts. A node whose type
-has an interface document (<a class="reference internal" href="#a-node-type-s-interface-document">A node type's interface document</a>) is given
-what it states: its container holds the document's container's fields, and
-a gateway node whose data goes only to nodes with that document takes the
-document's command, each named as the document names it and copied into
-the mission database, because a command cannot be put behind another's
-header from outside. Only what the copy says the same is copied, and a
-document that says more is refused. Any other node's container is named
-after it and holds its data as a parameter of the type the configuration's
-own XTCE gives it (<a class="reference internal" href="#the-configuration-s-own-xtce">The configuration's own XTCE</a>), copied from there as a
-document's type is; a string, bytes or a structure is binary, all of what
-follows the header. Any other gateway node's command is named after it and
-carries its data whole. So nothing per
-APID is stated twice, and a node added is decoded once the mission database
-is regenerated; the ping-yamcs example's tests hold the generated APIDs to
-the Rust's and work the containers and commands as Yamcs would on packets
-the vehicle frames, the ping's field by field. The mission database is
-written as its fixed part is, no line wider than 80 columns.</p>
+header on every packet, and no secondary header, so that a ground station that
+speaks CCSDS packets -- Yamcs -- tells them apart by APID. The kind frames every
+link in its section, as cFS's does: the beacon on <tt class="docutils literal">beacon.apid</tt>, the commands
+and their answers on <tt class="docutils literal">tcs_cmd.apid</tt>, each gateway node's uplink on its
+<tt class="docutils literal">apid_base</tt>, each source through it on <tt class="docutils literal">apid_base</tt> plus its device id, and
+the telemetry of each payload nothing touches on <tt class="docutils literal">payload_telemetry.apid_base</tt>
+plus its device id. An APID is counted as a port is, from a base by the device
+id, so the ground finds a payload's APID where it finds its port, and a node
+added moves both alike. The ground's packets are telecommands and the vehicle's
+telemetry, unsegmented, each sender counting its own sequence per APID; a packet
+with another type, another APID, a secondary header, a segment or a length field
+that is not its own is refused and counted, and the sequence count is not
+checked, a lost packet being no reason to refuse the next. The header is
+<tt class="docutils literal"><span class="pre">tcslib_protocol::ccsds</span></tt>. The APIDs are stated rather than fixed, because
+which a mission's ground expects is the mission's, and they are checked where
+the file is read: each counted APID at most <tt class="docutils literal">0x7FF</tt>, and no two links on one,
+a gateway node's uplink and its device id 0's downlink excepted, told apart by
+the packet type (<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::telemetry::apids</span></tt>). Yamcs's mission
+database is tcspecial's own XTCE with a wrapper that puts the header around it,
+which <tt class="docutils literal">python/tcslib_protocol/yamcs.py</tt> generates from the configuration, as
+it does Yamcs's links: a fixed part, <tt class="docutils literal">python/tcslib_protocol/yamcs.xtce</tt>, that
+says the header and the beacon's and the answers' layouts, with a container or a
+command added for every APID the configuration counts. A node whose type has an
+interface document (<a class="reference internal" href="#a-node-type-s-interface-document">A node type's interface document</a>) is given what it
+states: its container holds the document's container's fields, and a gateway
+node whose data goes only to nodes with that document takes the document's
+command, each named as the document names it and copied into the mission
+database, because a command cannot be put behind another's header from outside.
+Only what the copy says the same is copied, and a document that says more is
+refused. Any other node's container is named after it and holds its data as a
+parameter of the type the configuration's own XTCE gives it (<a class="reference internal" href="#the-configuration-s-own-xtce">The
+configuration's own XTCE</a>), copied from there as a document's type is; a
+string, bytes or a structure is binary, all of what follows the header. Any
+other gateway node's command is named after it and carries its data whole. So
+nothing per APID is stated twice, and a node added is decoded once the mission
+database is regenerated; the ping-yamcs example's tests hold the generated APIDs
+to the Rust's and work the containers and commands as Yamcs would on packets the
+vehicle frames, the ping's field by field. The mission database is written as
+its fixed part is, no line wider than 80 columns.</p>
 <p>A command link's sender written with port nought takes commands from any
 port of its host. Yamcs sends from a port the system chooses and takes the
 answers on the same socket, and an answer goes back to the port its command
@@ -5814,7 +5814,7 @@ states that form in XTCE for the ground stations that read XTCE.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A node type's interface document is named by the type, in
-<tt class="docutils literal">tcslibgs/interface.py</tt>'s <tt class="docutils literal">NODE_DOCUMENTS</tt>, and by nothing in a
+<tt class="docutils literal">tcslib_protocol/interface.py</tt>'s <tt class="docutils literal">NODE_DOCUMENTS</tt>, and by nothing in a
 configuration: a node of the type has it because of what its type's code
 writes and reads, and a configuration that could name another would state a
 form the vehicle does not speak. The <tt class="docutils literal">ping</tt> type's is
@@ -5822,13 +5822,13 @@ form the vehicle does not speak. The <tt class="docutils literal">ping</tt> type
 the count ended by a space, the seconds ended by a point and nine digits of
 nanoseconds, and for the answer the same, a space, and the vehicle's time.</dd>
 <dt>Requirement</dt>
-<dd>A node type's interface document states only what its type's code
-writes and reads, and a test holds the two together: packed by the code
-tcs-xtce generates from the document, a message is the type's code's,
-byte for byte, and unpacked, it is the same fields. For the ping node
-that is <tt class="docutils literal"><span class="pre">tcslib_protocol::node::vehicle::ping</span></tt>'s tests, and
-<tt class="docutils literal">python/tests/test_ping.py</tt>'s of <tt class="docutils literal">python/tcslibgs/ping.py</tt>. The type's
-code is still what the vehicle answers by; the generated code is
+<dd>A node type's interface document states only what its type's code writes and
+reads, and a test holds the two together: packed by the code tcs-xtce
+generates from the document, a message is the type's code's, byte for byte,
+and unpacked, it is the same fields. For the ping node that is
+<tt class="docutils literal"><span class="pre">tcslib_protocol::node::vehicle::ping</span></tt>'s tests, and
+<tt class="docutils literal">python/tests/test_ping.py</tt>'s of <tt class="docutils literal">python/tcslib_protocol/ping.py</tt>. The
+type's code is still what the vehicle answers by; the generated code is
 compiled into tests and ground stations only.</dd>
 <dt>Requirement</dt>
 <dd>No interface document is part of the interface, and none goes on the
@@ -6307,7 +6307,7 @@ temperature as <tt class="docutils literal">world_ambient_temp</tt>, a local par
 no encoding, no packet carrying it; <tt class="docutils literal">thermostat_yamcs.py</tt> sets it from
 <tt class="docutils literal">tcsverify <span class="pre">--ambient</span></tt> once the vehicle has answered CONNECT and shows
 it after the readings. A node named <tt class="docutils literal">world_ambient_temp</tt> is refused,
-told why. See <tt class="docutils literal">python/tcslibgs/yamcs.py</tt>.</dd>
+told why. See <tt class="docutils literal">python/tcslib_protocol/yamcs.py</tt>.</dd>
 </dl>
 </div>
 <div class="section" id="holes-in-the-checksum-scheme-and-what-closes-them">
@@ -7304,10 +7304,11 @@ Each segment that fills is handed to <tt class="docutils literal">segsend</tt>: 
 <tt class="docutils literal">log.segment_size</tt> is the payload bytes in one segment file, the header
 being added on top of that.</p>
 <p>Tcspecial hass a command interpreter (CI) running on the spacecraft where the
-payloads are located. CI has one or more threads to handle OC communications, i.e.
-data exchanged with tcslib over a bi-directional communication link. It
-defaults to using datagram communication to the tcslib, though this is usually actually
-a link to the spacecraft radio. The radio may use a different protocol.</p>
+payloads are located. CI has one or more threads to handle OC communications,
+i.e. data exchanged with tcslib-moc over a bi-directional communication link. It
+defaults to using datagram communication to the tcslib-moc, though this is
+usually actually a link to the spacecraft radio. The radio may use a different
+protocol.</p>
 <p>Tcspecial also has threads associated with each data handler (DH). Each DH
 communicates to payloads via a bi-direction channel. A key feature of tcspecial
 is that
@@ -8130,8 +8131,8 @@ destination, by the node each leaves and then by where it goes, which is
 the order tcsgui draws them in.</dd>
 </dl>
 </div>
-<div class="section" id="tcslib">
-<h2><a class="toc-backref" href="#toc-entry-105">tcslib</a></h2>
+<div class="section" id="tcslib-moc">
+<h2><a class="toc-backref" href="#toc-entry-105">tcslib-moc</a></h2>
 <p>The TCSpecial library has a set of operations for global control and status
 and a set of per-payload interface operations.  It is used for building control applications using mission control
 software such as YAMCS or MCT.</p>
@@ -8156,7 +8157,7 @@ correct, and the one in tcsmoc was the only one that existed.</p>
 <div class="section" id="tcslib-protocol">
 <h2><a class="toc-backref" href="#toc-entry-106">tcslib-protocol</a></h2>
 <p>The TCSpecial ground/space library contains definitions used by both
-tcslib and tcspecial.</p>
+tcslib-moc and tcspecial.</p>
 </div>
 <div class="section" id="what-each-end-read">
 <h2><a class="toc-backref" href="#toc-entry-107">What Each End Read</a></h2>
@@ -10262,7 +10263,7 @@ served only testing.</dd>
 <h2><a class="toc-backref" href="#toc-entry-135">Waiting for the Simulator</a></h2>
 <p>Implemented: the messages are <tt class="docutils literal"><span class="pre">tcslib_protocol::ready</span></tt>, tcssim's end is
 <tt class="docutils literal">tcssim/src/ready.rs</tt>, a harness waits through <tt class="docutils literal"><span class="pre">tcslib_moc::simulator</span></tt> or
-<tt class="docutils literal">python/tcslib/simulator.py</tt>, and tcsmoc and <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> are
+<tt class="docutils literal">python/tcslib_moc/simulator.py</tt>, and tcsmoc and <tt class="docutils literal">tcssim <span class="pre">--wait</span></tt> are
 harnesses.</p>
 <p>A simulated device has to exist before tcspecial looks for it, and a dummy
 device has to be loaded. Tcssim makes a pseudo-terminal and links the
@@ -10488,14 +10489,14 @@ each has been flown against the kernel's dummy device for it.</p>
 <div class="section" id="tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft">
 <h2><a class="toc-backref" href="#toc-entry-143">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></h2>
 </div>
-<div class="section" id="tcspecial-shall-include-a-library-named-tcslib-that-links-with-misssion-control-software">
-<h2><a class="toc-backref" href="#toc-entry-144">TCSpecial shall include a library named tcslib that links with misssion control software</a></h2>
+<div class="section" id="tcspecial-shall-include-a-library-named-tcslib-moc-that-links-with-misssion-control-software">
+<h2><a class="toc-backref" href="#toc-entry-144">TCSpecial shall include a library named tcslib-moc that links with misssion control software</a></h2>
 </div>
-<div class="section" id="tcspecial-shall-include-a-library-named-tcslib-protocol-that-is-shared-between-tcspecial-and-tcslib">
-<h2><a class="toc-backref" href="#toc-entry-145">TCSpecial shall include a library named tcslib-protocol that is shared between tcspecial and tcslib</a></h2>
+<div class="section" id="tcspecial-shall-include-a-library-named-tcslib-protocol-that-is-shared-between-tcspecial-and-tcslib-moc">
+<h2><a class="toc-backref" href="#toc-entry-145">TCSpecial shall include a library named tcslib-protocol that is shared between tcspecial and tcslib-moc</a></h2>
 </div>
-<div class="section" id="tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslib-protocol-and-tcslib">
-<h2><a class="toc-backref" href="#toc-entry-146">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslib-protocol, and tcslib</a></h2>
+<div class="section" id="tcspecial-shall-include-applications-named-tcsmoc-and-tcssim-that-provide-guis-for-testing-tcspecial-tcslib-protocol-and-tcslib-moc">
+<h2><a class="toc-backref" href="#toc-entry-146">TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslib-protocol, and tcslib-moc</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented as two programs rather than one. Tcsmoc simulates the
@@ -10503,8 +10504,8 @@ operations center and tcssim the payloads, because a test needs both
 ends of every link and one window driving both says less about either.</p>
 </div>
 </div>
-<div class="section" id="tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib">
-<h2><a class="toc-backref" href="#toc-entry-147">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib</a></h2>
+<div class="section" id="tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcslib-moc">
+<h2><a class="toc-backref" href="#toc-entry-147">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcslib-moc</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. <tt class="docutils literal">CommandInterpreter</tt> is a struct, not a trait:
@@ -10522,8 +10523,8 @@ there really are many implementations, one per type of endpoint.</p>
 What differs between handlers is the endpoints they open, which is where
 the traits are.</p>
 </div>
-<div class="section" id="ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-code-via-udp-ip">
-<h3><a class="toc-backref" href="#toc-entry-149">CI must be implemented by CI_UDP that communicates with tcslib code via UDP/IP</a></h3>
+<div class="section" id="ci-must-be-implemented-by-ci-udp-that-communicates-with-tcslib-moc-via-udp-ip">
+<h3><a class="toc-backref" href="#toc-entry-149">CI must be implemented by CI_UDP that communicates with tcslib-moc via UDP/IP</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">CI_UDP</tt>: the command interpreter
@@ -10531,8 +10532,8 @@ speaks UDP itself, on two sockets -- one for commands about the spacecraft
 and one for commands about a payload.</p>
 </div>
 </div>
-<div class="section" id="dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib">
-<h3><a class="toc-backref" href="#toc-entry-150">DH_UDP must implement DH and use UDP to send telemetry to tcslib</a></h3>
+<div class="section" id="dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcslib-moc">
+<h3><a class="toc-backref" href="#toc-entry-150">DH_UDP must implement DH and use UDP to send telemetry to tcslib-moc</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">DH_UDP</tt>. A node's endpoint is per

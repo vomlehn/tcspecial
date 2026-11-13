@@ -26,9 +26,10 @@ argue from this order and say so.
   `beacon` for its beacons, `simulator` for waiting until tcssim has made its
   simulated devices, `bus` for a vehicle on a cFS software bus (the station's
   SBN peer, and `SimulatedCfs`, the cFS end as tcssim simulates it).
-- `tcslib-c` -- tcslib-moc for C and C++: beacons, data and commands behind one
-  hand-written header, `include/tcs.h`, which `tests/c_and_cpp.rs` holds to the
-  library by compiling a ground station against it with gcc and g++.
+- `tcslib-moc-c` -- tcslib-moc for C and C++: beacons, data and commands behind
+  one hand-written header, `include/tcslib_moc_c.h`, which `tests/c_and_cpp.rs`
+  holds to the library by compiling a ground station against it with gcc and
+  g++.
 - `tcspecial` -- the flight software.
 - `tcsmoc` -- the test ground station (GUI).
 - `tcssim` -- the payload simulator (GUI).
@@ -103,7 +104,7 @@ make html-check                 # every committed page made again, and current
 ```
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
-`tcslib-moc/`, `tcslib-c/` and `tcslib-protocol/` builds their HTML pages.
+`tcslib-moc/`, `tcslib-moc-c/` and `tcslib-protocol/` builds their HTML pages.
 
 tcspecial, tcssim and tcsmoc take `--simulate=none|some|all`. Left out it is
 `none`, the flight setting, under which tcspecial refuses every simulated

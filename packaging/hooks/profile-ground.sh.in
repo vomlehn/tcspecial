@@ -1,7 +1,7 @@
 # shellcheck shell=sh
 # Puts @PREFIX@/bin on the search path, and @PREFIX@/lib/pkgconfig on
 # pkg-config's, for @PACKAGE@: the second is what lets a C or C++ ground
-# station be built with `pkg-config --cflags --libs tcs`.
+# station be built with `pkg-config --cflags --libs tcslib-moc-c`.
 #
 # Each TCS package installs one of these, named after itself, so that no two
 # packages own the same file. Each adds a directory only if it is not already

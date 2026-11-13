@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The CCSDS primary header a configuration whose gateway is yamcs puts on
+     every packet, around tcspecial's own XTCE, for Yamcs: what of the
+     mission database does not depend on the configuration.
+
+     tcspecial's link has no header: tcslib-protocol/xtce/link.xtce, fixed.xtce
+     and beacon.xtce describe each packet whole, and their digests are pinned.
+     With a yamcs gateway every packet to and from the ground gains a six-octet
+     CCSDS primary header, with no secondary header, so this file describes the
+     header and what follows it, reaching into those files for the rest rather
+     than stating any of it again.
+
+     No APID is stated here. tcslib_protocol/yamcs.py reads this and adds, from
+     the configuration, every APID it counts: the restrictions that put the
+     beacon in BeaconPacket and the answers in AnswerPacket, CONNECT's APID, a
+     container for each source drawn into a gateway_yamcs node and for each
+     payload nothing touches, and a command for each gateway_yamcs node. A node
+     whose type has an interface document of its own, as the ping node has
+     tcslib-protocol/xtce/ping.xtce, is given what that states, copied in from
+     it; any other node's data is a parameter of the type the configuration's
+     own XTCE gives it, the file tcsverify writes beside the configuration,
+     copied in from there (a value as a float in its unit, a boolean, a whole
+     number), or else, for a string, bytes or a structure, of PacketBodyType;
+     and what a gateway node takes is the
+     DataArg below. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20180204" name="TcsYamcs">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U1Type" signed="false">
+        <IntegerDataEncoding sizeInBits="1"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U2Type" signed="false">
+        <IntegerDataEncoding sizeInBits="2"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U3Type" signed="false">
+        <IntegerDataEncoding sizeInBits="3"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U8Type" signed="false">
+        <IntegerDataEncoding sizeInBits="8"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U11Type" signed="false">
+        <IntegerDataEncoding sizeInBits="11"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U14Type" signed="false">
+        <IntegerDataEncoding sizeInBits="14"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U16Type" signed="false">
+        <IntegerDataEncoding sizeInBits="16"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U32Type" signed="false">
+        <IntegerDataEncoding sizeInBits="32"/>
+      </IntegerParameterType>
+      <!-- Every octet after the header, whose count is the header's
+           length field plus one: the beacon read again whole, and the
+           data of a node whose layout no XTCE states. -->
+      <BinaryParameterType name="PacketBodyType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="CcsdsLength"/>
+              <LinearAdjustment slope="8" intercept="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="CcsdsVersion" parameterTypeRef="U3Type"/>
+      <Parameter name="CcsdsType" parameterTypeRef="U1Type"/>
+      <Parameter name="CcsdsSecHdr" parameterTypeRef="U1Type"/>
+      <Parameter name="CcsdsApid" parameterTypeRef="U11Type"/>
+      <Parameter name="CcsdsSeqFlags" parameterTypeRef="U2Type"/>
+      <Parameter name="CcsdsSeqCount" parameterTypeRef="U14Type"/>
+      <Parameter name="CcsdsLength" parameterTypeRef="U16Type"/>
+      <!-- The 32-bit count of the bytes a string comes after, where a
+           node's interface document lays out the string's own fields. -->
+      <Parameter name="DatumCount" parameterTypeRef="U32Type"/>
+      <!-- The first octet after an answer's header, which says whether it
+           is one of the fixed commands' answers or another's. -->
+      <Parameter name="AnswerOpcode" parameterTypeRef="U8Type"/>
+      <!-- The beacon as tcspecial sent it: every octet after the header,
+           read again whole so that the ground station can check it as the
+           ping example's does, from the bytes and not from Yamcs's
+           reading of them. -->
+      <Parameter name="BeaconBody" parameterTypeRef="PacketBodyType"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="CCSDSPacket">
+        <EntryList>
+          <ParameterRefEntry parameterRef="CcsdsVersion"/>
+          <ParameterRefEntry parameterRef="CcsdsType"/>
+          <ParameterRefEntry parameterRef="CcsdsSecHdr"/>
+          <ParameterRefEntry parameterRef="CcsdsApid"/>
+          <ParameterRefEntry parameterRef="CcsdsSeqFlags"/>
+          <ParameterRefEntry parameterRef="CcsdsSeqCount"/>
+          <ParameterRefEntry parameterRef="CcsdsLength"/>
+        </EntryList>
+      </SequenceContainer>
+      <!-- The beacon, on beacon.apid, which tcslib_protocol/yamcs.py restricts
+           it to. -->
+      <SequenceContainer name="BeaconPacket">
+        <EntryList>
+          <ContainerRefEntry containerRef="/TcsBeacon/Beacon"/>
+          <ParameterRefEntry parameterRef="BeaconBody">
+            <LocationInContainerInBits referenceLocation="containerStart">
+              <FixedValue>48</FixedValue>
+            </LocationInContainerInBits>
+          </ParameterRefEntry>
+        </EntryList>
+        <BaseContainer containerRef="CCSDSPacket"/>
+      </SequenceContainer>
+      <!-- An answer to a command, on tcs_cmd.apid, which
+           tcslib_protocol/yamcs.py restricts it to: a fixed command's
+           (RESTART_ARM 2, RESTART 3, CONNECT 4) or another's. -->
+      <SequenceContainer name="AnswerPacket">
+        <EntryList>
+          <ParameterRefEntry parameterRef="AnswerOpcode"/>
+        </EntryList>
+        <BaseContainer containerRef="CCSDSPacket"/>
+      </SequenceContainer>
+      <SequenceContainer name="FixedAnswerPacket">
+        <EntryList>
+          <ContainerRefEntry containerRef="/TcsFixed/FixedAnswer">
+            <LocationInContainerInBits referenceLocation="containerStart">
+              <FixedValue>48</FixedValue>
+            </LocationInContainerInBits>
+          </ContainerRefEntry>
+        </EntryList>
+        <BaseContainer containerRef="AnswerPacket">
+          <RestrictionCriteria>
+            <ComparisonList>
+              <Comparison parameterRef="AnswerOpcode" value="2"
+                          comparisonOperator="&gt;="/>
+              <Comparison parameterRef="AnswerOpcode" value="4"
+                          comparisonOperator="&lt;="/>
+            </ComparisonList>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="LinkAnswerPacket">
+        <EntryList>
+          <ContainerRefEntry containerRef="/TcsLink/AnswerLayout">
+            <LocationInContainerInBits referenceLocation="containerStart">
+              <FixedValue>48</FixedValue>
+            </LocationInContainerInBits>
+          </ContainerRefEntry>
+        </EntryList>
+        <BaseContainer containerRef="AnswerPacket">
+          <RestrictionCriteria>
+            <BooleanExpression>
+              <ORedConditions>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="AnswerOpcode"/>
+                  <ComparisonOperator>&lt;</ComparisonOperator>
+                  <Value>2</Value>
+                </Condition>
+                <Condition>
+                  <ParameterInstanceRef parameterRef="AnswerOpcode"/>
+                  <ComparisonOperator>&gt;</ComparisonOperator>
+                  <Value>4</Value>
+                </Condition>
+              </ORedConditions>
+            </BooleanExpression>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="U1Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="1"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U2Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="2"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U3Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="3"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U8Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="8"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U11Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="11"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U14Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="14"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U16Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="16"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U32Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="32"/>
+      </IntegerArgumentType>
+      <BinaryArgumentType name="ChecksumArg">
+        <BinaryDataEncoding>
+          <SizeInBits><FixedValue>128</FixedValue></SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
+      <!-- Data whose length is DataBits, an argument the sender gives
+           and nothing encodes: what the ground sends a gateway_yamcs node
+           goes as its octets and nothing else. -->
+      <BinaryArgumentType name="DataArg">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ArgumentInstanceRef argumentRef="DataBits"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <!-- The header of every command. Yamcs fills in the sequence count
+           and the length as each is sent. -->
+      <MetaCommand name="CcsdsTc" abstract="true">
+        <ArgumentList>
+          <Argument name="CcsdsVersion" argumentTypeRef="U3Arg"
+                    initialValue="0"/>
+          <Argument name="CcsdsType" argumentTypeRef="U1Arg"
+                    initialValue="1"/>
+          <Argument name="CcsdsSecHdr" argumentTypeRef="U1Arg"
+                    initialValue="0"/>
+          <Argument name="CcsdsApid" argumentTypeRef="U11Arg"/>
+          <Argument name="CcsdsSeqFlags" argumentTypeRef="U2Arg"
+                    initialValue="3"/>
+          <Argument name="CcsdsSeqCount" argumentTypeRef="U14Arg"
+                    initialValue="0"/>
+          <Argument name="CcsdsLength" argumentTypeRef="U16Arg"
+                    initialValue="0"/>
+        </ArgumentList>
+        <CommandContainer name="CcsdsTcContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="CcsdsVersion"/>
+            <ArgumentRefEntry argumentRef="CcsdsType"/>
+            <ArgumentRefEntry argumentRef="CcsdsSecHdr"/>
+            <ArgumentRefEntry argumentRef="CcsdsApid"/>
+            <ArgumentRefEntry argumentRef="CcsdsSeqFlags"/>
+            <ArgumentRefEntry argumentRef="CcsdsSeqCount"/>
+            <ArgumentRefEntry argumentRef="CcsdsLength"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- CONNECT, on tcs_cmd.apid, which tcslib_protocol/yamcs.py assigns: the
+           fixed command of tcslib-protocol/xtce/fixed.xtce, opcode 4, behind
+           the header. Stated again here because a command cannot be put behind
+           another's header from outside, and safe to be: the fixed commands'
+           layouts never change, and tcslib_protocol pins their digest. -->
+      <MetaCommand name="Connect">
+        <BaseMetaCommand metaCommandRef="CcsdsTc"/>
+        <ArgumentList>
+          <Argument name="Opcode" argumentTypeRef="U8Arg" initialValue="4"/>
+          <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+          <Argument name="Checksum" argumentTypeRef="ChecksumArg"/>
+        </ArgumentList>
+        <CommandContainer name="ConnectPacket">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Opcode"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+            <ArgumentRefEntry argumentRef="Checksum"/>
+          </EntryList>
+          <BaseContainer containerRef="CcsdsTcContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>

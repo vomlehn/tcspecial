@@ -59,10 +59,11 @@ Everything installs under `/opt/tcs`, as three packages:
   the five test app programs in `libexec/`, the documents and the example
   configurations, and a systemd unit, `tcspecial.service`, installed but not
   enabled.
-* `tcspecial-ground`, what a ground station is built on: `libtcs` for C and
-  C++ (`lib/libtcs.so.4`, `lib/libtcs.a`, `include/tcs.h`,
-  `lib/pkgconfig/tcs.pc`), the Python packages `tcslibgs`, `tcslib` and
-  `tcsui`, and `bin/tcsgui` with its data.
+* `tcspecial-ground`, what a ground station is built on: `libtcslib_moc_c` for C
+  and C++ (`lib/libtcslib_moc_c.so.4`, `lib/libtcslib_moc_c.a`,
+  `include/tcslib_moc_c.h`, `lib/pkgconfig/tcslib-moc-c.pc`), the Python
+  packages `tcslib_protocol`, `tcslib_moc` and `tcsui`, and `bin/tcsgui` with
+  its data.
 * `tcspecial-test`, the test ground station and simulator: `bin/tcsmoc` and
   `bin/tcssim`, and `bin/segsend`, the test one, which deletes each
   telemetry log segment. A vehicle that keeps a log puts its own segsend in
@@ -84,7 +85,7 @@ without them:
      make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix
      pip install ./python                    # the Python alone
      cargo install --path tcsverify --root /opt/tcs
-     cc station.c $(pkg-config --cflags --libs tcs)
+     cc station.c $(pkg-config --cflags --libs tcslib-moc-c)
 
 `HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
 the search paths: `/etc/profile.d/<package>.sh`,
@@ -111,10 +112,9 @@ something else already has, and takes `--dir DIR` for a directory other
 than `/usr/local/bin`. Removing a package takes its links away.
 
 Everything installed is stripped (`--strip-unneeded` for programs and
-`libtcs.so.4`, `--strip-debug` for `libtcs.a`), which takes a fifth to a
-quarter off what each package installs. `STRIP=0` keeps everything as cargo
-built it:
-`make packages STRIP=0`.
+`libtcslib_moc_c.so.4`, `--strip-debug` for `libtcslib_moc_c.a`), which takes a
+fifth to a quarter off what each package installs. `STRIP=0` keeps everything as
+cargo built it: `make packages STRIP=0`.
 
 See "Installing" in docs/tcspecial.rst for where everything goes and why.
 
@@ -175,7 +175,7 @@ Key TCSpecial features are:
 
 * Operations Center
 
-  * The TCSpecial library (tcslib) is used to send commands and receive
+  * The TCSpecial library (tcslib-moc) is used to send commands and receive
     telemetry from
     the spacecraft. This can be integrated with mission control software such
     Yamcs.
@@ -183,7 +183,7 @@ Key TCSpecial features are:
 * Test Software
 
   * The TCSpecial test interface (tcstest) provides simulated payload devices and
-    uses tcslib to verify the behavior of TCSpecial.
+    uses tcslib-moc to verify the behavior of TCSpecial.
 
 
 To Do
@@ -214,7 +214,7 @@ manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
   with a diagram.
 
 * [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html) and
-  [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html): the libraries a ground station is
+  [tcslib-moc-c](https://vomlehn.github.io/tcspecial/tcslib-moc-c/README.html): the libraries a ground station is
   built on, and what the ground and the vehicle share.
 
 * [Third-party integration](https://vomlehn.github.io/tcspecial/docs/third-party.html): how tcspecial would

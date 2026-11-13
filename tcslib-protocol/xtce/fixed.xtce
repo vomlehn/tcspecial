@@ -41,7 +41,7 @@
      number it is, and a station reads it as a refusal it cannot name.
 
      The Rust in tcslib-protocol/src/fixed_packet.rs and the Python in
-     python/tcslibgs/fixed_packet.py are generated from this file by
+     python/tcslib_protocol/fixed_packet.py are generated from this file by
      `make fixed-packet` in tcslib-protocol/. See "The fixed commands" in
      docs/tcspecial-design.rst. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsFixed">

@@ -689,15 +689,14 @@ how it shows what a node sends follows from the type, in <tt class="docutils lit
 <div class="section" id="adding-a-gateway-type">
 <h1><a class="toc-backref" href="#toc-entry-12">Adding a Gateway Type</a></h1>
 <p>A gateway type is a <tt class="docutils literal">GatewayKind</tt> in <tt class="docutils literal"><span class="pre">tcslib-protocol/src/gateway.rs</span></tt>, in
-<tt class="docutils literal">ALL</tt>, <tt class="docutils literal">name</tt>, <tt class="docutils literal">is_built</tt>, <tt class="docutils literal">on_bus</tt>, <tt class="docutils literal">framed</tt> and <tt class="docutils literal">node_type</tt>.
-If its ground decodes what it is sent by XTCE, as Yamcs does, the count
-before a string or bytes must be XTCE's, so <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> must
-give it <tt class="docutils literal"><span class="pre">Count::Xtce</span></tt>.
-The Python ground lists gateway types by hand, in <tt class="docutils literal">GATEWAY_BASES</tt> and
-<tt class="docutils literal">ON_BUS</tt> in <tt class="docutils literal">python/tcslibgs/configuration.py</tt>. Its description in tcsgui
-is at the top of <tt class="docutils literal">tcsgui/share/nodes/</tt>, and since it has no node module,
-it is one of the exemptions in <tt class="docutils literal">every_description_has_its_rust</tt> in
-<tt class="docutils literal">tcsgui/src/nodes.rs</tt>.</p>
+<tt class="docutils literal">ALL</tt>, <tt class="docutils literal">name</tt>, <tt class="docutils literal">is_built</tt>, <tt class="docutils literal">on_bus</tt>, <tt class="docutils literal">framed</tt> and <tt class="docutils literal">node_type</tt>. If
+its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
+string or bytes must be XTCE's, so <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> must give it
+<tt class="docutils literal"><span class="pre">Count::Xtce</span></tt>. The Python ground lists gateway types by hand, in
+<tt class="docutils literal">GATEWAY_BASES</tt> and <tt class="docutils literal">ON_BUS</tt> in <tt class="docutils literal">python/tcslib_protocol/configuration.py</tt>.
+Its description in tcsgui is at the top of <tt class="docutils literal">tcsgui/share/nodes/</tt>, and since it
+has no node module, it is one of the exemptions in
+<tt class="docutils literal">every_description_has_its_rust</tt> in <tt class="docutils literal">tcsgui/src/nodes.rs</tt>.</p>
 </div>
 <div class="section" id="the-editor-and-the-schemas">
 <h1><a class="toc-backref" href="#toc-entry-13">The Editor and the Schemas</a></h1>

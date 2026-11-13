@@ -334,15 +334,14 @@ how it shows what a node sends follows from the type, in ``form.py``.
 Adding a Gateway Type
 =====================
 A gateway type is a ``GatewayKind`` in ``tcslib-protocol/src/gateway.rs``, in
-``ALL``, ``name``, ``is_built``, ``on_bus``, ``framed`` and ``node_type``.
-If its ground decodes what it is sent by XTCE, as Yamcs does, the count
-before a string or bytes must be XTCE's, so ``Telemetered::count`` must
-give it ``Count::Xtce``.
-The Python ground lists gateway types by hand, in ``GATEWAY_BASES`` and
-``ON_BUS`` in ``python/tcslibgs/configuration.py``. Its description in tcsgui
-is at the top of ``tcsgui/share/nodes/``, and since it has no node module,
-it is one of the exemptions in ``every_description_has_its_rust`` in
-``tcsgui/src/nodes.rs``.
+``ALL``, ``name``, ``is_built``, ``on_bus``, ``framed`` and ``node_type``. If
+its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
+string or bytes must be XTCE's, so ``Telemetered::count`` must give it
+``Count::Xtce``. The Python ground lists gateway types by hand, in
+``GATEWAY_BASES`` and ``ON_BUS`` in ``python/tcslib_protocol/configuration.py``.
+Its description in tcsgui is at the top of ``tcsgui/share/nodes/``, and since it
+has no node module, it is one of the exemptions in
+``every_description_has_its_rust`` in ``tcsgui/src/nodes.rs``.
 
 The Editor and the Schemas
 ==========================

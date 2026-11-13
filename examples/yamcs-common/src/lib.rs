@@ -1,7 +1,8 @@
 //! What the tests of the examples through Yamcs share, ping-yamcs's and
-//! thermostat-yamcs's: the mission database's wrapper `tcslibgs/yamcs.py`
-//! generates for a configuration, read as XML, and worked as Yamcs would
-//! work it on the packets the vehicle frames with `tcslib_protocol::ccsds`.
+//! thermostat-yamcs's: the mission database's wrapper
+//! `tcslib_protocol/yamcs.py` generates for a configuration, read as XML, and
+//! worked as Yamcs would work it on the packets the vehicle frames with
+//! `tcslib_protocol::ccsds`.
 //!
 //! * [`generated_mdb`] has the Python generate the wrapper, as the ground
 //!   programs write it for Yamcs, and [`read_xml`] reads it;
@@ -232,7 +233,7 @@ pub fn python(script: &str, path: &[&Path], arguments: &[&Path]) -> String {
     String::from_utf8(ran.stdout).expect("text")
 }
 
-/// The mission database's wrapper `tcslibgs/yamcs.py` generates for a
+/// The mission database's wrapper `tcslib_protocol/yamcs.py` generates for a
 /// configuration, as the ground programs write it for Yamcs.
 ///
 /// # Arguments
@@ -251,7 +252,7 @@ pub fn generated_mdb(configuration: &Path) -> Element {
     let written = dir.path().join("tcs-ccsds.xtce");
     python(
         "from pathlib import Path\n\
-         from tcslibgs import configuration, yamcs\n\
+         from tcslib_protocol import configuration, yamcs\n\
          yamcs.write_mdb(configuration.load(sys.argv[1]), Path(sys.argv[2]))\n",
         &[],
         &[configuration, &written],

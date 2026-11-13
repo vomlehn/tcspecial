@@ -4878,15 +4878,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcslib-c"
-version = "0.1.0"
-dependencies = [
- "tcslib-moc",
- "tcslib-protocol",
- "tempfile",
-]
-
-[[package]]
 name = "tcslib-moc"
 version = "0.1.0"
 dependencies = [
@@ -4895,6 +4886,15 @@ dependencies = [
  "tcslib-protocol",
  "tempfile",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tcslib-moc-c"
+version = "0.1.0"
+dependencies = [
+ "tcslib-moc",
+ "tcslib-protocol",
+ "tempfile",
 ]
 
 [[package]]

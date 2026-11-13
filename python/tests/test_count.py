@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslibgs.count import counted, uncounted  # noqa: E402
+from tcslib_protocol.count import counted, uncounted  # noqa: E402
 
 
 class CountTest(unittest.TestCase):

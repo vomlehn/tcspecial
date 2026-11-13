@@ -6,7 +6,7 @@ license.workspace = true
 publish = false
 description = """\
 What the tests of the examples through Yamcs share: an interpreter of the \
-mission database tcslibgs/yamcs.py generates, which works it on the \
+mission database tcslib_protocol/yamcs.py generates, which works it on the \
 vehicle's own packets as Yamcs would"""
 
 # Not an example: nothing here is run or configured. The tests of

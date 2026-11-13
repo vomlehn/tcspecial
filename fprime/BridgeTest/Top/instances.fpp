@@ -12,7 +12,7 @@ module BridgeTest {
     constant STACK_SIZE = 64 * 1024
   }
 
-  # The bridge's thread runs tcslib-c, which is Rust, and needs the stack a
+  # The bridge's thread runs tcslib-moc-c, which is Rust, and needs the stack a
   # Rust thread is given rather than F´'s usual.
   constant BRIDGE_STACK_SIZE = 2 * 1024 * 1024
 

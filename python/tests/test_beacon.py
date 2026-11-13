@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib import beacon  # noqa: E402
-from tcslib.beacon import (  # noqa: E402
+from tcslib_moc import beacon  # noqa: E402
+from tcslib_moc.beacon import (  # noqa: E402
     Blink,
     Contact,
     Counted,
@@ -22,9 +22,10 @@ from tcslib.beacon import (  # noqa: E402
     Stage,
     Step,
 )
-from tcslibgs import interface  # noqa: E402
-from tcslibgs.beacon import BEACON_BYTES, Beacon, BeaconError  # noqa: E402
-from tcslibgs.configuration import HostPort  # noqa: E402
+from tcslib_protocol import interface  # noqa: E402
+from tcslib_protocol.beacon import (BEACON_BYTES, Beacon,  # noqa: E402
+                                    BeaconError)
+from tcslib_protocol.configuration import HostPort  # noqa: E402
 
 MS = 1_000_000
 SECOND = 1_000_000_000
@@ -195,7 +196,8 @@ class ScheduleTest(unittest.TestCase):
 
 
 class LayoutTest(unittest.TestCase):
-    """tcslibgs/beacon.py, held to the layout and to the Rust's own example."""
+    """tcslib_protocol/beacon.py, held to the layout and to the Rust's own
+    example."""
 
     def test_a_beacon_is_its_fields_as_text_a_colon_between_each(self):
         digest = bytes([0xD4, 0x1D, 0x8C, 0xD9, 0x8F, 0x00, 0xB2, 0x04,
@@ -406,7 +408,7 @@ class LoopTest(unittest.TestCase):
 
 
 def beacon_link():
-    from tcslibgs.configuration import BeaconLink
+    from tcslib_protocol.configuration import BeaconLink
     return BeaconLink(send=HostPort("0.0.0.0", 7500),
                       recv=HostPort("127.0.0.1", 7510))
 

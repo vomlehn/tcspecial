@@ -30,15 +30,15 @@
 //! # The interface document
 //!
 //! The same layout is stated in XTCE in `xtce/ping.xtce`, the ping node's
-//! interface document, field by field: the prefix, the count ended by a
-//! space, the seconds ended by a point, nine digits of nanoseconds, and for
-//! the answer the space and the vehicle's time after them. It is for the
-//! ground stations that read XTCE -- `python/tcslibgs/yamcs.py` gives Yamcs
-//! a command and a container from it -- and, like every XTCE document, it
-//! stays on the ground. This module is still what writes and reads a ping:
-//! a test here packs and unpacks pings and answers with the code tcs-xtce
-//! generates from the document and holds the bytes to this module's, so the
-//! two cannot drift apart.
+//! interface document, field by field: the prefix, the count ended by a space,
+//! the seconds ended by a point, nine digits of nanoseconds, and for the answer
+//! the space and the vehicle's time after them. It is for the ground stations
+//! that read XTCE -- `python/tcslib_protocol/yamcs.py` gives Yamcs a command
+//! and a container from it -- and, like every XTCE document, it stays on the
+//! ground. This module is still what writes and reads a ping: a test here packs
+//! and unpacks pings and answers with the code tcs-xtce generates from the
+//! document and holds the bytes to this module's, so the two cannot drift
+//! apart.
 //!
 //! # A fixed size
 //!
@@ -567,7 +567,7 @@ mod tests {
     /// ping [`message`] writes, byte for byte, and so is an answer and
     /// [`reply`]'s; and what [`message`] and [`reply`] write unpacks into
     /// the same fields. So a ground station that reads the document --
-    /// Yamcs, through `python/tcslibgs/yamcs.py` -- sends the pings this
+    /// Yamcs, through `python/tcslib_protocol/yamcs.py` -- sends the pings this
     /// reads and reads the answers this writes.
     #[test]
     fn xtce_holds_to_the_rust() {

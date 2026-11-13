@@ -32,9 +32,9 @@ RUST = .
 #   sbin/        <package>-links, one per package, which an administrator
 #                runs to link that package's programs into /usr/local/bin
 #   libexec/     programs other programs run: the five test app programs
-#   lib/         libtcs, its pkg-config file, and the Python packages, in
-#                lib/python3/site-packages, which names no minor version
-#   include/     tcs.h
+#   lib/         libtcslib_moc_c, its pkg-config file, and the Python packages,
+#                in lib/python3/site-packages, which names no minor version
+#   include/     tcslib_moc_c.h
 #   share/       tcsgui's data, the documents and the example configurations
 #
 # HOOKS=1 also installs what makes /opt/tcs usable without being told: a
@@ -60,7 +60,7 @@ include $(CURDIR)/beside.mk
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
 TCS_HELPERS_REQUIRED := 0.8.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
-# runtime python/tcslibgs/_xtce links to: a checkout of
+# runtime python/tcslib_protocol/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
 # cannot follow a variable. See the tcs-xtce target in tcslib-protocol/Makefile.
 TCS_XTCE := $(BESIDE)/tcs-xtce
@@ -304,7 +304,7 @@ doc-headers: tcs-xtce
 
 # Stop, saying what to do, unless the tcs-xtce checkout beside this one is
 # there, at the version tcslib-protocol pins the tcs-xtce crate to, and ready to
-# run: the tests reach its Python runtime through python/tcslibgs/_xtce,
+# run: the tests reach its Python runtime through python/tcslib_protocol/_xtce,
 # and installing the ground package copies it from there.
 .PHONY: tcs-xtce
 tcs-xtce:
@@ -802,7 +802,7 @@ PACKAGES := tcspecial tcspecial-ground tcspecial-test
 RELEASE_ATTRIBUTION := slint
 
 # The crates those come from, built together by install-build.
-INSTALL_CRATES := tcspecial tcsverify tcsgui tcslib-c tcsmoc tcssim \
+INSTALL_CRATES := tcspecial tcsverify tcsgui tcslib-moc-c tcsmoc tcssim \
 		  $(FLIGHT_LIBEXEC)
 
 # The crates each package's programs and libraries are built from, whose
@@ -811,26 +811,27 @@ INSTALL_CRATES := tcspecial tcsverify tcsgui tcslib-c tcsmoc tcssim \
 # third-party-notices.py gathers. segsend is a program of the tcspecial
 # crate's.
 FLIGHT_CRATES := tcspecial tcsverify $(FLIGHT_LIBEXEC)
-GROUND_CRATES := tcsgui tcslib-c
+GROUND_CRATES := tcsgui tcslib-moc-c
 TEST_CRATES := tcsmoc tcssim tcspecial
 
 # Where cargo puts a release build.
 RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
 
-# The versions, read from where each is stated so that it is stated once:
-# the workspace's Cargo.toml for the packages, tcslib-c's for libtcs's own,
-# which tcs.pc says, and tcslib-c/abi-version for libtcs's ABI version,
-# which is its soname -- libtcs.so.<ABI> -- and the name its file is
-# installed under. The ABI version goes up only when a program built against
-# the old tcs.h would not work with the new library: see tcslib-c/build.rs,
-# which reads the same file to set the soname, for exactly when.
+# The versions, read from where each is stated so that it is stated once: the
+# workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcslib_moc_c's
+# own, which tcslib-moc-c.pc says, and tcslib-moc-c/abi-version for
+# libtcslib_moc_c's ABI version, which is its soname -- libtcslib_moc_c.so.<ABI>
+# -- and the name its file is installed under. The ABI version goes up only when
+# a program built against the old tcslib_moc_c.h would not work with the new
+# library: see tcslib-moc-c/build.rs, which reads the same file to set the
+# soname, for exactly when.
 VERSION := $(shell sed -n \
 	   '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' \
 	   Cargo.toml)
 LIBTCS_VERSION := $(shell sed -n 's/^version *= *"\(.*\)"/\1/p' \
-		    tcslib-c/Cargo.toml)
-LIBTCS_ABI := $(shell cat tcslib-c/abi-version)
-LIBTCS_SONAME := libtcs.so.$(LIBTCS_ABI)
+		    tcslib-moc-c/Cargo.toml)
+LIBTCS_ABI := $(shell cat tcslib-moc-c/abi-version)
+LIBTCS_SONAME := libtcslib_moc_c.so.$(LIBTCS_ABI)
 
 # The example configurations, in both spellings, with their simulator files
 # and diagrams; the manual's figures are the diagrams, so it is given them as
@@ -847,11 +848,12 @@ EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 # whose storage is small and on ground stations alike, and a release build
 # carries its symbol tables and the standard library's debug information:
 # stripping takes a fifth to a quarter off what each package installs, and
-# libtcs.a from 33 MB to 24 MB. Executables and shared libraries are stripped of
-# everything they do not need to be linked or run (--strip-unneeded); the
-# static library only of its debug information (--strip-debug), because a
-# program linked with it needs its symbols. `make packages STRIP=0` keeps
-# everything as cargo built it, for a build to be debugged.
+# libtcslib_moc_c.a from 33 MB to 24 MB. Executables and shared libraries are
+# stripped of everything they do not need to be linked or run
+# (--strip-unneeded); the static library only of its debug information
+# (--strip-debug), because a program linked with it needs its symbols. `make
+# packages STRIP=0` keeps everything as cargo built it, for a build to be
+# debugged.
 #
 # Stripped as it is installed, so that the stage, and so the .debs and the
 # RPMs cut from it, hold the same files; the RPM specs keep rpmbuild from
@@ -971,14 +973,14 @@ install-tcspecial: tcs-helpers
 			$(DESTDIR)$(SYSTEMDDIR)/tcspecial.service; \
 	fi
 
-# What a ground station is built on: libtcs for C and C++, the Python
+# What a ground station is built on: libtcslib_moc_c for C and C++, the Python
 # packages, and the configuration editor with its data.
 #
-# libtcs.so is installed under its soname, libtcs.so.<ABI>, which is what a
-# program built against it asks for at run time, and linked to by
-# libtcs.so, which is what the linker looks for. tcs.h goes in include/
-# itself, as <tcs.h>. The library is not executable, as Debian wants a
-# shared library to be; the RPM spec makes it so, as rpm wants.
+# libtcslib_moc_c.so is installed under its soname, libtcslib_moc_c.so.<ABI>,
+# which is what a program built against it asks for at run time, and linked to
+# by libtcslib_moc_c.so, which is what the linker looks for. tcslib_moc_c.h goes
+# in include/ itself, as <tcslib_moc_c.h>. The library is not executable, as
+# Debian wants a shared library to be; the RPM spec makes it so, as rpm wants.
 #
 # The Python is installed by pip into a directory of its own, without
 # compiling it, so that the path names no Python version and any python3 can
@@ -997,21 +999,23 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 		$(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PYTHONDIR)
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(BINDIR)
-	install -m 644 tcslib-c/include/tcs.h $(DESTDIR)$(INCLUDEDIR)
-	install -m 644 $(RELEASE_DIR)/libtcs.so \
+	install -m 644 tcslib-moc-c/include/tcslib_moc_c.h \
+		$(DESTDIR)$(INCLUDEDIR)
+	install -m 644 $(RELEASE_DIR)/libtcslib_moc_c.so \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
-	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcs.so
-	install -m 644 $(RELEASE_DIR)/libtcs.a $(DESTDIR)$(LIBDIR)
+	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcslib_moc_c.so
+	install -m 644 $(RELEASE_DIR)/libtcslib_moc_c.a $(DESTDIR)$(LIBDIR)
 	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME), \
-		$(DESTDIR)$(LIBDIR)/libtcs.a)
+		$(DESTDIR)$(LIBDIR)/libtcslib_moc_c.a)
 	$(call install_links,tcspecial-ground,$(GROUND_BIN))
-	$(SUBST) packaging/tcs.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
-	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
+	$(SUBST) packaging/tcslib-moc-c.pc.in \
+		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
+	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
 # The schemas the Python reads are tcslib-protocol/schema, which install-data
 # puts under $(SCHEMADIR): the installed package reaches them through a link, as
-# python/tcslibgs/schema does in the source tree, rather than carrying a second
-# copy that could differ from the first.
+# python/tcslib_protocol/schema does in the source tree, rather than carrying a
+# second copy that could differ from the first.
 	set -e; \
 	tmp=$$(mktemp -d -t tcspecial-py.XXXXXXXXXX); \
 	trap 'rm -rf "$$tmp"' EXIT; \
@@ -1025,20 +1029,20 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	rm -f "$$dist/direct_url.json"; \
 	sed -i '/^tcspecial_ground-[^/]*\.dist-info\/direct_url\.json,/d' \
 		"$$dist/RECORD"; \
-	schema=$(DESTDIR)$(PYTHONDIR)/tcslibgs/schema; \
+	schema=$(DESTDIR)$(PYTHONDIR)/tcslib_protocol/schema; \
 	rm -rf "$$schema"; \
-	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcslibgs \
+	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcslib_protocol \
 		$(SCHEMADIR)) "$$schema"; \
-	sed -i '/^tcslibgs\/schema\//d' "$$dist/RECORD"
-	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-c \
+	sed -i '/^tcslib_protocol\/schema\//d' "$$dist/RECORD"
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-moc-c \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground
 	$(THIRD_PARTY_NOTICES) . \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/THIRD-PARTY-NOTICES \
 		tcspecial-ground $(GROUND_CRATES)
-	install -m 644 tcslib-c/README.html \
-		$(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-c
+	install -m 644 tcslib-moc-c/README.html \
+		$(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-moc-c
 	install -m 644 python/README.md \
 		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
 	if [ "$(HOOKS)" = 1 ]; then \
@@ -1138,12 +1142,13 @@ uninstall-files:
 		$(TEST_BIN))
 	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(FLIGHT_LIBEXEC))
 	rm -f $(addprefix $(DESTDIR)$(SBINDIR)/,$(addsuffix -links,$(PACKAGES)))
-	rm -f $(DESTDIR)$(INCLUDEDIR)/tcs.h
-	rm -f $(DESTDIR)$(LIBDIR)/libtcs.so $(DESTDIR)$(LIBDIR)/libtcs.a \
+	rm -f $(DESTDIR)$(INCLUDEDIR)/tcslib_moc_c.h
+	rm -f $(DESTDIR)$(LIBDIR)/libtcslib_moc_c.so \
+		$(DESTDIR)$(LIBDIR)/libtcslib_moc_c.a \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
-	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
-	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslibgs tcslib tcsui \
-		tcspecial_ground-*.dist-info)
+	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
+	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslib_protocol tcslib_moc \
+		tcsui tcspecial_ground-*.dist-info)
 	rm -rf $(TCSGUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
 		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))
@@ -1376,7 +1381,7 @@ screenshots: screenshots-tcsgui screenshots-tcsmoc screenshots-tcssim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
-HTML_DIRS = $(DOCS_DIR) examples tcslib-moc tcslib-c tcslib-protocol
+HTML_DIRS = $(DOCS_DIR) examples tcslib-moc tcslib-moc-c tcslib-protocol
 
 # Fail where a committed page has fallen behind its source, naming it, having
 # made every page again in place: tcs-helpers' html-pages check, which also

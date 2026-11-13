@@ -23,14 +23,14 @@
 //! check of its own: the transport under it checks it, as UDP's checksum
 //! does here.
 //!
-//! Its layout -- six text fields, each but the last ended by a colon, the
-//! last 32 characters that end the datagram -- is stated in XTCE in
-//! `xtce/beacon.xtce`, which never changes, and packed and unpacked by the code tcs-xtce generates from it, which allocates
-//! nothing. What the text must say -- the name, digits only, lower-case hex
-//! -- and turning it into numbers and digests and back, is here, and in
-//! `python/tcslibgs/beacon.py` over the Python tcs-xtce generates from the
-//! same document; the two are held to each other by the same examples in
-//! their tests.
+//! Its layout -- six text fields, each but the last ended by a colon, the last
+//! 32 characters that end the datagram -- is stated in XTCE in
+//! `xtce/beacon.xtce`, which never changes, and packed and unpacked by the code
+//! tcs-xtce generates from it, which allocates nothing. What the text must say
+//! -- the name, digits only, lower-case hex -- and turning it into numbers and
+//! digests and back, is here, and in `python/tcslib_protocol/beacon.py` over
+//! the Python tcs-xtce generates from the same document; the two are held to
+//! each other by the same examples in their tests.
 
 use std::fmt;
 use std::fmt::Write as _;

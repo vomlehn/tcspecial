@@ -22,8 +22,8 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import ping_yamcs  # noqa: E402
-from tcslibgs import configuration, ping, ping_packet  # noqa: E402
-from tcslibgs import yamcs as generated  # noqa: E402
+from tcslib_protocol import configuration, ping, ping_packet  # noqa: E402
+from tcslib_protocol import yamcs as generated  # noqa: E402
 
 
 def options(**changed):
@@ -136,8 +136,8 @@ class WriteYamcsTest(unittest.TestCase):
 
 class WrittenMdbTest(unittest.TestCase):
     """The wrapper as ping_yamcs.py writes it: no line wider than 80
-    columns, and the same XTCE as :func:`tcslibgs.yamcs.mdb` makes, for the
-    example and for a copy of it with more nodes."""
+    columns, and the same XTCE as :func:`tcslib_protocol.yamcs.mdb` makes, for
+    the example and for a copy of it with more nodes."""
 
     def written(self, path, directory):
         """Writes the wrapper for a configuration, and makes it again.

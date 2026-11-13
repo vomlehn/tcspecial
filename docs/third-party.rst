@@ -245,7 +245,7 @@ b. **A library.** tcspecial split in three:
        file access, each supplied by whoever hosts the core.
 
    ``tcspecial-c``
-       A C ABI whose header compiles as C and as C++, as ``tcslib-c``'s
+       A C ABI whose header compiles as C and as C++, as ``tcslib-moc-c``'s
        does.
 
    A cFS application then drives a pass on each wakeup from SCH and maps the

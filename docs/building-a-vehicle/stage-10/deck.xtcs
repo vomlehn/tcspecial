@@ -30,7 +30,7 @@
         <!-- The vehicle answers to an F´ flight computer. Its links are
              still the radio's, UDP in the radio's protocol, because the
              far end of each is the F´ deployment's TcsBridge component,
-             which is a ground station built on tcslib-c as far as
+             which is a ground station built on tcslib-moc-c as far as
              tcspecial can tell. -->
         <gateway>fprime</gateway>
         <interface>c7820f9bfe585feab72247ece0a2261d</interface>

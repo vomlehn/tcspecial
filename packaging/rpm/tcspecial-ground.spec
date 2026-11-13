@@ -14,11 +14,11 @@ Recommends:     python3-pyyaml, python3-tkinter, pkgconf-pkg-config
 import sysconfig
 print(sysconfig.get_path("purelib", "posix_prefix", {"base": "/usr"}))')}
 
-%description
-What a ground station for tcspecial is built on: libtcs, tcslib-moc for C and
-C++, with its header tcs.h and pkg-config file tcs.pc; the Python
-packages tcslibgs, tcslib and tcsui; and tcsgui, the graphical configuration
-editor, with its node descriptions and schemas.
+%description What a ground station for tcspecial is built on: libtcslib_moc_c,
+tcslib-moc for C and C++, with its header tcslib_moc_c.h and pkg-config file
+tcslib-moc-c.pc; the Python packages tcslib_protocol, tcslib_moc and tcsui; and
+tcsgui, the graphical configuration editor, with its node descriptions and
+schemas.
 
 %install
 cp -a %{tcs_stage}/. %{buildroot}/
@@ -30,7 +30,7 @@ echo /opt/tcs/lib/python3/site-packages \
 	> %{buildroot}%{python3_sitelib}/tcspecial-ground.pth
 # RPM finds what a shared library provides only in an executable file,
 # where Debian wants one that is not.
-chmod 755 %{buildroot}/opt/tcs/lib/libtcs.so.[0-9]*
+chmod 755 %{buildroot}/opt/tcs/lib/libtcslib_moc_c.so.[0-9]*
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -56,10 +56,10 @@ fi
 %dir /opt/tcs/share
 %dir /opt/tcs/share/doc
 /opt/tcs/bin/tcsgui
-/opt/tcs/include/tcs.h
-/opt/tcs/lib/libtcs.so*
-/opt/tcs/lib/libtcs.a
-/opt/tcs/lib/pkgconfig/tcs.pc
+/opt/tcs/include/tcslib_moc_c.h
+/opt/tcs/lib/libtcslib_moc_c.so*
+/opt/tcs/lib/libtcslib_moc_c.a
+/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc
 /opt/tcs/lib/python3/site-packages
 /opt/tcs/share/tcsgui
 /opt/tcs/share/tcspecial

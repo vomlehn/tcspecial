@@ -1,9 +1,10 @@
-# The Python a ground station is built on -- tcslibgs, tcslib and tcsui --
-# as one distribution, so that `pip install ./python` installs all three.
+# The Python a ground station is built on -- tcslib_protocol, tcslib_moc and
+# tcsui -- as one distribution, so that `pip install ./python` installs all
+# three.
 #
 # Named tcspecial-ground, as the system package that carries them is, and
 # not after any one of the three: the import names are the crates' own and
-# stay so, but a distribution called tcslib would be one name on PyPI away
+# stay so, but a distribution called tcslib_moc would be one name on PyPI away
 # from somebody else's.
 
 [build-system]
@@ -33,16 +34,16 @@ dependencies = []
 yaml = ["PyYAML"]
 
 [tool.setuptools]
-# Named rather than found: tcslibgs._xtce is a directory of links, which
+# Named rather than found: tcslib_protocol._xtce is a directory of links, which
 # package discovery does not follow, and tests/ is not to be installed.
-packages = ["tcslibgs", "tcslibgs._xtce", "tcslib", "tcsui"]
+packages = ["tcslib_protocol", "tcslib_protocol._xtce", "tcslib_moc", "tcsui"]
 
 [tool.setuptools.package-data]
 # The XTCE documents the interface digest is taken over: see
-# tcslibgs/interface.py. The configuration schema, whose lists of node
-# types a configuration is read against: see tcslibgs/configuration.py. And
-# the part of a Yamcs mission database no configuration changes: see
-# tcslibgs/yamcs.py; and the Yamcs server's and instance's configurations a
-# ground station fills in: see tcslib/yamcs_ground.py.
-tcslibgs = ["xtce/*.xtce", "schema/tcspecial.schema.json", "yamcs.xtce"]
-tcslib = ["yamcs-templates/*.in"]
+# tcslib_protocol/interface.py. The configuration schema, whose lists of node
+# types a configuration is read against: see tcslib_protocol/configuration.py.
+# And the part of a Yamcs mission database no configuration changes: see
+# tcslib_protocol/yamcs.py; and the Yamcs server's and instance's configurations
+# a ground station fills in: see tcslib_moc/yamcs_ground.py.
+tcslib_protocol = ["xtce/*.xtce", "schema/tcspecial.schema.json", "yamcs.xtce"]
+tcslib_moc = ["yamcs-templates/*.in"]

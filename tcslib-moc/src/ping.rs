@@ -16,7 +16,7 @@
 //!   which is what leaves it by its `moc-out` links. The answer comes down
 //!   as any node's data does, through [`crate::gateway::GatewayReceiver`].
 //!   It is the one way up to a gateway node, for a ping and for any other
-//!   datum a station sends -- tcslib-c's `tcs_uplink` is it, for C and C++
+//!   datum a station sends -- tcslib-moc-c's `tcs_uplink` is it, for C and C++
 //!   -- and a station that keeps a match gates it by that match, as its
 //!   client is gated: see [`Uplink::gated_by`].
 //! * [`Pinger`] keeps what there is to show: the last ping sent and when, the

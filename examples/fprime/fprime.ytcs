@@ -11,7 +11,7 @@ tcspecial:
   # The vehicle answers to an F´ flight computer rather than to the ground.
   # Its links are the radio's -- UDP, in the radio's protocol -- because the
   # far end of each is the F´ deployment's TcsBridge component, which is a
-  # ground station built on tcslib-c as far as tcspecial can tell.
+  # ground station built on tcslib-moc-c as far as tcspecial can tell.
   beacon:
     default_interval: "5 s"
     recv: "127.0.0.1:9510"

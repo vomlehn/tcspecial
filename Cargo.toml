@@ -16,8 +16,8 @@ members = [
     # the editor and for tcspecial's visual window alike. See tcsdiagram.
     "tcsdiagram",
     # tcslib-moc for C and C++: the ground station's library behind one header.
-    # See tcslib-c.
-    "tcslib-c",
+    # See tcslib-moc-c.
+    "tcslib-moc-c",
     # The file interfaces an app node's program is run with, and the five
     # apps that are run over them: see tcsapp. Three are nodes of the
     # vehicle's own and two are payloads.
@@ -38,7 +38,7 @@ members = [
     # And for the thermostat example through Yamcs.
     "examples/thermostat-yamcs",
     # What the tests of the examples through Yamcs share: an interpreter of
-    # the mission database tcslibgs/yamcs.py generates. Not an example.
+    # the mission database tcslib_protocol/yamcs.py generates. Not an example.
     "examples/yamcs-common",
 ]
 

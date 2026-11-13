@@ -401,7 +401,7 @@ program on a socket -- are each read and driven by a device node.
 Compute nodes work on what they read, a gateway node sends it to
 the ground, and tcslog keeps a record aboard of what was sent.
 Telemetry and beacons go down the space link to the mission
-operations center, where Yamcs uses tcslib for its end of the link,
+operations center, where Yamcs uses tcslib-moc for its end of the link,
 and commands come back up.</object>
 <p class="caption">A vehicle running tcspecial, and the ground station that commands it.</p>
 </div>
@@ -414,8 +414,8 @@ node is the vehicle's end of the link to the ground. tcspecial keeps a
 record aboard of what it sent down, in a log written by <strong>tcslog</strong>, a
 library of its own.</p>
 <p>On the ground, a mission control system such as Yamcs (<a class="reference external" href="https://yamcs.org">https://yamcs.org</a>)
-holds the other end of the link through <strong>tcslib</strong>, the TCS ground library.
-tcslib sends the vehicle its commands, receives its telemetry and beacons,
+holds the other end of the link through <strong>tcslib-moc</strong>, the TCS ground library.
+tcslib-moc sends the vehicle its commands, receives its telemetry and beacons,
 and knows from the vehicle's configuration where each datum arrives and
 what it is; Yamcs's mission database is generated from the same
 configuration, so the two ends cannot disagree about the link. The link's
@@ -499,7 +499,8 @@ System (cFS) and JPL's F´ (F Prime). Work in progress.</dd>
 <dd>The shipped example configurations, and what each one shows.</dd>
 <dt>The libraries</dt>
 <dd><a class="reference external" href="../tcslib-moc/README.html">tcslib-moc</a> in the MOC, in Rust, and
-<a class="reference external" href="../tcslib-c/README.html">tcslib-c</a>, its C interface; <a class="reference external" href="../tcslib-protocol/README.html">tcslib-protocol</a>, used aboard and in the MOC.</dd>
+<a class="reference external" href="../tcslib-moc-c/README.html">tcslib-moc-c</a>, its C interface;
+<a class="reference external" href="../tcslib-protocol/README.html">tcslib-protocol</a>, used aboard and in the MOC.</dd>
 </dl>
 </div>
 <div class="section" id="the-rest-of-the-tcs-software">

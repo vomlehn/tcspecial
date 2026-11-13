@@ -1,18 +1,18 @@
 //! The Yamcs wrapper reads what the vehicle frames as the configuration
 //! says it is.
 //!
-//! The mission database's wrapper, which `tcslibgs/yamcs.py` generates from the
-//! configuration, gives each node drawn into the gateway node a parameter of
-//! the type the configuration says its data are: a value as a float in its
-//! unit, read from four bytes of a signed count of the unit's steps through a
-//! calibrator, a decision as a boolean, read from the character `1` or `0` -- a
-//! thermostat's, and what a heater's switch was told -- and a GPIO payload's
-//! lines read for their levels as each line's record, its level a boolean.
-//! Nothing but a run against Yamcs itself would show the wrapper and the
-//! vehicle disagreeing -- a byte order, a scale off by a thousand, a sign lost
-//! -- so this generates the wrapper, as `thermostat_yamcs.py` does, and works
-//! it as Yamcs would, with `yamcs_common`'s interpreter, on what the vehicle
-//! sends: each value made by
+//! The mission database's wrapper, which `tcslib_protocol/yamcs.py` generates
+//! from the configuration, gives each node drawn into the gateway node a
+//! parameter of the type the configuration says its data are: a value as a
+//! float in its unit, read from four bytes of a signed count of the unit's
+//! steps through a calibrator, a decision as a boolean, read from the character
+//! `1` or `0` -- a thermostat's, and what a heater's switch was told -- and a
+//! GPIO payload's lines read for their levels as each line's record, its level
+//! a boolean. Nothing but a run against Yamcs itself would show the wrapper and
+//! the vehicle disagreeing -- a byte order, a scale off by a thousand, a sign
+//! lost -- so this generates the wrapper, as `thermostat_yamcs.py` does, and
+//! works it as Yamcs would, with `yamcs_common`'s interpreter, on what the
+//! vehicle sends: each value made by
 //! `tcslib_protocol::node::vehicle::compute::value_bytes`, each line's record
 //! as tcspecial writes it, framed by `tcslib_protocol::ccsds` under the APID
 //! `tcslib-protocol` counts for its source. And so for every unit there is, in

@@ -14,8 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib import simulator  # noqa: E402
-from tcslibgs import ready  # noqa: E402
+from tcslib_moc import simulator  # noqa: E402
+from tcslib_protocol import ready  # noqa: E402
 
 
 def set_up(mode):

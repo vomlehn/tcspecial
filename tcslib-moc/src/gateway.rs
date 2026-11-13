@@ -675,7 +675,7 @@ payloads:
 
     /// An F´ gateway is opened as a ground link is, and what is drawn into
     /// it arrives at its bridge_base plus the source's id: what the F´
-    /// bridge component, built on this through tcslib-c, receives.
+    /// bridge component, built on this through tcslib-moc-c, receives.
     #[test]
     fn an_fprime_gateway_receives_at_its_bridge_base() {
         let port = a_free_port();

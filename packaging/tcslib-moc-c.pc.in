@@ -1,0 +1,16 @@
+# pkg-config's account of libtcslib_moc_c, tcslib-moc for C and C++, written by
+# `make install-files` with the prefix it installs under.
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: tcslib-moc-c
+Description: tcslib-moc for C and C++: ground station beacons, data and commands
+URL: https://github.com/vomlehn/tcspecial
+Version: @LIBTCS_VERSION@
+Libs: -L${libdir} -ltcslib_moc_c
+# What libtcslib_moc_c.a needs besides, as `rustc --print native-static-libs`
+# says.
+Libs.private: -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
+Cflags: -I${includedir}

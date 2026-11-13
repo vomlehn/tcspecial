@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1040" height="560" viewBox="0 0 1040 560" role="img" aria-labelledby="title desc">
   <title id="title">TCSpecial in flight</title>
-  <desc id="desc">A vehicle runs tcspecial. On its left are its payloads, each on an interface of its own: temperature sensors on an I2C bus, a battery monitor on a SPI bus, an altimeter on a serial line, a motor controller on a CAN bus, heaters on GPIO lines, and a science program aboard reached through a socket. tcspecial reads and drives each through a device node, computes from what they read in compute nodes, keeps a record aboard, in a tcslog log, of what it sends to the ground, and sends it to the ground through a gateway node. The vehicle and the mission operations center talk over the space link: telemetry and beacons go down, commands go up. On the ground, Yamcs is the mission control system, and it uses tcslib, the TCS ground library, for its end of the link: tcslib sends commands and receives the telemetry, and its mission database is generated from the vehicle's configuration.</desc>
+  <desc id="desc">A vehicle runs tcspecial. On its left are its payloads, each on an interface of its own: temperature sensors on an I2C bus, a battery monitor on a SPI bus, an altimeter on a serial line, a motor controller on a CAN bus, heaters on GPIO lines, and a science program aboard reached through a socket. tcspecial reads and drives each through a device node, computes from what they read in compute nodes, keeps a record aboard, in a tcslog log, of what it sends to the ground, and sends it to the ground through a gateway node. The vehicle and the mission operations center talk over the space link: telemetry and beacons go down, commands go up. On the ground, Yamcs is the mission control system, and it uses tcslib-moc, the TCS ground library, for its end of the link: tcslib-moc sends commands and receives the telemetry, and its mission database is generated from the vehicle's configuration.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -104,7 +104,7 @@
   <text class="name" x="794" y="116">Yamcs</text>
   <text class="kind" x="794" y="136">mission control system</text>
   <rect class="lib" x="794" y="160" width="198" height="120" rx="6"/>
-  <text class="name" x="806" y="184">tcslib</text>
+  <text class="name" x="806" y="184">tcslib-moc</text>
   <text class="kind" x="806" y="204">the TCS ground library:</text>
   <text class="kind" x="806" y="222">sends commands,</text>
   <text class="kind" x="806" y="240">receives telemetry and</text>

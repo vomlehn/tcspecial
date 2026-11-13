@@ -60,7 +60,7 @@ def run_the_window(setup, beacons, pinger, title="tcspecial ping",
     Args:
         setup:   What the program read out of the configuration.
         beacons: The beacon socket, which a loop of its own listens to: a
-                 :class:`tcslib.beacon.Beacons`, or anything with its
+                 :class:`tcslib_moc.beacon.Beacons`, or anything with its
                  ``next_pass``.
         pinger:  The ping link, whose answers a loop of its own receives.
         title:   The window's title.

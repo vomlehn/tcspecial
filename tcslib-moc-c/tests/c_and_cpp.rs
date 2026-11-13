@@ -1,0 +1,545 @@
+//! The C/C++ ground station, built against `tcslib_moc_c.h` as C and as C++,
+//! run against a vehicle the Rust plays.
+//!
+//! What keeps the header honest. It is written by hand, so the only proof that
+//! it says what the library does is a program that compiles against it and
+//! works: `examples/ground.c` with gcc and `examples/ground.cpp` with g++, each
+//! linked with the `libtcslib_moc_c.a` this crate builds, each run against a
+//! simulated vehicle that sends beacons as tcspecial serializes them, answers
+//! CONNECT, PING and QUERY_NODE, takes a datum sent up to the gateway node, and
+//! sends one datum down from it. The two must print the same lines, and the
+//! right ones: among them that a PING and a datum sent up are refused unsent
+//! before the station is matched, that it is matched for listening by the
+//! vehicle's beacon and for commanding by its Connect, and what it has counted
+//! of what the vehicle sent.
+//!
+//! The ports are free ones, found as the test starts. Where there is no gcc
+//! or g++ this says so and passes: it tests the header, and a machine with no
+//! C compiler has no C program to break.
+
+use std::net::UdpSocket;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
+use tcslib_protocol::config_digest::{digest_of_file, ConfigVersion};
+use tcslib_protocol::node::vehicle::ping;
+// The link's command, beside std's process Command.
+use tcslib_protocol::Command as LinkCommand;
+use tcslib_protocol::{
+    Beacon, CommandStatus, ConnectTelemetry, DHSample, NodeCounts,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
+    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
+    Timestamp,
+};
+
+fn here() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
+}
+
+/// Finds where cargo puts `libtcslib_moc_c.a`: the directory above this test's
+/// own.
+///
+/// # Returns
+///
+/// The library's path, whether or not it has been built.
+///
+/// # Panics
+///
+/// If this test's own path cannot be found.
+fn library() -> PathBuf {
+    let test = std::env::current_exe().expect("where this test is");
+    let target = test
+        .parent()
+        .and_then(Path::parent)
+        .expect("the target directory");
+    target.join("libtcslib_moc_c.a")
+}
+
+/// Builds `libtcslib_moc_c.a` from the source as it is now, and says where it
+/// is.
+///
+/// `cargo test` builds this crate for its tests as an rlib and leaves the
+/// static library as the last `cargo build` left it, so a test that linked
+/// whatever was there could pass against a library older than the change
+/// it was meant to test. Built here, with the cargo and the profile running
+/// this test, it is this source's.
+///
+/// # Returns
+///
+/// The library's path.
+///
+/// # Panics
+///
+/// If cargo cannot be run, the library does not build, or it is not where
+/// [`library`] says.
+fn fresh_library() -> PathBuf {
+    let library = library();
+    let profile = library
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|name| name.to_str())
+        .unwrap_or("debug");
+    let mut build = Command::new(env!("CARGO"));
+    build.args(["build", "--quiet", "-p", "tcslib-moc-c", "--lib"]);
+    if profile == "release" {
+        build.arg("--release");
+    }
+    let built = build.output().expect("cargo runs");
+    assert!(
+        built.status.success(),
+        "the library does not build:\n{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    assert!(
+        library.is_file(),
+        "{} is not where cargo put it",
+        library.display()
+    );
+    library
+}
+
+/// A socket on a port nothing holds.
+fn bound() -> UdpSocket {
+    UdpSocket::bind("127.0.0.1:0").expect("a port of its own")
+}
+
+fn port(socket: &UdpSocket) -> u16 {
+    socket.local_addr().expect("its address").port()
+}
+
+/// A port nothing holds, for the ground station to bind.
+fn free() -> u16 {
+    port(&bound())
+}
+
+/// Compiles a ground station against `tcslib_moc_c.h` and the library.
+///
+/// # Arguments
+///
+/// * `compiler` - The compiler to run: "gcc" or "g++".
+/// * `standard` - The language standard's flag, such as "-std=c11".
+/// * `source`   - The program's file, in `examples/`.
+/// * `library`  - The `libtcslib_moc_c.a` to link with.
+/// * `out`      - Where the program is written.
+///
+/// # Returns
+///
+/// The program's path, or `None` where there is no such compiler.
+///
+/// # Panics
+///
+/// If the compiler cannot be run for another reason, or fails.
+fn compiled(
+    compiler: &str,
+    standard: &str,
+    source: &str,
+    library: &Path,
+    out: &Path,
+) -> Option<PathBuf> {
+    let ran = Command::new(compiler)
+        .args([standard, "-Wall", "-Wextra", "-Werror", "-pedantic"])
+        .arg(here().join("examples").join(source))
+        .arg("-I")
+        .arg(here().join("include"))
+        .arg(library)
+        .args(["-lpthread", "-ldl", "-lm", "-o"])
+        .arg(out)
+        .output();
+    let ran = match ran {
+        Ok(ran) => ran,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("there is no {compiler}, so {source} is not built");
+            return None;
+        }
+        Err(e) => panic!("{compiler} could not be run: {e}"),
+    };
+    assert!(
+        ran.status.success(),
+        "{compiler} {source}:\n{}",
+        String::from_utf8_lossy(&ran.stderr)
+    );
+    Some(out.to_path_buf())
+}
+
+/// Runs a ground station against a simulated vehicle, and checks what it
+/// printed.
+///
+/// # Arguments
+///
+/// * `program` - The compiled ground station.
+///
+/// # Returns
+///
+/// What the program printed on standard output, with the configuration's
+/// digest replaced by `<digest>`, which differs from run to run.
+///
+/// # Panics
+///
+/// If the program or the vehicle fails, the vehicle is not sent the
+/// commands expected, or the program does not print the lines expected.
+fn against_a_vehicle(program: &Path) -> String {
+    // The vehicle's sockets: where beacons come from, where commands are
+    // taken, where node commands are taken, where the gateway node takes a
+    // ping, and where its data is sent from.
+    let beacon = bound();
+    let interpreter = bound();
+    let nodes = bound();
+    let uplink = bound();
+    let sender = bound();
+    for socket in [&interpreter, &nodes, &uplink] {
+        socket
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .expect("a timeout");
+    }
+    let (beacons, ground_data, cmd_from, nodes_from) =
+        (free(), free(), free(), free());
+
+    let dir = tempfile::tempdir().expect("a directory");
+    let configuration = dir.path().join("ground.ytcs");
+    let state = dir.path().join("tcspecial.state").display().to_string();
+    std::fs::write(
+        &configuration,
+        format!(
+            "tcspecial:
+  gateway: radio
+  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  beacon:
+    default_interval: \"5 s\"
+    recv: \"127.0.0.1:{beacons}\"
+    reset_interval: \"1 s\"
+    send: \"127.0.0.1:{}\"
+  log:
+    directory: \"{}\"
+    segment_size: \"65536\"
+  payload_command:
+    dest_base: \"127.0.0.1:{}\"
+    source_base: \"127.0.0.1:{nodes_from}\"
+  payload_telemetry:
+    dest_base: \"127.0.0.1:{}\"
+    source_base: \"127.0.0.1:{}\"
+  state_file: \"{state}\"
+  tcs_cmd:
+    recv: \"127.0.0.1:{}\"
+    send: \"127.0.0.1:{cmd_from}\"
+gateways:
+  - type gateway_radio:
+      - gateway: gateway
+        address: \"127.0.0.1\"
+        ground_base: \"127.0.0.1:{}\"
+        port: \"{}\"
+        moc-out: [ping.gateway]
+        world-in: [ping]
+vehicle:
+  - type ping:
+      - compute: ping
+        world-out: [gateway.ping]
+        moc-in: [gateway]
+",
+            port(&beacon),
+            dir.path().display(),
+            port(&nodes),
+            free(),
+            free(),
+            port(&interpreter),
+            // ping's name sorts after the gateway node's, so it is device
+            // id 1 and its data arrives one above the base.
+            ground_data - 1,
+            port(&uplink),
+        ),
+    )
+    .expect("written");
+    let digest = digest_of_file(&configuration).expect("it digests");
+    let version = ConfigVersion::of_this_build();
+
+    let stop = Arc::new(AtomicBool::new(false));
+    let vehicle = {
+        let stop = Arc::clone(&stop);
+        std::thread::spawn(move || {
+            let mut buffer = [0u8; 65535];
+            let mut sequence = 0;
+            let mut answered = Vec::new();
+            let mut sent_up = Vec::new();
+            while !stop.load(Ordering::Relaxed) {
+                sequence += 1;
+                let datagram =
+                    Beacon::new(sequence, version, digest).to_bytes();
+                let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
+
+                // A ping, answered as the ping node answers it, down to where
+                // the ground takes the ping node's data; and anything else
+                // sent up, kept to say what arrived.
+                if let Ok((size, _)) = uplink.recv_from(&mut buffer) {
+                    match ping::reply(
+                        &buffer[..size],
+                        ping::now().expect("a clock"),
+                    ) {
+                        Ok(answer) => {
+                            // A string, sent the ground after the count of
+                            // its bytes, in groups of seven bits.
+                            let mut counted = Vec::new();
+                            tcslib_protocol::link_type::counted(
+                                answer.as_bytes(),
+                                tcslib_protocol::link_type::Count::Groups,
+                                &mut counted,
+                            )
+                            .expect("counted");
+                            sender
+                                .send_to(&counted, ("127.0.0.1", ground_data))
+                                .expect("the answer");
+                        }
+                        Err(_) => sent_up.push(buffer[..size].to_vec()),
+                    }
+                }
+
+                for link in [&interpreter, &nodes] {
+                    let Ok((size, from)) = link.recv_from(&mut buffer) else {
+                        continue;
+                    };
+                    let command =
+                        LinkCommand::read(&buffer[..size]).expect("a command");
+                    let seq = command.sequence();
+                    answered.push(command.cmd_type());
+                    let answer = match &command {
+                        LinkCommand::Connect(_) => Telemetry::Connect(
+                            ConnectTelemetry::new(seq, version, digest, 1),
+                        ),
+                        LinkCommand::Ping(_) => Telemetry::Ping(
+                            PingTelemetry::new(seq, CommandStatus::Success),
+                        ),
+                        LinkCommand::QueryNode(cmd) => {
+                            Telemetry::QueryNode(QueryNodeTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                                cmd.node,
+                                true,
+                                NodeCounts::default(),
+                            ))
+                        }
+                        // Refused as the vehicle refuses one, with its
+                        // reason: which the ground station prints. With a
+                        // status no build yet has, as a vehicle of a later
+                        // build might answer, which the station says is a
+                        // refusal, by its number.
+                        LinkCommand::SetNode(cmd) => Telemetry::SetNode(
+                            SetNodeTelemetry::new(
+                                seq,
+                                CommandStatus::Unknown(42),
+                                cmd.node,
+                            )
+                            .because(Reason::of(
+                                "no command binding says the ground may set \
+                                \"ping.count\"",
+                            )),
+                        ),
+                        LinkCommand::QueryNodeSample(cmd) => {
+                            // What it took: "ping", four bytes of a transfer
+                            // of six; and nothing given.
+                            let mut taken = DHSample::new();
+                            taken.time = Some(Timestamp { micros: 1_000_000 });
+                            taken.len = 4;
+                            taken.total = 6;
+                            taken.bytes[..4].copy_from_slice(b"ping");
+                            Telemetry::QueryNodeSample(
+                                QueryNodeSampleTelemetry::new(
+                                    seq,
+                                    CommandStatus::Success,
+                                    cmd.node,
+                                    taken,
+                                    DHSample::new(),
+                                ),
+                            )
+                        }
+                        // Onto the configuration the station read, which is
+                        // what a NULL target says.
+                        LinkCommand::RestartArm(cmd) => {
+                            assert_eq!(cmd.target, digest, "a plain restart");
+                            Telemetry::RestartArm(RestartArmTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                            ))
+                        }
+                        LinkCommand::Restart(cmd) => {
+                            assert_eq!(cmd.target, digest, "the arm's");
+                            Telemetry::Restart(RestartTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                            ))
+                        }
+                        other => panic!(
+                            "the ground station sent {:?}",
+                            other.cmd_type()
+                        ),
+                    };
+                    let data = answer.to_bytes();
+                    link.send_to(&data, from).expect("an answer");
+
+                    // The query answered, the node's data follows, as it
+                    // would from a node that is running.
+                    if matches!(command, LinkCommand::QueryNode(_)) {
+                        // A string, after the count of its bytes.
+                        sender
+                            .send_to(
+                                b"\x0fhello from ping",
+                                ("127.0.0.1", ground_data),
+                            )
+                            .expect("the datum");
+                    }
+                }
+            }
+            (answered, sent_up)
+        })
+    };
+
+    let ran = Command::new(program)
+        .arg("--restart")
+        .arg("--send=1")
+        .arg(&configuration)
+        .output()
+        .expect("the ground station runs");
+    stop.store(true, Ordering::Relaxed);
+    let (answered, sent_up) = vehicle.join().expect("the vehicle stops");
+
+    let printed = String::from_utf8_lossy(&ran.stdout).into_owned();
+    assert!(
+        ran.status.success(),
+        "{}: {printed}\n{}",
+        program.display(),
+        String::from_utf8_lossy(&ran.stderr)
+    );
+    assert_eq!(
+        answered,
+        [
+            tcslib_protocol::CommandType::Connect,
+            tcslib_protocol::CommandType::Ping,
+            tcslib_protocol::CommandType::QueryNode,
+            tcslib_protocol::CommandType::SetNode,
+            tcslib_protocol::CommandType::QueryNodeSample,
+            tcslib_protocol::CommandType::RestartArm,
+            tcslib_protocol::CommandType::Restart,
+        ],
+        "{}: what the vehicle was asked",
+        program.display()
+    );
+    // Once, after the match: the datum sent before it was refused unsent.
+    assert_eq!(
+        sent_up,
+        [b"1".to_vec()],
+        "{}: what was sent up",
+        program.display()
+    );
+
+    // What it printed, with the digest taken out: it is the temporary
+    // configuration's, which differs between the two runs.
+    let expected = [
+        format!("configuration: md5 {digest}"),
+        "ping before a match: refused, unsent".to_string(),
+        "send before a match: refused, unsent".to_string(),
+        format!("beacon: Heard, tcspecial v{version} md5 {digest}"),
+        "matched: listening yes, commanding no".to_string(),
+        "connect: agrees".to_string(),
+        "matched: listening yes, commanding yes".to_string(),
+        "ping: answered".to_string(),
+        "sent up to gateway: \"1\"".to_string(),
+        "query ping (node 1): Success, running".to_string(),
+        "set ping count: refused (status 42) -- no command binding says \
+        the ground may set \"ping.count\""
+            .to_string(),
+        "ping sends values: no".to_string(),
+        "ping sends decisions: no".to_string(),
+        "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
+        "restart: armed done, restarted done".to_string(),
+        "ping ping through gateway: sent".to_string(),
+        "data from ping: hello from ping".to_string(),
+        "ping ping: answered, round trip timed, up and down summing to it \
+        yes"
+        .to_string(),
+        // Seven answers and two data, every one read: the vehicle beacons
+        // clear and with this configuration's checksum, so nothing it sends
+        // is dropped.
+        "packets: 9 received = 9 processed + 0 malformed + 0 mismatched"
+            .to_string(),
+    ];
+    let lines: Vec<&str> = printed.lines().collect();
+    assert_eq!(lines, expected, "{}", program.display());
+    printed.replace(&digest.to_string(), "<digest>")
+}
+
+#[test]
+fn the_ground_station_works_as_c_and_as_cpp_and_says_the_same() {
+    let library = fresh_library();
+    let dir = tempfile::tempdir().expect("a directory");
+    let c = compiled(
+        "gcc",
+        "-std=c11",
+        "ground.c",
+        &library,
+        &dir.path().join("ground_c"),
+    );
+    let cpp = compiled(
+        "g++",
+        "-std=c++17",
+        "ground.cpp",
+        &library,
+        &dir.path().join("ground_cpp"),
+    );
+
+    let said: Vec<String> = [c, cpp]
+        .into_iter()
+        .flatten()
+        .map(|program| against_a_vehicle(&program))
+        .collect();
+    if let [c, cpp] = said.as_slice() {
+        assert_eq!(c, cpp, "the C and the C++ should say the same");
+    }
+}
+
+/// The header alone, included first, compiles as old C and old C++: nothing
+/// in it needs more than C99 or C++11.
+#[test]
+fn the_header_stands_alone_in_c_and_in_cpp() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let source = dir.path().join("only.c");
+    std::fs::write(
+        &source,
+        "#include \"tcslib_moc_c.h\"\nint main(void) { return 0; }\n",
+    )
+    .expect("written");
+    for (compiler, language, standard) in
+        [("gcc", "c", "-std=c99"), ("g++", "c++", "-std=c++11")]
+    {
+        let ran = Command::new(compiler)
+            .args([
+                "-x",
+                language,
+                standard,
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-pedantic",
+                "-c",
+            ])
+            .arg("-I")
+            .arg(here().join("include"))
+            .arg(&source)
+            .arg("-o")
+            .arg(dir.path().join("only.o"))
+            .output();
+        match ran {
+            Ok(ran) => assert!(
+                ran.status.success(),
+                "{compiler} {standard}:\n{}",
+                String::from_utf8_lossy(&ran.stderr)
+            ),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                eprintln!(
+                    "there is no {compiler}, so the header is not compiled \
+                    as {language}"
+                )
+            }
+            Err(e) => panic!("{compiler} could not be run: {e}"),
+        }
+    }
+}

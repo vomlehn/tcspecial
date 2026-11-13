@@ -13,16 +13,16 @@
 
        tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
 
-     six fields of UTF-8: the name, the version, the configuration's digest,
-     the beacon's number, the restart flag and the interface's digest, each
-     but the last ended by a colon, and the last 32 characters that end the
-     datagram. Numbers are decimal digits and digests lower-case hex: what
-     the text must say, and turning it into numbers and digests and back,
-     is tcslib-protocol/src/beacon.rs's and python/tcslibgs/beacon.py's. At most
-     106 bytes.
+     six fields of UTF-8: the name, the version, the configuration's digest, the
+     beacon's number, the restart flag and the interface's digest, each but the
+     last ended by a colon, and the last 32 characters that end the datagram.
+     Numbers are decimal digits and digests lower-case hex: what the text must
+     say, and turning it into numbers and digests and back, is
+     tcslib-protocol/src/beacon.rs's and python/tcslib_protocol/beacon.py's. At
+     most 106 bytes.
 
      The Rust in tcslib-protocol/src/beacon_packet.rs and the Python in
-     python/tcslibgs/beacon_packet.py are generated from this file by
+     python/tcslib_protocol/beacon_packet.py are generated from this file by
      `make beacon-packet` in tcslib-protocol/. See "The fixed commands" in
      docs/tcspecial-design.rst. -->
 <SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsBeacon">

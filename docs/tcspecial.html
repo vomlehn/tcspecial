@@ -504,10 +504,11 @@ program of an app node, or a payload that is a program rather than a device --
 is talked to through file descriptors it inherits, which a program in any of the
 three already knows how to read and write, so it may be written in C, C++, Rust
 or Python. On the ground, a station is built on <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> in Rust, on
-<tt class="docutils literal"><span class="pre">tcslib-c</span></tt> in C or C++ -- the same library behind one header,
-<tt class="docutils literal"><span class="pre">tcslib-c/include/tcs.h</span></tt> -- or on its Python spelling under <tt class="docutils literal">python/</tt>. Every
-interface offered to C is offered to C++ as well: a C header can be included
-from C++ as it stands, and nothing in it is C that C++ will not compile.</p>
+<tt class="docutils literal"><span class="pre">tcslib-moc-c</span></tt> in C or C++ -- the same library behind one header,
+<tt class="docutils literal"><span class="pre">tcslib-moc-c/include/tcslib_moc_c.h</span></tt> -- or on its Python spelling under
+<tt class="docutils literal">python/</tt>. Every interface offered to C is offered to C++ as well: a C header
+can be included from C++ as it stands, and nothing in it is C that C++ will not
+compile.</p>
 <p><strong>cFS and F´.</strong> Work is under way on using TCSpecial, its telemetry log tcslog
 and its packet compiler tcs-xtce with the two flight software frameworks most
 missions are built on, NASA's core Flight System and JPL's F´. What each
@@ -2868,7 +2869,7 @@ so tcsmoc cannot be run on the same configuration beside it. <tt class="docutils
 it is matched; a vehicle answering with another configuration's checksum is
 said whatever the flag. <tt class="docutils literal">ping_gateway.py</tt> does the same as soon as it has
 started the vehicle, and <tt class="docutils literal"><span class="pre">--pings</span></tt> waits for the match before its first
-ping. Through <tt class="docutils literal"><span class="pre">tcslib_moc::listening</span></tt> in Rust and <tt class="docutils literal">tcslib.listening</tt> in
+ping. Through <tt class="docutils literal"><span class="pre">tcslib_moc::listening</span></tt> in Rust and <tt class="docutils literal">tcslib_moc.listening</tt> in
 Python, either of which a station of your own that only listens can use.</p>
 <p>Both programs are beside the configuration: the payload is a Python 3 script
 that uses only the standard library, and the ground station is a Rust crate.
@@ -2931,11 +2932,11 @@ ended by its colon -- and nothing else, so a ground system that reads XTCE can
 read it too. That is what goes on the wire; what the window shows on its <tt class="docutils literal">Last
 msg:</tt> line is written for the window, as <tt class="docutils literal">tcspecial v0.1.0 md5</tt> and the
 digest. tcspecial writes each beacon, and <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt> reads it, with
-<tt class="docutils literal"><span class="pre">tcslib_protocol::Beacon</span></tt>, which the Python in <tt class="docutils literal">python/tcslibgs/beacon.py</tt>
-says again, held to it by the same examples in their tests. The example's test
-writes the beacon it sends the same way. A beacon is read strictly: anything
-with a field out of its form, a seventh field, a trailing colon or newline, or
-more than 106 bytes, is not a beacon.</p>
+<tt class="docutils literal"><span class="pre">tcslib_protocol::Beacon</span></tt>, which the Python in
+<tt class="docutils literal">python/tcslib_protocol/beacon.py</tt> says again, held to it by the same examples
+in their tests. The example's test writes the beacon it sends the same way. A
+beacon is read strictly: anything with a field out of its form, a seventh field,
+a trailing colon or newline, or more than 106 bytes, is not a beacon.</p>
 <p>tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
 one thing wherever it is shown, and an operator who has read one window has
@@ -3010,18 +3011,18 @@ by the count. An answer to an earlier ping is still shown as the last thing
 received, and changes none of the times.</p>
 <p>The ground station is built the way the <tt class="docutils literal">beacon</tt> program is, from two halves
 and a little of its own, and the halves are the same ones in Python:
-<tt class="docutils literal">python/tcslib/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt>,
-<tt class="docutils literal">python/tcsui/beacon_panel.py</tt> is <tt class="docutils literal">tcsui</tt>'s panel, and <tt class="docutils literal">python/tcslibgs</tt>
-holds the ping format and what a ground station reads out of a configuration. It
-reads the XML spelling, the standard library having no YAML, and asks
-<tt class="docutils literal">tcsverify <span class="pre">--digest</span></tt> for the digest it compares each beacon's with rather than
-working it out a second time. The rules are then written twice, in Rust and in
-Python, and the example's tests hold them to one another: the Python's own tests
-use the Rust tests' examples, one test checks that the Python reads the same
-ports from <tt class="docutils literal">ping.xtcs</tt> as the Rust does from <tt class="docutils literal">ping.ytcs</tt>, and one plays the
-vehicle with the Rust -- the ping answered by the function the <tt class="docutils literal">ping</tt> node
-answers with, the beacon packed as tcspecial packs it -- against the ground
-station. <tt class="docutils literal">cargo test</tt> runs them all.</p>
+<tt class="docutils literal">python/tcslib_moc/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt>,
+<tt class="docutils literal">python/tcsui/beacon_panel.py</tt> is <tt class="docutils literal">tcsui</tt>'s panel, and
+<tt class="docutils literal">python/tcslib_protocol</tt> holds the ping format and what a ground station reads
+out of a configuration. It reads the XML spelling, the standard library having
+no YAML, and asks <tt class="docutils literal">tcsverify <span class="pre">--digest</span></tt> for the digest it compares each
+beacon's with rather than working it out a second time. The rules are then
+written twice, in Rust and in Python, and the example's tests hold them to one
+another: the Python's own tests use the Rust tests' examples, one test checks
+that the Python reads the same ports from <tt class="docutils literal">ping.xtcs</tt> as the Rust does from
+<tt class="docutils literal">ping.ytcs</tt>, and one plays the vehicle with the Rust -- the ping answered by
+the function the <tt class="docutils literal">ping</tt> node answers with, the beacon packed as tcspecial
+packs it -- against the ground station. <tt class="docutils literal">cargo test</tt> runs them all.</p>
 <p>The ground station starts the vehicle itself -- tcspecial from the build, on
 the same configuration -- and kills it when it exits, however it exits: if the
 ground station is killed or crashes, the kernel kills tcspecial. So a vehicle
@@ -3079,25 +3080,24 @@ make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples
 </span>python3<span class="whitespace"> </span>examples/ping-yamcs/ping_yamcs.py<span class="whitespace"> </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--pings<span class="whitespace"> </span><span class="literal number">3</span>
 </pre>
 <p>It writes a Yamcs configuration from the tcspecial one into a run directory,
-<tt class="docutils literal"><span class="pre">/tmp/ping-yamcs</span></tt> unless <tt class="docutils literal"><span class="pre">--run-dir</span></tt> says, so that the ports and APIDs
-are stated once. The mission database is tcspecial's own XTCE,
+<tt class="docutils literal"><span class="pre">/tmp/ping-yamcs</span></tt> unless <tt class="docutils literal"><span class="pre">--run-dir</span></tt> says, so that the ports and APIDs are
+stated once. The mission database is tcspecial's own XTCE,
 <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce</span></tt>, as it is, and <tt class="docutils literal"><span class="pre">tcs-ccsds.xtce</span></tt>, generated from the
-configuration by <tt class="docutils literal">python/tcslibgs/yamcs.py</tt> with a container or a command
-for every APID it counts: the CCSDS header, what follows it on each APID,
-and CONNECT and the ping, behind a header. Yamcs's links, one on each port,
-are generated alongside: see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>. Nothing in it
-is written by hand per APID, so a node added to the configuration -- a
-payload nothing touches, or another source drawn into the gateway node --
-has its container in Yamcs the next time the example runs. The ping and its
-answer are laid out by the ping node's interface document,
+configuration by <tt class="docutils literal">python/tcslib_protocol/yamcs.py</tt> with a container or a
+command for every APID it counts: the CCSDS header, what follows it on each
+APID, and CONNECT and the ping, behind a header. Yamcs's links, one on each
+port, are generated alongside: see <a class="reference internal" href="#what-the-vehicle-answers-to">What the vehicle answers to</a>. Nothing in it
+is written by hand per APID, so a node added to the configuration -- a payload
+nothing touches, or another source drawn into the gateway node -- has its
+container in Yamcs the next time the example runs. The ping and its answer are
+laid out by the ping node's interface document,
 <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce/ping.xtce</span></tt>: a ping goes up as the document's command,
-<tt class="docutils literal">/TcsYamcs/Ping</tt>, its text split into the arguments <tt class="docutils literal">Count</tt>,
-<tt class="docutils literal">SentSeconds</tt> and <tt class="docutils literal">SentNanoseconds</tt> by the code tcs-xtce generates from
-the document, <tt class="docutils literal">python/tcslibgs/ping_packet.py</tt>, and its answer comes down
-as the document's parameters, <tt class="docutils literal">/TcsYamcs/ReplyCount</tt>,
-<tt class="docutils literal">/TcsYamcs/ReplySentSeconds</tt> and the rest, which are put together again
-into the answer's text. Yamcs shows both, in its command history and its
-parameters, as the text they are. It starts
+<tt class="docutils literal">/TcsYamcs/Ping</tt>, its text split into the arguments <tt class="docutils literal">Count</tt>, <tt class="docutils literal">SentSeconds</tt>
+and <tt class="docutils literal">SentNanoseconds</tt> by the code tcs-xtce generates from the document,
+<tt class="docutils literal">python/tcslib_protocol/ping_packet.py</tt>, and its answer comes down as the
+document's parameters, <tt class="docutils literal">/TcsYamcs/ReplyCount</tt>, <tt class="docutils literal">/TcsYamcs/ReplySentSeconds</tt>
+and the rest, which are put together again into the answer's text. Yamcs shows
+both, in its command history and its parameters, as the text they are. It starts
 Yamcs on that, and tcspecial on the configuration, each stopped when it
 exits, however it exits -- the kernel is told to kill both if it is killed;
 has Yamcs send CONNECT until the vehicle answers with the configuration's
@@ -3126,7 +3126,7 @@ answers on the same socket, so the configuration's <tt class="docutils literal">
 <tt class="docutils literal">127.0.0.1:0</tt>: commands from any port of this host, each answer going back
 to the port its command came from.</p>
 <p>Starting Yamcs, its REST API, CONNECT and the beacon through Yamcs are
-<tt class="docutils literal">python/tcslib/yamcs_ground.py</tt>'s, which <a class="reference internal" href="#the-thermostat-yamcs-example">The thermostat-yamcs example</a>
+<tt class="docutils literal">python/tcslib_moc/yamcs_ground.py</tt>'s, which <a class="reference internal" href="#the-thermostat-yamcs-example">The thermostat-yamcs example</a>
 shares, as it shares the Yamcs templates beside it.</p>
 </div>
 <div class="section" id="the-thermostat-yamcs-example">
@@ -3253,9 +3253,10 @@ heater.</object>
 <p>The vehicle answers to an F´ flight computer rather than to the ground, so the
 <tt class="docutils literal">tcspecial</tt> section says <tt class="docutils literal">gateway: &quot;fprime&quot;</tt> and the one gateway node,
 <tt class="docutils literal">fsw</tt>, is a <tt class="docutils literal">gateway_fprime</tt>. Its far end is a component of the F´
-deployment, <tt class="docutils literal">TcsBridge</tt>, built on tcslib-c: as far as tcspecial can tell it is
-a ground station, so every link is the radio's, UDP in the radio's protocol,
-and everything in the <tt class="docutils literal">tcspecial</tt> section is written as it is for a radio.</p>
+deployment, <tt class="docutils literal">TcsBridge</tt>, built on tcslib-moc-c: as far as tcspecial can tell
+it is a ground station, so every link is the radio's, UDP in the radio's
+protocol, and everything in the <tt class="docutils literal">tcspecial</tt> section is written as it is for a
+radio.</p>
 <p>What differs is the gateway node. Where a gateway node says where the ground
 station is as <tt class="docutils literal">ground_base</tt>, a <tt class="docutils literal">gateway_fprime</tt> node says where the bridge
 is as <tt class="docutils literal">bridge_base</tt>, counted on the same way: the <tt class="docutils literal">thermometer</tt>, device id
@@ -3285,8 +3286,8 @@ thousands, which no other example uses.</p>
 <div class="section" id="the-f-bridge">
 <h3><a class="toc-backref" href="#toc-entry-46">The F´ bridge</a></h3>
 <p>The bridge itself is in <tt class="docutils literal">fprime/</tt>: <tt class="docutils literal">TcsBridge</tt>, an F´ component built on
-tcslib-c, and <tt class="docutils literal">BridgeTest</tt>, an F´ deployment it is tested in. F´'s own tools
-build them, not cargo, from an F´ checkout (v4.4.1 or later) and a Python
+tcslib-moc-c, and <tt class="docutils literal">BridgeTest</tt>, an F´ deployment it is tested in. F´'s own
+tools build them, not cargo, from an F´ checkout (v4.4.1 or later) and a Python
 environment holding F´'s tools, <tt class="docutils literal"><span class="pre">fprime-util</span></tt> among them:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>fprime-build<span class="whitespace"> </span><span class="name variable">FPRIME_FRAMEWORK</span><span class="operator">=</span><span class="name variable">$HOME</span>/fprime<span class="whitespace"> </span><span class="name variable">FPRIME_VENV</span><span class="operator">=</span><span class="name variable">$HOME</span>/fprime-venv<span class="whitespace">
@@ -3493,7 +3494,7 @@ vehicle and tcsmoc both its peers, so tcsmoc's beacon light, its panels and
 its commands work as they do for a vehicle on the radio. tcsmoc joins as
 processor 3, one more than the larger of <tt class="docutils literal">processor_id</tt> and
 <tt class="docutils literal">peer_processor_id</tt>, and needs nothing more in the file. Everything built
-on tcslib -- the C/C++ library included -- does the same with no change to
+on tcslib-moc -- the C/C++ library included -- does the same with no change to
 the station.</p>
 <p>Two things follow. tcssim simulates the cFS side whenever it runs on a
 configuration that answers to cFS, so it is not run beside a real cFS, which
@@ -3507,7 +3508,7 @@ message IDs above.</p>
 the cFS side's SBN: tcspecial subscribes, the beacon and a reading are
 published, a CONNECT and a node command are answered under their answer IDs,
 a command whose checksum is wrong is not, and a command for <tt class="docutils literal">fsw</tt> reaches
-the heater. <tt class="docutils literal">tcspecial/tests/cfs_ground.rs</tt> commands it from tcslib
+the heater. <tt class="docutils literal">tcspecial/tests/cfs_ground.rs</tt> commands it from tcslib_moc
 through the simulated cFS side. The payloads' ports are in the eighty-six
 hundreds,
 which no other example uses.</p>
@@ -3632,12 +3633,12 @@ and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keep
 in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a class="reference internal" href="#where-the-logs-segments-go">Where the logs' segments
 go</a>).</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt></dt>
-<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs.so.4</tt> and <tt class="docutils literal">lib/libtcs.a</tt>
-with <tt class="docutils literal">include/tcs.h</tt> and <tt class="docutils literal">lib/pkgconfig/tcs.pc</tt>; the Python
-packages <tt class="docutils literal">tcslibgs</tt>, <tt class="docutils literal">tcslib</tt> and <tt class="docutils literal">tcsui</tt> in
-<tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; <tt class="docutils literal">bin/tcsgui</tt> with its descriptions in
-<tt class="docutils literal">share/tcsgui</tt>; and the XTCS, YTCS and simulator schemas in
-<tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
+<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcslib_moc_c.so.4</tt> and
+<tt class="docutils literal">lib/libtcslib_moc_c.a</tt> with <tt class="docutils literal">include/tcslib_moc_c.h</tt> and
+<tt class="docutils literal"><span class="pre">lib/pkgconfig/tcslib-moc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
+<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcsui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>; <tt class="docutils literal">bin/tcsgui</tt>
+with its descriptions in <tt class="docutils literal">share/tcsgui</tt>; and the XTCS, YTCS and simulator
+schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
 <dd><tt class="docutils literal">bin/tcsmoc</tt> and <tt class="docutils literal">bin/tcssim</tt>, which never fly, and <tt class="docutils literal">bin/segsend</tt>,
 the test one, which deletes each segment it is given. It depends on
@@ -3667,16 +3668,16 @@ directory every python3 reads -- which puts the Python on python3's path;
 and <tt class="docutils literal">/usr/lib/systemd/system/tcspecial.service</tt> (see <a class="reference internal" href="#running-tcspecial-under-a-supervisor">Running tcspecial
 under a supervisor</a>).</p>
 <p>Each .deb also carries what Debian expects of every package, outside
-<tt class="docutils literal">/opt/tcs</tt> as the files above are: <tt class="docutils literal"><span class="pre">/usr/share/doc/&lt;package&gt;/copyright</span></tt>,
-in Debian's machine-readable format, and <tt class="docutils literal">changelog.Debian.gz</tt>, both made
-as the package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and
-lintian's overrides, in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The
-ground package also has a trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once
-<tt class="docutils literal">libtcs.so.4</tt> is installed or removed. The RPMs say the same in their own
-<tt class="docutils literal">License</tt>, <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs.so.4</tt> is
-not executable in the .deb, as Debian wants a shared library to be, and is
-in the RPM, where rpm reads what a library provides only from an executable
-file; otherwise the two hold the same files under <tt class="docutils literal">/opt/tcs</tt>.</p>
+<tt class="docutils literal">/opt/tcs</tt> as the files above are: <tt class="docutils literal"><span class="pre">/usr/share/doc/&lt;package&gt;/copyright</span></tt>, in
+Debian's machine-readable format, and <tt class="docutils literal">changelog.Debian.gz</tt>, both made as the
+package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and lintian's overrides,
+in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The ground package also has a
+trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once <tt class="docutils literal">libtcslib_moc_c.so.4</tt> is
+installed or removed. The RPMs say the same in their own <tt class="docutils literal">License</tt>,
+<tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcslib_moc_c.so.4</tt> is not
+executable in the .deb, as Debian wants a shared library to be, and is in the
+RPM, where rpm reads what a library provides only from an executable file;
+otherwise the two hold the same files under <tt class="docutils literal">/opt/tcs</tt>.</p>
 <p><tt class="docutils literal">make <span class="pre">lint-packages</span></tt> checks the packages <tt class="docutils literal">make packages</tt> built with
 lintian and rpmlint, and the shell scripts they run or install with
 shellcheck: the profile.d hooks and the links scripts as the stage has
@@ -3726,13 +3727,12 @@ was copied.</p>
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>ldconfig<span class="whitespace">
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-files<span class="whitespace"> </span><span class="name variable">PREFIX</span><span class="operator">=</span><span class="name variable">$HOME</span>/tcs
 </pre>
-<p>Everything <tt class="docutils literal">make <span class="pre">install-files</span></tt> installs, and so everything in the
-packages, is
-stripped: the programs and <tt class="docutils literal">libtcs.so.4</tt> with <tt class="docutils literal">strip <span class="pre">--strip-unneeded</span></tt>,
-which leaves what they need to be run and linked with, and <tt class="docutils literal">libtcs.a</tt>
-with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a program linked with
-it needs. That takes a fifth to a quarter off what each package installs:
-the flight package installs about 9 MB stripped and 12 MB not.
+<p>Everything <tt class="docutils literal">make <span class="pre">install-files</span></tt> installs, and so everything in the packages,
+is stripped: the programs and <tt class="docutils literal">libtcslib_moc_c.so.4</tt> with <tt class="docutils literal">strip
+<span class="pre">--strip-unneeded</span></tt>, which leaves what they need to be run and linked with, and
+<tt class="docutils literal">libtcslib_moc_c.a</tt> with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a
+program linked with it needs. That takes a fifth to a quarter off what each
+package installs: the flight package installs about 9 MB stripped and 12 MB not.
 <tt class="docutils literal">STRIP=0</tt> keeps everything as cargo built it, for a build that is to be
 debugged:</p>
 <pre class="code console literal-block">
@@ -3772,8 +3772,8 @@ another directory.</p>
 </div>
 <div class="section" id="the-python-alone">
 <h2><a class="toc-backref" href="#toc-entry-55">The Python alone</a></h2>
-<p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcslibgs</tt>, <tt class="docutils literal">tcslib</tt> and <tt class="docutils literal">tcsui</tt> one
-distribution, <tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt>:</p>
+<p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcslib_protocol</tt>, <tt class="docutils literal">tcslib_moc</tt> and
+<tt class="docutils literal">tcsui</tt> one distribution, <tt class="docutils literal"><span class="pre">tcspecial-ground</span></tt>:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./python<span class="whitespace">
 </span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span>
@@ -3803,20 +3803,23 @@ dependencies, and are not installed.</p>
 <h2><a class="toc-backref" href="#toc-entry-57">A C or C++ ground station</a></h2>
 <p>With <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on <tt class="docutils literal">PKG_CONFIG_PATH</tt> -- the ground
 package's profile script puts it there -- a station includes
-<tt class="docutils literal">&lt;tcs.h&gt;</tt> and is built with what <tt class="docutils literal">tcs.pc</tt> says:</p>
+<tt class="docutils literal">&lt;tcslib_moc_c.h&gt;</tt> and is built with what <tt class="docutils literal"><span class="pre">tcslib-moc-c.pc</span></tt> says:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span><span class="whitespace">
-</span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcs<span class="keyword">)</span>
+<span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span>
 </pre>
-<p>That links with <tt class="docutils literal">libtcs.so.4</tt>, which the loader finds through the ground
-package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">1</tt> is libtcs's ABI version, which is
-not the package's: it goes up only when a station built against the old
-<tt class="docutils literal">tcs.h</tt> would not work with the new library, so an upgrade that keeps it
-needs no station rebuilt. See tcslib-c's README. A station linked with <tt class="docutils literal">libtcs.a</tt> instead
-names it and what it needs besides:</p>
+<p>That links with <tt class="docutils literal">libtcslib_moc_c.so.4</tt>, which the loader finds through the
+ground package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">1</tt> is libtcslib_moc_c's ABI
+version, which is not the package's: it goes up only when a station built
+against the old <tt class="docutils literal">tcslib_moc_c.h</tt> would not work with the new library, so an
+upgrade that keeps it needs no station rebuilt. See tcslib-moc-c's README. A
+station linked with <tt class="docutils literal">libtcslib_moc_c.a</tt> instead names it and what it needs
+besides:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cc<span class="whitespace"> </span>station.c<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>tcs<span class="keyword">)</span><span class="whitespace"> </span>/opt/tcs/lib/libtcs.a<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="generic prompt">    $</span><span class="operator">(</span>pkg-config<span class="whitespace"> </span>--static<span class="whitespace"> </span>--libs-only-l<span class="whitespace"> </span>tcs<span class="whitespace"> </span><span class="punctuation">|</span><span class="whitespace"> </span>sed<span class="whitespace"> </span><span class="literal string single">'s/-ltcs//'</span><span class="operator">)</span>
+<span class="generic prompt">$ </span>cc<span class="whitespace"> </span>station.c<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span><span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>/opt/tcs/lib/libtcslib_moc_c.a<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="generic prompt">    $</span><span class="operator">(</span>pkg-config<span class="whitespace"> </span>--static<span class="whitespace"> </span>--libs-only-l<span class="whitespace"> </span>tcslib-moc-c<span class="whitespace"> </span><span class="punctuation">|</span><span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">      </span>sed<span class="whitespace"> </span><span class="literal string single">'s/-ltcslib_moc_c//'</span><span class="operator">)</span>
 </pre>
 </div>
 <div class="section" id="running-tcspecial-under-a-supervisor">
@@ -4115,7 +4118,7 @@ still going back to the port its command came from. Yamcs needs it, sending
 its commands from a port the system chooses.</p>
 <p>A Yamcs ground station needs a container in its mission database for every APID
 the vehicle sends down, a command for every APID it sends up, and a link on
-every port. <tt class="docutils literal">python/tcslibgs/yamcs.py</tt> works all of them out of the
+every port. <tt class="docutils literal">python/tcslib_protocol/yamcs.py</tt> works all of them out of the
 configuration, as <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt> counts the APIDs, so none is written by
 hand and a node added to the configuration is in Yamcs's mission database as
 soon as it is regenerated:</p>
@@ -4147,9 +4150,9 @@ at.</li>
 </ul>
 <p>What does not depend on the configuration -- the header, the beacon's and the
 answers' layouts, which it takes from <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce</span></tt>, and CONNECT --
-is <tt class="docutils literal">python/tcslibgs/yamcs.xtce</tt>, to which the generated parts are added. A
-node whose name XTCE does not allow, or that is a name the mission database
-already has, is refused, naming the node, as is an APID used twice.</p>
+is <tt class="docutils literal">python/tcslib_protocol/yamcs.xtce</tt>, to which the generated parts are
+added. A node whose name XTCE does not allow, or that is a name the mission
+database already has, is refused, naming the node, as is an APID used twice.</p>
 <p>A node type may have an <em>interface document</em>: XTCE that states what a node
 of the type takes from the ground and gives back. The <tt class="docutils literal">ping</tt> type has
 one, <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce/ping.xtce</span></tt>, which lays a ping out field by field --
@@ -4291,14 +4294,14 @@ own, <tt class="docutils literal">&lt;node&gt;_packet</tt>; the types are copied
 <tt class="docutils literal"><span class="pre">tcslib-protocol/xtce/types.xtce</span></tt>. A ground station that reads XTCE is given
 that one file, and adds to it how its gateway frames what it sends: the Yamcs
 ground programs build Yamcs's mission database on it.</p>
-<p>A string or bytes is sent the ground after a count of its bytes. Under
-Yamcs, which decodes what it is sent by XTCE, the count is the 32 bits the
-document states. Everywhere else it is in groups of seven bits, least
-significant first, each in a byte whose top bit says another follows: one
-byte for a datum shorter than 128 bytes, two for the longest. A ground
-program reading through tcslib -- tcsmoc, the C library, the F´ bridge -- is
-given each datum without its count; one reading a link's socket itself
-takes the count off, as <tt class="docutils literal">python/tcslibgs/count.py</tt> does.</p>
+<p>A string or bytes is sent the ground after a count of its bytes. Under Yamcs,
+which decodes what it is sent by XTCE, the count is the 32 bits the document
+states. Everywhere else it is in groups of seven bits, least significant first,
+each in a byte whose top bit says another follows: one byte for a datum shorter
+than 128 bytes, two for the longest. A ground program reading through tcslib-moc
+-- tcsmoc, the C library, the F´ bridge -- is given each datum without its
+count; one reading a link's socket itself takes the count off, as
+<tt class="docutils literal">python/tcslib_protocol/count.py</tt> does.</p>
 <p>Nobody writes it by hand. tcsverify writes it from the configuration, and
 writes the same from either spelling:</p>
 <pre class="code text literal-block">
@@ -4561,10 +4564,10 @@ waiting:</p>
 </span><span class="generic prompt">$ </span>tcssim<span class="whitespace"> </span>--wait<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>x.ytcs
 </pre>
 <p><tt class="docutils literal"><span class="pre">--wait</span></tt> waits thirty seconds, or as many as <tt class="docutils literal"><span class="pre">--wait=&lt;seconds&gt;</span></tt> says, and
-exits with a failure saying what it last heard: nothing, which is a tcssim
-not running or an address that is wrong, or a simulator still starting, or one
-that failed or is set up for another run. A ground station of its own waits
-through <tt class="docutils literal"><span class="pre">tcslib_moc::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib.simulator.wait</tt> in Python.</p>
+exits with a failure saying what it last heard: nothing, which is a tcssim not
+running or an address that is wrong, or a simulator still starting, or one that
+failed or is set up for another run. A ground station of its own waits through
+<tt class="docutils literal"><span class="pre">tcslib_moc::simulator::wait</span></tt>, or <tt class="docutils literal">tcslib_moc.simulator.wait</tt> in Python.</p>
 <p>Each payload starts silent, until its panel's button is pressed, unless the
 simulator file says <tt class="docutils literal">enable: true</tt> of it or of its group, and then it starts
 sending as though the button had been pressed. <tt class="docutils literal">tcssim <span class="pre">--sending</span></tt> starts

@@ -2,7 +2,7 @@
 it writes for Yamcs, how it reads Yamcs's REST API, the beacon through a
 Yamcs played here, and that Yamcs dies with it.
 
-``tcslib.yamcs_ground``, which ping-yamcs and thermostat-yamcs share; their
+``tcslib_moc.yamcs_ground``, which ping-yamcs and thermostat-yamcs share; their
 own tests are beside them.
 """
 
@@ -22,10 +22,10 @@ PYTHON = Path(__file__).resolve().parents[1]
 ROOT = PYTHON.parent
 sys.path.insert(0, str(PYTHON))
 
-from tcslib import yamcs_ground  # noqa: E402
-from tcslib.beacon import Arrived, Schedule  # noqa: E402
-from tcslibgs import configuration  # noqa: E402
-from tcslibgs.beacon import Beacon  # noqa: E402
+from tcslib_moc import yamcs_ground  # noqa: E402
+from tcslib_moc.beacon import Arrived, Schedule  # noqa: E402
+from tcslib_protocol import configuration  # noqa: E402
+from tcslib_protocol.beacon import Beacon  # noqa: E402
 
 
 class WriteYamcsTest(unittest.TestCase):
@@ -181,7 +181,7 @@ class YamcsBeaconsTest(unittest.TestCase):
         """The beacon link through this test's Yamcs, at this test's time.
 
         Returns:
-            The :class:`tcslib.yamcs_ground.YamcsBeacons`.
+            The :class:`tcslib_moc.yamcs_ground.YamcsBeacons`.
         """
         return yamcs_ground.YamcsBeacons(self.yamcs, self.link,
                                        Schedule.for_interval(INTERVAL),
@@ -242,7 +242,7 @@ class YamcsDiesWithThisProgramTest(unittest.TestCase):
                 sys.executable, "-c",
                 "import sys; from pathlib import Path; "
                 f"sys.path.insert(0, {str(PYTHON)!r}); "
-                "from tcslib.yamcs_ground import Yamcs; "
+                "from tcslib_moc.yamcs_ground import Yamcs; "
                 f"Yamcs({str(home)!r}, Path({str(home)!r}), {port}, "
                 "'ping').start()"])
             try:

@@ -33,24 +33,24 @@ the editor is the one the vehicle would have refused the file with.
   which never changes, and every other command in `xtce/link.xtce`. The
   code that packs and unpacks them, `src/fixed_packet.rs` and
   `src/link_packet.rs`, is generated from those files, and the Python
-  `../python/tcslibgs/fixed_packet.py` from `fixed.xtce`: run `make
+  `../python/tcslib_protocol/fixed_packet.py` from `fixed.xtce`: run `make
   link-packet` here after changing `link.xtce`, and `make interface-digest`.
   A test pins `fixed.xtce`'s digest, and fails, saying it must never change,
   if it does.
 - `beacon`: the beacon, a line of text with six fields between colons,
-  `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that
-  a person can read it in a capture or a log with no decoder. Its layout is
-  in `xtce/beacon.xtce`, as text fields, packed and unpacked by the code
-  generated from it, `src/beacon_packet.rs` and
-  `../python/tcslibgs/beacon_packet.py` (`make beacon-packet`), and a test
-  pins its digest as it does `fixed.xtce`'s; what each field says is checked here and
-  in `../python/tcslibgs/beacon.py`, held to each other by the same examples
-  in their tests.
+  `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that a
+  person can read it in a capture or a log with no decoder. Its layout is in
+  `xtce/beacon.xtce`, as text fields, packed and unpacked by the code generated
+  from it, `src/beacon_packet.rs` and
+  `../python/tcslib_protocol/beacon_packet.py` (`make beacon-packet`), and a
+  test pins its digest as it does `fixed.xtce`'s; what each field says is
+  checked here and in `../python/tcslib_protocol/beacon.py`, held to each other
+  by the same examples in their tests.
 - `node::vehicle::ping`: what a ping and its answer say. The ping node's
   interface document, `xtce/ping.xtce`, states the same field by field for
   the ground stations that read XTCE; its tests pack and unpack pings with
   the code generated from it, `src/ping_packet.rs` and
-  `../python/tcslibgs/ping_packet.py` (`make ping-packet`), and hold the
+  `../python/tcslib_protocol/ping_packet.py` (`make ping-packet`), and hold the
   bytes to this module's. It is no part of the interface.
 - `interface`: the digest of `xtce/link.xtce`, which every beacon carries,
   and which every configuration names as its `tcspecial` section's
@@ -104,7 +104,7 @@ cargo doc -p tcslib-protocol --open
 ## See also
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html).
-- [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), what a ground station is built on, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), the same for C and C++.
+- [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), what a ground station is built on, and [tcslib-moc-c](https://vomlehn.github.io/tcspecial/tcslib-moc-c/README.html), the same for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

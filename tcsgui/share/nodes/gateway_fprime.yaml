@@ -1,5 +1,5 @@
-# A link to an F´ flight computer, which the vehicle answers to in place of
-# the ground: a TcsBridge component in the F´ deployment, built on tcslib-c,
+# A link to an F´ flight computer, which the vehicle answers to in place of the
+# ground: a TcsBridge component in the F´ deployment, built on tcslib-moc-c,
 # plays the ground station's part and passes what arrives on as F´ telemetry.
 #
 # The radio's own protocol, so it is opened, counted and driven as a

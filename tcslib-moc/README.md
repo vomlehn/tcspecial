@@ -84,7 +84,7 @@ cargo doc -p tcslib-moc --open
 ## See also
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html).
-- [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html), what the ground and the vehicle share, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), this library for C and C++.
+- [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html), what the ground and the vehicle share, and [tcslib-moc-c](https://vomlehn.github.io/tcspecial/tcslib-moc-c/README.html), this library for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

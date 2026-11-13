@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslibgs import cfs, sbn  # noqa: E402
+from tcslib_protocol import cfs, sbn  # noqa: E402
 
 HASH = "3b339a5e0f686cef822a5d6ea95004222ab7af33"
 

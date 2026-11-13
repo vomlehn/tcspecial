@@ -3,11 +3,11 @@
 The Python spelling of ``tcslib-moc/src/ping.rs``, which is what tcsmoc pings a
 ``ping`` node with: the same rules for what is kept and the same three times,
 shown the same way. Here between the two halves it borrows: the ping format
-(``python/tcslibgs/ping.py``, after ``tcslibgs``) and the configuration
-(``python/tcslibgs/configuration.py``). A :class:`Pinger`
+(``python/tcslib_protocol/ping.py``, after ``tcslib_protocol``) and the
+configuration (``python/tcslib_protocol/configuration.py``). A :class:`Pinger`
 sends each ping up to the ``gateway`` node, takes each answer the ``ping`` node
-sends back down, and keeps what a window shows: the last ping sent and when,
-the last answer received and when, and the three times between them.
+sends back down, and keeps what a window shows: the last ping sent and when, the
+last answer received and when, and the three times between them.
 
 Apart from the window, as the beacon's facts are apart from its panel, so
 that a test -- or a ground station with no screen -- has all of it.
@@ -50,8 +50,8 @@ import socket
 import time
 from dataclasses import dataclass
 
-from tcslib.beacon import NO_BEACON_MESSAGE
-from tcslibgs import count, ping
+from tcslib_moc.beacon import NO_BEACON_MESSAGE
+from tcslib_protocol import count, ping
 
 NANOS = 1_000_000_000
 

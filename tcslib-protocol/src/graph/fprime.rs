@@ -141,16 +141,16 @@ pub const OWN_CHANNELS: &[Own] = &[
 pub enum Form {
     /// The bytes, as a `Datum`: the length and the first of them.
     Datum,
-    /// A value, as an `F64` in its unit, which tcslib-c's `tcs_value_in`
+    /// A value, as an `F64` in its unit, which tcslib-moc-c's `tcs_value_in`
     /// reads.
     Value(Unit),
-    /// A decision, as a `bool`, true for on, which tcslib-c's
+    /// A decision, as a `bool`, true for on, which tcslib-moc-c's
     /// `tcs_decision_on` reads: a source that states it sends a `boolean`.
     Decision,
     /// A whole number of this type, which a source states it sends: a
     /// sensor's reading, a set of GPIO lines, a thermostat's decision sent
     /// as what a switch takes. F´'s channel for it is of that type, `U8`
-    /// to `I64`, read by tcslib-c's `tcs_unsigned_in` or `tcs_signed_in`.
+    /// to `I64`, read by tcslib-moc-c's `tcs_unsigned_in` or `tcs_signed_in`.
     Whole(Basic),
 }
 

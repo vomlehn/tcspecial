@@ -8,10 +8,10 @@ tcsmoc Design
 
 How tcsmoc, the simulated operations center, works and why.
 
-The tcsmoc is a GUI program used to control simulated payloads
-interacting with tcspecial using
-the tcslib library over a datagram connection to tcspecial.  For testing
-purposes, tcsmoc uses tcslib, along with simulated payloads, to support a simple GUI.
+The tcsmoc is a GUI program used to control simulated payloads interacting with
+tcspecial using the tcslib-moc library over a datagram connection to tcspecial.
+For testing purposes, tcsmoc uses tcslib-moc, along with simulated payloads, to
+support a simple GUI.
 
 Tcsmoc gets the payload definition from a file named on its command line, and
 reads the shipped fixture when the command line names none. It takes an argument

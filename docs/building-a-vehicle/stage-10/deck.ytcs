@@ -25,7 +25,7 @@ tcspecial:
   # The vehicle answers to an F´ flight computer. Its links are still the
   # radio's, UDP in the radio's protocol, because the far end of each is the F´
   # deployment's TcsBridge component, which is a ground station built on
-  # tcslib-c as far as tcspecial can tell.
+  # tcslib-moc-c as far as tcspecial can tell.
   gateway: "fprime"
   interface: "c7820f9bfe585feab72247ece0a2261d"
   log:

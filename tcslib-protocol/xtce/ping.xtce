@@ -7,15 +7,16 @@
      answers of the link are in fixed.xtce and link.xtce, and the beacon in
      beacon.xtce. What a ping and its answer say is
      tcslib-protocol/src/node/vehicle/ping/mod.rs's and
-     python/tcslibgs/ping.py's, which write and read them; this states the same
-     layout in XTCE, so that a ground station that reads XTCE (Yamcs, through
-     python/tcslibgs/yamcs.py) can send a ping and show its answer as the text
-     they are. A test in tcslib-protocol/src/node/vehicle/ping/mod.rs packs and
-     unpacks pings and answers with the code tcs-xtce generates from this,
+     python/tcslib_protocol/ping.py's, which write and read them; this states
+     the same layout in XTCE, so that a ground station that reads XTCE (Yamcs,
+     through python/tcslib_protocol/yamcs.py) can send a ping and show its
+     answer as the text they are. A test in
+     tcslib-protocol/src/node/vehicle/ping/mod.rs packs and unpacks pings and
+     answers with the code tcs-xtce generates from this,
      tcslib-protocol/src/ping_packet.rs, and holds the bytes to those the Rust
      writes; python/tests/test_ping.py does the same with
-     python/tcslibgs/ping_packet.py. `make ping-packet` in tcslib-protocol/
-     generates both.
+     python/tcslib_protocol/ping_packet.py. `make ping-packet` in
+     tcslib-protocol/ generates both.
 
      A ping is text, and only text:
 

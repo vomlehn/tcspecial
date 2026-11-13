@@ -1,9 +1,9 @@
 """A station's peer of a cFS software bus, against a far end played here.
 
-The test is the simulated cFS end -- a UDP socket speaking SBN's wire
-format, as ``tcslibgs.sbn`` and ``tcslibgs.cfs`` state it -- with the
-vehicle behind it: it answers the station's announcement, takes its
-subscriptions, publishes a beacon and answers a CONNECT, as
+The test is the simulated cFS end -- a UDP socket speaking SBN's wire format, as
+``tcslib_protocol.sbn`` and ``tcslib_protocol.cfs`` state it -- with the vehicle
+behind it: it answers the station's announcement, takes its subscriptions,
+publishes a beacon and answers a CONNECT, as
 ``tcslib-moc/src/bus.rs``'s tests play the peers of the Rust.
 """
 
@@ -17,12 +17,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib import beacon, bus  # noqa: E402
-from tcslib.beacon import Arrived, Schedule  # noqa: E402
-from tcslib.bus import Liveness  # noqa: E402
-from tcslib.listening import Listening, command_link_of  # noqa: E402
-from tcslibgs import cfs, configuration, fixed_packet, sbn  # noqa: E402
-from tcslibgs.beacon import Beacon  # noqa: E402
+from tcslib_moc import beacon, bus  # noqa: E402
+from tcslib_moc.beacon import Arrived, Schedule  # noqa: E402
+from tcslib_moc.bus import Liveness  # noqa: E402
+from tcslib_moc.listening import Listening, command_link_of  # noqa: E402
+from tcslib_protocol import cfs, configuration, fixed_packet, sbn  # noqa: E402
+from tcslib_protocol.beacon import Beacon  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 HASH = "3b339a5e0f686cef822a5d6ea95004222ab7af33"

@@ -2,15 +2,14 @@
 # examples and the libraries' READMEs -- as the GitHub Pages site,
 # https://vomlehn.github.io/tcspecial/, on every push to main.
 #
-# GitHub's own Pages build, which this replaces, stops at a symbolic link
-# that leads outside the repository, and python/tcslibgs/_xtce holds four:
-# they reach the Python runtime in the tcs-xtce checkout beside this one,
-# so that its code is stated once (see python/README.md). On GitHub there
-# is no checkout beside, so the links lead nowhere and every build since
-# they were added failed. Here they are left out of what is published,
-# which has no use for them, and everything else is published as it is
-# committed: nothing is built, so the site is exactly the HTML that
-# `make html-check` holds current.
+# GitHub's own Pages build, which this replaces, stops at a symbolic link that
+# leads outside the repository, and python/tcslib_protocol/_xtce holds four:
+# they reach the Python runtime in the tcs-xtce checkout beside this one, so
+# that its code is stated once (see python/README.md). On GitHub there is no
+# checkout beside, so the links lead nowhere and every build since they were
+# added failed. Here they are left out of what is published, which has no use
+# for them, and everything else is published as it is committed: nothing is
+# built, so the site is exactly the HTML that `make html-check` holds current.
 
 name: Pages
 

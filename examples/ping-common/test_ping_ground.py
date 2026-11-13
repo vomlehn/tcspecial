@@ -18,8 +18,8 @@ sys.path.insert(0, str(HERE.parents[1] / "python"))
 sys.path.insert(0, str(HERE))
 
 from ping_ground import Pinger, interval, precise_time, report  # noqa: E402
-from tcslibgs import count, ping  # noqa: E402
-from tcslibgs.configuration import HostPort  # noqa: E402
+from tcslib_protocol import count, ping  # noqa: E402
+from tcslib_protocol.configuration import HostPort  # noqa: E402
 
 SECOND = 1_000_000_000
 AT = 1_760_900_000 * SECOND

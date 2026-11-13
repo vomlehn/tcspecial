@@ -1,10 +1,10 @@
 # TcsBridge: tcspecial's commander, inside an F´ deployment.
 #
-# To tcspecial the bridge is a ground station: it opens the configuration
-# the vehicle flies, sends CONNECT and compares checksums, takes beacons,
-# sends commands and data and receives data, all over the radio's UDP
-# protocol, through tcslib-c's tcs.h. To the rest of the deployment it is a component
-# like any other: commands in, events and telemetry channels out.
+# To tcspecial the bridge is a ground station: it opens the configuration the
+# vehicle flies, sends CONNECT and compares checksums, takes beacons, sends
+# commands and data and receives data, all over the radio's UDP protocol,
+# through tcslib-moc-c's tcslib_moc_c.h. To the rest of the deployment it is a
+# component like any other: commands in, events and telemetry channels out.
 #
 # Which channels it has, and their IDs, are the configuration's: the model
 # included at the end is written from it by
@@ -110,7 +110,7 @@ module Tcs {
 
     @ The configuration could not be opened, so the bridge does nothing
     event OpenFailed(
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning high id 0 \
       format "The bridge does nothing: {}"
 
@@ -133,7 +133,7 @@ module Tcs {
 
     @ The beacon watch failed, and is tried again
     event BeaconsFailed(
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 3 \
       format "Beacons: {}" \
       throttle 10
@@ -158,7 +158,7 @@ module Tcs {
 
     @ A CONNECT could not be sent or was not answered
     event ConnectFailed(
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 6 \
       format "CONNECT: {}" \
       throttle 10
@@ -170,7 +170,7 @@ module Tcs {
     @ A command was not sent, or not answered
     event CommandFailed(
       cmd: string size 16 @< The command
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 8 \
       format "{}: {}"
 
@@ -218,7 +218,7 @@ module Tcs {
     @ one: it went to no channel, and is counted in DataNotValues
     event NotAValue(
       source: string size NODE_NAME_BYTES @< The node that sent it
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 16 \
       format "{} sent a datum that is not a value: {}" \
       throttle 10
@@ -227,7 +227,7 @@ module Tcs {
     @ not one: it went to no channel, and is counted in DataNotDecisions
     event NotADecision(
       source: string size NODE_NAME_BYTES @< The node that sent it
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 19 \
       format "{} sent a datum that is not a decision: {}" \
       throttle 10
@@ -237,7 +237,7 @@ module Tcs {
     @ in DataNotWholes
     event NotAWhole(
       source: string size NODE_NAME_BYTES @< The node that sent it
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 20 \
       format "{} sent a datum that is not a whole number of its type: {}" \
       throttle 10
@@ -257,7 +257,7 @@ module Tcs {
 
     @ Taking data failed
     event ReceiveFailed(
-      why: string size 256 @< What tcslib-c said
+      why: string size 256 @< What tcslib-moc-c said
     ) severity warning low id 14 \
       format "Data: {}" \
       throttle 10

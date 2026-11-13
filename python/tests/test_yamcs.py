@@ -5,7 +5,7 @@ The Python mirrors of ``tcslib_protocol::gateway::GatewayKind::Yamcs``'s base
 attribute, of ``tcslib_protocol::graph::telemetry::apids``, and of
 ``tcslib_protocol::types::came_from`` and ``sender_of``: the two languages must
 agree about which datagrams are the ground's, and what each carries. And
-the Yamcs mission database ``tcslibgs.yamcs`` generates from those APIDs.
+the Yamcs mission database ``tcslib_protocol.yamcs`` generates from those APIDs.
 """
 
 import os
@@ -19,10 +19,10 @@ from xml.etree import ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslibgs import configuration, interface  # noqa: E402
+from tcslib_protocol import configuration, interface  # noqa: E402
 from tests import loaded  # noqa: E402
-from tcslibgs import yamcs as generated  # noqa: E402
-from tcslibgs.configuration import HostPort, came_from  # noqa: E402
+from tcslib_protocol import yamcs as generated  # noqa: E402
+from tcslib_protocol.configuration import HostPort, came_from  # noqa: E402
 
 
 class SenderAtAnyPortTest(unittest.TestCase):

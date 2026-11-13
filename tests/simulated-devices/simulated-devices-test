@@ -5,9 +5,9 @@ payload tcssim simulates, and checks that each one's data reaches the ground.
     simulated-devices-test <tree> <run directory>
 
 <tree> is the tcspecial tree, whose target/debug holds tcssim, tcspecial and
-tcsverify, and whose python/ holds tcslibgs; <run directory> is where what
-the run leaves is kept, emptied first. `make simulated-devices-test` runs this
-with the right arguments.
+tcsverify, and whose python/ holds tcslib_protocol; <run directory> is where
+what the run leaves is kept, emptied first. `make simulated-devices-test` runs
+this with the right arguments.
 
 One configuration with a payload of each type, written into the run
 directory, since a simulated device's path is there: a device file, a serial
@@ -266,11 +266,11 @@ def stop(process):
         return None
 
 
-def connect(tcslibgs, digest):
+def connect(tcslib_protocol, digest):
     """Sends CONNECT until tcspecial answers it, as a ground station does.
 
     Args:
-        tcslibgs: The ground's library, for the command's layout.
+        tcslib_protocol: The ground's library, for the command's layout.
         digest:   The configuration's checksum, as tcsverify prints it.
 
     Returns:
@@ -282,7 +282,7 @@ def connect(tcslibgs, digest):
         deadline = time.monotonic() + PATIENCE
         sequence = 1
         while time.monotonic() < deadline:
-            link.sendto(tcslibgs.fixed.connect(sequence,
+            link.sendto(tcslib_protocol.fixed.connect(sequence,
                                                bytes.fromhex(digest)),
                         ("127.0.0.1", TCS_CMD_RECV))
             try:
@@ -336,7 +336,7 @@ def judged(made, got, lorem):
     Returns:
         A list of (name, passed, what was seen).
     """
-    from tcslibgs import count  # the tree's own, as main() finds it
+    from tcslib_protocol import count  # the tree's own, as main() finds it
 
     verdicts = []
     for name, kind, _ in made:
@@ -385,7 +385,7 @@ def main():
     run = os.path.abspath(sys.argv[2])
     debug = os.path.join(top, "target", "debug")
     sys.path.insert(0, os.path.join(top, "python"))
-    import tcslibgs.fixed  # the tree's own, found above
+    import tcslib_protocol.fixed  # the tree's own, found above
 
     subprocess.run(["rm", "-rf", run], check=True)
     os.makedirs(os.path.join(run, "log"))
@@ -415,7 +415,7 @@ def main():
                                configuration], capture_output=True,
                               text=True, check=True).stdout
         digest = said.rsplit("md5 ", 1)[1].split()[0]
-        if not connect(tcslibgs, digest):
+        if not connect(tcslib_protocol, digest):
             print(f"tcspecial did not answer CONNECT: see "
                   f"{run}/tcspecial.log")
             return 1

@@ -1,7 +1,7 @@
 /*
  * TcsBridge.hpp -- tcspecial's commander, inside an F´ deployment.
  *
- * To tcspecial the bridge is a ground station built on tcslib-c: it opens
+ * To tcspecial the bridge is a ground station built on tcslib-moc-c: it opens
  * the configuration the vehicle flies, takes its beacons, sends CONNECT
  * until the two agree, sends the commands and the data F´ gives it and
  * takes the data the vehicle sends down. To F´ it is an active component: commands in,
@@ -10,7 +10,8 @@
  * Nothing is allocated once the deployment is running. Every handle is
  * made, and every buffer is a member, when configure() is called as the
  * topology is set up; a datum is taken into a member and a channel written
- * from it. What tcslib-c does inside tcs.h's calls is what tcs.h says of
+ * from it. What tcslib-moc-c does inside tcslib_moc_c.h's calls is what
+   tcslib_moc_c.h says of
  * them.
  */
 
@@ -27,7 +28,7 @@
 #include "Tcs/TcsBridge/DatumSerializableAc.hpp"
 #include "Tcs/TcsBridge/FppConstantsAc.hpp"
 #include "Tcs/TcsBridge/TcsBridgeComponentAc.hpp"
-#include "tcs.h"
+#include "tcslib_moc_c.h"
 
 namespace Tcs {
 
@@ -128,7 +129,7 @@ private:
 	 *               datum. */
 	const Datum &asDatum(const tcs_datum &datum);
 
-	/** Reads a datum as a value in its unit, as tcslib-c reads one,
+	/** Reads a datum as a value in its unit, as tcslib-moc-c reads one,
 	 * counting and saying it where it is not one.
 	 *
 	 * @param datum  The datum.
@@ -137,7 +138,7 @@ private:
 	 * @return       true where it was a value. */
 	bool asValue(const tcs_datum &datum, const char *unit, F64 &value);
 
-	/** Reads a datum as a decision, on or off, as tcslib-c reads one,
+	/** Reads a datum as a decision, on or off, as tcslib-moc-c reads one,
 	 * counting and saying it where it is not one.
 	 *
 	 * @param datum  The datum.
@@ -146,7 +147,7 @@ private:
 	bool asDecision(const tcs_datum &datum, bool &on);
 
 	/** Reads a datum as an unsigned whole number of its type's width, as
-	 * tcslib-c reads one, counting and saying it where it is not one.
+	 * tcslib-moc-c reads one, counting and saying it where it is not one.
 	 *
 	 * @param datum  The datum.
 	 * @param width  How many bytes the number is: 1, 2, 4 or 8.
@@ -155,7 +156,7 @@ private:
 	bool asUnsigned(const tcs_datum &datum, size_t width, U64 &value);
 
 	/** Reads a datum as a signed whole number of its type's width, as
-	 * tcslib-c reads one, counting and saying it where it is not one.
+	 * tcslib-moc-c reads one, counting and saying it where it is not one.
 	 *
 	 * @param datum  The datum.
 	 * @param width  How many bytes the number is: 1, 2, 4 or 8.
@@ -234,9 +235,9 @@ private:
 	bool found(const char *command, FwOpcodeType opCode, U32 cmdSeq,
 		   const Fw::CmdStringArg &node, U32 &id);
 
-	// The handles, made by configure(). The configuration is read from
-	// both threads, as tcs.h allows; the beacon watch only from its own,
-	// its waker from stop(), and the rest only from the component's.
+	// The handles, made by configure(). The configuration is read from both
+	// threads, as tcslib_moc_c.h allows; the beacon watch only from its
+	// own, its waker from stop(), and the rest only from the component's.
 	tcs_configuration *m_configuration;
 	tcs_beacons *m_beacons;
 	tcs_beacons_waker *m_waker;

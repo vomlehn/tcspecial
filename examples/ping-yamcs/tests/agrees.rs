@@ -102,7 +102,7 @@ fn python_payload_telemetry(path: &Path) -> Vec<String> {
     let python = here().join("../../python");
     let script = "import sys\n\
         sys.path.insert(0, sys.argv[1])\n\
-        from tcslibgs import configuration\n\
+        from tcslib_protocol import configuration\n\
         said = configuration.load(sys.argv[2])\n\
         for name in said.untouched_payloads():\n\
         \x20   vehicle, ground = said.payload_telemetry_link(name)\n\
@@ -345,7 +345,7 @@ fn rust_apids(path: &Path) -> BTreeSet<(String, u16)> {
     expected
 }
 
-/// The wrapper `tcslibgs/yamcs.py` generates holds exactly the APIDs the
+/// The wrapper `tcslib_protocol/yamcs.py` generates holds exactly the APIDs the
 /// Rust counts, each in the container or command named for it: for the
 /// example, and for a copy with a payload more drawn into the gateway node
 /// and two payloads nothing touches, whose containers no hand wrote.

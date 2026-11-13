@@ -3,12 +3,12 @@ runs them under cargo test."""
 
 import unittest
 
-from tcslibgs import configuration
+from tcslib_protocol import configuration
 
 
 def loaded(path):
     """Loads a configuration a test has written, with its own XTCE written
-    beside it first, by :func:`tcslibgs.configuration.write_own_xtce`, as
+    beside it first, by :func:`tcslib_protocol.configuration.write_own_xtce`, as
     ``make xtce`` writes a shipped one's: a ground station reads what each
     node sends from there.
 
@@ -19,7 +19,7 @@ def loaded(path):
         path: The configuration's file.
 
     Returns:
-        The :class:`tcslibgs.configuration.Configuration`.
+        The :class:`tcslib_protocol.configuration.Configuration`.
 
     Raises:
         unittest.SkipTest: tcsverify is not built.

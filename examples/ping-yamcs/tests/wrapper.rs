@@ -1,14 +1,14 @@
 //! The Yamcs wrapper reads what the vehicle frames, and frames what the
 //! vehicle reads.
 //!
-//! The mission database's wrapper, which `tcslibgs/yamcs.py` generates from the
-//! configuration and `python/tcslibgs/yamcs.xtce`, tells Yamcs how a packet on
-//! the link is laid out: a CCSDS primary header, and after it, by APID, what
-//! follows. The vehicle frames and unframes with `tcslib_protocol::ccsds`.
-//! Nothing but a run against Yamcs itself would show the two disagreeing -- a
-//! header width, a length off by one, a restriction on the wrong APID -- so
-//! this generates the wrapper, as `ping_yamcs.py` does, and works it as Yamcs
-//! would on the vehicle's own packets:
+//! The mission database's wrapper, which `tcslib_protocol/yamcs.py` generates
+//! from the configuration and `python/tcslib_protocol/yamcs.xtce`, tells Yamcs
+//! how a packet on the link is laid out: a CCSDS primary header, and after it,
+//! by APID, what follows. The vehicle frames and unframes with
+//! `tcslib_protocol::ccsds`. Nothing but a run against Yamcs itself would show
+//! the two disagreeing -- a header width, a length off by one, a restriction on
+//! the wrong APID -- so this generates the wrapper, as `ping_yamcs.py` does,
+//! and works it as Yamcs would on the vehicle's own packets:
 //!
 //! * each packet the vehicle sends down -- a beacon, a ping's answer,
 //!   CONNECT's answer and another command's, and in a copy of the example
@@ -44,7 +44,7 @@ use yamcs_common::{
     counted, decode, encode, framed, generated_mdb, Element, Given,
 };
 
-/// The wrapper `tcslibgs/yamcs.py` generates for the example's
+/// The wrapper `tcslib_protocol/yamcs.py` generates for the example's
 /// configuration, as `ping_yamcs.py` writes it for Yamcs.
 ///
 /// # Returns

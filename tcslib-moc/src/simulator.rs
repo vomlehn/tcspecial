@@ -4,7 +4,7 @@
 //! The one way every harness waits -- tcsmoc, `tcssim --wait`, and a test --
 //! so that there is one statement of what the exchange is and of what each
 //! answer means. The messages are `tcslib_protocol::ready`; the Python ground
-//! station's library has the same function as `tcslib.simulator.wait`.
+//! station's library has the same function as `tcslib_moc.simulator.wait`.
 
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};

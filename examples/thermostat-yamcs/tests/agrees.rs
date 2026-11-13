@@ -5,12 +5,12 @@
 //! Yamcs's configuration from what it reads -- where Yamcs sends commands,
 //! where it listens for each source's data and the beacon, the APIDs that tell
 //! them apart -- and its mission database gives each source's parameter the
-//! type the configuration's own XTCE says its data are, by `tcslibgs/form.py`.
-//! A port, an APID or a form the two sides work out differently is a Yamcs that
-//! listens where nothing arrives, or reads a temperature as something else. So
-//! this holds the Python's answers for `thermostat-yamcs.xtcs` to the Rust's
-//! for `thermostat-yamcs.ytcs`, and the Python's form of every node of every
-//! example, read from its own XTCE, to
+//! type the configuration's own XTCE says its data are, by
+//! `tcslib_protocol/form.py`. A port, an APID or a form the two sides work out
+//! differently is a Yamcs that listens where nothing arrives, or reads a
+//! temperature as something else. So this holds the Python's answers for
+//! `thermostat-yamcs.xtcs` to the Rust's for `thermostat-yamcs.ytcs`, and the
+//! Python's form of every node of every example, read from its own XTCE, to
 //! `tcslib_protocol::graph::fprime::Form::of`, which tcsmoc's plot window and
 //! the F´ bridge go by, so that the two cannot drift.
 
@@ -68,7 +68,7 @@ fn described() -> Vec<(String, String)> {
 }
 
 /// The address to reach a socket at from this host, as the Python's
-/// `tcslibgs.yamcs.local` gives it.
+/// `tcslib_protocol.yamcs.local` gives it.
 ///
 /// # Arguments
 ///
@@ -235,11 +235,11 @@ fn every_example() -> Vec<(PathBuf, PathBuf)> {
 ///
 /// # Returns
 ///
-/// One line per node: its name and its form, as `tcslibgs/form.py` writes
-/// it, sorted.
+/// One line per node: its name and its form, as `tcslib_protocol/form.py`
+/// writes it, sorted.
 fn python_forms(path: &Path) -> Vec<String> {
     let said = yamcs_common::python(
-        "from tcslibgs import configuration, form\n\
+        "from tcslib_protocol import configuration, form\n\
          said = configuration.load(sys.argv[1])\n\
          for node in said.nodes:\n\
          \x20   print(node.name, form.form_of(said, node.name))\n",
@@ -281,7 +281,7 @@ fn every_nodes_form_is_the_rusts() {
     }
     assert!(values > 10, "too few values to say anything: {values}");
     let said = yamcs_common::python(
-        "from tcslibgs import configuration, form\n\
+        "from tcslib_protocol import configuration, form\n\
          said = configuration.load(sys.argv[1])\n\
          print(form.form_of(said, 'nobody'))\n",
         &[],
@@ -295,7 +295,7 @@ fn every_nodes_form_is_the_rusts() {
 #[test]
 fn the_units_are_the_rusts() {
     let said = yamcs_common::python(
-        "from tcslibgs import form\n\
+        "from tcslib_protocol import form\n\
          for unit in form.UNITS:\n\
          \x20   print(unit.variant, unit.symbol, unit.per_unit, unit.name,\n\
          \x20         sep='|')\n",

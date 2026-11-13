@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="940" height="720" viewBox="0 0 940 720" role="img" aria-labelledby="title desc">
+  <title id="title">The whole deck, its subsystems opened</title>
+  <desc id="desc">The deck of stages 9 and 10 with both included files drawn open. Payloads are on the left, computations in the middle, and the gateway node on the right, tall, with every reading for the ground arriving at it. In the science box: the seismometer sends to the gateway and to science_log; regolith_thermometer sends to regolith_kelvin, which sends to the gateway, to science_log and to probe_thermostat; probe_thermostat's decision goes back, dashed, to probe_heater, which reports to the gateway. A dotted line from the gateway to probe_thermostat is the command binding that lets the ground set its setpoint. In the thermal box: three hull_temp sensors each feed a hull_kelvin conversion, each conversion sends to the gateway and to hull_temp, a vote, which sends to the gateway. Below both, the camera, an app node running camera.py, sends to the gateway.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 13px; font-weight: bold; }
+      .kind { font-size: 11px; fill: #4b5563; }
+      .sub { font-size: 13px; font-weight: bold; fill: #475569; }
+      .label { font-size: 13px; fill: #1f2937; }
+      .small { font-size: 12px; fill: #4b5563; }
+      rect.sub { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.5; stroke-dasharray: 4 3; }
+      rect.node { fill: #ffffff; stroke: #374151; stroke-width: 1.5; }
+      rect.gw { fill: #f3f4f6; stroke-width: 2; }
+      .world { stroke: #0072B2; stroke-width: 2; fill: none; }
+      .moc { stroke: #D55E00; stroke-width: 2.5; fill: none; stroke-dasharray: 9 6; }
+      .bind { stroke: #CC79A7; stroke-width: 2.5; fill: none; stroke-dasharray: 2 4; stroke-linecap: round; }
+    </style>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0072B2"/>
+    </marker>
+    <marker id="vermillion" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#D55E00"/>
+    </marker>
+    <marker id="purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#CC79A7"/>
+    </marker>
+  </defs>
+  <rect width="940" height="720" fill="#ffffff"/>
+  <rect class="sub" x="20" y="30" width="710" height="310" rx="10"/>
+  <text class="sub" x="30" y="52" text-anchor="start">science -- common/science-logged</text>
+  <rect class="sub" x="20" y="360" width="710" height="250" rx="10"/>
+  <text class="sub" x="30" y="382" text-anchor="start">thermal -- common/thermal</text>
+  <rect class="node" x="40" y="70" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="87" text-anchor="middle">seismometer</text>
+  <text class="kind" x="125.0" y="102" text-anchor="middle">network</text>
+  <rect class="node" x="40" y="150" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="167" text-anchor="middle">regolith_thermometer</text>
+  <text class="kind" x="125.0" y="182" text-anchor="middle">serial</text>
+  <rect class="node" x="290" y="150" width="170" height="40" rx="6"/>
+  <text class="name" x="375.0" y="167" text-anchor="middle">regolith_kelvin</text>
+  <text class="kind" x="375.0" y="182" text-anchor="middle">compute: to_kelvin</text>
+  <rect class="node" x="540" y="105" width="170" height="40" rx="6"/>
+  <text class="name" x="625.0" y="122" text-anchor="middle">science_log</text>
+  <text class="kind" x="625.0" y="137" text-anchor="middle">log</text>
+  <rect class="node" x="540" y="215" width="170" height="40" rx="6"/>
+  <text class="name" x="625.0" y="232" text-anchor="middle">probe_thermostat</text>
+  <text class="kind" x="625.0" y="247" text-anchor="middle">compute: thermostat</text>
+  <rect class="node" x="40" y="260" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="277" text-anchor="middle">probe_heater</text>
+  <text class="kind" x="125.0" y="292" text-anchor="middle">gpio_inout</text>
+  <path class="world" d="M210,90 L798,90" marker-end="url(#blue)"/>
+  <circle cx="500" cy="90" r="4" fill="#0072B2"/>
+  <path class="world" d="M500,90 L500,118 L538,118" marker-end="url(#blue)"/>
+  <path class="world" d="M210,170 L288,170" marker-end="url(#blue)"/>
+  <path class="world" d="M440,170 L460,170"/>
+  <path class="world" d="M460,170 L798,170" marker-end="url(#blue)"/>
+  <circle cx="470" cy="170" r="4" fill="#0072B2"/>
+  <path class="world" d="M470,170 L470,132 L538,132" marker-end="url(#blue)"/>
+  <path class="world" d="M470,170 L470,235 L538,235" marker-end="url(#blue)"/>
+  <path class="world" d="M210,280 L798,280" marker-end="url(#blue)"/>
+  <path class="moc" d="M640,255 L640,318 L190,318 L190,304" marker-end="url(#vermillion)"/>
+  <text class="small" x="415" y="334" text-anchor="middle">the thermostat's decision, moc-out to moc-in</text>
+  <path class="bind" d="M800,226 L712,226" marker-end="url(#purple)"/>
+  <text class="small" x="756" y="216" text-anchor="middle">sets setpoint</text>
+  <rect class="node" x="40" y="400" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="417" text-anchor="middle">hull_temp_1</text>
+  <text class="kind" x="125.0" y="432" text-anchor="middle">i2c_tmass</text>
+  <rect class="node" x="290" y="400" width="170" height="40" rx="6"/>
+  <text class="name" x="375.0" y="417" text-anchor="middle">hull_kelvin_1</text>
+  <text class="kind" x="375.0" y="432" text-anchor="middle">compute: to_kelvin</text>
+  <path class="world" d="M210,420 L288,420" marker-end="url(#blue)"/>
+  <path class="world" d="M460,420 L798,420" marker-end="url(#blue)"/>
+  <path class="world" d="M440,420 L460,420"/>
+  <circle cx="480" cy="420" r="4" fill="#0072B2"/>
+  <path class="world" d="M480,420 L480,570 L538,570" marker-end="url(#blue)"/>
+  <rect class="node" x="40" y="460" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="477" text-anchor="middle">hull_temp_2</text>
+  <text class="kind" x="125.0" y="492" text-anchor="middle">i2c_tmass</text>
+  <rect class="node" x="290" y="460" width="170" height="40" rx="6"/>
+  <text class="name" x="375.0" y="477" text-anchor="middle">hull_kelvin_2</text>
+  <text class="kind" x="375.0" y="492" text-anchor="middle">compute: to_kelvin</text>
+  <path class="world" d="M210,480 L288,480" marker-end="url(#blue)"/>
+  <path class="world" d="M460,480 L798,480" marker-end="url(#blue)"/>
+  <path class="world" d="M440,480 L460,480"/>
+  <circle cx="495" cy="480" r="4" fill="#0072B2"/>
+  <path class="world" d="M495,480 L495,578 L538,578" marker-end="url(#blue)"/>
+  <rect class="node" x="40" y="520" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="537" text-anchor="middle">hull_temp_3</text>
+  <text class="kind" x="125.0" y="552" text-anchor="middle">i2c_tmass</text>
+  <rect class="node" x="290" y="520" width="170" height="40" rx="6"/>
+  <text class="name" x="375.0" y="537" text-anchor="middle">hull_kelvin_3</text>
+  <text class="kind" x="375.0" y="552" text-anchor="middle">compute: to_kelvin</text>
+  <path class="world" d="M210,540 L288,540" marker-end="url(#blue)"/>
+  <path class="world" d="M460,540 L798,540" marker-end="url(#blue)"/>
+  <path class="world" d="M440,540 L460,540"/>
+  <circle cx="510" cy="540" r="4" fill="#0072B2"/>
+  <path class="world" d="M510,540 L510,586 L538,586" marker-end="url(#blue)"/>
+  <rect class="node" x="540" y="560" width="170" height="40" rx="6"/>
+  <text class="name" x="625.0" y="577" text-anchor="middle">hull_temp</text>
+  <text class="kind" x="625.0" y="592" text-anchor="middle">compute: vote</text>
+  <path class="world" d="M710,580 L798,580" marker-end="url(#blue)"/>
+  <rect class="node" x="40" y="640" width="170" height="40" rx="6"/>
+  <text class="name" x="125.0" y="657" text-anchor="middle">camera</text>
+  <text class="kind" x="125.0" y="672" text-anchor="middle">app_pl: camera.py</text>
+  <path class="world" d="M210,660 L798,660" marker-end="url(#blue)"/>
+  <rect class="node gw" x="800" y="70" width="110" height="610" rx="6"/>
+  <text class="name" x="855" y="360" text-anchor="middle">gateway</text>
+  <text class="kind" x="855" y="378" text-anchor="middle">to the ground</text>
+  <path class="world" d="M40,702 L80,702" marker-end="url(#blue)"/>
+  <text class="small" x="88" y="706" text-anchor="start">solid: readings, towards the ground (world-)</text>
+  <path class="moc" d="M380,702 L420,702" marker-end="url(#vermillion)"/>
+  <text class="small" x="428" y="706" text-anchor="start">dashed: a command (moc-)</text>
+  <path class="bind" d="M620,702 L660,702" marker-end="url(#purple)"/>
+  <text class="small" x="668" y="706" text-anchor="start">dotted: command binding</text>
+</svg>

@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="520" viewBox="0 0 860 520" role="img" aria-labelledby="title desc">
+  <title id="title">Reading on one clock</title>
+  <desc id="desc">Two timelines over ten seconds, one above the other. Above, stage 4: the seismometer's readings, drawn as circles, arrive whenever it sends them, at no regular time; the regolith thermometer, drawn as squares, is asked once a second by its own trigger_interval, three quarters of a second into each second; so no reading of one lines up with a reading of the other. Below, stage 5: the two are members of the science_readings group, whose clock ticks every second, drawn as vertical lines, and at each tick the thermometer is asked and what the seismometer has sent is taken, so each circle sits on a square. In both, the heater's report, drawn as triangles, goes once a second on its own state_interval, and the beacon, drawn as diamonds, every five seconds; a group changes neither.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 13px; }
+      .head { font-size: 15px; font-weight: bold; fill: #1f2937; }
+      .label { font-size: 13px; fill: #1f2937; }
+      .small { font-size: 12px; fill: #4b5563; }
+      .row { stroke: #d1d5db; stroke-width: 1; }
+      .clock { stroke: #6b7280; stroke-width: 1.5; stroke-dasharray: 3 4; }
+      .axis { stroke: #374151; stroke-width: 1.5; }
+    </style>
+  </defs>
+  <rect width="860" height="520" fill="#ffffff"/>
+  <text class="head" x="20" y="36" text-anchor="start">Stage 4: each payload on a clock of its own</text>
+  <text class="name" x="20" y="75" text-anchor="start">seismometer</text>
+  <line class="row" x1="230" y1="70" x2="810" y2="70"/>
+  <circle cx="250.3" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="299.6" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="372.1" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="421.4" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="467.79999999999995" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="549.0" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="592.5" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="644.7" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="728.8" cy="70" r="7" fill="#0072B2"/>
+  <circle cx="775.2" cy="70" r="7" fill="#0072B2"/>
+  <text class="name" x="20" y="111" text-anchor="start">regolith_thermometer</text>
+  <line class="row" x1="230" y1="106" x2="810" y2="106"/>
+  <rect x="266.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="324.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="382.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="440.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="498.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="556.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="614.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="672.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="730.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="788.5" y="99" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <text class="name" x="20" y="147" text-anchor="start">probe_heater report</text>
+  <line class="row" x1="230" y1="142" x2="810" y2="142"/>
+  <path d="M259.0,134 L267.0,149 L251.0,149 z" fill="#009E73"/>
+  <path d="M317.0,134 L325.0,149 L309.0,149 z" fill="#009E73"/>
+  <path d="M375.0,134 L383.0,149 L367.0,149 z" fill="#009E73"/>
+  <path d="M433.0,134 L441.0,149 L425.0,149 z" fill="#009E73"/>
+  <path d="M491.0,134 L499.0,149 L483.0,149 z" fill="#009E73"/>
+  <path d="M549.0,134 L557.0,149 L541.0,149 z" fill="#009E73"/>
+  <path d="M607.0,134 L615.0,149 L599.0,149 z" fill="#009E73"/>
+  <path d="M665.0,134 L673.0,149 L657.0,149 z" fill="#009E73"/>
+  <path d="M723.0,134 L731.0,149 L715.0,149 z" fill="#009E73"/>
+  <path d="M781.0,134 L789.0,149 L773.0,149 z" fill="#009E73"/>
+  <text class="name" x="20" y="183" text-anchor="start">beacon</text>
+  <line class="row" x1="230" y1="178" x2="810" y2="178"/>
+  <path d="M241.6,169 L249.6,178 L241.6,187 L233.6,178 z" fill="#CC79A7"/>
+  <path d="M531.6,169 L539.6,178 L531.6,187 L523.6,178 z" fill="#CC79A7"/>
+  <text class="head" x="20" y="250" text-anchor="start">Stage 5: the science_readings group, read every 1 s</text>
+  <line class="clock" x1="230" y1="264" x2="230" y2="410"/>
+  <line class="clock" x1="288" y1="264" x2="288" y2="410"/>
+  <line class="clock" x1="346" y1="264" x2="346" y2="410"/>
+  <line class="clock" x1="404" y1="264" x2="404" y2="410"/>
+  <line class="clock" x1="462" y1="264" x2="462" y2="410"/>
+  <line class="clock" x1="520" y1="264" x2="520" y2="410"/>
+  <line class="clock" x1="578" y1="264" x2="578" y2="410"/>
+  <line class="clock" x1="636" y1="264" x2="636" y2="410"/>
+  <line class="clock" x1="694" y1="264" x2="694" y2="410"/>
+  <line class="clock" x1="752" y1="264" x2="752" y2="410"/>
+  <line class="clock" x1="810" y1="264" x2="810" y2="410"/>
+  <text class="name" x="20" y="289" text-anchor="start">seismometer</text>
+  <line class="row" x1="230" y1="284" x2="810" y2="284"/>
+  <circle cx="230.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="288.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="346.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="404.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="462.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="520.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="578.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="636.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="694.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="752.0" cy="284" r="7" fill="#0072B2"/>
+  <circle cx="810.0" cy="284" r="7" fill="#0072B2"/>
+  <text class="name" x="20" y="325" text-anchor="start">regolith_thermometer</text>
+  <line class="row" x1="230" y1="320" x2="810" y2="320"/>
+  <rect x="223.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="281.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="339.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="397.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="455.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="513.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="571.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="629.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="687.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="745.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <rect x="803.0" y="313" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <text class="name" x="20" y="361" text-anchor="start">probe_heater report</text>
+  <line class="row" x1="230" y1="356" x2="810" y2="356"/>
+  <path d="M259.0,348 L267.0,363 L251.0,363 z" fill="#009E73"/>
+  <path d="M317.0,348 L325.0,363 L309.0,363 z" fill="#009E73"/>
+  <path d="M375.0,348 L383.0,363 L367.0,363 z" fill="#009E73"/>
+  <path d="M433.0,348 L441.0,363 L425.0,363 z" fill="#009E73"/>
+  <path d="M491.0,348 L499.0,363 L483.0,363 z" fill="#009E73"/>
+  <path d="M549.0,348 L557.0,363 L541.0,363 z" fill="#009E73"/>
+  <path d="M607.0,348 L615.0,363 L599.0,363 z" fill="#009E73"/>
+  <path d="M665.0,348 L673.0,363 L657.0,363 z" fill="#009E73"/>
+  <path d="M723.0,348 L731.0,363 L715.0,363 z" fill="#009E73"/>
+  <path d="M781.0,348 L789.0,363 L773.0,363 z" fill="#009E73"/>
+  <text class="name" x="20" y="397" text-anchor="start">beacon</text>
+  <line class="row" x1="230" y1="392" x2="810" y2="392"/>
+  <path d="M241.6,383 L249.6,392 L241.6,401 L233.6,392 z" fill="#CC79A7"/>
+  <path d="M531.6,383 L539.6,392 L531.6,401 L523.6,392 z" fill="#CC79A7"/>
+  <text class="small" x="810" y="250" text-anchor="end">dotted: the group's clock ticks</text>
+  <line class="axis" x1="230" y1="440" x2="810" y2="440"/>
+  <line class="axis" x1="230" y1="440" x2="230" y2="446"/>
+  <text class="small" x="230" y="462" text-anchor="middle">0 s</text>
+  <line class="axis" x1="288" y1="440" x2="288" y2="446"/>
+  <text class="small" x="288" y="462" text-anchor="middle">1 s</text>
+  <line class="axis" x1="346" y1="440" x2="346" y2="446"/>
+  <text class="small" x="346" y="462" text-anchor="middle">2 s</text>
+  <line class="axis" x1="404" y1="440" x2="404" y2="446"/>
+  <text class="small" x="404" y="462" text-anchor="middle">3 s</text>
+  <line class="axis" x1="462" y1="440" x2="462" y2="446"/>
+  <text class="small" x="462" y="462" text-anchor="middle">4 s</text>
+  <line class="axis" x1="520" y1="440" x2="520" y2="446"/>
+  <text class="small" x="520" y="462" text-anchor="middle">5 s</text>
+  <line class="axis" x1="578" y1="440" x2="578" y2="446"/>
+  <text class="small" x="578" y="462" text-anchor="middle">6 s</text>
+  <line class="axis" x1="636" y1="440" x2="636" y2="446"/>
+  <text class="small" x="636" y="462" text-anchor="middle">7 s</text>
+  <line class="axis" x1="694" y1="440" x2="694" y2="446"/>
+  <text class="small" x="694" y="462" text-anchor="middle">8 s</text>
+  <line class="axis" x1="752" y1="440" x2="752" y2="446"/>
+  <text class="small" x="752" y="462" text-anchor="middle">9 s</text>
+  <line class="axis" x1="810" y1="440" x2="810" y2="446"/>
+  <text class="small" x="810" y="462" text-anchor="middle">10 s</text>
+  <circle cx="30.0" cy="494" r="7" fill="#0072B2"/>
+  <text class="small" x="46" y="498" text-anchor="start">seismometer</text>
+  <rect x="233.0" y="487" width="14" height="14" fill="#E69F00" stroke="#7a5200"/>
+  <text class="small" x="256" y="498" text-anchor="start">regolith_thermometer</text>
+  <path d="M450.0,486 L458.0,501 L442.0,501 z" fill="#009E73"/>
+  <text class="small" x="466" y="498" text-anchor="start">probe_heater report</text>
+  <path d="M660.0,485 L668.0,494 L660.0,503 L652.0,494 z" fill="#CC79A7"/>
+  <text class="small" x="676" y="498" text-anchor="start">beacon</text>
+</svg>

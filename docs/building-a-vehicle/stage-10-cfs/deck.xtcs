@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    <!-- Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst),
+         answering to a cFS flight computer: the deck of stage 9, joined to
+         the computer's software bus as a peer of its Software Bus Network.
+         Every link is a message ID on the bus rather than an address and
+         port, so the tcspecial section is written anew, and the gateway
+         node is a gateway_cfs; the subsystems do not change. The node is
+         still called gateway, so their links to it are unchanged. -->
+
+    <description>A lunar lander's science deck</description>
+    <tcspecial>
+        <!-- The vehicle answers to a cFS flight computer rather than to the
+             ground. It is one more peer of the computer's Software Bus
+             Network, over SBN's UDP module, and everything it takes and
+             sends crosses that one link as cFS packets: there is no
+             command socket and no beacon socket. The far end's SBN table
+             must list tcspecial as processor 2 of spacecraft 0x42, at the
+             address and port of sbn.local.
+
+             default_interval is how often a beacon goes while all is well,
+             and reset_interval how often after a start, until the ground
+             has connected. Each is published as tlm_msgid. -->
+        <beacon>
+            <default_interval>5 s</default_interval>
+            <reset_interval>1 s</reset_interval>
+            <tlm_msgid>0x4201</tlm_msgid>
+        </beacon>
+        <!-- Copied from the cFS build: its epoch, its time scale, and TAI
+             less UTC. -->
+        <cfe_time>
+            <epoch>1980-01-01T00:00:00</epoch>
+            <leap_seconds>37</leap_seconds>
+            <scale>tai</scale>
+        </cfe_time>
+        <gateway>cfs</gateway>
+        <interface>c7820f9bfe585feab72247ece0a2261d</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <!-- The block of message IDs the mission allotted tcspecial:
+             subsystem 0x42, its telemetry below 0x4280 and its commands
+             from there. Every message ID below is in it. -->
+        <msgid_range>
+            <first>0x4200</first>
+            <last>0x42FF</last>
+        </msgid_range>
+        <!-- Node k's commands are published as 0x4290 plus k, and their
+             answers as 0x4210 plus k: the ground's setpoint for
+             probe_thermostat, device id 10, as 0x429A. -->
+        <payload_command>
+            <cmd_base>0x4290</cmd_base>
+            <response_base>0x4210</response_base>
+        </payload_command>
+        <!-- A payload nothing in the drawing touches would be published as
+             0x4220 plus its device id. Every payload here is drawn into the
+             gateway node, so none is, but the base is said all the
+             same. -->
+        <payload_telemetry>
+            <tlm_base>0x4220</tlm_base>
+        </payload_telemetry>
+        <!-- The far end: SBN v7.0.1 on processor 1, listening on SBN's own
+             port. The ident is the hash SBN prints in its start-up
+             event. -->
+        <sbn>
+            <ident>3b339a5e0f686cef822a5d6ea95004222ab7af33</ident>
+            <local>0.0.0.0:8634</local>
+            <max_message>32768</max_message>
+            <peer>127.0.0.1:2234</peer>
+            <peer_processor_id>1</peer_processor_id>
+            <processor_id>2</processor_id>
+            <release>v7.0.1</release>
+            <spacecraft_id>0x42</spacecraft_id>
+        </sbn>
+        <!-- tcspecial keeps in this file which configuration the next start is
+             to run, the last one the ground confirmed, and how many starts of
+             it have ended before a matching CONNECT, so on a vehicle it must be
+             on storage that survives a power cycle. Each stage of the guide has
+             a file of its own, so that one stage's starts are not counted as
+             another's. -->
+        <state_file>/tmp/tcspecial-deck-stage-10-cfs.state</state_file>
+        <!-- Commands to tcspecial are published as cmd_msgid, and its
+             answers as response_msgid. -->
+        <tcs_cmd>
+            <cmd_msgid>0x4280</cmd_msgid>
+            <response_msgid>0x4200</response_msgid>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- Each path is the file's from this file's directory, without its
+         extension; the file is read in this file's spelling. Nothing in a
+         path is expanded, so a path is written as it is. -->
+    <include name="science" path="../common/science-logged"/>
+    <include name="thermal" path="../common/thermal"/>
+    <gateways>
+        <type name="gateway_cfs">
+            <!-- The software bus's end of the link, both ways. What comes
+                 down is published as tlm_base plus the device id of the
+                 node that sent it: the camera, device id 0, as 0x4240, and
+                 hull_temp, device id 5, as 0x4245. The node has no address
+                 and no port: it is reached through the peer. A command the
+                 bus publishes as cmd_msgid is taken by this node, which the
+                 command binding on the setpoint needs. -->
+            <gateway name="gateway">
+                <cmd_msgid>0x4281</cmd_msgid>
+                <tlm_base>0x4240</tlm_base>
+                <world-in>camera</world-in>
+                <world-in>hull_kelvin_1</world-in>
+                <world-in>hull_kelvin_2</world-in>
+                <world-in>hull_kelvin_3</world-in>
+                <world-in>hull_temp</world-in>
+                <world-in>probe_heater</world-in>
+                <world-in>regolith_kelvin</world-in>
+                <world-in>seismometer</world-in>
+            </gateway>
+        </type>
+    </gateways>
+    <payloads>
+        <!-- A payload that is a program rather than a device: tcspecial
+             starts it, and it writes its readings to tcspecial over the
+             file interfaces an app node is run with (see tcsapp). It is
+             never asked, so nothing here says when it sends. -->
+        <type name="app_pl">
+            <!-- The camera. ../camera.py stands in for the camera's own
+                 software: it sends a small made-up frame every
+                 app-payload-arg seconds, so that the stage runs on a desk
+                 with no camera. The path is from the repository's root,
+                 which is where tcspecial is run from. -->
+            <payload name="camera">
+                <app-payload-arg>10</app-payload-arg>
+                <executable>docs/building-a-vehicle/camera.py</executable>
+                <world-out>gateway.camera</world-out>
+            </payload>
+        </type>
+    </payloads>
+    <tcsgui>
+        <nodes>
+            <node name="camera" x="34" y="600"/>
+            <node name="gateway" x="790" y="34"/>
+            <node name="science" x="299" y="53"/>
+            <node name="thermal" x="299" y="336"/>
+        </nodes>
+    </tcsgui>
+</configuration>

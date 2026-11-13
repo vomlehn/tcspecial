@@ -66,11 +66,12 @@ node-types.html: node-types.rst
 # The guide from the examples to a whole vehicle. Its excerpts are read from
 # the stage files as the page is made, so a stage changed is a page made
 # again; its figures are tcsgui's drawings of the stages, which
-# building-a-vehicle/screenshots.sh makes again, and two drawn by hand.
+# building-a-vehicle/screenshots.sh makes again, and the vehicle-*.svg
+# figures drawn by hand.
 building-a-vehicle.html: building-a-vehicle.rst \
 		$(wildcard building-a-vehicle/*/*.ytcs) \
 		$(wildcard shots/vehicle-stage-*.png) \
-		vehicle-terminals.svg vehicle-app-node.svg
+		$(wildcard vehicle-*.svg)
 	rst2html building-a-vehicle.rst building-a-vehicle.html
 
 # What changes between a configuration run on a desk and one that flies.

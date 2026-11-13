@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    <!-- Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst),
+         with Yamcs as the ground: the deck of stage 9, its every packet to
+         and from the ground carrying a CCSDS primary header. The tcspecial
+         section says each link's APID, and the gateway node is a
+         gateway_yamcs; nothing else changes. The node is still called
+         gateway, so the subsystems' links to it are unchanged. -->
+
+    <description>A lunar lander's science deck</description>
+    <tcspecial>
+        <!-- tcspecial sends beacons from the interface the send attribute
+             names, and the MOC receives them on the address the recv
+             attribute names.
+
+             default_interval is how often a beacon goes while all is well:
+             how long the ground may wait to learn the vehicle is alive,
+             paid for with a beacon's few dozen bytes on the link each
+             time. reset_interval is how often one goes after a start,
+             until the ground has connected, so that a restart is seen
+             quickly. -->
+        <beacon>
+            <apid>0x110</apid>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:5650</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:5550</send>
+        </beacon>
+        <!-- The ground is Yamcs, so every packet on every link to the
+             ground carries a CCSDS primary header, and each link says its
+             APID: the beacon's here, the commands' in tcs_cmd, and the
+             readings' in payload_telemetry and the gateway node. -->
+        <gateway>yamcs</gateway>
+        <interface>c7820f9bfe585feab72247ece0a2261d</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <!-- Commands to a node are sent from source_base to tcspecial at
+             dest_base: one link for every node, each command naming its node by
+             its device id, and its answer going back to source_base.
+
+             Simple payloads, such as these, do not use payload commands:
+             what a simple payload is configured with is in this file, and
+             it is not changed while tcspecial is running. At present only
+             applications use the payload_command values. -->
+        <payload_command>
+            <dest_base>0.0.0.0:4200</dest_base>
+            <source_base>127.0.0.1:4300</source_base>
+        </payload_command>
+        <!-- tcspecial sends telemetry from the network interface
+             source_base names, plus the payload's device id, and the MOC
+             receives it on the network interface dest_base names, plus the
+             payload's device id, as telemetry of APID apid_base plus that
+             device id. Every payload here is drawn into the gateway node,
+             so none sends this way, but a configuration that answers to
+             Yamcs says where their APIDs would begin all the same. -->
+        <payload_telemetry>
+            <apid_base>0x500</apid_base>
+            <dest_base>127.0.0.1:6100</dest_base>
+            <source_base>0.0.0.0:6000</source_base>
+        </payload_telemetry>
+        <!-- tcspecial keeps in this file which configuration the next start is
+             to run, the last one the ground confirmed, and how many starts of
+             it have ended before a matching CONNECT, so on a vehicle it must be
+             on storage that survives a power cycle. Each stage of the guide has
+             a file of its own, so that one stage's starts are not counted as
+             another's. -->
+        <state_file>/tmp/tcspecial-deck-stage-10-yamcs.state</state_file>
+        <!-- Yamcs sends its commands, of APID 0x111, from a port the
+             system chooses, and takes the answers on the same socket, so
+             the commands are taken from any port of this host -- port 0 --
+             and each answer goes back to the port its command came
+             from. -->
+        <tcs_cmd>
+            <apid>0x111</apid>
+            <recv>0.0.0.0:4000</recv>
+            <send>127.0.0.1:0</send>
+        </tcs_cmd>
+    </tcspecial>
+    <!-- Each path is the file's from this file's directory, without its
+         extension; the file is read in this file's spelling. Nothing in a
+         path is expanded, so a path is written as it is. -->
+    <include name="science" path="../common/science-logged"/>
+    <include name="thermal" path="../common/thermal"/>
+    <gateways>
+        <type name="gateway_yamcs">
+            <!-- Yamcs's end of the link. Each reading drawn into this node
+                 comes down to Yamcs at ground_base plus its source's device
+                 id, as telemetry of APID apid_base plus that device id: the
+                 camera, device id 0, at 127.0.0.1:5100 as APID 0x400, and
+                 hull_temp, device id 5, at 127.0.0.1:5105 as 0x405. What
+                 Yamcs sends up to address and port, the ground's setpoint
+                 command among it, goes as a telecommand of APID
+                 apid_base. -->
+            <gateway name="gateway">
+                <address>127.0.0.1</address>
+                <apid_base>0x400</apid_base>
+                <ground_base>127.0.0.1:5100</ground_base>
+                <port>5000</port>
+                <world-in>camera</world-in>
+                <world-in>hull_kelvin_1</world-in>
+                <world-in>hull_kelvin_2</world-in>
+                <world-in>hull_kelvin_3</world-in>
+                <world-in>hull_temp</world-in>
+                <world-in>probe_heater</world-in>
+                <world-in>regolith_kelvin</world-in>
+                <world-in>seismometer</world-in>
+            </gateway>
+        </type>
+    </gateways>
+    <payloads>
+        <!-- A payload that is a program rather than a device: tcspecial
+             starts it, and it writes its readings to tcspecial over the
+             file interfaces an app node is run with (see tcsapp). It is
+             never asked, so nothing here says when it sends. -->
+        <type name="app_pl">
+            <!-- The camera. ../camera.py stands in for the camera's own
+                 software: it sends a small made-up frame every
+                 app-payload-arg seconds, so that the stage runs on a desk
+                 with no camera. The path is from the repository's root,
+                 which is where tcspecial is run from. -->
+            <payload name="camera">
+                <app-payload-arg>10</app-payload-arg>
+                <executable>docs/building-a-vehicle/camera.py</executable>
+                <world-out>gateway.camera</world-out>
+            </payload>
+        </type>
+    </payloads>
+    <tcsgui>
+        <nodes>
+            <node name="camera" x="34" y="600"/>
+            <node name="gateway" x="790" y="34"/>
+            <node name="science" x="299" y="53"/>
+            <node name="thermal" x="299" y="336"/>
+        </nodes>
+    </tcsgui>
+</configuration>

@@ -33,7 +33,9 @@ if ! DISPLAY=$display xdpyinfo > /dev/null 2>&1; then
 	exit 1
 fi
 
-for stage in docs/building-a-vehicle/stage-*; do
+# Only the numbered stages: stage 10's cFS and Yamcs versions draw as stage
+# 10 does, and the guide shows no drawing of them.
+for stage in docs/building-a-vehicle/stage-[0-9][0-9]; do
 	n=${stage##*stage-}
 	# Without WAYLAND_DISPLAY, so that tcsgui opens on the X display
 	# given rather than on the person's Wayland one.

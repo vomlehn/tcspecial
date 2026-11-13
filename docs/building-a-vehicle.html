@@ -460,7 +460,8 @@ it cools says how well the regolith conducts heat. The three hull sensors
 watch the deck's own temperature, and are three so that one going wrong does
 not take the reading with it.</p>
 <p>Each stage is a directory of <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/</span></tt>: <tt class="docutils literal"><span class="pre">stage-01</span></tt> to
-<tt class="docutils literal"><span class="pre">stage-10</span></tt>, each holding the configuration in both spellings,
+<tt class="docutils literal"><span class="pre">stage-10</span></tt>, and <tt class="docutils literal"><span class="pre">stage-10-cfs</span></tt> and <tt class="docutils literal"><span class="pre">stage-10-yamcs</span></tt> beside the last,
+each holding the configuration in both spellings,
 <tt class="docutils literal">deck.ytcs</tt> and <tt class="docutils literal">deck.xtcs</tt>, and its simulator file, <tt class="docutils literal"><span class="pre">deck-sim.yaml</span></tt>.
 From stage 7 the stages include files in <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/common/</span></tt>.
 Any stage can be started from, and two compared with <tt class="docutils literal">diff</tt>:</p>
@@ -741,7 +742,17 @@ second, each node fed by it at most as many, and the beacon one every
 <tt class="docutils literal">default_interval</tt>; their sum is what the link must carry, with margin.
 <tt class="docutils literal">tcsverify <span class="pre">--summary</span></tt> adds it up (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole vehicle</a>).</p>
 <p>The drawing is stage 4's: a group changes when nodes are read, not how they
-are joined.</p>
+are joined. When they are read is this:</p>
+<div class="figure">
+<object data="vehicle-group-clock.svg" style="width: 100%;" type="image/svg+xml">Two ten-second timelines. In stage 4 the seismometer's readings
+arrive at no regular time and the thermometer is asked on a clock
+of its own, so none line up; in stage 5 both are taken on each
+tick of the science_readings group's clock. The heater's report
+and the beacon keep their own clocks in both.</object>
+<p class="caption">Stage 4 and stage 5 over ten seconds. A group lines its members up; it
+does not touch the heater's <tt class="docutils literal">state_interval</tt> or the beacon's
+<tt class="docutils literal">default_interval</tt>.</p>
+</div>
 <p><em>See:</em> &quot;Lengths of Time&quot; and the groups in the tcspecial manual.</p>
 </div>
 <div class="section" id="stage-6-redundant-sensors-and-a-vote">
@@ -902,6 +913,14 @@ subsystem gains one, fed by the seismometer and the probe's temperature:</p>
 <tt class="docutils literal"><span class="pre">common/science-logged</span></tt>, a copy of <tt class="docutils literal">common/science</tt> with the log, and
 the top file changes only the path it includes. <tt class="docutils literal">diff</tt> the two to see the
 log alone.</p>
+<div class="figure">
+<object data="vehicle-files.svg" style="width: 100%;" type="image/svg+xml">The top files of stages 7 and 8, and the files they include:
+stage 7 includes common/science and common/thermal, stage 8
+common/science-logged and common/thermal. Each included file lists
+its exports.</object>
+<p class="caption">The deck's files at stages 7 and 8. Each file is read in its includer's
+spelling: <tt class="docutils literal">deck.xtcs</tt> includes <tt class="docutils literal">common/thermal.xtcs</tt>.</p>
+</div>
 <p><em>See:</em> &quot;The logging node&quot; in the <a class="reference external" href="tcspecial-design.html">design</a>, and
 &quot;Where the logs' segments go&quot; in the tcspecial manual.</p>
 </div>
@@ -941,12 +960,39 @@ checks its own.</p>
 <img alt="tcsgui showing the science and thermal boxes and the camera, all reaching the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
 <p class="caption">Stage 9: the whole deck.</p>
 </div>
+<p>tcsgui draws each included file as a box, which is the right size for
+editing and the wrong one for seeing what reaches what. Opened, the deck is
+this:</p>
+<div class="figure">
+<object data="vehicle-deck.svg" style="width: 100%;" type="image/svg+xml">Every node of the deck: the science and thermal subsystems drawn
+open, the camera below them, and the gateway node on the right,
+with every line between them.</object>
+<p class="caption">The deck of stages 9 and 10, every node drawn. Fifteen nodes, so device
+ids 0 to 14, and eight lines into the gateway node.</p>
+</div>
 </div>
 <div class="section" id="stage-10-choosing-the-gateway">
 <h1><a class="toc-backref" href="#toc-entry-12">Stage 10: choosing the gateway</a></h1>
-<p>Until now the deck has spoken to the ground directly by radio. Most missions
-put a flight computer in between. Stage 10 is stage 9 with the gateway
-changed to F´'s, and nothing else:</p>
+<p>Until now the deck has spoken to the ground directly, by radio. Most
+missions put something in between, and tcspecial answers to three of them:</p>
+<dl class="docutils">
+<dt>F´ (F Prime)</dt>
+<dd>NASA JPL's open-source flight software framework. A flight computer's
+software is built of components, joined in a <em>topology</em>; each kind of
+telemetry has an ID. It flew on the Ingenuity helicopter and flies on
+small spacecraft.</dd>
+<dt>cFS (the core Flight System)</dt>
+<dd>NASA Goddard's open-source flight software framework. A flight
+computer's applications send each other messages on a <em>software bus</em>,
+each kind of message known by its <em>message ID</em>, and its Software Bus
+Network (SBN) joins the buses of several processors into one. It flies
+on many NASA missions.</dd>
+<dt>Yamcs</dt>
+<dd>An open-source mission control system, for the ground rather than the
+vehicle. It speaks CCSDS packets, each kind known by its <em>APID</em>, and
+decodes them by a mission database written in XTCE.</dd>
+</dl>
+<p>Stage 10 is stage 9 answering to an F´ flight computer:</p>
 <pre class="literal-block">
 
       # The F´ bridge's end of the link, both ways. What comes down arrives at
@@ -973,10 +1019,93 @@ changed to F´'s, and nothing else:</p>
 
 
 </pre>
-<p>The gateway node keeps its name, <tt class="docutils literal">gateway</tt>, which every line to it is
-written with, so no subsystem file changes. <tt class="docutils literal">diff</tt> stages 9 and 10 to see
-the whole of the difference. A cFS or Yamcs ground system is the same
-change: see the <tt class="docutils literal">cfs</tt> and <tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> examples.</p>
+<p>Beside it, <tt class="docutils literal"><span class="pre">stage-10-cfs</span></tt> answers to a cFS flight computer, and
+<tt class="docutils literal"><span class="pre">stage-10-yamcs</span></tt> to Yamcs on the ground. In each, the gateway node keeps
+its name, <tt class="docutils literal">gateway</tt>, which every line to it is written with, so no
+subsystem file changes. What does change is how each reading is addressed
+on its way:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="24%" />
+<col width="13%" />
+<col width="24%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Stage</th>
+<th class="head">gateway</th>
+<th class="head">gateway node</th>
+<th class="head">a reading from device id <em>k</em></th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td><tt class="docutils literal"><span class="pre">stage-09</span></tt></td>
+<td><tt class="docutils literal">radio</tt></td>
+<td><tt class="docutils literal">gateway_radio</tt></td>
+<td>a UDP datagram to
+<tt class="docutils literal">ground_base</tt> + <em>k</em></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">stage-10</span></tt></td>
+<td><tt class="docutils literal">fprime</tt></td>
+<td><tt class="docutils literal">gateway_fprime</tt></td>
+<td>the same, to <tt class="docutils literal">bridge_base</tt> +
+<em>k</em>, which F´'s TcsBridge
+gives the ID
+<tt class="docutils literal">fprime_id_base</tt> + <em>k</em></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">stage-10-cfs</span></tt></td>
+<td><tt class="docutils literal">cfs</tt></td>
+<td><tt class="docutils literal">gateway_cfs</tt></td>
+<td>a cFS packet on the software
+bus, message ID
+<tt class="docutils literal">tlm_base</tt> + <em>k</em></td>
+</tr>
+<tr><td><tt class="docutils literal"><span class="pre">stage-10-yamcs</span></tt></td>
+<td><tt class="docutils literal">yamcs</tt></td>
+<td><tt class="docutils literal">gateway_yamcs</tt></td>
+<td>a CCSDS packet to
+<tt class="docutils literal">ground_base</tt> + <em>k</em>, APID
+<tt class="docutils literal">apid_base</tt> + <em>k</em></td>
+</tr>
+</tbody>
+</table>
+<p>F´ changes the gateway node and the <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">gateway</tt>,
+and nothing else. Yamcs gives each link of the section an APID besides. cFS
+changes the section throughout, because on a
+software bus every link is a message ID rather than an address and port, and
+the vehicle is one more SBN peer:</p>
+<pre class="literal-block">
+
+      # The software bus's end of the link, both ways. What comes down is
+      # published as tlm_base plus the device id of the node that sent it: the
+      # camera, device id 0, as 0x4240, and hull_temp, device id 5, as 0x4245.
+      # The node has no address and no port: it is reached through the peer.
+      # A command the bus publishes as cmd_msgid is taken by this node, which
+      # the command binding on the setpoint needs.
+      - gateway: gateway
+        cmd_msgid: &quot;0x4281&quot;
+        tlm_base: &quot;0x4240&quot;
+        world-in:
+          - camera
+          - hull_kelvin_1
+          - hull_kelvin_2
+          - hull_kelvin_3
+          - hull_temp
+          - probe_heater
+          - regolith_kelvin
+          - seismometer
+
+
+</pre>
+<p>The gateway node's <tt class="docutils literal">cmd_msgid</tt> is there for the command binding: a
+command binding leaving a <tt class="docutils literal">gateway_cfs</tt> node needs one, so that the
+ground's setpoint has a message ID to arrive on. <tt class="docutils literal">diff</tt> stage 9 with each
+of the three to see the whole of each difference.</p>
+<p>The F´ and cFS stages run as the others do, tcsmoc playing the F´ bridge or
+joining the simulated software bus as the ground, as the <tt class="docutils literal">fprime</tt> and
+<tt class="docutils literal">cfs</tt> examples do. The Yamcs stage is checked as every stage is, but its
+ground is Yamcs, which tcsmoc is not; <tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> shows a vehicle
+run with Yamcs.</p>
 <p><em>See:</em> &quot;The fprime example&quot;, &quot;The cfs example&quot; and &quot;The thermostat-yamcs
 example&quot; in the tcspecial manual.</p>
 </div>

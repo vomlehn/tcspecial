@@ -2,7 +2,8 @@
 //! examples are.
 //!
 //! Each stage of the guide is a directory of `docs/building-a-vehicle/`,
-//! `stage-NN`, holding `deck.ytcs`, the same in XML, `deck.xtcs`, and the
+//! `stage-NN`, or `stage-NN-<what>` for another version of a stage (stage
+//! 10's for cFS and for Yamcs), holding `deck.ytcs`, the same in XML, `deck.xtcs`, and the
 //! simulator file beside them, `deck-sim.yaml`. They are discovered rather
 //! than listed, so a stage added to the guide is checked without anyone
 //! having to name it here. The files the later stages include, in

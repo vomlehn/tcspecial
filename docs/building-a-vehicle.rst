@@ -63,7 +63,8 @@ watch the deck's own temperature, and are three so that one going wrong does
 not take the reading with it.
 
 Each stage is a directory of ``docs/building-a-vehicle/``: ``stage-01`` to
-``stage-10``, each holding the configuration in both spellings,
+``stage-10``, and ``stage-10-cfs`` and ``stage-10-yamcs`` beside the last,
+each holding the configuration in both spellings,
 ``deck.ytcs`` and ``deck.xtcs``, and its simulator file, ``deck-sim.yaml``.
 From stage 7 the stages include files in ``docs/building-a-vehicle/common/``.
 Any stage can be started from, and two compared with ``diff``:
@@ -284,7 +285,19 @@ second, each node fed by it at most as many, and the beacon one every
 ``tcsverify --summary`` adds it up (`Checking the whole vehicle`_).
 
 The drawing is stage 4's: a group changes when nodes are read, not how they
-are joined.
+are joined. When they are read is this:
+
+.. figure:: vehicle-group-clock.svg
+   :width: 100%
+   :alt: Two ten-second timelines. In stage 4 the seismometer's readings
+         arrive at no regular time and the thermometer is asked on a clock
+         of its own, so none line up; in stage 5 both are taken on each
+         tick of the science_readings group's clock. The heater's report
+         and the beacon keep their own clocks in both.
+
+   Stage 4 and stage 5 over ten seconds. A group lines its members up; it
+   does not touch the heater's ``state_interval`` or the beacon's
+   ``default_interval``.
 
 *See:* "Lengths of Time" and the groups in the tcspecial manual.
 
@@ -368,6 +381,16 @@ Stage 7 must not change when stage 8 is written, so the logged subsystem is
 the top file changes only the path it includes. ``diff`` the two to see the
 log alone.
 
+.. figure:: vehicle-files.svg
+   :width: 100%
+   :alt: The top files of stages 7 and 8, and the files they include:
+         stage 7 includes common/science and common/thermal, stage 8
+         common/science-logged and common/thermal. Each included file lists
+         its exports.
+
+   The deck's files at stages 7 and 8. Each file is read in its includer's
+   spelling: ``deck.xtcs`` includes ``common/thermal.xtcs``.
+
 *See:* "The logging node" in the `design <tcspecial-design.html>`__, and
 "Where the logs' segments go" in the tcspecial manual.
 
@@ -407,21 +430,93 @@ checks its own.
 
    Stage 9: the whole deck.
 
+tcsgui draws each included file as a box, which is the right size for
+editing and the wrong one for seeing what reaches what. Opened, the deck is
+this:
+
+.. figure:: vehicle-deck.svg
+   :width: 100%
+   :alt: Every node of the deck: the science and thermal subsystems drawn
+         open, the camera below them, and the gateway node on the right,
+         with every line between them.
+
+   The deck of stages 9 and 10, every node drawn. Fifteen nodes, so device
+   ids 0 to 14, and eight lines into the gateway node.
+
 Stage 10: choosing the gateway
 ==============================
-Until now the deck has spoken to the ground directly by radio. Most missions
-put a flight computer in between. Stage 10 is stage 9 with the gateway
-changed to F´'s, and nothing else:
+Until now the deck has spoken to the ground directly, by radio. Most
+missions put something in between, and tcspecial answers to three of them:
+
+F´ (F Prime)
+    NASA JPL's open-source flight software framework. A flight computer's
+    software is built of components, joined in a *topology*; each kind of
+    telemetry has an ID. It flew on the Ingenuity helicopter and flies on
+    small spacecraft.
+
+cFS (the core Flight System)
+    NASA Goddard's open-source flight software framework. A flight
+    computer's applications send each other messages on a *software bus*,
+    each kind of message known by its *message ID*, and its Software Bus
+    Network (SBN) joins the buses of several processors into one. It flies
+    on many NASA missions.
+
+Yamcs
+    An open-source mission control system, for the ground rather than the
+    vehicle. It speaks CCSDS packets, each kind known by its *APID*, and
+    decodes them by a mission database written in XTCE.
+
+Stage 10 is stage 9 answering to an F´ flight computer:
 
 .. include:: building-a-vehicle/stage-10/deck.ytcs
    :literal:
    :start-after:   - type gateway_fprime:
    :end-before: payloads:
 
-The gateway node keeps its name, ``gateway``, which every line to it is
-written with, so no subsystem file changes. ``diff`` stages 9 and 10 to see
-the whole of the difference. A cFS or Yamcs ground system is the same
-change: see the ``cfs`` and ``thermostat-yamcs`` examples.
+Beside it, ``stage-10-cfs`` answers to a cFS flight computer, and
+``stage-10-yamcs`` to Yamcs on the ground. In each, the gateway node keeps
+its name, ``gateway``, which every line to it is written with, so no
+subsystem file changes. What does change is how each reading is addressed
+on its way:
+
+==================  ==========  ==================  ==============================
+Stage               gateway     gateway node        a reading from device id *k*
+==================  ==========  ==================  ==============================
+``stage-09``        ``radio``   ``gateway_radio``   a UDP datagram to
+                                                    ``ground_base`` + *k*
+``stage-10``        ``fprime``  ``gateway_fprime``  the same, to ``bridge_base`` +
+                                                    *k*, which F´'s TcsBridge
+                                                    gives the ID
+                                                    ``fprime_id_base`` + *k*
+``stage-10-cfs``    ``cfs``     ``gateway_cfs``     a cFS packet on the software
+                                                    bus, message ID
+                                                    ``tlm_base`` + *k*
+``stage-10-yamcs``  ``yamcs``   ``gateway_yamcs``   a CCSDS packet to
+                                                    ``ground_base`` + *k*, APID
+                                                    ``apid_base`` + *k*
+==================  ==========  ==================  ==============================
+
+F´ changes the gateway node and the ``tcspecial`` section's ``gateway``,
+and nothing else. Yamcs gives each link of the section an APID besides. cFS
+changes the section throughout, because on a
+software bus every link is a message ID rather than an address and port, and
+the vehicle is one more SBN peer:
+
+.. include:: building-a-vehicle/stage-10-cfs/deck.ytcs
+   :literal:
+   :start-after:   - type gateway_cfs:
+   :end-before: payloads:
+
+The gateway node's ``cmd_msgid`` is there for the command binding: a
+command binding leaving a ``gateway_cfs`` node needs one, so that the
+ground's setpoint has a message ID to arrive on. ``diff`` stage 9 with each
+of the three to see the whole of each difference.
+
+The F´ and cFS stages run as the others do, tcsmoc playing the F´ bridge or
+joining the simulated software bus as the ground, as the ``fprime`` and
+``cfs`` examples do. The Yamcs stage is checked as every stage is, but its
+ground is Yamcs, which tcsmoc is not; ``thermostat-yamcs`` shows a vehicle
+run with Yamcs.
 
 *See:* "The fprime example", "The cfs example" and "The thermostat-yamcs
 example" in the tcspecial manual.

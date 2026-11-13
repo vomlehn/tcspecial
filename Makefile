@@ -167,8 +167,8 @@ help:
 		"the same thing"
 	@echo "  make comparespellings - Do that for every shipped" \
 		"configuration"
-	@echo "  make set-interfaces - Write this build's interface digest into" \
-		"every shipped configuration"
+	@echo "  make set-interfaces - Write this build's interface digest" \
+		"into every shipped configuration"
 	@echo "  make verify      - Check one version 2 configuration"
 	@echo "  make mkvcan      - Make the virtual CAN bus a CAN payload" \
 		"needs"

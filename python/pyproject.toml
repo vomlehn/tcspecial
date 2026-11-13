@@ -2,7 +2,7 @@
 # tcsui -- as one distribution, so that `pip install ./python` installs all
 # three.
 #
-# Named tcspecial-ground, as the system package that carries them is, and
+# Named tcspecial-moc, as the system package that carries them is, and
 # not after any one of the three: the import names are the crates' own and
 # stay so, but a distribution called tcslib_moc would be one name on PyPI away
 # from somebody else's.
@@ -12,7 +12,7 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tcspecial-ground"
+name = "tcspecial-moc"
 # The workspace's version, [workspace.package] in ../Cargo.toml.
 # tests/test_version.py fails when the two differ.
 version = "0.1.0"

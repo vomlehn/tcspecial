@@ -103,7 +103,7 @@ checks.
 
 7. Install the flight package, and only it
 ==========================================
-*Do:* install the ``tcspecial`` package on the vehicle; ``tcspecial-ground``
+*Do:* install the ``tcspecial`` package on the vehicle; ``tcspecial-moc``
 on the ground station; ``tcspecial-test`` on neither.
 
 *Why:* ``tcspecial-test`` holds tcsmoc and tcssim, which never fly, and the

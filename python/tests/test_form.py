@@ -5,8 +5,7 @@ The Python spelling of ``tcslib_protocol::graph::fprime::Form::of``, which
 ``examples/thermostat-yamcs/tests/agrees.rs`` holds to the Rust for every node
 of every example that reaches the ground; and the typed parameters
 ``tcslib_protocol.yamcs`` copies from the configuration's own XTCE for a node
-whose
-data no interface document lays out.
+whose data no interface document lays out.
 """
 
 import sys

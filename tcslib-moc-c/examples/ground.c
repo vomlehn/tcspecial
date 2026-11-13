@@ -1,5 +1,5 @@
 /*
- * A ground station in C, on tcslib_moc_c.h.
+ * A ground station in C, on tcslib-moc-c.h.
  *
  * What a ground station does, in the order it does it: read the
  * configuration, wait for the vehicle's first beacon, which matches the
@@ -19,13 +19,13 @@
  * and send to; and the node to ask about. Run from the repository's root
  * none need be given, and it watches the ping example.
  *
- *     cc ground.c -Iinclude target/debug/libtcslib_moc_c.a -lpthread -ldl -lm
+ *     cc ground.c -Iinclude target/debug/libtcs_moc_c.a -lpthread -ldl -lm
  */
 
 #include <stdio.h>
 #include <string.h>
 
-#include "tcslib_moc_c.h"
+#include "tcslib-moc-c.h"
 
 /* The example's configuration, without its extension. */
 static const char *const STEM = "examples/ping/ping";

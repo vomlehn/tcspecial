@@ -1,18 +1,18 @@
-/// Gives `libtcslib_moc_c.so` its soname, `libtcslib_moc_c.so.<ABI>`.
+/// Gives `libtcs_moc_c.so` its soname, `libtcs_moc_c.so.<ABI>`.
 ///
 /// A shared library without one is linked into a program by whatever name it
-/// was found under, so a program built against `libtcslib_moc_c.so` would ask
-/// for `libtcslib_moc_c.so` at run time -- the development symlink, which
+/// was found under, so a program built against `libtcs_moc_c.so` would ask
+/// for `libtcs_moc_c.so` at run time -- the development symlink, which
 /// points at whichever library was installed last. With the soname, a program
 /// asks for the ABI it was built against, and is refused by the loader, rather
 /// than misbehaving, on a machine that has only an incompatible one.
 ///
 /// The ABI version is `abi-version`, a whole number on one line, kept apart
 /// from the crate's version because it changes for another reason: it goes up
-/// by one when, and only when, a program built against the old `tcslib_moc_c.h`
+/// by one when, and only when, a program built against the old `tcslib-moc-c.h`
 /// would no longer work with the new library -- a function's signature or
 /// behaviour changing incompatibly, a function removed, or a struct or enum in
-/// `tcslib_moc_c.h` changing its layout or its values. Adding a function, or
+/// `tcslib-moc-c.h` changing its layout or its values. Adding a function, or
 /// anything else an old program cannot notice, leaves it alone. The Makefile
 /// reads the same file for the names it installs the library under, so the two
 /// cannot disagree.
@@ -35,7 +35,5 @@ fn main() {
             said.trim()
         )
     });
-    println!(
-        "cargo:rustc-cdylib-link-arg=-Wl,-soname,libtcslib_moc_c.so.{abi}"
-    );
+    println!("cargo:rustc-cdylib-link-arg=-Wl,-soname,libtcs_moc_c.so.{abi}");
 }

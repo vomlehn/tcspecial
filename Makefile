@@ -32,9 +32,9 @@ RUST = .
 #   sbin/        <package>-links, one per package, which an administrator
 #                runs to link that package's programs into /usr/local/bin
 #   libexec/     programs other programs run: the five test app programs
-#   lib/         libtcslib_moc_c, its pkg-config file, and the Python packages,
+#   lib/         libtcs_moc_c, its pkg-config file, and the Python packages,
 #                in lib/python3/site-packages, which names no minor version
-#   include/     tcslib_moc_c.h
+#   include/     tcslib-moc-c.h
 #   share/       tcsgui's data, the documents and the example configurations
 #
 # HOOKS=1 also installs what makes /opt/tcs usable without being told: a
@@ -80,7 +80,7 @@ SCHEMADIR = $(DATADIR)/tcspecial/schema
 
 # Where the hooks go. Debian's places; the RPM spec moves the .pth file to
 # Fedora's, which names python3's minor version: see
-# packaging/rpm/tcspecial-ground.spec.
+# packaging/rpm/tcspecial-moc.spec.
 PROFILEDIR ?= /etc/profile.d
 LDCONFDIR ?= /etc/ld.so.conf.d
 SYSTEMDDIR ?= /usr/lib/systemd/system
@@ -215,7 +215,7 @@ help:
 	@echo "  make install-build - The release build install-files copies"
 	@echo "  make install-files - Copy a build already made under PREFIX" \
 		"(/opt/tcs)"
-	@echo "  make install-tcspecial, install-tcspecial-ground," \
+	@echo "  make install-tcspecial, install-tcspecial-moc," \
 		"install-tcspecial-test"
 	@echo "                   - Copy one package's files from a build" \
 		"already made"
@@ -770,7 +770,7 @@ distclean: clean
 # What is installed, by package.
 #
 # Three packages, because three kinds of machine take them. tcspecial is
-# what flies, and nothing a vehicle does not need is in it; tcspecial-ground
+# what flies, and nothing a vehicle does not need is in it; tcspecial-moc
 # is what a ground station is built on; tcspecial-test is the test ground
 # station and the payload simulator, which never fly. Each install-<package>
 # target below installs one, so the lists here are the whole account of
@@ -794,7 +794,7 @@ FLIGHT_BIN := tcspecial tcsverify
 FLIGHT_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
 GROUND_BIN := tcsgui
 TEST_BIN := tcsmoc tcssim segsend
-PACKAGES := tcspecial tcspecial-ground tcspecial-test
+PACKAGES := tcspecial tcspecial-moc tcspecial-test
 # Its programs with windows are built with Slint, whose royalty-free
 # licence asks for its badge where they are downloaded: make
 # publish-release adds it to the notes of every release (see tcs-helpers'
@@ -818,11 +818,11 @@ TEST_CRATES := tcsmoc tcssim tcspecial
 RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
 
 # The versions, read from where each is stated so that it is stated once: the
-# workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcslib_moc_c's
+# workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcs_moc_c's
 # own, which tcslib-moc-c.pc says, and tcslib-moc-c/abi-version for
-# libtcslib_moc_c's ABI version, which is its soname -- libtcslib_moc_c.so.<ABI>
+# libtcs_moc_c's ABI version, which is its soname -- libtcs_moc_c.so.<ABI>
 # -- and the name its file is installed under. The ABI version goes up only when
-# a program built against the old tcslib_moc_c.h would not work with the new
+# a program built against the old tcslib-moc-c.h would not work with the new
 # library: see tcslib-moc-c/build.rs, which reads the same file to set the
 # soname, for exactly when.
 VERSION := $(shell sed -n \
@@ -831,7 +831,7 @@ VERSION := $(shell sed -n \
 LIBTCS_VERSION := $(shell sed -n 's/^version *= *"\(.*\)"/\1/p' \
 		    tcslib-moc-c/Cargo.toml)
 LIBTCS_ABI := $(shell cat tcslib-moc-c/abi-version)
-LIBTCS_SONAME := libtcslib_moc_c.so.$(LIBTCS_ABI)
+LIBTCS_SONAME := libtcs_moc_c.so.$(LIBTCS_ABI)
 
 # The example configurations, in both spellings, with their simulator files
 # and diagrams; the manual's figures are the diagrams, so it is given them as
@@ -848,7 +848,7 @@ EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 # whose storage is small and on ground stations alike, and a release build
 # carries its symbol tables and the standard library's debug information:
 # stripping takes a fifth to a quarter off what each package installs, and
-# libtcslib_moc_c.a from 33 MB to 24 MB. Executables and shared libraries are
+# libtcs_moc_c.a from 33 MB to 24 MB. Executables and shared libraries are
 # stripped of everything they do not need to be linked or run
 # (--strip-unneeded); the static library only of its debug information
 # (--strip-debug), because a program linked with it needs its symbols. `make
@@ -973,13 +973,13 @@ install-tcspecial: tcs-helpers
 			$(DESTDIR)$(SYSTEMDDIR)/tcspecial.service; \
 	fi
 
-# What a ground station is built on: libtcslib_moc_c for C and C++, the Python
+# What a ground station is built on: libtcs_moc_c for C and C++, the Python
 # packages, and the configuration editor with its data.
 #
-# libtcslib_moc_c.so is installed under its soname, libtcslib_moc_c.so.<ABI>,
+# libtcs_moc_c.so is installed under its soname, libtcs_moc_c.so.<ABI>,
 # which is what a program built against it asks for at run time, and linked to
-# by libtcslib_moc_c.so, which is what the linker looks for. tcslib_moc_c.h goes
-# in include/ itself, as <tcslib_moc_c.h>. The library is not executable, as
+# by libtcs_moc_c.so, which is what the linker looks for. tcslib-moc-c.h goes
+# in include/ itself, as <tcslib-moc-c.h>. The library is not executable, as
 # Debian wants a shared library to be; the RPM spec makes it so, as rpm wants.
 #
 # The Python is installed by pip into a directory of its own, without
@@ -992,23 +992,23 @@ install-tcspecial: tcs-helpers
 # `sudo make install-files` would be root's. The direct_url.json pip
 # writes names that copy, which is gone by then, so it is removed, with its
 # line in RECORD.
-.PHONY: install-tcspecial-ground
-install-tcspecial-ground: install-data tcs-helpers tcs-xtce
-	@echo "Installing tcspecial-ground under $(DESTDIR)$(PREFIX)..."
+.PHONY: install-tcspecial-moc
+install-tcspecial-moc: install-data tcs-helpers tcs-xtce
+	@echo "Installing tcspecial-moc under $(DESTDIR)$(PREFIX)..."
 	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(INCLUDEDIR) \
 		$(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PYTHONDIR)
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(BINDIR)
-	install -m 644 tcslib-moc-c/include/tcslib_moc_c.h \
+	install -m 644 tcslib-moc-c/include/tcslib-moc-c.h \
 		$(DESTDIR)$(INCLUDEDIR)
-	install -m 644 $(RELEASE_DIR)/libtcslib_moc_c.so \
+	install -m 644 $(RELEASE_DIR)/libtcs_moc_c.so \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
-	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcslib_moc_c.so
-	install -m 644 $(RELEASE_DIR)/libtcslib_moc_c.a $(DESTDIR)$(LIBDIR)
+	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcs_moc_c.so
+	install -m 644 $(RELEASE_DIR)/libtcs_moc_c.a $(DESTDIR)$(LIBDIR)
 	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME), \
-		$(DESTDIR)$(LIBDIR)/libtcslib_moc_c.a)
-	$(call install_links,tcspecial-ground,$(GROUND_BIN))
+		$(DESTDIR)$(LIBDIR)/libtcs_moc_c.a)
+	$(call install_links,tcspecial-moc,$(GROUND_BIN))
 	$(SUBST) packaging/tcslib-moc-c.pc.in \
 		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
@@ -1025,40 +1025,40 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	python3 -m pip install --quiet --upgrade --no-deps \
 		--no-build-isolation --no-compile \
 		--target $(DESTDIR)$(PYTHONDIR) "$$tmp/python"; \
-	dist=$$(echo $(DESTDIR)$(PYTHONDIR)/tcspecial_ground-*.dist-info); \
+	dist=$$(echo $(DESTDIR)$(PYTHONDIR)/tcspecial_moc-*.dist-info); \
 	rm -f "$$dist/direct_url.json"; \
-	sed -i '/^tcspecial_ground-[^/]*\.dist-info\/direct_url\.json,/d' \
+	sed -i '/^tcspecial_moc-[^/]*\.dist-info\/direct_url\.json,/d' \
 		"$$dist/RECORD"; \
 	schema=$(DESTDIR)$(PYTHONDIR)/tcslib_protocol/schema; \
 	rm -rf "$$schema"; \
 	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcslib_protocol \
 		$(SCHEMADIR)) "$$schema"; \
 	sed -i '/^tcslib_protocol\/schema\//d' "$$dist/RECORD"
-	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-moc-c \
-		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-moc/tcslib-moc-c \
+		$(DESTDIR)$(DOCDIR)/tcspecial-moc/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
-		$(DESTDIR)$(DOCDIR)/tcspecial-ground
+		$(DESTDIR)$(DOCDIR)/tcspecial-moc
 	$(THIRD_PARTY_NOTICES) . \
-		$(DESTDIR)$(DOCDIR)/tcspecial-ground/THIRD-PARTY-NOTICES \
-		tcspecial-ground $(GROUND_CRATES)
+		$(DESTDIR)$(DOCDIR)/tcspecial-moc/THIRD-PARTY-NOTICES \
+		tcspecial-moc $(GROUND_CRATES)
 	install -m 644 tcslib-moc-c/README.html \
-		$(DESTDIR)$(DOCDIR)/tcspecial-ground/tcslib-moc-c
+		$(DESTDIR)$(DOCDIR)/tcspecial-moc/tcslib-moc-c
 	install -m 644 python/README.md \
-		$(DESTDIR)$(DOCDIR)/tcspecial-ground/python
+		$(DESTDIR)$(DOCDIR)/tcspecial-moc/python
 	if [ "$(HOOKS)" = 1 ]; then \
 		set -e; \
 		install -d -m 755 $(DESTDIR)$(PROFILEDIR) \
 			$(DESTDIR)$(LDCONFDIR) $(DESTDIR)$(PTHDIR); \
-		$(SUBST) -e 's|@PACKAGE@|tcspecial-ground|g' \
-			packaging/hooks/profile-ground.sh.in \
-			> $(DESTDIR)$(PROFILEDIR)/tcspecial-ground.sh; \
+		$(SUBST) -e 's|@PACKAGE@|tcspecial-moc|g' \
+			packaging/hooks/profile-moc.sh.in \
+			> $(DESTDIR)$(PROFILEDIR)/tcspecial-moc.sh; \
 		echo $(LIBDIR) \
-			> $(DESTDIR)$(LDCONFDIR)/tcspecial-ground.conf; \
+			> $(DESTDIR)$(LDCONFDIR)/tcspecial-moc.conf; \
 		echo $(PYTHONDIR) \
-			> $(DESTDIR)$(PTHDIR)/tcspecial-ground.pth; \
-		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-ground.sh \
-			$(DESTDIR)$(LDCONFDIR)/tcspecial-ground.conf \
-			$(DESTDIR)$(PTHDIR)/tcspecial-ground.pth; \
+			> $(DESTDIR)$(PTHDIR)/tcspecial-moc.pth; \
+		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-moc.sh \
+			$(DESTDIR)$(LDCONFDIR)/tcspecial-moc.conf \
+			$(DESTDIR)$(PTHDIR)/tcspecial-moc.pth; \
 	fi
 	@if [ "$(HOOKS)" = 1 ] && [ -z "$(DESTDIR)" ]; then \
 		echo "Run ldconfig as root so the loader finds" \
@@ -1142,21 +1142,21 @@ uninstall-files:
 		$(TEST_BIN))
 	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(FLIGHT_LIBEXEC))
 	rm -f $(addprefix $(DESTDIR)$(SBINDIR)/,$(addsuffix -links,$(PACKAGES)))
-	rm -f $(DESTDIR)$(INCLUDEDIR)/tcslib_moc_c.h
-	rm -f $(DESTDIR)$(LIBDIR)/libtcslib_moc_c.so \
-		$(DESTDIR)$(LIBDIR)/libtcslib_moc_c.a \
+	rm -f $(DESTDIR)$(INCLUDEDIR)/tcslib-moc-c.h
+	rm -f $(DESTDIR)$(LIBDIR)/libtcs_moc_c.so \
+		$(DESTDIR)$(LIBDIR)/libtcs_moc_c.a \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslib_protocol tcslib_moc \
-		tcsui tcspecial_ground-*.dist-info)
+		tcsui tcspecial_moc-*.dist-info)
 	rm -rf $(TCSGUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
 		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))
 	if [ "$(HOOKS)" = 1 ]; then \
 		rm -f $(addprefix $(DESTDIR)$(PROFILEDIR)/,$(addsuffix .sh, \
 			$(PACKAGES))) \
-			$(DESTDIR)$(LDCONFDIR)/tcspecial-ground.conf \
-			$(DESTDIR)$(PTHDIR)/tcspecial-ground.pth \
+			$(DESTDIR)$(LDCONFDIR)/tcspecial-moc.conf \
+			$(DESTDIR)$(PTHDIR)/tcspecial-moc.pth \
 			$(DESTDIR)$(SYSTEMDDIR)/tcspecial.service; \
 	fi
 	-for dir in $(DESTDIR)$(INCLUDEDIR) \

@@ -47,7 +47,7 @@ is talked to through file descriptors it inherits, which a program in any of the
 three already knows how to read and write, so it may be written in C, C++, Rust
 or Python. On the ground, a station is built on ``tcslib-moc`` in Rust, on
 ``tcslib-moc-c`` in C or C++ -- the same library behind one header,
-``tcslib-moc-c/include/tcslib_moc_c.h`` -- or on its Python spelling under
+``tcslib-moc-c/include/tcslib-moc-c.h`` -- or on its Python spelling under
 ``python/``. Every interface offered to C is offered to C++ as well: a C header
 can be included from C++ as it stands, and nothing in it is C that C++ will not
 compile.
@@ -3438,9 +3438,9 @@ There are three, because three kinds of machine take them:
    and telemetry. No ``segsend``: a vehicle that keeps a log puts its own
    in ``/opt/tcs/bin``, beside tcspecial (see `Where the logs' segments
    go`_).
-``tcspecial-ground``
-   What a ground station is built on. ``lib/libtcslib_moc_c.so.4`` and
-   ``lib/libtcslib_moc_c.a`` with ``include/tcslib_moc_c.h`` and
+``tcspecial-moc``
+   What a ground station is built on. ``lib/libtcs_moc_c.so.4`` and
+   ``lib/libtcs_moc_c.a`` with ``include/tcslib-moc-c.h`` and
    ``lib/pkgconfig/tcslib-moc-c.pc``; the Python packages ``tcslib_protocol``,
    ``tcslib_moc`` and ``tcsui`` in ``lib/python3/site-packages``; ``bin/tcsgui``
    with its descriptions in ``share/tcsgui``; and the XTCS, YTCS and simulator
@@ -3468,8 +3468,8 @@ A package also installs what makes ``/opt/tcs`` usable without being told
 of it, each file named after the package so that no two own one:
 ``/etc/profile.d/<package>.sh``, which puts ``/opt/tcs/bin`` on ``PATH`` --
 and, for the ground package, ``/opt/tcs/lib/pkgconfig`` on
-``PKG_CONFIG_PATH``; ``/etc/ld.so.conf.d/tcspecial-ground.conf``, which puts
-``/opt/tcs/lib`` on the loader's path; a ``tcspecial-ground.pth`` in the
+``PKG_CONFIG_PATH``; ``/etc/ld.so.conf.d/tcspecial-moc.conf``, which puts
+``/opt/tcs/lib`` on the loader's path; a ``tcspecial-moc.pth`` in the
 system python3's own directory -- ``/usr/lib/python3/dist-packages`` on
 Debian, ``/usr/lib/python3.<minor>/site-packages`` on Fedora, which has no
 directory every python3 reads -- which puts the Python on python3's path;
@@ -3481,9 +3481,9 @@ Each .deb also carries what Debian expects of every package, outside
 Debian's machine-readable format, and ``changelog.Debian.gz``, both made as the
 package is built, from ``LICENSE-MIT`` and the version; and lintian's overrides,
 in ``/usr/share/lintian/overrides/<package>``. The ground package also has a
-trigger that has dpkg run ``ldconfig`` once ``libtcslib_moc_c.so.4`` is
+trigger that has dpkg run ``ldconfig`` once ``libtcs_moc_c.so.4`` is
 installed or removed. The RPMs say the same in their own ``License``,
-``%changelog``, ``%post`` and ``%postun``. ``libtcslib_moc_c.so.4`` is not
+``%changelog``, ``%post`` and ``%postun``. ``libtcs_moc_c.so.4`` is not
 executable in the .deb, as Debian wants a shared library to be, and is in the
 RPM, where rpm reads what a library provides only from an executable file;
 otherwise the two hold the same files under ``/opt/tcs``.
@@ -3530,7 +3530,7 @@ install-build`` made, so that nothing is built as root. ``DESTDIR`` is put
 in front of every path, for staging, and is not part of any path a program
 looks in. ``HOOKS=1`` installs the files outside the prefix as well, which
 a developer's copy leaves alone unless asked. ``make install-tcspecial``,
-``install-tcspecial-ground`` and ``install-tcspecial-test`` copy one
+``install-tcspecial-moc`` and ``install-tcspecial-test`` copy one
 package. ``make uninstall-files``, with the same variables, takes away what
 was copied.
 
@@ -3544,9 +3544,9 @@ was copied.
    $ make install-files PREFIX=$HOME/tcs
 
 Everything ``make install-files`` installs, and so everything in the packages,
-is stripped: the programs and ``libtcslib_moc_c.so.4`` with ``strip
+is stripped: the programs and ``libtcs_moc_c.so.4`` with ``strip
 --strip-unneeded``, which leaves what they need to be run and linked with, and
-``libtcslib_moc_c.a`` with ``strip --strip-debug``, which keeps the symbols a
+``libtcs_moc_c.a`` with ``strip --strip-debug``, which keeps the symbols a
 program linked with it needs. That takes a fifth to a quarter off what each
 package installs: the flight package installs about 9 MB stripped and 12 MB not.
 ``STRIP=0`` keeps everything as cargo built it, for a build that is to be
@@ -3572,7 +3572,7 @@ the administrator's choice:
 .. code-block:: console
 
    # /opt/tcs/sbin/tcspecial-links
-   # /opt/tcs/sbin/tcspecial-ground-links
+   # /opt/tcs/sbin/tcspecial-moc-links
    # /opt/tcs/sbin/tcspecial-test-links
    # /opt/tcs/sbin/tcspecial-links --dir /opt/bin
 
@@ -3596,7 +3596,7 @@ The Python alone
 ----------------
 
 ``python/pyproject.toml`` makes ``tcslib_protocol``, ``tcslib_moc`` and
-``tcsui`` one distribution, ``tcspecial-ground``:
+``tcsui`` one distribution, ``tcspecial-moc``:
 
 .. code-block:: console
 
@@ -3632,27 +3632,27 @@ A C or C++ ground station
 
 With ``/opt/tcs/lib/pkgconfig`` on ``PKG_CONFIG_PATH`` -- the ground
 package's profile script puts it there -- a station includes
-``<tcslib_moc_c.h>`` and is built with what ``tcslib-moc-c.pc`` says:
+``<tcslib-moc-c.h>`` and is built with what ``tcslib-moc-c.pc`` says:
 
 .. code-block:: console
 
    $ cc  station.c   $(pkg-config --cflags --libs tcslib-moc-c)
    $ c++ station.cpp $(pkg-config --cflags --libs tcslib-moc-c)
 
-That links with ``libtcslib_moc_c.so.4``, which the loader finds through the
-ground package's ``ld.so.conf.d`` file. The ``1`` is libtcslib_moc_c's ABI
+That links with ``libtcs_moc_c.so.4``, which the loader finds through the
+ground package's ``ld.so.conf.d`` file. The ``1`` is libtcs_moc_c's ABI
 version, which is not the package's: it goes up only when a station built
-against the old ``tcslib_moc_c.h`` would not work with the new library, so an
+against the old ``tcslib-moc-c.h`` would not work with the new library, so an
 upgrade that keeps it needs no station rebuilt. See tcslib-moc-c's README. A
-station linked with ``libtcslib_moc_c.a`` instead names it and what it needs
+station linked with ``libtcs_moc_c.a`` instead names it and what it needs
 besides:
 
 .. code-block:: console
 
    $ cc station.c $(pkg-config --cflags tcslib-moc-c) \
-       /opt/tcs/lib/libtcslib_moc_c.a \
+       /opt/tcs/lib/libtcs_moc_c.a \
        $(pkg-config --static --libs-only-l tcslib-moc-c | \
-         sed 's/-ltcslib_moc_c//')
+         sed 's/-ltcs_moc_c//')
 
 Running tcspecial under a supervisor
 ------------------------------------

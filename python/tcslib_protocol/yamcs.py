@@ -174,8 +174,8 @@ class Telemetry:
     #: ``None`` where it has none.
     document: Path = None
     #: What its data are, where no document lays them out: a
-    #: :class:`tcslib_protocol.form.Form`, read from the configuration's own
-    #XTCE.
+    #: :class:`tcslib_protocol.form.Form`, read from the configuration's
+    #: own XTCE.
     form: object = DATUM
     #: The configuration's own XTCE, which gives its parameter's type, or
     #: ``None`` where its document lays it out.

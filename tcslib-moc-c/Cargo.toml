@@ -8,9 +8,9 @@ tcslib-moc for C and C++: a ground station's beacons, the vehicle's data from \
 a gateway node, and commands to the vehicle, behind one header"""
 
 [lib]
-# libtcslib_moc_c.a and libtcslib_moc_c.so, which a C or C++ program links with
-# include/tcslib_moc_c.h; and the rlib, for this crate's own tests.
-name = "tcslib_moc_c"
+# libtcs_moc_c.a and libtcs_moc_c.so, which a C or C++ program links with
+# include/tcslib-moc-c.h; and the rlib, for this crate's own tests.
+name = "tcs_moc_c"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]

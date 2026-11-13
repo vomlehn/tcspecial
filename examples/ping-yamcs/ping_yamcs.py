@@ -81,18 +81,16 @@ HTTP_PORT = 16090
 INSTANCE = "ping"
 
 #: The ping command's arguments, as ``tcslib-protocol/xtce/ping.xtce`` names
-#them, : by the field of :class:`tcslib_protocol.ping_packet.Ping` that each is:
-#what a
-#: ping is split into by the code generated from that document, so that it
-#: is split as the document says.
+#: them, by the field of :class:`tcslib_protocol.ping_packet.Ping` that each
+#: is: what a ping is split into by the code generated from that document, so
+#: that it is split as the document says.
 PING_ARGUMENTS = {"count": "Count", "sent_seconds": "SentSeconds",
                   "sent_nanoseconds": "SentNanoseconds"}
 
 #: The answer's parameters, as the document names them, by the field of
-#: :class:`tcslib_protocol.ping_packet.PingReply` that each is: what an answer
-#is
-#: put back together from. Its prefix and its space are constants, which
-#: the generated code writes itself.
+#: :class:`tcslib_protocol.ping_packet.PingReply` that each is: what an
+#: answer is put back together from. Its prefix and its space are
+#: constants, which the generated code writes itself.
 REPLY_PARAMETERS = {
     "reply_count": "ReplyCount",
     "reply_sent_seconds": "ReplySentSeconds",

@@ -70,9 +70,8 @@ SCHEMAS = Path(__file__).resolve().parent / "schema"
 #: Each gateway node type, and the attribute it says where its data goes
 #: with: a radio's and a Yamcs gateway's ``ground_base``, an F´ gateway's
 #: ``bridge_base``. The Python spelling of
-#: ``tcslib_protocol::gateway::GatewayKind::base_attribute``, for the kinds that
-#have
-#: a node type.
+#: ``tcslib_protocol::gateway::GatewayKind::base_attribute``, for the kinds
+#: that have a node type.
 GATEWAY_BASES = {
     "gateway_radio": "ground_base",
     "gateway_yamcs": "ground_base",

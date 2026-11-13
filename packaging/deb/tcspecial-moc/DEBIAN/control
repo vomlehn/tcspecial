@@ -1,19 +1,21 @@
-Package: tcspecial-ground
+Package: tcspecial-moc
 Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: David VomLehn <dvomlehn@gmail.com>
 Installed-Size: @SIZE@
 Depends: @SHLIBS@, python3
 Recommends: python3-yaml, python3-tk, pkgconf
+Replaces: tcspecial-ground
+Conflicts: tcspecial-ground
 Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
 Description: tcspecial's ground libraries and configuration editor
- What a ground station for tcspecial is built on: libtcslib_moc_c, tcslib-moc
- for C and C++, with its header tcslib_moc_c.h and pkg-config file
+ What a ground station for tcspecial is built on: libtcs_moc_c, tcslib-moc
+ for C and C++, with its header tcslib-moc-c.h and pkg-config file
  tcslib-moc-c.pc; the Python packages tcslib_protocol, tcslib_moc and tcsui; and
  tcsgui, the graphical configuration editor, with its node descriptions and
- schemas. Everything is under /opt/tcs. /etc/ld.so.conf.d/tcspecial-ground.conf
+ schemas. Everything is under /opt/tcs. /etc/ld.so.conf.d/tcspecial-moc.conf
  puts /opt/tcs/lib on the loader's path, a .pth file puts the Python packages on
- python3's, and /etc/profile.d/tcspecial-ground.sh puts /opt/tcs/bin and
+ python3's, and /etc/profile.d/tcspecial-moc.sh puts /opt/tcs/bin and
  /opt/tcs/lib/pkgconfig on the shell's and pkg-config's.

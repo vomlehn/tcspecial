@@ -1,4 +1,4 @@
-// A ground station in C++, on tcslib_moc_c.h.
+// A ground station in C++, on tcslib-moc-c.h.
 //
 // The same program as ground.c, written as C++ is: the header included as it
 // stands, each handle held by a std::unique_ptr that closes it, and strings
@@ -14,7 +14,7 @@
 // and the node to ask about. Run from the repository's root none need
 // be given, and it watches the ping example.
 //
-//     c++ ground.cpp -Iinclude target/debug/libtcslib_moc_c.a
+//     c++ ground.cpp -Iinclude target/debug/libtcs_moc_c.a
 //         -lpthread -ldl -lm
 //
 // as one command.
@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#include "tcslib_moc_c.h"
+#include "tcslib-moc-c.h"
 
 namespace {
 

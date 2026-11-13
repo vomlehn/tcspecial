@@ -59,9 +59,9 @@ Everything installs under `/opt/tcs`, as three packages:
   the five test app programs in `libexec/`, the documents and the example
   configurations, and a systemd unit, `tcspecial.service`, installed but not
   enabled.
-* `tcspecial-ground`, what a ground station is built on: `libtcslib_moc_c` for C
-  and C++ (`lib/libtcslib_moc_c.so.4`, `lib/libtcslib_moc_c.a`,
-  `include/tcslib_moc_c.h`, `lib/pkgconfig/tcslib-moc-c.pc`), the Python
+* `tcspecial-moc`, what a ground station is built on: `libtcs_moc_c` for C
+  and C++ (`lib/libtcs_moc_c.so.4`, `lib/libtcs_moc_c.a`,
+  `include/tcslib-moc-c.h`, `lib/pkgconfig/tcslib-moc-c.pc`), the Python
   packages `tcslib_protocol`, `tcslib_moc` and `tcsui`, and `bin/tcsgui` with
   its data.
 * `tcspecial-test`, the test ground station and simulator: `bin/tcsmoc` and
@@ -89,7 +89,7 @@ without them:
 
 `HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
 the search paths: `/etc/profile.d/<package>.sh`,
-`/etc/ld.so.conf.d/tcspecial-ground.conf` and a `.pth` file for python3.
+`/etc/ld.so.conf.d/tcspecial-moc.conf` and a `.pth` file for python3.
 Each .deb also carries what Debian expects of every package:
 `/usr/share/doc/<package>/copyright` and `changelog.Debian.gz`, made as it
 is built, and lintian's overrides in `/usr/share/lintian/overrides`.
@@ -112,7 +112,7 @@ something else already has, and takes `--dir DIR` for a directory other
 than `/usr/local/bin`. Removing a package takes its links away.
 
 Everything installed is stripped (`--strip-unneeded` for programs and
-`libtcslib_moc_c.so.4`, `--strip-debug` for `libtcslib_moc_c.a`), which takes a
+`libtcs_moc_c.so.4`, `--strip-debug` for `libtcs_moc_c.a`), which takes a
 fifth to a quarter off what each package installs. `STRIP=0` keeps everything as
 cargo built it: `make packages STRIP=0`.
 

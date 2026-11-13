@@ -1,5 +1,5 @@
 /*
- * tcslib_moc_c.h -- tcslib-moc for C and C++.
+ * tcslib-moc-c.h -- tcslib-moc for C and C++.
  *
  * What a ground station is built on, behind one header: the vehicle's beacons,
  * the vehicle's data from a gateway node, data up to a gateway node, and
@@ -10,8 +10,8 @@
  * C and C++ alike. The header is C, includable from C++ as it stands; every
  * declaration has C linkage, and nothing in it is C that C++ will not compile.
  *
- * Link with libtcslib_moc_c.a (or libtcslib_moc_c.so), and on Linux with
-   -lpthread -ldl -lm.
+ * Link with libtcs_moc_c.a (or libtcs_moc_c.so), and on Linux with
+ * -lpthread -ldl -lm.
  *
  * Conventions, the same for every function:
  *

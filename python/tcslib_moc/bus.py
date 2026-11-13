@@ -24,8 +24,7 @@ CONNECT, RESTART_ARM and RESTART, on ``tcs_cmd.cmd_msgid``, each published
 with its opcode, its first byte, as its function code.
 
 The wire and the packets are :mod:`tcslib_protocol.sbn` and
-:mod:`tcslib_protocol.cfs`;
-nothing here states either again.
+:mod:`tcslib_protocol.cfs`; nothing here states either again.
 """
 
 import select

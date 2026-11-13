@@ -5283,11 +5283,10 @@ give is what ``tcsverify --interface-digest`` prints: the digest of the
 beacon it sends. A change to ``link.xtce`` is a new interface, after which
 ``make interface-digest`` in ``tcslib-protocol/`` is run and every configuration
 given the new digest; a build refuses the old ones until it is. ``tcsverify
---set-interface
-<configuration>...`` gives a configuration its build's digest in place,
-rewriting that one value -- or adding the attribute where the section has none
--- and every other byte of the file as it was, in YAML and XML alike; ``make
-set-interfaces`` does it to every shipped configuration, and a test in
+--set-interface <configuration>...`` gives a configuration its build's digest in
+place, rewriting that one value -- or adding the attribute where the section has
+none -- and every other byte of the file as it was, in YAML and XML alike;
+``make set-interfaces`` does it to every shipped configuration, and a test in
 ``tcsverify/tests/examples.rs`` fails while one of them is stale.
 
 Requirement

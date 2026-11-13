@@ -52,7 +52,7 @@ Makefiles take it (`beside.mk`). A beacon itself is plain text and needs nothing
 to read.
 
 `pyproject.toml` makes the three packages one distribution,
-`tcspecial-ground`, at the workspace's version, which `tests/test_version.py`
+`tcspecial-moc`, at the workspace's version, which `tests/test_version.py`
 holds it to:
 
 ```
@@ -60,7 +60,7 @@ pip install ./python
 pip install './python[yaml]'     # with PyYAML, for YAML configurations
 ```
 
-The `tcspecial-ground` system package installs them in
+The `tcspecial-moc` system package installs them in
 `/opt/tcs/lib/python3/site-packages`, a path that names no Python version,
 and puts that on python3's path with a `.pth` file: see "Installing" in
 docs/manual.rst.

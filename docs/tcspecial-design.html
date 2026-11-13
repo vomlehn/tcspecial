@@ -5619,11 +5619,10 @@ give is what <tt class="docutils literal">tcsverify <span class="pre">--interfac
 beacon it sends. A change to <tt class="docutils literal">link.xtce</tt> is a new interface, after which
 <tt class="docutils literal">make <span class="pre">interface-digest</span></tt> in <tt class="docutils literal"><span class="pre">tcslib-protocol/</span></tt> is run and every configuration
 given the new digest; a build refuses the old ones until it is. <tt class="docutils literal">tcsverify
-<span class="pre">--set-interface</span>
-<span class="pre">&lt;configuration&gt;...</span></tt> gives a configuration its build's digest in place,
-rewriting that one value -- or adding the attribute where the section has none
--- and every other byte of the file as it was, in YAML and XML alike; <tt class="docutils literal">make
-<span class="pre">set-interfaces</span></tt> does it to every shipped configuration, and a test in
+<span class="pre">--set-interface</span> <span class="pre">&lt;configuration&gt;...</span></tt> gives a configuration its build's digest in
+place, rewriting that one value -- or adding the attribute where the section has
+none -- and every other byte of the file as it was, in YAML and XML alike;
+<tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> does it to every shipped configuration, and a test in
 <tt class="docutils literal">tcsverify/tests/examples.rs</tt> fails while one of them is stale.</p>
 <dl class="docutils">
 <dt>Requirement</dt>

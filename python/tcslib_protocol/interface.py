@@ -14,14 +14,13 @@ from pathlib import Path
 from ._xtce import digest as _digest
 
 #: Where this tree's interface is stated: ``link.xtce`` and ``types.xtce``,
-#: as ``make interface-digest`` in tcslib-protocol/ takes them. ``fixed.xtce``
-#beside it holds the
-#: fixed commands, and ``beacon.xtce`` the beacon, which are not part of the
-#: interface: no change to the interface can touch them. Beside this module rather than found in the
-#: source tree, so that an installed package has them too: ``xtce`` here is a
-#: link to the crate's ``tcslib-protocol/xtce``, which is the one copy, and
-#installing
-#: the package copies what it links to.
+#: as ``make interface-digest`` in tcslib-protocol/ takes them.
+#: ``fixed.xtce`` beside it holds the fixed commands, and ``beacon.xtce`` the
+#: beacon, which are not part of the interface: no change to the interface
+#: can touch them. Beside this module rather than found in the source tree,
+#: so that an installed package has them too: ``xtce`` here is a link to the
+#: crate's ``tcslib-protocol/xtce``, which is the one copy, and installing the
+#: package copies what it links to.
 DOCUMENTS = Path(__file__).resolve().parent / "xtce"
 INTERFACE = (DOCUMENTS / "link.xtce", DOCUMENTS / "types.xtce")
 

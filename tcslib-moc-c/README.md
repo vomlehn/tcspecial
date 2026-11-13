@@ -3,7 +3,7 @@
 **tcslib-moc-c is tcslib-moc for C and C++.** It is the library a ground station
 written in C or C++ is built on: the vehicle's beacons, the vehicle's data
 from a gateway node, and commands to the vehicle, behind one header,
-`include/tcslib_moc_c.h`.
+`include/tcslib-moc-c.h`.
 
 It is not a second implementation of anything. Each function is a call into
 [tcslib-moc](../tcslib-moc/README.md), so a C or C++ ground station reads the
@@ -99,22 +99,22 @@ why. The header says the rest.
 
 ## Building with it
 
-Cargo builds `libtcslib_moc_c.a` and `libtcslib_moc_c.so`, from the repository's
+Cargo builds `libtcs_moc_c.a` and `libtcs_moc_c.so`, from the repository's
 root:
 
 ```
 cargo build -p tcslib-moc-c
 cc  my_station.c   -I tcslib-moc-c/include \
-    target/debug/libtcslib_moc_c.a -lpthread -ldl -lm
+    target/debug/libtcs_moc_c.a -lpthread -ldl -lm
 c++ my_station.cpp -I tcslib-moc-c/include \
-    target/debug/libtcslib_moc_c.a -lpthread -ldl -lm
+    target/debug/libtcs_moc_c.a -lpthread -ldl -lm
 ```
 
-Installed -- by the `tcspecial-ground` package, or `make install` at the
-repository's root -- it is `/opt/tcs/lib/libtcslib_moc_c.so.<ABI>`, with the
-link `libtcslib_moc_c.so` to it, `libtcslib_moc_c.a`, the header as
-`/opt/tcs/include/tcslib_moc_c.h`, and `/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc`.
-A station then includes `<tcslib_moc_c.h>` and is built with pkg-config:
+Installed -- by the `tcspecial-moc` package, or `make install` at the
+repository's root -- it is `/opt/tcs/lib/libtcs_moc_c.so.<ABI>`, with the
+link `libtcs_moc_c.so` to it, `libtcs_moc_c.a`, the header as
+`/opt/tcs/include/tcslib-moc-c.h`, and `/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc`.
+A station then includes `<tcslib-moc-c.h>` and is built with pkg-config:
 
 ```
 cc  my_station.c   $(pkg-config --cflags --libs tcslib-moc-c)
@@ -124,17 +124,17 @@ c++ my_station.cpp $(pkg-config --cflags --libs tcslib-moc-c)
 ### The ABI version
 
 `<ABI>` is the library's ABI version, the one whole number in `abi-version`, now
-4. It is the shared library's soname, `libtcslib_moc_c.so.<ABI>`, which a
+4. It is the shared library's soname, `libtcs_moc_c.so.<ABI>`, which a
 station linked with the library asks for at run time; `build.rs` sets the soname
 from the file, and the Makefile installs the library under the same name, so the
 number is stated once. It is not the crate's version, and changes for another
 reason. Add one to it when, and only when, a station built against the old
-`tcslib_moc_c.h` would not work with the new library:
+`tcslib-moc-c.h` would not work with the new library:
 
 - a function's signature changes, or its behaviour changes in a way a
   station relying on the old behaviour would notice;
 - a function is removed;
-- a struct or enum in `tcslib_moc_c.h` changes its layout or its values, a
+- a struct or enum in `tcslib-moc-c.h` changes its layout or its values, a
   constant such as `TCS_TEXT_BYTES` included.
 
 Adding a function, or anything else an old station cannot notice, leaves it
@@ -169,7 +169,7 @@ the gateway node, each of which they do only when asked.
 
 It is written by hand, for people, so the proof that it says what the library
 does is a program that compiles against it and works. `tests/c_and_cpp.rs`
-builds `libtcslib_moc_c.a` from the source as it is, compiles both example
+builds `libtcs_moc_c.a` from the source as it is, compiles both example
 programs against the header with gcc and g++ -- warnings as errors -- and runs
 each against a vehicle the test plays. The two must print the same lines, and
 the right ones, and they compare what they read against the header's own
@@ -191,7 +191,7 @@ header alone is also compiled as C99 and as C++11.
   finding nothing. The F´ bridge stops its beacon thread this way.
 - **Strings are borrowed.** A string a function returns is good until the
   next call on the same handle or its `_close`. Copy it to keep it.
-- **Linking.** On Linux, `libtcslib_moc_c.a` needs `-lpthread -ldl -lm` beside
+- **Linking.** On Linux, `libtcs_moc_c.a` needs `-lpthread -ldl -lm` beside
   it, which is what the tests link with. That is enough where the C library has
   folded the rest into itself, as recent glibc has; the whole list for a system
   is what `cargo rustc -p tcslib-moc-c --lib --crate-type staticlib -- --print

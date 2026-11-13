@@ -43,7 +43,7 @@ TEMPLATES = Path(__file__).resolve().parent / "yamcs-templates"
 
 #: tcspecial's own XTCE, which the instance's mission database reads as it
 #: is: the crate's ``tcslib-protocol/xtce``, linked beside
-#:mod:`tcslib_protocol`.
+#: :mod:`tcslib_protocol`.
 XTCE_DIR = Path(generated.__file__).resolve().parent / "xtce"
 
 #: The wrapper's qualified names, as Yamcs knows them.

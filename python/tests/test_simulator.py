@@ -2,7 +2,7 @@
 
 The same cases: a simulator that becomes ready is waited for, a failure and a
 difference are said at once, and silence and starting are told apart. And the
-messages are those ``tcslibgs/src/ready.rs`` writes.
+messages are those ``tcslib-protocol/src/ready.rs`` writes.
 """
 
 import socket

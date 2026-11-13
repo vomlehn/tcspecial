@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
 
 # Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst): choosing the
 # gateway. The deck of stage 9, answering to an F´ flight computer rather than

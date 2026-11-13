@@ -1,7 +1,7 @@
 //! That a ground station's loop, once running, allocates nothing: a beacon
 //! pass, a datum from a gateway node, a ping and its answer, and a command
-//! sent. A beacon is text, read in place by `tcslibgs::Beacon::read`, so a
-//! beacon pass allocates nothing to unpack it.
+//! sent. A beacon is text, read in place by `tcslib_protocol::Beacon::read`, so
+//! a beacon pass allocates nothing to unpack it.
 //!
 //! One test binary has one allocator, so these are together, under the one
 //! that counts.
@@ -10,8 +10,8 @@ use std::cell::Cell;
 use std::net::UdpSocket;
 use std::time::Duration;
 
-use tcslibgs::graph::Graph;
-use tcslibgs::{
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::{
     Beacon, Command, ConfigDigest, ConfigVersion, HostPort, PingCommand,
 };
 
@@ -112,7 +112,7 @@ fn a_free_port() -> u16 {
 /// buffer the packer made. And reading one allocates nothing either.
 #[test]
 fn packing_and_reading_a_beacon_allocate_nothing() {
-    let mut packer = tcslibgs::BeaconPacker::new();
+    let mut packer = tcslib_protocol::BeaconPacker::new();
     let digest = ConfigDigest([7; 16]);
     let beacon = Beacon::new(1, ConfigVersion::of_this_build(), digest);
     let mut read = None;
@@ -135,8 +135,8 @@ fn packing_and_reading_a_beacon_allocate_nothing() {
 }
 
 /// Once the first has been heard, a beacon pass allocates nothing: not to
-/// unpack the beacon, which `tcslibgs::Beacon::read` reads in place, not for
-/// what the beacon said, and not for the pass it hands back.
+/// unpack the beacon, which `tcslib_protocol::Beacon::read` reads in place, not
+/// for what the beacon said, and not for the pass it hands back.
 #[test]
 fn a_beacon_pass_allocates_nothing() {
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
@@ -287,14 +287,15 @@ payloads:
 #[test]
 fn pinging_allocates_nothing() {
     let mut pinger = Pinger::new();
-    let mut answer = [0u8; tcslibgs::node::vehicle::ping::REPLY_BYTES];
+    let mut answer = [0u8; tcslib_protocol::node::vehicle::ping::REPLY_BYTES];
     let mut at = Duration::new(1_760_900_000, 0);
 
     let mut round = |pinger: &mut Pinger| {
         at += Duration::from_millis(1);
         let sent = pinger.ping(at).expect("a ping");
-        let reply = tcslibgs::node::vehicle::ping::reply(sent.as_bytes(), at)
-            .expect("answered");
+        let reply =
+            tcslib_protocol::node::vehicle::ping::reply(sent.as_bytes(), at)
+                .expect("answered");
         let length = reply.as_bytes().len();
         answer[..length].copy_from_slice(reply.as_bytes());
         pinger.answered(&answer[..length], at + Duration::from_millis(1));

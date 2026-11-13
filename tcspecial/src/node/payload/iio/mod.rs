@@ -27,7 +27,7 @@ use std::io::Read;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{IioConfig, TcsError, TcsResult};
+use tcslib_protocol::{IioConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{

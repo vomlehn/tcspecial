@@ -2,24 +2,23 @@
 //!
 //! The ground station is Python and reads the XML spelling, the standard
 //! library having no YAML; the vehicle and every Rust ground program read
-//! through `tcslibgs`. Where the beacons are and how often they come, where a
-//! ping goes up and where its answer comes down are worked out on both sides,
-//! so this holds the Python's answers for `ping.xtcs` to the Rust's for
+//! through `tcslib-protocol`. Where the beacons are and how often they come,
+//! where a ping goes up and where its answer comes down are worked out on both
+//! sides, so this holds the Python's answers for `ping.xtcs` to the Rust's for
 //! `ping.ytcs` -- which is also the two spellings being held to one another.
-//! The ping node is in the file both ping examples include,
-//! `ping-common/ping`, so the two readers are held to following an include
-//! alike: the ids the ports are counted from, and the digest, which takes
-//! in the include's name.
+//! The ping node is in the file both ping examples include, `ping-common/ping`,
+//! so the two readers are held to following an include alike: the ids the ports
+//! are counted from, and the digest, which takes in the include's name.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
-use tcslibgs::graph::reach::reach_of;
-use tcslibgs::graph::telemetry::{self, Via};
-use tcslibgs::graph::Graph;
-use tcslibgs::EndpointConfig;
+use tcslib_protocol::config_digest::digest_of_file;
+use tcslib_protocol::graph::parameters::{beacon_interval_of, beacon_of};
+use tcslib_protocol::graph::reach::reach_of;
+use tcslib_protocol::graph::telemetry::{self, Via};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::EndpointConfig;
 
 fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()

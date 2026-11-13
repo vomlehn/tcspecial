@@ -218,8 +218,8 @@ class LayoutTest(unittest.TestCase):
     def test_this_trees_interface_is_the_one_the_rust_was_built_with(self):
         # The constant `make interface-digest` wrote for the Rust, read from
         # its source: one digest, computed by two runtimes, must agree.
-        source = (Path(__file__).resolve().parents[2] / "tcslibgs" / "src"
-                  / "interface_digest.rs").read_text()
+        source = (Path(__file__).resolve().parents[2] / "tcslib-protocol"
+                  / "src" / "interface_digest.rs").read_text()
         rust = bytes(int(byte, 16)
                      for byte in __import__("re").findall(r"0x([0-9a-f]{2})",
                                                           source))
@@ -227,7 +227,7 @@ class LayoutTest(unittest.TestCase):
 
     def test_the_beacon_is_what_the_hand_written_packer_wrote(self):
         # What the hand-written packer that came before the generated code
-        # wrote for these beacons, which tcslibgs/src/beacon.rs holds the
+        # wrote for these beacons, which tcslib-protocol/src/beacon.rs holds the
         # Rust to as well.
         digest = bytes.fromhex("d41d8cd98f00b204e9800998ecf8427e")
         face = bytes([0xAB] * 16)

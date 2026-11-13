@@ -11,7 +11,7 @@ hold the Python to the Rust it is written after"""
 # beside this. What is here is the tests, which need the Rust to hold the
 # Python to -- the ports, the APIDs and the checksum the configuration gives.
 [dev-dependencies]
-tcslibgs = { path = "../../tcslibgs" }
+tcslib-protocol = { path = "../../tcslib-protocol" }
 tempfile = "3.27.0"
 # Generates the Yamcs wrapper's XTCE and works it as Yamcs would, which the
 # tests hold to the vehicle's framing: shared with thermostat-yamcs.

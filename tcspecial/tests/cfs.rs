@@ -6,10 +6,10 @@
 //! What is run is `examples/cfs/cfs.ytcs` itself, with each of its sockets
 //! moved to a port nothing holds and its log and state file moved to a
 //! directory of the test's. The test is the cFS end -- a UDP socket speaking
-//! SBN's wire format, as `tcslibgs::sbn` and `tcslibgs::cfs` state it -- and
-//! both payloads. A run against cFS's own Linux build, with SBN, is the test
-//! that the format is SBN's and not only ours; this is the test that the
-//! vehicle keeps to it.
+//! SBN's wire format, as `tcslib_protocol::sbn` and `tcslib_protocol::cfs`
+//! state it -- and both payloads. A run against cFS's own Linux build, with
+//! SBN, is the test that the format is SBN's and not only ours; this is the
+//! test that the vehicle keeps to it.
 
 use std::collections::BTreeSet;
 use std::net::{SocketAddr, UdpSocket};
@@ -17,8 +17,8 @@ use std::path::Path;
 use std::process::{Child, Command as Process, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslibgs::sbn::{self, kind, Header};
-use tcslibgs::{
+use tcslib_protocol::sbn::{self, kind, Header};
+use tcslib_protocol::{
     cfs, Command, CommandStatus, ConfigDigest, ConnectCommand, NodeCommand,
     NodeId, Telemetry,
 };
@@ -390,7 +390,7 @@ fn a_vehicle_answering_to_cfs_is_a_peer_of_its_software_bus() {
         .published(BEACON, Duration::from_secs(5))
         .expect("a beacon on the bus");
     assert!(
-        tcslibgs::Beacon::read(&beacon).is_ok(),
+        tcslib_protocol::Beacon::read(&beacon).is_ok(),
         "the beacon as the radio carries it"
     );
 

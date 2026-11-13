@@ -13,7 +13,7 @@ vehicle's own packets as Yamcs would"""
 # ping-yamcs and thermostat-yamcs take it as a dev-dependency, so that the
 # interpreter they hold the generated XTCE to is written once.
 [dependencies]
-tcslibgs = { path = "../../tcslibgs" }
+tcslib-protocol = { path = "../../tcslib-protocol" }
 tempfile = "3.27.0"
 # Reads the Yamcs wrapper's XTCE, which the tests hold to the vehicle's
 # framing.

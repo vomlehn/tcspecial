@@ -348,9 +348,9 @@ pub const ERROR_TINT: &str = "#c0392b";
 
 /// A type's terminals, as the canvas needs them.
 ///
-/// The same two lists [`tcslibgs::graph::terminals::Terminals`] holds, and for
-/// most types literally those: this is a borrowed copy without the merge rule,
-/// which is a checking question rather than a drawing one.
+/// The same two lists [`tcslib_protocol::graph::terminals::Terminals`] holds,
+/// and for most types literally those: this is a borrowed copy without the
+/// merge rule, which is a checking question rather than a drawing one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Terminals {
     pub sinks: &'static [&'static str],
@@ -968,7 +968,8 @@ pub fn type_band(
 /// This is the drawing's question and not the checking's. A link into a
 /// computation that named `in0` resolves here to the sink the line should be
 /// drawn to; what `in0` *means* is the computation's business, and
-/// [`tcslibgs::graph::terminals::terminal_at`] is what the checking asks.
+/// [`tcslib_protocol::graph::terminals::terminal_at`] is what the checking
+/// asks.
 ///
 /// # Arguments
 ///
@@ -1098,7 +1099,7 @@ pub fn terminal_box(
 
 /// How wide the margin is either side of a subdiagram's page, which holds
 /// the page's edge: the four terminals a line from another file arrives at
-/// or leaves by. See `tcslibgs::graph::exports`.
+/// or leaves by. See `tcslib_protocol::graph::exports`.
 ///
 /// Outside the working panes rather than over them, because the panes are
 /// where nodes go, and an edge drawn over the payload pane's first column
@@ -1242,7 +1243,7 @@ pub enum NodeType {
     I2c,
     Spi,
     /// A temperature sensor on an I2C bus, fixed to a thermal mass: see
-    /// `tcslibgs::node::payload::i2c_tmass`.
+    /// `tcslib_protocol::node::payload::i2c_tmass`.
     I2cTmass,
     /// And one that is a SPI peripheral.
     SpiTmass,
@@ -1255,7 +1256,7 @@ pub enum NodeType {
     Network,
     DeviceFile,
     /// Discrete lines watched, driven, and some of each: see
-    /// `tcslibgs::node::payload::gpio::Kind`.
+    /// `tcslib_protocol::node::payload::gpio::Kind`.
     GpioIn,
     GpioOut,
     GpioInout,
@@ -1271,13 +1272,13 @@ pub enum NodeType {
     /// as payload data, and again as gateway data.
     TeePayload,
     /// A vehicle node that answers each ping from the ground with the
-    /// vehicle's time. See `tcslibgs::node::vehicle::ping`.
+    /// vehicle's time. See `tcslib_protocol::node::vehicle::ping`.
     Ping,
     Log,
     /// A program of the vehicle's own, taking part in the graph over the file
     /// interfaces `tcsapp` describes. Three of them, which differ in which of
     /// the two data interfaces the program is run with: see
-    /// `tcslibgs::node::app`.
+    /// `tcslib_protocol::node::app`.
     AppPayloadVeh,
     AppGatewayVeh,
     AppAllVeh,
@@ -1289,13 +1290,13 @@ pub enum NodeType {
     AppAllPl,
     GatewayRadio,
     /// The ground station again, a Yamcs one: every packet a CCSDS Space
-    /// Packet. See `tcslibgs::gateway`.
+    /// Packet. See `tcslib_protocol::gateway`.
     GatewayYamcs,
     /// A link to an F´ flight computer's bridge component, which the vehicle
-    /// answers to in place of the ground: see `tcslibgs::gateway`.
+    /// answers to in place of the ground: see `tcslib_protocol::gateway`.
     GatewayFprime,
     /// A link to a cFS flight computer's software bus, as a peer of its SBN:
-    /// see `tcslibgs::gateway`.
+    /// see `tcslib_protocol::gateway`.
     GatewayCfs,
     /// A diagram of its own, kept in its own file and shown here as one box.
     Subdiagram,
@@ -1499,11 +1500,12 @@ impl NodeType {
                 ("moc-in-type", false),
                 ("format", false),
             ],
-            // An interface, not a path: see tcslibgs::node::payload::hdlc. The
-            // standard and the clock are required because a line carries no
-            // negotiation; the rate is required only where this end
-            // generates the clock, which the palette cannot say, so it is
-            // shown as optional and the checking has the rule.
+            // An interface, not a path: see
+            // tcslib_protocol::node::payload::hdlc. The standard and the clock
+            // are required because a line carries no negotiation; the rate is
+            // required only where this end generates the clock, which the
+            // palette cannot say, so it is shown as optional and the checking
+            // has the rule.
             NodeType::Hdlc => &[
                 ("interface", true),
                 ("standard", true),
@@ -1632,10 +1634,10 @@ impl NodeType {
                 ("init", false),
                 ("sim_address", false),
             ],
-            // Every term any computation takes, which is what this list is
-            // for: the function itself is required of all of them, and each of
-            // the rest is required by the one function that uses it -- a rule
-            // this list cannot state and `tcslibgs::node::vehicle::compute`
+            // Every term any computation takes, which is what this list is for:
+            // the function itself is required of all of them, and each of the
+            // rest is required by the one function that uses it -- a rule this
+            // list cannot state and `tcslib_protocol::node::vehicle::compute`
             // does. Grouped by computation, in the order the tree offers them.
             //
             // Held against that module by
@@ -1678,17 +1680,17 @@ impl NodeType {
             NodeType::Ping => &[],
             NodeType::Log => &[("directory", true), ("format", true)],
             // Read from the rules rather than repeated, as the terminals are:
-            // what an app node may say is `tcslibgs::node::app`'s, and it
-            // differs by kind -- the argument for a stream is said by the
-            // kinds that handle that stream -- so each of the five asks for
-            // its own and an attribute added there appears in a node's window
+            // what an app node may say is `tcslib_protocol::node::app`'s, and
+            // it differs by kind -- the argument for a stream is said by the
+            // kinds that handle that stream -- so each of the five asks for its
+            // own and an attribute added there appears in a node's window
             // without this file being touched.
             NodeType::AppPayloadVeh
             | NodeType::AppGatewayVeh
             | NodeType::AppAllVeh
             | NodeType::AppPl
             | NodeType::AppAllPl => {
-                tcslibgs::node::app::attributes_of(self.spelling())
+                tcslib_protocol::node::app::attributes_of(self.spelling())
                     .expect("a type that is one of the app kinds")
             }
             NodeType::GatewayRadio => {
@@ -1714,11 +1716,11 @@ impl NodeType {
     /// Which terminals a node of this type has, as the canvas draws them.
     ///
     /// The four names and what each one is belong to
-    /// [`tcslibgs::graph::terminals`], and for every type that module has an
-    /// answer for -- a payload kind, the ground link, a tee --
-    /// this reads it rather than repeating it: a terminal added there appears
-    /// on the canvas without this file being touched, and the two cannot
-    /// disagree about what a payload has.
+    /// [`tcslib_protocol::graph::terminals`], and for every type that module
+    /// has an answer for -- a payload kind, the ground link, a tee -- this
+    /// reads it rather than repeating it: a terminal added there appears on the
+    /// canvas without this file being touched, and the two cannot disagree
+    /// about what a payload has.
     ///
     /// The rest are the types whose terminals that module calls their own
     /// business. The canvas has to draw something, because a terminal is the
@@ -1747,9 +1749,9 @@ impl NodeType {
     ///
     /// The type's sinks and sources.
     pub fn terminals(self) -> Terminals {
-        // What tcslibgs says, where it says anything.
+        // What tcslib-protocol says, where it says anything.
         if let Some(terminals) =
-            tcslibgs::graph::terminals::terminals_of(self.spelling())
+            tcslib_protocol::graph::terminals::terminals_of(self.spelling())
         {
             return Terminals {
                 sinks: terminals.sinks,
@@ -2793,14 +2795,14 @@ mod tests {
 
     /// The editor draws the terminals the schema says a type has.
     ///
-    /// Read from `tcslibgs` rather than copied, so this is a test that the
-    /// reading happens: a terminal added to the schema has to appear on the
+    /// Read from `tcslib-protocol` rather than copied, so this is a test that
+    /// the reading happens: a terminal added to the schema has to appear on the
     /// canvas without anybody remembering to come here.
     #[test]
     fn the_canvas_shows_the_terminals_the_schema_gives_a_type() {
         for t in NodeType::ALL {
             let Some(schema) =
-                tcslibgs::graph::terminals::terminals_of(t.spelling())
+                tcslib_protocol::graph::terminals::terminals_of(t.spelling())
             else {
                 continue;
             };
@@ -2824,8 +2826,9 @@ mod tests {
         // it.
         for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {
             for terminal in t.terminals().each() {
-                let lines =
-                    tcslibgs::node::payload::gpio::Kind::of(t.spelling());
+                let lines = tcslib_protocol::node::payload::gpio::Kind::of(
+                    t.spelling(),
+                );
                 let left = corner_of(terminal).unwrap().left;
                 match *terminal {
                     "world-in" | "moc-out" if lines.is_some() => {

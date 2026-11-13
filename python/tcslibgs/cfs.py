@@ -1,8 +1,9 @@
 """What crosses a cFS software bus: a cFS packet around a tcspecial packet.
 
-The Python spelling of ``tcslibgs/src/cfs.rs``, for the half a ground station
-needs: a command written, and a telemetry packet read. See "What crosses the
-bus" in ``docs/tcspecial-design.rst``. The layouts are cFE's, in a build with
+The Python spelling of ``tcslib-protocol/src/cfs.rs``, for the half a ground
+station needs: a command written, and a telemetry packet read. See "What crosses
+the bus" in ``docs/tcspecial-design.rst``. The layouts are cFE's, in a build
+with
 ``MISSION_INCLUDE_CCSDSEXT_HEADER``, and its message IDs its version 2 mapping;
 every number is most significant byte first::
 

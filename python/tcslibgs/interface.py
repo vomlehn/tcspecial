@@ -1,8 +1,8 @@
 """The interface: the XTCE documents every packet on the link is stated in.
 
-The Python spelling of ``tcslibgs/src/interface.rs``. Two programs speak the
-same interface when the tcs-xtce digests of their documents are the same, and
-tcs-xtce computes that digest alike in Python and Rust, so a ground station
+The Python spelling of ``tcslib-protocol/src/interface.rs``. Two programs speak
+the same interface when the tcs-xtce digests of their documents are the same,
+and tcs-xtce computes that digest alike in Python and Rust, so a ground station
 in Python can compare its copy of the documents with the digest every beacon
 carries.
 """
@@ -14,11 +14,13 @@ from pathlib import Path
 from ._xtce import digest as _digest
 
 #: Where this tree's interface is stated: ``link.xtce`` and ``types.xtce``,
-#: as ``make interface-digest`` in tcslibgs/ takes them. ``fixed.xtce`` beside it holds the
+#: as ``make interface-digest`` in tcslib-protocol/ takes them. ``fixed.xtce``
+#beside it holds the
 #: fixed commands, and ``beacon.xtce`` the beacon, which are not part of the
 #: interface: no change to the interface can touch them. Beside this module rather than found in the
 #: source tree, so that an installed package has them too: ``xtce`` here is a
-#: link to the crate's ``tcslibgs/xtce``, which is the one copy, and installing
+#: link to the crate's ``tcslib-protocol/xtce``, which is the one copy, and
+#installing
 #: the package copies what it links to.
 DOCUMENTS = Path(__file__).resolve().parent / "xtce"
 INTERFACE = (DOCUMENTS / "link.xtce", DOCUMENTS / "types.xtce")
@@ -27,7 +29,7 @@ INTERFACE = (DOCUMENTS / "link.xtce", DOCUMENTS / "types.xtce")
 #: the type takes from the ground and gives back, stated in XTCE for the
 #: ground stations that read it, as ``python/tcslibgs/yamcs.py`` does for
 #: Yamcs. A type's document is its own and the type's code is its other
-#: spelling -- ``ping.xtce`` is what ``tcslibgs::node::vehicle::ping``
+#: spelling -- ``ping.xtce`` is what ``tcslib_protocol::node::vehicle::ping``
 #: writes and reads, and a test there holds the two together -- so it is
 #: named here by the type, and by nothing in a configuration. None of them
 #: is part of the interface, which is tcspecial's commands, and like every
@@ -79,8 +81,8 @@ def of_hex(said):
 def of_configuration(said):
     """The interface a configuration's ``tcspecial`` section names, which
     must be this tree's: the Python spelling of
-    ``tcslibgs::graph::parameters::interface_of``, in the same words where
-    it is stated.
+    ``tcslib_protocol::graph::parameters::interface_of``, in the same words
+    where it is stated.
 
     Args:
         said: The section's ``interface``, or ``None`` where it states none.
@@ -109,8 +111,8 @@ def of_configuration(said):
     if named != ours:
         raise ValueError(
             f"interface is {said}, and this build speaks interface "
-            f"{ours.hex()}, the digest of the tcslibgs/xtce/link.xtce and "
-            "types.xtce it was "
+            f"{ours.hex()}, the digest of the tcslib-protocol/xtce/link.xtce "
+            "and types.xtce it was "
             f"built from: fly this configuration with a build of interface "
             f"{said}, or, once its commands have been checked against this "
             f'build\'s, write interface: "{ours.hex()}"'

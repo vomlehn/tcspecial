@@ -487,7 +487,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tcslib-moc",
- "tcslibgs",
+ "tcslib-protocol",
  "tcsui",
 ]
 
@@ -3691,7 +3691,7 @@ checksum = "b330c9d1b92dfe68442ca20b009c717d5f0b1e3cf4965e62f704c3c6e95a1305"
 name = "ping-yamcs-example"
 version = "0.1.0"
 dependencies = [
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
  "yamcs-common",
 ]
@@ -3700,7 +3700,7 @@ dependencies = [
 name = "ping_example"
 version = "0.1.0"
 dependencies = [
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
 ]
 
@@ -4440,7 +4440,7 @@ version = "0.1.0"
 dependencies = [
  "tcsapp",
  "tcslib-moc",
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
 ]
 
@@ -4850,7 +4850,7 @@ dependencies = [
 name = "tcsdiagram"
 version = "0.1.0"
 dependencies = [
- "tcslibgs",
+ "tcslib-protocol",
 ]
 
 [[package]]
@@ -4872,7 +4872,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tcsdiagram",
- "tcslibgs",
+ "tcslib-protocol",
  "tcsverify",
  "tempfile",
 ]
@@ -4882,7 +4882,7 @@ name = "tcslib-c"
 version = "0.1.0"
 dependencies = [
  "tcslib-moc",
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
 ]
 
@@ -4892,13 +4892,13 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "serde",
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "tcslibgs"
+name = "tcslib-protocol"
 version = "0.1.0"
 dependencies = [
  "leb128",
@@ -4933,7 +4933,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tcslib-moc",
- "tcslibgs",
+ "tcslib-protocol",
  "tcspecial",
  "tcsui",
  "tcsverify",
@@ -4955,7 +4955,7 @@ dependencies = [
  "tcsapp",
  "tcsdiagram",
  "tcslib-moc",
- "tcslibgs",
+ "tcslib-protocol",
  "tcslog",
  "tcsverify",
  "tempfile",
@@ -4976,7 +4976,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tcslib-moc",
- "tcslibgs",
+ "tcslib-protocol",
  "tcsverify",
  "tempfile",
 ]
@@ -4994,7 +4994,7 @@ name = "tcsverify"
 version = "0.1.0"
 dependencies = [
  "serde_json",
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
 ]
 
@@ -5031,7 +5031,7 @@ name = "thermostat-yamcs-example"
 version = "0.1.0"
 dependencies = [
  "serde_json",
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
  "yamcs-common",
 ]
@@ -6401,7 +6401,7 @@ name = "yamcs-common"
 version = "0.1.0"
 dependencies = [
  "quick-xml 0.42.0",
- "tcslibgs",
+ "tcslib-protocol",
  "tempfile",
 ]
 

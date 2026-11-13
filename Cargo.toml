@@ -2,7 +2,7 @@
 resolver = "2"
 
 members = [
-    "tcslibgs",
+    "tcslib-protocol",
     "tcslib-moc",
     "tcspecial",
     "tcsmoc",

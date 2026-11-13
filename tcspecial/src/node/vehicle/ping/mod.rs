@@ -1,10 +1,10 @@
 //! The node that answers the ground's pings.
 //!
 //! Each ping the MOC sends is handed back with the time the vehicle had it
-//! written on the end, so that the ground can see how long one takes to
-//! arrive and to come back, and how far the two clocks are apart. What a ping
-//! and its answer say is `tcslibgs::node::vehicle::ping`, which the ground
-//! reads the answers with; this is only the node.
+//! written on the end, so that the ground can see how long one takes to arrive
+//! and to come back, and how far the two clocks are apart. What a ping and its
+//! answer say is `tcslib_protocol::node::vehicle::ping`, which the ground reads
+//! the answers with; this is only the node.
 //!
 //! What a `ping` node is told is nothing. It has no attributes, and the
 //! configuration check refuses any written on one: what it does is fixed by
@@ -18,7 +18,7 @@
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use tcslibgs::node::vehicle::ping::{self, Reply};
+use tcslib_protocol::node::vehicle::ping::{self, Reply};
 
 /// The answers made and not yet taken.
 ///

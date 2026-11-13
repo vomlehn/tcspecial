@@ -1,7 +1,7 @@
 """SBN's wire format and the cFS packet, held to the Rust by its examples.
 
-The same figures as the tests of ``tcslibgs/src/sbn.rs`` and
-``tcslibgs/src/cfs.rs``, so that the two spellings cannot drift apart
+The same figures as the tests of ``tcslib-protocol/src/sbn.rs`` and
+``tcslib-protocol/src/cfs.rs``, so that the two spellings cannot drift apart
 unnoticed.
 """
 

@@ -3,13 +3,13 @@
 //!
 //! The one way every harness waits -- tcsmoc, `tcssim --wait`, and a test --
 //! so that there is one statement of what the exchange is and of what each
-//! answer means. The messages are `tcslibgs::ready`; the Python ground
+//! answer means. The messages are `tcslib_protocol::ready`; the Python ground
 //! station's library has the same function as `tcslib.simulator.wait`.
 
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
-use tcslibgs::ready::{Answer, Request, SetUpFor, State, ANSWER_BYTES};
+use tcslib_protocol::ready::{Answer, Request, SetUpFor, State, ANSWER_BYTES};
 
 /// How long one request is given before it is sent again. Short, because a
 /// lost request costs nothing but another, and a harness waits on the whole.
@@ -223,9 +223,9 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::sync::Arc;
-    use tcslibgs::config_digest::ConfigDigest;
-    use tcslibgs::ready::{Reason, Request};
-    use tcslibgs::simulate::Mode;
+    use tcslib_protocol::config_digest::ConfigDigest;
+    use tcslib_protocol::ready::{Reason, Request};
+    use tcslib_protocol::simulate::Mode;
 
     /// Makes the run a test's simulator is set up for.
     ///

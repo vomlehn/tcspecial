@@ -16,7 +16,7 @@
 
 use tcslib_moc::matched::Matched;
 use tcslib_moc::{TcsClient, UdpConnection};
-use tcslibgs::{HostPort, TcsResult, Timestamp};
+use tcslib_protocol::{HostPort, TcsResult, Timestamp};
 
 /// The local address the MOC sends from where nothing says otherwise: any
 /// interface, any port.
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn a_link_says_when_it_last_sent_and_received() {
         use std::net::UdpSocket;
-        use tcslibgs::{Command, PingTelemetry, Telemetry};
+        use tcslib_protocol::{Command, PingTelemetry, Telemetry};
 
         // A stub spacecraft that answers one PING on the command link. The
         // payload link is never sent anything by a ping.
@@ -219,7 +219,7 @@ mod tests {
                 Command::read(&buffer[..size]).expect("a valid command");
             let answer = Telemetry::Ping(PingTelemetry::new(
                 command.sequence(),
-                tcslibgs::CommandStatus::Success,
+                tcslib_protocol::CommandStatus::Success,
             ));
             let data = answer.to_bytes();
             spacecraft.send_to(&data, from).expect("the answer is sent");
@@ -265,7 +265,7 @@ mod tests {
     ///
     /// The window's state.
     fn matched() -> Matched {
-        let ours = tcslibgs::ConfigDigest([0x5A; 16]);
+        let ours = tcslib_protocol::ConfigDigest([0x5A; 16]);
         let matched = Matched::for_configuration(ours);
         matched.beacon(
             false,

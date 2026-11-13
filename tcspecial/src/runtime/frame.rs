@@ -2,8 +2,8 @@
 //!
 //! A line delivers bytes with no frame boundaries of its own, so a node on one
 //! states where a read ends -- `max_length`, `read_timeout`, `terminators`,
-//! `length_prefix`; see `tcslibgs::endpoint_config::StreamParams` -- and this
-//! holds what has arrived until one of them says the read is done. A read
+//! `length_prefix`; see `tcslib_protocol::endpoint_config::StreamParams` -- and
+//! this holds what has arrived until one of them says the read is done. A read
 //! then ends on whichever comes first:
 //!
 //! * a terminator, which is the last bytes of the read: the first of them,
@@ -36,7 +36,7 @@
 
 use std::time::{Duration, Instant};
 
-use tcslibgs::endpoint_config::{LengthPrefix, StreamParams};
+use tcslib_protocol::endpoint_config::{LengthPrefix, StreamParams};
 
 /// What has arrived of the read that is under way, and the rule that ends it.
 #[derive(Debug)]

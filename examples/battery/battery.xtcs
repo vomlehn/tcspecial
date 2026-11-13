@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
     <description>A spacecraft's power bus: a solar array and a battery, a power monitor asked over a serial line, the battery's charge counted by a program, and a load shed when the charge runs low</description>
     <tcspecial>
         <beacon>

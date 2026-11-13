@@ -1,8 +1,8 @@
 """What a ping and its answer say, which the ground and the vehicle share.
 
-The Python spelling of ``tcslibgs/src/node/vehicle/ping/mod.rs``, for a ground
-station written in Python. Everything here is said there first; this says it
-again, in the same words, and ``python/tests/test_ping.py`` holds the two to
+The Python spelling of ``tcslib-protocol/src/node/vehicle/ping/mod.rs``, for a
+ground station written in Python. Everything here is said there first; this says
+it again, in the same words, and ``python/tests/test_ping.py`` holds the two to
 one another with the same examples the Rust tests use.
 
 A ping is::
@@ -19,7 +19,7 @@ written with exactly nine digits after the point, so that it says the time to
 the nanosecond: ``1760900000.000000001``.
 
 The same layout is stated field by field in the ping node's interface
-document, ``tcslibgs/xtce/ping.xtce``, for the ground stations that read
+document, ``tcslib-protocol/xtce/ping.xtce``, for the ground stations that read
 XTCE; ``tcslibgs/ping_packet.py`` is generated from it, and the tests hold
 it to this.
 

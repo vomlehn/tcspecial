@@ -1,12 +1,12 @@
 //! One module per node type: what the simulator plays, in families.
 //!
 //! What goes at the far end of a node so that a configuration can be run with
-//! no hardware present. The attributes come from `tcslibgs::node` and the
-//! flight side is `tcspecial::node`; the three trees carry the same names, so
-//! a type is `node/payload/i2c` wherever you are standing.
+//! no hardware present. The attributes come from `tcslib_protocol::node` and
+//! the flight side is `tcspecial::node`; the three trees carry the same names,
+//! so a type is `node/payload/i2c` wherever you are standing.
 //!
-//! See `tcslibgs::node` for why there are three trees rather than one, and for
-//! what the families are.
+//! See `tcslib_protocol::node` for why there are three trees rather than one,
+//! and for what the families are.
 //!
 //! Mostly `payload`, and the reason is what a simulator is for. A simulation of
 //! a thing is only needed where the thing is absent, and what is absent on a

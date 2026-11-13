@@ -2,10 +2,10 @@
 //!
 //! An app node is a node whose work is a program, run by tcspecial, that takes
 //! part in the graph. What a file may say about one, and what is wrong with
-//! what it says, is `tcslibgs::node::app`; the file interfaces it is run with,
-//! the packets they carry and the starting of it are `tcsapp`. What is here is
-//! this kind of node: which of those interfaces it has, and which way each of
-//! them carries data.
+//! what it says, is `tcslib_protocol::node::app`; the file interfaces it is run
+//! with, the packets they carry and the starting of it are `tcsapp`. What is
+//! here is this kind of node: which of those interfaces it has, and which way
+//! each of them carries data.
 //!
 //! One interface, at descriptor 1 of the program, and the program only writes
 //! on it: payload data, which is a reading on its way to the ground. So this
@@ -32,7 +32,7 @@
 use std::process::ExitStatus;
 
 use tcsapp::parent::{self, Arrived, ReadInto, Running, Supports};
-use tcslibgs::node::app::{AppParams, Kind};
+use tcslib_protocol::node::app::{AppParams, Kind};
 
 /// The program this node is, running, and this end of its interface.
 #[derive(Debug)]
@@ -143,7 +143,7 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
 
-    use tcslibgs::node::vehicle::Restart;
+    use tcslib_protocol::node::vehicle::Restart;
 
     /// Writes a simulated program in place of a payload of this kind.
     ///

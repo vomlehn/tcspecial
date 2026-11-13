@@ -46,10 +46,10 @@ use beacon_example::{
     notice_exit, prepare, show_on, wire, Vehicle, WatchWindow,
 };
 use tcslib_moc::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
-use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::graph::parameters::{beacon_interval_of, beacon_of};
-use tcslibgs::graph::Graph;
-use tcslibgs::{ConfigFormat, Spelling};
+use tcslib_protocol::config_digest::digest_of_file;
+use tcslib_protocol::graph::parameters::{beacon_interval_of, beacon_of};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::{ConfigFormat, Spelling};
 use tcsui::Shown;
 
 /// The example's configuration, without its extension: `.yaml` or `.xml`,

@@ -138,7 +138,7 @@ impl Drawn {
 ///
 /// What is drawn, in the one order the model has.
 pub fn of_simulator(
-    sim: &tcslibgs::sim_config::SimConfigFile,
+    sim: &tcslib_protocol::sim_config::SimConfigFile,
     page: Option<&str>,
 ) -> Drawn {
     let mut drawn = Drawn::default();
@@ -178,7 +178,7 @@ pub fn of_simulator(
     drawn.components.retain(|(name, _)| page_of(name) == page);
     for payload in &sim.simulated_payloads {
         if let Some(said) = sim.settings_of(payload).connects {
-            for terminal in tcslibgs::sim_config::terminals_of(&said) {
+            for terminal in tcslib_protocol::sim_config::terminals_of(&said) {
                 drawn
                     .joins
                     .push((payload.name.clone(), terminal.to_string()));
@@ -425,13 +425,13 @@ pub fn node_look(
 /// `true` where one of its type's terminals goes that way; `false` for a
 /// type there is no such component of.
 fn has(kind: &str, output: bool) -> bool {
-    use tcslibgs::node::physics::terminal::Direction;
+    use tcslib_protocol::node::physics::terminal::Direction;
     let wanted = if output {
         Direction::Out
     } else {
         Direction::In
     };
-    tcslibgs::node::physics::terminals_of(kind)
+    tcslib_protocol::node::physics::terminals_of(kind)
         .is_some_and(|all| all.iter().any(|t| t.direction == wanted))
 }
 
@@ -560,10 +560,11 @@ pub fn looks(
             .find(|c| c.name == component)
             .map(|c| c.kind)
             .unwrap_or_default();
-        let input = tcslibgs::node::physics::terminals_of(kind)
+        let input = tcslib_protocol::node::physics::terminals_of(kind)
             .and_then(|all| all.iter().find(|t| t.name == terminal))
             .is_some_and(|t| {
-                t.direction == tcslibgs::node::physics::terminal::Direction::In
+                t.direction
+                    == tcslib_protocol::node::physics::terminal::Direction::In
             });
         let (_, tall) = crate::pane::size_of(node.node_type);
         let mine = end_at(place, !input);
@@ -687,14 +688,14 @@ mod tests {
     /// the top page those it puts on none.
     #[test]
     fn each_page_draws_its_own_components() {
-        let sim = tcslibgs::sim_config::SimConfigFile::parse(
+        let sim = tcslib_protocol::sim_config::SimConfigFile::parse(
             "world:\n  physics:\n    components:\n      \
              - type heater:\n          - component: heater_1\n            \
              power: \"4 W\"\n            voltage: \"28 V\"\n          \
              - component: heater_2\n            power: \"4 W\"\n            \
              voltage: \"28 V\"\n\
              tcsgui:\n  nodes: []\n  pages:\n    zone: [heater_2]\n",
-            tcslibgs::ConfigFormat::Yaml,
+            tcslib_protocol::ConfigFormat::Yaml,
         )
         .expect("the file reads");
         let names = |page| -> Vec<String> {

@@ -20,7 +20,9 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use log::info;
 use nix::poll::PollFlags;
-use tcslibgs::{BitOrder, CsActive, SpiConfig, SpiMode, TcsError, TcsResult};
+use tcslib_protocol::{
+    BitOrder, CsActive, SpiConfig, SpiMode, TcsError, TcsResult,
+};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{

@@ -437,7 +437,7 @@ to one schema:
     The same configuration written in YAML and held to
     ``tcspecial.schema.json``, a JSON Schema.
 
-Both schemas are in ``tcslibgs/schema``, installed under
+Both schemas are in ``tcslib-protocol/schema``, installed under
 ``share/tcspecial/schema``, beside the pair for the simulator's own file.
 They check a file's shape -- which sections there are and which words are
 words -- and not whether it can be flown, which is tcsverify's to say: a file
@@ -467,10 +467,11 @@ error but a file parsed as the wrong language. Nothing was written in it
 that was not also written in YAML.
 
 (The links carry packets stated in XTCE: the fixed commands in
-``tcslibgs/xtce/fixed.xtce``, the beacon in ``tcslibgs/xtce/beacon.xtce``
-and the rest in ``tcslibgs/xtce/link.xtce``. Those are not configuration
-files and are unaffected; a configuration names
-the second, as its ``interface``: see `Which interface it is written for`_.)
+``tcslib-protocol/xtce/fixed.xtce``, the beacon in
+``tcslib-protocol/xtce/beacon.xtce`` and the rest in
+``tcslib-protocol/xtce/link.xtce``. Those are not configuration files and are
+unaffected; a configuration names the second, as its ``interface``: see `Which
+interface it is written for`_.)
 
 Which Files There Are
 =====================
@@ -2000,7 +2001,7 @@ otherwise produces a payload that looks configured and is not:
   not held to this -- it is units per count, not a value, and what it may be
   depends on counts no file states.
 * **A link whose two ends carry different types**. Every terminal of a node
-  carries one type -- one of ``tcslibgs/xtce/types.xtce``'s, ``u8`` to
+  carries one type -- one of ``tcslib-protocol/xtce/types.xtce``'s, ``u8`` to
   ``i64``, ``boolean``, a value type such as ``kelvin`` or
   ``metre_per_second``, ``string`` or ``bytes``, or a structure of them --
   and a link is refused unless the types at its two ends are the same.
@@ -2657,16 +2658,16 @@ digest, also as 32 hex digits:
 
 It is text so that it can be read as it is, in a packet capture, a log or with
 any UDP listener, with nothing to decode it. Its layout is stated in XTCE, in
-``tcslibgs/xtce/beacon.xtce``, as six text fields -- each but the last ended by
-its colon -- and nothing else, so a ground system that reads XTCE can read it
-too. That is what goes on the wire; what the window shows on its ``Last msg:``
-line is written for the window, as ``tcspecial v0.1.0 md5`` and the digest.
-tcspecial writes each beacon, and ``tcslib_moc::beacon`` reads it, with
-``tcslibgs::Beacon``, which the Python in ``python/tcslibgs/beacon.py`` says
-again, held to it by the same examples in their tests. The example's test writes
-the beacon it sends the same way. A beacon is read strictly: anything with a
-field out of its form, a seventh field, a trailing colon or newline, or more
-than 106 bytes, is not a beacon.
+``tcslib-protocol/xtce/beacon.xtce``, as six text fields -- each but the last
+ended by its colon -- and nothing else, so a ground system that reads XTCE can
+read it too. That is what goes on the wire; what the window shows on its ``Last
+msg:`` line is written for the window, as ``tcspecial v0.1.0 md5`` and the
+digest. tcspecial writes each beacon, and ``tcslib_moc::beacon`` reads it, with
+``tcslib_protocol::Beacon``, which the Python in ``python/tcslibgs/beacon.py``
+says again, held to it by the same examples in their tests. The example's test
+writes the beacon it sends the same way. A beacon is read strictly: anything
+with a field out of its form, a seventh field, a trailing colon or newline, or
+more than 106 bytes, is not a beacon.
 
 tcsmoc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
@@ -2710,7 +2711,7 @@ ping, a space, and the vehicle's time, and sends that by its ``world-out``
 link back to the gateway node and so down to the ground, at ``ground_base`` plus
 its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 ``1760900000.000000001``. What a ping and its answer say is
-``tcslibgs::node::vehicle::ping``.
+``tcslib_protocol::node::vehicle::ping``.
 
 The ground station is a Python 3 program, ``ping_gateway.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
@@ -2831,7 +2832,7 @@ somewhere (``bin/yamcsd`` under it):
 It writes a Yamcs configuration from the tcspecial one into a run directory,
 ``/tmp/ping-yamcs`` unless ``--run-dir`` says, so that the ports and APIDs
 are stated once. The mission database is tcspecial's own XTCE,
-``tcslibgs/xtce``, as it is, and ``tcs-ccsds.xtce``, generated from the
+``tcslib-protocol/xtce``, as it is, and ``tcs-ccsds.xtce``, generated from the
 configuration by ``python/tcslibgs/yamcs.py`` with a container or a command
 for every APID it counts: the CCSDS header, what follows it on each APID,
 and CONNECT and the ping, behind a header. Yamcs's links, one on each port,
@@ -2840,7 +2841,7 @@ is written by hand per APID, so a node added to the configuration -- a
 payload nothing touches, or another source drawn into the gateway node --
 has its container in Yamcs the next time the example runs. The ping and its
 answer are laid out by the ping node's interface document,
-``tcslibgs/xtce/ping.xtce``: a ping goes up as the document's command,
+``tcslib-protocol/xtce/ping.xtce``: a ping goes up as the document's command,
 ``/TcsYamcs/Ping``, its text split into the arguments ``Count``,
 ``SentSeconds`` and ``SentNanoseconds`` by the code tcs-xtce generates from
 the document, ``python/tcslibgs/ping_packet.py``, and its answer comes down
@@ -3606,7 +3607,7 @@ The extra brings PyYAML, which a station reading a YAML configuration
 needs. ``tcsui`` needs tkinter, which pip cannot install: ``python3-tk`` on
 Debian, ``python3-tkinter`` on Fedora. The XTCE documents the interface
 digest is taken over, and the part of tcs-xtce that takes it, are inside
-``tcslibgs``, so an installed station needs nothing from the source tree.
+``tcslib-protocol``, so an installed station needs nothing from the source tree.
 
 The Rust programs alone
 -----------------------
@@ -3622,7 +3623,7 @@ Each program's crate installs with cargo, into the prefix's ``bin``:
 cargo installs programs and nothing else, so tcsgui installed this way has
 no descriptions or schemas until ``make install-data`` puts them in
 ``/opt/tcs/share/tcsgui`` and ``/opt/tcs/share/tcspecial/schema``, and an app program installed this way is in
-``bin`` rather than ``libexec``. The library crates -- ``tcslibgs``,
+``bin`` rather than ``libexec``. The library crates -- ``tcslib-protocol``,
 ``tcslib-moc`` and the rest -- are taken by a Rust ground station as path or git
 dependencies, and are not installed.
 
@@ -3990,12 +3991,12 @@ A command link's sender may be written with port ``0`` -- ``tcs_cmd.send:
 still going back to the port its command came from. Yamcs needs it, sending
 its commands from a port the system chooses.
 
-A Yamcs ground station needs a container in its mission database for every
-APID the vehicle sends down, a command for every APID it sends up, and a
-link on every port. ``python/tcslibgs/yamcs.py`` works all of them out of
-the configuration, as ``tcslibgs`` counts the APIDs, so none is written by
-hand and a node added to the configuration is in Yamcs's mission database
-as soon as it is regenerated:
+A Yamcs ground station needs a container in its mission database for every APID
+the vehicle sends down, a command for every APID it sends up, and a link on
+every port. ``python/tcslibgs/yamcs.py`` works all of them out of the
+configuration, as ``tcslib-protocol`` counts the APIDs, so none is written by
+hand and a node added to the configuration is in Yamcs's mission database as
+soon as it is regenerated:
 
 * the beacon's container, ``BeaconPacket``, and the answers',
   ``AnswerPacket``, restricted to ``beacon.apid`` and ``tcs_cmd.apid``, and
@@ -4022,15 +4023,15 @@ as soon as it is regenerated:
   node's ``address`` and ``port``, and on each port a source's data arrives
   at.
 
-What does not depend on the configuration -- the header, the beacon's and
-the answers' layouts, which it takes from ``tcslibgs/xtce``, and CONNECT --
-is ``python/tcslibgs/yamcs.xtce``, to which the generated parts are added.
-A node whose name XTCE does not allow, or that is a name the mission
-database already has, is refused, naming the node, as is an APID used twice.
+What does not depend on the configuration -- the header, the beacon's and the
+answers' layouts, which it takes from ``tcslib-protocol/xtce``, and CONNECT --
+is ``python/tcslibgs/yamcs.xtce``, to which the generated parts are added. A
+node whose name XTCE does not allow, or that is a name the mission database
+already has, is refused, naming the node, as is an APID used twice.
 
 A node type may have an *interface document*: XTCE that states what a node
 of the type takes from the ground and gives back. The ``ping`` type has
-one, ``tcslibgs/xtce/ping.xtce``, which lays a ping out field by field --
+one, ``tcslib-protocol/xtce/ping.xtce``, which lays a ping out field by field --
 the prefix ``ping #``, the count ended by a space, the seconds ended by a
 point and nine digits of nanoseconds -- and its answer as the same, a
 space, and the vehicle's time. The document goes with the type, not with a
@@ -4132,13 +4133,13 @@ for, and every configuration states it:
    tcspecial:
      interface: "c7820f9bfe585feab72247ece0a2261d"
 
-It is the digest of the ``tcslibgs/xtce/link.xtce`` a build was made from --
-the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
+It is the digest of the ``tcslib-protocol/xtce/link.xtce`` a build was made from
+-- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
 lower-case hex digits. A build speaks only the interface it was made from, so
-tcsverify, tcspecial, tcsmoc and the libraries all refuse a configuration
-whose ``interface`` is not their build's, saying both digests: a vehicle
-reading commands with other layouts than the ground's would be doing whatever
-each command happened to mean to it.
+tcsverify, tcspecial, tcsmoc and the libraries all refuse a configuration whose
+``interface`` is not their build's, saying both digests: a vehicle reading
+commands with other layouts than the ground's would be doing whatever each
+command happened to mean to it.
 
 To find the value, ask the build that is to fly it:
 
@@ -4162,34 +4163,33 @@ configuration to the build that is to fly it:
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and
 layout included; a file that is right already is not written. After a
-change to ``tcslibgs/xtce/link.xtce``, ``make set-interfaces`` does it to
+change to ``tcslib-protocol/xtce/link.xtce``, ``make set-interfaces`` does it to
 every configuration shipped in the tree. The
 configuration's checksum covers ``interface``, so a vehicle and a ground
 station whose checksums match are reading the same interface as well.
 
-Every digest you will see on the link stands for ``link.xtce``: the
-beacon's last field is its digest, and the checksums in the beacon, in
-CONNECT and its answer, and in RESTART_ARM and RESTART are configuration
-checksums, which cover ``interface``. None covers
-``tcslibgs/xtce/fixed.xtce``, where the fixed commands are laid out, or
-``tcslibgs/xtce/beacon.xtce``, where the beacon is. Each is the same in
-every build, so there is nothing to compare, and a test in ``tcslibgs``
-fails if either is ever changed. Nor does any cover
-``tcslibgs/xtce/ping.xtce``, the ping node's interface document, which is
-the ping node's and not tcspecial's: a test in ``tcslibgs`` holds it to the
-code that writes and reads a ping instead.
+Every digest you will see on the link stands for ``link.xtce``: the beacon's
+last field is its digest, and the checksums in the beacon, in CONNECT and its
+answer, and in RESTART_ARM and RESTART are configuration checksums, which cover
+``interface``. None covers ``tcslib-protocol/xtce/fixed.xtce``, where the fixed
+commands are laid out, or ``tcslib-protocol/xtce/beacon.xtce``, where the beacon
+is. Each is the same in every build, so there is nothing to compare, and a test
+in ``tcslib-protocol`` fails if either is ever changed. Nor does any cover
+``tcslib-protocol/xtce/ping.xtce``, the ping node's interface document, which is
+the ping node's and not tcspecial's: a test in ``tcslib-protocol`` holds it to
+the code that writes and reads a ping instead.
 
 What the ground is told: the configuration's own XTCE
 -----------------------------------------------------
 
-Beside each configuration is an XTCE document of its own, of its name with
-the extension ``.xtce`` -- ``examples/thermostat/thermostat.xtce`` -- which
-says what the vehicle flying it sends the ground. Each node whose data
-reaches the ground, drawn into a gateway node or a payload nothing touches,
-is a parameter named after the node, of the type its ``world-out`` sends, in
-a container of its own, ``<node>_packet``; the types are copied from
-``tcslibgs/xtce/types.xtce``. A ground station that reads XTCE is given that
-one file, and adds to it how its gateway frames what it sends: the Yamcs
+Beside each configuration is an XTCE document of its own, of its name with the
+extension ``.xtce`` -- ``examples/thermostat/thermostat.xtce`` -- which says
+what the vehicle flying it sends the ground. Each node whose data reaches the
+ground, drawn into a gateway node or a payload nothing touches, is a parameter
+named after the node, of the type its ``world-out`` sends, in a container of its
+own, ``<node>_packet``; the types are copied from
+``tcslib-protocol/xtce/types.xtce``. A ground station that reads XTCE is given
+that one file, and adds to it how its gateway frames what it sends: the Yamcs
 ground programs build Yamcs's mission database on it.
 
 A string or bytes is sent the ground after a count of its bytes. Under
@@ -4697,7 +4697,7 @@ that satisfies both.
    * - `libc <https://crates.io/crates/libc>`__
      - 0.2
      - `0.2.190 <https://docs.rs/libc/0.2.190>`__
-     - tcsapp, tcsgui, tcslib-moc, tcslibgs, tcsmoc, tcspecial, tcssim
+     - tcsapp, tcsgui, tcslib-moc, tcslib-protocol, tcsmoc, tcspecial, tcssim
      - The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.
      - `repository <https://github.com/rust-lang/libc>`__
    * - `log <https://crates.io/crates/log>`__
@@ -4709,7 +4709,7 @@ that satisfies both.
    * - `md5 <https://crates.io/crates/md5>`__
      - 0.8
      - `0.8.1 <https://docs.rs/md5/0.8.1>`__
-     - tcslibgs
+     - tcslib-protocol
      - The digest of a configuration, which both ends compare.
      - `repository <https://github.com/stainless-steel/md5>`__
    * - `nix <https://crates.io/crates/nix>`__
@@ -4727,7 +4727,7 @@ that satisfies both.
    * - `quick-xml <https://crates.io/crates/quick-xml>`__
      - 0.42
      - `0.42.0 <https://docs.rs/quick-xml/0.42.0>`__
-     - tcsgui, tcslibgs
+     - tcsgui, tcslib-protocol
      - Reads configuration files written in XML.
      - `repository <https://github.com/tafia/quick-xml>`__
    * - `rand <https://crates.io/crates/rand>`__
@@ -4745,19 +4745,19 @@ that satisfies both.
    * - `serde <https://crates.io/crates/serde>`__
      - 1.0
      - `1.0.229 <https://docs.rs/serde/1.0.229>`__
-     - tcsgui, tcslib-moc, tcslibgs, tcsmoc, tcspecial, tcssim
+     - tcsgui, tcslib-moc, tcslib-protocol, tcsmoc, tcspecial, tcssim
      - Turns the configuration, the commands and the telemetry into Rust types and back.
      - `repository <https://github.com/serde-rs/serde>`__
    * - `serde_json <https://crates.io/crates/serde_json>`__
      - 1.0
      - `1.0.151 <https://docs.rs/serde_json/1.0.151>`__
-     - tcsgui (tests only), tcslibgs, tcsverify
+     - tcsgui (tests only), tcslib-protocol, tcsverify
      - The value tree a configuration's digest is taken over and its two spellings are compared as, and the schema tests. Nothing on the link is JSON.
      - `repository <https://github.com/serde-rs/json>`__
    * - `serde_norway <https://crates.io/crates/serde_norway>`__
      - 0.9.42
      - `0.9.42 <https://docs.rs/serde_norway/0.9.42>`__
-     - tcsgui, tcslibgs
+     - tcsgui, tcslib-protocol
      - Reads configuration files written in YAML, and the editor's undo
        history, which it keeps on disk.
      - `repository <https://github.com/cafkafk/serde-yaml>`__
@@ -4790,7 +4790,7 @@ that satisfies both.
    * - `tcs-xtce <https://crates.io/crates/tcs-xtce>`__
      - =0.4.0
      - `0.4.0 <https://docs.rs/tcs-xtce/0.4.0>`__
-     - tcslibgs
+     - tcslib-protocol
      - The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are taken from a checkout of it beside this tree, ``../tcs-xtce``, at the same version.
      - `repository <https://github.com/vomlehn/tcs-xtce>`__
    * - `tcslog <https://crates.io/crates/tcslog>`__
@@ -4808,7 +4808,7 @@ that satisfies both.
    * - `thiserror <https://crates.io/crates/thiserror>`__
      - 1.0
      - `1.0.69 <https://docs.rs/thiserror/1.0.69>`__
-     - tcslib-moc, tcslibgs, tcspecial
+     - tcslib-moc, tcslib-protocol, tcspecial
      - Writes the error types and their messages.
      - `repository <https://github.com/dtolnay/thiserror>`__
 

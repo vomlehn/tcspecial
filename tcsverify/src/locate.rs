@@ -1,6 +1,6 @@
 //! Which line of a file an entry was written on.
 //!
-//! The rules in `tcslibgs` have never seen a file. A parser hands up a
+//! The rules in `tcslib-protocol` have never seen a file. A parser hands up a
 //! document and the lines are gone by then, so a problem says which payload
 //! or group it is about and this works out where that payload or group is
 //! written. It is the same thing a reader does with the error a program
@@ -18,7 +18,7 @@
 
 use std::collections::BTreeMap;
 
-use tcslibgs::{About, ConfigFormat};
+use tcslib_protocol::{About, ConfigFormat};
 
 /// Where each named entry of a file is, and where each of its sections is.
 ///
@@ -71,8 +71,8 @@ impl Where {
         // Which sections an entry of this kind may be written in, and the name
         // to look for. Three for a node: the sections are the editor's three
         // working panes, and which one a node is in is decided by its type --
-        // see `tcslibgs::graph::section_of` -- so a complaint about a node has
-        // to be looked for in all of them.
+        // see `tcslib_protocol::graph::section_of` -- so a complaint about a
+        // node has to be looked for in all of them.
         let (sections, name): (&[&str], &String) = match about {
             About::File => return THE_FILE_ITSELF,
             About::Section(section) => {
@@ -147,7 +147,7 @@ fn name_key(section: &str) -> String {
         "simulated_payloads" => "payload",
         "simulated_payload_groups" => "group",
         "world" => "component",
-        _ => tcslibgs::graph::Section::ALL
+        _ => tcslib_protocol::graph::Section::ALL
             .into_iter()
             .find(|s| s.name() == section)
             .map_or("name", |s| s.node_word()),
@@ -220,11 +220,11 @@ fn yaml(text: &str) -> Where {
 
         // The world's ambient temperature and its physics' connections,
         // which a problem with either is reported at: see
-        // `tcslibgs::node::physics::AMBIENT` and `CONNECTIONS`.
+        // `tcslib_protocol::node::physics::AMBIENT` and `CONNECTIONS`.
         if section == "world" {
             for (key, at) in [
-                ("ambient_temp:", tcslibgs::node::physics::AMBIENT),
-                ("connections:", tcslibgs::node::physics::CONNECTIONS),
+                ("ambient_temp:", tcslib_protocol::node::physics::AMBIENT),
+                ("connections:", tcslib_protocol::node::physics::CONNECTIONS),
             ] {
                 if trimmed.starts_with(key) {
                     found.note_section(at, number);
@@ -514,12 +514,15 @@ simulated_payloads:
         let found = Where::of(model, ConfigFormat::Yaml);
         assert_eq!(found.line_of(&About::PhysicsComponent("h".to_string())), 6);
         assert_eq!(
-            found
-                .line_of(&About::Section(tcslibgs::node::physics::CONNECTIONS)),
+            found.line_of(&About::Section(
+                tcslib_protocol::node::physics::CONNECTIONS
+            )),
             7
         );
         assert_eq!(
-            found.line_of(&About::Section(tcslibgs::node::physics::AMBIENT)),
+            found.line_of(&About::Section(
+                tcslib_protocol::node::physics::AMBIENT
+            )),
             2
         );
     }

@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use log::error;
 
-use tcslibgs::{CIConfig, TcsError, TcsResult};
+use tcslib_protocol::{CIConfig, TcsError, TcsResult};
 use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
 
 use crate::config::constants::{TELEMETRY_LOG_PREFIX, TELEMETRY_LOG_SUFFIX};

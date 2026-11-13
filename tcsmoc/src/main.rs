@@ -11,9 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use tcslibgs::config::payload_path_from_args;
-use tcslibgs::simulate::Mode;
-use tcslibgs::{Edge, NO_TRANSFER_TIME};
+use tcslib_protocol::config::payload_path_from_args;
+use tcslib_protocol::simulate::Mode;
+use tcslib_protocol::{Edge, NO_TRANSFER_TIME};
 use tcsverify::startup::Startup;
 
 use crate::oc_link::Arrivals;
@@ -355,10 +355,10 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
 
 /// Which simulator file goes with this payload set, if it has one.
 ///
-/// The one `PAYLOAD_SIM_YAML` names, and otherwise the one beside the
-/// tcspecial configuration and named for it -- see
-/// `tcslibgs::config::sim_path_beside`, which tcssim asks as well -- which is
-/// the convention the whole payload set mechanism rests on.
+/// The one `PAYLOAD_SIM_YAML` names, and otherwise the one beside the tcspecial
+/// configuration and named for it -- see
+/// `tcslib_protocol::config::sim_path_beside`, which tcssim asks as well --
+/// which is the convention the whole payload set mechanism rests on.
 ///
 /// `None` for a set with no simulator file beside it, which is a set with
 /// nothing simulated. It used to fall back to one named here, which was
@@ -377,7 +377,7 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
 fn sim_path_for(payload_path: &str) -> Option<String> {
     match env::var(SIM_CONFIG_PATH_VAR) {
         Ok(named) => Some(named),
-        Err(_) => tcslibgs::config::sim_path_beside(payload_path),
+        Err(_) => tcslib_protocol::config::sim_path_beside(payload_path),
     }
 }
 
@@ -463,7 +463,7 @@ fn stop(startup: &Startup) -> ! {
 /// # Returns
 ///
 /// The time of day, or the placeholder.
-pub(crate) fn shown_time(at: Option<tcslibgs::Timestamp>) -> String {
+pub(crate) fn shown_time(at: Option<tcslib_protocol::Timestamp>) -> String {
     match at {
         Some(at) => at.time_of_day(),
         None => NO_TRANSFER_TIME.to_string(),
@@ -547,7 +547,7 @@ fn update_row(
 /// could run twice at once, or alongside a real session.
 ///
 /// With the MOC's own simulation mode, so that the two cannot disagree in a
-/// run the MOC started: see `tcslibgs::simulate`.
+/// run the MOC started: see `tcslib_protocol::simulate`.
 ///
 /// Which program is run depends on where the MOC is. An installed MOC --
 /// `/opt/tcs/bin/tcsmoc` -- runs the child installed beside it, from the same
@@ -580,7 +580,7 @@ fn child_command(
     mode: Mode,
     installed: Option<&Path>,
 ) -> Result<Command, String> {
-    let flag = format!("{}={mode}", tcslibgs::simulate::FLAG);
+    let flag = format!("{}={mode}", tcslib_protocol::simulate::FLAG);
     if let Some(program) = child_program(name, installed)? {
         let mut command = Command::new(program);
         command.args([flag.as_str(), payload_path]);
@@ -844,15 +844,15 @@ fn main() {
     // Read the payload configuration before anything else, so a file the MOC
     // cannot read is reported before subprocesses are started and a window
     // appears. The window is built from what this file says: the number of
-    // panels, the grid they sit in, and the size the window opens at all
-    // follow from how many data handlers it describes.
-    // No variable of its own: the MOC starts the other two and they inherit
-    // its environment, so a variable here would name their file as well.
-    // The run's simulation mode, given to both programs this starts: see
-    // `tcslibgs::simulate`. Under the flight setting, which is what a run
-    // without the flag gets, tcssim is not started at all.
+    // panels, the grid they sit in, and the size the window opens at all follow
+    // from how many data handlers it describes. No variable of its own: the MOC
+    // starts the other two and they inherit its environment, so a variable here
+    // would name their file as well. The run's simulation mode, given to both
+    // programs this starts: see `tcslib_protocol::simulate`. Under the flight
+    // setting, which is what a run without the flag gets, tcssim is not started
+    // at all.
     let (mode, args) =
-        match tcslibgs::simulate::take_mode(env::args().collect()) {
+        match tcslib_protocol::simulate::take_mode(env::args().collect()) {
             Ok(taken) => taken,
             Err(e) => {
                 eprintln!("tcsmoc: {e}");
@@ -903,7 +903,7 @@ fn main() {
 /// than what it was given, and the bottom of the display is the display's
 /// height less the window's.
 ///
-/// A request, and not a thing to report on: see `tcslibgs::display`.
+/// A request, and not a thing to report on: see `tcslib_protocol::display`.
 ///
 /// # Arguments
 ///
@@ -918,9 +918,9 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
-            if let Some(y) = tcslibgs::display::top_of(
+            if let Some(y) = tcslib_protocol::display::top_of(
                 edge,
-                tcslibgs::screen_height(),
+                tcslib_protocol::screen_height(),
                 window.size().height,
             ) {
                 window.set_position(slint::PhysicalPosition::new(0, y));
@@ -1173,7 +1173,7 @@ mod tests {
 
     use std::ffi::OsStr;
     use std::path::Path;
-    use tcslibgs::config::DEFAULT_PAYLOAD_CONFIG_PATH;
+    use tcslib_protocol::config::DEFAULT_PAYLOAD_CONFIG_PATH;
 
     /// A panel for a source called `name`, in row `row`.
     ///
@@ -1433,10 +1433,11 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let graph = tcslibgs::graph::Graph::load(&path).unwrap_or_else(|e| {
-            panic!("{} failed to load: {e}", path.display())
-        });
-        let links = tcslibgs::graph::telemetry::of(&graph)
+        let graph =
+            tcslib_protocol::graph::Graph::load(&path).unwrap_or_else(|e| {
+                panic!("{} failed to load: {e}", path.display())
+            });
+        let links = tcslib_protocol::graph::telemetry::of(&graph)
             .expect("its links to the ground");
         let shipped = crate::vehicle::panels(
             &graph,
@@ -1880,18 +1881,18 @@ mod tests {
 
         // One file says it, and one function reads it, which is what both
         // ends call: tcspecial resolves the pair the same way.
-        let graph =
-            tcslibgs::graph::Graph::load(&payload_path).unwrap_or_else(|e| {
+        let graph = tcslib_protocol::graph::Graph::load(&payload_path)
+            .unwrap_or_else(|e| {
                 panic!("{} failed to load: {e}", payload_path.display())
             });
-        let mine = tcslibgs::graph::parameters::beacon_of(&graph)
+        let mine = tcslib_protocol::graph::parameters::beacon_of(&graph)
             .expect("its tcspecial section reads")
             .expect("the shipped fixture states a beacon");
 
         // What the file itself says, in its own words.
         let section = graph.tcspecial.as_ref().expect("a tcspecial section");
-        let said = tcslibgs::graph::parameters::ci_config_of(
-            &tcslibgs::graph::parameters::flatten(section),
+        let said = tcslib_protocol::graph::parameters::ci_config_of(
+            &tcslib_protocol::graph::parameters::flatten(section),
         )
         .expect("the section reads");
         assert_eq!(Some(mine.send.to_string()), said.beacon.send);
@@ -2268,7 +2269,7 @@ mod tests {
     #[test]
     fn a_panel_counts_what_arrived_at_the_ground() {
         use crate::oc_link::Arrival;
-        use tcslibgs::{DHSample, Timestamp};
+        use tcslib_protocol::{DHSample, Timestamp};
         let model: Rc<VecModel<DHInfo>> =
             Rc::new(VecModel::from(vec![a_panel(0, "DH0"), a_panel(1, "DH1")]));
 
@@ -2471,10 +2472,11 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join(DEFAULT_PAYLOAD_CONFIG_PATH);
-        let graph = tcslibgs::graph::Graph::load(&path).unwrap_or_else(|e| {
-            panic!("{} failed to load: {e}", path.display())
-        });
-        let links = tcslibgs::graph::telemetry::of(&graph)
+        let graph =
+            tcslib_protocol::graph::Graph::load(&path).unwrap_or_else(|e| {
+                panic!("{} failed to load: {e}", path.display())
+            });
+        let links = tcslib_protocol::graph::telemetry::of(&graph)
             .expect("its links to the ground");
         let model = crate::vehicle::panels(
             &graph,

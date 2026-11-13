@@ -24,8 +24,8 @@
 //! Every setting as the words a file holds, for the reason the `tcspecial`
 //! section is: the editor has to be able to write an interval somebody is
 //! halfway through typing, and a file it cannot read back is a file it has
-//! destroyed. The names come from `tcslibgs::sim_config::SETTINGS`, which is
-//! the one list of what a setting may be called, and a value nothing
+//! destroyed. The names come from `tcslib_protocol::sim_config::SETTINGS`,
+//! which is the one list of what a setting may be called, and a value nothing
 //! recognises is kept rather than dropped -- a file from a later build is
 //! readable, and a setting nobody can see is one that gets written back out
 //! without anybody knowing it is there.
@@ -35,8 +35,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use tcslibgs::endpoint_config::Scalar;
-use tcslibgs::format::ConfigFormat;
+use tcslib_protocol::endpoint_config::Scalar;
+use tcslib_protocol::format::ConfigFormat;
 
 /// What one group or one simulated payload says, by setting name.
 pub type Settings = BTreeMap<String, String>;
@@ -120,7 +120,7 @@ pub struct World {
     Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize,
 )]
 pub struct PhysicsComponent {
-    /// Its type, one of `tcslibgs::node::physics::TYPES`.
+    /// Its type, one of `tcslib_protocol::node::physics::TYPES`.
     pub kind: String,
     /// What it states, by setting name.
     pub settings: Settings,
@@ -188,7 +188,7 @@ impl World {
         }
         let mut text = String::new();
         world_written(&mut text, self, true);
-        match tcslibgs::sim_config::SimConfigFile::parse(
+        match tcslib_protocol::sim_config::SimConfigFile::parse(
             &text,
             ConfigFormat::Yaml,
         ) {
@@ -240,7 +240,7 @@ impl Simulator {
             .iter()
             .filter_map(|(payload, settings)| {
                 let said = settings.get("connects")?;
-                tcslibgs::sim_config::terminals_of(said)
+                tcslib_protocol::sim_config::terminals_of(said)
                     .any(|terminal| terminal.starts_with(&mine))
                     .then(|| (payload.clone(), said.clone()))
             })
@@ -350,11 +350,11 @@ impl Simulator {
             // as it was written.
             if let Some(said) = settings.get_mut("connects") {
                 let named: Vec<String> =
-                    tcslibgs::sim_config::terminals_of(said)
+                    tcslib_protocol::sim_config::terminals_of(said)
                         .map(moved)
                         .collect();
                 let was_said: Vec<&str> =
-                    tcslibgs::sim_config::terminals_of(said).collect();
+                    tcslib_protocol::sim_config::terminals_of(said).collect();
                 if named.iter().zip(&was_said).any(|(now, was)| now != was) {
                     *said = named.join(", ");
                 }
@@ -398,7 +398,7 @@ impl Simulator {
         if payload {
             fields.push("group");
         }
-        fields.extend(tcslibgs::sim_config::SETTINGS.iter().copied());
+        fields.extend(tcslib_protocol::sim_config::SETTINGS.iter().copied());
         fields
     }
 }
@@ -408,8 +408,8 @@ impl Simulator {
 /// Its name, the type a simulated payload is written under, and everything
 /// else: the settings are taken as the words they are, so that one nothing
 /// recognises is kept rather than thrown away. Read by
-/// `tcslibgs::sim_grouped`, as the simulator reads its own, so that the two
-/// read the one shape.
+/// `tcslib_protocol::sim_grouped`, as the simulator reads its own, so that the
+/// two read the one shape.
 #[derive(Debug, Deserialize)]
 struct Entry {
     #[serde(default)]
@@ -420,7 +420,7 @@ struct Entry {
     said: BTreeMap<String, Scalar>,
 }
 
-impl tcslibgs::sim_grouped::SimEntry for Entry {
+impl tcslib_protocol::sim_grouped::SimEntry for Entry {
     fn name(&self) -> &str {
         &self.name
     }
@@ -432,9 +432,10 @@ impl tcslibgs::sim_grouped::SimEntry for Entry {
 
 /// A simulator configuration file, as it parses.
 ///
-/// Permissive on purpose, and not [`tcslibgs::sim_config::SimConfigFile`]: that
-/// one reads the settings into the types the simulator wants, which is right
-/// for running and wrong for editing. Half a number is not a number yet.
+/// Permissive on purpose, and not
+/// [`tcslib_protocol::sim_config::SimConfigFile`]: that one reads the settings
+/// into the types the simulator wants, which is right for running and wrong for
+/// editing. Half a number is not a number yet.
 #[derive(Debug, Deserialize)]
 struct File {
     #[serde(default)]
@@ -447,14 +448,20 @@ struct File {
     /// parts: read only to be refused, as every program refuses it.
     #[serde(default)]
     thermal_mass: Option<serde::de::IgnoredAny>,
-    #[serde(default, deserialize_with = "tcslibgs::sim_grouped::groups")]
+    #[serde(
+        default,
+        deserialize_with = "tcslib_protocol::sim_grouped::groups"
+    )]
     simulated_payload_groups: Vec<Entry>,
-    #[serde(default, deserialize_with = "tcslibgs::sim_grouped::payloads")]
+    #[serde(
+        default,
+        deserialize_with = "tcslib_protocol::sim_grouped::payloads"
+    )]
     simulated_payloads: Vec<Entry>,
     /// Where the editor drew each physics component, read as every program
     /// reads it.
     #[serde(default)]
-    tcsgui: Option<tcslibgs::sim_config::SimTcsgui>,
+    tcsgui: Option<tcslib_protocol::sim_config::SimTcsgui>,
 }
 
 /// The `world` section, as it parses: permissive, as [`File`] is.
@@ -517,12 +524,14 @@ fn world_of(file: WorldFile) -> Result<World, String> {
         for (key, components) in entry {
             let kind = key
                 .strip_prefix("type ")
-                .filter(|kind| tcslibgs::node::physics::TYPES.contains(kind))
+                .filter(|kind| {
+                    tcslib_protocol::node::physics::TYPES.contains(kind)
+                })
                 .ok_or_else(|| {
                     format!(
                         "physics components: \"{key}\" is not the word type \
                          and one of {}",
-                        tcslibgs::node::physics::TYPES.join(", ")
+                        tcslib_protocol::node::physics::TYPES.join(", ")
                     )
                 })?;
             for mut said in components {
@@ -666,14 +675,15 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     // A file in the shape it had before its payloads were grouped by type
     // is refused and left as it is, as every program refuses it: read as
     // nothing, it would be written away at the next edit.
-    if let Some(why) = tcslibgs::sim_reshaped::sim_refused(&text, format) {
+    if let Some(why) = tcslib_protocol::sim_reshaped::sim_refused(&text, format)
+    {
         return Err(Trouble::Unusable(why));
     }
     let file: File = format.parse(&text).map_err(|e| unreadable(&e))?;
 
     if file.thermal_mass.is_some() {
         return Err(Trouble::Unusable(
-            tcslibgs::sim_config::MOVED_THERMAL_MASS.to_string(),
+            tcslib_protocol::sim_config::MOVED_THERMAL_MASS.to_string(),
         ));
     }
     simulator.description = file.description;
@@ -1006,7 +1016,7 @@ fn world_written(out: &mut String, world: &World, checking: bool) {
                 name_scalar(name)
             ));
             let mut settings: Vec<&str> = if checking {
-                tcslibgs::node::physics::settings_of(kind)
+                tcslib_protocol::node::physics::settings_of(kind)
                     .unwrap_or_default()
                     .to_vec()
             } else {
@@ -1379,7 +1389,7 @@ mod tests {
         assert_eq!(back.world.ambient_temp, "283.15 K");
 
         // And the simulator's own reader takes what the editor wrote.
-        let file = tcslibgs::sim_config::SimConfigFile::load(&path)
+        let file = tcslib_protocol::sim_config::SimConfigFile::load(&path)
             .expect("the simulator reads what the editor wrote");
         let model = file.world.expect("the model");
         assert_eq!(model.physics.components.len(), 2);
@@ -1507,7 +1517,7 @@ mod tests {
 
         let payloads = [("payload".to_string(), "network".to_string())];
         std::fs::write(&path, to_yaml(&simulator, &payloads)).expect("written");
-        let theirs = tcslibgs::sim_config::SimConfigFile::load(&path)
+        let theirs = tcslib_protocol::sim_config::SimConfigFile::load(&path)
             .expect("the simulator should read what the editor wrote");
         assert_eq!(theirs.simulated_payloads.len(), 1);
         assert!(
@@ -1601,7 +1611,7 @@ mod tests {
         );
         assert!(at("packet_interval:") < at("simulate:"), "{written}");
         std::fs::write(&path, &written).expect("written");
-        tcslibgs::sim_config::SimConfigFile::load(&path)
+        tcslib_protocol::sim_config::SimConfigFile::load(&path)
             .expect("the simulator reads it");
 
         let old = "simulated_payloads:\n  - name: a\n    type: spi\n";
@@ -1622,7 +1632,7 @@ mod tests {
 
         assert_eq!(payload.first(), Some(&"group"));
         assert!(!group.contains(&"group"), "a group has no group");
-        for setting in tcslibgs::sim_config::SETTINGS {
+        for setting in tcslib_protocol::sim_config::SETTINGS {
             assert!(payload.contains(setting), "{setting}");
             assert!(group.contains(setting), "{setting}");
         }

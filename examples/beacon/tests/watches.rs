@@ -8,16 +8,16 @@
 //!
 //! The beacon is sent by this test rather than by tcspecial. What tcspecial
 //! does with the same two addresses is its own tests' business; the datagram
-//! is the same either way, being the one `tcslibgs` packs with tcs-xtce.
+//! is the same either way, being the one `tcslib-protocol` packs with tcs-xtce.
 
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
 
 use tcslib_moc::beacon::{Arrived, Beacons, Contact, Schedule, Stage};
-use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::graph::parameters::beacon_of;
-use tcslibgs::graph::Graph;
-use tcslibgs::{Beacon, ConfigDigest, ConfigVersion};
+use tcslib_protocol::config_digest::digest_of_file;
+use tcslib_protocol::graph::parameters::beacon_of;
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::{Beacon, ConfigDigest, ConfigVersion};
 
 /// The example's configuration, found from this crate rather than from
 /// wherever the test was run.
@@ -85,7 +85,7 @@ fn a_beacon_from_the_configured_address_is_heard() {
     let mut station = match Beacons::listening(
         tcslib_moc::beacon::Link {
             send: link.send.clone(),
-            recv: tcslibgs::HostPort {
+            recv: tcslib_protocol::HostPort {
                 address: at.ip().to_string(),
                 port: at.port(),
             },
@@ -103,8 +103,8 @@ fn a_beacon_from_the_configured_address_is_heard() {
     };
 
     let version = ConfigVersion::of_this_build();
-    // Packed by tcs-xtce, from the layout in tcslibgs/xtce/beacon.xtcs, as
-    // tcspecial packs every beacon it sends.
+    // Packed by tcs-xtce, from the layout in tcslib-protocol/xtce/beacon.xtcs,
+    // as tcspecial packs every beacon it sends.
     let beacon = Beacon::new(7, version, ConfigDigest([0x5a; 16])).to_bytes();
     vehicle.send_to(&beacon, at).expect("the vehicle beacons");
 

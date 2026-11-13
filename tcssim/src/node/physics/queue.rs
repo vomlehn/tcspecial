@@ -24,12 +24,12 @@ struct Due {
 /// Every component's next event, soonest first.
 #[derive(Debug)]
 pub struct Queue {
-    /// Soonest first; of two at one moment, the component whose place is
-    /// first, which is the component whose name sorts first: the world's
-    /// components are in name order, as `tcslibgs::node::physics::Model` holds them,
-    /// and never in the order a file wrote them. A name is one component's
-    /// alone, so this is the whole of the order, and no second key is
-    /// wanted.
+    /// Soonest first; of two at one moment, the component whose place is first,
+    /// which is the component whose name sorts first: the world's components
+    /// are in name order, as `tcslib_protocol::node::physics::Model` holds
+    /// them, and never in the order a file wrote them. A name is one
+    /// component's alone, so this is the whole of the order, and no second key
+    /// is wanted.
     due: Vec<Due>,
 }
 

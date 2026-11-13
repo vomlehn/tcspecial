@@ -125,8 +125,9 @@ class ConfigurationTest(unittest.TestCase):
                 config.uplink("m")
 
     def test_every_file_the_two_readers_refuse_is_refused(self):
-        # tests/refused, which tcslibgs::graph::grouped holds the Rust reader
-        # to as well: the two refuse the same things, at the line of each.
+        # tests/refused, which tcslib_protocol::graph::grouped holds the Rust
+        # reader to as well: the two refuse the same things, at the line of
+        # each.
         files = sorted((ROOT / "tests" / "refused").iterdir())
         self.assertGreater(len(files), 20)
         for path in files:

@@ -3,8 +3,8 @@
 //! A gateway node is the ground's end of the vehicle's data. tcspecial sends
 //! what each node drawn into it produces as UDP datagrams to the node's
 //! `ground_base` address, at its port plus the source node's device id -- see
-//! `tcslibgs::graph::telemetry`, which is where both ends work that out. So a
-//! gateway node is a set of ports, one per source, and the port a datagram
+//! `tcslib_protocol::graph::telemetry`, which is where both ends work that out.
+//! So a gateway node is a set of ports, one per source, and the port a datagram
 //! arrives at says which node sent it.
 //!
 //! Ground software does not open those ports itself. It names the gateway node
@@ -20,9 +20,9 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use tcslibgs::graph::telemetry::{self, Telemetered, Via};
-use tcslibgs::graph::Graph;
-use tcslibgs::link_type::{uncounted, Count};
+use tcslib_protocol::graph::telemetry::{self, Telemetered, Via};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::link_type::{uncounted, Count};
 
 use crate::matched::Matched;
 
@@ -122,7 +122,8 @@ impl GatewayReceiver {
         gateway: &str,
     ) -> Result<GatewayReceiver, String> {
         match graph.node(gateway) {
-            Some(node) if tcslibgs::gateway::is_gateway(&node.node_type) => {}
+            Some(node)
+                if tcslib_protocol::gateway::is_gateway(&node.node_type) => {}
             Some(node) => {
                 return Err(format!(
                     "\"{gateway}\" is a {} node, not a gateway node",
@@ -558,7 +559,7 @@ mod tests {
     /// The datagram.
     fn sent(data: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        tcslibgs::link_type::counted(data, Count::Groups, &mut out)
+        tcslib_protocol::link_type::counted(data, Count::Groups, &mut out)
             .expect("counted");
         out
     }
@@ -726,7 +727,7 @@ payloads:
     #[test]
     fn a_gated_node_reads_only_while_matched() {
         use crate::beacon::Stage;
-        use tcslibgs::ConfigDigest;
+        use tcslib_protocol::ConfigDigest;
 
         let ours = ConfigDigest([0x5A; 16]);
         let port = a_free_port();
@@ -793,12 +794,12 @@ payloads:
         // Somewhere free instead of the example's 6100.
         let port = a_free_port();
         let section = graph.tcspecial.as_mut().expect("a section");
-        let mut flat = tcslibgs::graph::parameters::flatten(section);
+        let mut flat = tcslib_protocol::graph::parameters::flatten(section);
         flat.insert(
             "payload_telemetry.dest_base".to_string(),
-            tcslibgs::Scalar::of(format!("127.0.0.1:{port}")),
+            tcslib_protocol::Scalar::of(format!("127.0.0.1:{port}")),
         );
-        *section = tcslibgs::graph::parameters::nest(&flat);
+        *section = tcslib_protocol::graph::parameters::nest(&flat);
 
         let mut ground = GatewayReceiver::open_payload_telemetry(&graph)
             .expect("it opens")

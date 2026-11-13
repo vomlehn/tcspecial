@@ -121,7 +121,7 @@ configuration.
   --interface-digest print the digest of the interface this build speaks,
                      the 32 lower-case hex digits a configuration's
                      tcspecial section gives as its interface, and exit.
-                     It is the digest of the tcslibgs/xtce/link.xtce and
+                     It is the digest of the tcslib-protocol/xtce/link.xtce and
                      types.xtce the build was made from, which every beacon carries, and
                      a configuration naming another is refused by this
                      build's tcsverify, tcspecial and ground programs
@@ -141,7 +141,7 @@ configuration.
                      its tcspecial section's interface, in place, every
                      other byte of the file left as it was, and say for
                      each what was changed; a file that names it already
-                     is not written. For when tcslibgs/xtce/link.xtce or
+                     is not written. For when tcslib-protocol/xtce/link.xtce or
                      types.xtce has changed and every configuration is
                      to follow it
   --xtce             with one or more configurations and nothing else:
@@ -198,7 +198,7 @@ const XTCE_FLAG: &str = "--xtce";
 const XTCE_CHECK_FLAG: &str = "--xtce-check";
 
 /// Keeps the configuration, once checked, in the directory given: see
-/// `tcslibgs::store`.
+/// `tcslib_protocol::store`.
 const KEEP_FLAG: &str = "--keep=";
 
 /// Writes the F´ model of the configuration's bridge, once checked, into
@@ -232,7 +232,8 @@ fn main() -> ExitCode {
     let mut summary = false;
     let mut keep: Option<PathBuf> = None;
     let mut fprime_model: Option<PathBuf> = None;
-    let mut built: Vec<&str> = tcslibgs::graph::built::OPTIONAL_TYPES.to_vec();
+    let mut built: Vec<&str> =
+        tcslib_protocol::graph::built::OPTIONAL_TYPES.to_vec();
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.iter().any(|arg| arg == INTERFACE_DIGEST_FLAG) {
         if args.len() != 1 {
@@ -243,7 +244,7 @@ fn main() -> ExitCode {
             );
             return ExitCode::from(2);
         }
-        println!("{}", tcslibgs::InterfaceDigest::of_this_build());
+        println!("{}", tcslib_protocol::InterfaceDigest::of_this_build());
         return ExitCode::SUCCESS;
     }
     if args.first().is_some_and(|arg| arg == SET_INTERFACE_FLAG) {
@@ -309,7 +310,7 @@ fn main() -> ExitCode {
         } else if let Some(value) = said.strip_prefix(WARNINGS_FLAG) {
             warnings(value).map(|warnings| limits.warnings = warnings)
         } else if let Some(value) = said.strip_prefix(TYPES_FLAG) {
-            tcslibgs::graph::built::types_from(value)
+            tcslib_protocol::graph::built::types_from(value)
                 .map(|types| built = types)
                 .map_err(|why| format!("{TYPES_FLAG}{value}: {why}"))
         } else {
@@ -386,7 +387,7 @@ fn main() -> ExitCode {
     let mut unanswered = false;
     if digest {
         for path in configurations(&files) {
-            match tcslibgs::config_digest::digest_of_file(path) {
+            match tcslib_protocol::config_digest::digest_of_file(path) {
                 Ok(said) => {
                     if let Err(e) =
                         writeln!(out, "{}: md5 {said}", path.display())
@@ -474,11 +475,13 @@ fn main() -> ExitCode {
             );
             return ExitCode::from(1);
         }
-        match tcslibgs::store::Store::at(&dir).keep(payload) {
+        match tcslib_protocol::store::Store::at(&dir).keep(payload) {
             Ok((checksum, kept)) => {
                 let how = match kept {
-                    tcslibgs::store::Kept::Written(_) => "kept as",
-                    tcslibgs::store::Kept::Already(_) => "already kept as",
+                    tcslib_protocol::store::Kept::Written(_) => "kept as",
+                    tcslib_protocol::store::Kept::Already(_) => {
+                        "already kept as"
+                    }
                 };
                 if let Err(e) = writeln!(
                     out,
@@ -556,7 +559,7 @@ fn ambient(file: &Path) -> ExitCode {
     let said = file.to_string_lossy();
     let configuration = said.ends_with(".ytcs") || said.ends_with(".xtcs");
     let beside = configuration
-        .then(|| tcslibgs::config::sim_path_beside(&said))
+        .then(|| tcslib_protocol::config::sim_path_beside(&said))
         .flatten();
     let sim = match (configuration, &beside) {
         (false, _) => file,
@@ -569,7 +572,7 @@ fn ambient(file: &Path) -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let file = match tcslibgs::sim_config::SimConfigFile::load(sim) {
+    let file = match tcslib_protocol::sim_config::SimConfigFile::load(sim) {
         Ok(file) => file,
         Err(e) => {
             eprintln!("tcsverify: {}: {e}", sim.display());
@@ -633,7 +636,7 @@ fn set_interfaces(files: &[std::ffi::OsString]) -> ExitCode {
         );
         return ExitCode::from(2);
     }
-    let ours = tcslibgs::InterfaceDigest::of_this_build();
+    let ours = tcslib_protocol::InterfaceDigest::of_this_build();
     let mut failed = false;
     for file in files {
         let path = std::path::Path::new(file);
@@ -819,7 +822,7 @@ fn one_of_each(
     first: &std::path::Path,
     second: &std::path::Path,
 ) -> Result<(), String> {
-    use tcslibgs::ConfigFormat;
+    use tcslib_protocol::ConfigFormat;
 
     let format = |path: &std::path::Path| {
         ConfigFormat::of_file(path)

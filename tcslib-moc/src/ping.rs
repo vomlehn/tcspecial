@@ -1,11 +1,12 @@
 //! Pinging a `ping` node, from the ground.
 //!
 //! A `ping` vehicle node answers each ping the ground sends it with the time
-//! the vehicle had it written on the end: see `tcslibgs::node::vehicle::ping`,
-//! which is what a ping and its answer say. This is the ground's half of the
-//! exchange, as [`crate::beacon`] is the ground's half of a beacon, and with no
-//! window in it for the same reason: tcsmoc shows it in a panel, and a program
-//! with no screen -- a test, a logger -- wants it without a toolkit.
+//! the vehicle had it written on the end: see
+//! `tcslib_protocol::node::vehicle::ping`, which is what a ping and its answer
+//! say. This is the ground's half of the exchange, as [`crate::beacon`] is the
+//! ground's half of a beacon, and with no window in it for the same reason:
+//! tcsmoc shows it in a panel, and a program with no screen -- a test, a logger
+//! -- wants it without a toolkit.
 //!
 //! Three pieces:
 //!
@@ -44,11 +45,11 @@
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::time::Duration;
 
-use tcslibgs::graph::reach::reach_of;
-use tcslibgs::graph::telemetry::{self, Via};
-use tcslibgs::graph::{Destination, Graph};
-use tcslibgs::node::vehicle::ping;
-use tcslibgs::EndpointConfig;
+use tcslib_protocol::graph::reach::reach_of;
+use tcslib_protocol::graph::telemetry::{self, Via};
+use tcslib_protocol::graph::{Destination, Graph};
+use tcslib_protocol::node::vehicle::ping;
+use tcslib_protocol::EndpointConfig;
 
 use crate::matched::Matched;
 
@@ -137,7 +138,7 @@ fn feeds(graph: &Graph, from: &str, to: &str) -> bool {
 fn binds(graph: &Graph, gateway: &str) -> bool {
     graph
         .node(gateway)
-        .is_some_and(tcslibgs::graph::reach::binds)
+        .is_some_and(tcslib_protocol::graph::reach::binds)
 }
 
 /// The ground's end of a gateway node's way up.
@@ -173,13 +174,13 @@ impl Uplink {
         let node = graph
             .node(gateway)
             .ok_or_else(|| format!("there is no node called \"{gateway}\""))?;
-        if !tcslibgs::gateway::is_gateway(&node.node_type) {
+        if !tcslib_protocol::gateway::is_gateway(&node.node_type) {
             return Err(format!(
                 "\"{gateway}\" is a {} node, not a gateway node",
                 node.node_type
             ));
         }
-        if !tcslibgs::graph::reach::binds(node) {
+        if !tcslib_protocol::graph::reach::binds(node) {
             return Err(format!(
                 "\"{gateway}\" states no address and port, so it binds nothing \
                  aboard and the ground has nowhere to send to it"
@@ -699,7 +700,7 @@ mod tests {
         )
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
-        let ours = tcslibgs::ConfigDigest([0x5a; 16]);
+        let ours = tcslib_protocol::ConfigDigest([0x5a; 16]);
         let matched = Matched::for_configuration(ours);
         let mut uplink = Uplink::open(&graph, "gateway").expect("it binds");
         uplink.gated_by(matched.clone());

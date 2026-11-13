@@ -1,13 +1,13 @@
 //! Configuration loading for TCSpecial
 
-/// The two ends of the beacon link: `tcslibgs::BeaconLink`, under the name
-/// this module has always called it.
+/// The two ends of the beacon link: `tcslib_protocol::BeaconLink`, under the
+/// name this module has always called it.
 ///
 /// The type is in the shared library because both ends need it and neither
 /// owns it -- tcspecial sends and a ground station listens -- and the name
 /// stays here because this is where a reader of the flight software looks for
 /// it.
-pub use tcslibgs::BeaconLink as Beacon;
+pub use tcslib_protocol::BeaconLink as Beacon;
 
 /// Configuration constants
 pub mod constants {

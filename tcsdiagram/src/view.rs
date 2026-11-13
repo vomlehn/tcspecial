@@ -325,12 +325,12 @@ pub struct OnSheet<'a> {
 
 /// Where a node's lines are drawn to on a page.
 ///
-/// A line between two files of a configuration crosses the edge of an
-/// included file -- see `tcslibgs::graph::exports` -- and is drawn to that
-/// edge on both sides of it: to the subdiagram's box on the page the box is
-/// on, and to the page's own edge on the subdiagram's page. Either way the
-/// line is labelled with the node it really reaches, the edge saying no more
-/// than which way the data goes.
+/// A line between two files of a configuration crosses the edge of an included
+/// file -- see `tcslib_protocol::graph::exports` -- and is drawn to that edge
+/// on both sides of it: to the subdiagram's box on the page the box is on, and
+/// to the page's own edge on the subdiagram's page. Either way the line is
+/// labelled with the node it really reaches, the edge saying no more than which
+/// way the data goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Drawn {
     /// Where it is, or a stub where it is on another page.
@@ -444,16 +444,16 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         let terminal = style::terminal_for(node.node_type, named, sink)?;
         style::attachment(node.node_type, node.at, terminal)
     };
-    // Which data sink the line arrives at, where the link does not say. The
-    // one that pairs with the source it left: a link leaving `moc-out`
-    // arrives at a `moc-in`, that being the same stream named at its other
-    // end -- see tcslibgs::graph::terminals::answers. Without this the drawing
-    // fell back to the groundward sink whatever the link carried, so a command
-    // from the ground was drawn arriving at the corner the readings leave by.
+    // Which data sink the line arrives at, where the link does not say. The one
+    // that pairs with the source it left: a link leaving `moc-out` arrives at a
+    // `moc-in`, that being the same stream named at its other end -- see
+    // tcslib_protocol::graph::terminals::answers. Without this the drawing fell
+    // back to the groundward sink whatever the link carried, so a command from
+    // the ground was drawn arriving at the corner the readings leave by.
     let pairing = |from: Option<&OnSheet>, origin: Option<&str>| {
         let from = from?;
         let leaves = style::terminal_for(from.node_type, origin, false)?;
-        tcslibgs::graph::terminals::answers(leaves)
+        tcslib_protocol::graph::terminals::answers(leaves)
     };
 
     // A node outside a subdiagram's page, drawn at the page's edge: at the
@@ -463,7 +463,7 @@ pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
         let Drawn::AtTheEdge(left, right) = node.drawn else {
             return None;
         };
-        let facing = tcslibgs::graph::terminals::answers(own?)?;
+        let facing = tcslib_protocol::graph::terminals::answers(own?)?;
         style::edge_attachment(facing, (left as f32, right as f32))
     };
 
@@ -607,7 +607,7 @@ pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
             // looking. A label reading "world-in" beside every line would
             // be the name of the thing the picture is showing.
             let named_input = line.input.filter(|input| {
-                tcslibgs::graph::terminals::stream_of(input).is_none()
+                tcslib_protocol::graph::terminals::stream_of(input).is_none()
             });
             let label = match (named_input, crossing) {
                 (Some(input), false) => input.to_string(),

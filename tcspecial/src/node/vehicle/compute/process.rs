@@ -53,9 +53,9 @@ use std::time::{Duration, Instant};
 use nix::poll::{poll, PollFd, PollFlags};
 
 use crate::runtime::node_state::Abandon;
-use tcslibgs::link_text::{read_text, write_text};
-use tcslibgs::link_type::LinkType;
-use tcslibgs::node::vehicle::compute::{ProcessParams, Restart};
+use tcslib_protocol::link_text::{read_text, write_text};
+use tcslib_protocol::link_type::LinkType;
+use tcslib_protocol::node::vehicle::compute::{ProcessParams, Restart};
 
 use super::{Function, Out};
 
@@ -122,8 +122,9 @@ impl Process {
     ///
     /// Nothing to refuse: what a file may say -- the program, the deadline it
     /// cannot do without, and whether it may be restarted -- is
-    /// `tcslibgs::node::vehicle::compute`'s, where the ground tool checks it.
-    /// What is found here is the machine's answer: see [`Process::start`].
+    /// `tcslib_protocol::node::vehicle::compute`'s, where the ground tool
+    /// checks it. What is found here is the machine's answer: see
+    /// [`Process::start`].
     ///
     /// # Arguments
     ///
@@ -498,10 +499,10 @@ impl Function for Process {
         // What the program reads: the datum as text, and the input's name
         // where the link gave one. See the module comment.
         //
-        // The datum arrives as its type's own layout and goes to the program
-        // as text, because the far end is a program reading lines: see
-        // `tcslibgs::link_text`. This is the one boundary where a datum is
-        // written out and read back, and both halves of it are here.
+        // The datum arrives as its type's own layout and goes to the program as
+        // text, because the far end is a program reading lines: see
+        // `tcslib_protocol::link_text`. This is the one boundary where a datum
+        // is written out and read back, and both halves of it are here.
         //
         // Written into the node's own line, which keeps its room.
         self.line.clear();
@@ -581,7 +582,7 @@ impl Drop for Process {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::link_type::Basic;
+    use tcslib_protocol::link_type::Basic;
     // What a program is handed and what it answers with: a value on the link
     // and a decimal in the pipe. See `give`.
     use crate::node::vehicle::compute::{as_value, from_value};
@@ -591,7 +592,7 @@ mod tests {
     /// The refusal is `as_value`'s range, which these temperatures are all
     /// well inside; a test that meant to try the range says so.
     fn kelvin(number: f64) -> Vec<u8> {
-        as_value(number, tcslibgs::unit::Unit::Kelvin)
+        as_value(number, tcslib_protocol::unit::Unit::Kelvin)
             .expect("a temperature a value carries")
     }
 
@@ -599,8 +600,8 @@ mod tests {
     ///
     /// What a file may say about one -- that the program and the deadline are
     /// required, that a restart allowance is a number or "never" -- is
-    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
-    /// it. These tests are about what the supervision does.
+    /// `tcslib_protocol::node::vehicle::compute`'s rule, where the ground tool
+    /// applies it. These tests are about what the supervision does.
     ///
     /// # Arguments
     ///
@@ -617,7 +618,7 @@ mod tests {
         restart: Restart,
     ) -> Process {
         let kelvin =
-            LinkType::Basic(Basic::Value(tcslibgs::unit::Unit::Kelvin));
+            LinkType::Basic(Basic::Value(tcslib_protocol::unit::Unit::Kelvin));
         Process::of(ProcessParams {
             executable: executable.to_string(),
             timeout,
@@ -808,7 +809,7 @@ mod tests {
         let out = p.give(None, &kelvin(number)).expect("an answer");
         from_value(
             &out.expect("a value"),
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
             "the program",
         )
         .expect("a value")
@@ -858,8 +859,12 @@ mod tests {
             .expect("an answer")
             .expect("a value");
         assert_eq!(
-            from_value(&out, tcslibgs::unit::Unit::Kelvin, "the program")
-                .expect("a value"),
+            from_value(
+                &out,
+                tcslib_protocol::unit::Unit::Kelvin,
+                "the program"
+            )
+            .expect("a value"),
             1.0,
             "the program should see which input this is, and its value"
         );

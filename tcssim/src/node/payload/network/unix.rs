@@ -286,7 +286,7 @@ pub fn run_unix_dgram_node(
     // vehicle speaks first, with its trigger, and the answer goes back to
     // the name it asked from. The rule is the vehicle's own.
     let speaks_first =
-        tcslibgs::graph::interface::speaks_first(true, config.triggered);
+        tcslib_protocol::graph::interface::speaks_first(true, config.triggered);
 
     // The path this end answers from: the one the simulator file asked for,
     // or one beside the handler's. A file that says nothing gets the second,

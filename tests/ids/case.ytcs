@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
 
 description: "Names that differ only in case, and digits that sort as text"
 

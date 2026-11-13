@@ -35,8 +35,8 @@ use slint::platform::software_renderer::{
 };
 use slint::platform::{Platform, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, LogicalSize, Model, ModelRc, VecModel};
-use tcslibgs::simulate::Mode;
-use tcslibgs::Timestamp;
+use tcslib_protocol::simulate::Mode;
+use tcslib_protocol::Timestamp;
 use tcsverify::startup::Startup;
 
 use crate::payload::{PayloadConfig, SimulatedPayload};

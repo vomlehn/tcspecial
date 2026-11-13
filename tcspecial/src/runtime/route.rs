@@ -18,7 +18,8 @@
 //! source's device id; and a payload nothing touches is delivered to its link
 //! over the `tcspecial` section's `payload_telemetry`. They are in the same
 //! table because they are the same question -- where does this reading go --
-//! and each is named for what it carries: see `tcslibgs::graph::telemetry`.
+//! and each is named for what it carries: see
+//! `tcslib_protocol::graph::telemetry`.
 //!
 //! Nothing here opens anything or moves any bytes. It is the arithmetic of
 //! the graph, which is worth having on its own: it can be tested against a
@@ -27,13 +28,13 @@
 
 use std::collections::BTreeMap;
 
-use tcslibgs::graph::link_types::{self, Carries};
-use tcslibgs::graph::telemetry::{self, Telemetered, Via};
-use tcslibgs::graph::terminals::{self, Stream};
-use tcslibgs::graph::units;
-use tcslibgs::graph::{Destination, Graph, Link};
-use tcslibgs::link_type::LinkType;
-use tcslibgs::unit::Unit;
+use tcslib_protocol::graph::link_types::{self, Carries};
+use tcslib_protocol::graph::telemetry::{self, Telemetered, Via};
+use tcslib_protocol::graph::terminals::{self, Stream};
+use tcslib_protocol::graph::units;
+use tcslib_protocol::graph::{Destination, Graph, Link};
+use tcslib_protocol::link_type::LinkType;
+use tcslib_protocol::unit::Unit;
 
 /// What a command from the ground sets.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,7 +58,7 @@ pub struct Delivery {
     /// Which of the two streams this link carries.
     ///
     /// A link carries one: both of its ends are terminals of the same stream,
-    /// which is what [`tcslibgs::graph::check::Problem::CrossedStreams`]
+    /// which is what [`tcslib_protocol::graph::check::Problem::CrossedStreams`]
     /// refuses a configuration for. So it is a property of the link and is
     /// settled here, once, from the terminals the file names or from the only
     /// terminal the type at either end has -- see `stream_of`.
@@ -201,11 +202,11 @@ pub struct Routes {
     /// whose setpoint comes from the ground has a `commands` entry and no
     /// link out of the ground at all.
     commands: BTreeMap<String, Vec<Commanded>>,
-    /// What unit the values arriving at each computation are in, by node
-    /// name, for the computations that read values: a vote, a thermostat,
-    /// a program. The unit is never on a link, so this is how a node knows
-    /// what the four bytes it is handed count -- `tcslibgs::graph::units`,
-    /// asked once as the configuration is loaded.
+    /// What unit the values arriving at each computation are in, by node name,
+    /// for the computations that read values: a vote, a thermostat, a program.
+    /// The unit is never on a link, so this is how a node knows what the four
+    /// bytes it is handed count -- `tcslib_protocol::graph::units`, asked once
+    /// as the configuration is loaded.
     input_units: BTreeMap<String, Unit>,
     /// Every link to the ground, each delivered to under its own name.
     ///
@@ -274,7 +275,8 @@ impl Routes {
                 // it is dropped here rather than carried to a port that would
                 // refuse it as an input a device does not have.
                 let input = input.filter(|named| {
-                    tcslibgs::graph::terminals::stream_of(named).is_none()
+                    tcslib_protocol::graph::terminals::stream_of(named)
+                        .is_none()
                 });
 
                 // A line into a gateway node goes to this source's own link to
@@ -531,21 +533,21 @@ mod tests {
     /// A link that names its terminals routes as one that does not.
     ///
     /// A terminal says which way the data is going and not which of several
-    /// ways in -- see `tcslibgs::graph::terminals` -- so `a.world-out` to
-    /// `c.world-in` is the same delivery as `a` to `c`. It matters here
-    /// and not only in the checking: a terminal carried through as a named
-    /// input would reach a device's port, which refuses an input a device does
-    /// not have, and a configuration that passed the ground check would stop
+    /// ways in -- see `tcslib_protocol::graph::terminals` -- so `a.world-out`
+    /// to `c.world-in` is the same delivery as `a` to `c`. It matters here and
+    /// not only in the checking: a terminal carried through as a named input
+    /// would reach a device's port, which refuses an input a device does not
+    /// have, and a configuration that passed the ground check would stop
     /// delivering the moment it flew.
     #[test]
     fn a_terminal_on_a_link_is_not_a_named_input() {
-        use tcslibgs::graph::Destinations;
+        use tcslib_protocol::graph::Destinations;
 
         // The nodes are named and told nothing: a node's own attributes are
         // no part of the routing. Their *types* are, and only for one
         // question -- which stream a link carries, where the file left the
         // terminals out and the type is what settles it. See `stream_of`.
-        let node = |name: &str, node_type: &str| tcslibgs::graph::Node {
+        let node = |name: &str, node_type: &str| tcslib_protocol::graph::Node {
             name: name.to_string(),
             node_type: node_type.to_string(),
             group: None,
@@ -560,7 +562,7 @@ mod tests {
                 node("c", "gateway_radio"),
                 node("m", "compute"),
             ],
-            links: vec![tcslibgs::graph::Link {
+            links: vec![tcslib_protocol::graph::Link {
                 from: from.to_string(),
                 to: Destinations::of(vec![to.to_string()]),
                 comment: None,
@@ -690,7 +692,7 @@ mod tests {
 
     /// A payload nothing in the drawing touches reports to the ground over
     /// its own link, and one the drawing does touch goes only where it is
-    /// drawn: see `tcslibgs::graph::telemetry`.
+    /// drawn: see `tcslib_protocol::graph::telemetry`.
     #[test]
     fn only_an_undrawn_payload_reports_over_its_own_link() {
         let mut graph = thermostat();

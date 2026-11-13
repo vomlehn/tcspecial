@@ -30,7 +30,7 @@ slint::include_modules!();
 ///
 /// Never in practice: only if `255.255.255` were not a version.
 pub fn widest_messages() -> Vec<String> {
-    use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
+    use tcslib_protocol::config_digest::{ConfigDigest, ConfigVersion};
 
     let version = ConfigVersion::of_text("255.255.255")
         .expect("255.255.255 is a version");

@@ -59,8 +59,8 @@ pub fn run_iio_node(
     // make, and no pseudo-terminal is put in its place. Its panel is there, as
     // every simulated payload's is, and counts nothing -- the samples go from
     // the kernel to the vehicle, and nothing of them passes here to be seen.
-    if tcslibgs::node::payload::iio::is_dummy(
-        &tcslibgs::simulate::Host::this(),
+    if tcslib_protocol::node::payload::iio::is_dummy(
+        &tcslib_protocol::simulate::Host::this(),
         &config.address,
     ) {
         eprintln!(
@@ -142,7 +142,7 @@ mod tests {
     use std::io::Read;
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslibgs::Faults;
+    use tcslib_protocol::Faults;
 
     /// Configures a sensor whose buffer the handler would open at a path,
     /// sending eight bytes every 20 ms.

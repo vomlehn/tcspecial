@@ -135,7 +135,7 @@ mod tests {
     use std::net::TcpStream;
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslibgs::Faults;
+    use tcslib_protocol::Faults;
 
     /// Makes a working simulated TCP device on 127.0.0.1, sending twelve-byte
     /// packets.

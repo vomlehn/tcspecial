@@ -1,8 +1,8 @@
 """The ping format, held to the Rust's own examples.
 
-Each test here is a test of ``tcslibgs/src/node/vehicle/ping/mod.rs`` said
-again, with the same messages and the same answers, so that the two spellings
-of the format are held to one another.
+Each test here is a test of ``tcslib-protocol/src/node/vehicle/ping/mod.rs``
+said again, with the same messages and the same answers, so that the two
+spellings of the format are held to one another.
 """
 
 import sys
@@ -19,7 +19,8 @@ ANSWERED = 1_760_900_000 * SECOND + 250_000_000
 
 
 class DocumentTest(unittest.TestCase):
-    """``tcslibgs/xtce/ping.xtce``, the ping node's interface document, held
+    """``tcslib-protocol/xtce/ping.xtce``, the ping node's interface document,
+    held
     to this module as ``xtce_holds_to_the_rust`` holds it to the Rust: with
     the code tcs-xtce generates from it, ``tcslibgs/ping_packet.py``."""
 

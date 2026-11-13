@@ -5,27 +5,27 @@
 //! without it and the wrong thing for a person fixing the file: a set with
 //! four mistakes in it is four runs of tcsmoc, each reporting one of them.
 //!
-//! This asks the same rules for all of their answers at once, and says for
-//! each one which file it is in, which line of it, and what is wrong. The
-//! rules are not restated here -- they are `tcslibgs`'s, where the programs
-//! that run the files get them -- so a file this accepts is a file they
-//! accept, which is the only thing that makes a verifier worth running.
+//! This asks the same rules for all of their answers at once, and says for each
+//! one which file it is in, which line of it, and what is wrong. The rules are
+//! not restated here -- they are `tcslib-protocol`'s, where the programs that
+//! run the files get them -- so a file this accepts is a file they accept,
+//! which is the only thing that makes a verifier worth running.
 //!
 //! A configuration is a graph of nodes, and this checks:
 //!
 //! * that it reads, following the files it includes;
-//! * and that `tcslibgs::graph::Graph::check` finds nothing wrong with it,
-//!   which is the same code tcspecial runs aboard. This program adds the line
-//!   numbers and nothing else: a problem about a node is reported in the file
-//!   that node is written in, which is not always the file named on the
+//! * and that `tcslib_protocol::graph::Graph::check` finds nothing wrong with
+//!   it, which is the same code tcspecial runs aboard. This program adds the
+//!   line numbers and nothing else: a problem about a node is reported in the
+//!   file that node is written in, which is not always the file named on the
 //!   command line.
 //! * The simulator file, if one is given: that it parses, and that every name
-//!   in it is one the graph and the file itself agree on -- a simulated
-//!   payload the graph has, a group the file declares and uses, no setting
-//!   that is not one; see `tcslibgs::SimConfigFile::problems_by_name`. And,
-//!   where those are all right, that the simulator would simulate what it
-//!   names -- not for a payload that is only driven, nor for one that is a
-//!   program -- which is `tcslibgs::graph::simulated::handlers`, the question
+//!   in it is one the graph and the file itself agree on -- a simulated payload
+//!   the graph has, a group the file declares and uses, no setting that is not
+//!   one; see `tcslib_protocol::SimConfigFile::problems_by_name`. And, where
+//!   those are all right, that the simulator would simulate what it names --
+//!   not for a payload that is only driven, nor for one that is a program --
+//!   which is `tcslib_protocol::graph::simulated::handlers`, the question
 //!   tcssim and tcsmoc ask before they start one.
 //!
 //! The simulator file is checked against the configuration only when the
@@ -38,8 +38,8 @@ use std::fmt;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use tcslibgs::graph::check::Severity;
-use tcslibgs::{ConfigFormat, SimConfigFile, TcsError};
+use tcslib_protocol::graph::check::Severity;
+use tcslib_protocol::{ConfigFormat, SimConfigFile, TcsError};
 
 pub mod fprime_model;
 pub mod locate;
@@ -100,17 +100,17 @@ pub struct Finding {
     /// What is wrong, in the words the library uses for it.
     pub message: String,
     /// Whether the configuration says something wrong or has not finished
-    /// saying it. See [`Severity`], which is `tcslibgs`'s: the split belongs
-    /// with the rules and not with the program that prints them.
+    /// saying it. See [`Severity`], which is `tcslib-protocol`'s: the split
+    /// belongs with the rules and not with the program that prints them.
     pub severity: Severity,
     /// The rule's own answer, where it came from a configuration's
-    /// [`tcslibgs::graph::Graph::check`].
+    /// [`tcslib_protocol::graph::Graph::check`].
     ///
     /// Kept for a program that has rules of its own about the same thing and
     /// has to tell which of these it has already said: tcsgui marks faults on
     /// the nodes as somebody draws, and lists beside them what this finds that
     /// it does not. Not printed: the message is what it says.
-    pub problem: Option<tcslibgs::graph::check::Problem>,
+    pub problem: Option<tcslib_protocol::graph::check::Problem>,
 }
 
 impl fmt::Display for Finding {
@@ -261,7 +261,7 @@ impl Report {
         line: usize,
         message: impl Into<String>,
         severity: Severity,
-        problem: Option<tcslibgs::graph::check::Problem>,
+        problem: Option<tcslib_protocol::graph::check::Problem>,
     ) {
         if self.halted {
             return;
@@ -356,7 +356,7 @@ pub fn verify(
         payload_path,
         sim_path,
         limits,
-        &tcslibgs::graph::built::OPTIONAL_TYPES,
+        &tcslib_protocol::graph::built::OPTIONAL_TYPES,
     )
 }
 
@@ -364,10 +364,10 @@ pub fn verify(
 /// the optional payload types `built` names.
 ///
 /// Each node of a type `built` leaves out is reported as that tcspecial would
-/// refuse it, in the same words: see [`tcslibgs::graph::built`]. Tcspecial
-/// asks this with the types it was built with, and tcsverify with the types
-/// `--types` names, so a configuration can be held to a vehicle's build on
-/// the ground. [`verify`] is this with every type.
+/// refuse it, in the same words: see [`tcslib_protocol::graph::built`].
+/// Tcspecial asks this with the types it was built with, and tcsverify with the
+/// types `--types` names, so a configuration can be held to a vehicle's build
+/// on the ground. [`verify`] is this with every type.
 ///
 /// # Arguments
 ///
@@ -404,7 +404,7 @@ pub fn verify_built(
 /// Each is verified as [`verify`] verifies one, the first named first. Then
 /// what each is read as is compared: every section, every attribute and every
 /// value, in the form the programs act on -- see
-/// `tcslibgs::config_digest::interpretation_of_file`, which is what a
+/// `tcslib_protocol::config_digest::interpretation_of_file`, which is what a
 /// configuration's digest is taken over. So two files this finds no
 /// difference between are two files every program reads alike, and two whose
 /// digests tcspecial and tcsmoc would agree on.
@@ -474,7 +474,7 @@ pub fn verify_pair(
 /// * `report` - Where the differences, or that either file cannot be read,
 ///              are added.
 pub fn compare(first: &Path, second: &Path, report: &mut Report) {
-    use tcslibgs::config_digest::interpretation_of_file;
+    use tcslib_protocol::config_digest::interpretation_of_file;
 
     let (one, two) = match (
         interpretation_of_file(first),
@@ -505,7 +505,7 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
     // Every file of the second, for a difference to be reported in the one
     // that says the thing: a configuration that includes others has most of
     // what it says in them.
-    let (files, homes) = match tcslibgs::graph::Graph::load(second) {
+    let (files, homes) = match tcslib_protocol::graph::Graph::load(second) {
         Ok(graph) => (graph.files, graph.homes),
         Err(_) => (vec![second.to_path_buf()], Default::default()),
     };
@@ -883,9 +883,9 @@ fn outside_comments(text: &str) -> Vec<String> {
 
 /// Checks a configuration: reads it, then asks what is wrong with it.
 ///
-/// The checking is `tcslibgs::graph::Graph::check`, which is the same code
-/// tcspecial runs aboard. This adds only the line numbers, which it gets by
-/// scanning the text for the name the problem is about.
+/// The checking is `tcslib_protocol::graph::Graph::check`, which is the same
+/// code tcspecial runs aboard. This adds only the line numbers, which it gets
+/// by scanning the text for the name the problem is about.
 ///
 /// # Arguments
 ///
@@ -900,8 +900,8 @@ fn check_graph(
     path: &Path,
     built: &[&str],
     report: &mut Report,
-) -> Option<tcslibgs::graph::Graph> {
-    let graph = match tcslibgs::graph::Graph::load(path) {
+) -> Option<tcslib_protocol::graph::Graph> {
+    let graph = match tcslib_protocol::graph::Graph::load(path) {
         Ok(graph) => graph,
         Err(e) => {
             // A file that would not load at all: reported from where the
@@ -928,10 +928,9 @@ fn check_graph(
     // The build's types after the graph's own rules, being asked of a graph
     // that is otherwise right: a node of a misspelled type is reported as
     // unknown and needs no build.
-    let problems = graph
-        .check()
-        .into_iter()
-        .chain(tcslibgs::graph::built::not_built(&graph.nodes, built));
+    let problems = graph.check().into_iter().chain(
+        tcslib_protocol::graph::built::not_built(&graph.nodes, built),
+    );
     for problem in problems {
         if !report.room() {
             break;
@@ -942,10 +941,15 @@ fn check_graph(
         // about an included file's exports; the top file otherwise, which is
         // where the links and commands are.
         let home = match (&about, &problem) {
-            (tcslibgs::About::Node(name), _) => graph.homes.get(name).cloned(),
-            (_, tcslibgs::graph::check::Problem::BadExport { file, .. }) => {
-                Some(file.clone())
+            (tcslib_protocol::About::Node(name), _) => {
+                graph.homes.get(name).cloned()
             }
+            (
+                _,
+                tcslib_protocol::graph::check::Problem::BadExport {
+                    file, ..
+                },
+            ) => Some(file.clone()),
             _ => None,
         }
         .unwrap_or_else(|| path.to_path_buf());
@@ -971,12 +975,12 @@ fn check_graph(
 /// Checks a configuration's simulator file, against the configuration's
 /// payloads if the configuration read.
 ///
-/// By name first: see `tcslibgs::SimConfigFile::problems_by_name`. Then, where
-/// the names are all right, what tcssim and tcsmoc ask before starting a
-/// simulator, `tcslibgs::graph::simulated::handlers`, and what tcssim asks of
-/// each payload's settings against its handler,
-/// `tcslibgs::SimConfigFile::problems`: a file that passed here and was refused
-/// there would be a verifier saying yes to a run that fails.
+/// By name first: see `tcslib_protocol::SimConfigFile::problems_by_name`. Then,
+/// where the names are all right, what tcssim and tcsmoc ask before starting a
+/// simulator, `tcslib_protocol::graph::simulated::handlers`, and what tcssim
+/// asks of each payload's settings against its handler,
+/// `tcslib_protocol::SimConfigFile::problems`: a file that passed here and was
+/// refused there would be a verifier saying yes to a run that fails.
 ///
 /// # Arguments
 ///
@@ -986,7 +990,7 @@ fn check_graph(
 /// * `report` - Where each problem is added.
 fn check_graph_simulator(
     path: &Path,
-    graph: Option<&tcslibgs::graph::Graph>,
+    graph: Option<&tcslib_protocol::graph::Graph>,
     report: &mut Report,
 ) {
     let Some((text, format)) = read(path, report) else {
@@ -1004,8 +1008,8 @@ fn check_graph_simulator(
     if sim.moved_thermal_mass.is_some() {
         report.add(
             path,
-            found.line_of(&tcslibgs::About::Section("thermal_mass")),
-            tcslibgs::sim_config::MOVED_THERMAL_MASS,
+            found.line_of(&tcslib_protocol::About::Section("thermal_mass")),
+            tcslib_protocol::sim_config::MOVED_THERMAL_MASS,
         );
         return;
     }
@@ -1030,7 +1034,7 @@ fn check_graph_simulator(
     // One answer and not all of them: the simulator stops at the first payload
     // it will not simulate, and says which, as the start would.
     if named_well && report.room() {
-        match tcslibgs::graph::simulated::handlers(graph, &sim) {
+        match tcslib_protocol::graph::simulated::handlers(graph, &sim) {
             Err(why) => {
                 // The complaint names the payload first, in quotes, which is
                 // the entry to point at.
@@ -1038,7 +1042,7 @@ fn check_graph_simulator(
                     .strip_prefix('"')
                     .and_then(|rest| rest.split_once('"'))
                     .map_or(THE_FILE_ITSELF, |(payload, _)| {
-                        found.line_of(&tcslibgs::About::SimPayload(
+                        found.line_of(&tcslib_protocol::About::SimPayload(
                             payload.to_string(),
                         ))
                     });
@@ -1091,7 +1095,8 @@ fn check_graph_simulator(
 /// Checks that each sensor joined to the world feeds one conversion, in the
 /// unit of what it reports, and that what reaches each simulated payload
 /// driving a value is in that value's unit, which is what tcssim asks of them
-/// as it starts: see `tcslibgs::graph::simulated::reading_of` and `driving_of`.
+/// as it starts: see `tcslib_protocol::graph::simulated::reading_of` and
+/// `driving_of`.
 ///
 /// # Arguments
 ///
@@ -1102,12 +1107,13 @@ fn check_graph_simulator(
 /// * `report` - Where each problem is added.
 fn sensors_read_as_they_report(
     path: &Path,
-    graph: &tcslibgs::graph::Graph,
+    graph: &tcslib_protocol::graph::Graph,
     sim: &SimConfigFile,
     found: &Where,
     report: &mut Report,
 ) {
-    let Ok(handlers) = tcslibgs::graph::simulated::handlers(graph, sim) else {
+    let Ok(handlers) = tcslib_protocol::graph::simulated::handlers(graph, sim)
+    else {
         return;
     };
     // Whether or not the model's joins are right, which is reported at the
@@ -1116,9 +1122,9 @@ fn sensors_read_as_they_report(
     let Some(resolved) = sim.settled(&handlers) else {
         return;
     };
-    use tcslibgs::graph::simulated::{driving_of, reading_of};
-    use tcslibgs::node::physics::terminal::Kind;
-    use tcslibgs::sim_config::Attached;
+    use tcslib_protocol::graph::simulated::{driving_of, reading_of};
+    use tcslib_protocol::node::physics::terminal::Kind;
+    use tcslib_protocol::sim_config::Attached;
     for (dh, settled) in handlers.iter().zip(&resolved) {
         let name = &dh.name.0;
         let checked = match &settled.attached {
@@ -1135,7 +1141,7 @@ fn sensors_read_as_they_report(
             if !report.room() {
                 return;
             }
-            let about = tcslibgs::About::SimPayload(dh.name.0.clone());
+            let about = tcslib_protocol::About::SimPayload(dh.name.0.clone());
             report.add(path, found.line_of(&about), why);
         }
     }
@@ -1233,7 +1239,7 @@ fn line_of(e: &TcsError) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::graph::built::OPTIONAL_TYPES as ALL;
+    use tcslib_protocol::graph::built::OPTIONAL_TYPES as ALL;
 
     /// Copies the thermostat example's two spellings and its simulator file
     /// to a directory of their own, with the common file they include and
@@ -1309,7 +1315,7 @@ mod tests {
             vec![
                 (
                     line_of("heaters_1"),
-                    tcslibgs::graph::built::not_built_message(
+                    tcslib_protocol::graph::built::not_built_message(
                         "heaters_1",
                         "gpio_out"
                     )
@@ -1317,7 +1323,7 @@ mod tests {
                 ),
                 (
                     line_of("heaters_2"),
-                    tcslibgs::graph::built::not_built_message(
+                    tcslib_protocol::graph::built::not_built_message(
                         "heaters_2",
                         "gpio_out"
                     )

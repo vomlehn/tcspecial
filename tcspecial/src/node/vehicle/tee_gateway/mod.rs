@@ -51,7 +51,7 @@ impl Through {
         Through {
             waiting: VecDeque::with_capacity(WAITING_AT_ONCE),
             spare: (0..WAITING_AT_ONCE)
-                .map(|_| Vec::with_capacity(tcslibgs::DATUM_BYTES))
+                .map(|_| Vec::with_capacity(tcslib_protocol::DATUM_BYTES))
                 .collect(),
         }
     }

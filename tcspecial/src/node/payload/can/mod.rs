@@ -27,7 +27,7 @@ use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{
+use tcslib_protocol::{
     node::payload::can::frame_bytes, CanConfig, TcsError, TcsResult,
 };
 
@@ -220,7 +220,7 @@ fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
 ///
 /// `TcsError::Endpoint` if the kernel refuses the filter.
 fn set_filter(what: &str, fd: RawFd, can_id: u32) -> TcsResult<()> {
-    let id = if tcslibgs::node::payload::can::is_extended(can_id) {
+    let id = if tcslib_protocol::node::payload::can::is_extended(can_id) {
         can_id | libc::CAN_EFF_FLAG
     } else {
         can_id
@@ -484,11 +484,12 @@ impl EndpointWritable for CanEndpoint {
             )));
         }
 
-        let id = if tcslibgs::node::payload::can::is_extended(self.can_id) {
-            self.can_id | libc::CAN_EFF_FLAG
-        } else {
-            self.can_id
-        };
+        let id =
+            if tcslib_protocol::node::payload::can::is_extended(self.can_id) {
+                self.can_id | libc::CAN_EFF_FLAG
+            } else {
+                self.can_id
+            };
 
         let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
         frame[..4].copy_from_slice(&id.to_ne_bytes());

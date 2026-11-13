@@ -18,7 +18,7 @@ argue from this order and say so.
 
 ## The crates
 
-- `tcslibgs` -- what the ground and the vehicle share: the command and
+- `tcslib-protocol` -- what the ground and the vehicle share: the command and
   telemetry protocol, and how every configuration file is read and checked.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcslib-moc` -- what a ground station is built on (only in the MOC):
@@ -46,7 +46,7 @@ argue from this order and say so.
 - `examples/` -- configurations and programs; see `examples/README.md`.
 
 A node type is three modules with the same name in three crates: its
-attributes and checks in `tcslibgs::node`, the flight-side node in
+attributes and checks in `tcslib_protocol::node`, the flight-side node in
 `tcspecial::node`, and the simulator's simulated device in `tcssim::node`.
 
 ## Vocabulary
@@ -59,7 +59,7 @@ attributes and checks in `tcslibgs::node`, the flight-side node in
   software bus, joined as an SBN peer. Its section is `gateway:`, and
   `tee-gateway`, `null-gateway` and `app_gateway_veh` stand beside it. All
   of these were `moc` once; a file still saying so is refused, told the new
-  word (`tcslibgs::graph::renamed`).
+  word (`tcslib_protocol::graph::renamed`).
 - **MOC**: the mission operations center, on the ground. Still the word for
   the ground itself -- tcsmoc, "the MOC sends" -- and for the terminals
   below, but never for a node.
@@ -103,7 +103,7 @@ make html-check                 # every committed page made again, and current
 ```
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
-`tcslib-moc/`, `tcslib-c/` and `tcslibgs/` builds their HTML pages.
+`tcslib-moc/`, `tcslib-c/` and `tcslib-protocol/` builds their HTML pages.
 
 tcspecial, tcssim and tcsmoc take `--simulate=none|some|all`. Left out it is
 `none`, the flight setting, under which tcspecial refuses every simulated
@@ -111,7 +111,7 @@ and dummy device and tcssim will not start, so a run on a desk gives
 `--simulate=all`, as the Makefiles' run targets do. tcspecial judges each
 payload a simulated device (tcssim's: a pseudo-terminal, a socket), a dummy
 device (the kernel's: i2c-stub, gpio-sim, vcan, iio_dummy) or a real device
-from what is at its endpoint (`tcslibgs::simulate`), never from a file.
+from what is at its endpoint (`tcslib_protocol::simulate`), never from a file.
 `network` and `device-file` nodes are always real devices and not judged.
 Which payloads are meant to be simulated is the simulator file's `simulate`,
 which tcssim holds to the same judgement; tcspecial never reads that file.

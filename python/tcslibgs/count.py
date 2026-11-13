@@ -1,5 +1,5 @@
 """The count a string or bytes is sent the ground after:
-``tcslibgs::link_type::Count``.
+``tcslib_protocol::link_type::Count``.
 
 A string or bytes has no width of its own, so tcspecial sends it the ground
 after a count of its bytes. Where the ground decodes what it is sent by
@@ -16,7 +16,7 @@ is given the datum without it.
 XTCE_BYTES = 4
 
 #: The most bytes a count in groups of seven bits takes, for the largest
-#: datum there is, 4096 bytes: ``tcslibgs::types::DATUM_BYTES``.
+#: datum there is, 4096 bytes: ``tcslib_protocol::types::DATUM_BYTES``.
 MOST_GROUP_BYTES = 2
 
 

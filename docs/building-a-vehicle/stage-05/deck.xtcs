@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslibgs/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
     <!-- Stage 5 of "Building a Vehicle" (docs/building-a-vehicle.rst):
          rates and groups. The seismometer and the regolith thermometer are
          read together, as a group, so that a quake and a change of

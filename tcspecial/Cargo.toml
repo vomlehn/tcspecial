@@ -10,7 +10,7 @@ TCSpecial flight software: the spacecraft's command interpreter and data \
 handler manager, being integrated with NASA's cFS and JPL's F Prime"""
 
 [dependencies]
-tcslibgs = { path = "../tcslibgs" }
+tcslib-protocol = { path = "../tcslib-protocol" }
 # The file interfaces an app node's program is run with, and the starting of
 # one: see tcsapp. The same crate an app itself is written against, so that the
 # protocol is stated once.
@@ -46,8 +46,8 @@ slint-build = { version = "1.18", optional = true }
 # The network type over UDP, TCP and Unix-domain sockets is in every build --
 # the link to the ground is UDP -- and so is every node that reaches no
 # interface. `raw` is the raw protocol of the network type. The words are
-# tcslibgs::graph::built::OPTIONAL_TYPES, which a test holds these to; see
-# "Which Node Types Are Built" in docs/tcspecial-design.rst.
+# tcslib_protocol::graph::built::OPTIONAL_TYPES, which a test holds these to;
+# see "Which Node Types Are Built" in docs/tcspecial-design.rst.
 [features]
 default = [
     "device-file",

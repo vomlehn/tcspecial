@@ -35,9 +35,9 @@
 //! state it keeps is still the last decision; what changed is that silence is
 //! no longer how it is held.
 
-use tcslibgs::link_type::Basic;
-use tcslibgs::node::vehicle::compute::ThermostatParams;
-use tcslibgs::unit::Unit;
+use tcslib_protocol::link_type::Basic;
+use tcslib_protocol::node::vehicle::compute::ThermostatParams;
+use tcslib_protocol::unit::Unit;
 
 use super::{from_value, Function, Out};
 
@@ -91,9 +91,9 @@ impl Thermostat {
     /// Makes the thermostat these settled parameters describe.
     ///
     /// Nothing to refuse: that a band must be more than nought is
-    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
-    /// it. What is refused here is a *command* that would break it -- see
-    /// [`Thermostat::set`] -- because a command arrives after the checking.
+    /// `tcslib_protocol::node::vehicle::compute`'s rule, where the ground tool
+    /// applies it. What is refused here is a *command* that would break it --
+    /// see [`Thermostat::set`] -- because a command arrives after the checking.
     ///
     /// # Arguments
     ///
@@ -194,7 +194,7 @@ impl Function for Thermostat {
     fn set(&mut self, attribute: &str, value: &[u8]) -> Result<(), String> {
         // A value of the thermostat's type-in, as a reading is: four bytes
         // of a count of the unit's steps, its width checked before anything
-        // reads it. See `tcslibgs::graph::settings`.
+        // reads it. See `tcslib_protocol::graph::settings`.
         let wanted = from_value(value, self.unit, attribute)?;
 
         match attribute {
@@ -247,7 +247,7 @@ mod tests {
     /// The refusal is `as_value`'s range, which these temperatures are all
     /// well inside; a test that meant to try the range says so.
     fn kelvin(number: f64) -> Vec<u8> {
-        as_value(number, tcslibgs::unit::Unit::Kelvin)
+        as_value(number, tcslib_protocol::unit::Unit::Kelvin)
             .expect("a temperature a value carries")
     }
 
@@ -261,9 +261,9 @@ mod tests {
             ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
-                sends: tcslibgs::link_type::Basic::U8,
+                sends: tcslib_protocol::link_type::Basic::U8,
             },
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
         )
     }
 
@@ -367,13 +367,13 @@ mod tests {
 
     /// A band of nothing is refused where a file is read, not here.
     ///
-    /// `tcslibgs::node::vehicle::compute` applies that rule, so the ground tool
-    /// refuses such a node. What this refuses is a *command* that would make
-    /// one, which arrives long after the checking: see the setting test
-    /// below.
+    /// `tcslib_protocol::node::vehicle::compute` applies that rule, so the
+    /// ground tool refuses such a node. What this refuses is a *command* that
+    /// would make one, which arrives long after the checking: see the setting
+    /// test below.
     #[test]
     fn a_band_of_nothing_is_refused_before_it_is_built() {
-        use tcslibgs::node::vehicle::compute::params_of;
+        use tcslib_protocol::node::vehicle::compute::params_of;
 
         for half_band in ["0", "-1"] {
             let said = params_of(
@@ -384,7 +384,7 @@ mod tests {
                     ("half_band", half_band),
                 ]
                 .iter()
-                .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(*v)))
+                .map(|(k, v)| (k.to_string(), tcslib_protocol::Scalar::of(*v)))
                 .collect(),
             )
             .expect_err("a band of nothing");
@@ -419,9 +419,9 @@ mod tests {
             ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
-                sends: tcslibgs::link_type::Basic::U8,
+                sends: tcslib_protocol::link_type::Basic::U8,
             },
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
         );
 
         assert_eq!(

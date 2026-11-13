@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 
 use log::info;
 use nix::poll::PollFlags;
-use tcslibgs::{NetworkConfig, SendsFrom, TcsError, TcsResult};
+use tcslib_protocol::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
@@ -511,7 +511,7 @@ fn is_a_socket(found: &std::fs::Metadata) -> bool {
 mod tests {
     use super::*;
     use std::os::unix::net::UnixListener;
-    use tcslibgs::NetworkProtocol;
+    use tcslib_protocol::NetworkProtocol;
 
     /// Gives a path for a test's socket, unique to the process and thread.
     ///

@@ -1307,7 +1307,7 @@ tcsgui:
 
         // The simulator's own reader agrees, which is the point of writing it
         // at all.
-        tcslibgs::sim_config::SimConfigFile::load(&sim)
+        tcslib_protocol::sim_config::SimConfigFile::load(&sim)
             .expect("the simulator should read what the editor wrote");
     }
 
@@ -1389,7 +1389,7 @@ tcsgui:
         editor.undo();
         editor.undo();
         assert!(!world(&editor).components.contains_key(&name));
-        tcslibgs::sim_config::SimConfigFile::load(&sim)
+        tcslib_protocol::sim_config::SimConfigFile::load(&sim)
             .expect("the simulator reads what the editor wrote");
     }
 
@@ -1465,7 +1465,7 @@ tcsgui:
         assert!(again
             .connections
             .contains(&("heater_1.heat".into(), "zone.heat".into())));
-        let file = tcslibgs::sim_config::SimConfigFile::load(&sim)
+        let file = tcslib_protocol::sim_config::SimConfigFile::load(&sim)
             .expect("the simulator reads what the editor wrote");
         assert_eq!(file.tcsgui.expect("positions").nodes.len(), 1);
 
@@ -2601,7 +2601,7 @@ tcsgui:
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let mut directories = vec![
             PathBuf::from("tests/manual"),
-            PathBuf::from("tcslibgs/schema"),
+            PathBuf::from("tcslib-protocol/schema"),
         ];
         for entry in std::fs::read_dir(root.join("examples")).expect("listed") {
             let entry = entry.expect("an entry");

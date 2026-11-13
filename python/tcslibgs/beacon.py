@@ -1,6 +1,6 @@
 """The beacon, as it goes on the link.
 
-The Python spelling of ``tcslibgs/src/beacon.rs``. A beacon is text, and
+The Python spelling of ``tcslib-protocol/src/beacon.rs``. A beacon is text, and
 nothing but text: its fields in order, a colon between each, so that a person
 reading a packet capture or a log reads it as it is, with no decoder::
 
@@ -12,8 +12,8 @@ interface's digest, numbers in decimal and digests in lower-case hex. It is
 read strictly, as the Rust reads it. A beacon carries no check of its own:
 the transport under it checks it, as UDP's checksum does here.
 
-Its layout -- six text fields, each but the last ended by a colon, the last
-32 characters that end the datagram -- is in ``tcslibgs/xtce/beacon.xtce``,
+Its layout -- six text fields, each but the last ended by a colon, the last 32
+characters that end the datagram -- is in ``tcslib-protocol/xtce/beacon.xtce``,
 and is packed and unpacked here by the code tcs-xtce generates from it,
 :class:`tcslibgs.beacon_packet.Beacon`. What the
 text must say, and turning it into numbers and digests and back, is here.

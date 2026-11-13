@@ -4,8 +4,9 @@
 //! A vehicle that answers to cFS has no command socket, no beacon socket and no
 //! telemetry sockets: everything it takes and sends crosses one SBN peer as cFS
 //! packets told apart by message ID. See "What crosses the bus" in
-//! `docs/tcspecial-design.rst`, [`tcslibgs::sbn`] for the wire and
-//! [`tcslibgs::cfs`] for the packets on it; nothing here states either again.
+//! `docs/tcspecial-design.rst`, [`tcslib_protocol::sbn`] for the wire and
+//! [`tcslib_protocol::cfs`] for the packets on it; nothing here states either
+//! again.
 //!
 //! # The simulated cFS end
 //!
@@ -15,9 +16,9 @@
 //! to each station that subscribed to it, and what a station publishes goes to
 //! the vehicle where the vehicle subscribed to it. A real cFS does not do that
 //! last part for a ground station: SBN never sends one peer what another
-//! published (see [`tcslibgs::sbn::ground_processor_id`]), so a ground station
-//! is a peer of the simulated end and of nothing else, and the ground commands
-//! a vehicle behind a real cFS through that cFS's own ground system.
+//! published (see [`tcslib_protocol::sbn::ground_processor_id`]), so a ground
+//! station is a peer of the simulated end and of nothing else, and the ground
+//! commands a vehicle behind a real cFS through that cFS's own ground system.
 //!
 //! It is kept here, beside the station's peer, rather than in tcssim, so
 //! that the two ends are tested together and against the vehicle itself.
@@ -54,11 +55,13 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use tcslibgs::graph::parameters::{ci_config_of, flatten};
-use tcslibgs::graph::telemetry::{msgids, Carries, MsgIdUse};
-use tcslibgs::graph::Graph;
-use tcslibgs::sbn::{self, kind, Due, Header, Liveness, SubscriptionRefusal};
-use tcslibgs::{came_from, cfs, Bus, Command, HostPort};
+use tcslib_protocol::graph::parameters::{ci_config_of, flatten};
+use tcslib_protocol::graph::telemetry::{msgids, Carries, MsgIdUse};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::sbn::{
+    self, kind, Due, Header, Liveness, SubscriptionRefusal,
+};
+use tcslib_protocol::{came_from, cfs, Bus, Command, HostPort};
 
 /// The longest datagram either end reads: the longest UDP datagram.
 const ROOM: usize = 65_536;

@@ -12,7 +12,7 @@ build = "build.rs"
 # Listening for beacons, which is the half of it that is not a window.
 tcslib-moc = { path = "../../tcslib-moc" }
 # Reading the configuration to find where the beacons are.
-tcslibgs = { path = "../../tcslibgs" }
+tcslib-protocol = { path = "../../tcslib-protocol" }
 # The panel, and what to show on it.
 tcsui = { path = "../../tcsui" }
 slint = "1.3"

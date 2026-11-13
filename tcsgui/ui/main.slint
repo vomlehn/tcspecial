@@ -312,8 +312,8 @@ component FieldRow inherits HorizontalLayout {
     // attribute takes, so offering anything else to type is offering a way
     // to be wrong.
     //
-    // Unticked is both "false" and a file that says nothing, those meaning
-    // the same thing -- see `tcslibgs::node::vehicle::Restart::of` -- and
+    // Unticked is both "false" and a file that says nothing, those meaning the
+    // same thing -- see `tcslib_protocol::node::vehicle::Restart::of` -- and
     // ticking it writes the word, so what the file ends up saying is a word
     // somebody chose and not a box they left alone.
     if root.field.kind == "boolean": CheckBox {
@@ -2630,8 +2630,8 @@ export component ParametersWindow inherits Window {
     preferred-width: 440px;
     preferred-height: 560px;
 
-    // One per attribute of the section, in the order tcslibgs lists them:
-    // what must be stated first, and the rest after.
+    // One per attribute of the section, in the order tcslib-protocol lists
+    // them: what must be stated first, and the rest after.
     in property <[FieldView]> fields: [];
     // What went wrong with the last write, if anything. Shown here as well as
     // in the main window, so that somebody typing in this one is not left to

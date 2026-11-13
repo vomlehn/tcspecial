@@ -25,7 +25,7 @@ pub mod simulator;
 
 pub use client::*;
 pub use connection::*;
-pub use tcslibgs::*;
+pub use tcslib_protocol::*;
 
 #[cfg(test)]
 mod running;

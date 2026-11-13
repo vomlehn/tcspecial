@@ -13,12 +13,12 @@
 //!
 //! There are two of them, because the spacecraft takes commands on two links:
 //! what the ground needs in a hurry must never be queued behind what it asked
-//! for at leisure. Which command goes on which is not this module's decision
-//! -- it is [`tcslibgs::CommandType::link`], the one table both ends read.
+//! for at leisure. Which command goes on which is not this module's decision --
+//! it is [`tcslib_protocol::CommandType::link`], the one table both ends read.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
-use tcslibgs::{
+use tcslib_protocol::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
     CommandType, ConfigDigest, ConfigVersion, ConnectCommand, DHSample,
     NodeCommand, NodeCounts, NodeId, PingCommand, Reason, RestartArmCommand,
@@ -46,10 +46,10 @@ pub struct CommandLinks {
     /// address and port.
     pub interpreter: String,
     /// Where node commands are sent from: `payload_command.source_base`.
-    pub nodes_from: tcslibgs::HostPort,
+    pub nodes_from: tcslib_protocol::HostPort,
     /// And where they go: `payload_command.dest_base`, one socket for every
     /// node, a command carrying the node's id.
-    pub nodes_to: tcslibgs::HostPort,
+    pub nodes_to: tcslib_protocol::HostPort,
 }
 
 /// Reads the command links of a configuration.
@@ -73,9 +73,9 @@ pub struct CommandLinks {
 /// A message saying what is wrong with the `tcspecial` section's command
 /// interpreter settings, or why the peer of a bus cannot be started.
 pub fn command_links_of(
-    graph: &tcslibgs::graph::Graph,
+    graph: &tcslib_protocol::graph::Graph,
 ) -> Result<Option<CommandLinks>, String> {
-    use tcslibgs::graph::parameters::{ci_config_of, flatten};
+    use tcslib_protocol::graph::parameters::{ci_config_of, flatten};
 
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
@@ -87,7 +87,7 @@ pub fn command_links_of(
         let Some(ground) = crate::bus::Ground::of(graph)? else {
             return Ok(None);
         };
-        let anywhere = tcslibgs::HostPort {
+        let anywhere = tcslib_protocol::HostPort {
             address: "127.0.0.1".to_string(),
             port: 0,
         };
@@ -95,7 +95,7 @@ pub fn command_links_of(
             from: anywhere.to_string(),
             interpreter: ground.spacecraft().to_string(),
             nodes_from: anywhere,
-            nodes_to: tcslibgs::HostPort {
+            nodes_to: tcslib_protocol::HostPort {
                 address: ground.nodes().ip().to_string(),
                 port: ground.nodes().port(),
             },
@@ -457,7 +457,7 @@ impl TcsClient {
     /// `TcsError::Unmatched` if the station is not matched for commanding,
     /// `TcsError::Io` if it cannot be sent or no answer comes in time,
     /// and `TcsError::Protocol` if the answer is not this command's.
-    pub fn ping(&mut self) -> TcsResult<tcslibgs::PingTelemetry> {
+    pub fn ping(&mut self) -> TcsResult<tcslib_protocol::PingTelemetry> {
         let seq = self.next_sequence();
         let cmd = Command::Ping(PingCommand::new(seq));
         let response = self.send_command(cmd)?;
@@ -556,7 +556,7 @@ impl TcsClient {
         // having a connection to the vehicle, which is what this link is; a
         // payload's link carries what is asked of a payload, and a ground
         // station with no connection has nothing to ask one. See
-        // `tcslibgs::CommandType::link`.
+        // `tcslib_protocol::CommandType::link`.
         self.connection.send(&command)?;
         self.last_sent = Some(Timestamp::now());
 
@@ -745,7 +745,7 @@ impl TcsClient {
     /// the reason. The reason says why where the vehicle refused it --
     /// which attribute no binding names, with its spelling where that was
     /// what was wrong; what the node would not take -- and is empty where
-    /// it did not: see [`tcslibgs::SetNodeTelemetry::reason`].
+    /// it did not: see [`tcslib_protocol::SetNodeTelemetry::reason`].
     ///
     /// # Errors
     ///
@@ -1043,7 +1043,7 @@ mod tests {
     fn an_unmatched_station_sends_only_the_three() {
         let (connection, asked) = Canned::recording(an_answer(a_version(1)));
         let (nodes, node_asked) = Canned::recording(Telemetry::StopNode(
-            tcslibgs::NodeTelemetry::stopped(
+            tcslib_protocol::NodeTelemetry::stopped(
                 1,
                 CommandStatus::Success,
                 NodeId(2),
@@ -1091,12 +1091,13 @@ mod tests {
     /// make the station matched for commanding.
     #[test]
     fn a_connect_answered_with_another_checksum_does_not_match() {
-        let theirs = Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
-            1,
-            a_version(1),
-            ConfigDigest([0x11; 16]),
-            40,
-        ));
+        let theirs =
+            Telemetry::Connect(tcslib_protocol::ConnectTelemetry::new(
+                1,
+                a_version(1),
+                ConfigDigest([0x11; 16]),
+                40,
+            ));
         let mut client =
             TcsClient::spacecraft_only(Canned::answering(theirs), listening());
         client.connect(OURS).expect("answered");
@@ -1113,7 +1114,7 @@ mod tests {
     #[test]
     fn a_connect_refused_does_not_match() {
         let refused = Telemetry::Connect(
-            tcslibgs::ConnectTelemetry::new(1, a_version(1), OURS, 40)
+            tcslib_protocol::ConnectTelemetry::new(1, a_version(1), OURS, 40)
                 .refused(CommandStatus::Unmatched),
         );
         let matched = listening();
@@ -1183,7 +1184,10 @@ mod tests {
     fn the_arm_and_the_restart_carry_their_target() {
         let other = ConfigDigest([0x77; 16]);
         let (connection, asked) = Canned::recording(Telemetry::RestartArm(
-            tcslibgs::RestartArmTelemetry::new(1, CommandStatus::Success),
+            tcslib_protocol::RestartArmTelemetry::new(
+                1,
+                CommandStatus::Success,
+            ),
         ));
         let mut client = TcsClient::spacecraft_only(connection, commanding());
         client.restart_arm(ArmKey(9), other).expect("answered");
@@ -1340,7 +1344,7 @@ mod tests {
         ) -> TcsResult<Telemetry> {
             match self.offsets.pop_front() {
                 Some(offset) => {
-                    Ok(Telemetry::Ping(tcslibgs::PingTelemetry::new(
+                    Ok(Telemetry::Ping(tcslib_protocol::PingTelemetry::new(
                         (i64::from(self.asked) + offset) as u32,
                         CommandStatus::Success,
                     )))
@@ -1399,7 +1403,7 @@ mod tests {
     ///
     /// The answer.
     fn an_answer(version: ConfigVersion) -> Telemetry {
-        Telemetry::Connect(tcslibgs::ConnectTelemetry::new(
+        Telemetry::Connect(tcslib_protocol::ConnectTelemetry::new(
             1,
             version,
             ConfigDigest([0x5A; 16]),
@@ -1432,10 +1436,9 @@ mod tests {
     #[test]
     fn a_client_times_the_commands_it_sends() {
         let mut client = TcsClient::of_a_graph(
-            Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
-                1,
-                CommandStatus::Success,
-            ))),
+            Canned::answering(Telemetry::Ping(
+                tcslib_protocol::PingTelemetry::new(1, CommandStatus::Success),
+            )),
             Canned::answering(an_answer(a_version(1))),
             commanding(),
         );
@@ -1468,10 +1471,9 @@ mod tests {
     fn what_each_end_read_is_asked_of_the_spacecraft_alone() {
         let mut client = TcsClient::of_a_graph(
             Canned::answering(an_answer(a_version(1))),
-            Canned::answering(Telemetry::Ping(tcslibgs::PingTelemetry::new(
-                1,
-                CommandStatus::Success,
-            ))),
+            Canned::answering(Telemetry::Ping(
+                tcslib_protocol::PingTelemetry::new(1, CommandStatus::Success),
+            )),
             commanding(),
         );
 
@@ -1489,7 +1491,7 @@ mod tests {
     #[test]
     fn a_start_ends_the_match_until_a_connect_is_answered_again() {
         let (nodes, asked) = Canned::recording(Telemetry::StopNode(
-            tcslibgs::NodeTelemetry::stopped(
+            tcslib_protocol::NodeTelemetry::stopped(
                 1,
                 CommandStatus::Success,
                 NodeId(2),

@@ -75,7 +75,7 @@ def missed(elapsed, interval):
 #: a line the program has not filled in rather than one the spacecraft has not.
 NO_BEACON_MESSAGE = "<none>"
 
-#: What a time says before there is one: ``tcslibgs::NO_TRANSFER_TIME``.
+#: What a time says before there is one: ``tcslib_protocol::NO_TRANSFER_TIME``.
 NO_TRANSFER_TIME = "--:--:--"
 
 

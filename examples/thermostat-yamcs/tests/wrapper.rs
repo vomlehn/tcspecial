@@ -1,31 +1,31 @@
 //! The Yamcs wrapper reads what the vehicle frames as the configuration
 //! says it is.
 //!
-//! The mission database's wrapper, which `tcslibgs/yamcs.py` generates from
-//! the configuration, gives each node drawn into the gateway node a
-//! parameter of the type the configuration says its data are: a value as a
-//! float in its unit, read from four bytes of a signed count of the unit's
-//! steps through a calibrator, a decision as a boolean, read from the
-//! character `1` or `0` -- a thermostat's, and what a heater's switch was
-//! told -- and a GPIO payload's lines read for their levels as each line's
-//! record, its level a boolean. Nothing but a run against Yamcs itself would
-//! show the wrapper and the vehicle disagreeing -- a byte order, a scale off
-//! by a thousand, a sign lost -- so this generates the wrapper, as
-//! `thermostat_yamcs.py` does, and works it as Yamcs would, with
-//! `yamcs_common`'s interpreter, on what the vehicle sends: each value made
-//! by `tcslibgs::node::vehicle::compute::value_bytes`, each line's record as
-//! tcspecial writes it, framed by `tcslibgs::ccsds` under the
-//! APID `tcslibgs` counts for its source. And so for every unit there is, in
+//! The mission database's wrapper, which `tcslibgs/yamcs.py` generates from the
+//! configuration, gives each node drawn into the gateway node a parameter of
+//! the type the configuration says its data are: a value as a float in its
+//! unit, read from four bytes of a signed count of the unit's steps through a
+//! calibrator, a decision as a boolean, read from the character `1` or `0` -- a
+//! thermostat's, and what a heater's switch was told -- and a GPIO payload's
+//! lines read for their levels as each line's record, its level a boolean.
+//! Nothing but a run against Yamcs itself would show the wrapper and the
+//! vehicle disagreeing -- a byte order, a scale off by a thousand, a sign lost
+//! -- so this generates the wrapper, as `thermostat_yamcs.py` does, and works
+//! it as Yamcs would, with `yamcs_common`'s interpreter, on what the vehicle
+//! sends: each value made by
+//! `tcslib_protocol::node::vehicle::compute::value_bytes`, each line's record
+//! as tcspecial writes it, framed by `tcslib_protocol::ccsds` under the APID
+//! `tcslib-protocol` counts for its source. And so for every unit there is, in
 //! copies of the example whose readings are in that unit.
 
 use std::path::{Path, PathBuf};
 
-use tcslibgs::ccsds::HEADER_BYTES;
-use tcslibgs::graph::telemetry;
-use tcslibgs::graph::Graph;
-use tcslibgs::node::vehicle::compute::value_bytes;
-use tcslibgs::unit::Unit;
-use tcslibgs::{Beacon, ConfigDigest, ConfigVersion};
+use tcslib_protocol::ccsds::HEADER_BYTES;
+use tcslib_protocol::graph::telemetry;
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::node::vehicle::compute::value_bytes;
+use tcslib_protocol::unit::Unit;
+use tcslib_protocol::{Beacon, ConfigDigest, ConfigVersion};
 
 use yamcs_common::{decode, framed, generated_mdb, Element};
 
@@ -38,7 +38,7 @@ fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-/// The APID each source's data carries, as `tcslibgs` counts it.
+/// The APID each source's data carries, as `tcslib-protocol` counts it.
 ///
 /// # Arguments
 ///
@@ -153,8 +153,8 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
     let path = here().join("thermostat-yamcs.ytcs");
     let graph = Graph::load(&path).expect("the example reads");
     let section = graph.tcspecial.as_ref().expect("a tcspecial section");
-    let apid = tcslibgs::graph::parameters::ci_config_of(
-        &tcslibgs::graph::parameters::flatten(section),
+    let apid = tcslib_protocol::graph::parameters::ci_config_of(
+        &tcslib_protocol::graph::parameters::flatten(section),
     )
     .expect("its section reads")
     .to_ci_config()
@@ -213,9 +213,10 @@ fn in_unit(dir: &Path, unit: Unit) -> PathBuf {
         .expect("written");
     let path = at.join("thermostat-yamcs/in.xtcs");
     std::fs::copy(here().join("thermostat-yamcs.xtcs"), &path).expect("copied");
-    let graph = tcslibgs::graph::Graph::load(&path).expect("the copy reads");
-    let own =
-        tcslibgs::graph::own_xtce::written(&graph, "in").expect("its own XTCE");
+    let graph =
+        tcslib_protocol::graph::Graph::load(&path).expect("the copy reads");
+    let own = tcslib_protocol::graph::own_xtce::written(&graph, "in")
+        .expect("its own XTCE");
     std::fs::write(path.with_extension("xtce"), own).expect("written");
     path
 }

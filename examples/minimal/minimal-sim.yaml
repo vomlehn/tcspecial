@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial-sim.schema.json
+# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial-sim.schema.json
 
 # How tcssim simulates the one payload of minimal.ytcs.
 description: Simulator settings for the payload of minimal.ytcs

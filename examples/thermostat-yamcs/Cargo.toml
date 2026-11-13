@@ -13,7 +13,7 @@ Rust it is written after"""
 # Rust to hold the Python to -- the ports, the APIDs and what each node's
 # data are -- and the thermostat example to hold this one to.
 [dev-dependencies]
-tcslibgs = { path = "../../tcslibgs" }
+tcslib-protocol = { path = "../../tcslib-protocol" }
 tempfile = "3.27.0"
 # The two examples' configurations as value trees, compared.
 serde_json = "1.0"

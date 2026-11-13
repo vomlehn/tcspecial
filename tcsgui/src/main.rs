@@ -75,7 +75,7 @@ use pane::{
 };
 use style::NodeType;
 use subdiagram::{Home, Qualified};
-use tcslibgs::graph::check::{Problem, Severity};
+use tcslib_protocol::graph::check::{Problem, Severity};
 
 slint::include_modules!();
 
@@ -1455,9 +1455,10 @@ fn wire(
             // A terminal with one link on it is a line being picked up
             // by its end; one with none, or with several, is a line
             // about to be drawn. See Drawing::holding.
-            let sink = tcslibgs::graph::terminals::stream_of(&at.terminal)
-                .map(|(sink, _)| sink)
-                .unwrap_or(false);
+            let sink =
+                tcslib_protocol::graph::terminals::stream_of(&at.terminal)
+                    .map(|(sink, _)| sink)
+                    .unwrap_or(false);
             let held = {
                 let editor = editor_for_press.borrow();
                 let theirs = attached(editor.document(), &at, sink);
@@ -1640,7 +1641,8 @@ fn wire(
             let shown = Qualified::parse(&node).node;
             if offers.is_empty() {
                 let boxed = is_box(editor.borrow().document(), &node);
-                let at = tcslibgs::graph::terminals::answers(&from.terminal);
+                let at =
+                    tcslib_protocol::graph::terminals::answers(&from.terminal);
                 let nothing = match at {
                     // A box whose file shows nothing there: what to
                     // do about that is inside it.
@@ -3483,7 +3485,7 @@ fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
         }
         let node = match finding.problem.as_ref().map(|problem| problem.about())
         {
-            Some(tcslibgs::About::Node(name)) => name,
+            Some(tcslib_protocol::About::Node(name)) => name,
             _ => String::new(),
         };
         let at = (!node.is_empty()).then(|| at_of(&node)).flatten();
@@ -4396,11 +4398,11 @@ where
 
 /// Puts the tcspecial parameters into their window.
 ///
-/// Every attribute the section may have, in the order `tcslibgs` lists them --
-/// the ones that must be stated first -- with the empty required ones marked.
-/// Built from that list rather than from what the document happens to hold, so
-/// that a section somebody has never filled in shows nine fields to fill
-/// rather than nothing at all.
+/// Every attribute the section may have, in the order `tcslib-protocol` lists
+/// them -- the ones that must be stated first -- with the empty required ones
+/// marked. Built from that list rather than from what the document happens to
+/// hold, so that a section somebody has never filled in shows nine fields to
+/// fill rather than nothing at all.
 ///
 /// # Arguments
 ///
@@ -4413,8 +4415,8 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     // configuration needs is marked.
     let kind = said
         .get("gateway")
-        .and_then(|said| tcslibgs::gateway::GatewayKind::of(said).ok());
-    let fields: Vec<FieldView> = tcslibgs::graph::parameters::ATTRIBUTES
+        .and_then(|said| tcslib_protocol::gateway::GatewayKind::of(said).ok());
+    let fields: Vec<FieldView> = tcslib_protocol::graph::parameters::ATTRIBUTES
         .iter()
         .map(|(attribute, needed)| {
             let value = said.get(*attribute).cloned().unwrap_or_default();
@@ -4541,9 +4543,9 @@ fn settings_of(
             required: false,
             is_heading: false,
             simulated: true,
-            // The simulator's settings are described by `tcslibgs::sim_config`
-            // rather than by the tree, so they are boxes to write in until
-            // that says what each takes.
+            // The simulator's settings are described by
+            // `tcslib_protocol::sim_config` rather than by the tree, so they
+            // are boxes to write in until that says what each takes.
             kind: nodes::TEXT.into(),
         })
         .collect();
@@ -5474,7 +5476,8 @@ fn physics_views_of(
                 simulator.groups.get(group)?.get("connects")
             });
         if let Some(connects) = connects {
-            for terminal in tcslibgs::sim_config::terminals_of(connects) {
+            for terminal in tcslib_protocol::sim_config::terminals_of(connects)
+            {
                 said.push((drawn.clone(), terminal.to_string()));
             }
         }
@@ -5973,15 +5976,14 @@ fn physics_places(
 /// Everything a line in hand from a physics component, clicked down at a
 /// point, can mean.
 ///
-/// Over another component, each pair of terminals the two can be connected
-/// by, the way the line was drawn: `tcslibgs::node::physics::connectable` says
-/// which. Over a payload on the top page, or the box of a subdiagram, which
-/// is all of a subdiagram the top page shows, each payload there and each
-/// terminal of the component, the way the line was drawn, its simulated
-/// payload may be joined to: `tcslibgs::sim_config::may_join` says which. A
-/// join already made is offered too, marked as made, so that the menu says
-/// why it cannot be chosen rather than leaving somebody to wonder where it
-/// went.
+/// Over another component, each pair of terminals the two can be connected by,
+/// the way the line was drawn: `tcslib_protocol::node::physics::connectable`
+/// says which. Over a payload on the top page, or the box of a subdiagram,
+/// which is all of a subdiagram the top page shows, each payload there and each
+/// terminal of the component, the way the line was drawn, its simulated payload
+/// may be joined to: `tcslib_protocol::sim_config::may_join` says which. A join
+/// already made is offered too, marked as made, so that the menu says why it
+/// cannot be chosen rather than leaving somebody to wonder where it went.
 ///
 /// # Arguments
 ///
@@ -6034,7 +6036,7 @@ fn physics_joins(
             (other, &end.component, their_kind, &kind)
         };
         return Some(
-            tcslibgs::node::physics::connectable(outputs_of, inputs_of)
+            tcslib_protocol::node::physics::connectable(outputs_of, inputs_of)
                 .into_iter()
                 .map(|(output, input)| {
                     let (from, to) =
@@ -6053,13 +6055,14 @@ fn physics_joins(
     // coordinates; and the payloads it is, or on the top page holds.
     let left = sheet_left(dividers, home) as f32;
     let under = node_under(document, home, (x - left, y))?;
-    let Some(terminals) = tcslibgs::node::physics::terminals_of(&kind) else {
+    let Some(terminals) = tcslib_protocol::node::physics::terminals_of(&kind)
+    else {
         return Some(Vec::new());
     };
     let way = if end.output {
-        tcslibgs::node::physics::terminal::Direction::Out
+        tcslib_protocol::node::physics::terminal::Direction::Out
     } else {
-        tcslibgs::node::physics::terminal::Direction::In
+        tcslib_protocol::node::physics::terminal::Direction::In
     };
     let mut meant = Vec::new();
     for node in &document.nodes {
@@ -6079,12 +6082,12 @@ fn physics_joins(
             .map(String::as_str)
             .unwrap_or_default();
         let joined: Vec<&str> =
-            tcslibgs::sim_config::terminals_of(said).collect();
+            tcslib_protocol::sim_config::terminals_of(said).collect();
         let watches = watches_lines(&node.node_type);
         for terminal in terminals {
             let named = format!("{}.{}", end.component, terminal.name);
             if terminal.direction == way
-                && tcslibgs::sim_config::may_join(watches, terminal)
+                && tcslib_protocol::sim_config::may_join(watches, terminal)
             {
                 let made = joined.contains(&named.as_str());
                 meant.push((
@@ -6108,7 +6111,7 @@ fn physics_joins(
 /// the `moc` terminals carry what drives a payload, which drives an input
 /// of the component -- a heater's switch, a zone's own heater -- and the
 /// `world` ones what it reports, which is an output it reports -- a zone's
-/// temperature. `tcslibgs::sim_config::may_join` says which of those a
+/// temperature. `tcslib_protocol::sim_config::may_join` says which of those a
 /// payload may join, as it does for a line drawn from the component.
 ///
 /// # Arguments
@@ -6150,9 +6153,9 @@ fn payload_joins(
         })
         .map(|(name, kind, _)| (name, kind))?;
     let way = if from.terminal.starts_with("moc-") {
-        tcslibgs::node::physics::terminal::Direction::In
+        tcslib_protocol::node::physics::terminal::Direction::In
     } else {
-        tcslibgs::node::physics::terminal::Direction::Out
+        tcslib_protocol::node::physics::terminal::Direction::Out
     };
     let payload = crate::sim::Simulator::key_of(&node.name);
     let said = simulator
@@ -6161,14 +6164,15 @@ fn payload_joins(
         .and_then(|settings| settings.get("connects"))
         .map(String::as_str)
         .unwrap_or_default();
-    let joined: Vec<&str> = tcslibgs::sim_config::terminals_of(said).collect();
+    let joined: Vec<&str> =
+        tcslib_protocol::sim_config::terminals_of(said).collect();
     let watches = watches_lines(&node.node_type);
-    let meant = tcslibgs::node::physics::terminals_of(&kind)
+    let meant = tcslib_protocol::node::physics::terminals_of(&kind)
         .unwrap_or_default()
         .iter()
         .filter(|terminal| {
             terminal.direction == way
-                && tcslibgs::sim_config::may_join(watches, terminal)
+                && tcslib_protocol::sim_config::may_join(watches, terminal)
         })
         .map(|terminal| {
             let named = format!("{component}.{}", terminal.name);
@@ -6222,13 +6226,13 @@ fn physics_offers(
 /// # Arguments
 ///
 /// * `node_type` - The payload's type, which says: see
-///                 `tcslibgs::node::payload::gpio::Kind`.
+///                 `tcslib_protocol::node::payload::gpio::Kind`.
 ///
 /// # Returns
 ///
 /// Whether it watches lines.
 fn watches_lines(node_type: &str) -> bool {
-    tcslibgs::node::payload::gpio::Kind::of(node_type)
+    tcslib_protocol::node::payload::gpio::Kind::of(node_type)
         .is_some_and(|kind| kind.watches())
 }
 
@@ -6463,7 +6467,7 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(chosen.map_or("", |_| component).into());
     let fields: Vec<&'static str> = chosen
-        .and_then(|c| tcslibgs::node::physics::settings_of(&c.kind))
+        .and_then(|c| tcslib_protocol::node::physics::settings_of(&c.kind))
         .map(|settings| settings.to_vec())
         .unwrap_or_default();
     let empty = BTreeMap::new();
@@ -6528,8 +6532,9 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
     ModelRc::from(Rc::new(VecModel::from(entries)))
 }
 
-/// The physics component types by family, as the physics list heads them:
-/// every one of `tcslibgs::node::physics::TYPES` once, which a test holds it to.
+/// The physics component types by family, as the physics list heads them: every
+/// one of `tcslib_protocol::node::physics::TYPES` once, which a test holds it
+/// to.
 const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
     ("Thermal", &["heater", "thermal_mass"]),
     ("Power", &["battery", "bus", "load", "solar_array", "sun"]),
@@ -6666,7 +6671,8 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
     };
     let mut lines = Vec::new();
     for (terminal, nodes) in exports.each() {
-        let Some((sink, _)) = tcslibgs::graph::terminals::stream_of(terminal)
+        let Some((sink, _)) =
+            tcslib_protocol::graph::terminals::stream_of(terminal)
         else {
             continue;
         };
@@ -6687,7 +6693,7 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
             if crossing {
                 continue;
             }
-            let outside = tcslibgs::graph::terminals::answers(terminal)
+            let outside = tcslib_protocol::graph::terminals::answers(terminal)
                 .unwrap_or_default();
             lines.push(if sink {
                 Link::joining(NOT_JOINED_OUTSIDE, Some(outside), &at.node, None)
@@ -6881,8 +6887,8 @@ fn offers_model(offers: &[Offer]) -> ModelRc<JoinOffer> {
 ///
 /// a new line, from `from` to each terminal of the node it pairs with -- a
 /// `world-out` with a `world-in` and a `moc-out` with a `moc-in`, which is
-/// `tcslibgs::graph::terminals::pairs_with`, the rule the checking holds a
-/// written-out configuration to. A line may be drawn from either end, so
+/// `tcslib_protocol::graph::terminals::pairs_with`, the rule the checking holds
+/// a written-out configuration to. A line may be drawn from either end, so
 /// pressed on a sink this offers the node's source. Into a node that declares
 /// its inputs, as a mean does, one for each input, because which input a
 /// reading is, is the whole of what such a line says;
@@ -6895,10 +6901,10 @@ fn offers_model(offers: &[Offer]) -> ModelRc<JoinOffer> {
 /// menu's way of removing one beside the Delete key.
 ///
 /// Greyed rather than left out: anything from a node to itself, a line the
-/// document has already, and a second line into an input something else
-/// feeds, unless the node takes several -- the ground's: see
-/// `tcslibgs::graph::terminals::merges`. An editor that cannot make a bad
-/// link is worth more than one that makes it and explains afterwards.
+/// document has already, and a second line into an input something else feeds,
+/// unless the node takes several -- the ground's: see
+/// `tcslib_protocol::graph::terminals::merges`. An editor that cannot make a
+/// bad link is worth more than one that makes it and explains afterwards.
 ///
 /// # Arguments
 ///
@@ -6933,11 +6939,12 @@ fn offered(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
         return box_offers(document, from, node);
     }
     let Some((sink_pressed, _)) =
-        tcslibgs::graph::terminals::stream_of(&from.terminal)
+        tcslib_protocol::graph::terminals::stream_of(&from.terminal)
     else {
         return Vec::new();
     };
-    let Some(wanted) = tcslibgs::graph::terminals::answers(&from.terminal)
+    let Some(wanted) =
+        tcslib_protocol::graph::terminals::answers(&from.terminal)
     else {
         return Vec::new();
     };
@@ -7134,7 +7141,7 @@ fn repeated(
 /// A sink is fed by one source: two would interleave two streams that
 /// nothing downstream could tell apart. The ground's is the exception, and
 /// takes as many as the configuration gives it: see
-/// `tcslibgs::graph::terminals::merges`.
+/// `tcslib_protocol::graph::terminals::merges`.
 ///
 /// # Arguments
 ///
@@ -7155,13 +7162,14 @@ fn fed(
     except: Option<&Link>,
 ) -> Option<String> {
     let found = document.node(node)?;
-    if tcslibgs::graph::terminals::merges(&found.node_type) {
+    if tcslib_protocol::graph::terminals::merges(&found.node_type) {
         return None;
     }
     // A declared input is told apart by its name, and a terminal by where the
     // drawing puts the lines arriving at it.
-    let declared = input
-        .filter(|input| tcslibgs::graph::terminals::stream_of(input).is_none());
+    let declared = input.filter(|input| {
+        tcslib_protocol::graph::terminals::stream_of(input).is_none()
+    });
     document
         .links
         .iter()
@@ -7298,7 +7306,7 @@ fn anchored(
     if let Some(held) = &from.holding {
         let ends = ends_of(document, held, home, dividers);
         let (sink_pressed, _) =
-            tcslibgs::graph::terminals::stream_of(&from.terminal)?;
+            tcslib_protocol::graph::terminals::stream_of(&from.terminal)?;
         // The end that is not the one in hand.
         return Some(if sink_pressed { ends.from } else { ends.to });
     }
@@ -7390,7 +7398,8 @@ fn edge_offers(
         .iter()
         .find(|t| t.spelling() == found.node_type)
         .is_some_and(|t| t.terminals().has(terminal));
-    let Some((sink, _)) = tcslibgs::graph::terminals::stream_of(terminal)
+    let Some((sink, _)) =
+        tcslib_protocol::graph::terminals::stream_of(terminal)
     else {
         return Vec::new();
     };
@@ -7473,7 +7482,8 @@ fn outside_offers(
     if found.home.as_deref() != Some(home) {
         return Vec::new();
     }
-    let Some(wanted) = tcslibgs::graph::terminals::answers(terminal) else {
+    let Some(wanted) = tcslib_protocol::graph::terminals::answers(terminal)
+    else {
         return Vec::new();
     };
     let bare = Qualified::parse(node).node;
@@ -7598,11 +7608,12 @@ fn reached_at(
 /// Each offer, greyed where it cannot be made, as `offered` greys them.
 fn box_offers(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
     let Some((sink_pressed, _)) =
-        tcslibgs::graph::terminals::stream_of(&from.terminal)
+        tcslib_protocol::graph::terminals::stream_of(&from.terminal)
     else {
         return Vec::new();
     };
-    let Some(wanted) = tcslibgs::graph::terminals::answers(&from.terminal)
+    let Some(wanted) =
+        tcslib_protocol::graph::terminals::answers(&from.terminal)
     else {
         return Vec::new();
     };
@@ -7644,8 +7655,10 @@ fn box_offers(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
                 // is one a node declares.
                 let to = match (arriving_said.is_empty(), &input) {
                     (false, Some(input))
-                        if tcslibgs::graph::terminals::stream_of(input)
-                            .is_none() =>
+                        if tcslib_protocol::graph::terminals::stream_of(
+                            input,
+                        )
+                        .is_none() =>
                     {
                         format!("{arriving_said}.{input}")
                     }
@@ -7817,11 +7830,11 @@ fn seed(editor: &mut Editor) {
     // one Undo deep rather than one per parameter: what was seeded was one
     // thing, and nobody asked for it a field at a time.
     let mut edits = Vec::new();
-    for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
+    for (attribute, _) in tcslib_protocol::graph::parameters::ATTRIBUTES {
         // Empty, with one exception the schema itself names: the beacon's
         // interval has an answer that is right until somebody has a reason,
         // where a socket has none. See `parameters::default_of`.
-        let now = tcslibgs::graph::parameters::default_of(attribute)
+        let now = tcslib_protocol::graph::parameters::default_of(attribute)
             .unwrap_or_default()
             .to_string();
         edits.push(Edit::SetTcspecial {
@@ -8520,7 +8533,7 @@ fn the_physics_list_offers_every_type_once() {
         .flat_map(|(_, kinds)| kinds.iter().copied())
         .collect();
     offered.sort_unstable();
-    let mut known: Vec<&str> = tcslibgs::node::physics::TYPES.to_vec();
+    let mut known: Vec<&str> = tcslib_protocol::node::physics::TYPES.to_vec();
     known.sort_unstable();
     assert_eq!(offered, known);
 }
@@ -12939,11 +12952,11 @@ mod tests {
         // and answers none of them, because a value nobody chose looks as
         // chosen as one somebody did.
         let said = &editor.document().tcspecial;
-        for (attribute, _) in tcslibgs::graph::parameters::ATTRIBUTES {
+        for (attribute, _) in tcslib_protocol::graph::parameters::ATTRIBUTES {
             assert_eq!(
                 said.get(*attribute).map(String::as_str),
                 Some(
-                    tcslibgs::graph::parameters::default_of(attribute)
+                    tcslib_protocol::graph::parameters::default_of(attribute)
                         .unwrap_or("")
                 ),
                 "{attribute} should be offered with whatever it defaults to"
@@ -16118,17 +16131,18 @@ mod tests {
             .collect();
         let offered: Vec<String> =
             fields.iter().map(|f| f.name.to_string()).collect();
-        let expected: Vec<String> = tcslibgs::graph::parameters::ATTRIBUTES
-            .iter()
-            .map(|(name, _)| (*name).to_string())
-            .collect();
+        let expected: Vec<String> =
+            tcslib_protocol::graph::parameters::ATTRIBUTES
+                .iter()
+                .map(|(name, _)| (*name).to_string())
+                .collect();
         assert_eq!(offered, expected, "the fields are not the attributes");
         // The seven that must be stated say so. Said and not insisted on:
         // an empty one is a question not yet answered, which is why none of
         // this is a fault.
         assert_eq!(
             fields.iter().filter(|f| f.required).count(),
-            tcslibgs::graph::parameters::ATTRIBUTES
+            tcslib_protocol::graph::parameters::ATTRIBUTES
                 .iter()
                 .filter(|(_, needed)| needed.required(None))
                 .count()

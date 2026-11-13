@@ -94,7 +94,7 @@ on, and parts of it moved to real devices one at a time.
 
 A configuration is written with **tcsgui**, which draws it as a diagram of
 nodes and links, and checked with **tcsverify**, which says what is wrong
-with it without running any of it. Both read it through **tcslibgs**, the
+with it without running any of it. Both read it through **tcslib-protocol**, the
 library the vehicle and the ground share, so the error a person sees on the
 desktop is the one the vehicle would refuse the file with.
 
@@ -159,8 +159,8 @@ The other documents beside these:
 
 The libraries
     `tcslib-moc <../tcslib-moc/README.html>`__ in the MOC, in Rust, and
-    `tcslib-c <../tcslib-c/README.html>`__, its C interface; `tcslibgs
-    <../tcslibgs/README.html>`__, used aboard and in the MOC.
+    `tcslib-c <../tcslib-c/README.html>`__, its C interface; `tcslib-protocol
+    <../tcslib-protocol/README.html>`__, used aboard and in the MOC.
 
 The rest of the TCS software
 ============================

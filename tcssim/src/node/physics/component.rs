@@ -24,8 +24,8 @@ pub const MOST_TERMINALS: usize = 8;
 /// A component of the world.
 ///
 /// Its terminals are its type's, in the order its type in
-/// `tcslibgs::node::physics` lists them; every slice of values here is indexed
-/// by them, an output's place holding nothing a component reads.
+/// `tcslib_protocol::node::physics` lists them; every slice of values here is
+/// indexed by them, an output's place holding nothing a component reads.
 pub trait Component: Send + std::fmt::Debug {
     /// Takes what is at its inputs, which holds until it is given them
     /// again.

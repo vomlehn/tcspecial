@@ -1,12 +1,12 @@
 """What a node sends the ground: a value in a unit, a decision, a whole
 number, or bytes.
 
-The Python spelling of ``tcslibgs::graph::fprime::Form``, with
-``tcslibgs::unit``'s table of units behind it. What each node sends is not
-worked out here from what the configuration says of it: it is read from the
+The Python spelling of ``tcslib_protocol::graph::fprime::Form``, with
+``tcslib_protocol::unit``'s table of units behind it. What each node sends is
+not worked out here from what the configuration says of it: it is read from the
 configuration's own XTCE, which ``tcsverify --xtce`` writes beside it from the
-configuration and ``tcslibgs/xtce/types.xtce`` (see "The configuration's own
-XTCE" in ``docs/tcspecial-design.rst``), so the rules are the Rust's alone.
+configuration and ``tcslib-protocol/xtce/types.xtce`` (see "The configuration's
+own XTCE" in ``docs/tcspecial-design.rst``), so the rules are the Rust's alone.
 
 * A value -- four bytes of a signed count of its unit's steps, most
   significant first (``compute::from_value``) -- is a number in its unit:
@@ -41,7 +41,8 @@ DECISION_OFF = 0
 
 @dataclass(frozen=True)
 class Unit:
-    """A unit a value may be in: one row of ``tcslibgs::unit``'s table."""
+    """A unit a value may be in: one row of ``tcslib_protocol::unit``'s
+    table."""
 
     #: The Rust's name for it, ``Kelvin``, which names it where a symbol
     #: cannot: in an XTCE name, which allows no slash.

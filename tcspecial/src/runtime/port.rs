@@ -48,16 +48,16 @@ use std::time::{Duration, Instant};
 use nix::poll::{poll, PollFd, PollFlags};
 
 use tcsapp::parent::ReadInto;
-use tcslibgs::graph::interface::speaks_first;
-use tcslibgs::graph::link_types;
-use tcslibgs::graph::reach::reach_of;
-use tcslibgs::graph::terminals::Stream;
-use tcslibgs::graph::Node;
-use tcslibgs::link_type::LinkType;
-use tcslibgs::node::app;
-use tcslibgs::node::vehicle::compute::Format;
-use tcslibgs::unit::Unit;
-use tcslibgs::{EndpointConfig, TcsError, TcsResult};
+use tcslib_protocol::graph::interface::speaks_first;
+use tcslib_protocol::graph::link_types;
+use tcslib_protocol::graph::reach::reach_of;
+use tcslib_protocol::graph::terminals::Stream;
+use tcslib_protocol::graph::Node;
+use tcslib_protocol::link_type::LinkType;
+use tcslib_protocol::node::app;
+use tcslib_protocol::node::vehicle::compute::Format;
+use tcslib_protocol::unit::Unit;
+use tcslib_protocol::{EndpointConfig, TcsError, TcsResult};
 
 use crate::node::payload::app_all_pl::AppAllPl;
 use crate::node::payload::app_pl::AppPl;
@@ -235,7 +235,7 @@ impl EndpointPort {
         what: &str,
         config: &EndpointConfig,
         uses: Use,
-        sends_from: Option<&tcslibgs::SendsFrom>,
+        sends_from: Option<&tcslib_protocol::SendsFrom>,
     ) -> TcsResult<EndpointPort> {
         let (reader, writer) = hearing_endpoint_pair(what, config, sends_from)?;
         Ok(EndpointPort::of(what, reader, writer, uses))
@@ -407,9 +407,9 @@ impl EndpointPort {
     /// Opens the node a configuration describes.
     ///
     /// Everything the node says about reaching it comes from
-    /// [`tcslibgs::graph::reach`], and which way it is used from the links --
-    /// so this is the whole of what turns a configured graph into something
-    /// that moves bytes.
+    /// [`tcslib_protocol::graph::reach`], and which way it is used from the
+    /// links -- so this is the whole of what turns a configured graph into
+    /// something that moves bytes.
     ///
     /// A gateway link is bound and everything else is reached out to. That
     /// follows from which end exists first: the ground sends to an address it
@@ -447,10 +447,10 @@ impl EndpointPort {
         // of which end speaks first that a UDP payload has.
         let endpoint = reach.opened(crate::runtime::start::mode());
 
-        let opened = if tcslibgs::gateway::is_gateway(&node.node_type) {
+        let opened = if tcslib_protocol::gateway::is_gateway(&node.node_type) {
             // Under Yamcs what the ground sends is CCSDS telecommands under
             // the node's apid_base, each header checked and taken off.
-            match tcslibgs::graph::reach::apid_base_of(node)? {
+            match tcslib_protocol::graph::reach::apid_base_of(node)? {
                 Some(apid) => {
                     EndpointPort::bind_framed(&node.name, &endpoint, uses, apid)
                 }
@@ -481,9 +481,9 @@ impl EndpointPort {
         if let Some(size) = reach.read_size {
             port = port.reading(size as usize);
         }
-        if tcslibgs::graph::link_types::is_device(node) {
+        if tcslib_protocol::graph::link_types::is_device(node) {
             if let Some(format) =
-                tcslibgs::graph::link_types::part_format(node)?
+                tcslib_protocol::graph::link_types::part_format(node)?
             {
                 port = port.laid_out_as(format);
             }
@@ -539,7 +539,7 @@ impl EndpointPort {
     /// which is half a sentence as often as a whole one.
     pub fn framed_by(
         mut self,
-        rule: tcslibgs::endpoint_config::StreamParams,
+        rule: tcslib_protocol::endpoint_config::StreamParams,
     ) -> EndpointPort {
         self.framer = Some(Framer::new(rule));
         self
@@ -1301,7 +1301,7 @@ impl Port for LogPort {
 /// For a configuration that has to send a stream somewhere and has nowhere
 /// for it to go -- a payload's reading nobody is listening to yet, the
 /// ground's commands to a payload not yet fitted. Which stream it takes is its
-/// terminal's business, in `tcslibgs::graph::terminals`; here, either is
+/// terminal's business, in `tcslib_protocol::graph::terminals`; here, either is
 /// dropped alike, and is counted as delivered, because it was.
 ///
 /// Also what a gateway node is held as where nothing is read from it and it
@@ -1536,7 +1536,7 @@ impl AppPort {
         let sends = |terminal: &str| match link_types::carries(node, terminal) {
             Ok(link_types::Carries::Only(kind)) => Ok(kind),
             Ok(link_types::Carries::Any) => {
-                Ok(LinkType::Basic(tcslibgs::link_type::Basic::Bytes))
+                Ok(LinkType::Basic(tcslib_protocol::link_type::Basic::Bytes))
             }
             Err(why) => Err(why),
         };
@@ -1765,15 +1765,15 @@ mod tests {
     use std::path::Path;
     use std::sync::{Arc, Mutex};
 
-    use tcslibgs::graph::Graph;
-    use tcslibgs::{TcsError, TcsResult};
+    use tcslib_protocol::graph::Graph;
+    use tcslib_protocol::{TcsError, TcsResult};
 
     use crate::endpoint::EndpointWaitable;
 
     /// A temperature on a link: four bytes of micro-kelvin, which is what a
     /// conversion produces and what a computation reads.
     fn kelvin(number: f64) -> Vec<u8> {
-        compute::as_value(number, tcslibgs::unit::Unit::Kelvin)
+        compute::as_value(number, tcslib_protocol::unit::Unit::Kelvin)
             .expect("a temperature a value carries")
     }
 
@@ -1951,7 +1951,7 @@ mod tests {
             ],
         );
         let mut port =
-            port.framed_by(tcslibgs::endpoint_config::StreamParams {
+            port.framed_by(tcslib_protocol::endpoint_config::StreamParams {
                 max_length: 64,
                 timeout: None,
                 terminators: vec![b"\n".to_vec()],
@@ -1983,12 +1983,12 @@ mod tests {
             ],
         );
         let mut port =
-            port.framed_by(tcslibgs::endpoint_config::StreamParams {
+            port.framed_by(tcslib_protocol::endpoint_config::StreamParams {
                 max_length: 64,
                 timeout: None,
                 terminators: Vec::new(),
                 length_prefix: Some(
-                    tcslibgs::endpoint_config::LengthPrefix::U8,
+                    tcslib_protocol::endpoint_config::LengthPrefix::U8,
                 ),
             });
         let mut buffer = [0u8; 64];
@@ -2012,7 +2012,7 @@ mod tests {
     fn a_line_on_a_pseudo_terminal_is_read_a_whole_read_at_a_time() {
         use std::io::Write;
         use std::os::unix::io::FromRawFd;
-        use tcslibgs::graph::{Destinations, Link, Node};
+        use tcslib_protocol::graph::{Destinations, Link, Node};
 
         // SAFETY: posix_openpt takes only flags and has no preconditions;
         // its result is checked before it is used.
@@ -2064,7 +2064,7 @@ mod tests {
                 ("terminators", "[0A]"),
             ]
             .into_iter()
-            .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+            .map(|(a, v)| (a.to_string(), tcslib_protocol::Scalar::of(v)))
             .collect(),
         };
         let gateway = Node {
@@ -2153,7 +2153,9 @@ mod tests {
     /// written, with the setpoint never arriving and nothing saying so.
     #[test]
     fn a_commanded_ground_link_is_read_as_well() {
-        use tcslibgs::graph::{CommandBinding, Destinations, Link, Node};
+        use tcslib_protocol::graph::{
+            CommandBinding, Destinations, Link, Node,
+        };
 
         let node = |name: &str, node_type: &str| Node {
             name: name.to_string(),
@@ -2406,7 +2408,7 @@ mod tests {
     /// fails, which is the payload that would come up in a state nobody knows.
     #[test]
     fn a_payload_is_written_its_init_as_it_opens() {
-        use tcslibgs::graph::{Destinations, Link};
+        use tcslib_protocol::graph::{Destinations, Link};
 
         let heater = |path: &str| Node {
             name: "heater".to_string(),
@@ -2414,7 +2416,7 @@ mod tests {
             group: None,
             attributes: [("path", path), ("init", "\"0\"")]
                 .into_iter()
-                .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+                .map(|(a, v)| (a.to_string(), tcslib_protocol::Scalar::of(v)))
                 .collect(),
         };
         let routes = |heater: &Node| {
@@ -2485,7 +2487,7 @@ mod tests {
     #[test]
     fn a_payload_that_says_where_it_sends_from_is_read_only_from_there() {
         use std::net::UdpSocket;
-        use tcslibgs::graph::{Destinations, Link};
+        use tcslib_protocol::graph::{Destinations, Link};
 
         let payload =
             UdpSocket::bind("127.0.0.1:0").expect("the payload's socket");
@@ -2507,7 +2509,7 @@ mod tests {
                 ("sends_from", sends_from.as_str()),
             ]
             .into_iter()
-            .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+            .map(|(a, v)| (a.to_string(), tcslib_protocol::Scalar::of(v)))
             .collect(),
         };
         let routes = Routes::of(&Graph {
@@ -2574,7 +2576,7 @@ mod tests {
     #[test]
     fn an_asked_datagram_payload_is_reached_where_it_waits() {
         use std::net::UdpSocket;
-        use tcslibgs::graph::{Destinations, Link};
+        use tcslib_protocol::graph::{Destinations, Link};
 
         let sensor = UdpSocket::bind("127.0.0.1:0").expect("the sensor waits");
         sensor
@@ -2594,7 +2596,7 @@ mod tests {
                 ("init", "\"RESET\""),
             ]
             .into_iter()
-            .map(|(a, v)| (a.to_string(), tcslibgs::Scalar::of(v)))
+            .map(|(a, v)| (a.to_string(), tcslib_protocol::Scalar::of(v)))
             .collect(),
         };
         let routes = Routes::of(&Graph {
@@ -2689,7 +2691,7 @@ mod tests {
     #[test]
     fn a_quiet_node_does_not_block_the_pass() {
         use std::ffi::CString;
-        use tcslibgs::DeviceConfig;
+        use tcslib_protocol::DeviceConfig;
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pipe");
@@ -2741,7 +2743,7 @@ mod tests {
     #[test]
     fn a_device_file_opened_by_the_factory_carries_both_ways() {
         use std::ffi::CString;
-        use tcslibgs::DeviceConfig;
+        use tcslib_protocol::DeviceConfig;
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pipe");
@@ -2781,7 +2783,7 @@ mod tests {
     #[test]
     fn a_computation_has_a_result_when_it_has_enough() {
         use crate::node::vehicle::compute::vote::Vote;
-        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
+        use tcslib_protocol::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
             "zone_temp",
@@ -2791,7 +2793,7 @@ mod tests {
                     age: None,
                     inputs: vec!["in0".to_string(), "in1".to_string()],
                 },
-                tcslibgs::unit::Unit::Kelvin,
+                tcslib_protocol::unit::Unit::Kelvin,
             )),
         );
         assert_eq!(port.function(), "vote");
@@ -2814,7 +2816,7 @@ mod tests {
         assert_eq!(
             compute::from_value(
                 &buffer[..got],
-                tcslibgs::unit::Unit::Kelvin,
+                tcslib_protocol::unit::Unit::Kelvin,
                 "the average"
             ),
             Ok(291.0)
@@ -2838,13 +2840,14 @@ mod tests {
         );
         assert!(port.ready(), "an answer is made as the ping arrives");
 
-        let mut buffer = [0u8; tcslibgs::DATUM_BYTES];
+        let mut buffer = [0u8; tcslib_protocol::DATUM_BYTES];
         let got = port
             .take(&mut buffer)
             .map(|taken| taken.bytes)
             .expect("an answer");
-        let pong = tcslibgs::node::vehicle::ping::read_reply(&buffer[..got])
-            .expect("it reads");
+        let pong =
+            tcslib_protocol::node::vehicle::ping::read_reply(&buffer[..got])
+                .expect("it reads");
         assert_eq!(pong.ping.count, 1);
         assert!(!port.ready());
 
@@ -2910,7 +2913,7 @@ mod tests {
     #[test]
     fn a_datum_a_computation_cannot_use_is_refused() {
         use crate::node::vehicle::compute::vote::Vote;
-        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
+        use tcslib_protocol::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
             "zone_temp",
@@ -2920,7 +2923,7 @@ mod tests {
                     age: None,
                     inputs: vec!["in0".to_string(), "in1".to_string()],
                 },
-                tcslibgs::unit::Unit::Kelvin,
+                tcslib_protocol::unit::Unit::Kelvin,
             )),
         );
 
@@ -2948,7 +2951,7 @@ mod tests {
     #[test]
     fn a_result_too_large_for_the_buffer_is_kept() {
         use crate::node::vehicle::compute::vote::Vote;
-        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
+        use tcslib_protocol::node::vehicle::compute::{Algorithm, VoteParams};
 
         let mut port = ComputePort::of(
             "zone_temp",
@@ -2958,7 +2961,7 @@ mod tests {
                     age: None,
                     inputs: vec!["in0".to_string(), "in1".to_string()],
                 },
-                tcslibgs::unit::Unit::Kelvin,
+                tcslib_protocol::unit::Unit::Kelvin,
             )),
         );
         port.give(Arriving::named("in0"), &kelvin(293.15))
@@ -2983,7 +2986,7 @@ mod tests {
         assert_eq!(
             compute::from_value(
                 &buffer[..got],
-                tcslibgs::unit::Unit::Kelvin,
+                tcslib_protocol::unit::Unit::Kelvin,
                 "the result"
             ),
             Ok(293.15)
@@ -3002,13 +3005,13 @@ mod tests {
                 attributes: [
                     (
                         "directory".to_string(),
-                        tcslibgs::Scalar::of(
+                        tcslib_protocol::Scalar::of(
                             where_.path().to_str().expect("a path"),
                         ),
                     ),
                     (
                         "format".to_string(),
-                        tcslibgs::Scalar::of("variable_ts_rc"),
+                        tcslib_protocol::Scalar::of("variable_ts_rc"),
                     ),
                 ]
                 .into_iter()
@@ -3051,11 +3054,14 @@ mod tests {
                 attributes: [
                     (
                         "directory".to_string(),
-                        tcslibgs::Scalar::of(
+                        tcslib_protocol::Scalar::of(
                             where_.path().to_str().expect("a path"),
                         ),
                     ),
-                    ("format".to_string(), tcslibgs::Scalar::of("fixed:4")),
+                    (
+                        "format".to_string(),
+                        tcslib_protocol::Scalar::of("fixed:4"),
+                    ),
                 ]
                 .into_iter()
                 .collect(),
@@ -3211,7 +3217,7 @@ mod tests {
     #[test]
     fn disabling_a_node_ends_the_wait_between_asking_and_reading() {
         use crate::runtime::node_state::NodeState;
-        use tcslibgs::NodeId;
+        use tcslib_protocol::NodeId;
 
         let state = NodeState::new("temp_3", NodeId::of(0)).expect("a state");
         let (script, port) = port("temp_3", Use::Read);
@@ -3338,23 +3344,23 @@ mod tests {
             program: &std::path::Path,
         ) -> Node {
             // The whole path, this test module being called `app` itself.
-            let kind = tcslibgs::node::app::Kind::of(node_type)
+            let kind = tcslib_protocol::node::app::Kind::of(node_type)
                 .expect("a kind of app");
             let mut attributes = std::collections::BTreeMap::new();
             attributes.insert(
                 "executable".to_string(),
-                tcslibgs::Scalar::of(program.display().to_string()),
+                tcslib_protocol::Scalar::of(program.display().to_string()),
             );
             if kind.handles_payload_data() {
                 attributes.insert(
                     "app-payload-arg".to_string(),
-                    tcslibgs::Scalar::of("--readings"),
+                    tcslib_protocol::Scalar::of("--readings"),
                 );
             }
             if kind.handles_gateway_data() {
                 attributes.insert(
                     "app-gateway-arg".to_string(),
-                    tcslibgs::Scalar::of("--commands"),
+                    tcslib_protocol::Scalar::of("--commands"),
                 );
             }
             Node {
@@ -3522,7 +3528,7 @@ mod tests {
             let mut bay = node("bay", "app_pl", &path);
             bay.attributes.insert(
                 "world-out-type".to_string(),
-                tcslibgs::Scalar::of("u8"),
+                tcslib_protocol::Scalar::of("u8"),
             );
             let mut port = crate::when_not_busy(|| AppPort::open(&bay))
                 .expect("it starts");

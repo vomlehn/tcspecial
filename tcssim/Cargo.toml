@@ -7,7 +7,7 @@ description = "TCSpecial Payload Simulator GUI"
 build = "build.rs"
 
 [dependencies]
-tcslibgs = { path = "../tcslibgs" }
+tcslib-protocol = { path = "../tcslib-protocol" }
 # Asked about the pair before anything opens: see main.
 tcsverify = { path = "../tcsverify" }
 # How a harness waits for a simulator to be ready, which --wait is.

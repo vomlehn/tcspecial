@@ -8,7 +8,7 @@
 //! command line's `configurations` names. See "The three commands that
 //! always go" in `docs/tcspecial-design.rst`.
 
-use tcslibgs::ConfigDigest;
+use tcslib_protocol::ConfigDigest;
 
 use crate::runtime::choose::Boot;
 

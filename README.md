@@ -213,7 +213,7 @@ manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
 * [The examples](https://vomlehn.github.io/tcspecial/examples/README.html): working configurations, each
   with a diagram.
 
-* [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html) and
+* [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html) and
   [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html): the libraries a ground station is
   built on, and what the ground and the vehicle share.
 

@@ -1,4 +1,4 @@
-# @generated automatically by tcs-xtce from tcslibgs/xtce/fixed.xtce
+# @generated automatically by tcs-xtce from tcslib-protocol/xtce/fixed.xtce
 # (SpaceSystem 'TcsFixed').
 # Any changes made to this file will be lost when it is regenerated;
 # change the XTCE document instead and rerun `python3 -m tcs_xtce`.

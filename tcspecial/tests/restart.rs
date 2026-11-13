@@ -13,7 +13,7 @@ use std::net::UdpSocket;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslibgs::{
+use tcslib_protocol::{
     ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry,
 };
 
@@ -122,7 +122,7 @@ fn beacon(ground: &UdpSocket) -> Beacon {
 fn ask(
     ground: &UdpSocket,
     at: u16,
-    command: &tcslibgs::Command,
+    command: &tcslib_protocol::Command,
 ) -> CommandStatus {
     let asked = command.to_bytes();
     ground
@@ -213,7 +213,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     // A CONNECT carrying another configuration's checksum is answered and
     // changes nothing: the flag stays set, and a PING is not acted on.
     let connect = |sequence, digest| {
-        tcslibgs::Command::Connect(tcslibgs::ConnectCommand::new(
+        tcslib_protocol::Command::Connect(tcslib_protocol::ConnectCommand::new(
             sequence, digest,
         ))
     };
@@ -222,12 +222,14 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         ask(
             &commands,
             take_at,
-            &connect(1, tcslibgs::ConfigDigest([0; 16]))
+            &connect(1, tcslib_protocol::ConfigDigest([0; 16]))
         ),
         CommandStatus::Success
     );
     let ping = |sequence| {
-        tcslibgs::Command::Ping(tcslibgs::PingCommand::new(sequence))
+        tcslib_protocol::Command::Ping(tcslib_protocol::PingCommand::new(
+            sequence,
+        ))
     };
     assert_eq!(ask(&commands, take_at, &ping(2)), CommandStatus::Unmatched);
     beacon(&beacons);
@@ -258,12 +260,12 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     // NotFound, and nothing restarts; onto the running one, it is a plain
     // restart.
     let key = ArmKey(0x5eed);
-    let elsewhere = tcslibgs::ConfigDigest([0x77; 16]);
+    let elsewhere = tcslib_protocol::ConfigDigest([0x77; 16]);
     assert_eq!(
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::RestartArm(RestartArmCommand::new(
+            &tcslib_protocol::Command::RestartArm(RestartArmCommand::new(
                 5, key, elsewhere
             ))
         ),
@@ -273,7 +275,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::RestartArm(RestartArmCommand::new(
+            &tcslib_protocol::Command::RestartArm(RestartArmCommand::new(
                 6, key, ours
             ))
         ),
@@ -283,7 +285,9 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::Restart(RestartCommand::new(7, key, ours))
+            &tcslib_protocol::Command::Restart(RestartCommand::new(
+                7, key, ours
+            ))
         ),
         CommandStatus::Success
     );
@@ -392,7 +396,7 @@ fn written(
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \
   send: \"127.0.0.1:{commands_at}\" }}
 ",
-            tcslibgs::InterfaceDigest::of_this_build(),
+            tcslib_protocol::InterfaceDigest::of_this_build(),
             at(),
             at(),
             at(),
@@ -459,7 +463,7 @@ fn a_restart_runs_the_configuration_it_names() {
     let ours = common::checksum_of(&first);
     let theirs = common::checksum_of(&second);
     assert_ne!(ours, theirs, "two configurations");
-    let store = tcslibgs::store::Store::at(&kept);
+    let store = tcslib_protocol::store::Store::at(&kept);
     store.keep(&second).expect("kept");
 
     let _vehicle = Running(
@@ -477,19 +481,19 @@ fn a_restart_runs_the_configuration_it_names() {
     assert_eq!(started.digest, ours, "the command line's, at a first start");
 
     let connect = |sequence, digest| {
-        tcslibgs::Command::Connect(tcslibgs::ConnectCommand::new(
+        tcslib_protocol::Command::Connect(tcslib_protocol::ConnectCommand::new(
             sequence, digest,
         ))
     };
     let arm = |sequence, digest| {
-        tcslibgs::Command::RestartArm(RestartArmCommand::new(
+        tcslib_protocol::Command::RestartArm(RestartArmCommand::new(
             sequence,
             ArmKey(0x5eed),
             digest,
         ))
     };
     let restart = |sequence, digest| {
-        tcslibgs::Command::Restart(RestartCommand::new(
+        tcslib_protocol::Command::Restart(RestartCommand::new(
             sequence,
             ArmKey(0x5eed),
             digest,
@@ -499,7 +503,7 @@ fn a_restart_runs_the_configuration_it_names() {
         ask(&commands, take_at, &connect(1, ours)),
         CommandStatus::Success
     );
-    let elsewhere = tcslibgs::ConfigDigest([0x77; 16]);
+    let elsewhere = tcslib_protocol::ConfigDigest([0x77; 16]);
     assert_eq!(
         ask(&commands, take_at, &arm(2, elsewhere)),
         CommandStatus::NotFound,
@@ -605,7 +609,7 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::RestartArm(RestartArmCommand::new(
+            &tcslib_protocol::Command::RestartArm(RestartArmCommand::new(
                 1, key, ours
             ))
         ),
@@ -615,7 +619,9 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
         ask(
             &commands,
             take_at,
-            &tcslibgs::Command::Restart(RestartCommand::new(2, key, ours))
+            &tcslib_protocol::Command::Restart(RestartCommand::new(
+                2, key, ours
+            ))
         ),
         CommandStatus::Success
     );

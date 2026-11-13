@@ -40,9 +40,9 @@ use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use tcslib_moc::beacon::{Contact, Link};
 use tcslib_moc::gateway::GatewayReceiver;
 use tcslib_moc::matched::Matched;
-use tcslibgs::graph::telemetry::{self, Reaches};
-use tcslibgs::graph::Graph;
-use tcslibgs::{
+use tcslib_protocol::graph::telemetry::{self, Reaches};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::{
     Beacon, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, HostPort, NodeCounts, NodeTelemetry, QueryNodeTelemetry,
     Scalar, Telemetry, Timestamp,
@@ -616,7 +616,7 @@ fn answer(command: &Command, aboard: &mut Aboard) -> Telemetry {
             };
             Telemetry::StartNode(NodeTelemetry::started(seq, status, cmd.node))
         }
-        other => tcslibgs::answer_to(other, CommandStatus::Success),
+        other => tcslib_protocol::answer_to(other, CommandStatus::Success),
     }
 }
 
@@ -738,7 +738,7 @@ impl Station {
         let sim = root.join(format!("examples/{name}/{name}-sim.yaml"));
         let graph = Graph::load(&path).expect("the example reads");
         let links = telemetry::of(&graph).expect("its links");
-        let digest = tcslibgs::config_digest::digest_of_graph(&graph)
+        let digest = tcslib_protocol::config_digest::digest_of_graph(&graph)
             .expect("its checksum");
 
         let ui = MainWindow::new().expect("a window");
@@ -756,7 +756,7 @@ impl Station {
                 .nodes
                 .iter()
                 .filter_map(|node| {
-                    tcslibgs::graph::units::unit_of(&graph, &node.name)
+                    tcslib_protocol::graph::units::unit_of(&graph, &node.name)
                         .map(|unit| (node.name.clone(), unit))
                 })
                 .collect(),
@@ -815,9 +815,10 @@ impl Station {
         let socket = UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let beacon_to = socket.local_addr().expect("where");
         let beacon_from = UdpSocket::bind("127.0.0.1:0").expect("a socket");
-        let interval = tcslibgs::graph::parameters::beacon_interval_of(&graph)
-            .expect("its interval")
-            .unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL);
+        let interval =
+            tcslib_protocol::graph::parameters::beacon_interval_of(&graph)
+                .expect("its interval")
+                .unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL);
         let beacons = tcslib_moc::beacon::Beacons::on(
             socket,
             Link {
@@ -856,7 +857,7 @@ impl Station {
         let gateway = graph
             .nodes
             .iter()
-            .find(|n| tcslibgs::gateway::is_gateway(&n.node_type))
+            .find(|n| tcslib_protocol::gateway::is_gateway(&n.node_type))
             .map(|n| n.name.clone())
             .expect("a gateway node");
         let (receiver, moved) = receiver_on_free_ports(&graph, &gateway);
@@ -986,7 +987,7 @@ impl Station {
             let mut out = Vec::new();
             match link.count() {
                 Some(count) => {
-                    tcslibgs::link_type::counted(data, count, &mut out)
+                    tcslib_protocol::link_type::counted(data, count, &mut out)
                         .expect("counted");
                 }
                 None => out.extend_from_slice(data),
@@ -1049,7 +1050,7 @@ fn ping_node_answers(
     node: &str,
     done: &Arc<AtomicBool>,
 ) {
-    use tcslibgs::node::vehicle::ping;
+    use tcslib_protocol::node::vehicle::ping;
 
     let link = telemetry::of(moved)
         .expect("its links")
@@ -1080,7 +1081,7 @@ fn ping_node_answers(
             let mut out = Vec::new();
             match count {
                 Some(count) => {
-                    tcslibgs::link_type::counted(
+                    tcslib_protocol::link_type::counted(
                         reply.as_bytes(),
                         count,
                         &mut out,
@@ -1142,9 +1143,12 @@ impl Zone {
             self.heating = false;
         }
         let value = |kelvin: f64| {
-            tcslibgs::node::vehicle::compute::value_bytes(kelvin, Unit::Kelvin)
-                .expect("a temperature")
-                .to_vec()
+            tcslib_protocol::node::vehicle::compute::value_bytes(
+                kelvin,
+                Unit::Kelvin,
+            )
+            .expect("a temperature")
+            .to_vec()
         };
         BTreeMap::from([
             ("to_k1".to_string(), value(k1)),

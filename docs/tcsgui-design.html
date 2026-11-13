@@ -1008,22 +1008,22 @@ component: its <tt class="docutils literal">connects</tt> is set to the terminal
 watching lines, given the terminal after those it names already, one decision a
 line. The line says only which two things, the component being drawn with one
 output and one input whatever its type has, so the terminals come from the rules
-a file is held to -- <tt class="docutils literal"><span class="pre">tcslibgs::node::physics::connectable</span></tt> for a connection,
-an output to an input of one kind, and <tt class="docutils literal"><span class="pre">tcslibgs::sim_config::may_join</span></tt> for a
-simulated payload -- and each is offered where the line was clicked, with
-Cancel, one join or several -- a heater's heat, current and heating to a sensor
--- rather than one guessed at: a line to the wrong terminal is a simulator that
-reads something other than was meant. A join already made is offered greyed,
-saying so. Moving, connecting and joining, like placing, setting and removing,
-are edits like any other, each taken back by one undo. Removing a component
-removes the connections that join it and takes it out of every simulated
-payload's <tt class="docutils literal">connects</tt>, as removing a node removes its links, and all of it
-comes back with one undo. Without a simulator file the list is greyed and says
-to open one, and so does the Physics pane, which is drawn all the same: some of
-every pane is always to be seen, and a pane that came and went with a second
-file would be one nobody could find. The world's <tt class="docutils literal">ambient_temp</tt> is edited in
-the simulator file for now, and so is a connection or a join that is to be taken
-away.</p>
+a file is held to -- <tt class="docutils literal"><span class="pre">tcslib_protocol::node::physics::connectable</span></tt> for a
+connection, an output to an input of one kind, and
+<tt class="docutils literal"><span class="pre">tcslib_protocol::sim_config::may_join</span></tt> for a simulated payload -- and each is
+offered where the line was clicked, with Cancel, one join or several -- a
+heater's heat, current and heating to a sensor -- rather than one guessed at: a
+line to the wrong terminal is a simulator that reads something other than was
+meant. A join already made is offered greyed, saying so. Moving, connecting and
+joining, like placing, setting and removing, are edits like any other, each
+taken back by one undo. Removing a component removes the connections that join
+it and takes it out of every simulated payload's <tt class="docutils literal">connects</tt>, as removing a
+node removes its links, and all of it comes back with one undo. Without a
+simulator file the list is greyed and says to open one, and so does the Physics
+pane, which is drawn all the same: some of every pane is always to be seen, and
+a pane that came and went with a second file would be one nobody could find. The
+world's <tt class="docutils literal">ambient_temp</tt> is edited in the simulator file for now, and so is a
+connection or a join that is to be taken away.</p>
 <p>Where the Physics pane's line and the physics list's line are is kept in the
 preferences file beside the others: the pane's width as a percentage of the
 working width, and the list's share of the column.</p>
@@ -1241,16 +1241,16 @@ columns inside the width. A name never collides with them however they grow,
 being padded away from whichever side carries terminals.</p>
 <p>Only the terminals the type actually has. A payload carries its two on its
 right, a gateway link its two on its left, an <tt class="docutils literal">app_all_veh</tt> all four, a tee
-its three, a null node its one, a log the one it receives on, and a
-computation and a page of its own all four -- a computation may be on either
-stream in either direction, and what is inside a page may have any of them,
-which nothing outside it knows. A drawing that showed four
-on every node would say nothing about what may be linked to what, which is the
-one thing about a graph that the shapes cannot say. The table is the schema's
-own, <tt class="docutils literal"><span class="pre">tcslibgs::graph::terminals</span></tt>, read rather than copied wherever it has an
-answer, so a terminal added there appears on the canvas without the editor
-being touched; the computation, the log and the page, whose terminals that
-table leaves to them, are answered in <tt class="docutils literal"><span class="pre">tcsdiagram::style</span></tt>.</p>
+its three, a null node its one, a log the one it receives on, and a computation
+and a page of its own all four -- a computation may be on either stream in
+either direction, and what is inside a page may have any of them, which nothing
+outside it knows. A drawing that showed four on every node would say nothing
+about what may be linked to what, which is the one thing about a graph that the
+shapes cannot say. The table is the schema's own,
+<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::terminals</span></tt>, read rather than copied wherever it has
+an answer, so a terminal added there appears on the canvas without the editor
+being touched; the computation, the log and the page, whose terminals that table
+leaves to them, are answered in <tt class="docutils literal"><span class="pre">tcsdiagram::style</span></tt>.</p>
 <p>The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
@@ -1688,7 +1688,7 @@ so a line carrying what the ground sends has nothing to reach on a gateway
 node -- offers no menu, and the line stays in hand with the box on the sheet
 saying so, which is a kinder answer to a near miss than throwing away a line
 that took a click to pick up. The rule is still
-<tt class="docutils literal"><span class="pre">tcslibgs::graph::terminals</span></tt>; the menu only says it.</p>
+<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::terminals</span></tt>; the menu only says it.</p>
 <p>A link that is already there can be picked up by either of its ends. Click the
 terminal it is attached to and the line comes off the drawing and into the
 hand; the node clicked next offers the pressed end moved there, to its terminal
@@ -2355,7 +2355,7 @@ family from being half described.</p>
 be told. Both were written in Rust where nobody adding a node type could see
 them, and both are still <em>read</em> from Rust by the parts that cannot afford to
 read a file -- the checking and the flight software have
-<tt class="docutils literal"><span class="pre">tcslibgs::graph::terminals</span></tt>, and a window has
+<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::terminals</span></tt>, and a window has
 <tt class="docutils literal"><span class="pre">style::NodeType::attributes</span></tt> for a type the tree does not describe. So the
 tree is held against those: <tt class="docutils literal">the_trees_terminals_are_the_schemas</tt> and
 <tt class="docutils literal">a_description_of_a_whole_type_says_what_the_type_says</tt>. A description of one
@@ -2397,8 +2397,8 @@ twice is two statements of what its terminals are. What it says:</p>
 <tt class="docutils literal">kind</tt>, which is what its field is offered as: <tt class="docutils literal">boolean</tt> is a control with
 two states, and <tt class="docutils literal">text</tt>, <tt class="docutils literal">path</tt>, <tt class="docutils literal">whole</tt>, <tt class="docutils literal">interval</tt>, <tt class="docutils literal">timeout</tt> and
 <tt class="docutils literal">bytes</tt> are a box to write in, a kind with a rule of its own naming the
-<tt class="docutils literal">tcslibgs</tt> rule a value of it is read by (<tt class="docutils literal"><span class="pre">nodes::KINDS</span></tt>). Unstated is
-<tt class="docutils literal">text</tt>; <tt class="docutils literal">process.xml</tt> states a <tt class="docutils literal">path</tt>, an <tt class="docutils literal">interval</tt> and a
+<tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt> rule a value of it is read by (<tt class="docutils literal"><span class="pre">nodes::KINDS</span></tt>). Unstated
+is <tt class="docutils literal">text</tt>; <tt class="docutils literal">process.xml</tt> states a <tt class="docutils literal">path</tt>, an <tt class="docutils literal">interval</tt> and a
 <tt class="docutils literal">boolean</tt>.</p>
 <p>The shape of one of those files has two schemas of its own, <tt class="docutils literal">node.xsd</tt> and
 <tt class="docutils literal">node.schema.json</tt>, in <tt class="docutils literal">tcsgui/share/schema</tt> and installed with the tree;
@@ -2422,11 +2422,11 @@ type's name, so each is offered under that name as before. An editor that
 cannot find the tree at all offers every type as itself, which is exactly what
 it offered before there was a tree.</p>
 <p>What a computation is told is the flight software's own list, and the tree is
-held to it: <tt class="docutils literal"><span class="pre">tcslibgs::node::vehicle::compute::attributes_of</span></tt> says what each
-computation takes, <tt class="docutils literal">params_of</tt> refuses anything else, and a test says each
-description asks for exactly that list. A description that asked for something
-else would be a panel filling in a field the checking then refuses, or leaving
-out one it requires.</p>
+held to it: <tt class="docutils literal"><span class="pre">tcslib_protocol::node::vehicle::compute::attributes_of</span></tt> says what
+each computation takes, <tt class="docutils literal">params_of</tt> refuses anything else, and a test says
+each description asks for exactly that list. A description that asked for
+something else would be a panel filling in a field the checking then refuses, or
+leaving out one it requires.</p>
 <p>A file that is not a description is refused on its own and the rest of the tree
 is still read: a tree people edit has a half-written file in it sooner or
 later, and an editor that offered nothing because one file has a typo in it
@@ -2436,10 +2436,10 @@ the same way -- a name picks out one node here as it does in a configuration.</p
 </div>
 <div class="section" id="schemas-beside-the-tree">
 <h1><a class="toc-backref" href="#toc-entry-45">Schemas Beside the Tree</a></h1>
-<p><tt class="docutils literal">tcslibgs/schema</tt> holds a schema for each file tcsgui edits, in each
+<p><tt class="docutils literal"><span class="pre">tcslib-protocol/schema</span></tt> holds a schema for each file tcsgui edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
-tcslibgs's rather than this editor's, because every program that reads a
+tcslib-protocol's rather than this editor's, because every program that reads a
 configuration reads those formats; they are installed under
 <tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcspecial/schema</span></tt>. The schemas of the editor's own node
 descriptions stay with it, in <tt class="docutils literal">tcsgui/share/schema</tt>.</p>
@@ -2478,11 +2478,11 @@ that is the two attributes every XML tool reads:</p>
 <pre class="literal-block">
 &lt;configuration
     xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
-    xsi:noNamespaceSchemaLocation=&quot;tcslibgs/schema/tcspecial.xsd&quot;&gt;
+    xsi:noNamespaceSchemaLocation=&quot;tcslib-protocol/schema/tcspecial.xsd&quot;&gt;
 </pre>
 <p>and in YAML it is a comment, there being no other way to say it in YAML:</p>
 <pre class="literal-block">
-# yaml-language-server: $schema=tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=tcslib-protocol/schema/tcspecial.schema.json
 </pre>
 <p>Both are written by <tt class="docutils literal"><span class="pre">nodes::schema_reference</span></tt>, which gives the path relative
 to the file where the schemas are above it -- which is a checkout, where these

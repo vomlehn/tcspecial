@@ -24,9 +24,9 @@ use std::process::{Child, Command, Stdio};
 /// The datagram.
 fn sent(word: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
-    tcslibgs::link_type::counted(
+    tcslib_protocol::link_type::counted(
         word,
-        tcslibgs::link_type::Count::Groups,
+        tcslib_protocol::link_type::Count::Groups,
         &mut out,
     )
     .expect("counted");

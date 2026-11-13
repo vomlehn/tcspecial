@@ -92,7 +92,7 @@ fn the_interface_digest_is_printed_alone() {
     assert_eq!(status, 0);
     assert_eq!(
         lines,
-        vec![tcslibgs::InterfaceDigest::of_this_build().to_string()]
+        vec![tcslib_protocol::InterfaceDigest::of_this_build().to_string()]
     );
     assert_eq!(lines[0].len(), 32);
     assert!(
@@ -173,8 +173,8 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     }
     let example = dir.path().join("thermostat/thermostat.ytcs");
     let example = example.to_str().expect("a path");
-    let checksum =
-        tcslibgs::config_digest::digest_of_file(example).expect("it digests");
+    let checksum = tcslib_protocol::config_digest::digest_of_file(example)
+        .expect("it digests");
     let tree = store.join(checksum.to_string());
     let kept = tree.join("top").join(format!("{checksum}.ytcs"));
 
@@ -190,12 +190,12 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     let mode = std::fs::metadata(&kept).expect("kept").permissions().mode();
     assert_eq!(mode & 0o777, 0o444, "read-only");
     assert!(tree.join("thermostat-common/thermostat.ytcs").is_file());
-    let (graph, _) = tcslibgs::store::Store::at(&store)
+    let (graph, _) = tcslib_protocol::store::Store::at(&store)
         .load(checksum)
         .expect("it loads by its checksum");
     assert_eq!(
         graph.nodes.len(),
-        tcslibgs::graph::Graph::load(example)
+        tcslib_protocol::graph::Graph::load(example)
             .expect("the example reads")
             .nodes
             .len()
@@ -209,7 +209,7 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     let (_, status) = run(&[&keep, wrong.to_str().expect("a path")]);
     assert_eq!(status, 1, "a configuration with errors");
     assert_eq!(
-        tcslibgs::store::Store::at(&store)
+        tcslib_protocol::store::Store::at(&store)
             .held()
             .expect("it reads")
             .len(),
@@ -240,8 +240,8 @@ fn the_fprime_example_has_its_bridge_model_written() {
     assert!(lines[0].contains("the F´ model of fsw"), "{lines:?}");
     let fppi = std::fs::read_to_string(model.join("TcsBridgeModel.fppi"))
         .expect("the FPP is written");
-    let checksum =
-        tcslibgs::config_digest::digest_of_file(example).expect("it digests");
+    let checksum = tcslib_protocol::config_digest::digest_of_file(example)
+        .expect("it digests");
     assert!(
         fppi.contains(&format!("CONFIGURATION_DIGEST = \"{checksum}\"")),
         "{fppi}"
@@ -273,7 +273,7 @@ fn the_fprime_example_has_its_bridge_model_written() {
 #[test]
 fn set_interface_rewrites_only_the_interface() {
     let dir = tempfile::tempdir().expect("a directory");
-    let ours = tcslibgs::InterfaceDigest::of_this_build().to_string();
+    let ours = tcslib_protocol::InterfaceDigest::of_this_build().to_string();
     let stale = "0123456789abcdef0123456789abcdef";
     let mut paths = Vec::new();
     // An example that includes no other file, so that its copy reads.
@@ -358,9 +358,9 @@ fn the_options_are_taken_as_options() {
 /// graph, and nothing aboard reads it, so there is nothing on the other end
 /// to compare one with.
 ///
-/// What the digest *is* is checked in `tcslibgs`, which takes it. Checked
-/// here: that the flag is taken as a flag, which file it is taken of, and
-/// that the two spellings of one configuration come out alike -- that last
+/// What the digest *is* is checked in `tcslib-protocol`, which takes it.
+/// Checked here: that the flag is taken as a flag, which file it is taken of,
+/// and that the two spellings of one configuration come out alike -- that last
 /// being the whole point of digesting what a file says rather than its bytes,
 /// and the one thing a reader of this output relies on.
 #[test]
@@ -632,8 +632,9 @@ fn the_summary_lists_the_gateway_ports_by_source() {
         .join("../examples/thermostat/thermostat.ytcs");
     let (lines, status) = run(&["--summary", example.to_str().expect("path")]);
     assert_eq!(status, 0, "{lines:?}");
-    let graph = tcslibgs::graph::Graph::load(&example).expect("it loads");
-    let ids = tcslibgs::graph::telemetry::ids(&graph);
+    let graph =
+        tcslib_protocol::graph::Graph::load(&example).expect("it loads");
+    let ids = tcslib_protocol::graph::telemetry::ids(&graph);
     for source in ["consensus_temp", "to_k1", "to_k2", "to_k3"] {
         let port = 5100 + ids[source];
         assert!(
@@ -709,9 +710,10 @@ fn two_payloads_on_one_port_fail_the_summary() {
     assert_eq!(status, 1);
 }
 
-/// A payload at the port the vehicle takes commands on is one socket with
-/// it: an error, naming both, which fails the run. The rule is
-/// `tcslibgs::graph::sockets`'s, and without it this configuration passes.
+/// A payload at the port the vehicle takes commands on is one socket with it:
+/// an error, naming both, which fails the run. The rule is
+/// `tcslib_protocol::graph::sockets`'s, and without it this configuration
+/// passes.
 #[test]
 fn a_payload_on_the_command_port_fails_the_run() {
     let dir = tempfile::tempdir().expect("a directory");

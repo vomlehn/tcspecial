@@ -1,10 +1,10 @@
 """Whether the simulator is ready: the messages on tcssim's readiness socket.
 
-The Python spelling of ``tcslibgs/src/ready.rs``, in the same words: a harness
-sends a request carrying a sequence number to the address the simulator file
-states as ``tcssim.ready``, and tcssim answers with the same number, its state
--- starting, ready or failed -- what it is set up for, and why it failed where
-it did. Both messages are fixed in size and big-endian.
+The Python spelling of ``tcslib-protocol/src/ready.rs``, in the same words: a
+harness sends a request carrying a sequence number to the address the simulator
+file states as ``tcssim.ready``, and tcssim answers with the same number, its
+state -- starting, ready or failed -- what it is set up for, and why it failed
+where it did. Both messages are fixed in size and big-endian.
 """
 
 import struct

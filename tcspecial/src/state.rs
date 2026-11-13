@@ -43,8 +43,8 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use tcslibgs::crc::crc16;
-use tcslibgs::ConfigDigest;
+use tcslib_protocol::crc::crc16;
+use tcslib_protocol::ConfigDigest;
 
 /// What a state file holds.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

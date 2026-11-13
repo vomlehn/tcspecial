@@ -1,0 +1,649 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A tcspecial configuration, written in XML.
+
+  What this checks is the shape of the file: which sections there are, what an
+  entry may say, and which words are words. What it cannot check is whether the
+  configuration can be flown. Which attributes a node of a given type must
+  state, whether two payloads claim one socket, whether a link arrives by a
+  name its far end lists: those are rules about meaning, they are tested against
+  real buses, and tcsverify is the one place they live. A file this accepts may
+  still be refused, and the refusal will say why.
+
+  Two consequences worth knowing before reading further.
+
+  The nodes are grouped: each section, <gateways>, <vehicle> and <payloads>,
+  holds a <type name="..."> element for each type of node it has, and that
+  holds the nodes of the type, each a <gateway>, <compute> or <payload>
+  element named by its name attribute. A node says no type of its own. The
+  order of the types, of the nodes in a type and of a node's elements means
+  nothing.
+
+  A node's content is a choice of known element names repeated in any order,
+  which is as close as XSD 1.0 comes to "these words and no others". It cannot
+  say that `group` appears at most once, because `world-out` may appear many
+  times (several destinations are several elements, as several names are) and XSD 1.0's xs:all
+  allows neither repeats nor a mixture. A node that says a word twice is
+  refused where the file is read instead, and so is a type written twice in a
+  section, or a section written twice.
+
+  The attribute names below are the union over every node type: a bus address,
+  a baud rate and a setpoint are all here, and which of them a given type may
+  state is that type's own rule. A schema that knew those rules would be a
+  second copy of them, and the copy would be the one that was wrong.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- Where data leaves a node: a link, written as an attribute of the node
+       it leaves. One element per line, its text the node the line reaches
+       and the name it arrives by, separated by a dot: gateway.readings. -->
+  <xs:simpleType name="destination">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_./-]*\.[A-Za-z_][A-Za-z0-9_-]*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- A name a line may arrive at one of a node's data sinks by, which a
+       link to the node names after the dot. One element per name; one word,
+       with no dot in it. -->
+  <xs:simpleType name="arrival">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Za-z_][A-Za-z0-9_-]*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What a node is called, unique across the configuration. -->
+  <xs:simpleType name="name">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Where the editor drew one node, which the flight software ignores.
+       In the tcsgui section at the end of the file rather than on the node:
+       the node sections say what the vehicle carries, and this says where
+       somebody put the boxes on a screen. Named as a node is, by its name
+       attribute. -->
+  <xs:complexType name="placed">
+    <xs:attribute name="name" type="name" use="required"/>
+    <xs:attribute name="x" type="xs:integer" use="required"/>
+    <xs:attribute name="y" type="xs:integer" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="layout">
+    <xs:sequence>
+      <xs:element name="node" type="placed"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- A concern the editor was told not to go on raising: the node it is
+       about, and the editor's own word for the kind of concern. -->
+  <xs:complexType name="aside">
+    <xs:attribute name="name" type="name" use="required"/>
+    <xs:attribute name="concern" type="name" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="setAside">
+    <xs:sequence>
+      <xs:element name="node" type="aside"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="tcsgui">
+    <xs:all>
+      <xs:element name="nodes" type="layout" minOccurs="0"/>
+      <xs:element name="set-aside" type="setAside" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- The node types each section may hold, as a file spells them in the
+       name attribute of a <type>. One list per section, so that a type
+       written in the wrong section is refused here as it is where the file
+       is read; held against the software's own lists
+       (tcslib_protocol::graph::types_in) by tcsgui's schema tests. -->
+  <!-- A ground link. -->
+  <xs:simpleType name="gatewayType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="gateway_radio"/>
+      <xs:enumeration value="gateway_cfs"/>
+      <xs:enumeration value="gateway_fprime"/>
+      <xs:enumeration value="gateway_yamcs"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What the vehicle itself runs. -->
+  <xs:simpleType name="vehicleType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="compute"/>
+      <xs:enumeration value="log"/>
+      <xs:enumeration value="null-gateway"/>
+      <xs:enumeration value="null-payload"/>
+      <xs:enumeration value="tee-gateway"/>
+      <xs:enumeration value="tee-payload"/>
+      <xs:enumeration value="ping"/>
+      <xs:enumeration value="app_payload_veh"/>
+      <xs:enumeration value="app_gateway_veh"/>
+      <xs:enumeration value="app_all_veh"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What the vehicle carries: an interface, or a program. -->
+  <xs:simpleType name="payloadType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="network"/>
+      <xs:enumeration value="device-file"/>
+      <xs:enumeration value="serial"/>
+      <xs:enumeration value="i2c"/>
+      <xs:enumeration value="spi"/>
+      <xs:enumeration value="i2c_tmass"/>
+      <xs:enumeration value="spi_tmass"/>
+      <xs:enumeration value="can"/>
+      <xs:enumeration value="iio"/>
+      <xs:enumeration value="rpmsg"/>
+      <xs:enumeration value="gpio_in"/>
+      <xs:enumeration value="gpio_out"/>
+      <xs:enumeration value="gpio_inout"/>
+      <xs:enumeration value="hdlc"/>
+      <xs:enumeration value="app_pl"/>
+      <xs:enumeration value="app_all_pl"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What a node says, whichever section it is in, but for its name,
+       which is its name attribute, and its type, which is the type it is
+       written under. -->
+  <xs:group name="nodeWords">
+    <xs:choice>
+      <!-- The payload group that reads it, where it is in one. -->
+      <xs:element name="group" type="xs:string"/>
+      <!-- The two data sources, which are where links are written. -->
+      <xs:element name="world-out" type="destination"/>
+      <xs:element name="moc-out" type="destination"/>
+      <!-- And the two data sinks, each the names a line may arrive by:
+           a vote's are its inputs. See the `arrival` type above. -->
+      <xs:element name="world-in" type="arrival"/>
+      <xs:element name="moc-in" type="arrival"/>
+      <!-- Where a node is. -->
+      <xs:element name="path" type="xs:string"/>
+      <xs:element name="address" type="xs:string"/>
+      <xs:element name="port" type="xs:string"/>
+      <!-- Where a ground link's data goes: address:port, the port counted on
+           by each source node's device id. -->
+      <xs:element name="ground_base" type="xs:string"/>
+      <!-- An F´ gateway's ground_base: where its bridge component is. -->
+      <xs:element name="bridge_base" type="xs:string"/>
+      <!-- Where the F´ IDs of what reaches an F´ gateway begin. -->
+      <xs:element name="fprime_id_base" type="xs:string"/>
+      <!-- A Yamcs gateway's APID: what the ground's CCSDS telecommands to
+           it carry, and the first of the APIDs what goes through it to the
+           ground is counted from, by each source node's device id. -->
+      <xs:element name="apid_base" type="xs:string"/>
+      <!-- The message ID what a gateway_cfs node sends on is published
+           under on the cFS software bus. -->
+      <xs:element name="cmd_msgid" type="xs:string"/>
+      <!-- Where the message IDs of what reaches a gateway_cfs node begin,
+           counted on by each source node's device id. -->
+      <xs:element name="tlm_base" type="xs:string"/>
+      <xs:element name="protocol" type="xs:string"/>
+      <!-- The IP protocol number of a raw socket: `protocol` raw. -->
+      <xs:element name="ip_protocol" type="xs:string"/>
+      <!-- Where a udp or unix_dgram payload that speaks first sends from:
+           host:port, or a path. -->
+      <xs:element name="sends_from" type="xs:string"/>
+      <!-- Where an hdlc, spi, rpmsg, iio, i2c_tmass, spi_tmass, gpio_in,
+           gpio_out or gpio_inout payload is reached over UDP when
+           simulated: a loopback host:port. -->
+      <xs:element name="sim_address" type="xs:string"/>
+      <xs:element name="interface" type="xs:string"/>
+      <xs:element name="can_id" type="xs:string"/>
+      <!-- How it is read. -->
+      <xs:element name="read_size" type="xs:string"/>
+      <xs:element name="trigger" type="xs:string"/>
+      <!-- What a payload is set to as the vehicle opens it, written as a
+           trigger is. -->
+      <xs:element name="init" type="xs:string"/>
+      <!-- How a node that is asked is driven, and how one that is not.
+           `trigger_interval` is how often the trigger goes out and
+           `read_delay` how long the part takes to answer, both of which go
+           with a `trigger` and mean nothing without one. `poll_interval` is
+           the least time between one read of a node nothing asks and the
+           next: a floor rather than a cadence, there being no telling how
+           soon a descriptor will have anything. A node in a group states none
+           of the rates: its group says when it is read. -->
+      <xs:element name="trigger_interval" type="xs:string"/>
+      <xs:element name="read_delay" type="xs:string"/>
+      <xs:element name="poll_interval" type="xs:string"/>
+      <xs:element name="max_length" type="xs:string"/>
+      <xs:element name="read_timeout" type="xs:string"/>
+      <xs:element name="terminators" type="xs:string"/>
+      <!-- The terms of a line. -->
+      <xs:element name="datarate" type="xs:string"/>
+      <xs:element name="byte_length" type="xs:string"/>
+      <xs:element name="stop_bits" type="xs:string"/>
+      <xs:element name="parity" type="xs:string"/>
+      <xs:element name="standard" type="xs:string"/>
+      <xs:element name="clock_rate" type="xs:string"/>
+      <xs:element name="clock_type" type="xs:string"/>
+      <xs:element name="encoding" type="xs:string"/>
+      <xs:element name="frame_check" type="xs:string"/>
+      <xs:element name="loopback" type="xs:string"/>
+      <xs:element name="rs485" type="xs:string"/>
+      <xs:element name="rs485_rts_on_send" type="xs:string"/>
+      <xs:element name="rs485_delay_before_send" type="xs:string"/>
+      <xs:element name="rs485_delay_after_send" type="xs:string"/>
+      <!-- A device on a bus, and a peripheral on one. -->
+      <xs:element name="ten_bit" type="xs:string"/>
+      <xs:element name="pec" type="xs:string"/>
+      <xs:element name="retries" type="xs:string"/>
+      <xs:element name="timeout" type="xs:string"/>
+      <xs:element name="max_speed" type="xs:string"/>
+      <xs:element name="spi_mode" type="xs:string"/>
+      <xs:element name="bits_per_word" type="xs:string"/>
+      <xs:element name="bit_order" type="xs:string"/>
+      <xs:element name="cs_active" type="xs:string"/>
+      <xs:element name="can_fd" type="xs:string"/>
+      <!-- A channel to another core. -->
+      <xs:element name="service" type="xs:string"/>
+      <xs:element name="max_message_bytes" type="xs:string"/>
+      <!-- Discrete lines. -->
+      <xs:element name="lines" type="xs:string"/>
+      <xs:element name="bias" type="xs:string"/>
+      <xs:element name="debounce" type="xs:string"/>
+      <!-- How often a set of discrete lines reports what it is: one whole
+           number with a bit for each line, the first line listed bit 0.
+           Required of a gpio_in, and of a gpio_inout, which reports what its
+           lines were last told. -->
+      <xs:element name="state_interval" type="xs:string"/>
+      <!-- A computation, and what each of them is told. -->
+      <xs:element name="function" type="xs:string"/>
+      <xs:element name="format" type="xs:string"/>
+      <xs:element name="scale" type="xs:string"/>
+      <xs:element name="offset" type="xs:string"/>
+      <xs:element name="setpoint" type="xs:string"/>
+      <xs:element name="half_band" type="xs:string"/>
+      <xs:element name="algorithm" type="xs:string"/>
+      <!-- A vote's: how old a reading may be and still be voted on. -->
+      <xs:element name="age" type="xs:string"/>
+      <!-- No longer read: a to_value conversion and a process computation
+           state their type-out instead. -->
+      <xs:element name="unit" type="xs:string"/>
+      <!-- The type a link carries, one of tcslib-protocol/xtce/types.xtce's or
+      a
+           structure of them (name: type, name: type): see "Typed links" in
+           docs/tcspecial-design.rst. What a vote or a tee carries in and out;
+           what a conversion, thermostat or process takes and sends; and what a
+           device or an app carries at each terminal. -->
+      <xs:element name="carries" type="xs:string"/>
+      <xs:element name="type-in" type="xs:string"/>
+      <xs:element name="type-out" type="xs:string"/>
+      <xs:element name="world-in-type" type="xs:string"/>
+      <xs:element name="world-out-type" type="xs:string"/>
+      <xs:element name="moc-in-type" type="xs:string"/>
+      <xs:element name="moc-out-type" type="xs:string"/>
+      <!-- The program this node runs: an app node's application, or the
+           program a `process` computation runs on what arrives. Executed with
+           a leading `~` and `$HOME` expanded as a shell would expand them, to
+           the home directory and to the value of the environment variable
+           HOME of whatever runs it. An app node's is run with the node's name
+           as its first argument. -->
+      <xs:element name="executable" type="xs:string"/>
+      <!-- What an app node's program is told about each stream its kind
+           handles: the payload argument first, then the gateway one.
+           `app-payload-arg` is said by app_payload_veh, app_all_veh, app_pl
+           and app_all_pl, which handle payload data; `app-gateway-arg` by
+           app_gateway_veh, app_all_veh and app_all_pl, which handle gateway
+           data. Required of those kinds, the list a program is run with being a
+           fixed one. -->
+      <xs:element name="app-payload-arg" type="xs:string"/>
+      <xs:element name="app-gateway-arg" type="xs:string"/>
+      <xs:element name="restart" type="xs:string"/>
+      <!-- A log. -->
+      <xs:element name="directory" type="xs:string"/>
+      <xs:element name="segment_bytes" type="xs:string"/>
+      <!-- A page of its own. -->
+      <xs:element name="file" type="xs:string"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- A node of any section: its name, and what it says. -->
+  <xs:complexType name="node">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:group ref="nodeWords"/>
+    </xs:choice>
+    <xs:attribute name="name" type="name" use="required"/>
+  </xs:complexType>
+
+  <!-- One type's nodes in each section: the type, from the section's
+       list, and the nodes, each written as the section writes one. -->
+  <xs:complexType name="gatewayGroup">
+    <xs:sequence>
+      <xs:element name="gateway" type="node" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="gatewayType" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="vehicleGroup">
+    <xs:sequence>
+      <xs:element name="compute" type="node" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="vehicleType" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="payloadGroup">
+    <xs:sequence>
+      <xs:element name="payload" type="node" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="payloadType" use="required"/>
+  </xs:complexType>
+
+  <!-- And each section, its types. -->
+  <xs:complexType name="gateways">
+    <xs:sequence>
+      <xs:element name="type" type="gatewayGroup"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="vehicle">
+    <xs:sequence>
+      <xs:element name="type" type="vehicleGroup"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="payloads">
+    <xs:sequence>
+      <xs:element name="type" type="payloadGroup"
+        minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- A set of payloads read on one interval.
+
+       The interval is a number, whitespace, and a unit: `500 ms`, `3 s`,
+       `1.5 s`, `15 min`, `6 h`, `1 w`. The whitespace is required and one or
+       more characters of it will do, so `500 ms` and `500  ms` are the same
+       interval and `500ms` is refused. The units are `us`, `ms`, `s`, `min`,
+       `h`, `d` and `w`, each a word of its own. Minutes are `min` and never
+       `m`, a single `m` being one letter from `ms` and a thousand-fold apart
+       from it; a month and a year are not units here. The number is decimal,
+       whole or a fraction, with underscores allowed among the digits, so
+       `1_000 ms`, `1.5 s` and `1500 ms` are one interval written three ways.
+       There is no hexadecimal and none is planned.
+
+       Checked by the reader and not by a pattern here: the one grammar is
+       `graph::parse_interval`, and a pattern would be a second copy of it to
+       drift away from. An interval that is not one is refused where the file
+       is read, in words that say what is wrong with it. -->
+  <xs:complexType name="payload_group">
+    <xs:all>
+      <xs:element name="name" type="xs:string"/>
+      <xs:element name="interval" type="xs:string"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- A command from the ground that sets an attribute of a node. -->
+  <xs:complexType name="command">
+    <xs:all>
+      <xs:element name="from" type="xs:string"/>
+      <xs:element name="sets" type="xs:string"/>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- An address and a port in one value, which is how every socket of the
+       tcspecial section is written: two things only ever used together are
+       one fact. -->
+  <xs:simpleType name="socket">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[^:]+:[0-9]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- What tcspecial itself is configured with: where commands are taken,
+       where beacons go, where the telemetry log is written. Enumerated, unlike
+       a node's attributes, because this section's words are fixed and the
+       software refuses any other.
+
+       Everything optional, because the editor has to be able to write a
+       section somebody is halfway through filling in. What must be answered
+       before a configuration flies is tcsverify's to say. -->
+  <xs:complexType name="tcspecial">
+    <xs:all>
+      <!-- What the vehicle answers to: radio, the ground over UDP; yamcs,
+           a Yamcs ground station over the same, every packet a CCSDS Space
+           Packet; fprime, an F´ flight computer's bridge component, over
+           UDP too; cfs, a cFS flight computer's software bus, as a peer of
+           its SBN. It decides how the links below are written: sockets for
+           radio, yamcs and fprime, message IDs for cfs. -->
+      <xs:element name="gateway" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="radio"/>
+            <xs:enumeration value="cfs"/>
+            <xs:enumeration value="fprime"/>
+            <xs:enumeration value="yamcs"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <!-- The interface the configuration was written for: the digest of
+           the tcslib-protocol/xtce/link.xtce its commands are laid out by, as
+           32 lower-case hex digits, which tcsverify prints when asked with its
+           interface-digest option. Required, and refused unless it is the
+           build's own. -->
+      <xs:element name="interface" minOccurs="0">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:pattern value="[0-9a-f]{32}"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:element>
+      <xs:element name="tcs_cmd" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="recv" type="socket" minOccurs="0"/>
+            <xs:element name="send" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: the message IDs commands about the
+                 spacecraft and their answers are published under. -->
+            <xs:element name="cmd_msgid" type="xs:string" minOccurs="0"/>
+            <xs:element name="response_msgid" type="xs:string"
+                        minOccurs="0"/>
+            <!-- Where the gateway is yamcs: the APID the commands on both
+                 command links and their answers carry. -->
+            <xs:element name="apid" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="payload_command" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="source_base" type="socket" minOccurs="0"/>
+            <xs:element name="dest_base" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: where node commands' message IDs
+                 and their answers' are counted from, by the node's id. -->
+            <xs:element name="cmd_base" type="xs:string" minOccurs="0"/>
+            <xs:element name="response_base" type="xs:string"
+                        minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="payload_telemetry" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="source_base" type="socket" minOccurs="0"/>
+            <xs:element name="dest_base" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: where an untouched payload's message
+                 ID is counted from, by its id. -->
+            <xs:element name="tlm_base" type="xs:string" minOccurs="0"/>
+            <!-- Where the gateway is yamcs: where an untouched payload's
+                 APID is counted from, by its id. -->
+            <xs:element name="apid_base" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="beacon" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="default_interval" type="xs:string"
+                        minOccurs="0"/>
+            <!-- How often a beacon is sent across a restart: not nought,
+                 and no longer than interval. -->
+            <xs:element name="reset_interval" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="send" type="socket" minOccurs="0"/>
+            <xs:element name="recv" type="socket" minOccurs="0"/>
+            <!-- On a cFS software bus: the message ID the beacon is
+                 published under. -->
+            <xs:element name="tlm_msgid" type="xs:string" minOccurs="0"/>
+            <!-- Where the gateway is yamcs: the APID the beacon carries. -->
+            <xs:element name="apid" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- The SBN peer a vehicle that answers to cfs is on the software
+           bus through. The far end's SBN table must list tcspecial with
+           the same spacecraft_id, processor_id and address, which nothing
+           on this side can check. -->
+      <xs:element name="sbn" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="release" type="xs:string" minOccurs="0"/>
+            <xs:element name="ident" minOccurs="0">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:pattern value="[0-9a-fA-F]{40}"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+            <xs:element name="spacecraft_id" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="processor_id" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="local" type="socket" minOccurs="0"/>
+            <xs:element name="peer" type="socket" minOccurs="0"/>
+            <xs:element name="peer_processor_id" type="xs:string"
+                        minOccurs="0"/>
+            <xs:element name="max_message" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- The block of cFS message IDs the mission allotted tcspecial. -->
+      <xs:element name="msgid_range" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="first" type="xs:string" minOccurs="0"/>
+            <xs:element name="last" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- How the cFS build counts time: its UTC epoch, its scale, and TAI
+           less UTC where the scale is tai. -->
+      <xs:element name="cfe_time" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="epoch" type="xs:string" minOccurs="0"/>
+            <xs:element name="scale" minOccurs="0">
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:enumeration value="tai"/>
+                  <xs:enumeration value="utc"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:element>
+            <xs:element name="leap_seconds" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="log" minOccurs="0">
+        <xs:complexType>
+          <xs:all>
+            <xs:element name="directory" type="xs:string" minOccurs="0"/>
+            <xs:element name="segment_size" type="xs:string" minOccurs="0"/>
+          </xs:all>
+        </xs:complexType>
+      </xs:element>
+      <!-- How long a RESTART_ARM licenses a RESTART for, as a length of
+           time: 20 min. Twenty minutes where it is not stated. -->
+      <xs:element name="restart_arm_valid" type="xs:string" minOccurs="0"/>
+      <!-- The file tcspecial keeps what must survive a restart in, on
+           storage that survives a power cycle. -->
+      <xs:element name="state_file" type="xs:string" minOccurs="0"/>
+      <!-- The directory the vehicle keeps configurations in, each under its
+           checksum. Absent is a vehicle that keeps none. -->
+      <xs:element name="configurations" type="xs:string" minOccurs="0"/>
+      <!-- The fewest configurations kept there: 1 or more, 2 where it is
+           not stated. -->
+      <xs:element name="configurations_kept" type="xs:string"
+                  minOccurs="0"/>
+      <!-- How many starts of the configuration the state file names may end
+           before a matching CONNECT before it is given up: 1 or more, 3
+           where it is not stated. -->
+      <xs:element name="load_trials" type="xs:string" minOccurs="0"/>
+      <!-- Where tcsgui writes the Rust it generates from this configuration.
+           The one attribute of this section about building the software rather
+           than about running it: nothing aboard reads it. -->
+    </xs:all>
+  </xs:complexType>
+
+  <!-- One file this one includes: a subdiagram, by its own name, and the
+       file's path from this file's directory without an extension, such
+       as zone or ../common/zone, read in this file's format. The name is no
+       node's and no other subdiagram's, with no dot or slash in it. -->
+  <xs:complexType name="include">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="path" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- What of an included file the files around it may join: by
+       terminal, the nodes whose terminal of that name a line from another
+       file may reach. Each terminal written once for each node it names,
+       which is how XML spells a list. -->
+  <xs:complexType name="exports">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="world-in" type="xs:string"/>
+      <xs:element name="world-out" type="xs:string"/>
+      <xs:element name="moc-in" type="xs:string"/>
+      <xs:element name="moc-out" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- The file itself.
+
+       The sections may be written in any order. The lists among them,
+       include, payload_groups and commands, are written as many times as
+       they have entries, which is how XML spells a list; every other
+       section is written once at most. The description is held to that
+       here, by the identity constraint below: a field may find one node at
+       most, so a second description is refused. The tcspecial section, the
+       three node sections and the tcsgui section are held to it where the
+       file is read and not here, because XSD 1.0 cannot say it: xs:all
+       holds no list, and an identity constraint's field must find a value,
+       which a section of child elements is not. Nothing is required here,
+       for the reason the tcspecial section's attributes are not: a file
+       somebody is partway through writing must still open. That a
+       configuration has a tcspecial section is checked where a complaint can
+       name the file and the line. -->
+  <xs:element name="configuration">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element name="description" type="xs:string"/>
+        <xs:element name="include" type="include"/>
+        <xs:element name="exports" type="exports"/>
+        <xs:element name="tcspecial" type="tcspecial"/>
+        <xs:element name="payload_groups" type="payload_group"/>
+        <xs:element name="gateways" type="gateways"/>
+        <xs:element name="vehicle" type="vehicle"/>
+        <xs:element name="payloads" type="payloads"/>
+        <xs:element name="commands" type="command"/>
+        <xs:element name="tcsgui" type="tcsgui"/>
+      </xs:choice>
+    </xs:complexType>
+    <xs:unique name="one-description">
+      <xs:selector xpath="."/>
+      <xs:field xpath="description"/>
+    </xs:unique>
+  </xs:element>
+
+</xs:schema>

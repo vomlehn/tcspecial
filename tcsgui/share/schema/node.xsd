@@ -13,9 +13,9 @@
   spelling. The two are held against each other by a test, and both are held
   against the software's own reader: see `tcsgui/tests/schema.rs`.
 
-  What this checks is shape. Whether a type's terminals are the ones the
-  flight software believes in is a question about meaning, and the answer is a
-  test rather than a schema: `tcslibgs::graph::terminals` is the table the
+  What this checks is shape. Whether a type's terminals are the ones the flight
+  software believes in is a question about meaning, and the answer is a test
+  rather than a schema: `tcslib_protocol::graph::terminals` is the table the
   vehicle is flown by, and the tree has to agree with it.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

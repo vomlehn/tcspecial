@@ -20,7 +20,7 @@
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
-use tcslibgs::graph::Graph;
+use tcslib_protocol::graph::Graph;
 
 /// A group and when it is next due.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -381,7 +381,7 @@ mod tests {
     #[test]
     fn groups_keep_their_own_clocks() {
         let mut graph = thermostat();
-        graph.groups.push(tcslibgs::graph::Group {
+        graph.groups.push(tcslib_protocol::graph::Group {
             name: "slow".to_string(),
             interval: "10 s".to_string(),
         });
@@ -408,7 +408,7 @@ mod tests {
     #[test]
     fn the_longest_waiting_group_goes_first() {
         let mut graph = thermostat();
-        graph.groups.push(tcslibgs::graph::Group {
+        graph.groups.push(tcslib_protocol::graph::Group {
             name: "other".to_string(),
             interval: "1 s".to_string(),
         });

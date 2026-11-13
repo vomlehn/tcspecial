@@ -146,7 +146,7 @@ def gpio_sim():
     """
     # A chip's lines are in a directory named after the chip, under its
     # gpio-sim platform device, as simulated_chips() in
-    # tcslibgs/src/node/payload/gpio says for everything that looks.
+    # tcslib-protocol/src/node/payload/gpio says for everything that looks.
     chips = sorted(glob.glob("/sys/devices/platform/gpio-sim.*/gpiochip*"))
     if not chips:
         return None, ("no gpio-sim chip is there; make mkstubs makes one, "

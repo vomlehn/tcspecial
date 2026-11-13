@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
 
 description: "Answering to an F´ flight computer: a reading, the
   temperature made of it and what a thermostat would decide of that, to its

@@ -11,8 +11,8 @@
 //! mean and a threshold are all arithmetic on positive numbers, and a sign
 //! error is a value that is obviously wrong rather than plausibly cold.
 
-use tcslibgs::node::vehicle::compute::{Format, ToValueParams};
-use tcslibgs::unit::Unit;
+use tcslib_protocol::node::vehicle::compute::{Format, ToValueParams};
+use tcslib_protocol::unit::Unit;
 
 use super::{Function, Out};
 
@@ -32,7 +32,8 @@ impl ToValue {
     /// Makes the conversion these settled parameters describe.
     ///
     /// Nothing to refuse: what a file may say and what each value may be are
-    /// `tcslibgs::node::vehicle::compute`'s, where the ground tool checks them.
+    /// `tcslib_protocol::node::vehicle::compute`'s, where the ground tool
+    /// checks them.
     ///
     /// # Arguments
     ///
@@ -85,8 +86,8 @@ mod tests {
     ///
     /// What a file may say -- that the format is one of four, that a scale of
     /// nought is refused, that an offset has no default -- is
-    /// `tcslibgs::node::vehicle::compute`'s rule, where the ground tool applies
-    /// it. These tests are about the arithmetic.
+    /// `tcslib_protocol::node::vehicle::compute`'s rule, where the ground tool
+    /// applies it. These tests are about the arithmetic.
     ///
     /// # Arguments
     ///
@@ -103,7 +104,7 @@ mod tests {
                 format,
                 scale,
                 offset,
-                unit: tcslibgs::unit::Unit::Kelvin,
+                unit: tcslib_protocol::unit::Unit::Kelvin,
             },
             "to_kelvin",
         )
@@ -120,7 +121,7 @@ mod tests {
             .expect("a reading")
             .expect("a value");
         let kelvin =
-            from_value(&out, tcslibgs::unit::Unit::Kelvin, "the result")
+            from_value(&out, tcslib_protocol::unit::Unit::Kelvin, "the result")
                 .unwrap();
         assert!((kelvin - 293.15).abs() < 0.001, "{kelvin}");
     }
@@ -135,7 +136,7 @@ mod tests {
 
         let out = f.give(None, &[0xff, 0xc0]).unwrap().unwrap();
         let kelvin =
-            from_value(&out, tcslibgs::unit::Unit::Kelvin, "the result")
+            from_value(&out, tcslib_protocol::unit::Unit::Kelvin, "the result")
                 .unwrap();
         assert!((kelvin - 269.15).abs() < 0.001, "{kelvin}");
         assert!(kelvin > 0.0);
@@ -157,9 +158,12 @@ mod tests {
         ] {
             let mut f = conversion(format, 0.001, 0.0);
             let out = f.give(None, &bytes).unwrap().unwrap();
-            let got =
-                from_value(&out, tcslibgs::unit::Unit::Kelvin, "the result")
-                    .unwrap();
+            let got = from_value(
+                &out,
+                tcslib_protocol::unit::Unit::Kelvin,
+                "the result",
+            )
+            .unwrap();
             assert!((got - expected).abs() < 0.001, "{format:?}: {got}");
         }
     }
@@ -181,21 +185,23 @@ mod tests {
 
     /// What cannot convert anything is refused where a file is read.
     ///
-    /// By the one set of rules, in `tcslibgs::node::vehicle::compute`, which
-    /// the ground tool applies too: a format nobody has written, a scale of
-    /// nought -- every reading would become the offset, which looks exactly
+    /// By the one set of rules, in `tcslib_protocol::node::vehicle::compute`,
+    /// which the ground tool applies too: a format nobody has written, a scale
+    /// of nought -- every reading would become the offset, which looks exactly
     /// like a working sensor reporting a steady temperature -- and a missing
     /// offset, which is not nought by default.
     #[test]
     fn what_cannot_be_converted_is_refused_before_it_runs() {
-        use tcslibgs::node::vehicle::compute::params_of;
+        use tcslib_protocol::node::vehicle::compute::params_of;
 
         let refused = |pairs: &[(&str, &str)]| {
             params_of(
                 "k_1",
                 &pairs
                     .iter()
-                    .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(*v)))
+                    .map(|(k, v)| {
+                        (k.to_string(), tcslib_protocol::Scalar::of(*v))
+                    })
                     .collect(),
             )
             .expect_err("a conversion that cannot convert")

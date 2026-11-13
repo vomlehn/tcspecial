@@ -29,9 +29,9 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
-use tcslibgs::graph::Graph;
-use tcslibgs::store::Store;
+use tcslib_protocol::config_digest::{digest_of_graph, ConfigDigest};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::store::Store;
 
 use crate::state::{self, State};
 
@@ -102,7 +102,7 @@ pub fn problems_of(path: &Path, graph: &Graph) -> Vec<String> {
         .check()
         .iter()
         .chain(
-            tcslibgs::graph::built::not_built(
+            tcslib_protocol::graph::built::not_built(
                 &graph.nodes,
                 crate::node::payload::BUILT,
             )
@@ -135,8 +135,8 @@ impl Boot {
             digest_of_graph(&graph).map_err(|e| said(e.to_string()))?;
         let ci = match graph.tcspecial.as_ref() {
             Some(section) => Some(
-                tcslibgs::graph::parameters::ci_config_of(
-                    &tcslibgs::graph::parameters::flatten(section),
+                tcslib_protocol::graph::parameters::ci_config_of(
+                    &tcslib_protocol::graph::parameters::flatten(section),
                 )
                 .and_then(|json| json.to_ci_config())
                 .map_err(said)?,
@@ -154,7 +154,9 @@ impl Boot {
                     .map(Store::at),
                 load_trials: ci
                     .as_ref()
-                    .map_or(tcslibgs::LOAD_TRIALS_DEFAULT, |ci| ci.load_trials),
+                    .map_or(tcslib_protocol::LOAD_TRIALS_DEFAULT, |ci| {
+                        ci.load_trials
+                    }),
             },
             graph,
         ))
@@ -483,7 +485,7 @@ vehicle:
         world-out: [g.p]
         moc-in: [g]
 ",
-                tcslibgs::InterfaceDigest::of_this_build(),
+                tcslib_protocol::InterfaceDigest::of_this_build(),
                 dir.path().join("tcspecial.state").display(),
                 dir.path().join("kept").display(),
                 100 + n,

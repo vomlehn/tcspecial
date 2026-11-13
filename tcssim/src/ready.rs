@@ -2,18 +2,18 @@
 //! on.
 //!
 //! Bound before any simulation is made and kept bound for as long as tcssim
-//! runs, so that a harness asking while it is still starting is told so, and
-//! so that a simulator left running from an earlier run is found: it holds
-//! the address, and a second one started beside it is refused rather than
-//! left to fight it for the payloads' paths. The messages are
-//! `tcslibgs::ready`, and a harness waits through `tcslib_moc::simulator`. See
-//! "Waiting for the Simulator" in `docs/tcspecial-design.rst`.
+//! runs, so that a harness asking while it is still starting is told so, and so
+//! that a simulator left running from an earlier run is found: it holds the
+//! address, and a second one started beside it is refused rather than left to
+//! fight it for the payloads' paths. The messages are `tcslib_protocol::ready`,
+//! and a harness waits through `tcslib_moc::simulator`. See "Waiting for the
+//! Simulator" in `docs/tcspecial-design.rst`.
 
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tcslibgs::ready::{
+use tcslib_protocol::ready::{
     Answer, Reason, Request, SetUpFor, State, ANSWER_BYTES, REQUEST_BYTES,
 };
 
@@ -180,8 +180,8 @@ pub fn serve(socket: UdpSocket, readiness: Arc<Readiness>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::config_digest::ConfigDigest;
-    use tcslibgs::simulate::Mode;
+    use tcslib_protocol::config_digest::ConfigDigest;
+    use tcslib_protocol::simulate::Mode;
 
     /// Makes a readiness for payloads none of which is made yet.
     ///

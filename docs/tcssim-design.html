@@ -394,7 +394,7 @@ that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
 tcssim acts on. A shipped pair is <tt class="docutils literal">examples/minimal/minimal.ytcs</tt> and
-<tt class="docutils literal"><span class="pre">minimal-sim.yaml</span></tt> beside it; the parser is <tt class="docutils literal"><span class="pre">tcslibgs::sim_config</span></tt>.</p>
+<tt class="docutils literal"><span class="pre">minimal-sim.yaml</span></tt> beside it; the parser is <tt class="docutils literal"><span class="pre">tcslib_protocol::sim_config</span></tt>.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The parser lives with the other three configuration languages rather than
@@ -766,15 +766,15 @@ a simulator file that still declares masses itself.</dd>
 <dd>The model is the components it is made of, grouped by type as a
 configuration's nodes are, and a list of connections between them, as a
 configuration has links: <tt class="docutils literal">components</tt> and <tt class="docutils literal">connections</tt>, under
-<tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type,
-<tt class="docutils literal">- type heater:</tt>, holding the components of that type, each
-named by <tt class="docutils literal">component</tt>. The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>,
-<tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>, <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and
-<tt class="docutils literal">body</tt>, and a type of any other is refused; a <tt class="docutils literal">thermal_zone</tt>, which
-is what a <tt class="docutils literal">thermal_mass</tt> was called before, is told the name it has now.
-A type is written once, with a component under it. Each type's settings,
-terminals and rules are stated once, in <tt class="docutils literal"><span class="pre">tcslibgs::node::physics</span></tt>; its
-arithmetic is the simulator's, in <tt class="docutils literal"><span class="pre">tcssim::physics</span></tt>.</dd>
+<tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type, <tt class="docutils literal">- type
+heater:</tt>, holding the components of that type, each named by <tt class="docutils literal">component</tt>.
+The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>,
+<tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and <tt class="docutils literal">body</tt>, and a type of any
+other is refused; a <tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was
+called before, is told the name it has now. A type is written once, with a
+component under it. Each type's settings, terminals and rules are stated
+once, in <tt class="docutils literal"><span class="pre">tcslib_protocol::node::physics</span></tt>; its arithmetic is the
+simulator's, in <tt class="docutils literal"><span class="pre">tcssim::physics</span></tt>.</dd>
 <dt>Requirement</dt>
 <dd>A <tt class="docutils literal">thermal_mass</tt> has two heaters of its own, <tt class="docutils literal">heater_1</tt> and
 <tt class="docutils literal">heater_2</tt>: inputs taking a decision, each adding its stated
@@ -1114,9 +1114,9 @@ that no such sensor reaches, or that reaches no such heater, is refused.</dd>
 <dt>Requirement</dt>
 <dd>It reads what each sensor's simulated payload sends, as it leaves: a dropped
 reading never arrives, and a truncated or corrupted one arrives as the
-vehicle would see it. The bytes are read as the conversion the sensor
-feeds reads them, <tt class="docutils literal"><span class="pre">Format::counts</span></tt> in tcslibgs being the one reading
-both use, and a reading that conversion would refuse is ignored.</dd>
+vehicle would see it. The bytes are read as the conversion the sensor feeds
+reads them, <tt class="docutils literal"><span class="pre">Format::counts</span></tt> in tcslib-protocol being the one reading both
+use, and a reading that conversion would refuse is ignored.</dd>
 <dt>Requirement</dt>
 <dd>It decides on the median of each sensor's latest reading, as the example
 votes them, and asserts the decision to every heater on every reading,

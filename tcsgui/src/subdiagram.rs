@@ -22,11 +22,11 @@
 //! to anything without restructuring the diagram first.
 //!
 //! **A name is the node's own in every file.** The configuration reader,
-//! `tcslibgs::graph::Graph::load`, knows a node by its bare name across every
-//! file of a configuration -- no two nodes share one, whichever files they
-//! are in -- so a link in one file names a node in another just as it names
-//! one beside it, and that is how every file is written. The editor holds a
-//! node under `subdiagram/node`, which says which file it is drawn in, but
+//! `tcslib_protocol::graph::Graph::load`, knows a node by its bare name across
+//! every file of a configuration -- no two nodes share one, whichever files
+//! they are in -- so a link in one file names a node in another just as it
+//! names one beside it, and that is how every file is written. The editor holds
+//! a node under `subdiagram/node`, which says which file it is drawn in, but
 //! writes only the `node`.
 //!
 //! **A subdiagram has a name of its own.** The top file's include list

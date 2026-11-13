@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
     <description>A payload on a CAN bus: its frames to the ground, and the ground's commands to it as frames</description>
     <tcspecial>
         <!-- Every port is in the thirty-two hundreds to thirty-seven

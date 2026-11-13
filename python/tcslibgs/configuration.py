@@ -25,8 +25,8 @@ reads. A configuration's ``include`` list is followed as the Rust follows it
 same names: see :func:`load`.
 
 The digest is not worked out here. It is taken over what a configuration says
-rather than over its bytes -- see ``tcslibgs::config_digest`` -- and a second
-statement of that in Python would be a second digest on the day the first
+rather than over its bytes -- see ``tcslib_protocol::config_digest`` -- and a
+second statement of that in Python would be a second digest on the day the first
 changes. :func:`digest` asks ``tcsverify --digest``, which is the Rust one.
 
 This reads only what it needs, and checks nothing: tcsverify is what says
@@ -48,7 +48,7 @@ from . import sbn as _sbn
 
 #: The sections whose entries are nodes, and the word a node of each is
 #: written as: the key that names it in YAML, its element in XML. See
-#: ``tcslibgs::graph::grouped``.
+#: ``tcslib_protocol::graph::grouped``.
 NODE_SECTIONS = {"gateways": "gateway", "vehicle": "compute",
                  "payloads": "payload"}
 
@@ -59,7 +59,7 @@ LINKS = ("world-out", "moc-out")
 #: A node's data sinks, each listing the names a line may arrive by.
 SINKS = ("world-in", "moc-in")
 
-#: The attributes a node writes as a list: ``tcslibgs::graph::LISTED``.
+#: The attributes a node writes as a list: ``tcslib_protocol::graph::LISTED``.
 LISTED = ("terminators",)
 
 #: Where the schemas are: a link to tcsgui's ``share/schema``, the one copy,
@@ -70,7 +70,8 @@ SCHEMAS = Path(__file__).resolve().parent / "schema"
 #: Each gateway node type, and the attribute it says where its data goes
 #: with: a radio's and a Yamcs gateway's ``ground_base``, an F´ gateway's
 #: ``bridge_base``. The Python spelling of
-#: ``tcslibgs::gateway::GatewayKind::base_attribute``, for the kinds that have
+#: ``tcslib_protocol::gateway::GatewayKind::base_attribute``, for the kinds that
+#have
 #: a node type.
 GATEWAY_BASES = {
     "gateway_radio": "ground_base",
@@ -85,7 +86,8 @@ ON_BUS = ("gateway_cfs",)
 
 
 def whole(attribute, said, most=0xFFFFFFFF):
-    """A whole number as a configuration writes one: ``tcslibgs::whole``'s
+    """A whole number as a configuration writes one:
+    ``tcslib_protocol::whole``'s
     grammar, decimal or ``0x`` hexadecimal, underscores among the digits
     meaning nothing.
 
@@ -119,7 +121,7 @@ def whole(attribute, said, most=0xFFFFFFFF):
 @dataclass(frozen=True)
 class Sbn:
     """The ``sbn`` section: the peer every link of the vehicle is carried
-    over. ``tcslibgs::Sbn``."""
+    over. ``tcslib_protocol::Sbn``."""
 
     release: _sbn.Release
     #: ``SBN_IDENT``, the 48 bytes every subscription opens with.
@@ -143,7 +145,7 @@ class Sbn:
 @dataclass(frozen=True)
 class Bus:
     """A vehicle's links over a cFS software bus: its SBN peer, and the
-    message IDs the ``tcspecial`` section states. ``tcslibgs::Bus``."""
+    message IDs the ``tcspecial`` section states. ``tcslib_protocol::Bus``."""
 
     sbn: Sbn
     first: int
@@ -180,12 +182,13 @@ def counted(attribute, base, device_id):
     return msgid
 
 
-#: The largest APID, eleven bits: ``tcslibgs::ccsds::MAX_APID``.
+#: The largest APID, eleven bits: ``tcslib_protocol::ccsds::MAX_APID``.
 MAX_APID = 0x7FF
 
 
 def apid(attribute, said):
-    """Reads an APID a configuration states: ``tcslibgs::types::apid_of``.
+    """Reads an APID a configuration states:
+    ``tcslib_protocol::types::apid_of``.
 
     Args:
         attribute: Its name, for the complaint.
@@ -252,7 +255,7 @@ class HostPort:
             stated:    What the configuration says, as ``address:port``.
             any_port:  Whether port 0, any port from the host, is allowed: for
                        where the ground sends from, which the vehicle never
-                       binds. ``tcslibgs::types::sender_of``.
+                       binds. ``tcslib_protocol::types::sender_of``.
 
         Returns:
             The :class:`HostPort`, its address with surrounding space removed.
@@ -1059,9 +1062,9 @@ INTERVAL_UNITS = {
 def parse_interval(text):
     """A length of time as a configuration writes one, in nanoseconds.
 
-    The Python spelling of ``tcslibgs::graph::parse_interval``: the same units,
-    underscores among the digits meaning nothing, a decimal fraction kept to
-    the nearest whole microsecond, and nought refused. Its messages are
+    The Python spelling of ``tcslib_protocol::graph::parse_interval``: the same
+    units, underscores among the digits meaning nothing, a decimal fraction kept
+    to the nearest whole microsecond, and nought refused. Its messages are
     shorter; what it takes and refuses is the same.
 
     Args:
@@ -1112,7 +1115,8 @@ OLD_EXTENSIONS = {".yaml": ".ytcs", ".yml": ".ytcs", ".xml": ".xtcs"}
 
 
 def choose(named, stem, default, chosen=None):
-    """The configuration to read: ``tcslibgs::format::Spelling::configuration``.
+    """The configuration to read:
+    ``tcslib_protocol::format::Spelling::configuration``.
 
     ``named`` where one was named, and then ``chosen`` -- ``"yaml"`` or
     ``"xml"``, from ``--yaml`` or ``--xml`` -- has to agree with its
@@ -1349,7 +1353,7 @@ def _with_includes(path):
 def node_types(section):
     """The node types a section may hold, as a file spells them: the
     schema's list, which tcsgui's schema tests hold to
-    ``tcslibgs::graph::types_in``.
+    ``tcslib_protocol::graph::types_in``.
 
     Args:
         section: The section, as a file names it: ``gateways``, ``vehicle``
@@ -1722,7 +1726,7 @@ def _layout_entry(reader, line, what, said, seen):
 
 
 def _sink(reader, line, sink, said):
-    """Read one name a data sink lists, as ``tcslibgs::graph`` reads it.
+    """Read one name a data sink lists, as ``tcslib_protocol::graph`` reads it.
 
     Args:
         reader: The reader, for the complaint.
@@ -1747,7 +1751,8 @@ def _sink(reader, line, sink, said):
 
 
 def _destination(reader, line, source, entry, said):
-    """Read where one line goes, as ``tcslibgs::graph`` reads it, and keep
+    """Read where one line goes, as ``tcslib_protocol::graph`` reads it, and
+    keep
     the node it reaches.
 
     The name after the dot is the node's own business: what a ground
@@ -1783,7 +1788,7 @@ def _destination(reader, line, source, entry, said):
 def _load_xml(path):
     """Read a configuration written in XML.
 
-    Refused, as ``tcslibgs::graph::grouped`` refuses them: a file in the
+    Refused, as ``tcslib_protocol::graph::grouped`` refuses them: a file in the
     old shape, a type that is not one of its section's, a type written twice
     in a section or with no nodes in it, a node with a type of its own, with
     no name or an empty one, or that says a word twice, and two nodes of one
@@ -2092,7 +2097,7 @@ def _yaml_node(reader, section, node_type, item, construct):
 def _load_yaml(path):
     """Read a configuration written in YAML, with PyYAML.
 
-    Refused, as ``tcslibgs::graph::grouped`` refuses them: a file in the
+    Refused, as ``tcslib_protocol::graph::grouped`` refuses them: a file in the
     old shape, a type key that is not the word ``type``, one space and one of
     its section's types, a type written twice in a section or with no nodes,
     a node with a type of its own, with no name or an empty one, or that

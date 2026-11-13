@@ -15,7 +15,7 @@ use slint::ComponentHandle;
 
 use beacon_example::{show, WatchWindow};
 use tcslib_moc::beacon::{Schedule, NO_BEACON_MESSAGE};
-use tcslibgs::NO_TRANSFER_TIME;
+use tcslib_protocol::NO_TRANSFER_TIME;
 use tcsui::{palette, Shown};
 
 /// What the window has on it, as an operator would read it.

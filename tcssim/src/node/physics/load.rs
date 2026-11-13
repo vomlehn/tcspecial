@@ -1,14 +1,15 @@
 //! A load: a current drawn while it is on, nothing while it is shed.
 //!
-//! Its terminals are `tcslibgs::node::physics::load`'s: `shed`, a decision, and
-//! `current`, in amperes.
+//! Its terminals are `tcslib_protocol::node::physics::load`'s: `shed`, a
+//! decision, and `current`, in amperes.
 
-use tcslibgs::node::physics::load::Resolved;
+use tcslib_protocol::node::physics::load::Resolved;
 
 use super::component::Component;
 
-/// Its terminals' places, in `tcslibgs::node::physics::load::TERMINALS`'s order,
-/// which a test holds this to.
+/// Its terminals' places, in
+/// `tcslib_protocol::node::physics::load::TERMINALS`'s order, which a test
+/// holds this to.
 const SHED: usize = 0;
 const CURRENT: usize = 1;
 
@@ -56,7 +57,7 @@ impl Component for Load {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::node::physics::load::TERMINALS;
+    use tcslib_protocol::node::physics::load::TERMINALS;
 
     /// The places here are the type's; it draws its current until it is
     /// shed.

@@ -18,7 +18,7 @@ use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{I2cConfig, TcsError, TcsResult};
+use tcslib_protocol::{I2cConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{

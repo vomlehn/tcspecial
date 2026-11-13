@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/vomlehn/tcspecial/schema/node.schema.json",
   "title": "One node type, as a description file says it",
-  "description": "The description tree says what node types there are: one file per type, in this shape, in YAML or XML as its extension says. The editor reads the tree at run time to build its palette and to say what a node of each type may be told. This is the YAML spelling; node.xsd is the same shape in XML, and a test holds the two against each other. What this says is shape: whether a type's terminals are the ones the flight software believes in is a question about meaning, answered by a test against tcslibgs::graph::terminals, which is the table the vehicle is flown by.",
+  "description": "The description tree says what node types there are: one file per type, in this shape, in YAML or XML as its extension says. The editor reads the tree at run time to build its palette and to say what a node of each type may be told. This is the YAML spelling; node.xsd is the same shape in XML, and a test holds the two against each other. What this says is shape: whether a type's terminals are the ones the flight software believes in is a question about meaning, answered by a test against tcslib_protocol::graph::terminals, which is the table the vehicle is flown by.",
   "type": "object",
   "properties": {
     "node": {
@@ -46,7 +46,7 @@
             "type": "boolean"
           },
           "kind": {
-            "description": "What kind of value it takes, which decides what the node's window offers to type it with: `boolean` is a control with two states, and the rest are a box to write in. Absent is `text`, which is what an attribute whose rule is its own business takes. The rules themselves are tcslibgs': `whole` is a whole number as `whole::whole_u32` reads one, `interval` a length of time with its unit, `bytes` bytes as a trigger is written -- a C string in quotes, hexadecimal in square brackets, or both one after another, `path` a file or a program, and `text` anything.",
+            "description": "What kind of value it takes, which decides what the node's window offers to type it with: `boolean` is a control with two states, and the rest are a box to write in. Absent is `text`, which is what an attribute whose rule is its own business takes. The rules themselves are tcslib-protocol': `whole` is a whole number as `whole::whole_u32` reads one, `interval` a length of time with its unit, `bytes` bytes as a trigger is written -- a C string in quotes, hexadecimal in square brackets, or both one after another, `path` a file or a program, and `text` anything.",
             "enum": [
               "text",
               "path",

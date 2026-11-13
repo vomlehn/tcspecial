@@ -1,9 +1,9 @@
 """A configuration that answers to Yamcs, as a ground station reads it, its
 APIDs, and the port-0 rule for where the ground sends commands from.
 
-The Python mirrors of ``tcslibgs::gateway::GatewayKind::Yamcs``'s base
-attribute, of ``tcslibgs::graph::telemetry::apids``, and of
-``tcslibgs::types::came_from`` and ``sender_of``: the two languages must
+The Python mirrors of ``tcslib_protocol::gateway::GatewayKind::Yamcs``'s base
+attribute, of ``tcslib_protocol::graph::telemetry::apids``, and of
+``tcslib_protocol::types::came_from`` and ``sender_of``: the two languages must
 agree about which datagrams are the ground's, and what each carries. And
 the Yamcs mission database ``tcslibgs.yamcs`` generates from those APIDs.
 """
@@ -149,7 +149,8 @@ def yamcs(directory, base="0x300", gateway="yamcs", renamed=None,
 
 
 class ApidTest(unittest.TestCase):
-    """The APIDs, as ``tcslibgs::graph::telemetry::apids`` counts them."""
+    """The APIDs, as ``tcslib_protocol::graph::telemetry::apids`` counts
+    them."""
 
     def test_each_link_says_or_counts_its_apid(self):
         with tempfile.TemporaryDirectory() as directory:

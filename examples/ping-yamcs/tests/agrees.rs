@@ -1,7 +1,7 @@
 //! What the Python reads out of the configuration is what the Rust reads.
 //!
 //! The ground station is Python and reads the XML spelling; the vehicle reads
-//! the configuration through `tcslibgs`. `ping_yamcs.py` writes Yamcs's
+//! the configuration through `tcslib-protocol`. `ping_yamcs.py` writes Yamcs's
 //! configuration from what it reads -- where Yamcs sends commands and pings,
 //! where it listens for the answers and the beacon, and the APIDs that tell
 //! them apart -- so a port or an APID the two sides work out differently is a
@@ -15,8 +15,8 @@ use std::process::Command;
 
 use std::collections::BTreeSet;
 
-use tcslibgs::graph::telemetry::{self, ApidCarries, Via};
-use tcslibgs::graph::{Destination, Graph};
+use tcslib_protocol::graph::telemetry::{self, ApidCarries, Via};
+use tcslib_protocol::graph::{Destination, Graph};
 
 mod common;
 
@@ -246,8 +246,9 @@ fn mdb_apids(xtce: &Element) -> BTreeSet<(String, u16)> {
     found
 }
 
-/// The command the ping node's interface document, `tcslibgs/xtce/ping.xtce`,
-/// states: what a gateway node whose data goes only to ping nodes takes.
+/// The command the ping node's interface document,
+/// `tcslib-protocol/xtce/ping.xtce`, states: what a gateway node whose data
+/// goes only to ping nodes takes.
 ///
 /// # Returns
 ///
@@ -257,7 +258,7 @@ fn mdb_apids(xtce: &Element) -> BTreeSet<(String, u16)> {
 ///
 /// The document does not read, or states no one command.
 fn ping_command() -> String {
-    let path = here().join("../../tcslibgs/xtce/ping.xtce");
+    let path = here().join("../../tcslib-protocol/xtce/ping.xtce");
     let document = read_xml(&std::fs::read_to_string(path).expect("it reads"));
     let mut commands = Vec::new();
     document.within("MetaCommand", &mut commands);

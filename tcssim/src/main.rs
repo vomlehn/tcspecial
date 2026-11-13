@@ -8,13 +8,13 @@
 //! file adds what simulating one takes and the tcspecial configuration has no
 //! business knowing: how fast a payload produces packets, and how a packet is
 //! divided into segments. The two are joined by the data handler's name; see
-//! [`tcslibgs::sim_config`].
+//! [`tcslib_protocol::sim_config`].
 //!
 //! `--simulate=<mode>` is the run's simulation mode, as tcspecial and tcsmoc
-//! take it: see `tcslibgs::simulate`. Under `none`, the flight setting and
-//! the mode a run without the flag gets, tcssim refuses to start, there being
-//! nothing for it to do in a run that may simulate nothing. Under `some` and
-//! `all` it checks that what it will simulate, with what is a simulated or
+//! take it: see `tcslib_protocol::simulate`. Under `none`, the flight setting
+//! and the mode a run without the flag gets, tcssim refuses to start, there
+//! being nothing for it to do in a run that may simulate nothing. Under `some`
+//! and `all` it checks that what it will simulate, with what is a simulated or
 //! dummy device already, is what the mode allows.
 //!
 //! Every simulated payload is made as tcssim starts and kept until it stops,
@@ -47,8 +47,10 @@ use std::time::Duration;
 use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::flag;
 
-use tcslibgs::config::{payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR};
-use tcslibgs::{
+use tcslib_protocol::config::{
+    payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR,
+};
+use tcslib_protocol::{
     payload_parameters, DHConfig, DHSample, Edge, NO_TRANSFER_TIME,
 };
 
@@ -70,12 +72,13 @@ mod shots;
 
 use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
-use tcslibgs::graph::Graph;
-use tcslibgs::ready::SetUpFor;
-use tcslibgs::simulate::{
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::node::physics::Resolution;
+use tcslib_protocol::ready::SetUpFor;
+use tcslib_protocol::simulate::{
     counted, disagreement, judge, refusals, Host, Judged, Mode, Verdict,
 };
-use tcslibgs::{ResolvedSim, SimConfigFile};
+use tcslib_protocol::{ResolvedSim, SimConfigFile};
 use tcsverify::startup::Startup;
 
 slint::include_modules!();
@@ -427,8 +430,8 @@ type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 /// loop rather than three payloads sending noise.
 ///
 /// A sensor's encoding comes from the conversion its readings go to -- see
-/// `tcslibgs::graph::simulated::reading_of` -- so the bytes it sends are the
-/// bytes the vehicle reads back as what its terminal is, and neither file
+/// `tcslib_protocol::graph::simulated::reading_of` -- so the bytes it sends are
+/// the bytes the vehicle reads back as what its terminal is, and neither file
 /// states the scale twice.
 ///
 /// # Arguments
@@ -453,12 +456,12 @@ type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 /// switch one heater.
 fn joined_to_the_world(
     sim_file: &SimConfigFile,
-    graph: Option<&tcslibgs::graph::Graph>,
+    graph: Option<&tcslib_protocol::graph::Graph>,
     sims: &[ResolvedSim],
     dh_configs: &[DHConfig],
 ) -> Result<Attachments, String> {
-    use tcslibgs::node::physics::terminal::Kind;
-    use tcslibgs::sim_config::Attached;
+    use tcslib_protocol::node::physics::terminal::Kind;
+    use tcslib_protocol::sim_config::Attached;
 
     let model = sim_file.physics().map_err(|e| e.to_string())?;
     let simulating = sim_file
@@ -512,7 +515,7 @@ fn joined_to_the_world(
     ));
     // Each terminal is one the model has: `physics` refused a payload
     // naming another before this was reached.
-    let place = |at: &tcslibgs::node::physics::terminal::At| {
+    let place = |at: &tcslib_protocol::node::physics::terminal::At| {
         model.find(at).map(|(place, _)| place)
     };
 
@@ -530,7 +533,7 @@ fn joined_to_the_world(
                 world: world.clone(),
                 place: place(at)?,
                 offset: *offset,
-                reading: tcslibgs::graph::simulated::reading_of(
+                reading: tcslib_protocol::graph::simulated::reading_of(
                     graph, &name, *unit,
                 )?,
                 sensor: Arc::new(Sensor::new(&name, *sensor, seed)),
@@ -549,7 +552,7 @@ fn joined_to_the_world(
             Some(Attached::Drives { at, kind }) => {
                 let unit = match kind {
                     Kind::Value(unit) => {
-                        tcslibgs::graph::simulated::driving_of(
+                        tcslib_protocol::graph::simulated::driving_of(
                             graph, &name, *unit,
                         )?;
                         Some(*unit)
@@ -562,11 +565,8 @@ fn joined_to_the_world(
                 // a thermal mass's only decisions are its heaters.
                 let heater = matches!(
                     (&model.components[place.component].what, unit),
-                    (tcslibgs::node::physics::Resolution::Heater(_), _)
-                        | (
-                            tcslibgs::node::physics::Resolution::ThermalMass(_),
-                            None
-                        )
+                    (Resolution::Heater(_), _)
+                        | (Resolution::ThermalMass(_), None)
                 );
                 // Disabled, as every payload starts: its panel's button, or
                 // --sending, enables it.
@@ -623,11 +623,11 @@ fn joined_to_the_world(
 /// A message if the node is not a thermostat node, or no sensor reaches it,
 /// or it reaches no heater.
 fn thermostat_of(
-    graph: &tcslibgs::graph::Graph,
+    graph: &tcslib_protocol::graph::Graph,
     name: &str,
     attached: &BTreeMap<String, Attachment>,
 ) -> Result<Thermostat, String> {
-    use tcslibgs::graph::simulated::{reaches, thermostat_of};
+    use tcslib_protocol::graph::simulated::{reaches, thermostat_of};
 
     let params = thermostat_of(graph, name)?;
     let mut sensors = BTreeMap::new();
@@ -708,17 +708,18 @@ fn load(
     };
 
     // A configuration's payloads are nodes of a graph, and the ones simulated
-    // are the ones the simulator file names: see tcslibgs::graph::simulated,
-    // which makes of each a data handler, reached where tcspecial reaches it.
-    // Kept rather than dropped once the handlers are made: a sensor joined
-    // to the world sends what it reports in the encoding the graph's own
-    // conversion reads, and that is where the encoding is.
+    // are the ones the simulator file names: see
+    // tcslib_protocol::graph::simulated, which makes of each a data handler,
+    // reached where tcspecial reaches it. Kept rather than dropped once the
+    // handlers are made: a sensor joined to the world sends what it reports in
+    // the encoding the graph's own conversion reads, and that is where the
+    // encoding is.
     let mut graph = None;
-    let loaded = tcslibgs::graph::Graph::load(payload_path)
+    let loaded = tcslib_protocol::graph::Graph::load(payload_path)
         .map_err(|e| e.to_string())
         .and_then(|read| {
             let handlers =
-                tcslibgs::graph::simulated::handlers(&read, &sim_file);
+                tcslib_protocol::graph::simulated::handlers(&read, &sim_file);
             graph = Some(read);
             handlers
         });
@@ -830,12 +831,12 @@ fn load(
 /// simulator file says of them, or are not what the mode allows.
 ///
 /// Each payload is compared with what is at its endpoint: see
-/// `tcslibgs::simulate::disagreement`. One the file says is simulated is held
-/// to being reached at a simulated or dummy device, one it says is real to
+/// `tcslib_protocol::simulate::disagreement`. One the file says is simulated is
+/// held to being reached at a simulated or dummy device, one it says is real to
 /// not being, and one it does not name is refused where it is a simulated or
 /// dummy device all the same, so that every payload simulated is one tcssim
-/// controls and shows. For the mode, a payload is simulated when its
-/// simulate is true, and a dummy device stays one.
+/// controls and shows. For the mode, a payload is simulated when its simulate
+/// is true, and a dummy device stays one.
 ///
 /// # Arguments
 ///
@@ -958,10 +959,14 @@ fn set_up_for(
     mode: Mode,
 ) -> Result<SetUpFor, String> {
     Ok(SetUpFor {
-        configuration: tcslibgs::config_digest::digest_of_file(payload_path)
-            .map_err(|e| format!("{payload_path}: {e}"))?,
-        simulator: tcslibgs::config_digest::digest_of_simulator_file(sim_path)
-            .map_err(|e| format!("{sim_path}: {e}"))?,
+        configuration: tcslib_protocol::config_digest::digest_of_file(
+            payload_path,
+        )
+        .map_err(|e| format!("{payload_path}: {e}"))?,
+        simulator: tcslib_protocol::config_digest::digest_of_simulator_file(
+            sim_path,
+        )
+        .map_err(|e| format!("{sim_path}: {e}"))?,
         mode,
     })
 }
@@ -1174,7 +1179,7 @@ fn main() {
     // The mode first, and before anything is read: under the flight setting
     // there is nothing to read anything for.
     let (mode, args) =
-        match tcslibgs::simulate::take_mode(env::args().collect()) {
+        match tcslib_protocol::simulate::take_mode(env::args().collect()) {
             Ok(taken) => taken,
             Err(e) => {
                 eprintln!("tcssim: {e}");
@@ -1220,7 +1225,7 @@ fn main() {
     // The one PAYLOAD_SIM_YAML names, and otherwise the one beside the
     // configuration and named for it, found as tcsmoc finds it.
     let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
-        tcslibgs::config::sim_path_beside(&payload_path)
+        tcslib_protocol::config::sim_path_beside(&payload_path)
             .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
     });
 
@@ -1508,7 +1513,7 @@ fn quit_when_signalled(signalled: Arc<AtomicUsize>, quit: Rc<dyn Fn()>) {
 /// than what it was given, and the bottom of the display is the display's
 /// height less the window's.
 ///
-/// A request, and not a thing to report on: see `tcslibgs::display`.
+/// A request, and not a thing to report on: see `tcslib_protocol::display`.
 ///
 /// # Arguments
 ///
@@ -1523,9 +1528,9 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
-            if let Some(y) = tcslibgs::display::top_of(
+            if let Some(y) = tcslib_protocol::display::top_of(
                 edge,
-                tcslibgs::screen_height(),
+                tcslib_protocol::screen_height(),
                 window.size().height,
             ) {
                 window.set_position(slint::PhysicalPosition::new(0, y));
@@ -1542,7 +1547,9 @@ mod tests {
     use super::*;
     use std::path::Path;
     use std::time::Duration;
-    use tcslibgs::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
+    use tcslib_protocol::{
+        DHName, EndpointConfig, NetworkConfig, NetworkProtocol,
+    };
 
     /// `--sending` is taken out wherever it is, once, and nothing else is;
     /// twice, or with a value, is refused saying so.
@@ -1578,7 +1585,7 @@ mod tests {
     fn an_example_is_simulated() {
         let payload = repo_file("examples/minimal/minimal.ytcs");
         let payload = payload.to_str().expect("a path");
-        let sim = tcslibgs::config::sim_path_beside(payload)
+        let sim = tcslib_protocol::config::sim_path_beside(payload)
             .expect("its simulator file");
         assert!(sim.ends_with("minimal-sim.yaml"), "{sim}");
 
@@ -1617,10 +1624,10 @@ mod tests {
                 ),
             )
             .unwrap();
-            tcslibgs::graph::Graph::load(&path).expect("it reads")
+            tcslib_protocol::graph::Graph::load(&path).expect("it reads")
         };
         let sim = |simulate: bool| -> SimConfigFile {
-            tcslibgs::format::ConfigFormat::Yaml
+            tcslib_protocol::format::ConfigFormat::Yaml
                 .parse(&format!(
                     "simulated_payloads:\n  - type rpmsg:\n      \
                      - payload: channel\n        simulate: {simulate}\n"
@@ -1671,7 +1678,7 @@ mod tests {
     fn an_example_with_nothing_simulated_is_refused() {
         let payload = repo_file("examples/simple-app/simple-app.ytcs");
         let payload = payload.to_str().expect("a path");
-        let sim = tcslibgs::config::sim_path_beside(payload)
+        let sim = tcslib_protocol::config::sim_path_beside(payload)
             .expect("its simulator file");
 
         let mut startup = Startup::default();
@@ -1699,7 +1706,7 @@ mod tests {
     fn sample_of(seconds: u64, data: &[u8]) -> DHSample {
         let mut sample = DHSample::new();
         sample.record(data);
-        sample.time = Some(tcslibgs::Timestamp {
+        sample.time = Some(tcslib_protocol::Timestamp {
             micros: seconds * 1_000_000,
         });
         sample
@@ -2493,9 +2500,9 @@ mod tests {
     /// Makes the payloads of a configuration that its simulator file names,
     /// as `load` makes them.
     ///
-    /// Through `tcslibgs::graph::simulated`, which is what turns a payload
-    /// node into what the simulator simulates: where it is reached, how big a
-    /// packet is, and whether it answers a trigger.
+    /// Through `tcslib_protocol::graph::simulated`, which is what turns a
+    /// payload node into what the simulator simulates: where it is reached, how
+    /// big a packet is, and whether it answers a trigger.
     ///
     /// # Arguments
     ///
@@ -2513,13 +2520,14 @@ mod tests {
         configuration: &std::path::Path,
         sim_file: &SimConfigFile,
     ) -> Vec<DHConfig> {
-        let graph =
-            tcslibgs::graph::Graph::load(configuration).unwrap_or_else(|e| {
+        let graph = tcslib_protocol::graph::Graph::load(configuration)
+            .unwrap_or_else(|e| {
                 panic!("{} failed to load: {e}", configuration.display())
             });
-        tcslibgs::graph::simulated::handlers(&graph, sim_file).unwrap_or_else(
-            |e| panic!("{} cannot be simulated: {e}", configuration.display()),
-        )
+        tcslib_protocol::graph::simulated::handlers(&graph, sim_file)
+            .unwrap_or_else(|e| {
+                panic!("{} cannot be simulated: {e}", configuration.display())
+            })
     }
 
     /// Every shipped set's simulator file names every payload that is a
@@ -2530,8 +2538,8 @@ mod tests {
     #[test]
     fn every_shipped_simulated_payload_is_named() {
         for (configuration, sim_path) in shipped_sets() {
-            let graph =
-                tcslibgs::graph::Graph::load(&configuration).expect("it reads");
+            let graph = tcslib_protocol::graph::Graph::load(&configuration)
+                .expect("it reads");
             let sim_file = SimConfigFile::load(&sim_path).expect("it reads");
             let refused: Vec<String> = simulation_refused(
                 &graph,
@@ -2664,12 +2672,12 @@ mod tests {
     }
 
     // Nothing here checks that no shipped simulator file fits another
-    // configuration, because some do: `minimal` and `beacon` both have a
-    // sensor on a UDP socket, and `minimal`'s simulator file fits either,
-    // which is a true thing about two examples rather than a fault. The rule
-    // that matters is that a simulated payload states the kind of payload it
-    // simulates, and that is tested where the rule is:
-    // `tcslibgs::sim_config`'s `the_two_files_cannot_disagree_about_the_kind`.
+    // configuration, because some do: `minimal` and `beacon` both have a sensor
+    // on a UDP socket, and `minimal`'s simulator file fits either, which is a
+    // true thing about two examples rather than a fault. The rule that matters
+    // is that a simulated payload states the kind of payload it simulates, and
+    // that is tested where the rule is: `tcslib_protocol::sim_config`'s
+    // `the_two_files_cannot_disagree_about_the_kind`.
 
     /// Every shipped set has to describe payloads the simulator can simulate,
     /// and its two files have to agree with each other.
@@ -2727,7 +2735,8 @@ mod tests {
         )
         .expect("the simulator file reads");
         simulate_for(&mut sim_file, &["thermostat"]);
-        let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        let graph =
+            tcslib_protocol::graph::Graph::load(&payload_path).expect("reads");
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
 
@@ -2773,7 +2782,8 @@ mod tests {
             root.join("examples/thermostat/thermostat-sim.yaml"),
         )
         .expect("the simulator file reads");
-        let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        let graph =
+            tcslib_protocol::graph::Graph::load(&payload_path).expect("reads");
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
         let (attached, _) =
@@ -2819,7 +2829,7 @@ mod tests {
     /// # Arguments
     ///
     /// * `graph` - The thermostat example's graph.
-    fn with_a_backstop(graph: &mut tcslibgs::graph::Graph) {
+    fn with_a_backstop(graph: &mut tcslib_protocol::graph::Graph) {
         let mut node = graph
             .nodes
             .iter()
@@ -2832,8 +2842,8 @@ mod tests {
         for link in &mut graph.links {
             if link.to.each().contains(&"thermostat") {
                 let mut also = link.clone();
-                also.to = tcslibgs::graph::Destinations::of(vec![
-                    "backstop".to_string()
+                also.to = tcslib_protocol::graph::Destinations::of(vec![
+                    "backstop".to_string(),
                 ]);
                 added.push(also);
             }
@@ -2842,11 +2852,11 @@ mod tests {
             {
                 let mut taken = link.clone();
                 taken.from = link.from.replacen("thermostat", "backstop", 1);
-                taken.to = tcslibgs::graph::Destinations::of(vec![
+                taken.to = tcslib_protocol::graph::Destinations::of(vec![
                     "gpio-out-tmass2".to_string(),
                 ]);
                 added.push(taken);
-                link.to = tcslibgs::graph::Destinations::of(
+                link.to = tcslib_protocol::graph::Destinations::of(
                     link.to
                         .each()
                         .into_iter()
@@ -2872,7 +2882,7 @@ mod tests {
         .expect("the simulator file reads");
         simulate_for(&mut sim_file, &["thermostat", "backstop"]);
         let mut graph =
-            tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+            tcslib_protocol::graph::Graph::load(&payload_path).expect("reads");
         with_a_backstop(&mut graph);
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
@@ -2905,7 +2915,7 @@ mod tests {
         .expect("the simulator file reads");
         simulate_for(&mut sim_file, &["thermostat", "backstop"]);
         let mut graph =
-            tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+            tcslib_protocol::graph::Graph::load(&payload_path).expect("reads");
         with_a_backstop(&mut graph);
         // The backstop driving the first heater too.
         let mut also = graph
@@ -2917,8 +2927,9 @@ mod tests {
             })
             .cloned()
             .expect("the backstop drives gpio-out-tmass2");
-        also.to =
-            tcslibgs::graph::Destinations::of(vec!["gpio-out-tmass1".into()]);
+        also.to = tcslib_protocol::graph::Destinations::of(vec![
+            "gpio-out-tmass1".into(),
+        ]);
         graph.links.push(also);
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
@@ -2984,7 +2995,7 @@ mod tests {
         seconds: f64,
         enabled: [bool; 2],
     ) -> ThermostatRun {
-        use tcslibgs::graph::simulated::thermostat_of;
+        use tcslib_protocol::graph::simulated::thermostat_of;
 
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let payload_path = root.join("examples/thermostat/thermostat.ytcs");
@@ -2993,7 +3004,8 @@ mod tests {
         )
         .expect("the simulator file reads");
         sim_file.tcssim.as_mut().expect("a tcssim section").seed = Some(seed);
-        let graph = tcslibgs::graph::Graph::load(&payload_path).expect("reads");
+        let graph =
+            tcslib_protocol::graph::Graph::load(&payload_path).expect("reads");
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
         let (attached, _) =
@@ -3399,7 +3411,7 @@ mod tests {
 
         let first = handler("DH0");
         let mut second = handler("DH0");
-        second.name = tcslibgs::DHName::new("DH1");
+        second.name = tcslib_protocol::DHName::new("DH1");
         let settings = sim(1000, 1000, 12);
 
         let ui = MainWindow::new().unwrap();
@@ -3432,9 +3444,9 @@ mod tests {
     /// that payload.
     ///
     /// Everything up to the window is checked elsewhere -- the text itself by
-    /// `tcslibgs::payload_parameters`, and that a panel carries it by the
-    /// model -- and none of that puts anything on screen if the button is not
-    /// wired to the popup or the popup not to the text. This presses the
+    /// `tcslib_protocol::payload_parameters`, and that a panel carries it by
+    /// the model -- and none of that puts anything on screen if the button is
+    /// not wired to the popup or the popup not to the text. This presses the
     /// button and reads what the window then laid out.
     ///
     /// Not a test of its own, for the reason given above: one test per binary

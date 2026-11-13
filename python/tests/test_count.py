@@ -1,5 +1,5 @@
 """The count a string or bytes is sent the ground after, as
-``tcslibgs::link_type``'s tests hold the Rust to: the same bytes, both
+``tcslib_protocol::link_type``'s tests hold the Rust to: the same bytes, both
 ways."""
 
 import sys

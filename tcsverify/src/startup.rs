@@ -109,7 +109,7 @@ mod tests {
     use super::*;
     use crate::Finding;
     use std::path::PathBuf;
-    use tcslibgs::graph::check::Severity;
+    use tcslib_protocol::graph::check::Severity;
 
     /// Makes a finding of "wrong" at line 1 of a file.
     ///

@@ -15,7 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
 tcslib-moc = { path = "../tcslib-moc" }
-tcslibgs = { path = "../tcslibgs" }
+tcslib-protocol = { path = "../tcslib-protocol" }
 
 [dev-dependencies]
 tempfile = "3"

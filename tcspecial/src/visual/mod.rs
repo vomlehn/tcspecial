@@ -36,7 +36,7 @@ use tcsdiagram::look::{self, ground_of};
 use tcsdiagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
 use tcsdiagram::style;
 use tcsdiagram::view::{self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet};
-use tcslibgs::graph::{Destination, Graph};
+use tcslib_protocol::graph::{Destination, Graph};
 
 use crate::runtime;
 
@@ -189,7 +189,7 @@ fn lines_of(graph: &Graph) -> Vec<Line> {
 ///
 /// The exit status: the vehicle's, or 1 if the window or the vehicle's
 /// thread cannot be started.
-pub fn run(path: &str, mode: tcslibgs::simulate::Mode) -> i32 {
+pub fn run(path: &str, mode: tcslib_protocol::simulate::Mode) -> i32 {
     // Read again rather than handed over: the vehicle reads its own copy,
     // and checked it before this was called.
     let graph = match Graph::load(path) {
@@ -625,11 +625,11 @@ fn draw_physics(
     let sim = std::env::var("PAYLOAD_SIM_YAML")
         .ok()
         .filter(|named| !named.is_empty())
-        .or_else(|| tcslibgs::config::sim_path_beside(path));
+        .or_else(|| tcslib_protocol::config::sim_path_beside(path));
     let Some(sim) = sim else {
         return;
     };
-    let file = match tcslibgs::sim_config::SimConfigFile::load(&sim) {
+    let file = match tcslib_protocol::sim_config::SimConfigFile::load(&sim) {
         Ok(file) => file,
         Err(why) => {
             eprintln!(

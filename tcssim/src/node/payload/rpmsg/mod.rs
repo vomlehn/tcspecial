@@ -121,7 +121,7 @@ mod tests {
     use std::fs::OpenOptions;
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslibgs::Faults;
+    use tcslib_protocol::Faults;
 
     /// Configures a channel the handler would open at a path, sending
     /// eight-byte messages.

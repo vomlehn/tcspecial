@@ -1,6 +1,6 @@
 //! The sun: one in sunlight and nought in shadow, through an orbit.
 //!
-//! Its terminal is `tcslibgs::node::physics::sun`'s: `light`, a ratio.
+//! Its terminal is `tcslib_protocol::node::physics::sun`'s: `light`, a ratio.
 //!
 //! The light changes all at once, twice an orbit, and between the two it
 //! does not change at all. So the sun is a component of events: it knows when
@@ -8,12 +8,12 @@
 //! changes when the world reaches it. Nothing is stepped across, and the
 //! moment of each change is exact however seldom the world is asked about.
 
-use tcslibgs::node::physics::sun::Resolved;
+use tcslib_protocol::node::physics::sun::Resolved;
 
 use super::component::Component;
 
-/// Its terminal's place, in `tcslibgs::node::physics::sun::TERMINALS`'s order,
-/// which a test holds this to.
+/// Its terminal's place, in `tcslib_protocol::node::physics::sun::TERMINALS`'s
+/// order, which a test holds this to.
 const LIGHT: usize = 0;
 
 /// The sun of the world.
@@ -80,7 +80,7 @@ impl Component for Sun {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslibgs::node::physics::sun::TERMINALS;
+    use tcslib_protocol::node::physics::sun::TERMINALS;
 
     /// The place here is the type's.
     #[test]

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslibgs/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
     <!-- Stage 8 of "Building a Vehicle" (docs/building-a-vehicle.rst): a
          log aboard. The science subsystem keeps what it measures in a log
          node, for when the link is down: this file includes

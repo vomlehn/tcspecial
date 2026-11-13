@@ -20,7 +20,7 @@ What there is, in the order a reader meets it:
     The flight software. It serves the payloads its configuration file
     describes, takes commands from the ground, and sends beacons.
 
-``tcslibgs``
+``tcslib-protocol``
     What both ends share: the configuration file formats and the rules about
     them, the command and telemetry messages, and the digest each end says it
     read. Every rule in this document is stated there once.
@@ -343,12 +343,12 @@ link
 
     Which sink a line arrives at is the stream's own answer -- what leaves by
     ``world-out`` arrives at a ``world-in`` and nowhere else -- so a line to a
-    name the node lists under its other sink is refused as the backwards line
-    it is. ``tcslibgs::graph::mirror`` matches every line to its name as the
+    name the node lists under its other sink is refused as the backwards line it
+    is. ``tcslib_protocol::graph::mirror`` matches every line to its name as the
     configuration is read and then sets the names aside: the graph the vehicle
     flies is the sink each line arrives at, and for a vote the input, and
-    nothing aboard reads the names. The editor keeps them, and writes them
-    back as they were.
+    nothing aboard reads the names. The editor keeps them, and writes them back
+    as they were.
 
     In memory they are still a list, because every rule about a link is about
     both of its ends and a list is what a rule can be written against.
@@ -378,8 +378,8 @@ working panes of the editor:
     something aboard.
 
 Which section a node belongs in is its type's own answer, and there is one
-statement of it: ``tcslibgs::graph::section_of``. The editor's panes read it
-and so does the file reader, so a file and a drawing cannot come to disagree
+statement of it: ``tcslib_protocol::graph::section_of``. The editor's panes read
+it and so does the file reader, so a file and a drawing cannot come to disagree
 about what a node is.
 
 Within a section the nodes are grouped by type, and a node says no type of its
@@ -428,7 +428,7 @@ Requirement
     the editor's positions as ``name:`` entries -- is refused as it is read,
     in either spelling, naming the line of the first such thing and showing
     how it is written now. ``tools/convert-format.py`` rewrites such a file,
-    keeping its comments. The refusal is ``tcslibgs::graph::reshaped``'s.
+    keeping its comments. The refusal is ``tcslib_protocol::graph::reshaped``'s.
 
 Requirement
     A type written twice in one section, a type with no nodes under it, and a
@@ -611,7 +611,7 @@ Typed links
    ``types.xtce``, the Rust generated from it, the unit table generated
    from it, and its place in the interface digest; and every terminal's
    type, stated as `Every terminal carries one type`_ says, with each link
-   checked at both ends -- ``tcslibgs::graph::link_types`` -- and a
+   checked at both ends -- ``tcslib_protocol::graph::link_types`` -- and a
    device's reading laid out as its type's own as it is read; and every
    datum checked, as it is delivered, against the type the node it reaches
    takes (`Type and encoding`_); a thermostat's decision sent as its
@@ -645,8 +645,8 @@ Types
 
 Requirement
     Every type a link can carry is stated once, in
-    ``tcslibgs/xtce/types.xtce``, and the Rust that holds and checks a datum
-    of each is what tcs-xtce generates from it, committed beside the code
+    ``tcslib-protocol/xtce/types.xtce``, and the Rust that holds and checks a
+    datum of each is what tcs-xtce generates from it, committed beside the code
     generated from ``link.xtce``. No node type has a document of types of its
     own: what any terminal carries is one of these, or built from them.
 
@@ -672,8 +672,8 @@ Bounded strings and bounded bytes
 
 Requirement
     ``types.xtce`` is the one table of units: the list in
-    ``tcslibgs/src/unit.rs`` -- each unit's symbol, its name and its step --
-    is generated from it rather than written beside it. Adding a unit is
+    ``tcslib-protocol/src/unit.rs`` -- each unit's symbol, its name and its step
+    -- is generated from it rather than written beside it. Adding a unit is
     adding a type to ``types.xtce``.
 
 Requirement
@@ -915,7 +915,7 @@ Requirement
     named for the node, of the type its ``world-out`` sends, in a container
     of its own, ``<node>_packet``. The types it uses are copied into it from
     ``types.xtce``, a structure being an aggregate of them, so that a ground
-    station is given one file. ``tcslibgs::graph::own_xtce`` writes it.
+    station is given one file. ``tcslib_protocol::graph::own_xtce`` writes it.
 
 Requirement
     Each attribute a command binding sets is a command,
@@ -934,21 +934,21 @@ Requirement
     station's to add.
 
 Requirement
-    A string or bytes, whose type gives it no width, is sent the ground
-    after a count of its bytes, so that it reads the same however it is
-    framed (``tcslibgs::link_type::Count``). Where the ground decodes what it
-    is sent by XTCE -- under Yamcs -- the count is XTCE's, 32 bits, as
-    ``types.xtce`` states it and the document copies: a string's own
-    leading size, and ``bytes_length`` before bytes. Everywhere else -- over
-    a radio, ``payload_telemetry``, to the F´ bridge, on a cFS bus -- it is
-    in groups of seven bits, least significant first, each in a byte whose
-    top bit says another follows (unsigned LEB128), in as few bytes as hold
-    it: one byte for a datum below 128 bytes, two for any there is. A count
-    in more bytes than it needs, or that does not say how many bytes follow
-    it, is refused. A datum of a type with a width of its own is sent with
-    no count, and between nodes nothing is counted. Ground programs that
-    read through ``tcslib_moc::gateway::GatewayReceiver`` are given each datum
-    without its count; Python reading a link itself takes it off with
+    A string or bytes, whose type gives it no width, is sent the ground after a
+    count of its bytes, so that it reads the same however it is framed
+    (``tcslib_protocol::link_type::Count``). Where the ground decodes what it is
+    sent by XTCE -- under Yamcs -- the count is XTCE's, 32 bits, as
+    ``types.xtce`` states it and the document copies: a string's own leading
+    size, and ``bytes_length`` before bytes. Everywhere else -- over a radio,
+    ``payload_telemetry``, to the F´ bridge, on a cFS bus -- it is in groups of
+    seven bits, least significant first, each in a byte whose top bit says
+    another follows (unsigned LEB128), in as few bytes as hold it: one byte for
+    a datum below 128 bytes, two for any there is. A count in more bytes than it
+    needs, or that does not say how many bytes follow it, is refused. A datum of
+    a type with a width of its own is sent with no count, and between nodes
+    nothing is counted. Ground programs that read through
+    ``tcslib_moc::gateway::GatewayReceiver`` are given each datum without its
+    count; Python reading a link itself takes it off with
     ``python/tcslibgs/count.py``.
 
 Requirement
@@ -1062,7 +1062,7 @@ defensible answer, so it has one.
 ``restart_arm_valid`` is the third that may be left out: how long a
 RESTART_ARM licenses a RESTART for, as a length of time -- ``20 min``,
 ``90 s``. Absent is twenty minutes,
-``tcslibgs::commands::RESTART_ARM_VALID_DEFAULT``, the length an arm had
+``tcslib_protocol::commands::RESTART_ARM_VALID_DEFAULT``, the length an arm had
 before it could be configured: long enough to arm, look at what the vehicle is
 doing and decide over a link with minutes of latency, short enough that an arm
 left behind by a session that ended does not stand ready for the next RESTART
@@ -1177,23 +1177,23 @@ winner decided by the order the files happened to be read in.
 Gateways: what the vehicle answers to
 -------------------------------------
 
-**Specified and built.** ``tcspecial.gateway`` is read
-and required, and ``radio``, ``cfs`` and ``fprime`` are all accepted --
-``tcslibgs::gateway`` is the one place that says which kinds are built, which
-node type is which kind's, which are on a bus, and what each calls its far
+**Specified and built.** ``tcspecial.gateway`` is read and required, and
+``radio``, ``cfs`` and ``fprime`` are all accepted --
+``tcslib_protocol::gateway`` is the one place that says which kinds are built,
+which node type is which kind's, which are on a bus, and what each calls its far
 end. The radio is the ``gateway_radio`` node; the F´ gateway is the
 ``gateway_fprime`` node, opened, counted and driven as the radio's is, and
 ``examples/fprime`` flies it. cFS is the ``gateway_cfs`` node, with every link
 of the vehicle carried over one SBN peer (``tcspecial::runtime::bus``, on
-``tcslibgs::sbn`` and ``tcslibgs::cfs``), and ``examples/cfs`` flies it
-against a test playing the cFS end. The bridge at the F´ end is built too:
-its F´ model is written from the configuration by ``tcsverify
---fprime-model``, and the ``TcsBridge`` component in ``fprime/`` is tested in
-an F´ deployment against tcspecial and tcssim, data both ways, the node
-commands and the restart -- see `F´: gateway_fprime`_. The ground's end of
-the bus is built too: tcssim simulates the cFS end, and tcslib's SBN
-transport, ``tcslib_moc::bus``, lets tcsmoc and every station on tcslib command
-a vehicle that answers to cFS through it (see `What crosses the bus`_).
+``tcslib_protocol::sbn`` and ``tcslib_protocol::cfs``), and ``examples/cfs``
+flies it against a test playing the cFS end. The bridge at the F´ end is built
+too: its F´ model is written from the configuration by ``tcsverify
+--fprime-model``, and the ``TcsBridge`` component in ``fprime/`` is tested in an
+F´ deployment against tcspecial and tcssim, data both ways, the node commands
+and the restart -- see `F´: gateway_fprime`_. The ground's end of the bus is
+built too: tcssim simulates the cFS end, and tcslib's SBN transport,
+``tcslib_moc::bus``, lets tcsmoc and every station on tcslib command a vehicle
+that answers to cFS through it (see `What crosses the bus`_).
 
 The gateway nodes are written in the ``gateways`` section, linked through
 ``moc-in`` and ``moc-out``, with ``tee-gateway``, ``null-gateway`` and
@@ -1216,7 +1216,7 @@ Requirement
     write instead. Refused rather than read as the new word, because a reader
     that took both would leave every file free to say either for good, which
     is the one word for two things the rename was for. The list is
-    ``tcslibgs::graph::renamed``'s, and it is the one statement of it.
+    ``tcslib_protocol::graph::renamed``'s, and it is the one statement of it.
 
 tcspecial was written to answer to the ground. What it does well -- reach a
 payload over any of the interfaces in `Payloads`_ from a configuration
@@ -1322,7 +1322,7 @@ Requirement
 
 Every base counts on by the same rule, the one ``payload_telemetry`` has now:
 a base plus the node's own id. A message ID is a number, and counts as a port
-does; ``tcslibgs::graph::telemetry`` stays the one place that counts, for
+does; ``tcslib_protocol::graph::telemetry`` stays the one place that counts, for
 ports and message IDs alike.
 
 The radio: ``gateway_radio``
@@ -1399,23 +1399,23 @@ What SBN is, on the wire
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 Every SBN message over UDP is one datagram: a 13-byte header -- the length of
-what follows as four bytes, the message type as one, the sender's processor
-ID as four and its spacecraft ID as four, all most significant byte first --
-and then the message. The types are a subscription (1), an unsubscription
-(2), an application's message (3, a cFS packet, carried whole), and SBN's
-protocol version (4, one byte); the UDP module adds a heartbeat (``0xA0``), an
+what follows as four bytes, the message type as one, the sender's processor ID
+as four and its spacecraft ID as four, all most significant byte first -- and
+then the message. The types are a subscription (1), an unsubscription (2), an
+application's message (3, a cFS packet, carried whole), and SBN's protocol
+version (4, one byte); the UDP module adds a heartbeat (``0xA0``), an
 announcement (``0xA1``) and a disconnect (``0xA2``) of its own, each carrying
-nothing. A subscription and an unsubscription are laid out alike: the
-48-byte ident, a count of two bytes, and for each message ID four bytes of it
-and a byte each of priority and reliability, which tcspecial sends as nought.
-(Each of those numbers, and the layout, was read again from SBN v7.0.1's
-own source, ``sbn_types.h``, ``sbn_interfaces.h``, ``sbn_subs.c`` and the UDP
-module's ``sbn_udp_if.h`` and ``sbn_udp_if.c``, on 31 October 2026, after the
-gateway was built, and each is what was built.) ``tcslibgs::sbn`` is the one
-statement of all of it. A peer is connected by the first datagram that arrives from it, sends
-a heartbeat when it has sent nothing for five seconds, and is disconnected by
-ten seconds of silence. Each of those numbers is compiled into SBN and none
-can be configured from this side.
+nothing. A subscription and an unsubscription are laid out alike: the 48-byte
+ident, a count of two bytes, and for each message ID four bytes of it and a byte
+each of priority and reliability, which tcspecial sends as nought. (Each of
+those numbers, and the layout, was read again from SBN v7.0.1's own source,
+``sbn_types.h``, ``sbn_interfaces.h``, ``sbn_subs.c`` and the UDP module's
+``sbn_udp_if.h`` and ``sbn_udp_if.c``, on 31 October 2026, after the gateway was
+built, and each is what was built.) ``tcslib_protocol::sbn`` is the one
+statement of all of it. A peer is connected by the first datagram that arrives
+from it, sends a heartbeat when it has sent nothing for five seconds, and is
+disconnected by ten seconds of silence. Each of those numbers is compiled into
+SBN and none can be configured from this side.
 
 Two facts in that shape decide requirements here:
 
@@ -1495,13 +1495,13 @@ What crosses the bus
 Requirement
     What crosses the bus is a cFS packet: the CCSDS primary header, cFS's
     extended header, and a secondary header -- for a command, a function code
-    and a checksum; for telemetry, a time -- and then exactly what the UDP
-    link carries in a datagram. A command's function code is its tcspecial
-    command code, and its data is the command as tcspecial already encodes
-    it; a response, a beacon and a datum are the data of a telemetry packet.
-    Each command, response and the beacon is then still stated once, in
-    ``tcslibgs``, and the gateway changes how it is carried and nothing about
-    what it says.
+    and a checksum; for telemetry, a time -- and then exactly what the UDP link
+    carries in a datagram. A command's function code is its tcspecial command
+    code, and its data is the command as tcspecial already encodes it; a
+    response, a beacon and a datum are the data of a telemetry packet. Each
+    command, response and the beacon is then still stated once, in
+    ``tcslib-protocol``, and the gateway changes how it is carried and nothing
+    about what it says.
 
 Requirement
     The extended header is the one supported, as a cFS built with
@@ -1522,10 +1522,9 @@ header's EDS version as cFE's default, 1, and its system ID as
 ``sbn.spacecraft_id``, cut to sixteen bits as cFE cuts it.
 
 Requirement
-    A cFS function code is seven bits, so every tcspecial command code is
-    below 128. ``tcslibgs`` holds the codes to that where they are listed,
-    in a test, rather than leaving it to be found by the first code that
-    is not.
+    A cFS function code is seven bits, so every tcspecial command code is below
+    128. ``tcslib-protocol`` holds the codes to that where they are listed, in a
+    test, rather than leaving it to be found by the first code that is not.
 
 Requirement
     A command's checksum is checked as it arrives, as cFS's own applications
@@ -1584,34 +1583,34 @@ Requirement
     ours.
 
     **Built** (2026-10-31). ``tcslib_moc::bus`` holds both ground-side ends.
-    ``SimulatedCfs`` is the cFS end as tcssim runs it: it binds ``sbn.peer``,
-    is processor ``sbn.peer_processor_id`` to the vehicle, subscribes to
-    every message ID the vehicle publishes, and is a bus to the ground stations
-    that join it -- what the vehicle publishes goes to each station that
-    subscribed to it, and what a station publishes goes to the vehicle where
-    the vehicle subscribed to it. Like SBN on a cFS it never speaks first.
-    ``Ground`` is a station's one peer of it, kept on a thread of its own,
-    which announces, sends heartbeats and refuses a far end of another
-    protocol version or ident as the vehicle does, and turns the bus back
-    into the loopback UDP links a station already speaks: tcslib's
-    ``command_links_of``, ``beacon::open`` and ``GatewayReceiver::open`` use
-    it themselves, so tcsmoc, the C/C++ library and every other station are
-    written the same for a radio and a bus, and the bus is spoken in one
-    place, from ``tcslibgs::sbn`` and ``tcslibgs::cfs``. A station is
-    processor ``tcslibgs::sbn::ground_processor_id``, one more than the
-    larger of the two the configuration states. ``tcspecial/tests/cfs.rs``
-    still plays the cFS end byte by byte; ``tcspecial/tests/cfs_ground.rs``
-    commands the vehicle flying ``examples/cfs`` through the simulated cFS
-    end from tcslib, and ``make run-cfs`` in ``examples/`` runs tcsmoc on it.
+    ``SimulatedCfs`` is the cFS end as tcssim runs it: it binds ``sbn.peer``, is
+    processor ``sbn.peer_processor_id`` to the vehicle, subscribes to every
+    message ID the vehicle publishes, and is a bus to the ground stations that
+    join it -- what the vehicle publishes goes to each station that subscribed
+    to it, and what a station publishes goes to the vehicle where the vehicle
+    subscribed to it. Like SBN on a cFS it never speaks first. ``Ground`` is a
+    station's one peer of it, kept on a thread of its own, which announces,
+    sends heartbeats and refuses a far end of another protocol version or ident
+    as the vehicle does, and turns the bus back into the loopback UDP links a
+    station already speaks: tcslib's ``command_links_of``, ``beacon::open`` and
+    ``GatewayReceiver::open`` use it themselves, so tcsmoc, the C/C++ library
+    and every other station are written the same for a radio and a bus, and the
+    bus is spoken in one place, from ``tcslib_protocol::sbn`` and
+    ``tcslib_protocol::cfs``. A station is processor
+    ``tcslib_protocol::sbn::ground_processor_id``, one more than the larger of
+    the two the configuration states. ``tcspecial/tests/cfs.rs`` still plays the
+    cFS end byte by byte; ``tcspecial/tests/cfs_ground.rs`` commands the vehicle
+    flying ``examples/cfs`` through the simulated cFS end from tcslib, and
+    ``make run-cfs`` in ``examples/`` runs tcsmoc on it.
 
     tcssim simulates the cFS end of every configuration that answers to cFS,
     whenever it runs, and so is not run beside a real cFS: the far end is one
-    socket, and two programs cannot both be it. Whether it is simulated is
-    not written in the simulator file, because nothing would read it but
-    tcssim, and a run against a real cFS is a run without tcssim. A
-    ``gateway_cfs`` node, like the other gateway nodes, has no simulated
-    device of its own in tcssim: it is the far end that is simulated, not the
-    node, and the mode does not count it (``tcslibgs::simulate::counted``).
+    socket, and two programs cannot both be it. Whether it is simulated is not
+    written in the simulator file, because nothing would read it but tcssim, and
+    a run against a real cFS is a run without tcssim. A ``gateway_cfs`` node,
+    like the other gateway nodes, has no simulated device of its own in tcssim:
+    it is the far end that is simulated, not the node, and the mode does not
+    count it (``tcslib_protocol::simulate::counted``).
 
     Only the simulated cFS end takes a ground station as a peer. SBN on a real
     cFS passes nothing from one peer on to another: each peer's pipe is made
@@ -1753,16 +1752,16 @@ Requirement
 **Built.** What follows is how, and the choices the requirements left open,
 each made for reliability first.
 
-The model is ``tcslibgs::graph::fprime``'s, and nothing else says any of it.
-It counts from ``tcslibgs::graph::telemetry::of``, the function that gives
-each source its port, so a channel's ID and its port are the one device id
+The model is ``tcslib_protocol::graph::fprime``'s, and nothing else says any of
+it. It counts from ``tcslib_protocol::graph::telemetry::of``, the function that
+gives each source its port, so a channel's ID and its port are the one device id
 counted on from two bases. Each source drawn into the node is the channel at
-``fprime_id_base`` plus its device id, named after it; the bridge's own
-channels -- the beacon's stage and restart flag, the two halves of the match,
-the four counts of what has arrived, how many data were longer than a channel
-holds, and how many from a node of values were not one -- follow every device
-id the configuration has, so that
-drawing a new link never moves one. The component instance's base ID is
+``fprime_id_base`` plus its device id, named after it; the bridge's own channels
+-- the beacon's stage and restart flag, the two halves of the match, the four
+counts of what has arrived, how many data were longer than a channel holds, and
+how many from a node of values were not one -- follow every device id the
+configuration has, so that drawing a new link never moves one. The component
+instance's base ID is
 ``fprime_id_base``, so an ID within the component is the device id itself;
 the deployment gives it as ``base id Tcs.TcsBridge.ID_BASE``, a constant of
 the model, and the bridge refuses to run under any other.
@@ -1840,33 +1839,31 @@ configuration leaves a bridge built for this one with a vehicle it will not
 match, saying ``ConfigurationDiffers``: its model is this configuration's,
 and a bridge for the other is built from that one's.
 
-A source's channel is of the type the configuration says its data are, and
-the configuration says one thing of a datum's type: what a compute node
-sends, by its function, as
-``tcslibgs::node::vehicle::compute::node_produces`` says. A node whose
-function makes a value -- ``to_kelvin``, ``to_value``, ``vote``,
-``process`` -- sends values, four bytes of a signed count of its unit's steps
-(see `Compute elements`_), in the unit ``tcslibgs::graph::units`` gives it,
-which tcsmoc asks too. Such a source's channel is an ``F64`` in that unit,
-formatted with its symbol so that F´'s ground system shows ``293.15 K``, read
-by tcslib-c's ``tcs_value_in`` -- ``from_value``, the one statement of what a
-value is -- and a datum from it that is not a value is
-written to no channel, counted in ``DataNotValues`` and said in an event:
-four bytes made a number whatever they held would be a temperature nobody
-measured. A source that states it sends a ``boolean`` -- a ``thermostat``
+A source's channel is of the type the configuration says its data are, and the
+configuration says one thing of a datum's type: what a compute node sends, by
+its function, as ``tcslib_protocol::node::vehicle::compute::node_produces``
+says. A node whose function makes a value -- ``to_kelvin``, ``to_value``,
+``vote``, ``process`` -- sends values, four bytes of a signed count of its
+unit's steps (see `Compute elements`_), in the unit
+``tcslib_protocol::graph::units`` gives it, which tcsmoc asks too. Such a
+source's channel is an ``F64`` in that unit, formatted with its symbol so that
+F´'s ground system shows ``293.15 K``, read by tcslib-c's ``tcs_value_in`` --
+``from_value``, the one statement of what a value is -- and a datum from it that
+is not a value is written to no channel, counted in ``DataNotValues`` and said
+in an event: four bytes made a number whatever they held would be a temperature
+nobody measured. A source that states it sends a ``boolean`` -- a ``thermostat``
 whose ``type-out`` is one -- sends decisions, the one byte 1 or 0, and its
 channel is a ``bool``, true for on, read by ``tcs_decision_on`` --
 ``from_decision``, the one statement of what a decision is -- and a datum from
-it that is not one is written to no channel, counted in ``DataNotDecisions``
-and said in an event. A source that states a whole number -- a sensor's
-reading, what a set of lines is, a thermostat's decision sent as what a
-switch takes -- has a channel of that type, ``U8`` to ``I64``, read by
-``tcs_unsigned_in`` or ``tcs_signed_in``; a datum from it that is not one of
-its type's width is written to no channel, counted in ``DataNotWholes`` and
-said in an event. Every other source's channel is ``Tcs.Datum``: its length,
-and its first 64 bytes. A longer one goes as its
-first 64 bytes with its whole length, is counted, and is said in an event,
-so that nothing is cut short quietly.
+it that is not one is written to no channel, counted in ``DataNotDecisions`` and
+said in an event. A source that states a whole number -- a sensor's reading,
+what a set of lines is, a thermostat's decision sent as what a switch takes --
+has a channel of that type, ``U8`` to ``I64``, read by ``tcs_unsigned_in`` or
+``tcs_signed_in``; a datum from it that is not one of its type's width is
+written to no channel, counted in ``DataNotWholes`` and said in an event. Every
+other source's channel is ``Tcs.Datum``: its length, and its first 64 bytes. A
+longer one goes as its first 64 bytes with its whole length, is counted, and is
+said in an event, so that nothing is cut short quietly.
 
 A thermostat sends only a change of decision to anything but the lines it
 drives (see `Compute elements`_), so a decision's channel says what was last
@@ -1922,12 +1919,12 @@ What a device node says
 -----------------------
 
 A node of an interface type says where it is, what the link is set up as, and
-how it is read. The second of those -- a data rate, a bus address, a clock
-mode, a set of line numbers -- is written once, in ``tcslibgs``, per type:
-those rules are the ones that have been tested against real buses, and a
-second statement of them would be two statements of every rule drifting apart
-one flight at a time. A node's attributes are handed to those per-type rules,
-which refuse in the same words wherever the node is written.
+how it is read. The second of those -- a data rate, a bus address, a clock mode,
+a set of line numbers -- is written once, in ``tcslib-protocol``, per type:
+those rules are the ones that have been tested against real buses, and a second
+statement of them would be two statements of every rule drifting apart one
+flight at a time. A node's attributes are handed to those per-type rules, which
+refuse in the same words wherever the node is written.
 
 What locates a node depends on its type:
 
@@ -2011,23 +2008,23 @@ Requirement
     A gateway node is the ground's end of the vehicle's data, and states where
     the ground is as ``ground_base``, ``address:port``. What each node drawn
     into it produces is sent by tcspecial as UDP datagrams to that address, at
-    that port plus the source node's device id -- its position among the
-    names of all the configuration's nodes, in the canonical order (see
-    `What Each End Read`_). So each source arrives
-    on a port of its own and the ground tells them apart by the port, and the
-    vehicle sends from the first reading without being spoken to.
-    ``tcslibgs::graph::telemetry`` is the one place that counts the ports, for
-    both ends; two sources landing on one port are refused.
+    that port plus the source node's device id -- its position among the names
+    of all the configuration's nodes, in the canonical order (see `What Each End
+    Read`_). So each source arrives on a port of its own and the ground tells
+    them apart by the port, and the vehicle sends from the first reading without
+    being spoken to. ``tcslib_protocol::graph::telemetry`` is the one place that
+    counts the ports, for both ends; two sources landing on one port are
+    refused.
 
 Requirement
     The ground and the vehicle are held to one configuration. Both digest the
     configuration files they read with one function,
-    ``tcslibgs::config_digest::digest_of_graph``: an MD5 over everything the
-    vehicle and the ground act on -- the ``tcspecial`` section, the payload
-    groups, the nodes with their attributes, the links and the command
-    bindings -- across every included file, in the canonical order, the same
-    for either spelling and whatever order the files wrote, and not the
-    editor's layout or the description. tcspecial says its digest as it starts and sends it in a
+    ``tcslib_protocol::config_digest::digest_of_graph``: an MD5 over everything
+    the vehicle and the ground act on -- the ``tcspecial`` section, the payload
+    groups, the nodes with their attributes, the links and the command bindings
+    -- across every included file, in the canonical order, the same for either
+    spelling and whatever order the files wrote, and not the editor's layout or
+    the description. tcspecial says its digest as it starts and sends it in a
     beacon every ``beacon.default_interval``, from ``beacon.send`` to
     ``beacon.recv``. tcsmoc compares the digest in each beacon with the one it
     computed itself; when they differ it says so on the beacon line and the
@@ -2066,7 +2063,7 @@ Numbers, as a configuration writes them
 ---------------------------------------
 
 Every integer in every file this program reads has one grammar, in
-``tcslibgs::whole``: decimal, or hexadecimal with an ``0x`` prefix, with
+``tcslib_protocol::whole``: decimal, or hexadecimal with an ``0x`` prefix, with
 underscores anywhere among the digits. ``1000``, ``1_000``, ``0x3e8`` and
 ``0X3E8`` are one number written four ways, and the underscores carry no
 meaning beyond grouping digits for a reader.
@@ -2463,9 +2460,9 @@ Requirement
     that is not look the same from the ground. It comes up enabled, as every
     node does, and so it stays.
 
-What a ping and its answer say is ``tcslibgs::node::vehicle::ping``, which a
-ground station writes pings and reads answers with: the format is stated once,
-for both ends. The node is ``tcspecial::node::vehicle::ping``.
+What a ping and its answer say is ``tcslib_protocol::node::vehicle::ping``,
+which a ground station writes pings and reads answers with: the format is stated
+once, for both ends. The node is ``tcspecial::node::vehicle::ping``.
 
 Compute elements
 ----------------
@@ -2481,16 +2478,14 @@ not a conversion.
 
 A value has a unit -- a temperature in kelvin, a bus in volts, an altitude in
 metres -- and the unit is never on the link. The configuration says it, as it
-says which nodes send values at all: each node states the value type it
-sends and takes (see `Typed links`_) -- ``to_kelvin`` is in kelvin,
-``to_value`` and ``process`` state their ``type-out``, a ``vote`` what it
-``carries`` -- and nothing is worked out from what feeds a node.
-``tcslibgs::graph::units`` reads it, and everything that reads a value back
-asks it: the vehicle, decoding what
-arrives at a vote or a thermostat, and the ground, showing a reading with its
-unit. Not a byte is spent on it, and a link, a log or a configuration from
-before there were units reads the same, a kelvin being counted as it always
-was.
+says which nodes send values at all: each node states the value type it sends
+and takes (see `Typed links`_) -- ``to_kelvin`` is in kelvin, ``to_value`` and
+``process`` state their ``type-out``, a ``vote`` what it ``carries`` -- and
+nothing is worked out from what feeds a node. ``tcslib_protocol::graph::units``
+reads it, and everything that reads a value back asks it: the vehicle, decoding
+what arrives at a vote or a thermostat, and the ground, showing a reading with
+its unit. Not a byte is spent on it, and a link, a log or a configuration from
+before there were units reads the same, a kelvin being counted as it always was.
 
 Requirement
     Every node feeding a vote, a thermostat or a program sends values, and in
@@ -2501,7 +2496,7 @@ Requirement
 Requirement
     Each unit has a step, chosen to be finer than anything a part measures
     while leaving the range a vehicle needs, and the table of them is
-    ``tcslibgs::unit``, the one place it is stated:
+    ``tcslib_protocol::unit``, the one place it is stated:
 
     ============ ======= ============= ==================
     unit         symbol  step          range, either way
@@ -2550,17 +2545,17 @@ surviving: either is a thermostat acting confidently on a number nobody
 produced. A quantity that must carry more wants a unit with a coarser step,
 and that is a change to make deliberately.
 
-The same range holds a number a *file* states, and that is checked where a
-file is read: a setpoint of 3000 K is a thermostat whose readings can never
-reach it, so the heaters would be driven on and held there for the whole
-flight, and an offset of -2500 K is every reading of that part outside the
-range. A conversion's offset is checked against its own unit; a thermostat's
-setpoint and band against the unit of what it reads, which only the graph
-knows, so that is where it is checked. On a desk each is one line to change, which is the argument for the
-rule living with the other rules. The form of a value lives there too, in
-``tcslibgs``: the range and the representation are the same fact, and half of
-a fact in each crate is two places for it to drift. It is also one thing the
-vehicle writes and the ground reads back, so it belongs beside the protocol
+The same range holds a number a *file* states, and that is checked where a file
+is read: a setpoint of 3000 K is a thermostat whose readings can never reach it,
+so the heaters would be driven on and held there for the whole flight, and an
+offset of -2500 K is every reading of that part outside the range. A
+conversion's offset is checked against its own unit; a thermostat's setpoint and
+band against the unit of what it reads, which only the graph knows, so that is
+where it is checked. On a desk each is one line to change, which is the argument
+for the rule living with the other rules. The form of a value lives there too,
+in ``tcslib-protocol``: the range and the representation are the same fact, and
+half of a fact in each crate is two places for it to drift. It is also one thing
+the vehicle writes and the ground reads back, so it belongs beside the protocol
 the two already share -- a ground station that decodes a reading rather than
 showing four bytes of hexadecimal has it to hand.
 
@@ -2899,19 +2894,19 @@ the configuration nor the program.
 
 Where it all lives: ``tcsapp`` is the one statement of the protocol and holds
 both ends of it -- what the program itself holds, and the starting of one with
-the other end of each interface. ``tcslibgs::node::app`` is what a file may say
-and what is wrong with what it says, which is what the editor and ``tcsverify``
-read; it sits beside the two node families rather than in one of them, because
-the rule is one rule and the kind says which family a given app belongs to.
-``tcspecial::node::vehicle::app_payload_veh`` and its four neighbours are the
-flight side, two of them under ``tcspecial::node::payload`` because two of the
-kinds are payloads. And ``app_payload_veh``, ``app_gateway_veh``,
-``app_all_veh``, ``app_pl`` and ``app_all_pl`` are five programs of their own,
-built as crates and not installed: they are what the arrangement is tested with
--- three of them answer what arrives, one carries each stream through to the
-other interface, one reports without being asked, and a test that a packet comes
-back out of the interface it was *not* going to is how the streams are held
-apart.
+the other end of each interface. ``tcslib_protocol::node::app`` is what a file
+may say and what is wrong with what it says, which is what the editor and
+``tcsverify`` read; it sits beside the two node families rather than in one of
+them, because the rule is one rule and the kind says which family a given app
+belongs to. ``tcspecial::node::vehicle::app_payload_veh`` and its four
+neighbours are the flight side, two of them under ``tcspecial::node::payload``
+because two of the kinds are payloads. And ``app_payload_veh``,
+``app_gateway_veh``, ``app_all_veh``, ``app_pl`` and ``app_all_pl`` are five
+programs of their own, built as crates and not installed: they are what the
+arrangement is tested with -- three of them answer what arrives, one carries
+each stream through to the other interface, one reports without being asked, and
+a test that a packet comes back out of the interface it was *not* going to is
+how the streams are held apart.
 
 Which stream a datum is on
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2971,7 +2966,7 @@ arithmetic over the configuration and can be exercised with no vehicle present;
 the second is threads, descriptors and bytes.
 
 .. figure:: architecture.svg
-   :alt: The architecture. At startup tcslibgs::graph reads and
+   :alt: The architecture. At startup tcslib_protocol::graph reads and
          checks the file and four pieces that open nothing -- route, schedule,
          telemetry and parameters -- turn it into tables. Then system opens a
          port per node and holds them in a fabric. Four things run at once: the
@@ -2987,8 +2982,8 @@ the second is threads, descriptors and bytes.
 What the file becomes
 ~~~~~~~~~~~~~~~~~~~~~
 
-``tcslibgs::graph`` reads the file and checks it whole: a fault refuses the
-configuration rather than the node it is in, because a vehicle that started
+``tcslib_protocol::graph`` reads the file and checks it whole: a fault refuses
+the configuration rather than the node it is in, because a vehicle that started
 with one node missing would be a vehicle flying a configuration nobody wrote.
 What survives the check is turned into four tables, described under `Running a
 graph`_: ``route`` says where each node's output goes and which link fills each
@@ -3445,7 +3440,7 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     encoding, as ``types.xtce`` states it: a thermostat's setpoint is the
     value type its ``type-in`` is, four bytes of a count of the unit's
     steps, and not the text an operator typed
-    (``tcslibgs::graph::settings``). A ground station turns what is typed
+    (``tcslib_protocol::graph::settings``). A ground station turns what is typed
     into the type as it is typed -- tcsmoc does, and the C library's
     ``tcs_configuration_setting`` -- so text that is not a value of it is
     refused on the ground and never sent, and the vehicle holds the value
@@ -3457,9 +3452,9 @@ both ends read; what follows is what a vehicle made of nodes does with each.
     ``setpoint`` is one a log reads back.
 
     Each has a largest size: an attribute of 64 bytes, ``ATTRIBUTE_BYTES``, and
-    a value of 256, ``VALUE_BYTES``, both in ``tcslibgs::commands``. Fixed, so
-    that the vehicle reads a ``SET_NODE`` into room it holds and allocates
-    nothing to take one.
+    a value of 256, ``VALUE_BYTES``, both in ``tcslib_protocol::commands``.
+    Fixed, so that the vehicle reads a ``SET_NODE`` into room it holds and
+    allocates nothing to take one.
 
 Requirement
     Any node may be disabled, whatever its kind, but a ping node. A graph does
@@ -3586,14 +3581,14 @@ Requirement
     aboard to find out which word to change.
 
 Requirement
-    The answer to a ``SET_NODE`` carries why it was refused, as text of at
-    most ``REASON_BYTES``, 160, in ``tcslibgs::telemetry``: the attribute no
+    The answer to a ``SET_NODE`` carries why it was refused, as text of at most
+    ``REASON_BYTES``, 160, in ``tcslib_protocol::telemetry``: the attribute no
     binding names, with its spelling where that was what was wrong; what the
     node would not take; the id no node has. A longer reason is cut at a
-    character and ends ``...``, the whole of it being in the log. Held in
-    room of that size, so that the vehicle makes an answer without
-    allocating, as it reads a command. Empty for a ``SET_NODE`` that was
-    done, and read as empty from a vehicle that sends none.
+    character and ends ``...``, the whole of it being in the log. Held in room
+    of that size, so that the vehicle makes an answer without allocating, as it
+    reads a command. Empty for a ``SET_NODE`` that was done, and read as empty
+    from a vehicle that sends none.
 
 Requirement
     Nothing is half applied. The value is read and checked before anything
@@ -4106,10 +4101,10 @@ Requirement
     makes what the ground can change in flight something written down and
     checkable rather than whatever a computation happens to accept. The node
     must then accept the value, which is where a setpoint that is not of the
-    attribute's type, or a band of nought, is refused. Which attributes a
-    node takes, and as which type, is ``tcslibgs::graph::settings``'s, and a
-    binding naming one the node does not take is refused where the
-    configuration is read.
+    attribute's type, or a band of nought, is refused. Which attributes a node
+    takes, and as which type, is ``tcslib_protocol::graph::settings``'s, and a
+    binding naming one the node does not take is refused where the configuration
+    is read.
 
 Requirement
     A device accepts no settings. A bus address or a set of line numbers is
@@ -4325,14 +4320,14 @@ An included file is a part of the vehicle somebody else may own, and its
 ``exports`` are its edge: what of it the files around it are allowed to join.
 Stated in the file rather than worked out from the lines that happen to cross
 it, because an edge is something a reader of the file can check, and a page
-anything outside could reach into would have none -- one line drawn to the
-wrong node across it is a line nothing would question. The links are written as
-they always were, node to node, so nothing aboard reads the section and the
-flight software runs the same graph whether a file exports or not; the check is
-``tcslibgs::graph::Graph::check``'s, which tcspecial runs as it loads, so a
-configuration that breaks it is refused before it flies.
+anything outside could reach into would have none -- one line drawn to the wrong
+node across it is a line nothing would question. The links are written as they
+always were, node to node, so nothing aboard reads the section and the flight
+software runs the same graph whether a file exports or not; the check is
+``tcslib_protocol::graph::Graph::check``'s, which tcspecial runs as it loads, so
+a configuration that breaks it is refused before it flies.
 
-``tcslibgs::graph::Graph::load`` is the reader, and the Python ground
+``tcslib_protocol::graph::Graph::load`` is the reader, and the Python ground
 reader, ``python/tcslibgs/configuration.py``, follows includes by the same
 rules, so that the two count a node's device id among the same names.
 How tcsgui opens and writes an included file is in the `tcsgui design
@@ -4587,11 +4582,11 @@ Features
 
     * tcslib: ground software library providing simple integration with mission control software
 
-    * tcslibgs: software library containing the commands, the telemetry, and
-      the configuration languages -- what tcspecial and tcslib share, and what
-      the two GUIs share with them: every configuration file format is parsed
-      here, including the simulator's, and a time or a sample of a transfer is
-      formatted here so that both windows show it the same way
+    * tcslib-protocol: software library containing the commands, the telemetry,
+      and the configuration languages -- what tcspecial and tcslib share, and
+      what the two GUIs share with them: every configuration file format is
+      parsed here, including the simulator's, and a time or a sample of a
+      transfer is formatted here so that both windows show it the same way
 
     * the configuration: the nodes tcspecial serves, tcsmoc watches and
       commands, and tcssim simulates the payloads of -- one file, named on
@@ -4666,7 +4661,7 @@ systems as follows:
    +=======================+  :   +===========================+   +=============+
    ||  Ground Ops         ||  :   ||  Flight Software        ||   || Payload Bay||
    +=======================+  :   +===========================+   +=============+
-   |  +---------+          |  :   |  tcspecial (tcslibgs)     |   |             |
+   |  +---------+          |  :   |tcspecial (tcslib-protocol)|   |             |
    |  | Mission |          |  :   |  +---------------------+  |   |             |
    |  | Control |          |  :   |  | Command interpreter |  |   |             |
    |  | S/W     |          |  :   |  +---------------------+  |   |             |
@@ -4675,10 +4670,10 @@ systems as follows:
    |       |               |  :   |  | The graph           |  |   | +---------+ |
    |       v               |  :   |  |  gateway nodes      |  |   | |Payload 0| |
    |  +-----------------+  |  :   |  |  vehicle nodes:     |  |   | +---------+ |
-   |  | tcslib          |<------->|  |   compute, log,     |  |   | +---------+ |
+   |  | tcslib-moc      |<------->|  |   compute, log,     |  |   | +---------+ |
    |  | tcslib-c        |  |  :   |  |   tee, null, ping,  |  |   | |Payload 1| |
    |  | python/tcslib   |  |  :   |  |   apps              |  |   | +---------+ |
-   |  | (tcslibgs)      |  |  :   |  |  payload nodes  <------------->   .     | |
+   |  |(tcslib-protocol)|  |  :   |  |  payload nodes  <------------->   .     | |
    |  +-----------------+  |  :   |  +---------------------+  |   | +---------+ |
    |  |  configuration  |  |  :   |  |  configuration      |  |   | |Payload n| |
    |  +-----------------+  |  :   |  +---------------------+  |   | +---------+ |
@@ -4709,8 +4704,8 @@ where each datum goes. Every node runs in the one process, so a reading
 reaching two places is a link with two destinations rather than two programs
 talking to each other. See `The four concepts`_.
 
-The tcslibgs library contains definitions shared between the ground portion of the
-software, tcslib, and the space portion, tcspecial.
+The tcslib-protocol library contains definitions shared between the ground
+portion of the software, tcslib, and the space portion, tcspecial.
 
 Commands and Telemetry
 ======================
@@ -4890,17 +4885,16 @@ Beacon
 
 The beacon answers no command and has a form of its own: a line of text, six
 fields with a colon between each, and no newline at the end. Its layout is
-stated in XTCE in ``tcslibgs/xtce/beacon.xtce``, a document of its own:
-six string fields of UTF-8, each but the last ended by the
-termination character ``:`` (``0x3A``) and no longer than its field can be,
-and the last 32 characters that end the datagram. It is packed and
-unpacked by the code tcs-xtce generates from that document, in Rust without
-allocating and in Python; what each field must say -- the name, decimal
-digits, lower-case hex -- and turning the text into numbers and digests and
-back is ``tcslibgs::beacon``'s, which tcspecial and ``tcslib-moc`` use, and
-``python/tcslibgs/beacon.py``'s; the two are held to each other by the same
-examples in their tests, and to what the hand-written packer that came
-before wrote, byte for byte. For example:
+stated in XTCE in ``tcslib-protocol/xtce/beacon.xtce``, a document of its own:
+six string fields of UTF-8, each but the last ended by the termination character
+``:`` (``0x3A``) and no longer than its field can be, and the last 32 characters
+that end the datagram. It is packed and unpacked by the code tcs-xtce generates
+from that document, in Rust without allocating and in Python; what each field
+must say -- the name, decimal digits, lower-case hex -- and turning the text
+into numbers and digests and back is ``tcslib_protocol::beacon``'s, which
+tcspecial and ``tcslib-moc`` use, and ``python/tcslibgs/beacon.py``'s; the two
+are held to each other by the same examples in their tests, and to what the
+hand-written packer that came before wrote, byte for byte. For example:
 
 .. code-block:: text
 
@@ -4940,7 +4934,7 @@ Requirement
     of text fields and nothing else.
 
 Requirement
-    A beacon is read strictly, by ``tcslibgs::Beacon::read`` in Rust and
+    A beacon is read strictly, by ``tcslib_protocol::Beacon::read`` in Rust and
     ``tcslibgs.beacon.Beacon.read`` in Python, and by nothing else: exactly
     six fields, each in the form the table gives. A datagram longer than
     the longest beacon, 106 bytes (``BEACON_BYTES``), that is not UTF-8, or
@@ -4971,7 +4965,7 @@ Requirement
 Requirement
     Neither a beacon nor the answer to a CONNECT carries a configuration
     version. A configuration states none, and the version of the language
-    this software reads, ``tcslibgs::graph::VERSION``, is taken into the
+    this software reads, ``tcslib_protocol::graph::VERSION``, is taken into the
     digest: two builds that read the language differently announce different
     digests, which is the difference a version would have told.
 
@@ -5046,23 +5040,23 @@ is the one it follows.
    allocating.
    ``state_file``, ``beacon.default_interval`` and ``beacon.reset_interval``
    are read; there is no generation, in the state file or anywhere else;
-   the beacon goes fast from start, and from a restart's being initiated,
-   and slows when a CONNECT carrying the running configuration's checksum
-   is taken. ``tcslibgs::interface`` gives the interface digest in Rust and
-   Python, and ``tcsverify --interface-digest`` prints it. ``tcslib-moc``'s
+   the beacon goes fast from start, and from a restart's being initiated, and
+   slows when a CONNECT carrying the running configuration's checksum is taken.
+   ``tcslib_protocol::interface`` gives the interface digest in Rust and Python,
+   and ``tcsverify --interface-digest`` prints it. ``tcslib-moc``'s
    ``TcsClient``, and through it the C/C++ library, holds nothing back after a
-   RESTART, the vehicle refusing what follows it, and the beacon watches in
-   Rust and Python judge a start by the beacon's number alone. Commands and
-   answers have no header, as `The link
-   without a header`_ says: the fixed commands are stated in
-   ``tcslibgs/xtce/fixed.xtce``, the beacon in ``tcslibgs/xtce/beacon.xtce``
-   and every other command in ``tcslibgs/xtce/link.xtce``, packed and unpacked
-   by ``tcslibgs::link`` without allocating; nothing on the link is JSON. The
-   vehicle counts the datagrams its command links do not take, and logs each.
-   Every configuration names its interface, and every program refuses one that
-   is not its build's. There is no fallback interface apart from the fixed
-   commands, and no link of its own for one, and nothing aboard reads XTCE:
-   see `What goes on the vehicle`_.
+   RESTART, the vehicle refusing what follows it, and the beacon watches in Rust
+   and Python judge a start by the beacon's number alone. Commands and answers
+   have no header, as `The link without a header`_ says: the fixed commands are
+   stated in ``tcslib-protocol/xtce/fixed.xtce``, the beacon in
+   ``tcslib-protocol/xtce/beacon.xtce`` and every other command in
+   ``tcslib-protocol/xtce/link.xtce``, packed and unpacked by
+   ``tcslib_protocol::link`` without allocating; nothing on the link is JSON.
+   The vehicle counts the datagrams its command links do not take, and logs
+   each. Every configuration names its interface, and every program refuses one
+   that is not its build's. There is no fallback interface apart from the fixed
+   commands, and no link of its own for one, and nothing aboard reads XTCE: see
+   `What goes on the vehicle`_.
 
 Every packet is XTCE
 --------------------
@@ -5109,7 +5103,7 @@ Replaced
     taken for the other.
 
 Requirement
-    ``tcslibgs::link`` is the one place a command or an answer is turned
+    ``tcslib_protocol::link`` is the one place a command or an answer is turned
     into a packet and back, and every program goes through it: tcspecial,
     ``tcslib-moc`` and through it the C/C++ library and tcsmoc, and every test
     that plays the other end. A ground station in Python sends CONNECT through
@@ -5123,7 +5117,7 @@ Requirement
     A packet is *valid* when the transport beneath it delivered it and it is
     exactly one packet of the layout its port takes. A valid packet from the MOC
     is one that is valid and came from where the configuration says the MOC
-    sends from (``tcslibgs::came_from``). Nothing else is.
+    sends from (``tcslib_protocol::came_from``). Nothing else is.
 
 Requirement
     The generated Rust that tcspecial packs and unpacks with allocates
@@ -5136,18 +5130,18 @@ The link without a header
 
 .. note::
    **Built** (2026-10-31), with the framing of ``gateway_cfs`` since: see
-   `Framing is a gateway's`_. It replaces the
-   CCSDS layout in `Every packet is XTCE`_, above, and settles what was left
-   open in `Configurations named by their checksum`_: what of the link
-   never changes. What it replaced is under `What the headerless link
-   replaces`_. The fixed commands are ``tcslibgs/xtce/fixed.xtce`` and the
-   beacon ``tcslibgs/xtce/beacon.xtce``, and a test in ``tcslibgs::link``
-   pins the digest of each, failing, saying it must never change, if it
-   does. The vehicle counts and logs every datagram its
-   command links do not take (``Commands::malformed``); the ground counts
-   them as malformed, as it did. A station shows a status it does not know
-   as a refusal with its number, in Rust as ``CommandStatus::Unknown`` and
-   in C/C++ by the number ``tcs_status_name`` cannot name.
+   `Framing is a gateway's`_. It replaces the CCSDS layout in `Every packet is
+   XTCE`_, above, and settles what was left open in `Configurations named by
+   their checksum`_: what of the link never changes. What it replaced is under
+   `What the headerless link replaces`_. The fixed commands are
+   ``tcslib-protocol/xtce/fixed.xtce`` and the beacon
+   ``tcslib-protocol/xtce/beacon.xtce``, and a test in ``tcslib_protocol::link``
+   pins the digest of each, failing, saying it must never change, if it does.
+   The vehicle counts and logs every datagram its command links do not take
+   (``Commands::malformed``); the ground counts them as malformed, as it did. A
+   station shows a status it does not know as a refusal with its number, in Rust
+   as ``CommandStatus::Unknown`` and in C/C++ by the number ``tcs_status_name``
+   cannot name.
 
 A packet on tcspecial's command links carries what the protocol uses and
 nothing else. There is no CCSDS primary header, no packet type, no APID and
@@ -5271,27 +5265,27 @@ refused by a build that speaks another.
 
 Requirement
     The ``tcspecial`` section's ``interface`` attribute, required, is the
-    interface digest -- 32 lower-case hex digits, ``tcslibgs::interface`` --
-    of the XTCE the configuration was written against. tcsverify, tcspecial
-    and every ground program refuse a configuration whose ``interface`` is
-    not their build's own, saying both digests. The configuration's checksum
-    covers it, so matching checksums means matching interfaces as well.
+    interface digest -- 32 lower-case hex digits, ``tcslib_protocol::interface``
+    -- of the XTCE the configuration was written against. tcsverify, tcspecial
+    and every ground program refuse a configuration whose ``interface`` is not
+    their build's own, saying both digests. The configuration's checksum covers
+    it, so matching checksums means matching interfaces as well.
 
-The rule is stated once, in ``tcslibgs::graph::parameters::interface_of``,
-which every Rust program and the C/C++ library read the section through, and
-again in Python, in ``tcslibgs.interface.of_configuration``, which
-``tcslibgs.configuration.load`` calls. The value a configuration is to give
-is what ``tcsverify --interface-digest`` prints: the digest of the
-``link.xtce`` that build was made from, which is also the last field of every
-beacon it sends. A change to ``link.xtce`` is a new interface, after which
-``make interface-digest`` in ``tcslibgs/`` is run and every configuration
-given the new digest; a build refuses the old ones until it is. ``tcsverify
---set-interface <configuration>...`` gives a configuration its build's
-digest in place, rewriting that one value -- or adding the attribute where
-the section has none -- and every other byte of the file as it was, in YAML
-and XML alike; ``make set-interfaces`` does it to every shipped
-configuration, and a test in ``tcsverify/tests/examples.rs`` fails while
-one of them is stale.
+The rule is stated once, in
+``tcslib_protocol::graph::parameters::interface_of``, which every Rust program
+and the C/C++ library read the section through, and again in Python, in
+``tcslibgs.interface.of_configuration``, which ``tcslibgs.configuration.load``
+calls. The value a configuration is to give is what ``tcsverify
+--interface-digest`` prints: the digest of the ``link.xtce`` that build was made
+from, which is also the last field of every beacon it sends. A change to
+``link.xtce`` is a new interface, after which ``make interface-digest`` in
+``tcslib-protocol/`` is run and every configuration given the new digest; a
+build refuses the old ones until it is. ``tcsverify --set-interface
+<configuration>...`` gives a configuration its build's digest in place,
+rewriting that one value -- or adding the attribute where the section has none
+-- and every other byte of the file as it was, in YAML and XML alike; ``make
+set-interfaces`` does it to every shipped configuration, and a test in
+``tcsverify/tests/examples.rs`` fails while one of them is stale.
 
 Requirement
     The fixed commands are not in that XTCE: they are in a document of their
@@ -5310,7 +5304,7 @@ Requirement
     ``beacon.xtce`` need no name for the two ends to agree on, because each
     is the same in every build: what holds them so is the tests
     ``the_fixed_commands_document_never_changes`` and
-    ``the_beacon_document_never_changes`` in ``tcslibgs/src/link.rs``,
+    ``the_beacon_document_never_changes`` in ``tcslib-protocol/src/link.rs``,
     which pin their digests and fail at any change to either.
 
 Framing is a gateway's
@@ -5330,13 +5324,13 @@ Requirement
 As built, ``gateway_radio`` sends tcspecial's packets as they are. So does
 ``gateway_fprime``: as `F´: gateway_fprime`_ has it, the F´ end is a bridge
 component built on ``tcslib-c`` that speaks the radio's own UDP protocol,
-playing the MOC, and what F´ itself frames is what the bridge passes on to
-the rest of its deployment, not what crosses the link to tcspecial. The
-framing of ``gateway_cfs`` -- the CCSDS primary header, cFS's extended
-header and its secondary header, around exactly what the UDP link carries
--- is specified in `What crosses the bus`_ and built in ``tcslibgs::cfs``,
-which the vehicle frames and strips with, refusing and counting as
-malformed whatever arrives on the bus not framed so.
+playing the MOC, and what F´ itself frames is what the bridge passes on to the
+rest of its deployment, not what crosses the link to tcspecial. The framing of
+``gateway_cfs`` -- the CCSDS primary header, cFS's extended header and its
+secondary header, around exactly what the UDP link carries -- is specified in
+`What crosses the bus`_ and built in ``tcslib_protocol::cfs``, which the vehicle
+frames and strips with, refusing and counting as malformed whatever arrives on
+the bus not framed so.
 
 ``gateway_yamcs`` is the radio's UDP links with a CCSDS Space Packet primary
 header on every packet, and no secondary header, so that a ground station
@@ -5353,12 +5347,12 @@ the vehicle's telemetry, unsegmented, each sender counting its own sequence
 per APID; a packet with another type, another APID, a secondary header, a
 segment or a length field that is not its own is refused and counted, and
 the sequence count is not checked, a lost packet being no reason to refuse
-the next. The header is ``tcslibgs::ccsds``. The APIDs are stated rather
+the next. The header is ``tcslib_protocol::ccsds``. The APIDs are stated rather
 than fixed, because which a mission's ground expects is the mission's, and
 they are checked where the file is read: each counted APID at most
 ``0x7FF``, and no two links on one, a gateway node's uplink and its device
 id 0's downlink excepted, told apart by the packet type
-(``tcslibgs::graph::telemetry::apids``). Yamcs's mission database
+(``tcslib_protocol::graph::telemetry::apids``). Yamcs's mission database
 is tcspecial's own XTCE with a wrapper that puts the header around it, which
 ``python/tcslibgs/yamcs.py`` generates from the configuration, as it does
 Yamcs's links: a fixed part, ``python/tcslibgs/yamcs.xtce``, that says the
@@ -5425,15 +5419,15 @@ interface apart from them, and no link of its own for one: every command
 goes on the command link, and the beacon on a link of its own.
 
 Requirement
-    The *interface digest* of an interface is the tcs-xtce digest of its set
-    of XTCE documents, which state the commands and answers and not the
-    beacon -- for the interface today, the documents in ``tcslibgs/xtce/``,
-    which are ``link.xtce`` and ``types.xtce``, as ``make interface-digest``
-    there takes them. It is the MD5 of what the documents mean, which leaves out
-    comments, whitespace, attribute order and the order of the members of a
-    set, and which tcs-xtce computes identically in Rust, C/C++ and Python.
-    Two programs speak the same interface when, and only when, their digests
-    are the same.
+    The *interface digest* of an interface is the tcs-xtce digest of its set of
+    XTCE documents, which state the commands and answers and not the beacon --
+    for the interface today, the documents in ``tcslib-protocol/xtce/``, which
+    are ``link.xtce`` and ``types.xtce``, as ``make interface-digest`` there
+    takes them. It is the MD5 of what the documents mean, which leaves out
+    comments, whitespace, attribute order and the order of the members of a set,
+    and which tcs-xtce computes identically in Rust, C/C++ and Python. Two
+    programs speak the same interface when, and only when, their digests are the
+    same.
 
 Requirement
     The fixed commands are CONNECT, RESTART_ARM and RESTART, stated in
@@ -5493,20 +5487,19 @@ states that form in XTCE for the ground stations that read XTCE.
 Requirement
     A node type's interface document is named by the type, in
     ``tcslibgs/interface.py``'s ``NODE_DOCUMENTS``, and by nothing in a
-    configuration: a node of the type has it because of what its type's
-    code writes and reads, and a configuration that could name another
-    would state a form the vehicle does not speak. The ``ping`` type's is
-    ``tcslibgs/xtce/ping.xtce``, field by field: the prefix ``ping #``, the
-    count ended by a space, the seconds ended by a point and nine digits of
-    nanoseconds, and for the answer the same, a space, and the vehicle's
-    time.
+    configuration: a node of the type has it because of what its type's code
+    writes and reads, and a configuration that could name another would state a
+    form the vehicle does not speak. The ``ping`` type's is
+    ``tcslib-protocol/xtce/ping.xtce``, field by field: the prefix ``ping #``,
+    the count ended by a space, the seconds ended by a point and nine digits of
+    nanoseconds, and for the answer the same, a space, and the vehicle's time.
 
 Requirement
     A node type's interface document states only what its type's code
     writes and reads, and a test holds the two together: packed by the code
     tcs-xtce generates from the document, a message is the type's code's,
     byte for byte, and unpacked, it is the same fields. For the ping node
-    that is ``tcslibgs::node::vehicle::ping``'s tests, and
+    that is ``tcslib_protocol::node::vehicle::ping``'s tests, and
     ``python/tests/test_ping.py``'s of ``python/tcslibgs/ping.py``. The type's
     code is still what the vehicle answers by; the generated code is
     compiled into tests and ground stations only.
@@ -5613,29 +5606,27 @@ Configurations named by their checksum
    with another. What is still to be decided is under `Still to be
    decided`_.
 
-   *Built:* in `Starting, and the restart flag`_, the restart flag set at
-   every start and from a RESTART's being taken and cleared only by a
-   matching CONNECT; nothing sent down but beacons and answers until a
-   match; every command but the three answered ``Unmatched`` (status 10)
-   and not acted on until a match; and the commands queued on the node
-   command link dropped at a match. In `The three commands that always
-   go`_, the three being taken at any time, named once in
-   ``tcslibgs::CommandType::taken_unmatched``, and the CONNECT requirement:
-   its answer carries the running checksum, a matching one clears the flag,
-   sends a beacon at once, slows the beacons and opens the downlink and the
-   other commands, one with another checksum changes nothing else, one
-   after a RESTART changes nothing, and the ground takes a CONNECT as
+   *Built:* in `Starting, and the restart flag`_, the restart flag set at every
+   start and from a RESTART's being taken and cleared only by a matching
+   CONNECT; nothing sent down but beacons and answers until a match; every
+   command but the three answered ``Unmatched`` (status 10) and not acted on
+   until a match; and the commands queued on the node command link dropped at a
+   match. In `The three commands that always go`_, the three being taken at any
+   time, named once in ``tcslib_protocol::CommandType::taken_unmatched``, and
+   the CONNECT requirement: its answer carries the running checksum, a matching
+   one clears the flag, sends a beacon at once, slows the beacons and opens the
+   downlink and the other commands, one with another checksum changes nothing
+   else, one after a RESTART changes nothing, and the ground takes a CONNECT as
    matched only when its answer carries the station's checksum. In `On the
-   ground`_, every requirement but tcsmoc's pop-ups, which are built since:
-   the station's match
-   (``tcslib_moc::matched``), data dropped and counted while not matched and
-   what is queued dropped and counted as a match begins, a match ended by a
-   flagged beacon, another checksum or an overdue beacon, answers taken
-   only by their sequence, the four counts (shown by tcsmoc and given by
-   the C/C++ library), the differing checksum said, and ``TcsClient``
-   refusing all but the three, unsent. ``TcsClient`` queues no commands, so
-   ending a match has nothing to throw away; tcsmoc reads one configuration
-   for as long as it runs, so a node id is never taken from another.
+   ground`_, every requirement but tcsmoc's pop-ups, which are built since: the
+   station's match (``tcslib_moc::matched``), data dropped and counted while not
+   matched and what is queued dropped and counted as a match begins, a match
+   ended by a flagged beacon, another checksum or an overdue beacon, answers
+   taken only by their sequence, the four counts (shown by tcsmoc and given by
+   the C/C++ library), the differing checksum said, and ``TcsClient`` refusing
+   all but the three, unsent. ``TcsClient`` queues no commands, so ending a
+   match has nothing to throw away; tcsmoc reads one configuration for as long
+   as it runs, so a node id is never taken from another.
 
    Built with `The link without a header`_: in `Starting, and the restart
    flag`_, there being no generation; in `The three commands that always
@@ -5647,7 +5638,7 @@ Configurations named by their checksum
    ``configurations`` names, the checksum taking in the includes;
    keeping one already held writing nothing; the checksum computed again
    at every load and a mismatch refused; and ``configurations_kept`` read
-   and enforced by the store's removal (``tcslibgs::store``), which
+   and enforced by the store's removal (``tcslib_protocol::store``), which
    nothing in tcspecial calls: configurations are managed from the
    ground. In `Starting, and the restart flag`_, every requirement: the state
    file naming the next start's configuration and the confirmed one, a
@@ -5673,7 +5664,7 @@ Configurations named by their checksum
    says: nothing of the scheme it replaces is still standing.
 
 A configuration is known by its *checksum*: the MD5 ``tcsverify``
-computes of it, the configuration digest (``tcslibgs::config_digest``).
+computes of it, the configuration digest (``tcslib_protocol::config_digest``).
 The checksum is taken over what the configuration says, not over its
 bytes, so the YAML and the XML spellings of one configuration have the
 same checksum. Two configurations with the same checksum mean the same
@@ -5734,7 +5725,7 @@ that a power failure leaves the whole of it or none.
 A section that names none is a vehicle that keeps no configurations: it
 runs the one on its command line, and a RESTART may name only that and the
 one running.
-The rules are ``tcslibgs::store``'s, which tcspecial loads through and
+The rules are ``tcslib_protocol::store``'s, which tcspecial loads through and
 ``tcsverify --keep=<directory>`` keeps through, so the two cannot disagree
 about what a kept configuration is. ``tcsverify --keep`` checks the
 configuration as tcsverify checks any, keeps it only if nothing is wrong
@@ -6599,7 +6590,7 @@ Requirement
     before it and is read by the start whose definitions it was built
     with, and one sent after it arrives after it and is refused. Before a
     match a PING is refused besides, by
-    ``tcslibgs::CommandType::taken_unmatched``.
+    ``tcslib_protocol::CommandType::taken_unmatched``.
 
 Requirement
     A ground station that does not watch the beacons -- a program that only
@@ -6610,22 +6601,22 @@ Requirement
 
 Requirement
     A command older than one this start of tcspecial has already taken, on
-    either link, is answered ``Stale`` and nothing in it is acted on. The
-    radio delivers in order, and what lies either side of it uses reliable
-    datagrams -- see `What is assumed`_ -- so this is a guard: should a
-    command arrive after one sent later all the same, the later one is what
-    the ground meant last. Older is by serial-number arithmetic on the
-    four-byte sequence (RFC 1982), ``tcslibgs::sequence_is_before``, so that a count that wraps
-    still goes forward. A command of the same sequence as the newest taken
-    is a repeat, not an older command, and is taken. A command refused
-    ``Unmatched`` is refused before its sequence is looked at, and does not
-    count as taken. PING and CONNECT are answered however old they are, by
-    ``tcslibgs::CommandType::always_taken``. The newest taken is not kept
-    across a restart, and need not be: a command sent before a RESTART
-    arrives before it, in order, and every command but the three that
-    reaches the start that came back before a matching CONNECT is refused
-    ``Unmatched`` before its sequence is looked at. The CONNECT's answer
-    is where the station's count goes on from.
+    either link, is answered ``Stale`` and nothing in it is acted on. The radio
+    delivers in order, and what lies either side of it uses reliable datagrams
+    -- see `What is assumed`_ -- so this is a guard: should a command arrive
+    after one sent later all the same, the later one is what the ground meant
+    last. Older is by serial-number arithmetic on the four-byte sequence (RFC
+    1982), ``tcslib_protocol::sequence_is_before``, so that a count that wraps
+    still goes forward. A command of the same sequence as the newest taken is a
+    repeat, not an older command, and is taken. A command refused ``Unmatched``
+    is refused before its sequence is looked at, and does not count as taken.
+    PING and CONNECT are answered however old they are, by
+    ``tcslib_protocol::CommandType::always_taken``. The newest taken is not kept
+    across a restart, and need not be: a command sent before a RESTART arrives
+    before it, in order, and every command but the three that reaches the start
+    that came back before a matching CONNECT is refused ``Unmatched`` before its
+    sequence is looked at. The CONNECT's answer is where the station's count
+    goes on from.
 
 Requirement
     The answer to a CONNECT carries the newest command sequence this start
@@ -6973,11 +6964,11 @@ name to give it rather than read, so that nothing goes on being named two
 ways.
 
 The structs the files parse into are the single description of the data, in
-``tcslibgs``; a format is a spelling of it. Adding a third would be a variant
-of ``ConfigFormat`` and no second set of structs. Every shipped configuration
-exists in both formats, so each parser is exercised by a file someone runs
-rather than only by a fixture, and a test loads both of every set and
-compares the payloads they produce.
+``tcslib-protocol``; a format is a spelling of it. Adding a third would be a
+variant of ``ConfigFormat`` and no second set of structs. Every shipped
+configuration exists in both formats, so each parser is exercised by a file
+someone runs rather than only by a fixture, and a test loads both of every set
+and compares the payloads they produce.
 
 **How the two correspond**
 
@@ -7223,7 +7214,7 @@ What a ``network`` node takes today is one of five protocols, named by its
 ``AF_UNIX`` with the same two, and ``AF_INET`` or ``AF_INET6`` with
 ``SOCK_RAW`` and the number the node's ``ip_protocol`` states. Anything else
 is refused where the configuration is read, naming the five (see
-``tcslibgs::graph::reach``).
+``tcslib_protocol::graph::reach``).
 
 Requirement
     A ``raw`` node states an ``address`` and an ``ip_protocol`` from 1 to 254,
@@ -7439,24 +7430,24 @@ tcspecial contains is chosen when it is built, and a configuration is held to
 what was chosen.
 
 Requirement
-    Each payload type is a Cargo feature of the ``tcspecial`` crate, declared
-    in ``tcspecial/Cargo.toml`` and named as the type is written in a
-    configuration: ``device-file``, ``serial``, ``i2c``, ``spi``,
-    ``i2c_tmass``, ``spi_tmass``, ``can``, ``iio``, ``rpmsg``, ``gpio_in``,
-    ``gpio_out``, ``gpio_inout`` and ``hdlc``, with ``raw`` for the raw protocol of the network type. A
-    sensor's feature brings in its bus's, the sensor being opened as a device
-    on that bus is. One word for a type in the configuration,
+    Each payload type is a Cargo feature of the ``tcspecial`` crate, declared in
+    ``tcspecial/Cargo.toml`` and named as the type is written in a
+    configuration: ``device-file``, ``serial``, ``i2c``, ``spi``, ``i2c_tmass``,
+    ``spi_tmass``, ``can``, ``iio``, ``rpmsg``, ``gpio_in``, ``gpio_out``,
+    ``gpio_inout`` and ``hdlc``, with ``raw`` for the raw protocol of the
+    network type. A sensor's feature brings in its bus's, the sensor being
+    opened as a device on that bus is. One word for a type in the configuration,
     the build and the refusal means none of them has to be translated into
-    another. The words are ``tcslibgs::graph::built::OPTIONAL_TYPES``, and a
-    test holds the features in ``Cargo.toml`` to them.
+    another. The words are ``tcslib_protocol::graph::built::OPTIONAL_TYPES``,
+    and a test holds the features in ``Cargo.toml`` to them.
 
 Requirement
     A feature includes or leaves out that type's module in
     ``tcspecial::node::payload`` and nothing else. The rules for the type in
-    ``tcslibgs::node`` are built whatever tcspecial is built with: tcsverify
-    and tcsgui run on the ground and check configurations for any vehicle, so
-    what a configuration may say about a type cannot depend on how one
-    vehicle's tcspecial was built. Tcssim is built with every type, since it
+    ``tcslib_protocol::node`` are built whatever tcspecial is built with:
+    tcsverify and tcsgui run on the ground and check configurations for any
+    vehicle, so what a configuration may say about a type cannot depend on how
+    one vehicle's tcspecial was built. Tcssim is built with every type, since it
     runs on a development host and not on the target.
 
 Requirement
@@ -7492,10 +7483,10 @@ Requirement
        i2c: build tcspecial with --features i2c, or take the node out of the
        configuration
 
-    The rule and its sentence are ``tcslibgs::graph::built``, which tcspecial
-    asks through ``tcsverify::verify_built`` with the types it contains. An
-    open of a type the build lacks says the same, though the load means none
-    is ever reached.
+    The rule and its sentence are ``tcslib_protocol::graph::built``, which
+    tcspecial asks through ``tcsverify::verify_built`` with the types it
+    contains. An open of a type the build lacks says the same, though the load
+    means none is ever reached.
 
     A configuration refused on the ground costs a rebuild, where one that
     reached a node it could not open would have failed in flight.
@@ -7800,8 +7791,8 @@ canned spacecraft in its place. Tcsmoc is built on this client, which is why it 
 rather than in tcsmoc: a second copy of it would be a second thing to keep
 correct, and the one in tcsmoc was the only one that existed.
 
-tcslibgs
---------
+tcslib-protocol
+---------------
 The TCSpecial ground/space library contains definitions used by both
 tcslib and tcspecial.
 
@@ -7870,14 +7861,14 @@ Requirement
     only in them are one configuration.
 
 Requirement
-    There is one canonical order, and everything that needs an order takes
-    it: nodes by name; a node's attributes by name; links by the node they
-    leave, each one's destinations by name; payload groups by name; command
-    bindings by where they come from and then what they set; included files
-    by name; and the entries of a set-valued attribute -- a vote's
-    inputs, gpio ``lines``, ``terminators`` -- in one spelling, sorted.
-    ``tcslibgs::config_digest::interpretation_of_graph`` is the one place it
-    is written down.
+    There is one canonical order, and everything that needs an order takes it:
+    nodes by name; a node's attributes by name; links by the node they leave,
+    each one's destinations by name; payload groups by name; command bindings by
+    where they come from and then what they set; included files by name; and the
+    entries of a set-valued attribute -- a vote's inputs, gpio ``lines``,
+    ``terminators`` -- in one spelling, sorted.
+    ``tcslib_protocol::config_digest::interpretation_of_graph`` is the one place
+    it is written down.
 
 Requirement
     Names are compared exactly, and upper and lower case are different
@@ -8089,8 +8080,8 @@ Requirement
 
 Requirement
     A trigger's bytes go out as the file wrote them, and are shown as a file
-    could have written them: text as a C string, and anything else as bytes
-    in brackets. See ``tcslibgs::trigger``, which is the one reader of the
+    could have written them: text as a C string, and anything else as bytes in
+    brackets. See ``tcslib_protocol::trigger``, which is the one reader of the
     notation for triggers, inits and terminators alike.
 
 Requirement
@@ -8282,8 +8273,8 @@ on an I2C bus, a peripheral on a SPI bus -- and each has terms that say how
 that link is driven: a data rate, an address on a bus, the shape of a clock.
 A node states them among its attributes, beside everything else it states.
 
-The rules are in ``tcslibgs::endpoint_config`` and the per-type modules beside
-it, and are asked of a node by ``graph::reach``, through
+The rules are in ``tcslib_protocol::endpoint_config`` and the per-type modules
+beside it, and are asked of a node by ``graph::reach``, through
 ``types::kind_of_terms``.
 
 Requirement
@@ -8433,7 +8424,7 @@ through a chip's character device, where a program asks for a set of lines
 and reads or sets their values together. A set of lines is one unsigned whole
 number, a bit for each line: see `GPIO lines`_.
 
-The rules are in ``tcslibgs::node::payload::gpio``, the endpoint in
+The rules are in ``tcslib_protocol::node::payload::gpio``, the endpoint in
 ``tcspecial::node::payload::gpio`` and the simulation in
 ``tcssim::node::payload::gpio``: one module in each for three node types.
 
@@ -8453,9 +8444,9 @@ Requirement
     a heater that forgot to say ``output`` read as a file that was right.
 
 Requirement
-    A file that says ``gpio`` or ``direction`` is refused, told the three
-    types and to take ``direction`` out (`tcslibgs::graph::renamed`), as a
-    file in the other old words is.
+    A file that says ``gpio`` or ``direction`` is refused, told the three types
+    and to take ``direction`` out (`tcslib_protocol::graph::renamed`), as a file
+    in the other old words is.
 
 Requirement
     Each states a ``path`` and its ``lines``. A ``gpio_in`` must state the
@@ -8610,7 +8601,7 @@ wire. Linux talks to it over rpmsg: the remote announces a named channel,
 Linux makes a character device for it, and the two ends exchange whole
 messages through that device.
 
-The rules are in ``tcslibgs::endpoint_config_rpmsg``, the endpoint in
+The rules are in ``tcslib_protocol::endpoint_config_rpmsg``, the endpoint in
 ``tcspecial::endpoint_rpmsg`` and the simulation in ``tcssim::payload_rpmsg``.
 
 Requirement
@@ -8669,7 +8660,7 @@ hands over packed sample sets as they become ready.
 That is a device file a handler reads, which is nearly a ``device-file``
 payload.
 What makes it a type of its own is that it is read-only. The rules are in
-``tcslibgs::node::iio``, the endpoint in ``tcspecial::node::iio`` and the
+``tcslib_protocol::node::iio``, the endpoint in ``tcspecial::node::iio`` and the
 simulation in ``tcssim::node::iio``.
 
 Requirement
@@ -8721,7 +8712,7 @@ the one type whose simulation is as faithful as a socket: a bus
 carries every member's frames to every other member, so the simulator joins
 the bus rather than imitating something on it.
 
-The rules are in ``tcslibgs::endpoint_config_can``, the endpoint in
+The rules are in ``tcslib_protocol::endpoint_config_can``, the endpoint in
 ``tcspecial::endpoint_can`` and the simulation in ``tcssim::payload_can``.
 
 Requirement
@@ -8837,8 +8828,8 @@ register -- so Linux does it in the UART driver, told through ``TIOCSRS485``.
 
 RS-485 is not a type of link. It is the electrical layer under a start-stop
 line: the same termios terms, the same framing, the same device file. So these
-are terms of the ``serial`` type, in ``tcslibgs::endpoint_config_rs485``, and a
-payload on a four-wire line states none of them and is unchanged.
+are terms of the ``serial`` type, in ``tcslib_protocol::endpoint_config_rs485``,
+and a payload on a four-wire line states none of them and is unchanged.
 
 Requirement
     A line states ``rs485: true`` to be a bus, and says nothing to be a plain
@@ -8922,7 +8913,7 @@ the mechanism **generic HDLC**, and what it presents is a network interface --
 ``hdlc0`` -- not a device file. The terms of the line are set with one ioctl on
 it, ``SIOCWANDEV``, which carries whichever of the structures in
 ``linux/hdlc/ioctl.h`` its ``type`` field names; the data is frames on that
-interface. The rules are in ``tcslibgs::node::hdlc``, the endpoint in
+interface. The rules are in ``tcslib_protocol::node::hdlc``, the endpoint in
 ``tcspecial::node::hdlc``, and the kernel has no dummy device for it.
 
 Requirement
@@ -9170,8 +9161,8 @@ network node whose protocol is ``tcp`` or ``unix_stream``.
 
 Requirement
     A line specifies the maximum read length, and it is at most a datum's,
-    ``tcslibgs::DATUM_BYTES``: a read is delivered whole, and one longer than
-    a datum would arrive cut short, as pieces nothing knows how to put back
+    ``tcslib_protocol::DATUM_BYTES``: a read is delivered whole, and one longer
+    than a datum would arrive cut short, as pieces nothing knows how to put back
     together.
 
 Requirement
@@ -9202,7 +9193,7 @@ Requirement
     so a list has the one shape in a file. A node holds the list as one value
     with its entries joined by commas, which is what the editor shows; a
     comma inside a string is a character of it, so the join is exact. See
-    ``tcslibgs::graph::LISTED``.
+    ``tcslib_protocol::graph::LISTED``.
 
 Requirement
     A stream socket -- ``tcp`` or ``unix_stream`` -- specifies these
@@ -9333,7 +9324,7 @@ Requirement
     ``max-length`` is answered *it is spelled max_length*. Two spellings would
     be twice the words for the editor, the XML and the YAML to agree about,
     and a node that wrote both would say one thing twice with nothing to
-    choose between them. See ``tcslibgs::graph::spelled``.
+    choose between them. See ``tcslib_protocol::graph::spelled``.
 
 Requirement
     The rule and its answer are the same wherever a name is refused: a
@@ -9584,15 +9575,15 @@ what is wrong with them.
    +=======================+  :    +=========================+     +=================+
    |  +---------+          |  :    |    +=================+  |     |                 |
    |  | tcsmoc  |          |  :  ----+->| tcspecial      |  |     |                 |
-   |  | Control |          |  : |  | |  | (tcslibgs)      |  |     |                 |
+   |  | Control |          |  : |  | |  |(tcslib-protocol)|  |     |                 |
    |  | S/W     |          |  : |  | |  +-----------------+  |     |                 |
    |  +---------+          |  : |  | |  | Command         |  |     |                 |
    |       ^               |  : |  | +->| Interpreter     |  |     |                 |
    |       |               |  : |  | |  +-----------------+  |     |  +-----------+  |
    |       v               |  : |  | |  | Data            |<-------|->| Payload 0 |  |
    |  +-----------------+  |  : |  | +->| Handler 0       |  |     |  +-----------+  |
-   |  | tcslib          |<------   | |  +-----------------+  |     |  +-----------+  |
-   |  | (tcslibgs)      |  |  :    | |  | Data            |<--------->| Payload 1 |  |
+   |  | tcslib-moc      |<------   | |  +-----------------+  |     |  +-----------+  |
+   |  |(tcslib-protocol)|  |  :    | |  | Data            |<--------->| Payload 1 |  |
    |  +-----------------+  |  :    | |  | Handler 1       |  |     |  +-----------+  |
    |  |  configuration  |  |  :    | |  |      .          |  |     |                 |
    |  +-----------------+  |  :    |           .             |     |                 |
@@ -9609,10 +9600,10 @@ Simulation Modes
 ----------------
 Implemented, except that the mode and the judgements are not yet written
 to the telemetry log: they are said in the startup summary only. The mode is
-read by ``tcslibgs::simulate::take_mode``, a payload is judged by
-``tcslibgs::simulate::judge`` and its type's ``judged`` in
-``tcslibgs::node::payload``, and the mode is checked by
-``tcslibgs::simulate::refusals``, which tcspecial and tcssim both call.
+read by ``tcslib_protocol::simulate::take_mode``, a payload is judged by
+``tcslib_protocol::simulate::judge`` and its type's ``judged`` in
+``tcslib_protocol::node::payload``, and the mode is checked by
+``tcslib_protocol::simulate::refusals``, which tcspecial and tcssim both call.
 
 Tcspecial reaches each payload through whatever is at the end of its endpoint,
 and nothing in its configuration says whether that is the real device, a dummy
@@ -9748,11 +9739,11 @@ Requirement
     Which Payloads Are Simulated`_).
 
 Requirement
-    Each type's judgement is in that type's own module, ``tcslibgs::node``,
-    beside the type's other rules, and tcspecial and tcssim both call it. A
-    type cannot then be added without saying how its simulated or dummy
-    device is told apart, and the two programs cannot come to disagree about
-    what one is.
+    Each type's judgement is in that type's own module,
+    ``tcslib_protocol::node``, beside the type's other rules, and tcspecial and
+    tcssim both call it. A type cannot then be added without saying how its
+    simulated or dummy device is told apart, and the two programs cannot come to
+    disagree about what one is.
 
 Requirement
     A refusal names the node, what it reaches, what was found there and the
@@ -9771,9 +9762,9 @@ Requirement
 Saying Which Payloads Are Simulated
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Implemented: ``simulate`` is read by
-``tcslibgs::sim_config::SimConfigFile::simulate_of``, tcssim's comparison is
-``tcslibgs::simulate::disagreement``, and a simulated device reached over
-UDP is ``tcslibgs::graph::reach::Reach::opened``.
+``tcslib_protocol::sim_config::SimConfigFile::simulate_of``, tcssim's comparison
+is ``tcslib_protocol::simulate::disagreement``, and a simulated device reached
+over UDP is ``tcslib_protocol::graph::reach::Reach::opened``.
 
 Which payloads a run means to simulate is said in the simulator file, payload
 by payload, and checked against what is at each endpoint before tcssim
@@ -9948,7 +9939,7 @@ Requirement
 
 Waiting for the Simulator
 -------------------------
-Implemented: the messages are ``tcslibgs::ready``, tcssim's end is
+Implemented: the messages are ``tcslib_protocol::ready``, tcssim's end is
 ``tcssim/src/ready.rs``, a harness waits through ``tcslib_moc::simulator`` or
 ``python/tcslib/simulator.py``, and tcsmoc and ``tcssim --wait`` are
 harnesses.
@@ -9987,10 +9978,11 @@ Requirement
     A request that is lost is sent again, and a repeated one does no harm.
 
 Requirement
-    The messages are defined in ``tcslibgs``, beside the commands and telemetry,
-    and a ground station waits through one function in ``tcslib-moc``, with the
-    same function in the Python ground station's library. Every harness then
-    waits the same way, and there is one statement of what the messages are.
+    The messages are defined in ``tcslib-protocol``, beside the commands and
+    telemetry, and a ground station waits through one function in
+    ``tcslib-moc``, with the same function in the Python ground station's
+    library. Every harness then waits the same way, and there is one statement
+    of what the messages are.
 
 Requirement
     Tcssim makes every simulated device as it starts and keeps it until it
@@ -10167,11 +10159,11 @@ About the names and the notes
 The requirements below are as they were written, with two types of change.
 
 The names are the ones the software goes by. Three were settled differently
-after this was written: the spacecraft process is **tcspecial**, not
-``tcssvr``; the library both ends share is **tcslibgs**, not ``tcsdefs``; and
-the testing GUI became two programs, **tcsmoc** for the ground and **tcssim**
-for the payloads, rather than one ``tcstest``. A third test program,
-**tcsverify**, checks the configuration files without running any of them.
+after this was written: the spacecraft process is **tcspecial**, not ``tcssvr``;
+the library both ends share is **tcslib-protocol**, not ``tcsdefs``; and the
+testing GUI became two programs, **tcsmoc** for the ground and **tcssim** for
+the payloads, rather than one ``tcstest``. A third test program, **tcsverify**,
+checks the configuration files without running any of them.
 
 Four words changed as well, and these requirements use the old ones throughout.
 What a requirement calls a **payload** is a **device** where it is hardware,
@@ -10205,11 +10197,11 @@ TCSpecial shall include a process named tcspecial that runs on the spacecraft
 TCSpecial shall include a library named tcslib that links with misssion control software
 ----------------------------------------------------------------------------------------
 
-TCSpecial shall include a library named tcslibgs that is shared between tcspecial and tcslib
---------------------------------------------------------------------------------------------
+TCSpecial shall include a library named tcslib-protocol that is shared between tcspecial and tcslib
+---------------------------------------------------------------------------------------------------
 
-TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslibgs, and tcslib
---------------------------------------------------------------------------------------------------------------------------
+TCSpecial shall include applications named tcsmoc and tcssim that provide GUIs for testing tcspecial, tcslib-protocol, and tcslib
+---------------------------------------------------------------------------------------------------------------------------------
 
 .. note::
    Implemented as two programs rather than one. Tcsmoc simulates the

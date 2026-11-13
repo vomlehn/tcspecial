@@ -57,8 +57,9 @@ built on it: `tcsui` holds the panels the ground programs share, and `tcsmoc`
 is the test ground station that puts them on the screen.
 
 tcslib-moc does not define the link either. The commands, the telemetry, and the
-configuration files both ends read belong to `tcslibgs`, which the vehicle uses
-too. tcslib-moc re-exports all of it, so a ground program needs only tcslib-moc.
+configuration files both ends read belong to `tcslib-protocol`, which the
+vehicle uses too. tcslib-moc re-exports all of it, so a ground program needs
+only tcslib-moc.
 
 ## Who uses it
 
@@ -83,7 +84,7 @@ cargo doc -p tcslib-moc --open
 ## See also
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html).
-- [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), this library for C and C++.
+- [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html), what the ground and the vehicle share, and [tcslib-c](https://vomlehn.github.io/tcspecial/tcslib-c/README.html), this library for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

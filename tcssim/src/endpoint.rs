@@ -6,8 +6,8 @@
 //! simulated payload runs on, and into the line a panel shows for it.
 //!
 //! The kinds of payload tcssim cannot simulate are refused by
-//! `tcslibgs::simulable`, which this asks first: the rule is there so that
-//! `tcsverify` asks it of the same files, and saying so is better than
+//! `tcslib_protocol::simulable`, which this asks first: the rule is there so
+//! that `tcsverify` asks it of the same files, and saying so is better than
 //! simulating something else at that address.
 //!
 //! What a payload then does with the endpoint is in the file for its kind:
@@ -18,10 +18,10 @@
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
-use tcslibgs::{DHConfig, EndpointConfig, NetworkProtocol};
+use tcslib_protocol::{DHConfig, EndpointConfig, NetworkProtocol};
 
 use crate::payload::{PayloadConfig, PayloadProtocol};
-use tcslibgs::ResolvedSim;
+use tcslib_protocol::ResolvedSim;
 
 /// Turn a data handler and its simulator settings into the simulator's own
 /// configuration.
@@ -66,16 +66,16 @@ pub fn payload_config_from(
 /// # Errors
 ///
 /// A message naming the handler if it is of a kind the simulator cannot
-/// simulate (see `tcslibgs::simulable`), or its packet size does not
+/// simulate (see `tcslib_protocol::simulable`), or its packet size does not
 /// fit in 32 bits.
 pub fn payload_config_attached(
     dh: &DHConfig,
     sim: &ResolvedSim,
     attachment: Option<crate::node::physics::Attachment>,
 ) -> Result<PayloadConfig, String> {
-    // What the simulator cannot be, which is tcslibgs's rule so that tcsverify
-    // asks it too: see `tcslibgs::simulable`.
-    tcslibgs::simulable(dh)?;
+    // What the simulator cannot be, which is tcslib-protocol's rule so that
+    // tcsverify asks it too: see `tcslib_protocol::simulable`.
+    tcslib_protocol::simulable(dh)?;
 
     let (protocol, address, port, bus_address) =
         match (&dh.endpoint, dh.sim_address) {
@@ -84,7 +84,7 @@ pub fn payload_config_attached(
             // UDP there when the run simulates, which is the only kind of run
             // tcssim takes part in, so the simulator is a UDP payload there, by
             // the same rule of which end speaks first. See
-            // `tcslibgs::graph::reach::Reach::opened`.
+            // `tcslib_protocol::graph::reach::Reach::opened`.
             // Discrete lines whose node gives a sim_address: tcssim answers
             // for them there, in the lines' own datagrams rather than as a
             // stream of bytes. See payload_gpio.
@@ -346,8 +346,8 @@ mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
     use std::time::Duration;
-    use tcslibgs::ResolvedSim;
-    use tcslibgs::{
+    use tcslib_protocol::ResolvedSim;
+    use tcslib_protocol::{
         BitOrder, CsActive, DHMode, DHName, DeviceConfig, I2cConfig,
         NetworkConfig, NetworkProtocol, SerialConfig, SpiConfig, SpiMode,
         StopBits,
@@ -431,7 +431,7 @@ mod tests {
             sim_address: Some("127.0.0.1:7950".parse().unwrap()),
             driven: false,
         };
-        let rpmsg = on(EndpointConfig::Rpmsg(tcslibgs::RpmsgConfig {
+        let rpmsg = on(EndpointConfig::Rpmsg(tcslib_protocol::RpmsgConfig {
             path: "/dev/rpmsg0".to_string(),
             service: "payload-telemetry".to_string(),
             max_message_bytes: None,
@@ -441,8 +441,8 @@ mod tests {
         assert_eq!((config.address.as_str(), config.port), ("127.0.0.1", 7950));
 
         let mut line = rpmsg.clone();
-        line.endpoint =
-            tcslibgs::graph::reach::reach_of(&tcslibgs::graph::Node {
+        line.endpoint = tcslib_protocol::graph::reach::reach_of(
+            &tcslib_protocol::graph::Node {
                 name: "DH7".to_string(),
                 node_type: "hdlc".to_string(),
                 group: None,
@@ -452,23 +452,24 @@ mod tests {
                     ("clock_type", "external"),
                 ]
                 .into_iter()
-                .map(|(k, v)| (k.to_string(), tcslibgs::Scalar::of(v)))
+                .map(|(k, v)| (k.to_string(), tcslib_protocol::Scalar::of(v)))
                 .collect(),
-            })
-            .expect("an hdlc node")
-            .endpoint;
+            },
+        )
+        .expect("an hdlc node")
+        .endpoint;
         assert!(payload_config_from(&line, &sim(250, 100, 2)).is_ok());
         line.sim_address = None;
         assert!(payload_config_from(&line, &sim(250, 100, 2)).is_err());
 
         // Discrete lines are answered for there in their own datagrams, as
         // lines and not as a stream of bytes.
-        let lines = on(EndpointConfig::Gpio(tcslibgs::GpioConfig {
-            kind: tcslibgs::node::payload::gpio::Kind::Inout,
+        let lines = on(EndpointConfig::Gpio(tcslib_protocol::GpioConfig {
+            kind: tcslib_protocol::node::payload::gpio::Kind::Inout,
             path: "/dev/gpiochip1".to_string(),
             inputs: Vec::new(),
             outputs: vec![4],
-            bias: tcslibgs::Bias::None,
+            bias: tcslib_protocol::Bias::None,
             debounce: None,
             state_interval: Some(std::time::Duration::from_secs(1)),
             sim_address: None,
@@ -628,7 +629,7 @@ mod tests {
             endpoint: EndpointConfig::Serial(SerialConfig {
                 path: "/tmp/ttyS0".to_string(),
                 datarate: 9600,
-                parity: tcslibgs::Parity::None,
+                parity: tcslib_protocol::Parity::None,
                 stop_bits: StopBits::One,
                 byte_length: 8,
                 rs485: None,

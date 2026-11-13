@@ -6,9 +6,9 @@
 //! file. An editor that cannot open what it writes is a program for making
 //! configurations once.
 //!
-//! The structure comes from `tcslibgs::graph::Graph`, which is the one reader
-//! of the schema: it reads YAML and XML, follows `include`, and has the rules
-//! about what a node may say. Nothing here parses a configuration a
+//! The structure comes from `tcslib_protocol::graph::Graph`, which is the one
+//! reader of the schema: it reads YAML and XML, follows `include`, and has the
+//! rules about what a node may say. Nothing here parses a configuration a
 //! second time.
 //!
 //! # The comments
@@ -27,7 +27,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use tcslibgs::graph::{Destination, Graph, Section};
+use tcslib_protocol::graph::{Destination, Graph, Section};
 
 use crate::document::{Command, Document, Heading, Node, Remark};
 use crate::journal::Link;
@@ -64,13 +64,13 @@ pub fn read(path: &Path) -> Result<Document, String> {
 
     // What tcspecial is configured with, as the words the file holds. The
     // reader is deliberately not strict about it -- see
-    // tcslibgs::graph::parameters -- so a section somebody left halfway
+    // tcslib_protocol::graph::parameters -- so a section somebody left halfway
     // through opens, says what is missing, and can be put right.
     if let Some(said) = &graph.tcspecial {
         // Flat here, a subsection's attribute written `parent.child`: a field
         // in a window is one name, and so is a complaint about it. The
         // writers put the subsections back.
-        document.tcspecial = tcslibgs::graph::parameters::flatten(said)
+        document.tcspecial = tcslib_protocol::graph::parameters::flatten(said)
             .into_iter()
             .map(|(attribute, value)| (attribute, value.as_str().to_string()))
             .collect();
@@ -98,8 +98,8 @@ pub fn read(path: &Path) -> Result<Document, String> {
         let Some(name) = graph.include_name(file) else {
             continue;
         };
-        let declared =
-            tcslibgs::graph::read_one(file).map_err(|e| format!("{e}"))?;
+        let declared = tcslib_protocol::graph::read_one(file)
+            .map_err(|e| format!("{e}"))?;
         if let Some(exports) = &declared.exports {
             document.exports.insert(name.clone(), exports.clone());
         }
@@ -681,7 +681,7 @@ fn comment_over_lines<'a, I: Iterator<Item = &'a str>>(
 /// `world-out: k_1` in YAML and `<world-out>k_1</world-out>` in XML --
 /// and the list form too, a comment above `world-out: [a, b]` being about
 /// both of them. The two names are the schema's: see
-/// `tcslibgs::graph::terminals`.
+/// `tcslib_protocol::graph::terminals`.
 ///
 /// # Arguments
 ///
@@ -1163,8 +1163,8 @@ mod tests {
     /// by hand: the YAML is the one a person edits -- it is the one carrying
     /// the prose -- and the XML is the same configuration in the other
     /// language, which is what the XSD is validated against and what
-    /// `tcslibgs` reads to prove its two readers agree. Two files kept in step
-    /// by hand are two files that drift.
+    /// `tcslib-protocol` reads to prove its two readers agree. Two files kept
+    /// in step by hand are two files that drift.
     ///
     /// Set TCSGUI_WRITE_EXAMPLE to write it out after a deliberate change to
     /// the YAML, as `tests/manual/thermostat.*` is written.

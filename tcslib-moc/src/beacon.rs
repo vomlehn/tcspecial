@@ -42,20 +42,20 @@ use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
 
-use tcslibgs::{
+use tcslib_protocol::{
     came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion, Timestamp,
     NO_TRANSFER_TIME,
 };
 
 /// Where beacons come from and where they are received.
 ///
-/// The shared library's [`tcslibgs::BeaconLink`], under the name this module
-/// uses for it: one type for the pair, so that the end that sends and the end
-/// that listens cannot come to disagree about where the link is. Taken from
-/// the configuration rather than stated again by a ground station, because a
-/// station listening where the spacecraft is not sending hears nothing and
+/// The shared library's [`tcslib_protocol::BeaconLink`], under the name this
+/// module uses for it: one type for the pair, so that the end that sends and
+/// the end that listens cannot come to disagree about where the link is. Taken
+/// from the configuration rather than stated again by a ground station, because
+/// a station listening where the spacecraft is not sending hears nothing and
 /// says nothing about why.
-pub use tcslibgs::BeaconLink as Link;
+pub use tcslib_protocol::BeaconLink as Link;
 
 /// The beacon interval the standard schedule is for: see
 /// [`Schedule::for_interval`].
@@ -956,12 +956,12 @@ impl Waker {
 ///
 /// What is wrong with the `tcspecial` section, or what cannot be bound.
 pub fn open(
-    graph: &tcslibgs::graph::Graph,
+    graph: &tcslib_protocol::graph::Graph,
     schedule: Schedule,
     expected: Option<ConfigDigest>,
 ) -> Result<Option<Beacons>, String> {
     let cannot = |e: io::Error| format!("beacons cannot be received: {e}");
-    if let Some(link) = tcslibgs::graph::parameters::beacon_of(graph)? {
+    if let Some(link) = tcslib_protocol::graph::parameters::beacon_of(graph)? {
         return Beacons::listening(link, schedule, expected)
             .map(Some)
             .map_err(cannot);
@@ -973,7 +973,7 @@ pub fn open(
         return Ok(None);
     };
     let socket = ground.receiving(bus.beacon_msgid)?;
-    let at = |addr: SocketAddr| tcslibgs::HostPort {
+    let at = |addr: SocketAddr| tcslib_protocol::HostPort {
         address: addr.ip().to_string(),
         port: addr.port(),
     };
@@ -1282,7 +1282,10 @@ fn restarted(now: u32) -> String {
 /// What to say of a datagram from `from` on the beacon link, which beacons
 /// come to from `send` and nowhere else: one sentence, the same in every
 /// station and in the Python, saying what was ignored and why.
-fn stranger_warning(from: SocketAddr, send: &tcslibgs::HostPort) -> String {
+fn stranger_warning(
+    from: SocketAddr,
+    send: &tcslib_protocol::HostPort,
+) -> String {
     format!(
         "a beacon came from {from} and not from {send}, which is where the \
          configuration says they come from -- ignored"
@@ -1304,7 +1307,7 @@ mod tests {
                 .collect();
         assert_eq!(said, ["Unheard", "Heard", "Aging", "Waiting"]);
     }
-    use tcslibgs::{CommandStatus, HostPort, PingTelemetry, Telemetry};
+    use tcslib_protocol::{CommandStatus, HostPort, PingTelemetry, Telemetry};
 
     /// Makes a schedule with one stage of contact and one without, so that a
     /// test can tell a fresh beacon from a stale one.

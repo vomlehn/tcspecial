@@ -12,7 +12,7 @@ Python to the Rust it is written after"""
 # Python to -- the configuration's facts, the ping format and the beacon's
 # layout.
 [dev-dependencies]
-tcslibgs = { path = "../../tcslibgs" }
+tcslib-protocol = { path = "../../tcslib-protocol" }
 tempfile = "3"
 
 [lints]

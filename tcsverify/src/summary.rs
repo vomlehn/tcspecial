@@ -2,20 +2,20 @@
 //! place, for `--summary`: every address and port, every device id, every
 //! message ID and APID, and how much it sends the ground.
 //!
-//! Nothing here is a rule. Each list is `tcslibgs`'s -- the sockets
-//! [`tcslibgs::graph::sockets::of`], the ids [`telemetry::ids`], the message
-//! IDs [`telemetry::msgids`], the APIDs [`telemetry::apids`], the rates
-//! [`tcslibgs::graph::rates::of`] -- and the checks that hold them apart are
-//! `Graph::check`'s, which the run has printed above. This lays them out:
-//! plain text in aligned columns, each list in the order it is made in, so
-//! that two summaries can be compared with `diff`.
+//! Nothing here is a rule. Each list is `tcslib-protocol`'s -- the sockets
+//! [`tcslib_protocol::graph::sockets::of`], the ids [`telemetry::ids`], the
+//! message IDs [`telemetry::msgids`], the APIDs [`telemetry::apids`], the rates
+//! [`tcslib_protocol::graph::rates::of`] -- and the checks that hold them apart
+//! are `Graph::check`'s, which the run has printed above. This lays them out:
+//! plain text in aligned columns, each list in the order it is made in, so that
+//! two summaries can be compared with `diff`.
 
 use std::fmt::Write;
 use std::path::Path;
 
-use tcslibgs::graph::sockets::Socket;
-use tcslibgs::graph::telemetry::{self, Telemetered};
-use tcslibgs::graph::Graph;
+use tcslib_protocol::graph::sockets::Socket;
+use tcslib_protocol::graph::telemetry::{self, Telemetered};
+use tcslib_protocol::graph::Graph;
 
 /// Lays out rows in columns, two spaces apart, each as wide as its widest
 /// cell, the last left ragged.
@@ -77,7 +77,8 @@ fn number(value: f64) -> String {
 /// # Arguments
 ///
 /// * `out`     - Where it is written.
-/// * `sockets` - Every socket, in [`tcslibgs::graph::sockets::of`]'s order.
+/// * `sockets` - Every socket, in [`tcslib_protocol::graph::sockets::of`]'s
+///   order.
 fn addresses(out: &mut String, sockets: &[Socket]) {
     out.push_str("Addresses and ports\n");
     if sockets.is_empty() {
@@ -146,8 +147,8 @@ fn msgids(out: &mut String, graph: &Graph) {
     // The allotment every ID is held to, where the section reads, which it
     // does: the IDs were found from it.
     let bus = graph.tcspecial.as_ref().and_then(|section| {
-        let flat = tcslibgs::graph::parameters::flatten(section);
-        tcslibgs::graph::parameters::ci_config_of(&flat)
+        let flat = tcslib_protocol::graph::parameters::flatten(section);
+        tcslib_protocol::graph::parameters::ci_config_of(&flat)
             .ok()?
             .to_ci_config()
             .ok()?
@@ -224,7 +225,7 @@ fn rates(out: &mut String, graph: &Graph) {
         }
     };
     links.sort_by(|a, b| a.name.cmp(&b.name));
-    let rates = tcslibgs::graph::rates::of(graph);
+    let rates = tcslib_protocol::graph::rates::of(graph);
     let mut rows = vec![vec![
         "link".to_string(),
         "data/s".to_string(),
@@ -265,7 +266,7 @@ fn rates(out: &mut String, graph: &Graph) {
         ]);
     }
     if let Ok(Some(every)) =
-        tcslibgs::graph::parameters::beacon_interval_of(graph)
+        tcslib_protocol::graph::parameters::beacon_interval_of(graph)
     {
         if !every.is_zero() {
             let value = 1.0 / every.as_secs_f64();
@@ -309,7 +310,7 @@ fn rates(out: &mut String, graph: &Graph) {
 /// rates, each under its heading, a blank line between them.
 pub fn written(graph: &Graph) -> String {
     let mut out = String::new();
-    addresses(&mut out, &tcslibgs::graph::sockets::of(graph));
+    addresses(&mut out, &tcslib_protocol::graph::sockets::of(graph));
     out.push('\n');
     device_ids(&mut out, graph);
     out.push('\n');

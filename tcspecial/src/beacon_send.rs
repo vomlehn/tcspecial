@@ -16,7 +16,9 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 
 use log::{error, info, trace};
-use tcslibgs::{Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult};
+use tcslib_protocol::{
+    Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult,
+};
 
 use crate::runtime::bus::Publisher;
 use crate::runtime::matched::Matched;
@@ -140,8 +142,8 @@ impl BeaconSend {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         timing: BeaconTiming,
-        from_addr: tcslibgs::HostPort,
-        dest_addr: tcslibgs::HostPort,
+        from_addr: tcslib_protocol::HostPort,
+        dest_addr: tcslib_protocol::HostPort,
         apid: Option<u16>,
         log: TelemetryLog,
         version: ConfigVersion,
@@ -158,7 +160,7 @@ impl BeaconSend {
         // describable from one end only: nothing could be filtered, captured
         // or firewalled by a rule somebody could write down beforehand.
         let socket = UdpSocket::bind(from_addr.to_string()).map_err(|e| {
-            tcslibgs::TcsError::Config(format!(
+            tcslib_protocol::TcsError::Config(format!(
                 "beacons cannot be sent from {from_addr} ({e}): change \
                  beacon.send in the configuration's tcspecial section to an \
                  address this machine has and a port nothing else is using"
@@ -169,7 +171,7 @@ impl BeaconSend {
         // beacon allocates nothing. Resolving a name is a lookup that
         // allocates, and the destination does not move.
         let unresolved = || {
-            tcslibgs::TcsError::Config(format!(
+            tcslib_protocol::TcsError::Config(format!(
                 "beacons cannot be sent to {dest_addr}, which does not resolve \
                  to an address: change beacon.recv in the configuration's \
                  tcspecial section to the address the ground listens for \
@@ -186,20 +188,22 @@ impl BeaconSend {
         // made here so that sending one allocates nothing.
         let framing = apid
             .map(|apid| {
-                tcslibgs::ccsds::Sender::new(
-                    tcslibgs::ccsds::PacketType::Telemetry,
+                tcslib_protocol::ccsds::Sender::new(
+                    tcslib_protocol::ccsds::PacketType::Telemetry,
                     apid,
                 )
                 .map(|sender| Framing {
                     sender,
                     room: vec![
                         0u8;
-                        tcslibgs::ccsds::HEADER_BYTES
-                            + tcslibgs::BEACON_BYTES
+                        tcslib_protocol::ccsds::HEADER_BYTES
+                            + tcslib_protocol::BEACON_BYTES
                     ],
                 })
                 .map_err(|fault| {
-                    tcslibgs::TcsError::Config(format!("beacon.apid: {fault}"))
+                    tcslib_protocol::TcsError::Config(format!(
+                        "beacon.apid: {fault}"
+                    ))
                 })
             })
             .transpose()?;
@@ -413,7 +417,9 @@ impl BeaconSend {
                 framing: Some(Framing { sender, room }),
             } => {
                 let packet = sender.frame(room, data).map_err(|fault| {
-                    tcslibgs::TcsError::Config(format!("a beacon: {fault}"))
+                    tcslib_protocol::TcsError::Config(format!(
+                        "a beacon: {fault}"
+                    ))
                 })?;
                 socket.send_to(packet, *dest)?;
             }
@@ -422,7 +428,7 @@ impl BeaconSend {
             Out::Bus { publisher, msgid } => {
                 publisher
                     .publish(*msgid, data)
-                    .map_err(tcslibgs::TcsError::Config)?;
+                    .map_err(tcslib_protocol::TcsError::Config)?;
             }
         }
         Ok(())
@@ -484,10 +490,10 @@ enum Out {
     Bus { publisher: Publisher, msgid: u16 },
 }
 
-/// How a beacon goes as a CCSDS Space Packet: see [`tcslibgs::ccsds`].
+/// How a beacon goes as a CCSDS Space Packet: see [`tcslib_protocol::ccsds`].
 struct Framing {
     /// The APID, the type and the beacons' own sequence count.
-    sender: tcslibgs::ccsds::Sender,
+    sender: tcslib_protocol::ccsds::Sender,
     /// Where each packet is made: a header and the longest beacon.
     room: Vec<u8>,
 }
@@ -544,7 +550,7 @@ impl Failing {
 mod tests {
     use super::*;
 
-    use tcslibgs::CIConfig;
+    use tcslib_protocol::CIConfig;
 
     /// Makes a timing that beacons every fifty milliseconds, across a
     /// restart or not.
@@ -582,50 +588,54 @@ mod tests {
 
         let log = TelemetryLog::open(
             &CIConfig {
-                links: tcslibgs::Links::Sockets(tcslibgs::Sockets {
-                    address: "127.0.0.1".to_string(),
-                    port: 0,
-                    payload_command_source_base: tcslibgs::HostPort {
+                links: tcslib_protocol::Links::Sockets(
+                    tcslib_protocol::Sockets {
                         address: "127.0.0.1".to_string(),
                         port: 0,
+                        payload_command_source_base:
+                            tcslib_protocol::HostPort {
+                                address: "127.0.0.1".to_string(),
+                                port: 0,
+                            },
+                        payload_command_dest_base: tcslib_protocol::HostPort {
+                            address: "127.0.0.1".to_string(),
+                            port: 0,
+                        },
+                        moc_cmd_send: tcslib_protocol::HostPort {
+                            address: "127.0.0.1".to_string(),
+                            port: 4100,
+                        },
+                        payload_source_base: tcslib_protocol::HostPort {
+                            address: "0.0.0.0".to_string(),
+                            port: 6000,
+                        },
+                        payload_dest_base: tcslib_protocol::HostPort {
+                            address: "127.0.0.1".to_string(),
+                            port: 6100,
+                        },
+                        beacon_send: tcslib_protocol::HostPort {
+                            address: "127.0.0.1".to_string(),
+                            port: 0,
+                        },
+                        beacon_recv: tcslib_protocol::HostPort {
+                            address: at.ip().to_string(),
+                            port: at.port(),
+                        },
+                        framing: None,
                     },
-                    payload_command_dest_base: tcslibgs::HostPort {
-                        address: "127.0.0.1".to_string(),
-                        port: 0,
-                    },
-                    moc_cmd_send: tcslibgs::HostPort {
-                        address: "127.0.0.1".to_string(),
-                        port: 4100,
-                    },
-                    payload_source_base: tcslibgs::HostPort {
-                        address: "0.0.0.0".to_string(),
-                        port: 6000,
-                    },
-                    payload_dest_base: tcslibgs::HostPort {
-                        address: "127.0.0.1".to_string(),
-                        port: 6100,
-                    },
-                    beacon_send: tcslibgs::HostPort {
-                        address: "127.0.0.1".to_string(),
-                        port: 0,
-                    },
-                    beacon_recv: tcslibgs::HostPort {
-                        address: at.ip().to_string(),
-                        port: at.port(),
-                    },
-                    framing: None,
-                }),
+                ),
                 beacon_interval: Duration::from_millis(50),
                 reset_interval: Duration::from_millis(50),
                 // Nothing to write: what is being tested is what goes out.
                 log_dir: None,
                 log_segment_bytes: 65_536,
-                restart_arm_valid: tcslibgs::RESTART_ARM_VALID_DEFAULT,
-                gateway: tcslibgs::gateway::GatewayKind::Radio,
-                interface: tcslibgs::InterfaceDigest::of_this_build(),
+                restart_arm_valid: tcslib_protocol::RESTART_ARM_VALID_DEFAULT,
+                gateway: tcslib_protocol::gateway::GatewayKind::Radio,
+                interface: tcslib_protocol::InterfaceDigest::of_this_build(),
                 configurations: None,
-                configurations_kept: tcslibgs::CONFIGURATIONS_KEPT_DEFAULT,
-                load_trials: tcslibgs::LOAD_TRIALS_DEFAULT,
+                configurations_kept:
+                    tcslib_protocol::CONFIGURATIONS_KEPT_DEFAULT,
+                load_trials: tcslib_protocol::LOAD_TRIALS_DEFAULT,
                 state_file: String::new(),
             },
             &crate::segsend::SegSend::none(),
@@ -636,11 +646,11 @@ mod tests {
             fifty(),
             // From a port of the system's choosing, to where the ground
             // socket above is bound.
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 0,
             },
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: at.ip().to_string(),
                 port: at.port(),
             },
@@ -703,11 +713,11 @@ mod tests {
         let at = ground.local_addr().expect("where it is");
         let sender = BeaconSend::new(
             timing,
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 0,
             },
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: at.ip().to_string(),
                 port: at.port(),
             },
@@ -826,11 +836,11 @@ mod tests {
 
         let refused = BeaconSend::new(
             fifty(),
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: at.ip().to_string(),
                 port: at.port(),
             },
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 9,
             },
@@ -853,11 +863,11 @@ mod tests {
     fn a_beacon_destination_that_does_not_resolve_is_refused_at_the_start() {
         let refused = BeaconSend::new(
             fifty(),
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: "127.0.0.1".to_string(),
                 port: 0,
             },
-            tcslibgs::HostPort {
+            tcslib_protocol::HostPort {
                 address: "no-such-host.invalid".to_string(),
                 port: 5550,
             },

@@ -2,9 +2,9 @@
 //! for each unit, and every switch's decisions under them.
 //!
 //! What is plotted is what the configuration says reaches the ground. A value
-//! is anything `tcslibgs::graph::units::unit_of` gives a unit -- a
+//! is anything `tcslib_protocol::graph::units::unit_of` gives a unit -- a
 //! conversion, a vote, a program's answer -- read by the rule the vehicle
-//! writes it by, `tcslibgs::node::vehicle::compute::from_value`, in that
+//! writes it by, `tcslib_protocol::node::vehicle::compute::from_value`, in that
 //! unit. A switch is a node that sends decisions, a `thermostat`, or a
 //! `gpio_inout`'s report of what its lines were told -- a `boolean` or a
 //! whole number, drawn on where it is not nought; or one line of a GPIO
@@ -69,10 +69,12 @@ use slint::{
     Color, ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode,
     VecModel,
 };
-use tcslibgs::graph::units::{input_unit, unit_of};
-use tcslibgs::graph::Graph;
-use tcslibgs::node::vehicle::compute::{from_value, params_of, Computation};
-use tcslibgs::unit::Unit;
+use tcslib_protocol::graph::units::{input_unit, unit_of};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::node::vehicle::compute::{
+    from_value, params_of, Computation,
+};
+use tcslib_protocol::unit::Unit;
 
 use crate::{
     MainWindow, PanelShown, PlotWindow, SpanShown, SwitchShown, TickShown,
@@ -397,7 +399,7 @@ impl Plot {
         let mut thermostats: Vec<(Unit, Band)> = Vec::new();
         // By name, the one order a configuration has: the panels, traces
         // and switches are drawn in it.
-        let mut nodes: Vec<&tcslibgs::graph::Node> =
+        let mut nodes: Vec<&tcslib_protocol::graph::Node> =
             graph.nodes.iter().collect();
         nodes.sort_by(|a, b| a.name.cmp(&b.name));
         for node in nodes {
@@ -440,10 +442,10 @@ impl Plot {
             // doing. And a gpio_inout's report, what a heater was told. A
             // node whose reach does not settle is refused before the window
             // opens.
-            if let Ok(tcslibgs::graph::reach::Reach {
-                endpoint: tcslibgs::EndpointConfig::Gpio(gpio),
+            if let Ok(tcslib_protocol::graph::reach::Reach {
+                endpoint: tcslib_protocol::EndpointConfig::Gpio(gpio),
                 ..
-            }) = tcslibgs::graph::reach::reach_of(node)
+            }) = tcslib_protocol::graph::reach::reach_of(node)
             {
                 if !gpio.inputs.is_empty() {
                     line_sets.push(LineSet {
@@ -1173,9 +1175,9 @@ fn drives(graph: &Graph, switch: &str) -> Vec<String> {
             continue;
         }
         for to in link.to.each() {
-            let node = tcslibgs::graph::Destination::parse(to).node;
+            let node = tcslib_protocol::graph::Destination::parse(to).node;
             let is_payload = graph.node(&node).is_some_and(|n| {
-                !tcslibgs::gateway::is_gateway(&n.node_type)
+                !tcslib_protocol::gateway::is_gateway(&n.node_type)
                     && n.node_type != "log"
                     && n.node_type != "compute"
             });
@@ -1589,7 +1591,7 @@ pub(crate) mod tests {
     ///
     /// Whether a node's data reaches the ground.
     fn reaching(graph: &Graph) -> impl Fn(&str) -> bool {
-        let sources: Vec<String> = tcslibgs::graph::telemetry::of(graph)
+        let sources: Vec<String> = tcslib_protocol::graph::telemetry::of(graph)
             .expect("its links to the ground")
             .into_iter()
             .map(|link| link.source)
@@ -1955,8 +1957,8 @@ pub(crate) mod tests {
     /// own strip, but the band drawn is the first stage's.
     #[test]
     fn staged_heating_draws_the_first_stages_band() {
-        use tcslibgs::endpoint_config::Scalar;
-        use tcslibgs::graph::{Destinations, Link};
+        use tcslib_protocol::endpoint_config::Scalar;
+        use tcslib_protocol::graph::{Destinations, Link};
 
         let mut graph = example("thermostat");
         let mut second = graph

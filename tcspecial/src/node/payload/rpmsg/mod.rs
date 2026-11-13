@@ -29,7 +29,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
 
 use nix::poll::PollFlags;
-use tcslibgs::{
+use tcslib_protocol::{
     node::payload::rpmsg::message_bytes, RpmsgConfig, TcsError, TcsResult,
 };
 

@@ -1,29 +1,29 @@
 //! What the Python reads out of the configuration is what the Rust reads.
 //!
 //! The ground station is Python and reads the XML spelling; the vehicle reads
-//! the configuration through `tcslibgs`. `thermostat_yamcs.py` writes Yamcs's
-//! configuration from what it reads -- where Yamcs sends commands, where it
-//! listens for each source's data and the beacon, the APIDs that tell them
-//! apart -- and its mission database gives each source's parameter the type
-//! the configuration's own XTCE says its data are, by `tcslibgs/form.py`. A
-//! port, an APID or a form the two sides work out differently is a Yamcs
-//! that listens where nothing arrives, or reads a temperature as something
-//! else. So this holds the Python's answers for `thermostat-yamcs.xtcs` to
-//! the Rust's for `thermostat-yamcs.ytcs`, and the Python's form of every
-//! node of every example, read from its own XTCE, to
-//! `tcslibgs::graph::fprime::Form::of`, which tcsmoc's plot window and the
-//! F´ bridge go by, so that the two cannot drift.
+//! the configuration through `tcslib-protocol`. `thermostat_yamcs.py` writes
+//! Yamcs's configuration from what it reads -- where Yamcs sends commands,
+//! where it listens for each source's data and the beacon, the APIDs that tell
+//! them apart -- and its mission database gives each source's parameter the
+//! type the configuration's own XTCE says its data are, by `tcslibgs/form.py`.
+//! A port, an APID or a form the two sides work out differently is a Yamcs that
+//! listens where nothing arrives, or reads a temperature as something else. So
+//! this holds the Python's answers for `thermostat-yamcs.xtcs` to the Rust's
+//! for `thermostat-yamcs.ytcs`, and the Python's form of every node of every
+//! example, read from its own XTCE, to
+//! `tcslib_protocol::graph::fprime::Form::of`, which tcsmoc's plot window and
+//! the F´ bridge go by, so that the two cannot drift.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use tcslibgs::config_digest::digest_of_file;
-use tcslibgs::graph::fprime::Form;
-use tcslibgs::graph::parameters::{beacon_of, ci_config_of, flatten};
-use tcslibgs::graph::reach::apid_base_of;
-use tcslibgs::graph::telemetry::{self, Via};
-use tcslibgs::graph::Graph;
-use tcslibgs::unit::Unit;
+use tcslib_protocol::config_digest::digest_of_file;
+use tcslib_protocol::graph::fprime::Form;
+use tcslib_protocol::graph::parameters::{beacon_of, ci_config_of, flatten};
+use tcslib_protocol::graph::reach::apid_base_of;
+use tcslib_protocol::graph::telemetry::{self, Via};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::unit::Unit;
 
 /// Where the example is.
 ///
@@ -290,8 +290,8 @@ fn every_nodes_form_is_the_rusts() {
     assert_eq!(said.trim(), format!("{:?}", Form::Datum));
 }
 
-/// The Python's table of units is `tcslibgs::unit`'s: each unit, in order,
-/// with the same name, symbol, words and steps.
+/// The Python's table of units is `tcslib_protocol::unit`'s: each unit, in
+/// order, with the same name, symbol, words and steps.
 #[test]
 fn the_units_are_the_rusts() {
     let said = yamcs_common::python(

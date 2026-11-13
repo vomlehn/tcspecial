@@ -10,4 +10,4 @@
 //! its type, and that a run that simulates it may reach it at its `sim_address`
 //! over UDP, where tcssim answers with the temperature of the thermal mass it
 //! is joined to. Under the flight setting `sim_address` is never used, and the
-//! bus is what is opened: see `tcslibgs::graph::reach::Reach::opened`.
+//! bus is what is opened: see `tcslib_protocol::graph::reach::Reach::opened`.

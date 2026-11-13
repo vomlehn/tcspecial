@@ -7,14 +7,14 @@
 //!
 //! Two of these are payloads that are not devices: `app_pl` and `app_all_pl`
 //! are programs the mission wrote, run by tcspecial and read the way a sensor
-//! is read. What a file may say about either is `tcslibgs::node::app`, that
-//! rule being one rule for all five app node types, and the interfaces their
-//! programs are run with are `tcsapp`.
+//! is read. What a file may say about either is `tcslib_protocol::node::app`,
+//! that rule being one rule for all five app node types, and the interfaces
+//! their programs are run with are `tcsapp`.
 //!
 //! `network` is here and serves two sections: a network payload and the ground
 //! link are the same endpoint code, a socket being a socket whichever end of
 //! the mission is at the other end of it. That is why there is no `gateway`
-//! directory -- see `tcslibgs::node`.
+//! directory -- see `tcslib_protocol::node`.
 //!
 //! Which of the types are here is chosen when tcspecial is built: each is a
 //! Cargo feature named as a configuration writes the type, and [`BUILT`] is
@@ -56,7 +56,7 @@ pub mod app_pl;
 /// The one list of them: the check made as a configuration is loaded, the
 /// startup summary and `tcspecial --types` all read it, so none can disagree
 /// with the others about what was built. The words are
-/// [`tcslibgs::graph::built::OPTIONAL_TYPES`], in that order.
+/// [`tcslib_protocol::graph::built::OPTIONAL_TYPES`], in that order.
 pub const BUILT: &[&str] = &[
     #[cfg(feature = "device-file")]
     "device-file",
@@ -135,7 +135,7 @@ compile_error!(
 #[cfg(test)]
 mod tests {
     use super::BUILT;
-    use tcslibgs::graph::built::OPTIONAL_TYPES;
+    use tcslib_protocol::graph::built::OPTIONAL_TYPES;
 
     /// Built with its defaults, tcspecial contains every type a build may
     /// leave out, in the order that list has. A feature misnamed here, or a

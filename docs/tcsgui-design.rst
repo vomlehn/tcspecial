@@ -642,22 +642,22 @@ component: its ``connects`` is set to the terminal, or, for a GPIO payload
 watching lines, given the terminal after those it names already, one decision a
 line. The line says only which two things, the component being drawn with one
 output and one input whatever its type has, so the terminals come from the rules
-a file is held to -- ``tcslibgs::node::physics::connectable`` for a connection,
-an output to an input of one kind, and ``tcslibgs::sim_config::may_join`` for a
-simulated payload -- and each is offered where the line was clicked, with
-Cancel, one join or several -- a heater's heat, current and heating to a sensor
--- rather than one guessed at: a line to the wrong terminal is a simulator that
-reads something other than was meant. A join already made is offered greyed,
-saying so. Moving, connecting and joining, like placing, setting and removing,
-are edits like any other, each taken back by one undo. Removing a component
-removes the connections that join it and takes it out of every simulated
-payload's ``connects``, as removing a node removes its links, and all of it
-comes back with one undo. Without a simulator file the list is greyed and says
-to open one, and so does the Physics pane, which is drawn all the same: some of
-every pane is always to be seen, and a pane that came and went with a second
-file would be one nobody could find. The world's ``ambient_temp`` is edited in
-the simulator file for now, and so is a connection or a join that is to be taken
-away.
+a file is held to -- ``tcslib_protocol::node::physics::connectable`` for a
+connection, an output to an input of one kind, and
+``tcslib_protocol::sim_config::may_join`` for a simulated payload -- and each is
+offered where the line was clicked, with Cancel, one join or several -- a
+heater's heat, current and heating to a sensor -- rather than one guessed at: a
+line to the wrong terminal is a simulator that reads something other than was
+meant. A join already made is offered greyed, saying so. Moving, connecting and
+joining, like placing, setting and removing, are edits like any other, each
+taken back by one undo. Removing a component removes the connections that join
+it and takes it out of every simulated payload's ``connects``, as removing a
+node removes its links, and all of it comes back with one undo. Without a
+simulator file the list is greyed and says to open one, and so does the Physics
+pane, which is drawn all the same: some of every pane is always to be seen, and
+a pane that came and went with a second file would be one nobody could find. The
+world's ``ambient_temp`` is edited in the simulator file for now, and so is a
+connection or a join that is to be taken away.
 
 Where the Physics pane's line and the physics list's line are is kept in the
 preferences file beside the others: the pane's width as a percentage of the
@@ -900,16 +900,16 @@ being padded away from whichever side carries terminals.
 
 Only the terminals the type actually has. A payload carries its two on its
 right, a gateway link its two on its left, an ``app_all_veh`` all four, a tee
-its three, a null node its one, a log the one it receives on, and a
-computation and a page of its own all four -- a computation may be on either
-stream in either direction, and what is inside a page may have any of them,
-which nothing outside it knows. A drawing that showed four
-on every node would say nothing about what may be linked to what, which is the
-one thing about a graph that the shapes cannot say. The table is the schema's
-own, ``tcslibgs::graph::terminals``, read rather than copied wherever it has an
-answer, so a terminal added there appears on the canvas without the editor
-being touched; the computation, the log and the page, whose terminals that
-table leaves to them, are answered in ``tcsdiagram::style``.
+its three, a null node its one, a log the one it receives on, and a computation
+and a page of its own all four -- a computation may be on either stream in
+either direction, and what is inside a page may have any of them, which nothing
+outside it knows. A drawing that showed four on every node would say nothing
+about what may be linked to what, which is the one thing about a graph that the
+shapes cannot say. The table is the schema's own,
+``tcslib_protocol::graph::terminals``, read rather than copied wherever it has
+an answer, so a terminal added there appears on the canvas without the editor
+being touched; the computation, the log and the page, whose terminals that table
+leaves to them, are answered in ``tcsdiagram::style``.
 
 The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
@@ -1393,7 +1393,7 @@ so a line carrying what the ground sends has nothing to reach on a gateway
 node -- offers no menu, and the line stays in hand with the box on the sheet
 saying so, which is a kinder answer to a near miss than throwing away a line
 that took a click to pick up. The rule is still
-``tcslibgs::graph::terminals``; the menu only says it.
+``tcslib_protocol::graph::terminals``; the menu only says it.
 
 A link that is already there can be picked up by either of its ends. Click the
 terminal it is attached to and the line comes off the drawing and into the
@@ -2132,7 +2132,7 @@ Which terminals a type has is declared there, and so is what a node of it may
 be told. Both were written in Rust where nobody adding a node type could see
 them, and both are still *read* from Rust by the parts that cannot afford to
 read a file -- the checking and the flight software have
-``tcslibgs::graph::terminals``, and a window has
+``tcslib_protocol::graph::terminals``, and a window has
 ``style::NodeType::attributes`` for a type the tree does not describe. So the
 tree is held against those: ``the_trees_terminals_are_the_schemas`` and
 ``a_description_of_a_whole_type_says_what_the_type_says``. A description of one
@@ -2178,8 +2178,8 @@ That is ``vehicle/compute/vote.yaml`` shortened. An attribute may also say its
 ``kind``, which is what its field is offered as: ``boolean`` is a control with
 two states, and ``text``, ``path``, ``whole``, ``interval``, ``timeout`` and
 ``bytes`` are a box to write in, a kind with a rule of its own naming the
-``tcslibgs`` rule a value of it is read by (``nodes::KINDS``). Unstated is
-``text``; ``process.xml`` states a ``path``, an ``interval`` and a
+``tcslib-protocol`` rule a value of it is read by (``nodes::KINDS``). Unstated
+is ``text``; ``process.xml`` states a ``path``, an ``interval`` and a
 ``boolean``.
 
 The shape of one of those files has two schemas of its own, ``node.xsd`` and
@@ -2207,11 +2207,11 @@ cannot find the tree at all offers every type as itself, which is exactly what
 it offered before there was a tree.
 
 What a computation is told is the flight software's own list, and the tree is
-held to it: ``tcslibgs::node::vehicle::compute::attributes_of`` says what each
-computation takes, ``params_of`` refuses anything else, and a test says each
-description asks for exactly that list. A description that asked for something
-else would be a panel filling in a field the checking then refuses, or leaving
-out one it requires.
+held to it: ``tcslib_protocol::node::vehicle::compute::attributes_of`` says what
+each computation takes, ``params_of`` refuses anything else, and a test says
+each description asks for exactly that list. A description that asked for
+something else would be a panel filling in a field the checking then refuses, or
+leaving out one it requires.
 
 A file that is not a description is refused on its own and the rest of the tree
 is still read: a tree people edit has a half-written file in it sooner or
@@ -2223,10 +2223,10 @@ the same way -- a name picks out one node here as it does in a configuration.
 Schemas Beside the Tree
 =======================
 
-``tcslibgs/schema`` holds a schema for each file tcsgui edits, in each
+``tcslib-protocol/schema`` holds a schema for each file tcsgui edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
-tcslibgs's rather than this editor's, because every program that reads a
+tcslib-protocol's rather than this editor's, because every program that reads a
 configuration reads those formats; they are installed under
 ``$(PREFIX)/share/tcspecial/schema``. The schemas of the editor's own node
 descriptions stay with it, in ``tcsgui/share/schema``.
@@ -2269,11 +2269,11 @@ that is the two attributes every XML tool reads::
 
     <configuration
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="tcslibgs/schema/tcspecial.xsd">
+        xsi:noNamespaceSchemaLocation="tcslib-protocol/schema/tcspecial.xsd">
 
 and in YAML it is a comment, there being no other way to say it in YAML::
 
-    # yaml-language-server: $schema=tcslibgs/schema/tcspecial.schema.json
+    # yaml-language-server: $schema=tcslib-protocol/schema/tcspecial.schema.json
 
 Both are written by ``nodes::schema_reference``, which gives the path relative
 to the file where the schemas are above it -- which is a checkout, where these

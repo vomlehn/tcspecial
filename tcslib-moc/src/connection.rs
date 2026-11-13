@@ -3,7 +3,7 @@
 use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
-use tcslibgs::{
+use tcslib_protocol::{
     came_from, Command, CommandPacker, HostPort, TcsError, TcsResult, Telemetry,
 };
 
@@ -262,7 +262,7 @@ mod tests {
     /// which datagram was taken rather than about the receive having failed.
     #[test]
     fn a_datagram_from_elsewhere_is_not_an_answer() {
-        use tcslibgs::{CommandStatus, PingTelemetry, Telemetry};
+        use tcslib_protocol::{CommandStatus, PingTelemetry, Telemetry};
 
         let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("the far end");
         let at = spacecraft.local_addr().expect("where it is");

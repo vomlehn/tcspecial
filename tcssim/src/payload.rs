@@ -31,9 +31,9 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use rand::Rng;
-use tcslibgs::DHSample;
+use tcslib_protocol::DHSample;
 
-use tcslibgs::Faults;
+use tcslib_protocol::Faults;
 
 /// Payload configuration
 #[derive(Clone)]
@@ -126,8 +126,8 @@ pub struct PayloadConfig {
     /// Whether its simulation has been made, which the readiness socket says:
     /// see [`crate::ready`].
     pub standing: Arc<crate::ready::Standing>,
-    /// Whether the payload is only driven, so that its simulation sends
-    /// nothing and watches what arrives: see `tcslibgs::DHConfig::driven`.
+    /// Whether the payload is only driven, so that its simulation sends nothing
+    /// and watches what arrives: see `tcslib_protocol::DHConfig::driven`.
     pub driven: bool,
 }
 
@@ -471,7 +471,11 @@ impl SimulatedPayload {
     ///           the packet went, so that a picture says the same time
     ///           whenever it is made.
     /// * `rng` - Where the random faults come from.
-    pub fn take_a_turn(&self, at: tcslibgs::Timestamp, rng: &mut impl Rng) {
+    pub fn take_a_turn(
+        &self,
+        at: tcslib_protocol::Timestamp,
+        rng: &mut impl Rng,
+    ) {
         let pacing = Pacing::read(&self.config);
         if !pacing.a_packet_is_due(self.config.triggered, 0) {
             return;

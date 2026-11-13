@@ -17,7 +17,7 @@ use std::time::Duration;
 use tcslib_moc::beacon::Stage;
 use tcslib_moc::matched::Matched;
 use tcslib_moc::{TcsClient, UdpConnection};
-use tcslibgs::{
+use tcslib_protocol::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
     PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
@@ -220,7 +220,7 @@ fn stub_counts() -> NodeCounts {
         asks: 40,
         asks_failed: 3,
         strangers: 4,
-        last_moved: Some(tcslibgs::Timestamp {
+        last_moved: Some(tcslib_protocol::Timestamp {
             micros: 1_700_000_000_000_000,
         }),
     }

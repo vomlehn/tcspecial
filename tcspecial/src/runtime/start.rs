@@ -18,10 +18,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 use log::{debug, error, info, warn};
-use tcslibgs::config_digest::{ConfigDigest, ConfigVersion};
-use tcslibgs::graph::Graph;
-use tcslibgs::simulate::{judge, refusals, Host, Judged, Mode};
-use tcslibgs::Links;
+use tcslib_protocol::config_digest::{ConfigDigest, ConfigVersion};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::simulate::{judge, refusals, Host, Judged, Mode};
+use tcslib_protocol::Links;
 
 use crate::beacon_send::BeaconSend;
 use crate::runtime::bus::{Bus, BusReader};
@@ -312,7 +312,7 @@ fn clean_up(running: Running) {
 
 /// Judges each payload of `graph`, says in the summary what each was found
 /// to be, and gives whatever `mode` forbids of them: see
-/// `tcslibgs::simulate`.
+/// `tcslib_protocol::simulate`.
 ///
 /// # Arguments
 ///
@@ -413,8 +413,8 @@ fn telemetry_log(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(TelemetryLog::disabled());
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(
-        &tcslibgs::graph::parameters::flatten(section),
+    let ci = tcslib_protocol::graph::parameters::ci_config_of(
+        &tcslib_protocol::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
     let log = TelemetryLog::open(&ci, segsend).map_err(|e| e.to_string())?;
@@ -452,8 +452,8 @@ fn telemetry_log(
 /// beside this program, or its not starting, as a message.
 fn segsend_for(graph: &Graph) -> Result<SegSend, String> {
     let telemetry = match graph.tcspecial.as_ref() {
-        Some(section) => tcslibgs::graph::parameters::ci_config_of(
-            &tcslibgs::graph::parameters::flatten(section),
+        Some(section) => tcslib_protocol::graph::parameters::ci_config_of(
+            &tcslib_protocol::graph::parameters::flatten(section),
         )?
         .to_ci_config()?
         .log_dir
@@ -491,14 +491,14 @@ fn open_bus(graph: &Graph) -> Result<Option<(Bus, BusReader)>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(
-        &tcslibgs::graph::parameters::flatten(section),
+    let ci = tcslib_protocol::graph::parameters::ci_config_of(
+        &tcslib_protocol::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
     let Some(settled) = ci.bus() else {
         return Ok(None);
     };
-    let used = tcslibgs::graph::telemetry::msgids(graph)
+    let used = tcslib_protocol::graph::telemetry::msgids(graph)
         .map_err(|refused| refused.why)?;
     let opened = Bus::open(settled, &used)?;
     summary(format!(
@@ -563,8 +563,8 @@ fn beacons(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let ci = tcslibgs::graph::parameters::ci_config_of(
-        &tcslibgs::graph::parameters::flatten(section),
+    let ci = tcslib_protocol::graph::parameters::ci_config_of(
+        &tcslib_protocol::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
     let timing = crate::beacon_send::BeaconTiming {
@@ -686,8 +686,8 @@ fn command_links(
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
-    let mut ci = tcslibgs::graph::parameters::ci_config_of(
-        &tcslibgs::graph::parameters::flatten(section),
+    let mut ci = tcslib_protocol::graph::parameters::ci_config_of(
+        &tcslib_protocol::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
     // The state file is the command line's configuration's, whichever

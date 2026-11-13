@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A ping, and the ping node's answer to it: the whole of each, as the
+     ground sends a ping to a `ping` node through a gateway node and the
+     answer comes back down through it.
+
+     The ping node's own interface, and no part of tcspecial's: the commands and
+     answers of the link are in fixed.xtce and link.xtce, and the beacon in
+     beacon.xtce. What a ping and its answer say is
+     tcslib-protocol/src/node/vehicle/ping/mod.rs's and
+     python/tcslibgs/ping.py's, which write and read them; this states the same
+     layout in XTCE, so that a ground station that reads XTCE (Yamcs, through
+     python/tcslibgs/yamcs.py) can send a ping and show its answer as the text
+     they are. A test in tcslib-protocol/src/node/vehicle/ping/mod.rs packs and
+     unpacks pings and answers with the code tcs-xtce generates from this,
+     tcslib-protocol/src/ping_packet.rs, and holds the bytes to those the Rust
+     writes; python/tests/test_ping.py does the same with
+     python/tcslibgs/ping_packet.py. `make ping-packet` in tcslib-protocol/
+     generates both.
+
+     A ping is text, and only text:
+
+       ping #42 1760900000.000000001
+
+     the prefix "ping #"; the count, decimal digits from one, ended by a
+     space; the seconds since the UNIX epoch, ended by a point; and exactly
+     nine digits of nanoseconds, which end it. Its answer is the ping, a
+     space, and the vehicle's time written as the ping's is:
+
+       ping #42 1760900000.000000001 1760900000.000500002
+
+     A count and a whole number of seconds are each at most twenty digits,
+     those of the largest 64-bit number, so a ping is at most 57 bytes and
+     an answer at most 88. What the digits must be (no leading nought, a
+     count from one, numbers that fit in 64 bits) is the Rust's and the
+     Python's to check, as XTCE says nothing of a string's characters.
+
+     Like every XTCE document here, this stays on the ground: nothing
+     aboard reads it, and the ping node answers by the Rust. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsPing">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <!-- What every ping begins with: "ping #". -->
+      <StringParameterType name="PingPrefixType">
+        <StringDataEncoding encoding="US-ASCII">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>48</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
+      <!-- The count, ended by a space: at most twenty digits and the
+           space. -->
+      <StringParameterType name="PingCountType">
+        <StringDataEncoding encoding="US-ASCII">
+          <Variable maxSizeInBits="168">
+            <TerminationChar>20</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <!-- A time's whole seconds, ended by the point: at most twenty
+           digits and the point. -->
+      <StringParameterType name="PingSecondsType">
+        <StringDataEncoding encoding="US-ASCII">
+          <Variable maxSizeInBits="168">
+            <TerminationChar>2E</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <!-- A time's nanoseconds: exactly nine digits. -->
+      <StringParameterType name="PingNanosecondsType">
+        <StringDataEncoding encoding="US-ASCII">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>72</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
+      <!-- The space between the ping and the vehicle's time. -->
+      <StringParameterType name="PingSpaceType">
+        <StringDataEncoding encoding="US-ASCII">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>8</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="ReplyPrefix" parameterTypeRef="PingPrefixType"/>
+      <Parameter name="ReplyCount" parameterTypeRef="PingCountType"/>
+      <Parameter name="ReplySentSeconds" parameterTypeRef="PingSecondsType"/>
+      <Parameter name="ReplySentNanoseconds"
+                 parameterTypeRef="PingNanosecondsType"/>
+      <Parameter name="ReplySpace" parameterTypeRef="PingSpaceType"/>
+      <Parameter name="ReplyAnsweredSeconds"
+                 parameterTypeRef="PingSecondsType"/>
+      <Parameter name="ReplyAnsweredNanoseconds"
+                 parameterTypeRef="PingNanosecondsType"/>
+    </ParameterSet>
+    <ContainerSet>
+      <!-- The answer's fields, in order: the ping it answers, field by
+           field, the space, and the vehicle's time. -->
+      <SequenceContainer name="PingReplyFields" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="ReplyPrefix"/>
+          <ParameterRefEntry parameterRef="ReplyCount"/>
+          <ParameterRefEntry parameterRef="ReplySentSeconds"/>
+          <ParameterRefEntry parameterRef="ReplySentNanoseconds"/>
+          <ParameterRefEntry parameterRef="ReplySpace"/>
+          <ParameterRefEntry parameterRef="ReplyAnsweredSeconds"/>
+          <ParameterRefEntry parameterRef="ReplyAnsweredNanoseconds"/>
+        </EntryList>
+      </SequenceContainer>
+      <!-- The answer, whose prefix and space are what they always are. -->
+      <SequenceContainer name="PingReply">
+        <EntryList/>
+        <BaseContainer containerRef="PingReplyFields">
+          <RestrictionCriteria>
+            <ComparisonList>
+              <Comparison parameterRef="ReplyPrefix" value="ping #"/>
+              <Comparison parameterRef="ReplySpace" value=" "/>
+            </ComparisonList>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <StringArgumentType name="PingCountArg">
+        <StringDataEncoding encoding="US-ASCII">
+          <Variable maxSizeInBits="168">
+            <TerminationChar>20</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringArgumentType>
+      <StringArgumentType name="PingSecondsArg">
+        <StringDataEncoding encoding="US-ASCII">
+          <Variable maxSizeInBits="168">
+            <TerminationChar>2E</TerminationChar>
+          </Variable>
+        </StringDataEncoding>
+      </StringArgumentType>
+      <StringArgumentType name="PingNanosecondsArg">
+        <StringDataEncoding encoding="US-ASCII">
+          <SizeInBits>
+            <Fixed>
+              <FixedValue>72</FixedValue>
+            </Fixed>
+          </SizeInBits>
+        </StringDataEncoding>
+      </StringArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <!-- A ping: "ping #", then the count, the seconds and the
+           nanoseconds of the time it is sent, each written as the
+           parameters of the answer are. -->
+      <MetaCommand name="Ping">
+        <ArgumentList>
+          <Argument name="Count" argumentTypeRef="PingCountArg"/>
+          <Argument name="SentSeconds" argumentTypeRef="PingSecondsArg"/>
+          <Argument name="SentNanoseconds"
+                    argumentTypeRef="PingNanosecondsArg"/>
+        </ArgumentList>
+        <CommandContainer name="PingText">
+          <EntryList>
+            <FixedValueEntry name="Prefix" binaryValue="70696E672023"
+                             sizeInBits="48"/>
+            <ArgumentRefEntry argumentRef="Count"/>
+            <ArgumentRefEntry argumentRef="SentSeconds"/>
+            <ArgumentRefEntry argumentRef="SentNanoseconds"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>

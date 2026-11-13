@@ -62,7 +62,7 @@ TCS_HELPERS_REQUIRED := 0.8.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcslibgs/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
-# cannot follow a variable. See the tcs-xtce target in tcslibgs/Makefile.
+# cannot follow a variable. See the tcs-xtce target in tcslib-protocol/Makefile.
 TCS_XTCE := $(BESIDE)/tcs-xtce
 BINDIR = $(PREFIX)/bin
 SBINDIR = $(PREFIX)/sbin
@@ -74,8 +74,8 @@ DOCDIR = $(DATADIR)/doc
 EXAMPLEDIR = $(DATADIR)/examples/$(PROJECT_NAME)
 PYTHONDIR = $(LIBDIR)/python3/site-packages
 TCSGUI_DATA = $(DESTDIR)$(DATADIR)/$(GUI_NAME)
-# The XTCS, YTCS and simulator schemas, tcslibgs/schema: tcspecial's and not
-# tcsgui's, since they define the formats every program reads.
+# The XTCS, YTCS and simulator schemas, tcslib-protocol/schema: tcspecial's and
+# not tcsgui's, since they define the formats every program reads.
 SCHEMADIR = $(DATADIR)/tcspecial/schema
 
 # Where the hooks go. Debian's places; the RPM spec moves the .pth file to
@@ -303,12 +303,12 @@ doc-headers: tcs-xtce
 	python3 -I $(TCS_XTCE)/tests/doc_headers.py
 
 # Stop, saying what to do, unless the tcs-xtce checkout beside this one is
-# there, at the version tcslibgs pins the tcs-xtce crate to, and ready to
+# there, at the version tcslib-protocol pins the tcs-xtce crate to, and ready to
 # run: the tests reach its Python runtime through python/tcslibgs/_xtce,
 # and installing the ground package copies it from there.
 .PHONY: tcs-xtce
 tcs-xtce:
-	@$(MAKE) --no-print-directory -C tcslibgs tcs-xtce
+	@$(MAKE) --no-print-directory -C tcslib-protocol tcs-xtce
 
 # Stop, saying what to do, unless the tcs-helpers checkout is there and
 # at least TCS_HELPERS_REQUIRED.
@@ -465,7 +465,7 @@ VEHICLE_GUIDE_CONFIGURATIONS = \
 		$(stage)/deck.xtcs)
 
 # Write this build's interface digest into every shipped configuration, in
-# place and changing nothing else, after tcslibgs/xtce/link.xtce changes:
+# place and changing nothing else, after tcslib-protocol/xtce/link.xtce changes:
 # tcsverify --set-interface, which says what it changed. A test in
 # tcsverify/tests/examples.rs fails while one is stale.
 .PHONY: set-interfaces
@@ -482,7 +482,7 @@ OWN_XTCE_CONFIGURATIONS = $(filter %.ytcs, \
 	$(filter-out $(VEHICLE_GUIDE_CONFIGURATIONS),$(SHIPPED_CONFIGURATIONS)))
 
 # Write each one's own XTCE again, after a configuration or
-# tcslibgs/xtce/types.xtce changes: tcsverify --xtce, which says what it
+# tcslib-protocol/xtce/types.xtce changes: tcsverify --xtce, which says what it
 # wrote.
 .PHONY: xtce
 xtce:
@@ -1008,10 +1008,10 @@ install-tcspecial-ground: install-data tcs-helpers tcs-xtce
 	$(call install_links,tcspecial-ground,$(GROUND_BIN))
 	$(SUBST) packaging/tcs.pc.in > $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcs.pc
-# The schemas the Python reads are tcslibgs/schema, which install-data puts
-# under $(SCHEMADIR): the installed package reaches them through a link, as
-# python/tcslibgs/schema does in the source tree, rather than carrying a
-# second copy that could differ from the first.
+# The schemas the Python reads are tcslib-protocol/schema, which install-data
+# puts under $(SCHEMADIR): the installed package reaches them through a link, as
+# python/tcslibgs/schema does in the source tree, rather than carrying a second
+# copy that could differ from the first.
 	set -e; \
 	tmp=$$(mktemp -d -t tcspecial-py.XXXXXXXXXX); \
 	trap 'rm -rf "$$tmp"' EXIT; \
@@ -1088,8 +1088,8 @@ install-tcspecial-test: tcs-helpers
 		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-test.sh; \
 	fi
 
-# Install tcsgui's data -- the description tree and its schemas -- and the
-# XTCS, YTCS and simulator schemas of tcslibgs/schema, under $(SCHEMADIR).
+# Install tcsgui's data -- the description tree and its schemas -- and the XTCS,
+# YTCS and simulator schemas of tcslib-protocol/schema, under $(SCHEMADIR).
 #
 # The whole of tcsgui/share, with its structure: the description tree's shape
 # is part of what it means -- a description at vehicle/compute/vote.yaml is
@@ -1112,8 +1112,9 @@ install-data:
 	@cd $(GUI_NAME)/share && find . -type f \
 		-exec install -m 644 {} $(TCSGUI_DATA)/{} \;
 	@install -d -m 755 $(DESTDIR)$(SCHEMADIR)
-	@install -m 644 tcslibgs/schema/README tcslibgs/schema/*.xsd \
-		tcslibgs/schema/*.json $(DESTDIR)$(SCHEMADIR)
+	@install -m 644 tcslib-protocol/schema/README \
+		tcslib-protocol/schema/*.xsd tcslib-protocol/schema/*.json \
+		$(DESTDIR)$(SCHEMADIR)
 	@echo "✓ $(GUI_NAME) data installed"
 
 # Take away what `make install-files` put in place, with the same PREFIX,
@@ -1375,7 +1376,7 @@ screenshots: screenshots-tcsgui screenshots-tcsmoc screenshots-tcssim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
-HTML_DIRS = $(DOCS_DIR) examples tcslib-moc tcslib-c tcslibgs
+HTML_DIRS = $(DOCS_DIR) examples tcslib-moc tcslib-c tcslib-protocol
 
 # Fail where a committed page has fallen behind its source, naming it, having
 # made every page again in place: tcs-helpers' html-pages check, which also

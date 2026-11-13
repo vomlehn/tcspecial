@@ -27,13 +27,13 @@
 //! quietly ignored: a file that asks a set of discretes to drop a tenth of
 //! its packets has asked for something this kind cannot do.
 //!
-//! A node that gives a `sim_address` needs no chip: in a run that simulates
-//! it, tcspecial reaches its lines over UDP there, and this answers for them
-//! -- see [`run_gpio_udp_node`]. One datagram is one state of the lines, an
-//! ASCII `1` or `0` for each in the node's order, as
-//! [`tcslibgs::node::payload::gpio::state_said`] says it, both ways: what
-//! the vehicle drives its lines to, and what watched lines are. The lines are
-//! moved and watched as a chip's are, by the same rules; only where a level
+//! A node that gives a `sim_address` needs no chip: in a run that simulates it,
+//! tcspecial reaches its lines over UDP there, and this answers for them -- see
+//! [`run_gpio_udp_node`]. One datagram is one state of the lines, an ASCII `1`
+//! or `0` for each in the node's order, as
+//! [`tcslib_protocol::node::payload::gpio::state_said`] says it, both ways:
+//! what the vehicle drives its lines to, and what watched lines are. The lines
+//! are moved and watched as a chip's are, by the same rules; only where a level
 //! goes differs.
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
@@ -49,8 +49,8 @@ use crate::payload::{
 };
 
 /// Where the kernel puts a simulated chip's lines: see
-/// [`tcslibgs::node::payload::gpio::simulated_chips`].
-const SIM_DEVICES: &str = tcslibgs::node::payload::gpio::SIM_DEVICES;
+/// [`tcslib_protocol::node::payload::gpio::simulated_chips`].
+const SIM_DEVICES: &str = tcslib_protocol::node::payload::gpio::SIM_DEVICES;
 
 /// How many bytes a set of lines is counted as having sent or been sent:
 /// the whole number with a bit for each line the vehicle reads it as.
@@ -63,7 +63,7 @@ const SIM_DEVICES: &str = tcslibgs::node::payload::gpio::SIM_DEVICES;
 ///
 /// That number's width.
 fn lines_bytes(count: usize) -> u64 {
-    tcslibgs::link_type::Basic::lines(count)
+    tcslib_protocol::link_type::Basic::lines(count)
         .width()
         .expect("a set of lines is a whole number") as u64
 }
@@ -90,8 +90,8 @@ const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
 
 /// Finds the simulated lines of a chip, where the kernel has any.
 ///
-/// Where they are is tcslibgs's to say, once, for everything that looks:
-/// see [`tcslibgs::node::payload::gpio::simulated_chips`]. The chip is
+/// Where they are is tcslib-protocol's to say, once, for everything that looks:
+/// see [`tcslib_protocol::node::payload::gpio::simulated_chips`]. The chip is
 /// matched by its node's name, not its number, which is given out as chips
 /// appear, exactly as an `i2c-stub` adapter's bus is.
 ///
@@ -113,7 +113,8 @@ pub(crate) fn lines_of(
     chip: &str,
     lines: &[u32],
 ) -> Option<Vec<SimulatedLine>> {
-    let dir = tcslibgs::node::payload::gpio::simulated_chip(devices, chip)?;
+    let dir =
+        tcslib_protocol::node::payload::gpio::simulated_chip(devices, chip)?;
     Some(
         lines
             .iter()
@@ -258,7 +259,8 @@ pub fn run_gpio_udp_node(
 
     let count = config.gpio_lines.len();
     let mut vehicle: Option<SocketAddr> = None;
-    let mut datagram = [0u8; tcslibgs::node::payload::gpio::MOST_LINES + 1];
+    let mut datagram =
+        [0u8; tcslib_protocol::node::payload::gpio::MOST_LINES + 1];
     // What the vehicle last drove the lines to, and what watched lines were
     // last said to be: nothing yet, so the first of each counts.
     let mut driven: Option<u64> = None;
@@ -332,8 +334,9 @@ pub fn run_gpio_udp_node(
         };
         if let (Some(to), Some(now)) = (vehicle, now) {
             if said != Some(now) {
-                let state =
-                    tcslibgs::node::payload::gpio::state_said(count, now);
+                let state = tcslib_protocol::node::payload::gpio::state_said(
+                    count, now,
+                );
                 match socket.send_to(&state, to) {
                     Ok(_) => {
                         said = Some(now);
@@ -374,13 +377,15 @@ fn took_a_drive(
     datagram: &[u8],
     driven: &mut Option<u64>,
 ) {
-    let now = match tcslibgs::node::payload::gpio::state_read(count, datagram) {
-        Ok(now) => now,
-        Err(why) => {
-            eprintln!("{}: the vehicle sent {why}", config.name);
-            return;
-        }
-    };
+    let now =
+        match tcslib_protocol::node::payload::gpio::state_read(count, datagram)
+        {
+            Ok(now) => now,
+            Err(why) => {
+                eprintln!("{}: the vehicle sent {why}", config.name);
+                return;
+            }
+        };
     // The lines as the one number they are, which is what the world is
     // driven with: see `physics::driven`.
     crate::node::physics::driven(

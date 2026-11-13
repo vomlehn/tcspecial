@@ -1,4 +1,4 @@
-# @generated automatically by tcs-xtce from tcslibgs/xtce/ping.xtce
+# @generated automatically by tcs-xtce from tcslib-protocol/xtce/ping.xtce
 # (SpaceSystem 'TcsPing').
 # Any changes made to this file will be lost when it is regenerated;
 # change the XTCE document instead and rerun `python3 -m tcs_xtce`.

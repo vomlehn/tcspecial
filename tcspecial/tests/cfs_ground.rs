@@ -18,7 +18,7 @@ use tcslib_moc::bus::SimulatedCfs;
 use tcslib_moc::gateway::GatewayReceiver;
 use tcslib_moc::matched::Matched;
 use tcslib_moc::{command_links_of, CommandStatus, NodeId, TcsClient};
-use tcslibgs::graph::Graph;
+use tcslib_protocol::graph::Graph;
 
 mod common;
 

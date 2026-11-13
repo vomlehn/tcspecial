@@ -24,9 +24,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tcslibgs::config_digest::{digest_of_file, ConfigVersion};
-use tcslibgs::node::vehicle::ping;
-use tcslibgs::{
+use tcslib_protocol::config_digest::{digest_of_file, ConfigVersion};
+use tcslib_protocol::node::vehicle::ping;
+// The link's command, beside std's process Command.
+use tcslib_protocol::Command as LinkCommand;
+use tcslib_protocol::{
     Beacon, CommandStatus, ConnectTelemetry, DHSample, NodeCounts,
     PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
     RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
@@ -276,9 +278,9 @@ vehicle:
                             // A string, sent the ground after the count of
                             // its bytes, in groups of seven bits.
                             let mut counted = Vec::new();
-                            tcslibgs::link_type::counted(
+                            tcslib_protocol::link_type::counted(
                                 answer.as_bytes(),
-                                tcslibgs::link_type::Count::Groups,
+                                tcslib_protocol::link_type::Count::Groups,
                                 &mut counted,
                             )
                             .expect("counted");
@@ -294,18 +296,18 @@ vehicle:
                     let Ok((size, from)) = link.recv_from(&mut buffer) else {
                         continue;
                     };
-                    let command = tcslibgs::Command::read(&buffer[..size])
-                        .expect("a command");
+                    let command =
+                        LinkCommand::read(&buffer[..size]).expect("a command");
                     let seq = command.sequence();
                     answered.push(command.cmd_type());
                     let answer = match &command {
-                        tcslibgs::Command::Connect(_) => Telemetry::Connect(
+                        LinkCommand::Connect(_) => Telemetry::Connect(
                             ConnectTelemetry::new(seq, version, digest, 1),
                         ),
-                        tcslibgs::Command::Ping(_) => Telemetry::Ping(
+                        LinkCommand::Ping(_) => Telemetry::Ping(
                             PingTelemetry::new(seq, CommandStatus::Success),
                         ),
-                        tcslibgs::Command::QueryNode(cmd) => {
+                        LinkCommand::QueryNode(cmd) => {
                             Telemetry::QueryNode(QueryNodeTelemetry::new(
                                 seq,
                                 CommandStatus::Success,
@@ -319,7 +321,7 @@ vehicle:
                         // status no build yet has, as a vehicle of a later
                         // build might answer, which the station says is a
                         // refusal, by its number.
-                        tcslibgs::Command::SetNode(cmd) => Telemetry::SetNode(
+                        LinkCommand::SetNode(cmd) => Telemetry::SetNode(
                             SetNodeTelemetry::new(
                                 seq,
                                 CommandStatus::Unknown(42),
@@ -330,7 +332,7 @@ vehicle:
                                 \"ping.count\"",
                             )),
                         ),
-                        tcslibgs::Command::QueryNodeSample(cmd) => {
+                        LinkCommand::QueryNodeSample(cmd) => {
                             // What it took: "ping", four bytes of a transfer
                             // of six; and nothing given.
                             let mut taken = DHSample::new();
@@ -350,14 +352,14 @@ vehicle:
                         }
                         // Onto the configuration the station read, which is
                         // what a NULL target says.
-                        tcslibgs::Command::RestartArm(cmd) => {
+                        LinkCommand::RestartArm(cmd) => {
                             assert_eq!(cmd.target, digest, "a plain restart");
                             Telemetry::RestartArm(RestartArmTelemetry::new(
                                 seq,
                                 CommandStatus::Success,
                             ))
                         }
-                        tcslibgs::Command::Restart(cmd) => {
+                        LinkCommand::Restart(cmd) => {
                             assert_eq!(cmd.target, digest, "the arm's");
                             Telemetry::Restart(RestartTelemetry::new(
                                 seq,
@@ -374,7 +376,7 @@ vehicle:
 
                     // The query answered, the node's data follows, as it
                     // would from a node that is running.
-                    if matches!(command, tcslibgs::Command::QueryNode(_)) {
+                    if matches!(command, LinkCommand::QueryNode(_)) {
                         // A string, after the count of its bytes.
                         sender
                             .send_to(
@@ -408,13 +410,13 @@ vehicle:
     assert_eq!(
         answered,
         [
-            tcslibgs::CommandType::Connect,
-            tcslibgs::CommandType::Ping,
-            tcslibgs::CommandType::QueryNode,
-            tcslibgs::CommandType::SetNode,
-            tcslibgs::CommandType::QueryNodeSample,
-            tcslibgs::CommandType::RestartArm,
-            tcslibgs::CommandType::Restart,
+            tcslib_protocol::CommandType::Connect,
+            tcslib_protocol::CommandType::Ping,
+            tcslib_protocol::CommandType::QueryNode,
+            tcslib_protocol::CommandType::SetNode,
+            tcslib_protocol::CommandType::QueryNodeSample,
+            tcslib_protocol::CommandType::RestartArm,
+            tcslib_protocol::CommandType::Restart,
         ],
         "{}: what the vehicle was asked",
         program.display()

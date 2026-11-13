@@ -227,7 +227,7 @@ The header alone is also compiled as C99 and as C++11.
 ## See also
 
 - [This page as HTML](https://vomlehn.github.io/tcspecial/tcslib-c/README.html).
-- [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), the Rust library this one wraps, and [tcslibgs](https://vomlehn.github.io/tcspecial/tcslibgs/README.html), what the ground and the vehicle share.
+- [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), the Rust library this one wraps, and [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html), what the ground and the vehicle share.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

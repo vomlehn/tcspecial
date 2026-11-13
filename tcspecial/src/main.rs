@@ -14,9 +14,9 @@
 //! setting and the one a run without `--simulate` gets.
 //!
 //! `--simulate=<mode>` is the simulation mode, `none`, `some` or `all`: see
-//! `tcslibgs::simulate`. Each payload is judged a real, a dummy or a simulated
-//! device before anything is opened, and a run whose payloads the mode does not
-//! allow is refused: see `tcspecial::runtime::start`.
+//! `tcslib_protocol::simulate`. Each payload is judged a real, a dummy or a
+//! simulated device before anything is opened, and a run whose payloads the
+//! mode does not allow is refused: see `tcspecial::runtime::start`.
 //!
 //! `--types` prints the payload types this build contains, separated by
 //! commas, and exits: what `tcsverify --types=` takes, so that a
@@ -29,7 +29,9 @@ use std::process;
 #[cfg(feature = "visual")]
 use log::warn;
 use log::{debug, error, trace};
-use tcslibgs::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
+use tcslib_protocol::config::{
+    payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR,
+};
 use tcspecial::runtime;
 
 /// Runs tcspecial as the command line asks, as the module documentation
@@ -63,7 +65,7 @@ fn main() {
     let (visual, args): (Vec<String>, Vec<String>) =
         args.into_iter().partition(|arg| arg == "--visual");
     let visual = !visual.is_empty();
-    let (simulate, args) = match tcslibgs::simulate::take_mode(args) {
+    let (simulate, args) = match tcslib_protocol::simulate::take_mode(args) {
         Ok(taken) => taken,
         Err(e) => {
             eprintln!("tcspecial: {e}");
@@ -168,7 +170,7 @@ fn main() {
     //
     // Refused on a warning as well: a node whose attributes are not all in is
     // a node that cannot be opened, so aboard it is not a question of degree
-    // -- see `tcslibgs::graph::check::Severity`.
+    // -- see `tcslib_protocol::graph::check::Severity`.
     //
     // Against the types this build contains, so that a configuration with a
     // node of another type is refused here, before anything is opened, in

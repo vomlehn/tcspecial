@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
 
 description: "Discrete lines of a GPIO chip: a switch's level to the ground,
   and the ground's 1 or 0 driving a lamp"

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
 
 # The vehicle the two thermostat examples share, which each includes:
 # the three sensors, the three conversions and the vote between them,

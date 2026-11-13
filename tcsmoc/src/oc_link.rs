@@ -26,8 +26,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use tcslibgs::unit::Unit;
-use tcslibgs::{DHSample, Timestamp};
+use tcslib_protocol::unit::Unit;
+use tcslib_protocol::{DHSample, Timestamp};
 
 /// What one payload last sent to the ground, as the ground received it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,7 +59,7 @@ pub struct Arrival {
     /// From the configuration and never from the data. Every four bytes are a
     /// value, so a decision of four characters would be shown as a
     /// number by anything that guessed from the width -- see
-    /// `tcslibgs::graph::units::unit_of`.
+    /// `tcslib_protocol::graph::units::unit_of`.
     pub unit: Option<Unit>,
 }
 
@@ -92,8 +92,11 @@ mod tests {
         );
         let mut data = DHSample::new();
         data.record(
-            &tcslibgs::node::vehicle::compute::as_value(293.15, Unit::Kelvin)
-                .expect("a temperature"),
+            &tcslib_protocol::node::vehicle::compute::as_value(
+                293.15,
+                Unit::Kelvin,
+            )
+            .expect("a temperature"),
         );
 
         let arrival = Arrival {

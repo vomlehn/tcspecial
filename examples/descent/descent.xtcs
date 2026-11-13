@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslibgs/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
     <description>A lander's terminal descent: a radar altimeter's altitude flown down by a guidance program throttling the engine, a Doppler velocimeter for the ground, and a switch that says when it is down</description>
     <tcspecial>
         <beacon>

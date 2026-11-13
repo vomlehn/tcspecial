@@ -240,7 +240,7 @@ class GroundTest(unittest.TestCase):
 
 def telemetry(msgid, data):
     """A telemetry packet as the vehicle publishes one, laid out by hand as
-    ``tcslibgs/src/cfs.rs``'s ``write_telemetry`` lays it.
+    ``tcslib-protocol/src/cfs.rs``'s ``write_telemetry`` lays it.
 
     Args:
         msgid: Its message ID.
@@ -256,7 +256,7 @@ def telemetry(msgid, data):
 
 def command_of(packet):
     """A command packet's message ID, function code and data, read as
-    ``tcslibgs/src/cfs.rs``'s ``read_command`` reads them.
+    ``tcslib-protocol/src/cfs.rs``'s ``read_command`` reads them.
 
     Args:
         packet: The packet.

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
 
 description: "Answering to a cFS flight computer: a reading published on its
   software bus, and a command from it to a heater"

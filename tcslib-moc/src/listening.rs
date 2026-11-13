@@ -19,8 +19,10 @@
 
 use std::time::Duration;
 
-use tcslibgs::config_digest::{digest_of_graph, ConfigDigest, ConfigVersion};
-use tcslibgs::graph::Graph;
+use tcslib_protocol::config_digest::{
+    digest_of_graph, ConfigDigest, ConfigVersion,
+};
+use tcslib_protocol::graph::Graph;
 
 use crate::client::{command_links_of, TcsClient};
 use crate::matched::Matched;
@@ -178,7 +180,7 @@ impl Listening {
 mod tests {
     use super::*;
     use std::net::UdpSocket;
-    use tcslibgs::{Command, ConnectTelemetry, Telemetry};
+    use tcslib_protocol::{Command, ConnectTelemetry, Telemetry};
 
     /// A configuration whose spacecraft command link is on loopback ports
     /// nothing holds, the vehicle's end at `vehicle`.
@@ -215,7 +217,7 @@ mod tests {
             \"127.0.0.1:{}\", recv: \"127.0.0.1:{}\" }}
   state_file: \"/tmp/listening.state\"
 ",
-                tcslibgs::InterfaceDigest::of_this_build(),
+                tcslib_protocol::InterfaceDigest::of_this_build(),
                 free(),
                 free(),
                 free(),

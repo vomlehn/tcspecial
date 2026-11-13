@@ -1,7 +1,7 @@
 """What a node sends the ground, as the configuration's own XTCE says it,
 and the Yamcs parameter type it is given for it.
 
-The Python spelling of ``tcslibgs::graph::fprime::Form::of``, which
+The Python spelling of ``tcslib_protocol::graph::fprime::Form::of``, which
 ``examples/thermostat-yamcs/tests/agrees.rs`` holds to the Rust for every
 node of every example that reaches the ground; and the typed parameters
 ``tcslibgs.yamcs`` copies from the configuration's own XTCE for a node whose

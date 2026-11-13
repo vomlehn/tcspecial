@@ -45,7 +45,7 @@ TICK = 0.1
 
 class Liveness:
     """When a peer last sent and last heard, and whether it is connected:
-    ``tcslibgs::sbn::Liveness``, asked with the time so that it can be
+    ``tcslib_protocol::sbn::Liveness``, asked with the time so that it can be
     tested without waiting.
 
     Args:

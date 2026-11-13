@@ -45,15 +45,15 @@ pub mod to_value;
 pub mod vote;
 
 use crate::runtime::node_state::Abandon;
-use tcslibgs::graph::Node;
-use tcslibgs::node::vehicle::compute::{self, Computation};
-use tcslibgs::unit::Unit;
+use tcslib_protocol::graph::Node;
+use tcslib_protocol::node::vehicle::compute::{self, Computation};
+use tcslib_protocol::unit::Unit;
 
 /// The most a computation hands on at once.
 ///
 /// A built-in's result is a value -- four bytes, see
-/// `tcslibgs::node::vehicle::compute::VALUE_BYTES` -- or a decision of at
-/// most eight; a program's may be a structure, at most sixteen fields of at
+/// `tcslib_protocol::node::vehicle::compute::VALUE_BYTES` -- or a decision of
+/// at most eight; a program's may be a structure, at most sixteen fields of at
 /// most eight bytes each, which is this.
 pub const OUT_BYTES: usize = 128;
 
@@ -70,7 +70,7 @@ pub struct Out {
 
 impl Out {
     /// Makes a value, as every computation's result over values is: see
-    /// `tcslibgs::node::vehicle::compute::as_value`.
+    /// `tcslib_protocol::node::vehicle::compute::as_value`.
     ///
     /// # Arguments
     ///
@@ -133,7 +133,10 @@ impl Out {
     /// # Returns
     ///
     /// The decision, in the form it takes on a link.
-    pub fn decision(asserted: bool, sends: tcslibgs::link_type::Basic) -> Out {
+    pub fn decision(
+        asserted: bool,
+        sends: tcslib_protocol::link_type::Basic,
+    ) -> Out {
         let width = sends.width().unwrap_or(1);
         let mut bytes = [0u8; OUT_BYTES];
         bytes[width - 1] = u8::from(asserted);
@@ -270,7 +273,7 @@ pub trait Function: Send {
 ///               waiting for three until something tells it how many links
 ///               arrive.
 /// * `unit`    - What the values arriving at it are in, for a computation
-///               that reads values: see `tcslibgs::graph::units`.
+///               that reads values: see `tcslib_protocol::graph::units`.
 /// * `abandon` - The node's own wakeup, which a `process` gives up its wait
 ///               for an answer on when the node is disabled.
 ///
@@ -291,8 +294,8 @@ pub fn make(
     abandon: &Abandon,
 ) -> Result<Box<dyn Function>, String> {
     // What the node says, by the rules the ground tool checks it against: see
-    // tcslibgs::node::vehicle::compute. Every complaint from there already
-    // names the node and the computation.
+    // tcslib_protocol::node::vehicle::compute. Every complaint from there
+    // already names the node and the computation.
     let what = compute::params_of(&node.name, &node.attributes)?;
 
     // What a vote, a thermostat or a program reads is values in one unit,
@@ -356,17 +359,19 @@ pub fn make(
     }
 }
 
-// The form a value takes on a link is `tcslibgs`'s, with the range it can
-// carry: it is one fact the vehicle writes and the ground reads back, and the
-// range is also a rule about what a configuration may say, which `tcsverify`
-// checks on a desk. Named here because every computation in this tree calls
-// these by their short names, and because this is where a reader of the
-// arithmetic looks for them.
-pub(crate) use tcslibgs::node::vehicle::compute::{from_value, value_bytes};
+// The form a value takes on a link is `tcslib-protocol`'s, with the range it
+// can carry: it is one fact the vehicle writes and the ground reads back, and
+// the range is also a rule about what a configuration may say, which
+// `tcsverify` checks on a desk. Named here because every computation in this
+// tree calls these by their short names, and because this is where a reader of
+// the arithmetic looks for them.
+pub(crate) use tcslib_protocol::node::vehicle::compute::{
+    from_value, value_bytes,
+};
 // What the vehicle no longer makes as it runs -- a value as a `Vec` -- and the
 // tests still compare against.
 #[cfg(test)]
-pub(crate) use tcslibgs::node::vehicle::compute::as_value;
+pub(crate) use tcslib_protocol::node::vehicle::compute::as_value;
 
 #[cfg(test)]
 mod tests {
@@ -384,17 +389,18 @@ mod tests {
     fn the_thermostat_runs_from_counts_to_a_decision() {
         let sensor = |scale: f64, offset: f64| {
             to_value::ToValue::of(
-                tcslibgs::node::vehicle::compute::ToValueParams {
-                    format: tcslibgs::node::vehicle::compute::Format::I16Be,
+                tcslib_protocol::node::vehicle::compute::ToValueParams {
+                    format:
+                        tcslib_protocol::node::vehicle::compute::Format::I16Be,
                     scale,
                     offset,
-                    unit: tcslibgs::unit::Unit::Kelvin,
+                    unit: tcslib_protocol::unit::Unit::Kelvin,
                 },
                 "to_kelvin",
             )
         };
 
-        use tcslibgs::node::vehicle::compute::{Algorithm, VoteParams};
+        use tcslib_protocol::node::vehicle::compute::{Algorithm, VoteParams};
 
         // Three sensors of one make, for simplicity: a sixteenth of a degree
         // a count, above freezing.
@@ -413,16 +419,16 @@ mod tests {
                 algorithm: Algorithm::Median,
                 age: None,
             },
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
         );
 
         let mut thermostat = thermostat::Thermostat::of(
-            tcslibgs::node::vehicle::compute::ThermostatParams {
+            tcslib_protocol::node::vehicle::compute::ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
-                sends: tcslibgs::link_type::Basic::U8,
+                sends: tcslib_protocol::link_type::Basic::U8,
             },
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
         );
 
         /// Runs one pass: three readings in, a decision out if there is one.
@@ -519,7 +525,7 @@ mod tests {
     /// another, each with its own conversion, averaged into one number.
     #[test]
     fn three_unlike_sensors_average_to_one_temperature() {
-        use tcslibgs::node::vehicle::compute::{
+        use tcslib_protocol::node::vehicle::compute::{
             Algorithm, Format, ToValueParams, VoteParams,
         };
 
@@ -529,7 +535,7 @@ mod tests {
                     format,
                     scale,
                     offset: 273.15,
-                    unit: tcslibgs::unit::Unit::Kelvin,
+                    unit: tcslib_protocol::unit::Unit::Kelvin,
                 },
                 "to_kelvin",
             )
@@ -549,7 +555,7 @@ mod tests {
                 algorithm: Algorithm::Median,
                 age: None,
             },
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
         );
 
         // All three sitting at 20 above freezing, in their own units.
@@ -563,7 +569,8 @@ mod tests {
         let out = voted.give(Some("in2"), &c).unwrap().expect("a vote");
 
         let averaged =
-            from_value(&out, tcslibgs::unit::Unit::Kelvin, "the mean").unwrap();
+            from_value(&out, tcslib_protocol::unit::Unit::Kelvin, "the mean")
+                .unwrap();
         assert!(
             (averaged - 293.15).abs() < 0.01,
             "three sensors at one temperature averaged to {averaged}"
@@ -594,8 +601,10 @@ mod tests {
     #[test]
     fn an_unknown_function_is_refused() {
         let mut attributes = BTreeMap::new();
-        attributes
-            .insert("function".to_string(), tcslibgs::Scalar::of("sorcery"));
+        attributes.insert(
+            "function".to_string(),
+            tcslib_protocol::Scalar::of("sorcery"),
+        );
         let node = Node {
             name: "n".to_string(),
             node_type: "compute".to_string(),
@@ -612,16 +621,24 @@ mod tests {
 
     /// A node whose computation is wrong is refused by the one set of rules.
     ///
-    /// Which is in `tcslibgs::node::vehicle::compute` now, so the ground tool
-    /// applies it too: what this holds is that `make` goes through those rules
-    /// rather than having a second set of its own.
+    /// Which is in `tcslib_protocol::node::vehicle::compute` now, so the ground
+    /// tool applies it too: what this holds is that `make` goes through those
+    /// rules rather than having a second set of its own.
     #[test]
     fn a_parameter_with_no_sensible_default_is_required() {
         let mut attributes = BTreeMap::new();
-        attributes
-            .insert("function".to_string(), tcslibgs::Scalar::of("to_kelvin"));
-        attributes.insert("format".to_string(), tcslibgs::Scalar::of("i16_be"));
-        attributes.insert("offset".to_string(), tcslibgs::Scalar::of("273.15"));
+        attributes.insert(
+            "function".to_string(),
+            tcslib_protocol::Scalar::of("to_kelvin"),
+        );
+        attributes.insert(
+            "format".to_string(),
+            tcslib_protocol::Scalar::of("i16_be"),
+        );
+        attributes.insert(
+            "offset".to_string(),
+            tcslib_protocol::Scalar::of("273.15"),
+        );
         let node = Node {
             name: "k_1".to_string(),
             node_type: "compute".to_string(),

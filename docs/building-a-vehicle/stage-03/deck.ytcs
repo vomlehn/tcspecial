@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslibgs/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
 
 # Stage 3 of "Building a Vehicle" (docs/building-a-vehicle.rst): a computation
 # between a payload and the ground: the regolith thermometer's readings made

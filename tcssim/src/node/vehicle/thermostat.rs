@@ -5,7 +5,7 @@
 //! so that a zone's loop closes with no tcspecial running. It stands
 //! in for one thermostat node of the configuration, whose `setpoint` and
 //! `half_band` it takes, and the simulator file names that node: see
-//! `tcslibgs::sim_config::SimTcssim::thermostats`. Several zones, or a
+//! `tcslib_protocol::sim_config::SimTcssim::thermostats`. Several zones, or a
 //! staged thermostat, are several of these, each switching heaters of its
 //! own.
 //!
@@ -36,7 +36,9 @@
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use tcslibgs::node::vehicle::compute::{ThermostatParams, ToValueParams};
+use tcslib_protocol::node::vehicle::compute::{
+    ThermostatParams, ToValueParams,
+};
 
 use crate::node::physics::{driven, Attachment};
 
@@ -238,8 +240,8 @@ mod tests {
     use crate::node::physics::{encode, world::World};
     use std::sync::Arc;
     use std::time::Instant;
-    use tcslibgs::node::physics::Place;
-    use tcslibgs::node::vehicle::compute::Format;
+    use tcslib_protocol::node::physics::Place;
+    use tcslib_protocol::node::vehicle::compute::Format;
 
     /// The thermostat example's sensor's encoding.
     ///
@@ -252,7 +254,7 @@ mod tests {
             format: Format::I16Be,
             scale: 0.0625,
             offset: 273.15,
-            unit: tcslibgs::unit::Unit::Kelvin,
+            unit: tcslib_protocol::unit::Unit::Kelvin,
         }
     }
 
@@ -280,7 +282,7 @@ mod tests {
         let params = ThermostatParams {
             setpoint: 293.15,
             half_band: 2.0,
-            sends: tcslibgs::link_type::Basic::U8,
+            sends: tcslib_protocol::link_type::Basic::U8,
         };
         (
             Thermostat::new("thermostat", params, sensors, heaters),

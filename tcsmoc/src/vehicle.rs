@@ -1,9 +1,9 @@
 //! The MOC's view of the vehicle: running a configuration.
 //!
-//! A vehicle is a graph of nodes, and what the window shows is that graph:
-//! each node drawn into a gateway node sends to the gateway node's
-//! `ground_base` plus its device id, and each payload nothing touches sends
-//! over `payload_telemetry` -- see `tcslibgs::graph::telemetry`. So there is
+//! A vehicle is a graph of nodes, and what the window shows is that graph: each
+//! node drawn into a gateway node sends to the gateway node's `ground_base`
+//! plus its device id, and each payload nothing touches sends over
+//! `payload_telemetry` -- see `tcslib_protocol::graph::telemetry`. So there is
 //! one panel per source, filled through `tcslib_moc::gateway`, the same
 //! function call any ground software uses.
 //!
@@ -11,7 +11,7 @@
 //!
 //! The vehicle takes commands on two links, and binds the second once for
 //! every node, the node's id in the message saying which -- see
-//! `tcslibgs::NodeId`. So Enable and Disable on a panel are START_NODE
+//! `tcslib_protocol::NodeId`. So Enable and Disable on a panel are START_NODE
 //! and STOP_NODE about the node that panel is for, by the device id the panel
 //! already shows.
 //!
@@ -49,15 +49,15 @@ use tcslib_moc::gateway::DATUM_BYTES;
 use tcslib_moc::matched::Matched;
 use tcslib_moc::ping::{Pinger, Uplink};
 use tcslib_moc::simulator;
-use tcslibgs::graph::reach::reach_of;
-use tcslibgs::graph::telemetry::{self, Reaches, Telemetered, Via};
-use tcslibgs::graph::Graph;
-use tcslibgs::link_type::LinkType;
-use tcslibgs::ready::SetUpFor;
-use tcslibgs::sim_config::SimConfigFile;
-use tcslibgs::simulate::Mode;
-use tcslibgs::unit::Unit;
-use tcslibgs::{DHSample, Timestamp};
+use tcslib_protocol::graph::reach::reach_of;
+use tcslib_protocol::graph::telemetry::{self, Reaches, Telemetered, Via};
+use tcslib_protocol::graph::Graph;
+use tcslib_protocol::link_type::LinkType;
+use tcslib_protocol::ready::SetUpFor;
+use tcslib_protocol::sim_config::SimConfigFile;
+use tcslib_protocol::simulate::Mode;
+use tcslib_protocol::unit::Unit;
+use tcslib_protocol::{DHSample, Timestamp};
 use tcsui::PingShown;
 use tcsverify::startup::Startup;
 
@@ -85,7 +85,7 @@ const NO_TARGET: &str = "this window's configuration could not be digested, \
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RestartTarget {
     /// The configuration's checksum, which the two commands carry.
-    pub(crate) digest: tcslibgs::ConfigDigest,
+    pub(crate) digest: tcslib_protocol::ConfigDigest,
     /// The file it was read from, where the operator named one.
     pub(crate) file: Option<std::path::PathBuf>,
     /// Whether it is this window's own configuration.
@@ -136,7 +136,7 @@ impl RestartTarget {
 /// that cannot be read, or the problems the checks found.
 pub(crate) fn restart_target_of(
     said: &str,
-    ours: Option<tcslibgs::ConfigDigest>,
+    ours: Option<tcslib_protocol::ConfigDigest>,
 ) -> Result<RestartTarget, String> {
     let said = said.trim();
     if said.is_empty() {
@@ -148,7 +148,7 @@ pub(crate) fn restart_target_of(
             })
             .ok_or_else(|| NO_TARGET.to_string());
     }
-    if let Some(digest) = tcslibgs::ConfigDigest::of_hex(said) {
+    if let Some(digest) = tcslib_protocol::ConfigDigest::of_hex(said) {
         return Ok(RestartTarget {
             digest,
             file: None,
@@ -175,7 +175,7 @@ pub(crate) fn restart_target_of(
             problems.join("; ")
         ));
     }
-    let digest = tcslibgs::config_digest::digest_of_file(path)
+    let digest = tcslib_protocol::config_digest::digest_of_file(path)
         .map_err(|e| format!("{said}: {e}"))?;
     Ok(RestartTarget {
         digest,
@@ -196,7 +196,7 @@ pub(crate) fn restart_target_of(
 /// The target, or why what is typed is not one.
 fn restart_target_shown(
     said: &str,
-    ours: Option<tcslibgs::ConfigDigest>,
+    ours: Option<tcslib_protocol::ConfigDigest>,
 ) -> String {
     match restart_target_of(said, ours) {
         Ok(target) => target.said(),
@@ -336,7 +336,7 @@ struct MatchSeen<'a> {
     /// it; empty where no beacon has been heard.
     theirs: &'a str,
     /// This station's configuration's checksum, where it has one.
-    ours: Option<tcslibgs::ConfigDigest>,
+    ours: Option<tcslib_protocol::ConfigDigest>,
     /// Whether the station is matched for listening: the last beacon is
     /// recent, has its restart flag clear, and carries `ours`.
     listening: bool,
@@ -369,7 +369,7 @@ struct MatchSeen<'a> {
 ///
 /// The heading, `Last Response` and the pop-up's text.
 fn unmatched_refusal(
-    kind: tcslibgs::CommandType,
+    kind: tcslib_protocol::CommandType,
     refused: &str,
     seen: MatchSeen<'_>,
 ) -> Refusal {
@@ -438,7 +438,7 @@ const UNANSWERED_HEADING: &str = "No CONNECT has been answered yet";
 /// nothing where neither is known.
 fn checksums_said(
     ui: &MainWindow,
-    ours: Option<tcslibgs::ConfigDigest>,
+    ours: Option<tcslib_protocol::ConfigDigest>,
 ) -> String {
     checksums_of(&ui.get_beacon_checksum(), ours)
 }
@@ -455,7 +455,10 @@ fn checksums_said(
 ///
 /// A sentence to follow what a pop-up says, with a space before it, or
 /// nothing where neither is known.
-fn checksums_of(theirs: &str, ours: Option<tcslibgs::ConfigDigest>) -> String {
+fn checksums_of(
+    theirs: &str,
+    ours: Option<tcslib_protocol::ConfigDigest>,
+) -> String {
     match (theirs.is_empty(), ours) {
         (false, Some(ours)) => format!(
             " The vehicle's beacon carries md5 {theirs}; this station's \
@@ -515,7 +518,7 @@ fn show_notice(ui: &MainWindow, heading: &str, message: &str, asks: bool) {
 fn refused_unmatched(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
-    kind: tcslibgs::CommandType,
+    kind: tcslib_protocol::CommandType,
 ) -> bool {
     let refused = {
         let mut guard = link.lock().unwrap();
@@ -784,7 +787,9 @@ pub fn panels(
 fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
     sim_path
         .and_then(|path| SimConfigFile::load(path).ok())
-        .and_then(|sim| tcslibgs::graph::simulated::handlers(graph, &sim).ok())
+        .and_then(|sim| {
+            tcslib_protocol::graph::simulated::handlers(graph, &sim).ok()
+        })
         .is_some_and(|handlers| !handlers.is_empty())
 }
 
@@ -885,10 +890,12 @@ fn simulator_for(
         .map_err(|e| format!("{sim_path}: {e}"))?;
     let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
     let ours = SetUpFor {
-        configuration: tcslibgs::config_digest::digest_of_graph(graph)
+        configuration: tcslib_protocol::config_digest::digest_of_graph(graph)
             .map_err(|e| format!("{payload_path}: {e}"))?,
-        simulator: tcslibgs::config_digest::digest_of_simulator_file(sim_path)
-            .map_err(|e| format!("{sim_path}: {e}"))?,
+        simulator: tcslib_protocol::config_digest::digest_of_simulator_file(
+            sim_path,
+        )
+        .map_err(|e| format!("{sim_path}: {e}"))?,
         mode,
     };
     let [_, tcssim] = CHILDREN;
@@ -1003,7 +1010,7 @@ fn hear_what_the_vehicle_read(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     agreed: &Agreed,
-    digest: tcslibgs::ConfigDigest,
+    digest: tcslib_protocol::ConfigDigest,
 ) {
     ui.set_last_response(SharedString::from(connect_said(
         link, agreed, digest,
@@ -1031,7 +1038,7 @@ fn hear_what_the_vehicle_read(
 fn connect_said(
     link: &Mutex<CiLink>,
     agreed: &Agreed,
-    digest: tcslibgs::ConfigDigest,
+    digest: tcslib_protocol::ConfigDigest,
 ) -> String {
     let answer = {
         let mut guard = link.lock().unwrap();
@@ -1044,7 +1051,7 @@ fn connect_said(
     // The CONNECT carries no build version, since the vehicle acts on the
     // checksum alone; the answer carries the vehicle's, which is shown
     // against this window's own.
-    let version = tcslibgs::ConfigVersion::of_this_build();
+    let version = tcslib_protocol::ConfigVersion::of_this_build();
     match answer {
         Ok((theirs, their_digest)) => {
             eprintln!(
@@ -1111,7 +1118,7 @@ fn query_every_node(
     agreed: &Agreed,
     model: &impl Model<Data = DHInfo>,
 ) {
-    if refused_unmatched(ui, link, tcslibgs::CommandType::QueryNode) {
+    if refused_unmatched(ui, link, tcslib_protocol::CommandType::QueryNode) {
         return;
     }
     ask_nodes(ui, link, agreed, model, None);
@@ -1123,14 +1130,20 @@ struct Asked {
     /// The panel's row, which what was found is shown in.
     row: usize,
     /// The node's id, which the question names.
-    node: tcslibgs::NodeId,
+    node: tcslib_protocol::NodeId,
 }
 
 /// What a node's QUERY_NODE came to: the status it was answered with,
 /// whether the node is running and what it has moved; or why there was no
 /// answer.
-type Answered =
-    Result<(tcslibgs::CommandStatus, bool, tcslibgs::NodeCounts), String>;
+type Answered = Result<
+    (
+        tcslib_protocol::CommandStatus,
+        bool,
+        tcslib_protocol::NodeCounts,
+    ),
+    String,
+>;
 
 /// The nodes of the panels, each panel's node once, in the panels' order:
 /// every one, or with `declined`, every one the operator has not stopped.
@@ -1156,7 +1169,7 @@ fn to_ask(
             let info = model.row_data(row)?;
             Some(Asked {
                 row,
-                node: tcslibgs::NodeId(
+                node: tcslib_protocol::NodeId(
                     u32::try_from(info.dev_id).unwrap_or(u32::MAX),
                 ),
             })
@@ -1221,7 +1234,7 @@ fn show_node_answers(
         match answer {
             // No such node aboard: a tcspecial flying another configuration,
             // which nobody here can speak for.
-            Ok((tcslibgs::CommandStatus::NotFound, _, _)) => {
+            Ok((tcslib_protocol::CommandStatus::NotFound, _, _)) => {
                 info.status = SharedString::from(UNKNOWN_STATUS);
                 said.push(format!("{}: {}", info.name, info.status));
                 model.set_row_data(*row, info);
@@ -1327,7 +1340,7 @@ pub(crate) struct Asking {
     /// Every panel's node, in the panels' order.
     nodes: Arc<Vec<Asked>>,
     /// This window's configuration's checksum, which a CONNECT carries.
-    digest: Option<tcslibgs::ConfigDigest>,
+    digest: Option<tcslib_protocol::ConfigDigest>,
     /// Whether the question is owed: set as contact is made, cleared as it
     /// is asked and as contact is lost.
     owed: Arc<AtomicBool>,
@@ -1388,7 +1401,7 @@ impl Asking {
         link: &Arc<Mutex<CiLink>>,
         agreed: &Agreed,
         declined: &crate::Declined,
-        digest: Option<tcslibgs::ConfigDigest>,
+        digest: Option<tcslib_protocol::ConfigDigest>,
         model: &impl Model<Data = DHInfo>,
     ) -> Asking {
         Asking {
@@ -1531,7 +1544,7 @@ fn describes(info: &DHInfo) -> String {
 /// # Returns
 ///
 /// The popup's lines, one count to a line.
-fn counted(counts: &tcslibgs::NodeCounts) -> String {
+fn counted(counts: &tcslib_protocol::NodeCounts) -> String {
     let moved = match counts.last_moved {
         Some(at) => at.time_of_day(),
         // Never, which is not the same as a long time ago: the first has not
@@ -1581,8 +1594,8 @@ fn counted(counts: &tcslibgs::NodeCounts) -> String {
 ///                 nothing.
 /// * `attribute` - The attribute's name, as typed.
 /// * `value`     - The value, as typed, sent as a datum of the attribute's
-///                 type (see `tcslibgs::graph::settings`); text that is not
-///                 one is refused here and nothing is sent.
+///                 type (see `tcslib_protocol::graph::settings`); text that is
+///                 not one is refused here and nothing is sent.
 ///
 /// # Panics
 ///
@@ -1601,7 +1614,8 @@ fn set_a_nodes_attribute(
     let Some(info) = model.row_data(row) else {
         return;
     };
-    let node = tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+    let node =
+        tcslib_protocol::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
     let name = info.name.to_string();
 
     if attribute.trim().is_empty() || value.is_empty() {
@@ -1611,7 +1625,7 @@ fn set_a_nodes_attribute(
         return;
     }
 
-    let encoded = match tcslibgs::graph::settings::encoded(
+    let encoded = match tcslib_protocol::graph::settings::encoded(
         graph,
         &name,
         attribute.trim(),
@@ -1625,7 +1639,7 @@ fn set_a_nodes_attribute(
             return;
         }
     };
-    if refused_unmatched(ui, link, tcslibgs::CommandType::SetNode) {
+    if refused_unmatched(ui, link, tcslib_protocol::CommandType::SetNode) {
         return;
     }
     if !may_command_nodes(agreed) {
@@ -1721,14 +1735,15 @@ fn command_a_node(
     let Some(info) = model.row_data(row) else {
         return;
     };
-    let node = tcslibgs::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+    let node =
+        tcslib_protocol::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
     let name = info.name.to_string();
     let verb = if enable { "START_NODE" } else { "STOP_NODE" };
 
     let kind = if enable {
-        tcslibgs::CommandType::StartNode
+        tcslib_protocol::CommandType::StartNode
     } else {
-        tcslibgs::CommandType::StopNode
+        tcslib_protocol::CommandType::StopNode
     };
     if refused_unmatched(ui, link, kind) {
         return;
@@ -1870,7 +1885,7 @@ pub(crate) fn command_buttons(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
     agreed: &Agreed,
-    digest: Option<tcslibgs::ConfigDigest>,
+    digest: Option<tcslib_protocol::ConfigDigest>,
     model: &Rc<VecModel<DHInfo>>,
     declined: &crate::Declined,
     asking: &Asking,
@@ -1951,7 +1966,8 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         ui.on_ping_clicked(move || {
             let ui = weak.unwrap();
-            if refused_unmatched(&ui, &link, tcslibgs::CommandType::Ping) {
+            if refused_unmatched(&ui, &link, tcslib_protocol::CommandType::Ping)
+            {
                 return;
             }
             let answer =
@@ -2172,7 +2188,7 @@ pub(crate) fn command_buttons(
                     if refused_unmatched(
                         &ui,
                         &link,
-                        tcslibgs::CommandType::Ping,
+                        tcslib_protocol::CommandType::Ping,
                     ) {
                         return;
                     }
@@ -2448,11 +2464,11 @@ pub(crate) fn packets_said(counts: &tcslib_moc::matched::Counts) -> String {
 /// # Returns
 ///
 /// The key.
-fn window_arm_key() -> tcslibgs::ArmKey {
+fn window_arm_key() -> tcslib_protocol::ArmKey {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_nanos() as u64);
-    tcslibgs::ArmKey(nanos ^ (u64::from(std::process::id()) << 32))
+    tcslib_protocol::ArmKey(nanos ^ (u64::from(std::process::id()) << 32))
 }
 
 /// The ping node's answers, on their way to the pinger and its window.
@@ -2615,7 +2631,7 @@ fn serve(
         };
         if let Some(feed) = pings.as_ref().filter(|_| source.pings) {
             // The ground's clock, now: a datum is timed as it is taken.
-            if let Ok(at) = tcslibgs::node::vehicle::ping::now() {
+            if let Ok(at) = tcslib_protocol::node::vehicle::ping::now() {
                 take_answer(feed, data, at);
             }
         }
@@ -2720,13 +2736,14 @@ fn ping_node(
                 window.set_sent(SharedString::from(said));
                 return;
             }
-            let sent = tcslibgs::node::vehicle::ping::now().and_then(|at| {
-                let mut pinger =
-                    pinger.lock().map_err(|_| "the pinger".to_string())?;
-                let message = pinger.ping(at)?;
-                uplink.send(message.as_bytes())?;
-                Ok(PingShown::of(pinger.exchange()))
-            });
+            let sent =
+                tcslib_protocol::node::vehicle::ping::now().and_then(|at| {
+                    let mut pinger =
+                        pinger.lock().map_err(|_| "the pinger".to_string())?;
+                    let message = pinger.ping(at)?;
+                    uplink.send(message.as_bytes())?;
+                    Ok(PingShown::of(pinger.exchange()))
+                });
             match sent {
                 Ok(shown) => show_ping(&window, &shown),
                 Err(why) => eprintln!("ping: {why}"),
@@ -2798,17 +2815,17 @@ pub fn run(
             .map(|(row, info)| (info.name.to_string(), row))
             .collect(),
     );
-    // Which sources send values, and in what unit, asked of the
-    // configuration once: a panel then shows a reading as the number it is,
-    // with its unit, and everything else as bytes. See
-    // `tcslibgs::graph::units::unit_of` for why this is the configuration's
-    // answer rather than a guess from the data.
+    // Which sources send values, and in what unit, asked of the configuration
+    // once: a panel then shows a reading as the number it is, with its unit,
+    // and everything else as bytes. See
+    // `tcslib_protocol::graph::units::unit_of` for why this is the
+    // configuration's answer rather than a guess from the data.
     let units: Arc<BTreeMap<String, Unit>> = Arc::new(
         graph
             .nodes
             .iter()
             .filter_map(|node| {
-                tcslibgs::graph::units::unit_of(&graph, &node.name)
+                tcslib_protocol::graph::units::unit_of(&graph, &node.name)
                     .map(|unit| (node.name.clone(), unit))
             })
             .collect(),
@@ -2829,11 +2846,11 @@ pub fn run(
     // every beacon, and a beacon whose digest differs asks the operator
     // whether to continue anyway -- the panels say where each source's data
     // arrives, and a different configuration may send it somewhere else.
-    let digest = match tcslibgs::config_digest::digest_of_graph(&graph) {
+    let digest = match tcslib_protocol::config_digest::digest_of_graph(&graph) {
         Ok(digest) => {
             eprintln!(
                 "tcsmoc v{} md5 {digest}",
-                tcslibgs::config_digest::ConfigVersion::of_this_build()
+                tcslib_protocol::config_digest::ConfigVersion::of_this_build()
             );
             Some(digest)
         }
@@ -2941,20 +2958,20 @@ pub fn run(
     // The interval the configuration sends beacons at, which is what says how
     // late one is; a configuration whose interval cannot be read gets the
     // standard schedule, and says so.
-    let interval = match tcslibgs::graph::parameters::beacon_interval_of(&graph)
-    {
-        Ok(interval) => {
-            interval.unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL)
-        }
-        Err(e) => {
-            startup.warning(format!(
+    let interval =
+        match tcslib_protocol::graph::parameters::beacon_interval_of(&graph) {
+            Ok(interval) => {
+                interval.unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL)
+            }
+            Err(e) => {
+                startup.warning(format!(
                 "The beacon interval cannot be read, so the beacon indicator \
                  ages as though it were {:?}: {e}",
                 tcslib_moc::beacon::STANDARD_INTERVAL
             ));
-            tcslib_moc::beacon::STANDARD_INTERVAL
-        }
-    };
+                tcslib_moc::beacon::STANDARD_INTERVAL
+            }
+        };
     // At the socket the beacon link states, or from the station's peer of a
     // software bus: see `tcslib_moc::beacon::open`.
     let _beacon_receive = match tcslib_moc::beacon::open(
@@ -3033,7 +3050,7 @@ pub fn run(
     let gateways: Vec<&str> = graph
         .nodes
         .iter()
-        .filter(|n| tcslibgs::gateway::is_gateway(&n.node_type))
+        .filter(|n| tcslib_protocol::gateway::is_gateway(&n.node_type))
         .map(|n| n.name.as_str())
         .filter(|name| {
             links
@@ -3189,9 +3206,9 @@ pub(crate) mod tests {
     /// The datagram.
     fn as_sent(data: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        tcslibgs::link_type::counted(
+        tcslib_protocol::link_type::counted(
             data,
-            tcslibgs::link_type::Count::Groups,
+            tcslib_protocol::link_type::Count::Groups,
             &mut out,
         )
         .expect("counted");
@@ -3204,7 +3221,7 @@ pub(crate) mod tests {
     /// them, and one without is its checksum and its file.
     #[test]
     fn a_restart_target_is_a_file_or_a_checksum_or_this_windows() {
-        use tcslibgs::ConfigDigest;
+        use tcslib_protocol::ConfigDigest;
 
         let ours = ConfigDigest([0x5A; 16]);
         let own = restart_target_of("", Some(ours)).expect("this window's");
@@ -3227,7 +3244,7 @@ pub(crate) mod tests {
             .expect("a configuration with nothing wrong with it");
         assert_eq!(
             target.digest,
-            tcslibgs::config_digest::digest_of_file(&file).unwrap()
+            tcslib_protocol::config_digest::digest_of_file(&file).unwrap()
         );
         assert_eq!(target.file.as_deref(), Some(file.as_path()));
         let said = target.said();
@@ -3264,7 +3281,7 @@ pub(crate) mod tests {
     /// from `crate::tests::every_panels_data_is_inside_the_window`.
     pub(crate) fn the_restart_controls_go_onto_the_restart_target() {
         use std::net::UdpSocket;
-        use tcslibgs::{
+        use tcslib_protocol::{
             Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
             Telemetry,
         };
@@ -3297,16 +3314,16 @@ pub(crate) mod tests {
                     }
                     Command::RestartArm(cmd) => {
                         seen.push(("arm", cmd.target));
-                        tcslibgs::answer_to(
+                        tcslib_protocol::answer_to(
                             &command,
-                            tcslibgs::CommandStatus::Success,
+                            tcslib_protocol::CommandStatus::Success,
                         )
                     }
                     Command::Restart(cmd) => {
                         seen.push(("restart", cmd.target));
-                        tcslibgs::answer_to(
+                        tcslib_protocol::answer_to(
                             &command,
-                            tcslibgs::CommandStatus::Success,
+                            tcslib_protocol::CommandStatus::Success,
                         )
                     }
                     other => panic!("the window sent {:?}", other.cmd_type()),
@@ -3416,7 +3433,7 @@ pub(crate) mod tests {
     pub(crate) fn a_command_pressed_unmatched_is_said_in_a_pop_up() {
         use i_slint_backend_testing::ElementQuery;
         use std::net::UdpSocket;
-        use tcslibgs::{Command, CommandType, ConfigDigest, HostPort};
+        use tcslib_protocol::{Command, CommandType, ConfigDigest, HostPort};
 
         let ours = ConfigDigest([0x5Au8; 16]);
         let theirs = ConfigDigest([0x11u8; 16]);
@@ -3453,9 +3470,9 @@ pub(crate) mod tests {
                 let command =
                     Command::read(&buffer[..size]).expect("a command");
                 seen.push(command.cmd_type());
-                let answer = tcslibgs::answer_to(
+                let answer = tcslib_protocol::answer_to(
                     &command,
-                    tcslibgs::CommandStatus::Success,
+                    tcslib_protocol::CommandStatus::Success,
                 );
                 vehicle
                     .send_to(&answer.to_bytes(), from)
@@ -3606,13 +3623,13 @@ pub(crate) mod tests {
     /// checksums that agree.
     #[test]
     fn an_unmatched_refusal_fits_its_case() {
-        use tcslibgs::{CommandType, ConfigDigest};
+        use tcslib_protocol::{CommandType, ConfigDigest};
 
         let ours = ConfigDigest([0x5Au8; 16]);
         let other = ConfigDigest([0x11u8; 16]).to_string();
         let same = ours.to_string();
         let refused =
-            tcslibgs::TcsError::Unmatched(CommandType::Ping).to_string();
+            tcslib_protocol::TcsError::Unmatched(CommandType::Ping).to_string();
         let seen = |theirs, listening, flagged| MatchSeen {
             theirs,
             ours: Some(ours),
@@ -3718,7 +3735,7 @@ pub(crate) mod tests {
     /// making nothing for the window itself.
     #[test]
     fn a_ping_answer_reaches_the_pinger_and_the_window_is_told() {
-        use tcslibgs::node::vehicle::ping;
+        use tcslib_protocol::node::vehicle::ping;
 
         let port = std::net::UdpSocket::bind("127.0.0.1:0")
             .and_then(|socket| socket.local_addr())
@@ -4000,7 +4017,7 @@ payloads:
             .expect("the sensor");
         sensor
             .attributes
-            .insert("read_size".to_string(), tcslibgs::Scalar::of("6"));
+            .insert("read_size".to_string(), tcslib_protocol::Scalar::of("6"));
         assert_eq!(sizes(&graph), said(&[("sensor", "6 bytes")]));
     }
 
@@ -4144,16 +4161,18 @@ payloads:
         let link = Arc::new(Mutex::new(CiLink::down_commanding(
             "127.0.0.1:0",
             Commanded {
-                from: tcslibgs::HostPort {
+                from: tcslib_protocol::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 0,
                 },
-                to: tcslibgs::HostPort {
+                to: tcslib_protocol::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 1,
                 },
             },
-            Matched::for_configuration(tcslibgs::ConfigDigest([0x5A; 16])),
+            Matched::for_configuration(tcslib_protocol::ConfigDigest(
+                [0x5A; 16],
+            )),
         )));
         let agreed: Agreed = Arc::new(Mutex::new(Some(true)));
         link.lock().unwrap().connect("127.0.0.1:1").expect("up");
@@ -4183,7 +4202,7 @@ payloads:
     /// what is checked is the press and the answer and not tcspecial.
     pub(crate) fn pressing_send_ping_pings_the_node_and_times_its_answer() {
         use std::net::UdpSocket;
-        use tcslibgs::node::vehicle::ping;
+        use tcslib_protocol::node::vehicle::ping;
 
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
@@ -4216,7 +4235,7 @@ vehicle:
 
         let ui = MainWindow::new().expect("a window");
         let ping_window = PingWindow::new().expect("the ping window");
-        let ours = tcslibgs::ConfigDigest([0x5A; 16]);
+        let ours = tcslib_protocol::ConfigDigest([0x5A; 16]);
         let matched = Matched::for_configuration(ours);
         let (through, feed) = ping_node(&ui, &ping_window, &graph, &matched)
             .expect("it can be pinged")
@@ -4351,7 +4370,7 @@ vehicle:
     pub(crate) fn pressing_connect_and_enable_commands_the_vehicle() {
         use i_slint_backend_testing::ElementHandle;
         use std::net::UdpSocket;
-        use tcslibgs::{
+        use tcslib_protocol::{
             Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
             NodeTelemetry, Telemetry,
         };
@@ -4404,14 +4423,14 @@ vehicle:
                     Command::StopNode(cmd) => {
                         Telemetry::StopNode(NodeTelemetry::stopped(
                             seq,
-                            tcslibgs::CommandStatus::Success,
+                            tcslib_protocol::CommandStatus::Success,
                             cmd.node,
                         ))
                     }
                     Command::StartNode(cmd) => {
                         Telemetry::StartNode(NodeTelemetry::started(
                             seq,
-                            tcslibgs::CommandStatus::Success,
+                            tcslib_protocol::CommandStatus::Success,
                             cmd.node,
                         ))
                     }
@@ -4420,27 +4439,31 @@ vehicle:
                             cmd.attribute.to_string(),
                             cmd.value.to_vec(),
                         ));
-                        Telemetry::SetNode(tcslibgs::SetNodeTelemetry::new(
-                            seq,
-                            tcslibgs::CommandStatus::Success,
-                            cmd.node,
-                        ))
+                        Telemetry::SetNode(
+                            tcslib_protocol::SetNodeTelemetry::new(
+                                seq,
+                                tcslib_protocol::CommandStatus::Success,
+                                cmd.node,
+                            ),
+                        )
                     }
                     Command::QueryNode(cmd) => {
-                        Telemetry::QueryNode(tcslibgs::QueryNodeTelemetry::new(
-                            seq,
-                            tcslibgs::CommandStatus::Success,
-                            cmd.node,
-                            // Stopped, so the panel has something to show that
-                            // it could not have known without asking.
-                            false,
-                            tcslibgs::NodeCounts {
-                                taken_bytes: 480,
-                                reads: 40,
-                                asks: 40,
-                                ..Default::default()
-                            },
-                        ))
+                        Telemetry::QueryNode(
+                            tcslib_protocol::QueryNodeTelemetry::new(
+                                seq,
+                                tcslib_protocol::CommandStatus::Success,
+                                cmd.node,
+                                // Stopped, so the panel has something to show
+                                // that it could not have known without asking.
+                                false,
+                                tcslib_protocol::NodeCounts {
+                                    taken_bytes: 480,
+                                    reads: 40,
+                                    asks: 40,
+                                    ..Default::default()
+                                },
+                            ),
+                        )
                     }
                     other => panic!("the window sent {:?}", other.cmd_type()),
                 };
@@ -4658,7 +4681,7 @@ vehicle:
             was_set.lock().expect("the record").clone(),
             Some((
                 "setpoint".to_string(),
-                tcslibgs::node::vehicle::compute::value_bytes(
+                tcslib_protocol::node::vehicle::compute::value_bytes(
                     300.0,
                     Unit::Kelvin
                 )
@@ -4771,15 +4794,15 @@ vehicle:
         assert_eq!(
             sent,
             vec![
-                tcslibgs::CommandType::Connect,
-                tcslibgs::CommandType::QueryNode,
-                tcslibgs::CommandType::StopNode,
-                tcslibgs::CommandType::SetNode,
-                tcslibgs::CommandType::QueryNode,
-                tcslibgs::CommandType::StartNode,
-                tcslibgs::CommandType::QueryNode,
-                tcslibgs::CommandType::Connect,
-                tcslibgs::CommandType::QueryNode
+                tcslib_protocol::CommandType::Connect,
+                tcslib_protocol::CommandType::QueryNode,
+                tcslib_protocol::CommandType::StopNode,
+                tcslib_protocol::CommandType::SetNode,
+                tcslib_protocol::CommandType::QueryNode,
+                tcslib_protocol::CommandType::StartNode,
+                tcslib_protocol::CommandType::QueryNode,
+                tcslib_protocol::CommandType::Connect,
+                tcslib_protocol::CommandType::QueryNode
             ],
             "the commands the presses and contact made should have sent, and \
              no query of a node the operator had stopped"

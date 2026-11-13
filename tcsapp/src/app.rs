@@ -368,7 +368,7 @@ impl AppPl {
 /// run with -- what tells the two apart is which side of the graph the node
 /// stands on, not what its program holds. A payload is asked for a reading and
 /// answers with one, so this is the kind that plays a payload as every
-/// other payload behaves: see `tcslibgs::node::app`.
+/// other payload behaves: see `tcslib_protocol::node::app`.
 #[derive(Debug)]
 pub struct AppAllPl {
     /// What the node this program is runs under in the configuration.

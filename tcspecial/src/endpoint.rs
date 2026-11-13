@@ -22,8 +22,8 @@ use std::os::fd::BorrowedFd;
 use std::os::unix::io::RawFd;
 
 use nix::poll::{poll, PollFd, PollFlags};
-use tcslibgs::graph::terminals::Stream;
-use tcslibgs::{
+use tcslib_protocol::graph::terminals::Stream;
+use tcslib_protocol::{
     EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError,
     TcsResult,
 };
@@ -61,11 +61,13 @@ use crate::node::payload::spi::SpiEndpoint;
 /// An open refused because this build does not contain the type.
 ///
 /// In the words the load uses: see
-/// [`tcslibgs::graph::built::not_built_message`]. Only a build that leaves a
-/// type out can reach it.
+/// [`tcslib_protocol::graph::built::not_built_message`]. Only a build that
+/// leaves a type out can reach it.
 #[allow(dead_code)]
 fn not_built(what: &str, node_type: &str) -> TcsError {
-    TcsError::Config(tcslibgs::graph::built::not_built_message(what, node_type))
+    TcsError::Config(tcslib_protocol::graph::built::not_built_message(
+        what, node_type,
+    ))
 }
 
 /// Says what could not be bound, and what that usually means.
@@ -384,7 +386,9 @@ pub fn bind_endpoint_pair(
                 Ok((Box::new(reader), Box::new(writer)))
             }
             #[cfg(not(feature = "raw"))]
-            NetworkProtocol::Raw(_) => Err(not_built(what, tcslibgs::RAW)),
+            NetworkProtocol::Raw(_) => {
+                Err(not_built(what, tcslib_protocol::RAW))
+            }
             _ => Err(TcsError::Config(
                 "Unsupported network protocol".to_string(),
             )),
@@ -491,13 +495,14 @@ pub fn bind_endpoint_pair(
 
 /// Opens a reader and a writer for a payload that is spoken to first, once.
 ///
-/// For what the arrangement below cannot serve. A UDP payload that speaks
-/// first is reached by binding its address and waiting to hear from it, and
-/// a payload that is spoken to first has nothing to say until it is -- so the
-/// wait would never end and every write would be refused for want of a peer.
-/// A heater is such a payload, and so is a valve: the vehicle decides and the
-/// device obeys. So is a sensor that is asked: the trigger is the first word.
-/// [`tcslibgs::graph::interface::speaks_first`] says which payloads these are.
+/// For what the arrangement below cannot serve. A UDP payload that speaks first
+/// is reached by binding its address and waiting to hear from it, and a payload
+/// that is spoken to first has nothing to say until it is -- so the wait would
+/// never end and every write would be refused for want of a peer. A heater is
+/// such a payload, and so is a valve: the vehicle decides and the device obeys.
+/// So is a sensor that is asked: the trigger is the first word.
+/// [`tcslib_protocol::graph::interface::speaks_first`] says which payloads
+/// these are.
 ///
 /// So this sends where the node says the device is, and binds a port of its
 /// own that nothing has to find, which is where an answer comes back to. See
@@ -673,7 +678,9 @@ pub fn hearing_endpoint_pair(
                 Ok((Box::new(reader), Box::new(writer)))
             }
             #[cfg(not(feature = "raw"))]
-            NetworkProtocol::Raw(_) => Err(not_built(what, tcslibgs::RAW)),
+            NetworkProtocol::Raw(_) => {
+                Err(not_built(what, tcslib_protocol::RAW))
+            }
         },
         #[cfg(feature = "device-file")]
         EndpointConfig::Device(dev_config) => {
@@ -779,7 +786,7 @@ pub fn hearing_endpoint_pair(
 /// header is checked and taken off, and what is under it is what is read.
 ///
 /// For the uplink of a gateway whose packets are CCSDS Space Packets: see
-/// [`tcslibgs::ccsds`]. A datagram whose header is not one -- not a
+/// [`tcslib_protocol::ccsds`]. A datagram whose header is not one -- not a
 /// telecommand, another APID, a length it does not say -- is passed over and
 /// counted with the strangers, as a datagram from the wrong sender is:
 /// nothing in it is acted on, and a flood of them is a count rather than a
@@ -836,16 +843,19 @@ impl EndpointReadable for CcsdsReader {
             if got == 0 {
                 return Ok(0);
             }
-            match tcslibgs::ccsds::read_header(
+            match tcslib_protocol::ccsds::read_header(
                 &buffer[..got],
-                tcslibgs::ccsds::PacketType::Telecommand,
+                tcslib_protocol::ccsds::PacketType::Telecommand,
                 self.apid,
             ) {
                 Ok(data) => {
                     // Moved down over the header rather than copied out, so
                     // that reading allocates nothing.
                     let size = data.len();
-                    buffer.copy_within(tcslibgs::ccsds::HEADER_BYTES..got, 0);
+                    buffer.copy_within(
+                        tcslib_protocol::ccsds::HEADER_BYTES..got,
+                        0,
+                    );
                     return Ok(size);
                 }
                 Err(_) => self.refused += 1,
@@ -867,14 +877,14 @@ impl EndpointReadable for CcsdsReader {
 /// APID: a header goes on each, counted by the writer's own sequence count.
 ///
 /// For a source's downlink through a gateway whose packets are CCSDS Space
-/// Packets: see [`tcslibgs::ccsds`]. The packet is made in room the writer
-/// keeps, which grows to the largest datum and no further, so that writing
-/// allocates nothing once that has been seen.
+/// Packets: see [`tcslib_protocol::ccsds`]. The packet is made in room the
+/// writer keeps, which grows to the largest datum and no further, so that
+/// writing allocates nothing once that has been seen.
 pub struct CcsdsWriter {
     /// What the packets are written to.
     inner: Box<dyn EndpointWritable + Send>,
     /// The APID, the type and the count.
-    sender: tcslibgs::ccsds::Sender,
+    sender: tcslib_protocol::ccsds::Sender,
     /// Where each packet is made.
     room: Vec<u8>,
 }
@@ -898,8 +908,8 @@ impl CcsdsWriter {
         inner: Box<dyn EndpointWritable + Send>,
         apid: u16,
     ) -> TcsResult<Self> {
-        let sender = tcslibgs::ccsds::Sender::new(
-            tcslibgs::ccsds::PacketType::Telemetry,
+        let sender = tcslib_protocol::ccsds::Sender::new(
+            tcslib_protocol::ccsds::PacketType::Telemetry,
             apid,
         )
         .map_err(|fault| TcsError::Config(fault.to_string()))?;
@@ -930,7 +940,7 @@ impl EndpointWritable for CcsdsWriter {
     /// it, none, or what went after the header of a packet only partly
     /// written.
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
-        let total = tcslibgs::ccsds::HEADER_BYTES + data.len();
+        let total = tcslib_protocol::ccsds::HEADER_BYTES + data.len();
         if self.room.len() < total {
             self.room.resize(total, 0);
         }
@@ -941,7 +951,7 @@ impl EndpointWritable for CcsdsWriter {
         let wrote = self.inner.write(packet)?;
         Ok(match wrote == packet.len() {
             true => data.len(),
-            false => wrote.saturating_sub(tcslibgs::ccsds::HEADER_BYTES),
+            false => wrote.saturating_sub(tcslib_protocol::ccsds::HEADER_BYTES),
         })
     }
 }
@@ -974,19 +984,19 @@ mod tests {
         let mut reader = CcsdsReader::of(Box::new(inner), 0x123);
 
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground");
-        let mut sender = tcslibgs::ccsds::Sender::new(
-            tcslibgs::ccsds::PacketType::Telecommand,
+        let mut sender = tcslib_protocol::ccsds::Sender::new(
+            tcslib_protocol::ccsds::PacketType::Telecommand,
             0x123,
         )
         .expect("an APID");
         let mut room = [0u8; 64];
-        let mut wrong = tcslibgs::ccsds::Sender::new(
-            tcslibgs::ccsds::PacketType::Telecommand,
+        let mut wrong = tcslib_protocol::ccsds::Sender::new(
+            tcslib_protocol::ccsds::PacketType::Telecommand,
             0x124,
         )
         .expect("an APID");
-        let mut telemetry = tcslibgs::ccsds::Sender::new(
-            tcslibgs::ccsds::PacketType::Telemetry,
+        let mut telemetry = tcslib_protocol::ccsds::Sender::new(
+            tcslib_protocol::ccsds::PacketType::Telemetry,
             0x123,
         )
         .expect("an APID");

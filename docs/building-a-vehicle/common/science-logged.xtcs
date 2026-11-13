@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslibgs/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
     <!-- The deck's science subsystem with a log aboard, which the stages
          of "Building a Vehicle" from stage 8 on include in place of
          science.ytcs: the same nodes, and science_log, which keeps the

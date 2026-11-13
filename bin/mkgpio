@@ -80,7 +80,7 @@ echo 1 > "$gpio_sim/$sim_device/live"
 # The lines are in sysfs, under the platform device in a directory named
 # after the chip -- /sys/devices/platform/gpio-sim.0/gpiochip1/sim_gpio0 --
 # with no bank directory between, as simulated_chips() in
-# tcslibgs/src/node/payload/gpio says for everything that looks.
+# tcslib-protocol/src/node/payload/gpio says for everything that looks.
 dev_name="$(cat "$gpio_sim/$sim_device/dev_name")"
 chip="$(cat "$gpio_sim/$sim_device/$sim_bank/chip_name")"
 bank="/sys/devices/platform/$dev_name/$chip"

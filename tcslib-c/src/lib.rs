@@ -49,15 +49,15 @@ use tcslib_moc::gateway::{GatewayReceiver, DATUM_BYTES};
 use tcslib_moc::matched::Matched;
 use tcslib_moc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcslib_moc::{command_links_of, CommandStatus, TcsClient};
-use tcslibgs::config_digest::{digest_of_graph, ConfigDigest};
-use tcslibgs::graph::parameters::beacon_interval_of;
-use tcslibgs::graph::units;
-use tcslibgs::graph::{telemetry, Graph};
-use tcslibgs::node::vehicle::compute::{
+use tcslib_protocol::config_digest::{digest_of_graph, ConfigDigest};
+use tcslib_protocol::graph::parameters::beacon_interval_of;
+use tcslib_protocol::graph::units;
+use tcslib_protocol::graph::{telemetry, Graph};
+use tcslib_protocol::node::vehicle::compute::{
     from_decision, from_value, node_sends_a_decision, node_sends_a_value,
 };
-use tcslibgs::unit::Unit;
-use tcslibgs::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
+use tcslib_protocol::unit::Unit;
+use tcslib_protocol::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
 /// `TCS_ERROR_BYTES` in the header.
@@ -1063,10 +1063,10 @@ pub unsafe extern "C" fn tcs_gateway_close(gateway: *mut tcs_gateway) {
     }
 }
 
-/// Says whether what a node sends is a value: four bytes of a signed count
-/// of micro-kelvin, which [`tcs_value_kelvin`] reads. The configuration's
-/// answer, `tcslibgs::node::vehicle::compute::node_sends_a_value`, and never
-/// a guess from a datum's width, every four bytes reading as a value.
+/// Says whether what a node sends is a value: four bytes of a signed count of
+/// micro-kelvin, which [`tcs_value_kelvin`] reads. The configuration's answer,
+/// `tcslib_protocol::node::vehicle::compute::node_sends_a_value`, and never a
+/// guess from a datum's width, every four bytes reading as a value.
 ///
 /// # Arguments
 ///
@@ -1106,7 +1106,7 @@ pub unsafe extern "C" fn tcs_configuration_sends_values(
 
 /// Reads a value -- four bytes of a signed count of micro-kelvin, most
 /// significant first -- as a temperature in kelvin, by
-/// `tcslibgs::node::vehicle::compute::from_value`, the one statement of
+/// `tcslib_protocol::node::vehicle::compute::from_value`, the one statement of
 /// what a value is.
 ///
 /// # Arguments
@@ -1132,8 +1132,8 @@ pub unsafe extern "C" fn tcs_value_kelvin(
     guard(-1, || {
         let out = out_of(kelvin, "kelvin")?;
         let data = bytes_of(data, length)?;
-        // Allocates, in tcslibgs, only where what arrived is not a value, to
-        // say why. Copied here into a fixed buffer.
+        // Allocates, in tcslib-protocol, only where what arrived is not a
+        // value, to say why. Copied here into a fixed buffer.
         *out = from_value(data, Unit::Kelvin, "the datum").map_err(fail)?;
         Ok(0)
     })
@@ -1147,7 +1147,7 @@ pub unsafe extern "C" fn tcs_value_kelvin(
 ///
 /// # Returns
 ///
-/// Its symbol, as `tcslibgs::unit::Unit::symbol` spells it.
+/// Its symbol, as `tcslib_protocol::unit::Unit::symbol` spells it.
 fn c_symbol(unit: Unit) -> &'static CStr {
     match unit {
         Unit::Kelvin => c"K",
@@ -1163,7 +1163,7 @@ fn c_symbol(unit: Unit) -> &'static CStr {
 }
 
 /// Says what unit a node's values are in, as the configuration says:
-/// `tcslibgs::graph::units::unit_of`, and never the datum's width.
+/// `tcslib_protocol::graph::units::unit_of`, and never the datum's width.
 ///
 /// # Arguments
 ///
@@ -1204,7 +1204,7 @@ pub unsafe extern "C" fn tcs_configuration_value_unit(
 
 /// Reads a value -- four bytes of a signed count of its unit's steps, most
 /// significant first -- as a number in that unit, by
-/// `tcslibgs::node::vehicle::compute::from_value`, the one statement of
+/// `tcslib_protocol::node::vehicle::compute::from_value`, the one statement of
 /// what a value is.
 ///
 /// # Arguments
@@ -1241,7 +1241,7 @@ pub unsafe extern "C" fn tcs_value_in(
 
 /// Says whether what a node sends is a decision: a `boolean`, the one byte
 /// 1 or 0, which [`tcs_decision_on`] reads. The configuration's answer,
-/// `tcslibgs::node::vehicle::compute::node_sends_a_decision`.
+/// `tcslib_protocol::node::vehicle::compute::node_sends_a_decision`.
 ///
 /// # Arguments
 ///
@@ -1282,8 +1282,8 @@ pub unsafe extern "C" fn tcs_configuration_sends_decisions(
 }
 
 /// Reads a decision -- a `boolean`, the one byte 1 or 0 -- as on or off, by
-/// `tcslibgs::node::vehicle::compute::from_decision`, the one statement of
-/// what a decision is.
+/// `tcslib_protocol::node::vehicle::compute::from_decision`, the one statement
+/// of what a decision is.
 ///
 /// # Arguments
 ///
@@ -1308,8 +1308,8 @@ pub unsafe extern "C" fn tcs_decision_on(
     guard(-1, || {
         let out = out_of(on, "on")?;
         let data = bytes_of(data, length)?;
-        // Allocates, in tcslibgs, only where what arrived is not a decision,
-        // to say why. Copied here into a fixed buffer.
+        // Allocates, in tcslib-protocol, only where what arrived is not a
+        // decision, to say why. Copied here into a fixed buffer.
         *out = c_int::from(from_decision(data, "the datum").map_err(fail)?);
         Ok(0)
     })
@@ -1944,7 +1944,7 @@ unsafe fn target_of(
 /// Writes a setting's value as SET_NODE carries it: a datum of the type the
 /// configuration sets the attribute as, in that type's own encoding, read
 /// from text as an operator types it -- a thermostat's setpoint, `293.15`, as
-/// four bytes of micro-kelvin. See `tcslibgs::graph::settings`.
+/// four bytes of micro-kelvin. See `tcslib_protocol::graph::settings`.
 ///
 /// # Arguments
 ///
@@ -1987,14 +1987,14 @@ pub unsafe extern "C" fn tcs_configuration_setting(
         }
         // Allocates: a station turns what an operator typed into a value
         // as it is typed, and not as data moves.
-        let encoded = tcslibgs::graph::settings::encoded(
+        let encoded = tcslib_protocol::graph::settings::encoded(
             &configuration.graph,
             node,
             attribute,
             text,
         )
         .map_err(fail)?;
-        if encoded.len() > tcslibgs::VALUE_BYTES {
+        if encoded.len() > tcslib_protocol::VALUE_BYTES {
             return Err(fail(format_args!(
                 "{} bytes are more than a SET_NODE carries",
                 encoded.len()
@@ -2445,9 +2445,11 @@ mod tests {
     fn a_value_reads_as_the_vehicle_writes_it() {
         use super::*;
 
-        let written =
-            tcslibgs::node::vehicle::compute::value_bytes(293.15, Unit::Kelvin)
-                .expect("a value");
+        let written = tcslib_protocol::node::vehicle::compute::value_bytes(
+            293.15,
+            Unit::Kelvin,
+        )
+        .expect("a value");
         let mut kelvin = 0.0;
         // SAFETY: four readable bytes, and a writable double.
         let read = unsafe {
@@ -2480,9 +2482,11 @@ mod tests {
             assert_eq!((read, on), (0, said), "{written:?}");
         }
 
-        let value =
-            tcslibgs::node::vehicle::compute::value_bytes(293.15, Unit::Kelvin)
-                .expect("a value");
+        let value = tcslib_protocol::node::vehicle::compute::value_bytes(
+            293.15,
+            Unit::Kelvin,
+        )
+        .expect("a value");
         // SAFETY: four readable bytes, and a writable int.
         let read =
             unsafe { tcs_decision_on(value.as_ptr(), value.len(), &mut on) };
@@ -2571,9 +2575,11 @@ mod tests {
         // SAFETY: made by tcs_configuration_open and not yet closed.
         unsafe { tcs_configuration_close(configuration) };
 
-        let volts =
-            tcslibgs::node::vehicle::compute::value_bytes(28.5, Unit::Volt)
-                .expect("a voltage");
+        let volts = tcslib_protocol::node::vehicle::compute::value_bytes(
+            28.5,
+            Unit::Volt,
+        )
+        .expect("a voltage");
         let mut read = 0.0;
         // SAFETY: a terminated unit, four readable bytes, a writable double.
         let said = unsafe {
@@ -2608,7 +2614,7 @@ mod tests {
         // SAFETY: a NUL-terminated path that outlives the call.
         let configuration = unsafe { tcs_configuration_open(path.as_ptr()) };
         assert!(!configuration.is_null(), "the example opens");
-        let mut value = [0u8; tcslibgs::VALUE_BYTES];
+        let mut value = [0u8; tcslib_protocol::VALUE_BYTES];
         let mut length = 0usize;
         for (attribute, text, wanted) in [
             (c"setpoint", c"293.15", 0),
@@ -2631,9 +2637,11 @@ mod tests {
         }
         // SAFETY: made by tcs_configuration_open and not yet closed.
         unsafe { tcs_configuration_close(configuration) };
-        let kelvin =
-            tcslibgs::node::vehicle::compute::value_bytes(293.15, Unit::Kelvin)
-                .expect("a temperature");
+        let kelvin = tcslib_protocol::node::vehicle::compute::value_bytes(
+            293.15,
+            Unit::Kelvin,
+        )
+        .expect("a temperature");
         assert_eq!(&value[..length], kelvin);
     }
 
@@ -2896,8 +2904,8 @@ mod tests {
             ("TCS_TEXT_BYTES", TEXT_BYTES),
             ("TCS_MAX_REMARKS", MAX_REMARKS),
             ("TCS_SAMPLE_BYTES", DH_SAMPLE_BYTES),
-            ("TCS_ATTRIBUTE_BYTES", tcslibgs::ATTRIBUTE_BYTES),
-            ("TCS_VALUE_BYTES", tcslibgs::VALUE_BYTES),
+            ("TCS_ATTRIBUTE_BYTES", tcslib_protocol::ATTRIBUTE_BYTES),
+            ("TCS_VALUE_BYTES", tcslib_protocol::VALUE_BYTES),
         ] {
             let line = format!("#define {name} {size}");
             assert!(header.contains(&line), "the header has no \"{line}\"");

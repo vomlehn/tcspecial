@@ -18,7 +18,7 @@ that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
 tcssim acts on. A shipped pair is ``examples/minimal/minimal.ytcs`` and
-``minimal-sim.yaml`` beside it; the parser is ``tcslibgs::sim_config``.
+``minimal-sim.yaml`` beside it; the parser is ``tcslib_protocol::sim_config``.
 
 Requirement
     The parser lives with the other three configuration languages rather than
@@ -336,15 +336,15 @@ Requirement
     The model is the components it is made of, grouped by type as a
     configuration's nodes are, and a list of connections between them, as a
     configuration has links: ``components`` and ``connections``, under
-    ``physics``. Each entry of ``components`` is ``type`` and a type,
-    ``- type heater:``, holding the components of that type, each
-    named by ``component``. The types are ``heater``, ``thermal_mass``,
-    ``sun``, ``solar_array``, ``load``, ``bus``, ``battery``, ``engine`` and
-    ``body``, and a type of any other is refused; a ``thermal_zone``, which
-    is what a ``thermal_mass`` was called before, is told the name it has now.
-    A type is written once, with a component under it. Each type's settings,
-    terminals and rules are stated once, in ``tcslibgs::node::physics``; its
-    arithmetic is the simulator's, in ``tcssim::physics``.
+    ``physics``. Each entry of ``components`` is ``type`` and a type, ``- type
+    heater:``, holding the components of that type, each named by ``component``.
+    The types are ``heater``, ``thermal_mass``, ``sun``, ``solar_array``,
+    ``load``, ``bus``, ``battery``, ``engine`` and ``body``, and a type of any
+    other is refused; a ``thermal_zone``, which is what a ``thermal_mass`` was
+    called before, is told the name it has now. A type is written once, with a
+    component under it. Each type's settings, terminals and rules are stated
+    once, in ``tcslib_protocol::node::physics``; its arithmetic is the
+    simulator's, in ``tcssim::physics``.
 
 Requirement
     A ``thermal_mass`` has two heaters of its own, ``heater_1`` and
@@ -734,9 +734,9 @@ Requirement
 Requirement
     It reads what each sensor's simulated payload sends, as it leaves: a dropped
     reading never arrives, and a truncated or corrupted one arrives as the
-    vehicle would see it. The bytes are read as the conversion the sensor
-    feeds reads them, ``Format::counts`` in tcslibgs being the one reading
-    both use, and a reading that conversion would refuse is ignored.
+    vehicle would see it. The bytes are read as the conversion the sensor feeds
+    reads them, ``Format::counts`` in tcslib-protocol being the one reading both
+    use, and a reading that conversion would refuse is ignored.
 
 Requirement
     It decides on the median of each sensor's latest reading, as the example

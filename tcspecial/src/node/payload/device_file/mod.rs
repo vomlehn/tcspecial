@@ -21,7 +21,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslibgs::{DeviceConfig, TcsError, TcsResult};
+use tcslib_protocol::{DeviceConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{

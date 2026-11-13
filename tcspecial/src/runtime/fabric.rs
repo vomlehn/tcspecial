@@ -57,8 +57,8 @@ use std::sync::{
 };
 use std::thread::JoinHandle;
 
-use tcslibgs::graph::terminals::Stream;
-use tcslibgs::link_type::LinkType;
+use tcslib_protocol::graph::terminals::Stream;
+use tcslib_protocol::link_type::LinkType;
 
 use super::node_state::Outcome;
 use super::route::{Delivery, Routes};
@@ -1320,9 +1320,11 @@ impl Fabric {
             // told so than told nothing may be set. Made only on the way to
             // refusing a command, which allocates its answer already.
             let routes = &self.shared.routes;
-            if let Some(hint) = tcslibgs::graph::spelled(attribute, |other| {
-                routes.is_commanded(node, other)
-            }) {
+            if let Some(hint) =
+                tcslib_protocol::graph::spelled(attribute, |other| {
+                    routes.is_commanded(node, other)
+                })
+            {
                 return Err(format!(
                     "no command binding says the ground may set \
                      \"{node}.{attribute}\": {hint}"
@@ -1854,7 +1856,7 @@ mod tests {
 
     use std::path::Path;
     use std::sync::Mutex as TestLock;
-    use tcslibgs::graph::Graph;
+    use tcslib_protocol::graph::Graph;
 
     /// What a node was given, and what it will say when read.
     #[derive(Default)]
@@ -1969,7 +1971,7 @@ mod tests {
     fn kelvin(number: f64) -> Vec<u8> {
         crate::node::vehicle::compute::as_value(
             number,
-            tcslibgs::unit::Unit::Kelvin,
+            tcslib_protocol::unit::Unit::Kelvin,
         )
         .expect("a temperature a value carries")
     }
@@ -2240,7 +2242,7 @@ vehicle:
             .map(|datum| {
                 crate::node::vehicle::compute::from_value(
                     datum,
-                    tcslibgs::unit::Unit::Kelvin,
+                    tcslib_protocol::unit::Unit::Kelvin,
                     "the ground",
                 )
                 .expect("a value")
@@ -2607,7 +2609,7 @@ vehicle:
         // An attribute a binding names, written with a hyphen for its
         // underscore, is told its spelling.
         let mut bound = graph.clone();
-        bound.commands.push(tcslibgs::graph::CommandBinding {
+        bound.commands.push(tcslib_protocol::graph::CommandBinding {
             from: "gateway".to_string(),
             sets: "thermostat.half_band".to_string(),
         });
@@ -2667,7 +2669,7 @@ vehicle:
     /// telemetry would say why.
     #[test]
     fn a_cycle_is_stopped_and_named() {
-        use tcslibgs::graph::{Destinations, Link, Node};
+        use tcslib_protocol::graph::{Destinations, Link, Node};
 
         /// A node that always has a result, which is what makes the cycle
         /// turn.
@@ -2893,7 +2895,7 @@ vehicle:
     ///
     /// The routes of that graph.
     fn shaped(nodes: &[&str], links: &[(&str, &str)]) -> Routes {
-        use tcslibgs::graph::{Destinations, Link, Node};
+        use tcslib_protocol::graph::{Destinations, Link, Node};
         Routes::of(&Graph {
             description: None,
             tcspecial: None,

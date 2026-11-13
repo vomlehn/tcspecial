@@ -1,9 +1,9 @@
 //! A battery: charge moving in a straight line with the current, until it
 //! is full or empty.
 //!
-//! Its terminals are `tcslibgs::node::physics::battery`'s: `offered`, what the bus
-//! has left over, in amperes; `voltage`, in volts; `current`, what actually
-//! flows in, in amperes; and `charge`, the fraction of its capacity it
+//! Its terminals are `tcslib_protocol::node::physics::battery`'s: `offered`,
+//! what the bus has left over, in amperes; `voltage`, in volts; `current`, what
+//! actually flows in, in amperes; and `charge`, the fraction of its capacity it
 //! holds.
 //!
 //! # The arithmetic
@@ -24,12 +24,13 @@
 //! is outside what this models, and its voltage, below empty, is what shows
 //! it.
 
-use tcslibgs::node::physics::battery::Resolved;
+use tcslib_protocol::node::physics::battery::Resolved;
 
 use super::component::Component;
 
-/// Its terminals' places, in `tcslibgs::node::physics::battery::TERMINALS`'s
-/// order, which a test holds this to.
+/// Its terminals' places, in
+/// `tcslib_protocol::node::physics::battery::TERMINALS`'s order, which a test
+/// holds this to.
 const OFFERED: usize = 0;
 const VOLTAGE: usize = 1;
 const CURRENT: usize = 2;
@@ -127,7 +128,7 @@ impl Component for Battery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslibgs::node::physics::battery::TERMINALS;
+    use tcslib_protocol::node::physics::battery::TERMINALS;
 
     /// A battery of one ampere-hour from 24 V to 32 V, a tenth of an ohm,
     /// half full.

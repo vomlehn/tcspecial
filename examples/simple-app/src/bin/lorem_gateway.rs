@@ -38,7 +38,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use simple_app::TERMINATOR;
-use tcsmoc::gateway::{GatewayReceiver, DATUM_BYTES};
+use tcsmoc::gateway::GatewayReceiver;
 use tcsmoc::listening::{Heard, Listening};
 
 /// How long each CONNECT waits for its answer before it is sent again.
@@ -196,8 +196,9 @@ fn main() -> ExitCode {
     }
 
     let mut said_anything = false;
-    // Every word is received here, made once: room for any datagram.
-    let mut datum = vec![0u8; DATUM_BYTES];
+    // Every word is received here, made once: room for the largest any of
+    // its sources can send.
+    let mut datum = vec![0u8; gateway.datum_bytes()];
     loop {
         let arrival = match gateway.receive_into(None, &mut datum) {
             Ok(Some(arrival)) => arrival,

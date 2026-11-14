@@ -28,6 +28,7 @@
 
 use std::collections::BTreeMap;
 
+use tcsprotocol::graph::largest;
 use tcsprotocol::graph::link_types::{self, Carries};
 use tcsprotocol::graph::telemetry::{self, Telemetered, Via};
 use tcsprotocol::graph::terminals::{self, Stream};
@@ -214,6 +215,15 @@ pub struct Routes {
     /// collide with a node: a node's name is a word, and these have spaces in
     /// them. They are opened from what is here.
     ground_links: Vec<Telemetered>,
+    /// The largest result each node can produce, by node name, which the
+    /// buffers its results are written into are made: see
+    /// `tcsprotocol::graph::largest::largest_result`, asked once as the
+    /// configuration is loaded.
+    largest: BTreeMap<String, usize>,
+    /// The most any datum may be in this configuration, which a buffer for
+    /// something not a node is made: see
+    /// `tcsprotocol::graph::largest::most_datum`.
+    most: usize,
 }
 
 impl Routes {
@@ -344,7 +354,38 @@ impl Routes {
             }
         }
 
+        routes.most = largest::most_datum(graph);
+        for node in &graph.nodes {
+            routes.largest.insert(
+                node.name.clone(),
+                largest::largest_result(graph, node),
+            );
+        }
+
         routes
+    }
+
+    /// The largest result a node can produce, which its buffers are made.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The bytes, or `None` for a name that is not a node of the
+    /// configuration: a link to the ground, or a node a test made.
+    pub fn largest_of(&self, node: &str) -> Option<usize> {
+        self.largest.get(node).copied()
+    }
+
+    /// The most any datum may be in this configuration.
+    ///
+    /// # Returns
+    ///
+    /// The bytes.
+    pub fn most(&self) -> usize {
+        self.most
     }
 
     /// Where this node's output goes.

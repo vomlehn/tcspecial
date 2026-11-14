@@ -637,6 +637,11 @@ struct Worker {
     /// wave, made the first time it produces that many and kept: a node
     /// produces one result per arrival at most, and most produce one.
     banks: [RwLock<Vec<Vec<u8>>>; 2],
+    /// How large each result buffer in the banks is: the largest result
+    /// this node can produce, as the configuration says
+    /// ([`Routes::largest_of`]), so that a two-byte sensor has buffers of
+    /// two bytes.
+    size: usize,
     mail: Mutex<Mail>,
     /// What the thread waits on for a job.
     wake: Condvar,
@@ -677,7 +682,8 @@ struct Shared {
     /// What says whether a node may be touched, and is told what it moved:
     /// see [`Watch`].
     watch: RwLock<Arc<dyn Watch>>,
-    /// How large a datum may be, which is the buffer a read is given.
+    /// How large a datum may be, which is the buffer a read is given where
+    /// the routes do not say a node's own: the most any datum may be.
     buffer: usize,
     /// The datum [`Fabric::deliver`] was given, copied here so that every
     /// thread can read it.
@@ -745,8 +751,9 @@ impl Fabric {
     ///
     /// * `routes` - Where each node's output goes and which link fills each
     ///              named input.
-    /// * `buffer` - How large a datum may be: the size of the buffer each
-    ///              read is given.
+    /// * `buffer` - How large a datum may be: the size of the buffer a read
+    ///              is given where `routes` says nothing of its node, and
+    ///              of the one a delivery is copied into.
     ///
     /// # Returns
     ///
@@ -854,13 +861,19 @@ impl Fabric {
     /// The node's worker, holding no port yet; `threaded` is false if no
     /// thread could be started for it.
     fn start(&mut self, name: &str) -> Arc<Worker> {
+        let size = self
+            .shared
+            .routes
+            .largest_of(name)
+            .unwrap_or(self.shared.buffer);
         let mut worker = Worker {
             name: name.to_string(),
             port: Mutex::new(None),
             banks: [
-                RwLock::new(vec![vec![0; self.shared.buffer]]),
-                RwLock::new(vec![vec![0; self.shared.buffer]]),
+                RwLock::new(vec![vec![0; size]]),
+                RwLock::new(vec![vec![0; size]]),
             ],
+            size,
             mail: Mutex::new(Mail::default()),
             wake: Condvar::new(),
             threaded: true,
@@ -1774,7 +1787,7 @@ fn deliver_to(
         // many in one wave and kept.
         let item = produced.len();
         if out.len() <= item {
-            out.push(vec![0; shared.buffer]);
+            out.push(vec![0; worker.size]);
         }
         match node.take(&mut out[item]) {
             Ok(taken) if taken.bytes == 0 => {}
@@ -2098,8 +2111,8 @@ vehicle:
         let (valve, valve_port) = device();
         fabric.hold("ground", ground_port);
         fabric.hold("valve", valve_port);
-        fabric.hold("commands", Box::new(TeePort::of("commands")));
-        fabric.hold("readings", Box::new(TeePort::of("readings")));
+        fabric.hold("commands", Box::new(TeePort::of("commands", 64)));
+        fabric.hold("readings", Box::new(TeePort::of("readings", 64)));
         fabric.hold("dropped", Box::new(NullPort::of()));
 
         // A command: to the tee, then from it to the valve and the ground.

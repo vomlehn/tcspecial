@@ -960,7 +960,7 @@ impl Inbox {
     ///
     /// The inbox, with nothing waiting in it.
     fn new(sbn: &tcsprotocol::Sbn) -> Inbox {
-        let room = (sbn.max_message as usize).min(tcsprotocol::DATUM_BYTES);
+        let room = sbn.max_message as usize;
         Inbox {
             ring: Mutex::new(Ring {
                 slots: (0..INBOX_SLOTS).map(|_| (0, vec![0; room])).collect(),

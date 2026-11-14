@@ -1355,15 +1355,17 @@ impl TeePort {
     ///
     /// # Arguments
     ///
-    /// * `what` - The node's name, which every complaint names.
+    /// * `what`    - The node's name, which every complaint names.
+    /// * `largest` - The largest datum that may arrive: the largest its
+    ///               sources produce.
     ///
     /// # Returns
     ///
     /// The tee, holding nothing.
-    pub fn of(what: &str) -> TeePort {
+    pub fn of(what: &str, largest: usize) -> TeePort {
         TeePort {
             what: what.to_string(),
-            through: Through::new(),
+            through: Through::new(largest),
         }
     }
 }
@@ -2836,7 +2838,7 @@ mod tests {
         );
         assert!(port.ready(), "an answer is made as the ping arrives");
 
-        let mut buffer = [0u8; tcsprotocol::DATUM_BYTES];
+        let mut buffer = [0u8; tcsprotocol::node::vehicle::ping::REPLY_BYTES];
         let got = port
             .take(&mut buffer)
             .map(|taken| taken.bytes)
@@ -2857,7 +2859,7 @@ mod tests {
     /// particular: so that the fabric sends it down every link the node has.
     #[test]
     fn a_tee_hands_on_what_arrives() {
-        let mut port = TeePort::of("through");
+        let mut port = TeePort::of("through", 64);
 
         assert!(!port.ready(), "nothing has arrived");
         assert_eq!(port.take(&mut [0u8; 64]), Ok(Taken::NOTHING));

@@ -437,13 +437,13 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     // datum carries would arrive cut short -- and a line read in pieces is a
     // line whose pieces nothing knows how to put back together.
     if let Some(rule) = &framing {
-        if rule.max_length as usize > crate::types::DATUM_BYTES {
+        let most = crate::graph::largest::MOST_ANY;
+        if rule.max_length as usize > most {
             return Err(format!(
                 "\"{what}\": max_length {} is more than one datum carries: a \
-                 read is delivered whole, and the most a datum holds is {} \
-                 bytes",
-                rule.max_length,
-                crate::types::DATUM_BYTES
+                 read is delivered whole, and the most a datum holds is \
+                 {most} bytes",
+                rule.max_length
             ));
         }
     }
@@ -3063,8 +3063,8 @@ mod tests {
     /// knows how to put back together.
     #[test]
     fn a_read_longer_than_a_datum_is_refused() {
-        let most = crate::types::DATUM_BYTES.to_string();
-        let one_more = (crate::types::DATUM_BYTES + 1).to_string();
+        let most = crate::graph::largest::MOST_ANY.to_string();
+        let one_more = (crate::graph::largest::MOST_ANY + 1).to_string();
         let fits =
             line_with(&[("max_length", &most), ("read_timeout", "none")]);
         reached("serial", &fits).expect("a datum's worth fits");

@@ -112,6 +112,9 @@ pub struct Telemetered {
     /// that states none it can be held to. A string or bytes is sent after
     /// a count of its bytes ([`LinkType::is_counted`]).
     pub carries: LinkType,
+    /// The largest datum its source can produce, which the buffer it is
+    /// sent from is sized by: see [`crate::graph::largest::largest_datum`].
+    pub largest: usize,
 }
 
 impl Telemetered {
@@ -426,6 +429,9 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 reaches,
                 apid,
                 carries: sent_by(graph.node(&source)),
+                largest: graph.node(&source).map_or(0, |node| {
+                    super::largest::largest_datum(graph, node).bytes
+                }),
             });
         }
     }
@@ -487,6 +493,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 reaches,
                 apid,
                 carries: sent_by(Some(node)),
+                largest: super::largest::largest_datum(graph, node).bytes,
             });
         }
     }

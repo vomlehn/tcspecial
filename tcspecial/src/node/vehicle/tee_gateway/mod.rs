@@ -41,17 +41,21 @@ const WAITING_AT_ONCE: usize = 4;
 
 impl Through {
     /// Makes a pass-through with nothing in it, and buffers made for a few
-    /// data of the largest size a datum has: made with the node, so that
-    /// passing data through allocates nothing.
+    /// data of the largest size its sources' data has: made with the node,
+    /// so that passing data through allocates nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `largest` - The largest datum that may arrive.
     ///
     /// # Returns
     ///
     /// The empty pass-through.
-    pub fn new() -> Through {
+    pub fn new(largest: usize) -> Through {
         Through {
             waiting: VecDeque::with_capacity(WAITING_AT_ONCE),
             spare: (0..WAITING_AT_ONCE)
-                .map(|_| Vec::with_capacity(tcsprotocol::DATUM_BYTES))
+                .map(|_| Vec::with_capacity(largest))
                 .collect(),
         }
     }
@@ -129,7 +133,7 @@ mod tests {
     /// What arrives is handed on, in order and unchanged.
     #[test]
     fn what_arrives_is_handed_on_in_order() {
-        let mut through = Through::new();
+        let mut through = Through::new(64);
         assert!(!through.waiting());
         assert_eq!(through.take("through", &mut [0u8; 8]), Ok(0));
 
@@ -151,7 +155,7 @@ mod tests {
     /// A datum that will not fit is kept, and the complaint names the node.
     #[test]
     fn a_datum_too_large_for_the_buffer_is_kept() {
-        let mut through = Through::new();
+        let mut through = Through::new(64);
         through.give(b"2901234");
 
         let said = through

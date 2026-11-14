@@ -29,8 +29,10 @@ use crate::matched::Matched;
 /// What the ground's end of the `payload_telemetry` links is called.
 pub const PAYLOAD_TELEMETRY: &str = "payload_telemetry";
 
-/// The largest datum one receive returns: room for a whole datagram, and
-/// the size of a buffer that [`GatewayReceiver::receive_into`] can always fill.
+/// Room for any datagram there is: the size of a buffer that
+/// [`GatewayReceiver::receive_into`] can always fill, whatever node it is.
+/// A buffer for one node is better made [`GatewayReceiver::datum_bytes`],
+/// the largest its sources can send.
 pub const DATUM_BYTES: usize = 65_536;
 
 /// One datum from the vehicle, and the node that produced it.
@@ -72,6 +74,11 @@ pub struct GatewayReceiver {
     /// Whether the station is matched with the vehicle, where it watches
     /// the beacons: see [`GatewayReceiver::gated_by`]. `None` reads everything.
     gate: Option<Matched>,
+    /// The largest datagram any of its sources can send: the largest datum
+    /// each can produce, as the configuration says, and the count before it
+    /// where it is counted. The vehicle sizes its buffers by the same
+    /// figures (`tcsprotocol::graph::largest`).
+    datum_bytes: usize,
 }
 
 impl GatewayReceiver {
@@ -207,8 +214,14 @@ impl GatewayReceiver {
     ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
         let mut counts = Vec::new();
+        let mut datum_bytes = 0;
         for link in links {
             counts.push(link.count());
+            let count = match link.count() {
+                Some(_) => tcsprotocol::link_type::COUNT_BYTES,
+                None => 0,
+            };
+            datum_bytes = datum_bytes.max(link.largest + count);
             // A link on a software bus has no ground socket of its own: the
             // bus's peer sends what is published under its message ID to a
             // socket it makes for it, as tcspecial would over UDP.
@@ -251,7 +264,19 @@ impl GatewayReceiver {
             fds,
             next: 0,
             gate: None,
+            datum_bytes,
         })
+    }
+
+    /// How large a buffer [`GatewayReceiver::receive_into`] needs for any
+    /// datum this node's sources can send: sized by the configuration, as
+    /// the vehicle's buffers are.
+    ///
+    /// # Returns
+    ///
+    /// The bytes.
+    pub fn datum_bytes(&self) -> usize {
+        self.datum_bytes
     }
 
     /// Reads data only while the station is matched with the vehicle for
@@ -326,7 +351,7 @@ impl GatewayReceiver {
         &mut self,
         wait: Option<Duration>,
     ) -> Result<Option<Received>, String> {
-        let mut datum = vec![0u8; DATUM_BYTES];
+        let mut datum = vec![0u8; self.datum_bytes];
         let Some(arrival) = self.receive_into(wait, &mut datum)? else {
             return Ok(None);
         };
@@ -416,7 +441,7 @@ impl GatewayReceiver {
             return Err(format!(
                 "\"{}\": \"{source}\" sent {} bytes, which is more than \
                  the {} there was room for: receive into a buffer of \
-                 DATUM_BYTES",
+                 datum_bytes(), the most its sources can send",
                 self.name,
                 arrival.length,
                 out.len()

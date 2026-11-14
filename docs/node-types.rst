@@ -161,7 +161,8 @@ with nothing before it or after it.
 
 Every datum delivered to a node is checked against the type the node takes
 there before the node is given it -- its width, a boolean's being ``1`` or
-``0``, a string's being UTF-8, and no datum longer than 4096 bytes -- and
+``0``, a string's being UTF-8, and no string or bytes longer than its most
+-- and
 one that is not refused, counted and said. So a node may rely on what it is
 given being its type, and needs no check of its own for that. A device's
 own bytes are not a type's encoding; ``format`` says how to read them, and

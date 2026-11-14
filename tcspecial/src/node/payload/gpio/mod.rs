@@ -860,7 +860,7 @@ fn lines_read(what: &str, count: usize, data: &[u8]) -> TcsResult<u64> {
 ///
 /// * `count`  - How many lines the node has.
 /// * `bits`   - The lines' bits, by their places.
-/// * `buffer` - Where it is written, with room for eight bytes.
+/// * `buffer` - Where it is written, with room for the number's width.
 ///
 /// # Returns
 ///
@@ -953,8 +953,10 @@ impl EndpointReadable for GpioEndpoint {
         // What the driven lines were set to, passed on as the number it
         // was, which is what whatever the lines drive reads.
         let count = self.offsets.len();
-        if buffer.len() >= 8 && self.shared.passes.swap(false, Ordering::AcqRel)
-        {
+        // Room for the lines' number, as wide as they need and no wider: the
+        // buffer is sized by the node's type, a byte for up to eight lines.
+        let room = buffer.len() >= lines_width(count);
+        if room && self.shared.passes.swap(false, Ordering::AcqRel) {
             let passing = self.shared.passing.load(Ordering::Acquire);
             self.last = Some(Stream::Vehicleward);
             return Ok(lines_said(count, passing, buffer));
@@ -964,7 +966,7 @@ impl EndpointReadable for GpioEndpoint {
         // What a gpio_inout's lines were last told, as the decision it was,
         // on the report clock: the ground follows a heater's switch on a
         // beat, and a report lost is made good by the next.
-        if self.told_due() && buffer.len() >= 8 {
+        if self.told_due() && room {
             let told = self.shared.driven.load(Ordering::Acquire);
             self.wind();
             return Ok(lines_said(count, told, buffer));
@@ -988,7 +990,7 @@ impl EndpointReadable for GpioEndpoint {
         // which a long pause would do -- is not made up for; what the ground
         // wants is what the lines are now. One asked for leaves the clock as
         // it was.
-        if !self.report_due() || buffer.len() < 8 {
+        if !self.report_due() || !room {
             return Ok(0);
         }
         self.shared.asked.store(false, Ordering::Release);

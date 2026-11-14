@@ -54,10 +54,6 @@ use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 use crate::segsend::SegSend;
 
-/// How large a datum may be: see [`tcsprotocol::DATUM_BYTES`], which is
-/// where the configuration is held to it.
-pub use tcsprotocol::DATUM_BYTES;
-
 /// How long a pass may wait when a node is polled rather than scheduled.
 ///
 /// A node in no group is read as it becomes readable, which means asking. The
@@ -412,7 +408,7 @@ impl System {
             Arc::new(NodeStates::of(graph).map_err(|e| {
                 vec![format!("a node's wakeup descriptor: {e}")]
             })?);
-        let mut fabric = Fabric::new(routes.clone(), DATUM_BYTES);
+        let mut fabric = Fabric::new(routes.clone(), routes.most());
         fabric.watched_by(states.clone());
         let mut refused = Vec::new();
         let mut logs = Vec::new();
@@ -1044,7 +1040,7 @@ pub fn open_ground_link(
 /// The port, counting where it must.
 fn counted_if(link: &Telemetered, port: Box<dyn Port>) -> Box<dyn Port> {
     match link.count() {
-        Some(count) => Box::new(Counted::of(port, count)),
+        Some(count) => Box::new(Counted::of(port, count, link.largest)),
         None => port,
     }
 }
@@ -1073,19 +1069,19 @@ impl Counted {
     ///
     /// # Arguments
     ///
-    /// * `inner` - The link.
-    /// * `count` - How the count is written.
+    /// * `inner`   - The link.
+    /// * `count`   - How the count is written.
+    /// * `largest` - The largest datum the link's source can produce.
     ///
     /// # Returns
     ///
     /// The link, counting.
-    pub fn of(inner: Box<dyn Port>, count: Count) -> Counted {
+    pub fn of(inner: Box<dyn Port>, count: Count, largest: usize) -> Counted {
         Counted {
             inner,
             count,
             buffer: Vec::with_capacity(
-                tcsprotocol::link_type::COUNT_BYTES
-                    + tcsprotocol::types::DATUM_BYTES,
+                tcsprotocol::link_type::COUNT_BYTES + largest,
             ),
         }
     }
@@ -1275,7 +1271,10 @@ pub fn open(
         // A node that drops the one stream it takes, and one that sends it on
         // both ways. Nothing is opened for either: neither is an interface.
         "null-gateway" | "null-payload" => Ok(Box::new(NullPort::of())),
-        "tee-gateway" | "tee-payload" => Ok(Box::new(TeePort::of(&node.name))),
+        "tee-gateway" | "tee-payload" => Ok(Box::new(TeePort::of(
+            &node.name,
+            routes.largest_of(&node.name).unwrap_or(routes.most()),
+        ))),
         // A node that answers the ground's pings. Nothing is opened for it
         // either: what it hears and where its answers go are its links.
         "ping" => Ok(Box::new(PingPort::of(&node.name))),

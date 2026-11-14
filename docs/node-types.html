@@ -531,7 +531,8 @@ produces at a terminal is that encoding of the type the terminal carries,
 with nothing before it or after it.</p>
 <p>Every datum delivered to a node is checked against the type the node takes
 there before the node is given it -- its width, a boolean's being <tt class="docutils literal">1</tt> or
-<tt class="docutils literal">0</tt>, a string's being UTF-8, and no datum longer than 4096 bytes -- and
+<tt class="docutils literal">0</tt>, a string's being UTF-8, and no string or bytes longer than its most
+-- and
 one that is not refused, counted and said. So a node may rely on what it is
 given being its type, and needs no check of its own for that. A device's
 own bytes are not a type's encoding; <tt class="docutils literal">format</tt> says how to read them, and

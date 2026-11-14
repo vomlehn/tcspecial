@@ -46,7 +46,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tcsmoc::beacon::{
     Beacons, Contact, Schedule, Stage, Waker, STANDARD_INTERVAL,
 };
-use tcsmoc::gateway::{GatewayReceiver, DATUM_BYTES};
+use tcsmoc::gateway::GatewayReceiver;
 use tcsmoc::matched::Matched;
 use tcsmoc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcsmoc::{command_links_of, CommandStatus, TcsClient};
@@ -993,10 +993,11 @@ pub unsafe extern "C" fn tcs_gateway_open(
                 CString::new(source.replace('\0', " ")).unwrap_or_default()
             })
             .collect();
+        let data = vec![0; gateway.datum_bytes()];
         Ok(Box::into_raw(Box::new(tcs_gateway {
             gateway,
             names,
-            data: vec![0; DATUM_BYTES],
+            data,
         })))
     })
 }

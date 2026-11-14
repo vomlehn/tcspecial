@@ -26,6 +26,12 @@ pub const UDP_IPV4_BYTES: usize = 65_507;
 /// its payload length.
 pub const UDP_IPV6_BYTES: usize = 65_527;
 
+/// The most any datum may be, on any link: one UDP datagram over IPv6. What
+/// is checked without the gateway in view -- a type's most, a line's
+/// `max_length` -- is held to this, and the gateway's own most, which may be
+/// less, is held to by [`too_large`].
+pub const MOST_ANY: usize = UDP_IPV6_BYTES;
+
 /// How large one node's largest datum is, and whether the configuration
 /// says so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,10 +70,6 @@ fn is_ipv6(host: &str) -> bool {
 /// one. A string or bytes is sent the ground after its count, so the count's
 /// bytes come off as well. A configuration that names no gateway is held to
 /// UDP over IPv4.
-///
-/// For now no more than `tcsprotocol::types::DATUM_BYTES` either, as every
-/// buffer aboard is that size until each is sized by its node's largest
-/// datum.
 ///
 /// # Arguments
 ///
@@ -108,9 +110,7 @@ pub fn most_datum(graph: &Graph) -> usize {
             0
         }
     };
-    datagram
-        .saturating_sub(crate::link_type::COUNT_BYTES)
-        .min(crate::types::DATUM_BYTES)
+    datagram.saturating_sub(crate::link_type::COUNT_BYTES)
 }
 
 /// Says the longest message the configuration's cFS bus carries.
@@ -259,6 +259,46 @@ fn largest_of(
         }
     }
     unbounded
+}
+
+/// Says the largest result a node can produce at either of its sources, its
+/// `world-out` and its `moc-out`: what a buffer aboard that holds its
+/// results is sized by.
+///
+/// The `world-out` is [`largest_datum`]'s. The `moc-out` is the width of the
+/// type it carries, or a string's or bytes' most; and where it carries
+/// whatever reaches it -- a gateway node, passing on what the ground sends
+/// -- the most any datum may be.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+/// * `node`  - The node.
+///
+/// # Returns
+///
+/// The bytes: the larger of the two, where the node sends at its
+/// `moc-out` at all.
+pub fn largest_result(graph: &Graph, node: &Node) -> usize {
+    let world = largest_datum(graph, node).bytes;
+    let sends_back = graph.links.iter().any(|link| {
+        let origin = link.origin();
+        origin.node == node.name && origin.input.as_deref() == Some("moc-out")
+    });
+    if !sends_back {
+        return world;
+    }
+    let back = match carries(node, "moc-out") {
+        Ok(Carries::Only(kind)) => kind
+            .width()
+            .or_else(|| match &kind {
+                crate::link_type::LinkType::Basic(basic) => basic.most(),
+                _ => None,
+            })
+            .unwrap_or_else(|| most_datum(graph)),
+        _ => most_datum(graph),
+    };
+    world.max(back)
 }
 
 /// Lists each node that sends what nothing in the configuration bounds: one
@@ -428,10 +468,13 @@ mod tests {
         assert!(too_large(&tees).contains(&("sensor".to_string(), most + 1)));
     }
 
-    /// Until buffers are sized by their nodes, the most is what they hold.
+    /// Over UDP and IPv4 the most is a datagram's, less a string's count.
     #[test]
-    fn the_most_is_held_to_what_a_buffer_holds_for_now() {
-        assert_eq!(most_datum(&example("tees")), crate::types::DATUM_BYTES);
+    fn the_most_is_a_datagram_less_its_count() {
+        assert_eq!(
+            most_datum(&example("tees")),
+            UDP_IPV4_BYTES - crate::link_type::COUNT_BYTES
+        );
     }
 
     /// A host is IPv6 only where it is an IPv6 address written out.

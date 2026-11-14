@@ -16,8 +16,9 @@ is given the datum without it.
 XTCE_BYTES = 4
 
 #: The most bytes a count in groups of seven bits takes, for the largest
-#: datum there is, 4096 bytes: ``tcsprotocol::types::DATUM_BYTES``.
-MOST_GROUP_BYTES = 2
+#: datum there is, one UDP datagram over IPv6, 65,527 bytes:
+#: ``tcsprotocol::graph::largest::MOST_ANY``.
+MOST_GROUP_BYTES = 3
 
 
 def counted(data, xtce=False):

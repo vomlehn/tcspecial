@@ -17,7 +17,7 @@ use tcsprotocol::{
 
 use crate::beacon::{Arrived, Beacons, Link, Schedule};
 use crate::connection::{Connection, UdpConnection};
-use crate::gateway::{GatewayReceiver, DATUM_BYTES};
+use crate::gateway::GatewayReceiver;
 use crate::ping::Pinger;
 
 /// The process's allocator, counting what one thread asks of it while that
@@ -217,7 +217,7 @@ payloads:
         return;
     };
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
-    let mut buffer = vec![0u8; DATUM_BYTES];
+    let mut buffer = vec![0u8; gateway.datum_bytes()];
     let to = std::net::SocketAddr::from(([127, 0, 0, 1], port));
 
     // As tcspecial sends an untyped source's bytes: after their count.

@@ -373,9 +373,9 @@ impl LinkType {
     }
 }
 
-/// The most a string or bytes may hold, whatever its own most says:
-/// `tcsprotocol::types::DATUM_BYTES`.
-const MOST_BYTES: usize = crate::types::DATUM_BYTES;
+/// The most a string or bytes may hold, whatever its own most says: the
+/// most any datum may be, `crate::graph::largest::MOST_ANY`.
+const MOST_BYTES: usize = crate::graph::largest::MOST_ANY;
 
 /// How many bytes the count is that a string or bytes is sent after where
 /// it is XTCE-encoded: a 32-bit count of its bytes, most significant first,
@@ -414,7 +414,8 @@ pub enum Count {
     Xtce,
     /// In groups of seven bits, least significant first, each in a byte
     /// whose top bit says another follows: unsigned LEB128, in as few bytes
-    /// as hold it -- one for a count below 128, two for any datum there is.
+    /// as hold it -- one for a count below 128, two below 16,384, and three
+    /// for any datum there is.
     /// Where the ground reads what it is sent by no XTCE.
     Groups,
 }
@@ -646,8 +647,9 @@ mod tests {
         assert!(of("boolean").accepts(&[2]).is_err());
         assert!(of("string").accepts(b"ping #1").is_ok());
         assert!(of("string").accepts(&[0xff]).is_err());
-        assert!(of("bytes").accepts(&[0xff; 4096]).is_ok());
-        assert!(of("bytes").accepts(&[0xff; 4097]).is_err());
+        let most = crate::graph::largest::MOST_ANY;
+        assert!(of("bytes").accepts(&vec![0xff; most]).is_ok());
+        assert!(of("bytes").accepts(&vec![0xff; most + 1]).is_err());
         assert!(of("bytes(4)").accepts(&[0xff; 4]).is_ok());
         assert!(of("bytes(4)").accepts(&[0xff; 5]).is_err());
         assert!(of("string(3)").accepts(b"abcd").is_err());

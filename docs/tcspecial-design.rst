@@ -61,13 +61,14 @@ about such a choice should cite this list rather than taste.
    vehicle arrangements must be reachable without disturbing what already
    flies -- but never at the cost of the three above.
 
-Production code and its names
------------------------------
+Operational code and its names
+------------------------------
 
 TCS is code of two kinds, which are written, reviewed and changed with
-different care, and a name says which kind a thing is.
+different care, and a name says which kind a thing is: operational code,
+and everything else.
 
-**Production code** is code a mission depends on while it operates. It is
+**Operational code** is code a mission depends on while it operates. It is
 of two kinds, by where it runs:
 
 * **Vehicle code** runs aboard the vehicle: tcspecial, the flight
@@ -79,22 +80,32 @@ of two kinds, by where it runs:
 Code can be both: tcsprotocol, what the two ends share, runs aboard the
 vehicle and in the MOC alike.
 
-**Non-production code** is everything else: what is used to write, check,
-simulate, test, build or package production code, on a desk or a test bench,
-and that a mission never depends on while it operates. tcs-gui, the
-configuration editor; tcs-sim, the payload simulator; tcs-moc, the test
-ground station; tcs-ui, the window pieces tcs-moc and the desk tools share;
-tcs-verify, the configuration checker as a program; tcs-diagram; the XTCE
-compiler; the test apps; and tcs-helpers, which packages the rest.
+Everything else is code a mission never depends on while it operates,
+used on a desk or a test bench. It is of five kinds, by what it is for:
+
+* **Software tools** make or check what operational code is built from or
+  loads: tcs-gui, the configuration editor; tcs-verify, the configuration
+  checker as a program; the tcs-xtce compiler; tcs-xtcee, the XTCE editor;
+  and the pieces they are drawn with, tcs-diagram and tcs-ui.
+* **Verification tools** are used only for testing: tcs-sim, the payload
+  simulator; tcs-moc, the test ground station; the test apps; the test
+  fixtures; and the test container.
+* **Infrastructure** builds, packages and checks the rest: tcs-helpers,
+  install-tools, the Makefiles, CI, ntss and the builders of the
+  documents.
+* **Analysis tools** work on what a mission produced: tcslog-tools.
+* **Examples** show how the rest is used: ``examples/``.
 
 Requirement
     A name says which kind a thing is. Find its prefix -- ``tcslog`` if the
     name starts with it, ``tcs`` otherwise -- and look at what follows. A
-    letter, or nothing, names production code: ``tcspecial``, ``tcsmoc``,
-    ``tcsprotocol``, ``tcslog``, ``tcslogc``. A hyphen or an underscore names
-    non-production code: ``tcs-gui``, ``tcs-verify``, ``tcs_xtce``,
-    ``tcslog-tools``. A name says nothing of whether production code is
-    vehicle code or MOC code; this document does.
+    letter, or nothing, names operational code: ``tcspecial``, ``tcsmoc``,
+    ``tcsprotocol``, ``tcslog``, ``tcslogc``. A hyphen or an underscore
+    names code that is not operational: ``tcs-gui``, ``tcs-verify``,
+    ``tcs_xtce``, ``tcslog-tools``. A name says nothing of whether
+    operational code is vehicle code or MOC code, nor which of the other
+    five kinds the rest is; this document does, and each project's
+    ``categories.toml``.
 
 Requirement
     The names the rule covers are these:
@@ -104,15 +115,15 @@ Requirement
     * **Libraries**: Rust crates; C and C++ libraries, whose file is ``lib``
       and the name of the crate it is built from (``libtcsmoc-c`` from
       ``tcsmoc-c``), and never ``libtcslib...``; and Python packages.
-    * **Executables**. tcspecial is the one production program, and is
-      production code whatever it is built with.
+    * **Executables**. tcspecial is the one operational program, and is
+      operational code whatever it is built with.
     * **Header files**, which take the name of their library
       (``tcsmoc-c.h`` for ``libtcsmoc-c``), and so its kind.
 
 Requirement
     The rule does not cover projects. A project -- a repository, such as
     tcspecial, tcslog, tcslog-tools, tcs-xtce or tcs-helpers -- may hold
-    production and non-production code side by side, and its name says
+    operational code and the other kinds side by side, and its name says
     nothing of either. Nor does it cover the ``.deb`` and ``.rpm`` packages
     a project installs with, which are named for the project and for where
     they install, and may hold both: the ``tcspecial`` package installs
@@ -125,9 +136,9 @@ Requirement
     bringing each in would take.
 
 Requirement
-    Production code is built only from production code. A library or
-    program with a production name depends on, links with and imports
-    nothing with a non-production name.
+    Operational code is built only from operational code. A library or
+    program with an operational name depends on, links with and imports
+    nothing with any other name.
 
     tcspecial's visual window, ``--visual``, is the one allowance. A
     tcspecial built with it, and with tcs-diagram, which draws the window, is
@@ -136,11 +147,13 @@ Requirement
 
 Requirement
     The rule is held in one place and checked rather than remembered:
-    ``make production-names``, part of ``make check``, runs tcs-helpers'
-    ``production-names``, which states the rule for every TCS project and
-    fails where production code is built from or imports non-production
-    code. tcs-helpers' pre-commit hook runs it too, on a commit that
-    changes a dependency. A
+    ``make operational-names``, part of ``make check``, runs tcs-helpers'
+    ``operational-names``, which states the rule for every TCS project and
+    fails where operational code is built from or imports code that is not.
+    It also reads the project's ``categories.toml``, which lists each of
+    its directories by kind, and fails where a directory is not listed or
+    its kind disagrees with its name. tcs-helpers' pre-commit hook runs it
+    too, on a commit that changes a dependency. A
     tcspecial built for installing with the visual window is a warning
     there, not an error. A dependency TCS has not yet brought into line is
     listed there as an exception, with why, and warned of on every run until
@@ -10689,17 +10702,17 @@ pkg-config files and the naming rule
     each of its C and C++ libraries, in ``/opt/tcs/lib/pkgconfig``:
     ``tcsmoc-c.pc``, ``tcslogc.pc`` and tcs-xtce's.
 
-    They are left out of the rule that names production and non-production
-    code (`Production code and its names`_). What they manage is the
+    They are left out of the rule that names operational code and the rest
+    (`Operational code and its names`_). What they manage is the
     compiler, which is outside how TCS manages its versions, and they carry
     no code of their own. As it is, each is named after its library, so its
     name says what its library's does, but nothing requires that.
 
     Bringing them in would mean, first, naming each after its library, as a
     header is, so that a station's build cannot ask for a tool's library by
-    a production name; and then holding each ``Requires`` line of a
-    production library's file to production libraries, as
-    ``make production-names`` holds a crate's dependencies. It would also be
+    an operational name; and then holding each ``Requires`` line of an
+    operational library's file to operational libraries, as
+    ``make operational-names`` holds a crate's dependencies. It would also be
     the place to tie the ``Version`` a file states to the library's ABI
     version, which its soname states now. CMake's package configuration
     files, should TCS install any, would raise the same question.
@@ -10716,8 +10729,8 @@ Package names and the naming rule
     built on.
 
     Bringing them in would mean splitting each package that holds both
-    kinds in two, one of production code and one of tools -- so that a
-    vehicle or a station could be given its production code and nothing
+    kinds in two, one of operational code and one of tools -- so that a
+    vehicle or a station could be given its operational code and nothing
     else, and could tell from a package's name alone what it was being
     given -- and then naming each by the rule. The cost is more packages to
     build, test and install, and a dependency between each pair, for a
@@ -10744,7 +10757,7 @@ Other names and the naming rule
       the rest, named after the program or project each describes.
 
     Each would want to say, as the rule does for a library, whether what it
-    names is production code; most would inherit that from the program or
+    names is operational code; most would inherit that from the program or
     library they belong to, as a header does from its library. None carries
     code, so for now a name of one of these says only what it belongs to.
 
@@ -10992,8 +11005,8 @@ See Also
     back, and what each outcome of reading means.
 
 `TCS Design and Documentation <tcs-docs_>`_
-    Every TCS manual and design document, production and non-production
-    software apart, from the TCSpecial Flight Executive's manual on.
+    Every TCS manual and design document, operational software and the
+    rest apart, from the TCSpecial Flight Executive's manual on.
 
 .. _tcs-docs: https://vomlehn.github.io/tcspecial/docs/manual.html
 

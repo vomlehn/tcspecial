@@ -26,7 +26,7 @@ set -eu
 # What tcspecial needs. Building: a C compiler, and fontconfig's headers
 # for the windows. Its tests: Python with PyYAML and tkinter, and xmllint.
 # make check: rustfmt, clippy, rst2html and pandoc for the pages. Slint
-# needs Rust 1.92; tcs-helpers' production-names, which make check runs,
+# needs Rust 1.92; tcs-helpers' operational-names, which make check runs,
 # Python 3.11.
 PROJECT=tcspecial
 RUST_MIN=1.92

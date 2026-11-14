@@ -458,26 +458,18 @@ that comes with tcs-xtce, and every TCS project builds its packages with
 the make rules and scripts of <strong>tcs-helpers</strong>.</p>
 </div>
 </div>
-<div class="section" id="production-and-non-production-software">
-<h1>Production and non-production software</h1>
-<p>The TCS software is in two kinds, and its documents are divided the same
-way. <strong>Production</strong> software runs aboard the vehicle or in the mission
-operations center, and is written and reviewed as such; its names have a
-letter straight after <tt class="docutils literal">tcs</tt> or <tt class="docutils literal">tcslog</tt>: tcspecial, tcsmoc, tcslog. The
-rest -- the tools that write, check, simulate, test and build -- is
-<strong>non-production</strong>, and its names have a hyphen or an underscore there:
-tcs-gui, tcs-sim, tcslog-tools. Production software is built only from
-production software. See <a class="reference external" href="tcspecial-design.html#production-code-and-its-names">Production code and its names</a> in the tcspecial
-design.</p>
+<div class="section" id="the-manuals">
+<h1>The manuals</h1>
+<p>The manuals and the design documents are grouped by the category of
+software each is about, from operational code, which flies or runs the
+MOC, to the tools around it: see <a class="reference internal" href="#the-categories-of-tcs-software">The categories of TCS software</a> at the
+end of this page.</p>
 <p>Read from a checkout, the links to the other TCS projects lead to their
 documents in a checkout of each beside this one, as the build expects
 (<tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt> and so on); read on the web, to their published pages.
 Where neither has them, their repositories do: <a class="reference external" href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>, <a class="reference external" href="https://github.com/vomlehn/tcslog">tcslog</a>, <a class="reference external" href="https://github.com/vomlehn/tcslog-tools">tcslog-tools</a> and <a class="reference external" href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a>.</p>
-</div>
-<div class="section" id="the-manuals">
-<h1>The manuals</h1>
-<div class="section" id="production-software">
-<h2>Production software</h2>
+<div class="section" id="operational-code">
+<h2>Operational code</h2>
 <dl class="docutils">
 <dt><a class="reference external" href="tcspecial.html">The tcspecial manual</a></dt>
 <dd>The TCSpecial Flight Executive, and what is common to all the programs:
@@ -502,20 +494,13 @@ manual is tcs-xtce's, and covers the compiler as well.</dd>
 tcs-xtce manual.</dd>
 </dl>
 </div>
-<div class="section" id="non-production-software">
-<h2>Non-production software</h2>
+<div class="section" id="software-tools">
+<h2>Software tools</h2>
 <dl class="docutils">
 <dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
 <dd>The editor. tcs-gui draws a configuration and its simulator
 configuration as diagrams of nodes and links, checks them as they are
 edited, and writes them back.</dd>
-<dt><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a></dt>
-<dd>The payload simulator. tcs-sim answers for a vehicle's payloads as their
-devices would; its manual also describes the simulator configuration
-that says how.</dd>
-<dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
-<dd>The simulated operations center. tcs-moc shows what the vehicle sends
-the ground, panel by panel and in plots, and sends it commands.</dd>
 <dt><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a></dt>
 <dd>The checker. tcs-verify reads a configuration and says what is wrong
 with it, running none of it.</dd>
@@ -524,11 +509,34 @@ with it, running none of it.</dd>
 code that packs and unpacks the link's packets. <a class="reference external" href="../../tcs-xtce/docs/manual.html">The tcs-xtce manuals</a> list it and the others below.</dd>
 <dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtcee.html">The tcs-xtcee manual</a></dt>
 <dd>The XTCE editor.</dd>
+</dl>
+</div>
+<div class="section" id="verification-tools">
+<h2>Verification tools</h2>
+<dl class="docutils">
+<dt><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a></dt>
+<dd>The payload simulator. tcs-sim answers for a vehicle's payloads as their
+devices would; its manual also describes the simulator configuration
+that says how.</dd>
+<dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
+<dd>The simulated operations center. tcs-moc shows what the vehicle sends
+the ground, panel by panel and in plots, and sends it commands.</dd>
+</dl>
+</div>
+<div class="section" id="analysis-tools">
+<h2>Analysis tools</h2>
+<dl class="docutils">
 <dt><a class="reference external" href="../../tcslog-tools/docs/tcslog-tools.html">The tcslog-tools manual</a></dt>
 <dd>The programs that read a tcslog log on the ground.</dd>
+</dl>
+</div>
+<div class="section" id="infrastructure">
+<h2>Infrastructure</h2>
+<dl class="docutils">
 <dt><a class="reference external" href="../../tcs-helpers/README.html">The tcs-helpers README</a></dt>
 <dd>The make rules and scripts the TCS projects share to build their
-packages, check their names and keep their pages up to date.</dd>
+packages, check their names and categories and keep their pages up to
+date.</dd>
 </dl>
 </div>
 </div>
@@ -537,8 +545,8 @@ packages, check their names and keep their pages up to date.</dd>
 <p><a class="reference external" href="design.html">The TCSpecial design documents</a> list TCSpecial's own, and
 <a class="reference external" href="../../tcs-xtce/docs/design.html">the tcs-xtce design documents</a>
 tcs-xtce's.</p>
-<div class="section" id="production-software-1">
-<h2>Production software</h2>
+<div class="section" id="operational-code-1">
+<h2>Operational code</h2>
 <dl class="docutils">
 <dt><a class="reference external" href="tcspecial-design.html">The tcspecial design</a></dt>
 <dd>The TCSpecial Flight Executive and what the programs share: the
@@ -552,18 +560,12 @@ fault resiliency and restarts, and the requirements.</dd>
 digest. The design is tcs-xtce's, and covers the compiler as well.</dd>
 </dl>
 </div>
-<div class="section" id="non-production-software-1">
-<h2>Non-production software</h2>
+<div class="section" id="software-tools-1">
+<h2>Software tools</h2>
 <dl class="docutils">
 <dt><a class="reference external" href="tcs-gui-design.html">The tcs-gui design</a></dt>
 <dd>The editor: how it draws, reads and writes a configuration, its undo
 history, autosave and recovery.</dd>
-<dt><a class="reference external" href="tcs-sim-design.html">The tcs-sim design</a></dt>
-<dd>The payload simulator: its configuration files, the physics model,
-fault injection, and the program.</dd>
-<dt><a class="reference external" href="tcs-moc-design.html">The tcs-moc design</a></dt>
-<dd>The simulated operations center: its window, what it reads, and where
-the addresses it talks to come from.</dd>
 <dt><a class="reference external" href="tcs-verify-design.html">The tcs-verify design</a></dt>
 <dd>The configuration checker.</dd>
 <dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce-design.html">The tcs-xtce design</a></dt>
@@ -571,6 +573,17 @@ the addresses it talks to come from.</dd>
 share.</dd>
 <dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtcee-design.html">The tcs-xtcee design</a></dt>
 <dd>The XTCE editor.</dd>
+</dl>
+</div>
+<div class="section" id="verification-tools-1">
+<h2>Verification tools</h2>
+<dl class="docutils">
+<dt><a class="reference external" href="tcs-sim-design.html">The tcs-sim design</a></dt>
+<dd>The payload simulator: its configuration files, the physics model,
+fault injection, and the program.</dd>
+<dt><a class="reference external" href="tcs-moc-design.html">The tcs-moc design</a></dt>
+<dd>The simulated operations center: its window, what it reads, and where
+the addresses it talks to come from.</dd>
 </dl>
 </div>
 </div>
@@ -593,6 +606,50 @@ System (cFS) and JPL's F´ (F Prime). Work in progress.</dd>
 <dd>The shipped example configurations, and what each one shows; and <a class="reference external" href="../../tcs-xtce/examples/README.html">the
 tcs-xtce examples</a>.</dd>
 </dl>
+</div>
+<div class="section" id="the-categories-of-tcs-software">
+<h1>The categories of TCS software</h1>
+<p>The manuals and design documents above are grouped by the category of TCS
+software each is about. Every TCS project puts each of its directories in
+one of six categories, and says which in a <tt class="docutils literal">categories.toml</tt> at its top:</p>
+<dl class="docutils">
+<dt><strong>Operational code</strong></dt>
+<dd>What a mission depends on while it operates, aboard the vehicle or in
+the mission operations center, written and reviewed as such:
+tcspecial, tcsmoc, tcsprotocol, tcsverify, tcsapp, tcslog, tcsxtce and
+tcsccsds. It is built only from operational code.</dd>
+<dt><strong>Software tools</strong></dt>
+<dd>What makes or checks what operational code is built from or loads:
+the tcs-xtce compiler, which generates the link's packet code;
+tcs-gui and tcs-xtcee, which write configurations and XTCE; tcs-verify,
+which checks them; and tcs-diagram and tcs-ui, which they draw with.
+They take the most care of all but operational code, since a mistake
+in what they make or pass reaches a vehicle with no fault in the
+operational code.</dd>
+<dt><strong>Verification tools</strong></dt>
+<dd>What is used only to test: tcs-sim, which stands in for the payloads,
+tcs-moc, which stands in for the MOC, the test apps, the test
+container, and every test.</dd>
+<dt><strong>Infrastructure</strong></dt>
+<dd>What builds, packages, documents and checks the rest: tcs-helpers,
+each project's makefiles and <tt class="docutils literal"><span class="pre">install-tools</span></tt>, its CI and its pages.</dd>
+<dt><strong>Analysis tools</strong></dt>
+<dd>What works on what a mission produced: tcslog-tools, which reads a log
+once it is on the ground.</dd>
+<dt><strong>Examples</strong></dt>
+<dd>What is there to show how the rest is used: each project's examples,
+and the guide's lander.</dd>
+</dl>
+<p>The names follow DO-178C's where they can, though its &quot;software tools&quot; are
+every tool, verification tools among them, and here they are the others.</p>
+<p>A name says whether code is operational: a letter, or nothing, straight
+after <tt class="docutils literal">tcs</tt> or <tt class="docutils literal">tcslog</tt> (tcspecial, tcsmoc, tcslog) is operational
+code's, and a hyphen or an underscore there (tcs-gui, tcs-sim,
+tcslog-tools) is any other category's. Each project's <tt class="docutils literal">make
+<span class="pre">operational-names</span></tt> holds its names and its <tt class="docutils literal">categories.toml</tt> to each
+other. See <a class="reference external" href="tcspecial-design.html#operational-code-and-its-names">Operational code and its names</a> in the tcspecial
+design for the requirements, and <a class="reference external" href="../../tcs-helpers/README.html#code-categories">Code categories</a> in tcs-helpers' README,
+which defines the categories for every TCS project.</p>
 </div>
 </div>
 </body>

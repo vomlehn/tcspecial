@@ -18,7 +18,7 @@ quick-xml = { version = "0.42", features = ["serialize"] }
 md5 = "0.8"
 # Packs and unpacks the commands and answers, from the code tcs-xtce generated
 # from xtce/link.xtce, and computes the interface's digest: tcsxtce,
-# tcs-xtce's runtime, the one part of tcs-xtce that is production code. The
+# tcs-xtce's runtime, the one part of tcs-xtce that is operational code. The
 # version is the one the tcs-xtce checkout beside this tree, whose generator
 # wrote that code, must be at, as the code calls this runtime: see the
 # tcs-xtce target in Makefile.

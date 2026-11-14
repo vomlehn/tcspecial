@@ -1,8 +1,8 @@
 //! Window pieces shared by the ground programs, and what to show on them.
 //!
-//! It has a production name, a letter straight after `tcs`, because a ground
-//! station's window shows a vehicle's beacon with it: it is to be written and
-//! reviewed as code that runs in the MOC.
+//! It is a software tool, with a hyphen after `tcs` in its name: tcs-moc,
+//! which stands in for the MOC, and the desk tools use it, and no
+//! operational code does.
 //!
 //! The other half of [`tcsmoc::beacon`]. That one listens and says what is
 //! true of the spacecraft -- how stale the last beacon is, what it said, and

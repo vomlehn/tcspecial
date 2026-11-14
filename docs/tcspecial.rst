@@ -4834,7 +4834,7 @@ that satisfies both.
      - =0.7.0
      - 0.7.0
      - tcsprotocol
-     - tcs-xtce's runtime, the one part of tcs-xtce that is production code: what the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its Python, and tcs-xtce's generator, are taken from a checkout of tcs-xtce beside this tree, ``../tcs-xtce``, at the same version.
+     - tcs-xtce's runtime, the one part of tcs-xtce that is operational code: what the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its Python, and tcs-xtce's generator, are taken from a checkout of tcs-xtce beside this tree, ``../tcs-xtce``, at the same version.
      - `repository <https://github.com/vomlehn/tcs-xtce>`__
    * - `tempfile <https://crates.io/crates/tempfile>`__
      - 3, 3.27.0
@@ -4878,8 +4878,8 @@ See Also
 ========
 
 `TCS Design and Documentation <manual.html>`__
-    Every TCS manual and design document, production and non-production
-    software apart.
+    Every TCS manual and design document, divided by the category of
+    TCS software each is about.
 
 `The tcs-gui manual <tcs-gui.html>`__
     The editor of configurations and simulator configurations.

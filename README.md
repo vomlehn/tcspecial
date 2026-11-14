@@ -120,10 +120,12 @@ See "Installing" in docs/tcspecial.rst for where everything goes and why.
 
 # Where things are
 
-Each top-level directory, production code first: see "Production code and
-its names" in [the design](docs/tcspecial-design.rst).
+Each top-level directory, by the category of TCS code it holds, as
+`categories.toml` lists them: see "Operational code and its names" in
+[the design](docs/tcspecial-design.rst), and "Code categories" in
+[tcs-helpers' README](https://github.com/vomlehn/tcs-helpers#code-categories).
 
-Production code, which a mission depends on while it operates:
+Operational code, which a mission depends on while it operates:
 
 * [`tcspecial/`](tcspecial/): the flight software, the TCSpecial Flight
   Executive.
@@ -137,44 +139,59 @@ Production code, which a mission depends on while it operates:
   tcspecial and every program that reads a configuration asks.
 * [`tcsapp/`](tcsapp/): the file interfaces an app node's program runs with.
 * [`python/`](python/): the Python spellings of tcsprotocol and tcsmoc,
-  for ground stations written in Python, and of tcs-ui, `tcs_ui`, which
-  is not production code.
+  for ground stations written in Python, and of tcs-ui, `tcs_ui`, a
+  software tool.
 
-Non-production code:
+Software tools, which make or check what operational code is built from or
+loads:
 
 * [`tcs-gui/`](tcs-gui/): the graphical configuration editor.
-* [`tcs-moc/`](tcs-moc/): the test ground station.
-* [`tcs-sim/`](tcs-sim/): the payload simulator.
 * [`tcs-verify/`](tcs-verify/): the configuration checker as a program.
 * [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-gui
   and tcspecial's visual window, which never flies.
 * [`tcs-ui/`](tcs-ui/): the window pieces tcs-moc and the desk tools
   share: the beacon and ping panels, fonts and colours.
+* [`tools/`](tools/): `tools/convert-format.py`, which rewrites a
+  configuration from the old shape into the new.
+
+Verification tools, used only to test:
+
+* [`tcs-moc/`](tcs-moc/): the test ground station.
+* [`tcs-sim/`](tcs-sim/): the payload simulator.
 * [`app_pl/`](app_pl/), [`app_all_pl/`](app_all_pl/),
   [`app_payload_veh/`](app_payload_veh/),
   [`app_gateway_veh/`](app_gateway_veh/) and
   [`app_all_veh/`](app_all_veh/): the five test apps, one for each app node
   type.
-* [`examples/`](examples/): working configurations and the programs they
-  run; see [its README](examples/README.md).
-* [`docs/`](docs/): every manual and design document, and the guide to
-  building a vehicle.
 * [`tests/`](tests/): the configurations the tests read -- the ids, the
   refused ones, the simulated devices -- and `tests/manual/`, the editor's
   example.
-* [`cfs/`](cfs/) and [`fprime/`](fprime/): tcspecial beside NASA's cFS and
-  JPL's F´, and the F´ component that bridges to it; see
-  [docs/third-party.rst](docs/third-party.rst).
-* [`packaging/`](packaging/): what the `.deb` and `.rpm` packages are made
-  from: their control files, specs and install hooks.
+* [`cfs/`](cfs/) and [`fprime/`](fprime/): NASA's cFS and JPL's F´
+  software, generated or written for them, that tcspecial is tested
+  beside; see [docs/third-party.rst](docs/third-party.rst). It is not TCS
+  software, and `make ntss` does not count it.
 * [`bin/`](bin/): scripts for a desk, such as those that make and remove the
   kernel's dummy devices (`bin/mk-kernel-dummies`).
-* [`tools/`](tools/): one-off conversions, such as
-  `tools/convert-format.py`, which rewrites a configuration from the old
-  shape into the new, and `tools/ntss.py`, which `make ntss` runs: it counts
-  the non-test source statements of every tcs project checked out beside
-  this one, by subproject and language, production code apart from the
-  rest, as tables or, with `CSV=1`, comma-separated values.
+
+Infrastructure, which builds, packages, documents and checks the rest:
+
+* [`docs/`](docs/): every manual and design document.
+* [`packaging/`](packaging/): what the `.deb` and `.rpm` packages are made
+  from: their control files, specs and install hooks.
+* `bin/install-tools`, which `make install-tools` runs, and
+  `tools/ntss.py`, which `make ntss` runs: it counts the non-test source
+  statements of every tcs project checked out beside this one, by category,
+  subproject and language, as tables or, with `CSV=1`, comma-separated
+  values.
+* `.cargo/`, `.claude/` and `.github/`: settings for cargo, Claude Code and
+  GitHub's workflows.
+
+Examples:
+
+* [`examples/`](examples/): working configurations and the programs they
+  run; see [its README](examples/README.md).
+* [`docs/building-a-vehicle/`](docs/building-a-vehicle/): the guide's
+  lander, built a stage at a time.
 
 # Stuff
 
@@ -256,8 +273,8 @@ To Do
 See also
 ========
 * [TCS Design and Documentation](https://vomlehn.github.io/tcspecial/docs/manual.html):
-  every TCS manual and design document, production and non-production
-  software apart, of which TCSpecial is the hub.
+  every TCS manual and design document, by the category of the code it
+  is about, of which TCSpecial is the hub.
 * [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
   how to write a configuration, and how to run the flight software and the

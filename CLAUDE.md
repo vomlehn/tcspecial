@@ -55,17 +55,26 @@ attributes and checks in `tcsprotocol::node`, the flight-side node in
 
 ## Names
 
-A TCS name says whether it is production code, which a mission depends on
-while it operates, on the vehicle or in the MOC, or non-production code.
-Find the prefix, `tcslog` if the name starts with it and `tcs` otherwise. A
-letter after it, or nothing, is production (`tcspecial`, `tcsmoc`,
-`tcsprotocol`, `tcslog`); a hyphen or an underscore is non-production
-(`tcs-gui`, `tcs-verify`, `tcs_xtce`, `tcslog-tools`). Name new work by it,
-and rename what moves from one side to the other.
+TCS code is in six categories, which tcs-helpers' README defines under
+"Code categories": **operational code**, which a mission depends on while it
+operates, on the vehicle or in the MOC; **software tools**, which make or
+check what operational code is built from or loads (tcs-gui, tcs-verify,
+tcs-diagram, tcs-ui); **verification tools**, used only to test (tcs-sim,
+tcs-moc, the test apps, `tests/`); **infrastructure**, which builds,
+packages, documents and checks; **analysis tools**, which work on what a
+mission produced; and **examples**. Say these, never "production" or
+"non-production". `categories.toml` puts each directory in one; put a new
+directory there.
+
+A TCS name says whether code is operational. Find the prefix, `tcslog` if
+the name starts with it and `tcs` otherwise. A letter after it, or nothing,
+is operational (`tcspecial`, `tcsmoc`, `tcsprotocol`, `tcslog`); a hyphen or
+an underscore is not (`tcs-gui`, `tcs-verify`, `tcs_xtce`, `tcslog-tools`).
+Name new work by it, and rename what moves from one side to the other.
 
 - **Published names**, such as a crate's on crates.io, follow the rule.
-- **Executables**: tcspecial is the one production program, even when built
-  with `--visual`. Every other program is a tool.
+- **Executables**: tcspecial is the one operational program, even when
+  built with `--visual`. Every other program is a tool.
 - **Libraries** -- crates, C and C++ library files, Python packages -- follow
   the rule. A C or C++ library is `lib` and its crate's name: `libtcsmoc-c`
   is built from `tcsmoc-c`. Never name a library file `libtcslib...`.
@@ -75,12 +84,12 @@ and rename what moves from one side to the other.
   install with may hold both kinds, and the rule does not cover them, nor
   pkg-config files, which are the compiler's business.
 
-Production code is built only from production code. "Production code and
-its names" in `docs/tcspecial-design.rst` gives the requirements and defines
-production (vehicle and MOC) and non-production code; `make
-production-names`, part of `make check` and of tcs-helpers' pre-commit
-hook, holds the workspace to it, and tcs-helpers' `bin/production-names` is
-the one statement of the rule, for every TCS project.
+Operational code is built only from operational code. "Operational code and
+its names" in `docs/tcspecial-design.rst` gives the requirements; `make
+operational-names`, part of `make check` and of tcs-helpers' pre-commit
+hook, holds the workspace and `categories.toml` to them, and tcs-helpers'
+`bin/operational-names` is the one statement of the rule and the
+categories, for every TCS project.
 
 ## Vocabulary
 

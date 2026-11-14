@@ -1052,8 +1052,8 @@ See Also
 ========
 
 `TCS Design and Documentation <manual.html>`__
-    Every TCS manual and design document, production and non-production
-    software apart.
+    Every TCS manual and design document, divided by the category of
+    TCS software each is about.
 
 `The tcspecial manual <tcspecial.html>`__
     The flight software, its configuration files, the examples, installing and

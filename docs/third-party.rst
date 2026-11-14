@@ -336,8 +336,8 @@ See Also
     back, and what each outcome of reading means.
 
 `TCS Design and Documentation <tcs-docs_>`_
-    Every TCS manual and design document, production and non-production
-    software apart, from the TCSpecial Flight Executive's manual on.
+    Every TCS manual and design document, divided by the category of
+    TCS software each is about, from the TCSpecial Flight Executive's manual on.
 
 .. _tcs-docs: https://vomlehn.github.io/tcspecial/docs/manual.html
 

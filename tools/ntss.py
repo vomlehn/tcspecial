@@ -15,10 +15,11 @@ A statement written over several lines counts once for each line.
   as a file's `mod tests`;
 - generated code, whose first lines say @generated, since nobody writes it.
 
-Code written for another project is left out too: anything under a
-project's top-level directory named for one, such as tcspecial's cfs and
-fprime, which hold a cFS mission's definitions and an F' component built
-with that project's own tools. See OTHER_PROJECTS.
+Another project's software is left out too, written for it or generated
+by its tools: anything under a project's top-level directory named for
+one, such as tcspecial's cfs and fprime, which hold the cFS and F'
+software tcspecial is tested beside. It is used only to verify TCS
+software and is not TCS software itself. See OTHER_PROJECTS.
 
 A file with no extension is a shell or Python script as its first line,
 its #! line, says.
@@ -35,15 +36,16 @@ Cargo.toml holding [package], a pyproject.toml, a setup.py or a
 CMakeLists.txt; a file in none of them goes under the first directory of
 its path, or "(top)" for one at the top.
 
-Each subproject is production code or not as its name says, by the rule
-tcs-helpers' production-names states: a crate's, a Python project's or a
-CMake project's name with a letter, or nothing, after `tcs` or `tcslog`
-is production code's (tcslog, tcsmoc, tcsxtce), and any other name is
-not (tcs-gui, tcs_xtce). A file in no subproject -- a project's top-level
-scripts, makefiles, tools and packaging -- is not production code. The
-counts are printed in two parts, production code and non-production code,
-each by project and subproject with its totals, and then the totals of
-both.
+Each file is in the category of TCS code its project's categories.toml
+puts it in -- operational code, software tools, verification tools,
+infrastructure, analysis tools or examples, as "Code categories" in
+tcs-helpers' README defines them -- read by tcs-helpers'
+operational-names, the one reader of that file. A project with no
+categories.toml yet has its operational code told by the names of its
+subprojects, a crate's, a Python project's or a CMake project's, by the
+same tool's rule, and the rest of it counted as not yet in a category.
+The counts are printed a category at a time, each by project and
+subproject with its totals, and then the totals of all.
 
 Run as `python3 tools/ntss.py`, which is what `make ntss` does. With
 --csv, it prints instead one comma-separated row per subproject, with a
@@ -102,9 +104,10 @@ MANIFESTS = ["Cargo.toml", "pyproject.toml", "setup.py", "CMakeLists.txt"]
 CMAKE_PROJECT = re.compile(r"^\s*project\s*\(\s*([A-Za-z0-9_.+-]+)",
                            re.IGNORECASE | re.MULTILINE)
 
-# The two parts of the counts, in the order they are printed: whether
-# production code's, and the heading.
-KINDS = [(True, "Production code"), (False, "Non-production code")]
+# Where code of a project with no categories.toml, other than its
+# operational code, is counted, and the heading it is printed under.
+UNCATEGORIZED = "uncategorized"
+UNCATEGORIZED_HEADING = "Not yet in a category"
 
 # A character literal, which a ' that does not begin one, a Rust lifetime
 # or label such as 'a, is told from.
@@ -502,17 +505,15 @@ def group_of(relative):
     return relative.parts[0]
 
 
-def count(project, is_production):
+def count(project, rules):
     """Counts a project.
 
     Args:
-        project:       The project's directory.
-        is_production: production-names' test of whether a name is
-                       production code's.
+        project: The project's directory.
+        rules:   tcs-helpers' operational-names, loaded as a module.
 
     Returns:
-        {(production, subproject): {language: statements}}, where
-        production says whether the subproject is production code.
+        {(category, subproject): {language: statements}}.
     """
     listed = subprocess.run(
         ["git", "-C", str(project), "ls-files", "-z"],
@@ -520,6 +521,8 @@ def count(project, is_production):
     ).stdout.decode("utf-8", errors="replace").split("\0")
     files = [Path(f) for f in listed if f]
     dirs = subprojects(project, files)
+    listing = project / "categories.toml"
+    table = rules.read_categories(listing) if listing.is_file() else None
     counts = {}
     for relative in files:
         path = project / relative
@@ -534,12 +537,16 @@ def count(project, is_production):
         if n == 0:
             continue
         directory = subproject_of(relative, dirs)
-        if directory is None:
-            key = (False, group_of(relative))
+        group = group_of(relative) if directory is None else str(directory)
+        if table is not None:
+            category = (rules.category_of(relative, table)
+                        or UNCATEGORIZED)
+        elif (directory is not None
+              and rules.is_operational(name_of(project, directory))):
+            category = "operational"
         else:
-            key = (is_production(name_of(project, directory)),
-                   str(directory))
-        row = counts.setdefault(key, {})
+            category = UNCATEGORIZED
+        row = counts.setdefault((category, group), {})
         row[kind] = row.get(kind, 0) + n
     return counts
 
@@ -574,55 +581,74 @@ def add(total, row):
         total[k] = total.get(k, 0) + v
 
 
-def load_is_production(helpers):
-    """Loads the naming rule from tcs-helpers' production-names.
+def load_rules(helpers):
+    """Loads tcs-helpers' operational-names, which holds the categories
+    and the naming rule.
 
     Args:
         helpers: The tcs-helpers checkout.
 
     Returns:
-        Its is_production function.
+        The tool, as a module.
 
     Raises:
-        SystemExit: The checkout has no production-names.
+        SystemExit: The checkout has no operational-names.
     """
-    path = helpers / "bin" / "production-names"
+    path = helpers / "bin" / "operational-names"
     if not path.is_file():
         sys.exit(f"ntss: no {path}: ntss needs a tcs-helpers checkout, "
-                 "0.9.0 or later, for the rule that names production code")
-    loader = importlib.machinery.SourceFileLoader("production_names",
+                 "0.10.0 or later, for the categories of TCS code")
+    loader = importlib.machinery.SourceFileLoader("operational_names",
                                                   str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(spec)
+    # Not left beside the tool, in the checkout.
+    sys.dont_write_bytecode = True
     loader.exec_module(module)
-    return module.is_production
+    return module
 
 
-def print_csv(results):
+def headings(rules):
+    """Gives the categories, in the order they are printed, with their
+    headings.
+
+    Args:
+        rules: tcs-helpers' operational-names, loaded as a module.
+
+    Returns:
+        (category, heading) for each, the one for code not yet in a
+        category last.
+    """
+    return (list(rules.CATEGORIES.items())
+            + [(UNCATEGORIZED, UNCATEGORIZED_HEADING)])
+
+
+def print_csv(results, rules):
     """Prints the counts as comma-separated values.
 
     Args:
         results: (project, its counts from count()) for each project.
+        rules:   tcs-helpers' operational-names, loaded as a module.
     """
     out = csv.writer(sys.stdout, lineterminator="\n")
-    out.writerow(["code", "project", "subproject"] + LANGUAGES
+    out.writerow(["category", "project", "subproject"] + LANGUAGES
                  + ["Total"])
-    for production, _ in KINDS:
-        kind = "production" if production else "non-production"
+    for kind, _ in headings(rules):
         for name, counts in results:
-            for (p, sub), row in sorted(counts.items()):
-                if p != production:
+            for (c, sub), row in sorted(counts.items()):
+                if c != kind:
                     continue
                 cells = [row.get(k, 0) for k in LANGUAGES]
                 out.writerow([kind, name, sub] + cells + [sum(cells)])
 
 
-def print_text(results):
-    """Prints the counts as tables: production code's, non-production
-    code's, and the totals of both.
+def print_text(results, rules):
+    """Prints the counts as tables, a category at a time, and the totals
+    of all.
 
     Args:
         results: (project, its counts from count()) for each project.
+        rules:   tcs-helpers' operational-names, loaded as a module.
     """
     names = [s for _, c in results for _, s in c] + ["total"]
     width = max(len(n) for n in names)
@@ -631,13 +657,14 @@ def print_text(results):
     grand = {}
     print("Non-test source statements: lines of code, less tests and "
           "generated code")
-    for production, heading in KINDS:
+    for kind, heading in headings(rules):
+        if not any(c == kind for _, counts in results for c, _ in counts):
+            continue
         print()
         print(heading)
         part = {}
         for name, counts in results:
-            rows = {s: r for (p, s), r in counts.items()
-                    if p == production}
+            rows = {s: r for (c, s), r in counts.items() if c == kind}
             if not rows:
                 continue
             total = {}
@@ -652,7 +679,8 @@ def print_text(results):
                 print("  " + line)
         add(grand, part)
         print()
-        print(f"  All {heading[0].lower()}{heading[1:]}")
+        print(f"  All {heading[0].lower()}{heading[1:]}"
+              if kind != UNCATEGORIZED else "  All of it")
         print(header)
         for line in table([("total", part)], width):
             print("  " + line)
@@ -664,7 +692,7 @@ def print_text(results):
 
 
 def main():
-    """Prints the counts, production code's first, as tables or CSV.
+    """Prints the counts, a category at a time, as tables or CSV.
 
     Returns:
         0.
@@ -683,13 +711,13 @@ def main():
                         help="a checkout beside this one not to count; "
                              "may be repeated")
     args = parser.parse_args()
-    is_production = load_is_production(args.tcs_helpers)
-    results = [(p.name, count(p, is_production))
+    rules = load_rules(args.tcs_helpers)
+    results = [(p.name, count(p, rules))
                for p in projects(set(args.skip))]
     if args.csv:
-        print_csv(results)
+        print_csv(results, rules)
     else:
-        print_text(results)
+        print_text(results, rules)
     return 0
 
 

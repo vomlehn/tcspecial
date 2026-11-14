@@ -5,8 +5,8 @@ TCSpecial Design
 How TCSpecial works inside, and why. Each of its programs has a design
 document of its own, as it has a manual of its own.
 
-Production software
-===================
+Operational code
+================
 
 `The tcspecial design <tcspecial-design.html>`__
     The flight software, and what the programs share: the terminology, the
@@ -16,13 +16,19 @@ Production software
     restarts, payloads and their link terms, platforms and porting, testing
     with simulated devices, and the requirements.
 
-Non-production software
-=======================
+Software tools
+==============
 
 `The tcs-gui design <tcs-gui-design.html>`__
     The editor: how it draws, reads and writes a configuration, its
     descriptions of the node types, its undo history, autosave and
     recovery.
+
+`The tcs-verify design <tcs-verify-design.html>`__
+    The configuration checker.
+
+Verification tools
+==================
 
 `The tcs-sim design <tcs-sim-design.html>`__
     The payload simulator: its configuration files, the physics model,
@@ -32,9 +38,6 @@ Non-production software
     The simulated operations center: its window, what it reads, and where
     the addresses it talks to come from.
 
-`The tcs-verify design <tcs-verify-design.html>`__
-    The configuration checker.
-
-How to use each program is in its manual, and what is production software
-and what is not is said in `TCS Design and Documentation <manual.html>`__,
+How to use each program is in its manual, and the categories of TCS
+software are said in `TCS Design and Documentation <manual.html>`__,
 which lists these, the manuals and the other TCS projects' documents.

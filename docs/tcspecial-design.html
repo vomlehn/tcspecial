@@ -369,7 +369,7 @@ ul.auto-toc {
 <ul class="simple">
 <li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a><ul>
 <li><a class="reference internal" href="#the-ranked-quality-attributes" id="toc-entry-2">The ranked quality attributes</a></li>
-<li><a class="reference internal" href="#production-code-and-its-names" id="toc-entry-3">Production code and its names</a></li>
+<li><a class="reference internal" href="#operational-code-and-its-names" id="toc-entry-3">Operational code and its names</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#terminology" id="toc-entry-4">Terminology</a></li>
@@ -638,11 +638,12 @@ vehicle arrangements must be reachable without disturbing what already
 flies -- but never at the cost of the three above.</li>
 </ol>
 </div>
-<div class="section" id="production-code-and-its-names">
-<h2><a class="toc-backref" href="#toc-entry-3">Production code and its names</a></h2>
+<div class="section" id="operational-code-and-its-names">
+<h2><a class="toc-backref" href="#toc-entry-3">Operational code and its names</a></h2>
 <p>TCS is code of two kinds, which are written, reviewed and changed with
-different care, and a name says which kind a thing is.</p>
-<p><strong>Production code</strong> is code a mission depends on while it operates. It is
+different care, and a name says which kind a thing is: operational code,
+and everything else.</p>
+<p><strong>Operational code</strong> is code a mission depends on while it operates. It is
 of two kinds, by where it runs:</p>
 <ul class="simple">
 <li><strong>Vehicle code</strong> runs aboard the vehicle: tcspecial, the flight
@@ -653,22 +654,33 @@ station: tcsmoc and tcsmoc-c, which a station is built on.</li>
 </ul>
 <p>Code can be both: tcsprotocol, what the two ends share, runs aboard the
 vehicle and in the MOC alike.</p>
-<p><strong>Non-production code</strong> is everything else: what is used to write, check,
-simulate, test, build or package production code, on a desk or a test bench,
-and that a mission never depends on while it operates. tcs-gui, the
-configuration editor; tcs-sim, the payload simulator; tcs-moc, the test
-ground station; tcs-ui, the window pieces tcs-moc and the desk tools share;
-tcs-verify, the configuration checker as a program; tcs-diagram; the XTCE
-compiler; the test apps; and tcs-helpers, which packages the rest.</p>
+<p>Everything else is code a mission never depends on while it operates,
+used on a desk or a test bench. It is of five kinds, by what it is for:</p>
+<ul class="simple">
+<li><strong>Software tools</strong> make or check what operational code is built from or
+loads: tcs-gui, the configuration editor; tcs-verify, the configuration
+checker as a program; the tcs-xtce compiler; tcs-xtcee, the XTCE editor;
+and the pieces they are drawn with, tcs-diagram and tcs-ui.</li>
+<li><strong>Verification tools</strong> are used only for testing: tcs-sim, the payload
+simulator; tcs-moc, the test ground station; the test apps; the test
+fixtures; and the test container.</li>
+<li><strong>Infrastructure</strong> builds, packages and checks the rest: tcs-helpers,
+install-tools, the Makefiles, CI, ntss and the builders of the
+documents.</li>
+<li><strong>Analysis tools</strong> work on what a mission produced: tcslog-tools.</li>
+<li><strong>Examples</strong> show how the rest is used: <tt class="docutils literal">examples/</tt>.</li>
+</ul>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A name says which kind a thing is. Find its prefix -- <tt class="docutils literal">tcslog</tt> if the
 name starts with it, <tt class="docutils literal">tcs</tt> otherwise -- and look at what follows. A
-letter, or nothing, names production code: <tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal">tcsmoc</tt>,
-<tt class="docutils literal">tcsprotocol</tt>, <tt class="docutils literal">tcslog</tt>, <tt class="docutils literal">tcslogc</tt>. A hyphen or an underscore names
-non-production code: <tt class="docutils literal"><span class="pre">tcs-gui</span></tt>, <tt class="docutils literal"><span class="pre">tcs-verify</span></tt>, <tt class="docutils literal">tcs_xtce</tt>,
-<tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>. A name says nothing of whether production code is
-vehicle code or MOC code; this document does.</dd>
+letter, or nothing, names operational code: <tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal">tcsmoc</tt>,
+<tt class="docutils literal">tcsprotocol</tt>, <tt class="docutils literal">tcslog</tt>, <tt class="docutils literal">tcslogc</tt>. A hyphen or an underscore
+names code that is not operational: <tt class="docutils literal"><span class="pre">tcs-gui</span></tt>, <tt class="docutils literal"><span class="pre">tcs-verify</span></tt>,
+<tt class="docutils literal">tcs_xtce</tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>. A name says nothing of whether
+operational code is vehicle code or MOC code, nor which of the other
+five kinds the rest is; this document does, and each project's
+<tt class="docutils literal">categories.toml</tt>.</dd>
 <dt>Requirement</dt>
 <dd><p class="first">The names the rule covers are these:</p>
 <ul class="last simple">
@@ -677,8 +689,8 @@ to build on, such as a crate's on crates.io.</li>
 <li><strong>Libraries</strong>: Rust crates; C and C++ libraries, whose file is <tt class="docutils literal">lib</tt>
 and the name of the crate it is built from (<tt class="docutils literal"><span class="pre">libtcsmoc-c</span></tt> from
 <tt class="docutils literal"><span class="pre">tcsmoc-c</span></tt>), and never <tt class="docutils literal"><span class="pre">libtcslib...</span></tt>; and Python packages.</li>
-<li><strong>Executables</strong>. tcspecial is the one production program, and is
-production code whatever it is built with.</li>
+<li><strong>Executables</strong>. tcspecial is the one operational program, and is
+operational code whatever it is built with.</li>
 <li><strong>Header files</strong>, which take the name of their library
 (<tt class="docutils literal"><span class="pre">tcsmoc-c.h</span></tt> for <tt class="docutils literal"><span class="pre">libtcsmoc-c</span></tt>), and so its kind.</li>
 </ul>
@@ -686,7 +698,7 @@ production code whatever it is built with.</li>
 <dt>Requirement</dt>
 <dd>The rule does not cover projects. A project -- a repository, such as
 tcspecial, tcslog, tcslog-tools, tcs-xtce or tcs-helpers -- may hold
-production and non-production code side by side, and its name says
+operational code and the other kinds side by side, and its name says
 nothing of either. Nor does it cover the <tt class="docutils literal">.deb</tt> and <tt class="docutils literal">.rpm</tt> packages
 a project installs with, which are named for the project and for where
 they install, and may hold both: the <tt class="docutils literal">tcspecial</tt> package installs
@@ -698,9 +710,9 @@ installed directories, configuration keys, environment variables,
 systemd units and documents. <a class="reference internal" href="#possible-future-directions">Possible Future Directions</a> says what
 bringing each in would take.</dd>
 <dt>Requirement</dt>
-<dd><p class="first">Production code is built only from production code. A library or
-program with a production name depends on, links with and imports
-nothing with a non-production name.</p>
+<dd><p class="first">Operational code is built only from operational code. A library or
+program with an operational name depends on, links with and imports
+nothing with any other name.</p>
 <p class="last">tcspecial's visual window, <tt class="docutils literal"><span class="pre">--visual</span></tt>, is the one allowance. A
 tcspecial built with it, and with tcs-diagram, which draws the window, is
 a desk build, never one that flies; the one that flies is built
@@ -708,11 +720,13 @@ without it.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>The rule is held in one place and checked rather than remembered:
-<tt class="docutils literal">make <span class="pre">production-names</span></tt>, part of <tt class="docutils literal">make check</tt>, runs tcs-helpers'
-<tt class="docutils literal"><span class="pre">production-names</span></tt>, which states the rule for every TCS project and
-fails where production code is built from or imports non-production
-code. tcs-helpers' pre-commit hook runs it too, on a commit that
-changes a dependency. A
+<tt class="docutils literal">make <span class="pre">operational-names</span></tt>, part of <tt class="docutils literal">make check</tt>, runs tcs-helpers'
+<tt class="docutils literal"><span class="pre">operational-names</span></tt>, which states the rule for every TCS project and
+fails where operational code is built from or imports code that is not.
+It also reads the project's <tt class="docutils literal">categories.toml</tt>, which lists each of
+its directories by kind, and fails where a directory is not listed or
+its kind disagrees with its name. tcs-helpers' pre-commit hook runs it
+too, on a commit that changes a dependency. A
 tcspecial built for installing with the visual window is a warning
 there, not an error. A dependency TCS has not yet brought into line is
 listed there as an exception, with why, and warned of on every run until
@@ -10948,16 +10962,16 @@ installed library: <tt class="docutils literal"><span class="pre">pkg-config</sp
 needs, and CMake and Meson read the same file. TCS installs one beside
 each of its C and C++ libraries, in <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt>:
 <tt class="docutils literal"><span class="pre">tcsmoc-c.pc</span></tt>, <tt class="docutils literal">tcslogc.pc</tt> and tcs-xtce's.</p>
-<p>They are left out of the rule that names production and non-production
-code (<a class="reference internal" href="#production-code-and-its-names">Production code and its names</a>). What they manage is the
+<p>They are left out of the rule that names operational code and the rest
+(<a class="reference internal" href="#operational-code-and-its-names">Operational code and its names</a>). What they manage is the
 compiler, which is outside how TCS manages its versions, and they carry
 no code of their own. As it is, each is named after its library, so its
 name says what its library's does, but nothing requires that.</p>
 <p>Bringing them in would mean, first, naming each after its library, as a
 header is, so that a station's build cannot ask for a tool's library by
-a production name; and then holding each <tt class="docutils literal">Requires</tt> line of a
-production library's file to production libraries, as
-<tt class="docutils literal">make <span class="pre">production-names</span></tt> holds a crate's dependencies. It would also be
+an operational name; and then holding each <tt class="docutils literal">Requires</tt> line of an
+operational library's file to operational libraries, as
+<tt class="docutils literal">make <span class="pre">operational-names</span></tt> holds a crate's dependencies. It would also be
 the place to tie the <tt class="docutils literal">Version</tt> a file states to the library's ABI
 version, which its soname states now. CMake's package configuration
 files, should TCS install any, would raise the same question.</p>
@@ -10973,8 +10987,8 @@ of code: <tt class="docutils literal">tcspecial</tt> installs tcs-verify beside 
 <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt> installs tcs-gui beside the libraries a station is
 built on.</p>
 <p>Bringing them in would mean splitting each package that holds both
-kinds in two, one of production code and one of tools -- so that a
-vehicle or a station could be given its production code and nothing
+kinds in two, one of operational code and one of tools -- so that a
+vehicle or a station could be given its operational code and nothing
 else, and could tell from a package's name alone what it was being
 given -- and then naming each by the rule. The cost is more packages to
 build, test and install, and a dependency between each pair, for a
@@ -11001,7 +11015,7 @@ only reach them through another spelling of its own.</li>
 the rest, named after the program or project each describes.</li>
 </ul>
 <p>Each would want to say, as the rule does for a library, whether what it
-names is production code; most would inherit that from the program or
+names is operational code; most would inherit that from the program or
 library they belong to, as a header does from its library. None carries
 code, so for now a name of one of these says only what it belongs to.</p>
 </blockquote>
@@ -11250,8 +11264,8 @@ manual says how to generate that code and use it.</dd>
 is often out of contact. The manual says how to write a log, read it
 back, and what each outcome of reading means.</dd>
 <dt><a class="reference external" href="https://vomlehn.github.io/tcspecial/docs/manual.html">TCS Design and Documentation</a></dt>
-<dd>Every TCS manual and design document, production and non-production
-software apart, from the TCSpecial Flight Executive's manual on.</dd>
+<dd>Every TCS manual and design document, operational software and the
+rest apart, from the TCSpecial Flight Executive's manual on.</dd>
 </dl>
 <dl class="docutils">
 <dt><a class="reference external" href="https://vomlehn.github.io/tcspecial/docs/third-party.html">Third-party integration</a></dt>

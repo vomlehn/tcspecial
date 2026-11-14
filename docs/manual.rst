@@ -107,19 +107,13 @@ The link's XTCE can be read and edited with **tcs-xtcee**, the XTCE editor
 that comes with tcs-xtce, and every TCS project builds its packages with
 the make rules and scripts of **tcs-helpers**.
 
-Production and non-production software
-=======================================
+The manuals
+===========
 
-The TCS software is in two kinds, and its documents are divided the same
-way. **Production** software runs aboard the vehicle or in the mission
-operations center, and is written and reviewed as such; its names have a
-letter straight after ``tcs`` or ``tcslog``: tcspecial, tcsmoc, tcslog. The
-rest -- the tools that write, check, simulate, test and build -- is
-**non-production**, and its names have a hyphen or an underscore there:
-tcs-gui, tcs-sim, tcslog-tools. Production software is built only from
-production software. See `Production code and its names
-<tcspecial-design.html#production-code-and-its-names>`__ in the tcspecial
-design.
+The manuals and the design documents are grouped by the category of
+software each is about, from operational code, which flies or runs the
+MOC, to the tools around it: see `The categories of TCS software`_ at the
+end of this page.
 
 Read from a checkout, the links to the other TCS projects lead to their
 documents in a checkout of each beside this one, as the build expects
@@ -130,11 +124,8 @@ Where neither has them, their repositories do: `tcs-xtce
 <https://github.com/vomlehn/tcslog-tools>`__ and `tcs-helpers
 <https://github.com/vomlehn/tcs-helpers>`__.
 
-The manuals
-===========
-
-Production software
--------------------
+Operational code
+----------------
 
 `The tcspecial manual <tcspecial.html>`__
     The TCSpecial Flight Executive, and what is common to all the programs:
@@ -165,22 +156,13 @@ The TCSpecial libraries
 .. _The tcsccsds manual:
    ../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcsccsds
 
-Non-production software
------------------------
+Software tools
+--------------
 
 `The tcs-gui manual <tcs-gui.html>`__
     The editor. tcs-gui draws a configuration and its simulator
     configuration as diagrams of nodes and links, checks them as they are
     edited, and writes them back.
-
-`The tcs-sim manual <tcs-sim.html>`__
-    The payload simulator. tcs-sim answers for a vehicle's payloads as their
-    devices would; its manual also describes the simulator configuration
-    that says how.
-
-`The tcs-moc manual <tcs-moc.html>`__
-    The simulated operations center. tcs-moc shows what the vehicle sends
-    the ground, panel by panel and in plots, and sends it commands.
 
 `The tcs-verify manual <tcs-verify.html>`__
     The checker. tcs-verify reads a configuration and says what is wrong
@@ -194,12 +176,31 @@ Non-production software
 `The tcs-xtcee manual <../../tcs-xtce/docs/tcs-xtcee.html>`__
     The XTCE editor.
 
+Verification tools
+------------------
+
+`The tcs-sim manual <tcs-sim.html>`__
+    The payload simulator. tcs-sim answers for a vehicle's payloads as their
+    devices would; its manual also describes the simulator configuration
+    that says how.
+
+`The tcs-moc manual <tcs-moc.html>`__
+    The simulated operations center. tcs-moc shows what the vehicle sends
+    the ground, panel by panel and in plots, and sends it commands.
+
+Analysis tools
+--------------
+
 `The tcslog-tools manual <../../tcslog-tools/docs/tcslog-tools.html>`__
     The programs that read a tcslog log on the ground.
 
+Infrastructure
+--------------
+
 `The tcs-helpers README <../../tcs-helpers/README.html>`__
     The make rules and scripts the TCS projects share to build their
-    packages, check their names and keep their pages up to date.
+    packages, check their names and categories and keep their pages up to
+    date.
 
 The design documents
 ====================
@@ -208,8 +209,8 @@ The design documents
 `the tcs-xtce design documents <../../tcs-xtce/docs/design.html>`__
 tcs-xtce's.
 
-Production software
--------------------
+Operational code
+----------------
 
 `The tcspecial design <tcspecial-design.html>`__
     The TCSpecial Flight Executive and what the programs share: the
@@ -224,20 +225,12 @@ Production software
     How tcsxtce, the runtime, packs and unpacks packets and computes the
     digest. The design is tcs-xtce's, and covers the compiler as well.
 
-Non-production software
------------------------
+Software tools
+--------------
 
 `The tcs-gui design <tcs-gui-design.html>`__
     The editor: how it draws, reads and writes a configuration, its undo
     history, autosave and recovery.
-
-`The tcs-sim design <tcs-sim-design.html>`__
-    The payload simulator: its configuration files, the physics model,
-    fault injection, and the program.
-
-`The tcs-moc design <tcs-moc-design.html>`__
-    The simulated operations center: its window, what it reads, and where
-    the addresses it talks to come from.
 
 `The tcs-verify design <tcs-verify-design.html>`__
     The configuration checker.
@@ -248,6 +241,17 @@ Non-production software
 
 `The tcs-xtcee design <../../tcs-xtce/docs/tcs-xtcee-design.html>`__
     The XTCE editor.
+
+Verification tools
+------------------
+
+`The tcs-sim design <tcs-sim-design.html>`__
+    The payload simulator: its configuration files, the physics model,
+    fault injection, and the program.
+
+`The tcs-moc design <tcs-moc-design.html>`__
+    The simulated operations center: its window, what it reads, and where
+    the addresses it talks to come from.
 
 Other documents
 ===============
@@ -271,3 +275,51 @@ Other documents
 `Examples <../examples/README.html>`__
     The shipped example configurations, and what each one shows; and `the
     tcs-xtce examples <../../tcs-xtce/examples/README.html>`__.
+
+The categories of TCS software
+==============================
+
+The manuals and design documents above are grouped by the category of TCS
+software each is about. Every TCS project puts each of its directories in
+one of six categories, and says which in a ``categories.toml`` at its top:
+
+**Operational code**
+    What a mission depends on while it operates, aboard the vehicle or in
+    the mission operations center, written and reviewed as such:
+    tcspecial, tcsmoc, tcsprotocol, tcsverify, tcsapp, tcslog, tcsxtce and
+    tcsccsds. It is built only from operational code.
+**Software tools**
+    What makes or checks what operational code is built from or loads:
+    the tcs-xtce compiler, which generates the link's packet code;
+    tcs-gui and tcs-xtcee, which write configurations and XTCE; tcs-verify,
+    which checks them; and tcs-diagram and tcs-ui, which they draw with.
+    They take the most care of all but operational code, since a mistake
+    in what they make or pass reaches a vehicle with no fault in the
+    operational code.
+**Verification tools**
+    What is used only to test: tcs-sim, which stands in for the payloads,
+    tcs-moc, which stands in for the MOC, the test apps, the test
+    container, and every test.
+**Infrastructure**
+    What builds, packages, documents and checks the rest: tcs-helpers,
+    each project's makefiles and ``install-tools``, its CI and its pages.
+**Analysis tools**
+    What works on what a mission produced: tcslog-tools, which reads a log
+    once it is on the ground.
+**Examples**
+    What is there to show how the rest is used: each project's examples,
+    and the guide's lander.
+
+The names follow DO-178C's where they can, though its "software tools" are
+every tool, verification tools among them, and here they are the others.
+
+A name says whether code is operational: a letter, or nothing, straight
+after ``tcs`` or ``tcslog`` (tcspecial, tcsmoc, tcslog) is operational
+code's, and a hyphen or an underscore there (tcs-gui, tcs-sim,
+tcslog-tools) is any other category's. Each project's ``make
+operational-names`` holds its names and its ``categories.toml`` to each
+other. See `Operational code and its names
+<tcspecial-design.html#operational-code-and-its-names>`__ in the tcspecial
+design for the requirements, and `Code categories
+<../../tcs-helpers/README.html#code-categories>`__ in tcs-helpers' README,
+which defines the categories for every TCS project.

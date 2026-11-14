@@ -174,6 +174,7 @@ impl SpiEndpoint {
             .map_err(|e| {
                 TcsError::Endpoint(format!("{on} cannot be opened: {e}"))
             })?;
+        crate::exclusive::device(what, &config.path, &device)?;
 
         let fd = device.as_raw_fd();
 

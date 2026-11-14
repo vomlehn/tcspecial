@@ -116,6 +116,7 @@ impl SerialEndpoint {
             // that have nothing to do with its device.
             .custom_flags(libc::O_NOCTTY)
             .open(&config.path)?;
+        crate::exclusive::device(what, &config.path, &file)?;
 
         apply_line_terms(what, &file, config)?;
 

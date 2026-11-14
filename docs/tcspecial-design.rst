@@ -6989,6 +6989,20 @@ Requirement
     restart flag`_ says.
 
 Requirement
+    A start locks its state file before it reads it, and holds the lock
+    until the process ends or runs itself again, so that no two tcspecials
+    keep one state file: each would overwrite what the other is to start
+    with. The lock is on a file beside it, its name and ``.lock``, because
+    the state file itself is replaced by a rename at every write; that file
+    is never removed. A state file another process holds refuses the start,
+    naming the file and ``state_file``. A lock that cannot be taken at all
+    refuses it as well, since the state file is what every later start of
+    this vehicle depends on.
+
+    **Built** (2026-11-14): ``tcspecial::exclusive::state_file``, called by
+    ``runtime::choose`` before the state file is read.
+
+Requirement
     An armed RESTART that is taken writes to the state file that
     the next start is commanded, before it is answered. The start that
     reads it says so in its startup summary, and writes the file again
@@ -8837,6 +8851,29 @@ Requirement
     no bus. A node whose terms will not parse is left out as well, so that the
     complaint about what is actually wrong with it is not buried under a
     second one built on half-read terms.
+
+Requirement
+    No two tcspecials want the same device. A configuration cannot see
+    another process, so each tcspecial locks what its nodes claim, as the
+    requirement above claims it, when it opens it: a character or block
+    device whole, and a device on an I\ :superscript:`2`\ C bus by its
+    address alone, so that the bus stays shared. A node whose device
+    another process holds is refused at its open, naming the node and the
+    device. A named pipe, a socket or a plain file is not locked, being a
+    channel two processes may share by design; a GPIO line and a socket's
+    address are refused a second holder by the kernel already; and a CAN or
+    HDLC interface hands every socket on it every frame, so two tcspecials
+    on one see all of it, not part. A device that cannot be locked at all
+    is opened unlocked, with a warning: a device the vehicle needs is not
+    refused for want of a lock only another tcspecial would ask for.
+
+    The locks are the kernel's advisory ones, let go of when the descriptor
+    closes, so a tcspecial that dies leaves nothing for the next start to
+    clear.
+
+    **Built** (2026-11-14): ``tcspecial::exclusive``, ``device`` and
+    ``on_bus``, called by the serial, SPI, I\ :superscript:`2`\ C, IIO,
+    rpmsg and device-file nodes as they open.
 
 Requirement
     Hosts that certainly mean this host -- ``localhost``, ``127.0.0.1`` and

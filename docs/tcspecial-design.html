@@ -7223,6 +7223,19 @@ next start is one the ground commanded, and which configurations it
 names and how many of its starts have been tried, as <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the
 restart flag</a> says.</dd>
 <dt>Requirement</dt>
+<dd><p class="first">A start locks its state file before it reads it, and holds the lock
+until the process ends or runs itself again, so that no two tcspecials
+keep one state file: each would overwrite what the other is to start
+with. The lock is on a file beside it, its name and <tt class="docutils literal">.lock</tt>, because
+the state file itself is replaced by a rename at every write; that file
+is never removed. A state file another process holds refuses the start,
+naming the file and <tt class="docutils literal">state_file</tt>. A lock that cannot be taken at all
+refuses it as well, since the state file is what every later start of
+this vehicle depends on.</p>
+<p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">tcspecial::exclusive::state_file</span></tt>, called by
+<tt class="docutils literal"><span class="pre">runtime::choose</span></tt> before the state file is read.</p>
+</dd>
+<dt>Requirement</dt>
 <dd>An armed RESTART that is taken writes to the state file that
 the next start is commanded, before it is answered. The start that
 reads it says so in its startup summary, and writes the file again
@@ -9107,6 +9120,27 @@ is a program is reached by running it, which is why it names a program and
 no bus. A node whose terms will not parse is left out as well, so that the
 complaint about what is actually wrong with it is not buried under a
 second one built on half-read terms.</p>
+</dd>
+<dt>Requirement</dt>
+<dd><p class="first">No two tcspecials want the same device. A configuration cannot see
+another process, so each tcspecial locks what its nodes claim, as the
+requirement above claims it, when it opens it: a character or block
+device whole, and a device on an I<sup>2</sup>C bus by its
+address alone, so that the bus stays shared. A node whose device
+another process holds is refused at its open, naming the node and the
+device. A named pipe, a socket or a plain file is not locked, being a
+channel two processes may share by design; a GPIO line and a socket's
+address are refused a second holder by the kernel already; and a CAN or
+HDLC interface hands every socket on it every frame, so two tcspecials
+on one see all of it, not part. A device that cannot be locked at all
+is opened unlocked, with a warning: a device the vehicle needs is not
+refused for want of a lock only another tcspecial would ask for.</p>
+<p>The locks are the kernel's advisory ones, let go of when the descriptor
+closes, so a tcspecial that dies leaves nothing for the next start to
+clear.</p>
+<p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">tcspecial::exclusive</span></tt>, <tt class="docutils literal">device</tt> and
+<tt class="docutils literal">on_bus</tt>, called by the serial, SPI, I<sup>2</sup>C, IIO,
+rpmsg and device-file nodes as they open.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>Hosts that certainly mean this host -- <tt class="docutils literal">localhost</tt>, <tt class="docutils literal">127.0.0.1</tt> and

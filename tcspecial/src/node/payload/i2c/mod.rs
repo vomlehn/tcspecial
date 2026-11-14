@@ -188,6 +188,7 @@ impl I2cEndpoint {
             .map_err(|e| {
                 TcsError::Endpoint(format!("{on} cannot be opened: {e}"))
             })?;
+        crate::exclusive::on_bus(what, &config.bus, config.address, &bus)?;
 
         let fd = bus.as_raw_fd();
 

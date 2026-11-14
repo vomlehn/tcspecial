@@ -3891,7 +3891,11 @@ So, as root:</p>
 </span><span class="generic prompt"># </span>systemctl<span class="whitespace"> </span><span class="name builtin">enable</span><span class="whitespace"> </span>--now<span class="whitespace"> </span>tcspecial
 </pre>
 <p>The configuration's <tt class="docutils literal">state_file</tt> and <tt class="docutils literal">log.directory</tt> belong under
-<tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, on storage that survives a power cycle. An XML
+<tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, on storage that survives a power cycle. tcspecial
+keeps a lock beside the state file, its name with <tt class="docutils literal">.lock</tt> added, and
+locks each device its nodes open; a second tcspecial given the same state
+file or the same device is refused, naming it. To run two on one machine,
+give each its own <tt class="docutils literal">state_file</tt>, <tt class="docutils literal">log.directory</tt>, addresses and devices. An XML
 configuration is named with <tt class="docutils literal">systemctl edit tcspecial</tt>, in a drop-in
 that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils literal">ConditionPathExists</tt> to the <tt class="docutils literal">.xtcs</tt> file.</p>
 </div>

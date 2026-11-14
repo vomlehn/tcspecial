@@ -88,6 +88,7 @@ impl RpmsgEndpoint {
                     config.path
                 ))
             })?;
+        crate::exclusive::device(what, &config.path, &file)?;
 
         is_that_service(
             what,

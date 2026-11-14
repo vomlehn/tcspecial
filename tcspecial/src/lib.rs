@@ -7,6 +7,7 @@
 pub mod beacon_send;
 pub mod config;
 pub mod endpoint;
+pub mod exclusive;
 pub mod node;
 pub mod runtime;
 pub mod segsend;

@@ -71,6 +71,7 @@ impl DeviceEndpoint {
                     config.path
                 ))
             })?;
+        crate::exclusive::device(what, &config.path, &file)?;
 
         Ok(Self {
             file,

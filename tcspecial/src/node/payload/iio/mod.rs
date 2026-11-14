@@ -84,6 +84,7 @@ impl IioEndpoint {
                     config.path
                 ))
                 })?;
+        crate::exclusive::device(what, &config.path, &file)?;
 
         Ok(Self {
             what: what.to_string(),

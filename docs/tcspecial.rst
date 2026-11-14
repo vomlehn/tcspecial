@@ -3732,7 +3732,11 @@ So, as root:
    # systemctl enable --now tcspecial
 
 The configuration's ``state_file`` and ``log.directory`` belong under
-``/var/opt/tcs/tcspecial``, on storage that survives a power cycle. An XML
+``/var/opt/tcs/tcspecial``, on storage that survives a power cycle. tcspecial
+keeps a lock beside the state file, its name with ``.lock`` added, and
+locks each device its nodes open; a second tcspecial given the same state
+file or the same device is refused, naming it. To run two on one machine,
+give each its own ``state_file``, ``log.directory``, addresses and devices. An XML
 configuration is named with ``systemctl edit tcspecial``, in a drop-in
 that sets ``ExecStart`` and ``ConditionPathExists`` to the ``.xtcs`` file.
 

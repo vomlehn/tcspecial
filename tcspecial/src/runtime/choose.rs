@@ -305,6 +305,10 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
         });
     };
 
+    // Before it is read: another tcspecial writing it would make what is
+    // read here a guess, and what this one writes a loss to the other.
+    crate::exclusive::state_file(&state_file)
+        .map_err(|why| vec![format!("{}: {why}", path.display())])?;
     let found = state::read(&state_file);
     let mut notes = Vec::new();
     if let Some(why) = &found.damaged {

@@ -317,6 +317,7 @@ pub const ATTRIBUTES: &[(&str, Needed)] = &[
     ("configurations", Needed::Optional),
     ("configurations_kept", Needed::Optional),
     ("load_trials", Needed::Optional),
+    ("thread_stack", Needed::Optional),
 ];
 
 /// Says which configurations an attribute of the section belongs to.
@@ -637,6 +638,12 @@ pub fn ci_config_of(
             }
             _ => None,
         },
+        thread_stack: match said.get("thread_stack") {
+            Some(value) if !value.as_str().trim().is_empty() => {
+                Some(enough_stack(number("thread_stack")?)?)
+            }
+            _ => None,
+        },
         log: LogJson {
             // Absent is "run without a telemetry log", which is a
             // configuration somebody may mean: a vehicle with no writable
@@ -732,6 +739,34 @@ fn at_least_one(
         )),
         count => Ok(count),
     }
+}
+
+/// Refuses a `thread_stack` too small for tcspecial's threads.
+///
+/// # Arguments
+///
+/// * `bytes` - What `thread_stack` says.
+///
+/// # Returns
+///
+/// It, where it is enough.
+///
+/// # Errors
+///
+/// A sentence naming the least, where it is less: a thread whose stack
+/// overflows aborts the whole process, in flight.
+fn enough_stack(bytes: u32) -> Result<u32, String> {
+    let least = crate::types::THREAD_STACK_LEAST;
+    if bytes < least {
+        return Err(format!(
+            "thread_stack is {bytes} bytes, and tcspecial's threads need at \
+             least {least}: a thread that overflows its stack aborts the \
+             vehicle's software, so make it {least} or more, or leave it out \
+             for {}",
+            crate::types::THREAD_STACK_DEFAULT
+        ));
+    }
+    Ok(bytes)
 }
 
 /// Reads the section's `interface`, and refuses one that is not this build's.
@@ -1333,6 +1368,41 @@ mod tests {
             let why = settled(&[change]).expect_err(change.1);
             assert!(why.contains(said), "{change:?}: {why}");
         }
+    }
+
+    /// `thread_stack` is 256 KiB where it is not said, is taken as said
+    /// where it is at least 128 KiB, and is refused below that, naming the
+    /// attribute and the least.
+    #[test]
+    fn the_thread_stack_has_a_default_and_a_least() {
+        let settled = |stack: Option<&'static str>| {
+            let mut all: Vec<_> = whole()
+                .into_iter()
+                .filter(|(name, _)| *name != "thread_stack")
+                .collect();
+            if let Some(said) = stack {
+                all.push(("thread_stack", said));
+            }
+            ci_config_of(&said(&all)).and_then(|config| config.to_ci_config())
+        };
+        assert_eq!(
+            settled(None).expect("unsaid").thread_stack,
+            crate::types::THREAD_STACK_DEFAULT
+        );
+        assert_eq!(
+            settled(Some("131072")).expect("the least").thread_stack,
+            131_072
+        );
+        assert_eq!(
+            settled(Some("1048576")).expect("more").thread_stack,
+            1_048_576
+        );
+        for small in ["131071", "65536", "0"] {
+            let why = settled(Some(small)).expect_err(small);
+            assert!(why.contains("thread_stack"), "{why}");
+            assert!(why.contains("131072"), "{why}");
+        }
+        assert!(settled(Some("big")).is_err());
     }
 
     /// `interface` is required, is 32 lower-case hex digits, and must be

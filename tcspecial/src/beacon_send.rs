@@ -631,6 +631,7 @@ mod tests {
                 configurations: None,
                 configurations_kept: tcsprotocol::CONFIGURATIONS_KEPT_DEFAULT,
                 load_trials: tcsprotocol::LOAD_TRIALS_DEFAULT,
+                thread_stack: tcsprotocol::THREAD_STACK_DEFAULT,
                 state_file: String::new(),
             },
             &crate::segsend::SegSend::none(),

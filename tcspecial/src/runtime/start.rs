@@ -172,6 +172,23 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
         ConfigVersion::of_this_build()
     ));
 
+    // The stack every thread from here on is given, before the first is
+    // made: segsend's, just below. Said in the summary, because a stack too
+    // small is a vehicle that aborts, and whoever reads why first asks this.
+    let stack = graph
+        .tcspecial
+        .as_ref()
+        .and_then(|section| {
+            tcsprotocol::graph::parameters::ci_config_of(
+                &tcsprotocol::graph::parameters::flatten(section),
+            )
+            .and_then(|json| json.to_ci_config())
+            .ok()
+        })
+        .map_or(tcsprotocol::THREAD_STACK_DEFAULT, |ci| ci.thread_stack);
+    crate::runtime::thread::set_stack(stack);
+    summary(format!("thread stack: {stack} bytes"));
+
     // What every log hands its filled segments to, found before any log is
     // opened: opening one hands over what an earlier run left in it.
     let segsend =

@@ -2080,7 +2080,21 @@ pub struct CIConfigJson {
     /// one. Absent is [`LOAD_TRIALS_DEFAULT`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_trials: Option<u32>,
+    /// The stack each of tcspecial's threads is given, in bytes. Absent is
+    /// [`THREAD_STACK_DEFAULT`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_stack: Option<u32>,
 }
+
+/// The stack each of tcspecial's threads is given where the section does
+/// not say, in bytes: 256 KiB, twice the least.
+pub const THREAD_STACK_DEFAULT: u32 = 256 * 1024;
+
+/// The least stack a configuration may give tcspecial's threads, in bytes:
+/// 128 KiB, the least its tests pass with in a debug build, which uses more
+/// than a release build does. Below it the deepest thread, the command
+/// thread, overflows its stack and the process aborts.
+pub const THREAD_STACK_LEAST: u32 = 128 * 1024;
 
 /// How many configurations provisioning keeps at least where the section
 /// does not say: two, the one running and one to go back to.
@@ -2256,6 +2270,9 @@ pub struct CIConfig {
     /// How many unconfirmed starts a configuration is given:
     /// `load_trials`.
     pub load_trials: u32,
+    /// The stack each of tcspecial's threads is given, in bytes:
+    /// `thread_stack`.
+    pub thread_stack: u32,
 }
 
 impl CIConfig {
@@ -2424,6 +2441,7 @@ impl CIConfigJson {
                 .configurations_kept
                 .unwrap_or(CONFIGURATIONS_KEPT_DEFAULT),
             load_trials: self.load_trials.unwrap_or(LOAD_TRIALS_DEFAULT),
+            thread_stack: self.thread_stack.unwrap_or(THREAD_STACK_DEFAULT),
         })
     }
 

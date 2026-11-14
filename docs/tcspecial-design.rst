@@ -1101,31 +1101,50 @@ Requirement
     datum, and the vehicle and the ground cannot disagree about it.
 
 Requirement
-    tcspecial locks its memory into RAM when it starts, with ``mlockall``
-    for what it has and what it will have, before it loads a
-    configuration, so that every buffer is real once it is made: a
+    The tcspecial that runs the nodes -- the child of `The supervisor and
+    the configuration stack`_ -- locks its memory into RAM when it starts,
+    with ``mlockall`` for what it has and what it will have, before it
+    loads a configuration, so that every buffer is real once it is made: a
     shortage is then a failure to load, not a process killed mid-pass when
     a buffer is first written. On another kernel, its own call for this
-    does the same.
+    does the same. The supervisor locks nothing.
+
+A lock can fail at two moments, and only the second depends on the
+configuration. The call itself locks everything the process has mapped
+already -- its code, its libraries, what the allocator has set aside --
+before any configuration is loaded, so whether it succeeds is the same for
+every configuration. Once it has succeeded, every buffer and stack made
+after it is locked as it is made, and a configuration with more nodes
+needs more of them: one may run out where a smaller one fits.
 
 Requirement
-    A lock that fails, or a buffer that cannot be made once locked, fails
-    the configuration's load, which falls back to the next configuration
-    as `Starting, and the restart flag`_ says, the start saying in its log
-    why. The configuration on tcspecial's command line has none to fall
-    back to: a start running it that cannot lock says so in its log and
-    its startup summary and runs unlocked, since that configuration must
-    always start (see `What is assumed`_), and a vehicle that would not
-    start for want of a lock would be lost for want of a setting.
+    A lock call that fails does not depend on the configuration, so
+    nothing falls back for it. In flight, the start says so in its log and
+    its startup summary and runs the configuration it chose unlocked: a
+    vehicle that would not start for want of a lock would be lost for want
+    of a setting, and no other configuration would lock either.
+
+Requirement
+    Memory that cannot be had once the lock has succeeded -- a buffer, a
+    node's thread, its stack -- fails the configuration's load, which the
+    child ends with a bad status, so that the supervisor gives that
+    configuration up and starts a fresh child on the next (see `The
+    supervisor and the configuration stack`_). A fresh process, because
+    what the failed load took is not reliably handed back to the system
+    and stays locked. So every allocation a load makes is one that can
+    fail and say so, rather than ending the process, and a node whose
+    thread cannot start fails the load rather than running on the main
+    thread. The configuration at the bottom of the stack has none to fall
+    back to: its child is started again unlocked, and says so.
 
 Requirement
     Under ``--simulate=some`` or ``all`` -- a desk, a test bench -- a lock
-    that fails stops the start at once, whichever configuration it was
-    loading, the command line's among them, saying why on its error output:
-    nothing falls back and nothing runs unlocked. A desk is set up to lock,
-    as a vehicle is, so a lock that fails there is not expected, and may be
-    the first sign of a failure a vehicle would meet; a start that carried
-    on would hide it.
+    that fails, at either moment, stops tcspecial at once, saying why on
+    its error output: the child exits with the fatal status, the
+    supervisor stops, nothing falls back and nothing runs unlocked. A desk
+    is set up to lock, as a vehicle is, so a lock that fails there is not
+    expected, and may be the first sign of a failure a vehicle would meet;
+    a start that carried on would hide it.
 
 Requirement
     The manual says how a system lets tcspecial lock what it needs --
@@ -1134,17 +1153,22 @@ Requirement
     shipped with tcspecial sets it.
 
 Requirement
-    Each of tcspecial's threads is given a small stack,
-    ``runtime::thread::STACK_BYTES``, rather than the 2 MiB a Rust thread
-    has, so that what is locked is mostly what tcspecial uses. It is twice
-    what the deepest thread needs in a debug build, as the tests measure it,
-    and every thread the flight software runs on is made by
-    ``runtime::thread::named``, so none takes the default by being made
-    elsewhere.
+    Each of tcspecial's threads is given a small stack, the running
+    configuration's ``thread_stack``, 256 KiB where it says nothing, rather
+    than the 2 MiB a Rust thread has, so that what is locked is mostly what
+    tcspecial uses. Less than 128 KiB is refused when the configuration is
+    checked (``tcsprotocol::THREAD_STACK_LEAST``): the least the tests pass
+    with in a debug build, which uses more than a release build, the
+    default being twice that. Every thread the flight software runs on is
+    made by ``runtime::thread::named``, so none takes the standard
+    library's default by being made elsewhere. The signal thread, made
+    before any configuration is read, has the default. One setting for
+    every thread: a node's own may be added later without changing what
+    this one means.
 
-    **Built** (2026-11-14): 256 KiB, for the nodes', the commands', the
-    beacons', the signals' and segsend's threads. The lock itself is not
-    built yet.
+    **Built** (2026-11-14): ``thread_stack``, for the nodes', the
+    commands', the beacons' and segsend's threads, said in the startup
+    summary. The lock itself is not built yet.
 
 Requirement
     Whether there is memory enough is not tcspecial's to judge. A total of
@@ -6373,6 +6397,12 @@ Requirement
 Starting, and the restart flag
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. note::
+   How a start chooses its configuration here -- ``next``, ``confirmed``
+   and the command line's -- is to be replaced by the configuration stack
+   of `The supervisor and the configuration stack`_, designed and not yet
+   built.
+
 Requirement
     There is no generation number. A start of tcspecial is told by its
     restart flag, and which configuration it runs by its checksum; nothing
@@ -6927,6 +6957,110 @@ Requirement
 Which configuration a start runs, and when one is given up for failing to
 be heard from, is in `Starting, and the restart flag`_.
 
+The supervisor and the configuration stack
+------------------------------------------
+
+.. note::
+   **Not yet built** (designed 2026-11-14). Once built, this replaces how
+   `Starting, and the restart flag`_ chooses a configuration -- the state
+   file's ``next`` and ``confirmed`` -- and how `A commanded restart`_
+   runs tcspecial again, and the state file holds the stack (see `The
+   state file`_). The restart flag, the three commands that always go and
+   ``load_trials`` are unchanged.
+
+tcspecial is two processes. The *supervisor* is what is started -- by
+systemd, by tcs-moc, from a shell -- and does almost nothing: it chooses a
+configuration, starts a *child* to run it, waits for the child to end,
+and decides from how it ended what to start next. The child is the
+tcspecial of everything else in this document: it locks its memory, opens
+the nodes and runs them. The supervisor locks nothing, opens no node and
+allocates nothing once it is waiting, so that the process a vehicle
+depends on to try again is one that has nothing in it to fail.
+
+Each attempt is a fresh child, so that nothing a failed configuration did
+-- memory it took and did not give back, a descriptor it left open, a
+thread it left stuck -- is still there for the next.
+
+Requirement
+    The supervisor starts one child at a time, with the configuration on
+    top of the *configuration stack*, and waits for it to end. It holds
+    the instance lock (see `The state file`_) for as long as it runs, so
+    that no second tcspecial runs beside it, and passes SIGTERM and SIGINT
+    on to the child and waits for it, so that a stop is the child's clean
+    stop. The child asks the kernel to end it if the supervisor ends
+    (``PR_SET_PDEATHSIG``), so that no child runs without a supervisor.
+
+Requirement
+    The configuration stack is a list of configurations, by checksum, kept
+    in the state file. Its top is the configuration the next child runs.
+    Its bottom is the configuration on tcspecial's command line, which
+    provisioning installed and made read-only, and which nothing pops.
+
+Requirement
+    A configuration is pushed when a CONNECT whose checksum matches it is
+    taken: the ground has heard it, which is what finishing its start
+    cannot show, a configuration being able to start cleanly with a link
+    to the ground that is wrong. A configuration already on top is not
+    pushed again. A RESTART pushes the configuration it names, which the
+    next child then runs; if that one fails, it is popped, and the one
+    beneath, which the ground had heard, runs again.
+
+Requirement
+    How the child ends says what the supervisor does next:
+
+    +----------------------------------+--------------------------------------+
+    | The child exits                  | The supervisor                       |
+    +==================================+======================================+
+    | good, having been told to stop   | stops too, the stack unchanged       |
+    +----------------------------------+--------------------------------------+
+    | restart, having taken a RESTART  | starts a child on the new top, the   |
+    |                                  | configuration the RESTART pushed     |
+    +----------------------------------+--------------------------------------+
+    | fatal: a lock that failed under  | stops, the stack unchanged, saying   |
+    | ``--simulate``, a command line   | why                                  |
+    | that is not one                  |                                      |
+    +----------------------------------+--------------------------------------+
+    | bad, or ended by a signal        | pops the top, unless it is the       |
+    |                                  | bottom, and starts a child on what   |
+    |                                  | is then the top                      |
+    +----------------------------------+--------------------------------------+
+
+    Each status is a number of its own, named once, in the code the
+    supervisor and the child share.
+
+Requirement
+    Some failures end the supervisor too, and it sees no bad exit: a power
+    loss, a configuration that hangs the whole machine. So the supervisor
+    counts the attempts on each configuration in the state file, written
+    before each child starts, and a matching CONNECT sets the count back
+    to nought. A configuration whose count reaches ``load_trials`` is
+    popped, whatever ended its attempts, so that one that takes the
+    vehicle down at every start is given up rather than started for ever.
+
+Requirement
+    When the bottom fails, there is nothing to pop: the supervisor starts
+    it again after a delay that doubles at each failure, from one second
+    to at most a minute, and goes back to nought once the bottom has
+    stayed up for a minute. A configuration that fails at once is then
+    not started thousands of times an hour, and one that recovers is not
+    kept waiting.
+
+Requirement
+    Software outside tcspecial may push and pop the stack, as provisioning
+    and a mission's own tools may need to. It does so through the state
+    file's short lock, as tcspecial does (see `The state file`_), and the
+    supervisor reads the stack afresh before every child, so what was
+    pushed or popped meanwhile is what the next child runs. What is pushed
+    must be a configuration the vehicle holds, by its checksum; the
+    bottom cannot be popped.
+
+Requirement
+    Every child is a start, as `Kinds of restart`_ says: it begins with
+    the restart flag set, says in its startup summary which configuration
+    it runs and why -- the top of the stack, popped to after which
+    failure, pushed by which RESTART -- and is commanded only where the
+    child before it took an armed RESTART.
+
 Lost, late and repeated commands
 --------------------------------
 
@@ -6987,6 +7121,16 @@ Requirement
     next start is one the ground commanded, and which configurations it
     names and how many of its starts have been tried, as `Starting, and the
     restart flag`_ says.
+
+.. note::
+   Once `The supervisor and the configuration stack`_ is built, the lock
+   below is two: an *instance lock*, on the ``.lock`` file, which the
+   supervisor holds for as long as it runs, so that no second tcspecial
+   runs on this state file; and a *short lock*, taken by anything that
+   changes the state file -- the supervisor, the child, software outside
+   tcspecial pushing or popping the stack -- for no longer than it takes
+   to read it, change it and rename the new one over it, so that no two
+   changes are lost to each other.
 
 Requirement
     A start locks its state file before it reads it, and holds the lock

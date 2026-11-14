@@ -1519,6 +1519,7 @@ mod tests {
             configurations: None,
             configurations_kept: tcsprotocol::CONFIGURATIONS_KEPT_DEFAULT,
             load_trials: tcsprotocol::LOAD_TRIALS_DEFAULT,
+            thread_stack: tcsprotocol::THREAD_STACK_DEFAULT,
             // Nothing reads it: the state file is counted where beacons
             // start, which this does not.
             state_file: String::new(),

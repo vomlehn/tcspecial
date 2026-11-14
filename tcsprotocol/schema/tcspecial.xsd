@@ -582,6 +582,9 @@
            before a matching CONNECT before it is given up: 1 or more, 3
            where it is not stated. -->
       <xs:element name="load_trials" type="xs:string" minOccurs="0"/>
+      <!-- The stack each of tcspecial's threads is given, in bytes: 131072
+           (128 KiB) or more, 262144 (256 KiB) where it is not stated. -->
+      <xs:element name="thread_stack" type="xs:string" minOccurs="0"/>
       <!-- Where tcs-gui writes the Rust it generates from this configuration.
            The one attribute of this section about building the software rather
            than about running it: nothing aboard reads it. -->

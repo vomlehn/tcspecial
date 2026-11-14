@@ -4187,6 +4187,26 @@ command line's configuration's, whichever configuration runs.
 vehicle is to keep, which nothing removes below; nothing in flight removes
 configurations yet.
 
+Thread stacks
+-------------
+
+tcspecial runs a thread for each node, one for each payload's link to the
+ground, and one each for its commands, its beacons, its signals and, where
+it keeps a log, segsend. Each is given ``thread_stack`` bytes of stack, the
+running configuration's:
+
+.. code-block:: yaml
+
+   tcspecial:
+     thread_stack: "262144"
+
+Left out, it is 262144, 256 KiB. Less than 131072, 128 KiB, is refused:
+a thread that overflows its stack aborts tcspecial, and that is the least
+its tests pass with. The startup summary says what each thread was given.
+The signal thread is started before any configuration is read and has the
+default; the main thread's stack is set as the process starts, by
+``ulimit -s`` or a systemd unit's ``LimitSTACK``.
+
 Which interface it is written for
 ---------------------------------
 

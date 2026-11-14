@@ -170,7 +170,9 @@ Non-production code:
   kernel's dummy devices (`bin/mk-kernel-dummies`).
 * [`tools/`](tools/): one-off conversions, such as
   `tools/convert-format.py`, which rewrites a configuration from the old
-  shape into the new.
+  shape into the new, and `tools/ntss.py`, which `make ntss` runs: it counts
+  the non-test source statements of every tcs project checked out beside
+  this one, by subproject and language.
 
 # Stuff
 

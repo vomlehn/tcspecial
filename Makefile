@@ -213,6 +213,8 @@ help:
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make distclean   - Remove everything that can be rebuilt"
+	@echo "  make ntss        - Count each tcs project's non-test source" \
+		"statements"
 	@echo "  make install-tools - Install the tools building, testing and" \
 		"packaging need"
 	@echo "                     (DRY_RUN=1: show what it would do;"
@@ -921,6 +923,14 @@ SUBST = sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@SYSCONFDIR@|$(SYSCONFDIR)|g' \
 .PHONY: install-build
 install-build:
 	cargo build --release $(addprefix -p ,$(INSTALL_CRATES))
+
+# Count each tcs project's and subproject's non-test source statements, of
+# every ../tcs* checkout beside this one: see tools/ntss.py for what is
+# counted. Printed, not kept: the counts are of other repositories too, as
+# they stand when it is run.
+.PHONY: ntss
+ntss:
+	python3 tools/ntss.py
 
 # Install the tools building, testing, checking, documenting and packaging
 # this project need, with the system's own package manager, under sudo:

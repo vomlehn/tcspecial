@@ -78,7 +78,7 @@ fn number(value: f64) -> String {
 ///
 /// * `out`     - Where it is written.
 /// * `sockets` - Every socket, in [`tcsprotocol::graph::sockets::of`]'s
-///   order.
+///               order.
 fn addresses(out: &mut String, sockets: &[Socket]) {
     out.push_str("Addresses and ports\n");
     if sockets.is_empty() {

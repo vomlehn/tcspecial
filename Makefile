@@ -1245,6 +1245,11 @@ endif
 
 # Check code quality
 #
+# Every crate is linted with its tests, examples and benches as well as its
+# library and programs: a warning in a test is a warning, and a check that
+# looks only at what ships lets one sit until it is copied somewhere that
+# does.
+#
 # With tcspecial built with no optional payload type and with each one alone
 # as well as with all of them: a gate that leaves a reference to a type's
 # module outside it breaks only the builds without that type, which a
@@ -1262,7 +1267,7 @@ endif
 check:
 	@echo "Running cargo check..."
 	cd $(RUST) && cargo check
-	cd $(RUST) && cargo clippy -- -D warnings
+	cd $(RUST) && cargo clippy --workspace --all-targets -- -D warnings
 	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --no-default-features \
 		-- -D warnings
 	cd $(RUST) && for type in $$(cargo run -q -p $(PROJECT_NAME) \

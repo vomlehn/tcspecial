@@ -271,7 +271,7 @@ def connect(tcsprotocol, digest):
 
     Args:
         tcsprotocol: The ground's library, for the command's layout.
-        digest:   The configuration's checksum, as tcs-verify prints it.
+        digest:      The configuration's checksum, as tcs-verify prints it.
 
     Returns:
         True if it was answered within PATIENCE seconds.

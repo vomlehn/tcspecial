@@ -866,24 +866,20 @@ mod tests {
         assert_eq!(said.bias, Bias::PullUp);
         assert_eq!(said.debounce, Some(Duration::from_micros(5_000)));
 
-        for (field, value, expected) in
-            [("bias", "pull_sideways", "none, pull_up or pull_down")]
-        {
-            let said = group_kind_of(
-                "discretes",
-                Kind::In,
-                terms(&[
-                    ("lines", "0"),
-                    (field, value),
-                    ("state_interval", "1 s"),
-                ]),
-            )
-            .expect_err("a word that is not a value");
-            assert!(
-                format!("{said}").contains(expected),
-                "the error should list the values: {said}"
-            );
-        }
+        let said = group_kind_of(
+            "discretes",
+            Kind::In,
+            terms(&[
+                ("lines", "0"),
+                ("bias", "pull_sideways"),
+                ("state_interval", "1 s"),
+            ]),
+        )
+        .expect_err("a word that is not a value");
+        assert!(
+            format!("{said}").contains("none, pull_up or pull_down"),
+            "the error should list the values: {said}"
+        );
 
         let said = group_kind_of(
             "discretes",

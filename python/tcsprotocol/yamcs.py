@@ -317,7 +317,7 @@ def _shared_document(config, gateway):
     Args:
         config:  The :class:`tcsprotocol.configuration.Configuration`.
         gateway: The gateway node's
-        :class:`~tcsprotocol.configuration.Node`.
+                 :class:`~tcsprotocol.configuration.Node`.
 
     Returns:
         The document's path, or ``None`` where the node's data goes nowhere,

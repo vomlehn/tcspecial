@@ -4830,6 +4830,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcs-conflict"
+version = "0.1.0"
+dependencies = [
+ "tcsverify",
+ "tempfile",
+]
+
+[[package]]
 name = "tcs-diagram"
 version = "0.1.0"
 dependencies = [

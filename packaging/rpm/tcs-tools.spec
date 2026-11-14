@@ -14,7 +14,8 @@ Conflicts:      tcspecial < 0.1.1
 The software tools that write and check tcspecial's configurations:
 tcs-gui, the graphical configuration editor, with its node descriptions;
 tcs-verify, which says what is wrong with a configuration without running
-any of it; and tcs_ui, the Python window pieces the examples' ground
+any of it; tcs-conflict, which says whether two configurations can be run
+at once; and tcs_ui, the Python window pieces the examples' ground
 stations show. Never flown. The manuals and the example configurations are
 the tcspecial-doc package.
 
@@ -67,6 +68,7 @@ fi
 %dir /opt/tcs/share/doc
 /opt/tcs/bin/tcs-gui
 /opt/tcs/bin/tcs-verify
+/opt/tcs/bin/tcs-conflict
 /opt/tcs/lib/python3/site-packages/tcs_ui
 /opt/tcs/lib/python3/site-packages/tcs_ui-%{version}.dist-info
 /opt/tcs/share/tcs-gui

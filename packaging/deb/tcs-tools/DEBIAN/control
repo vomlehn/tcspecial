@@ -14,6 +14,7 @@ Description: tcspecial's configuration editor and checker
  The software tools that write and check tcspecial's configurations: tcs-gui,
  the graphical configuration editor, with its node descriptions; tcs-verify,
  which says what is wrong with a configuration without running any of it;
+ tcs-conflict, which says whether two configurations can be run at once;
  and tcs_ui, the Python window pieces the examples' ground stations show.
  Never flown; the manuals and examples are tcspecial-doc. Everything is
  under /opt/tcs, and a .pth file puts tcs_ui on python3's path.

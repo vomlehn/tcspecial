@@ -27,6 +27,9 @@ Software tools
 `The tcs-verify design <tcs-verify-design.html>`__
     The configuration checker.
 
+`The tcs-conflict design <tcs-conflict-design.html>`__
+    The check that two configurations can be run at once.
+
 Verification tools
 ==================
 

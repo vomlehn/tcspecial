@@ -47,6 +47,8 @@ use std::path::{Path, PathBuf};
 use tcsprotocol::graph::check::Severity;
 use tcsprotocol::{ConfigFormat, SimConfigFile, TcsError};
 
+pub mod conflict;
+pub mod flags;
 pub mod locate;
 
 use locate::{Where, THE_FILE_ITSELF};

@@ -830,7 +830,7 @@ distclean: clean
 # the file or overwrites it on an upgrade. The test one goes in the same
 # bin, beside tcspecial, which is where tcspecial looks for it.
 FLIGHT_BIN := tcspecial
-TOOLS_BIN := tcs-gui tcs-verify
+TOOLS_BIN := tcs-gui tcs-verify tcs-conflict
 TEST_BIN := tcs-moc tcs-sim segsend
 TEST_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
 PACKAGES := tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-doc
@@ -841,7 +841,8 @@ PACKAGES := tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-doc
 RELEASE_ATTRIBUTION := slint
 
 # The crates those come from, built together by install-build.
-INSTALL_CRATES := tcspecial tcs-verify tcs-gui tcsmoc-c tcs-moc tcs-sim \
+INSTALL_CRATES := tcspecial tcs-verify tcs-conflict tcs-gui tcsmoc-c \
+		  tcs-moc tcs-sim \
 		  $(TEST_LIBEXEC)
 
 # The crates each package's programs and libraries are built from, whose
@@ -851,7 +852,7 @@ INSTALL_CRATES := tcspecial tcs-verify tcs-gui tcsmoc-c tcs-moc tcs-sim \
 # crate's.
 FLIGHT_CRATES := tcspecial
 MOC_CRATES := tcsmoc-c
-TOOLS_CRATES := tcs-gui tcs-verify
+TOOLS_CRATES := tcs-gui tcs-verify tcs-conflict
 TEST_CRATES := tcs-moc tcs-sim tcspecial $(TEST_LIBEXEC)
 
 # Where cargo puts a release build.

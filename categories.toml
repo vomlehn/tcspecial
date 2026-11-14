@@ -21,6 +21,7 @@ operational = [
 software-tools = [
 	"tcs-gui",
 	"tcs-verify",
+	"tcs-conflict",
 	"tcs-diagram",
 	"tcs-ui",
 	"tools/convert-format.py",

@@ -168,6 +168,11 @@ Software tools
     The checker. tcs-verify reads a configuration and says what is wrong
     with it, running none of it.
 
+`The tcs-conflict manual <tcs-conflict.html>`__
+    Whether two configurations can be run at once: tcs-conflict says what
+    both want -- a port, a device, a state file -- with the lines that say
+    so.
+
 `The tcs-xtce manual <../../tcs-xtce/docs/tcs-xtce.html>`__
     The compiler from XTCE to Rust, C, C++ and Python, which generates the
     code that packs and unpacks the link's packets. `The tcs-xtce manuals

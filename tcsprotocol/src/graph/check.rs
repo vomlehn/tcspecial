@@ -1886,11 +1886,7 @@ impl Graph {
         // which is why it names a program and no bus. Asking this of one would
         // refuse every `app_pl` in every file for want of an address it has no
         // use for.
-        for node in self.nodes.iter().filter(|node| {
-            (node.is_payload()
-                && crate::node::app::Kind::of(&node.node_type).is_none())
-                || crate::gateway::is_gateway(&node.node_type)
-        }) {
+        for node in self.nodes.iter().filter(|node| is_opened(node)) {
             if let Err(why) = crate::graph::reach::reach_of(node) {
                 problems.push(Problem::BadNode {
                     node: node.name.clone(),
@@ -1903,11 +1899,7 @@ impl Graph {
         // opened, in the order the configuration declares them, so that the
         // claim which came first is the one that stands.
         let mut taken: BTreeMap<Claim, String> = BTreeMap::new();
-        for node in self.nodes.iter().filter(|node| {
-            (node.is_payload()
-                && crate::node::app::Kind::of(&node.node_type).is_none())
-                || crate::gateway::is_gateway(&node.node_type)
-        }) {
+        for node in self.nodes.iter().filter(|node| is_opened(node)) {
             // A node whose terms will not parse has no claim to compare: the
             // rule above names what is wrong with it, and a second complaint
             // built on half-read terms would bury that one.
@@ -2106,7 +2098,7 @@ impl Graph {
 /// it is not. Everything else -- a device file, a socket, a peripheral's node
 /// -- is claimed whole.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-enum Claim {
+pub(crate) enum Claim {
     /// A port on a host. `localhost`, `127.0.0.1` and `::1` are one host, as
     /// they are everywhere else in these rules, so naming it differently does
     /// not make it a different port.
@@ -2142,7 +2134,10 @@ enum Claim {
 ///
 /// Each claim, with the quoted node name a complaint calls it by: one for
 /// each line of a set of discrete lines, and one for any other endpoint.
-fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
+pub(crate) fn claims_of(
+    name: &str,
+    endpoint: &EndpointConfig,
+) -> Vec<(Claim, String)> {
     let mut claims = Vec::new();
 
     let whole = match endpoint {
@@ -2205,6 +2200,22 @@ fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
     claims
 }
 
+/// Whether a node is opened over an interface, and so claims what it opens:
+/// a payload that is not a program, or a gateway. An app node is reached by
+/// running it, and names a program and no bus.
+///
+/// # Arguments
+///
+/// * `node` - The node.
+///
+/// # Returns
+///
+/// Whether it is opened.
+pub(crate) fn is_opened(node: &crate::graph::Node) -> bool {
+    (node.is_payload() && crate::node::app::Kind::of(&node.node_type).is_none())
+        || crate::gateway::is_gateway(&node.node_type)
+}
+
 /// How a claim reads in a complaint.
 ///
 /// # Arguments
@@ -2215,7 +2226,7 @@ fn claims_of(name: &str, endpoint: &EndpointConfig) -> Vec<(Claim, String)> {
 ///
 /// The thing claimed, as a complaint names it: a host and port, a path, an
 /// address on a bus and so on.
-fn claim_text(claim: &Claim) -> String {
+pub(crate) fn claim_text(claim: &Claim) -> String {
     match claim {
         Claim::Port { host, port } => format!("{host}:{port}"),
         Claim::Path(path) => path.clone(),

@@ -1,0 +1,18 @@
+[package]
+name = "tcs-conflict"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+Checks whether two tcspecial configurations can be run at once"""
+
+[dependencies]
+# The check this program prints, which is the library's: see
+# tcsverify::conflict.
+tcsverify = { path = "../tcsverify" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

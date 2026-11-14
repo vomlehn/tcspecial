@@ -1,19 +1,20 @@
 O = ../OUT
 
 # manual.rst is the short page that says what each manual covers;
-# tcspecial.rst, tcs-gui.rst, tcs-moc.rst, tcs-sim.rst and tcs-verify.rst are
-# the programs' manuals. The pages are committed beside their sources: the
+# tcspecial.rst, tcs-gui.rst, tcs-moc.rst, tcs-sim.rst, tcs-verify.rst and
+# tcs-conflict.rst are the programs' manuals. The pages are committed beside
+# their sources: the
 # pre-commit hook remakes the page of each document a commit changes and adds
 # it to the commit, and make html-check in the top directory fails where one
 # is behind (see make hooks there).
 MANUALS = manual.html tcspecial.html tcs-gui.html tcs-moc.html tcs-sim.html \
-	tcs-verify.html
+	tcs-verify.html tcs-conflict.html
 
 # design.rst says the same of the design documents, one per program as the
 # manuals are. tcspecial-design.html, which draws the restart figures, has a
 # rule of its own.
 DESIGNS = design.html tcs-gui-design.html tcs-moc-design.html \
-	tcs-sim-design.html tcs-verify-design.html
+	tcs-sim-design.html tcs-verify-design.html tcs-conflict-design.html
 
 .PHONY: all
 all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \

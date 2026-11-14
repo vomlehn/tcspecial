@@ -152,6 +152,8 @@ loads:
 
 * [`tcs-gui/`](tcs-gui/): the graphical configuration editor.
 * [`tcs-verify/`](tcs-verify/): the configuration checker as a program.
+* [`tcs-conflict/`](tcs-conflict/): whether two configurations can be run
+  at once.
 * [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-gui
   and tcspecial's visual window, which never flies.
 * [`tcs-ui/`](tcs-ui/): the window pieces tcs-moc and the desk tools

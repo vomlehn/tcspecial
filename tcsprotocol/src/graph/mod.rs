@@ -46,6 +46,7 @@
 
 pub mod built;
 pub mod check;
+pub mod conflict;
 pub mod exports;
 pub mod fprime;
 pub mod grouped;

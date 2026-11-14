@@ -167,21 +167,6 @@ under --fatal-warnings -- 1 an error was printed, or a warning under
 the file could not be read to give it, 2 the command line was not one of
 these.";
 
-/// How many errors are printed before the run stops looking: every one
-/// unless asked.
-///
-/// Nought is a limit like any other: whether the files are good is the exit
-/// status, which does not depend on how much of the reason was printed, so a
-/// script that wants only the answer may ask for none of the reasons and is
-/// answered at the first error.
-const ERROR_LIMIT_FLAG: &str = "--error-limit=";
-
-/// What is done with warnings: printed and not counted unless asked.
-const WARNINGS_FLAG: &str = "--warnings=";
-
-/// Whether a warning fails the run, as an error does.
-const FATAL_WARNINGS_FLAG: &str = "--fatal-warnings";
-
 /// Which payload types the tcspecial being checked for contains: every one
 /// unless asked.
 const TYPES_FLAG: &str = "--types=";
@@ -314,22 +299,17 @@ fn main() -> ExitCode {
             fprime_model = Some(PathBuf::from(value));
             continue;
         }
-        if said == FATAL_WARNINGS_FLAG {
-            limits.fatal_warnings = true;
-            continue;
-        }
-        let asked = if let Some(value) = said.strip_prefix(ERROR_LIMIT_FLAG) {
-            error_limit(value).map(|limit| limits.error_limit = limit)
-        } else if let Some(value) = said.strip_prefix(WARNINGS_FLAG) {
-            warnings(value).map(|warnings| limits.warnings = warnings)
-        } else if let Some(value) = said.strip_prefix(TYPES_FLAG) {
-            tcsprotocol::graph::built::types_from(value)
-                .map(|types| built = types)
-                .map_err(|why| format!("{TYPES_FLAG}{value}: {why}"))
-        } else {
-            files.push(PathBuf::from(&arg));
-            continue;
-        };
+        let asked =
+            if let Some(taken) = tcsverify::flags::take(&said, &mut limits) {
+                taken
+            } else if let Some(value) = said.strip_prefix(TYPES_FLAG) {
+                tcsprotocol::graph::built::types_from(value)
+                    .map(|types| built = types)
+                    .map_err(|why| format!("{TYPES_FLAG}{value}: {why}"))
+            } else {
+                files.push(PathBuf::from(&arg));
+                continue;
+            };
         if let Err(why) = asked {
             eprintln!("tcs-verify: {why}\n\n{USAGE}");
             return ExitCode::from(2);
@@ -338,12 +318,8 @@ fn main() -> ExitCode {
 
     // A warning that fails the run and is not printed would be a failure
     // nothing explains.
-    if limits.fatal_warnings && limits.warnings == tcsverify::Warnings::Off {
-        eprintln!(
-            "tcs-verify: {FATAL_WARNINGS_FLAG} fails the run on a warning, \
-             and {WARNINGS_FLAG}off prints none: give one or the other\n\n\
-             {USAGE}"
-        );
+    if let Err(why) = tcsverify::flags::agree(&limits) {
+        eprintln!("tcs-verify: {why}\n\n{USAGE}");
         return ExitCode::from(2);
     }
 
@@ -776,57 +752,6 @@ fn configurations(files: &[PathBuf]) -> &[PathBuf] {
     }
 }
 
-/// Reads what `--error-limit=` was given, as how many to list.
-///
-/// # Arguments
-///
-/// * `value` - What follows the `=`.
-///
-/// # Returns
-///
-/// The limit, or `None` for "unlimited", which is every one.
-///
-/// # Errors
-///
-/// A sentence saying what the limit may be, if it is anything else.
-fn error_limit(value: &str) -> Result<Option<usize>, String> {
-    if value == "unlimited" {
-        return Ok(None);
-    }
-    value.parse::<usize>().map(Some).map_err(|_| {
-        format!(
-            "{ERROR_LIMIT_FLAG}{value}: the limit is a whole number, \
-             0 included, or \"unlimited\""
-        )
-    })
-}
-
-/// Reads what `--warnings=` was given.
-///
-/// # Arguments
-///
-/// * `value` - What follows the `=`: "on", "off" or "errors".
-///
-/// # Returns
-///
-/// What is done with warnings.
-///
-/// # Errors
-///
-/// A sentence saying what it may be, if it is anything else.
-fn warnings(value: &str) -> Result<tcsverify::Warnings, String> {
-    use tcsverify::Warnings;
-
-    match value {
-        "on" => Ok(Warnings::On),
-        "off" => Ok(Warnings::Off),
-        "errors" => Ok(Warnings::Errors),
-        _ => Err(format!(
-            "{WARNINGS_FLAG}{value}: warnings are \"on\", \"off\" or \"errors\""
-        )),
-    }
-}
-
 /// Checks that two configurations are one XML file and one YAML file, in
 /// either order, which is what comparing two spellings of one configuration
 /// is.
@@ -859,36 +784,5 @@ fn one_of_each(
             first.display(),
             second.display()
         )),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A whole number, nought included, or "unlimited"; anything else is a
-    /// command line that is not one of the shapes, and is told so.
-    #[test]
-    fn an_error_limit_is_a_number_or_unlimited() {
-        assert_eq!(error_limit("0"), Ok(Some(0)));
-        assert_eq!(error_limit("5"), Ok(Some(5)));
-        assert_eq!(error_limit("250"), Ok(Some(250)));
-        assert_eq!(error_limit("unlimited"), Ok(None));
-        for bad in ["", "-1", "five", "Unlimited", "5.0", "all"] {
-            assert!(error_limit(bad).is_err(), "{bad:?} was taken as a limit");
-        }
-    }
-
-    /// On, off or errors, spelled so; anything else is told so.
-    #[test]
-    fn warnings_are_on_off_or_errors() {
-        use tcsverify::Warnings;
-
-        assert_eq!(warnings("on"), Ok(Warnings::On));
-        assert_eq!(warnings("off"), Ok(Warnings::Off));
-        assert_eq!(warnings("errors"), Ok(Warnings::Errors));
-        for bad in ["", "On", "none", "error", "yes"] {
-            assert!(warnings(bad).is_err(), "{bad:?} was taken");
-        }
     }
 }

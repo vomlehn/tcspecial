@@ -213,6 +213,10 @@ help:
 	@echo "  make release     - Build with optimizations"
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make distclean   - Remove everything that can be rebuilt"
+	@echo "  make install-tools - Install the tools building, testing and" \
+		"packaging need"
+	@echo "                     (DRY_RUN=1: show what it would do;"
+	@echo "                     PACKAGING=0: no packaging tools)"
 	@echo "  make install     - Build the packages and install them with" \
 		"apt-get, dnf or zypper"
 	@echo "                     (DRY_RUN=1: show what it would do)"
@@ -917,6 +921,16 @@ SUBST = sed -e 's|@PREFIX@|$(PREFIX)|g' -e 's|@SYSCONFDIR@|$(SYSCONFDIR)|g' \
 .PHONY: install-build
 install-build:
 	cargo build --release $(addprefix -p ,$(INSTALL_CRATES))
+
+# Install the tools building, testing, checking, documenting and packaging
+# this project need, with the system's own package manager, under sudo:
+# see bin/install-tools, which a container can run as root too. DRY_RUN=1
+# shows the commands and runs none; PACKAGING=0 leaves out what only make
+# packages and make lint-packages need.
+.PHONY: install-tools
+install-tools:
+	bin/install-tools $(if $(filter 1,$(DRY_RUN)),--dry-run) \
+		$(if $(filter 0,$(PACKAGING)),--no-packaging)
 
 # Copy all three packages' files into place from a build already made,
 # under PREFIX and DESTDIR: what `make install` once did, kept for

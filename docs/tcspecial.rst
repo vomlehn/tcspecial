@@ -41,6 +41,16 @@ configuration file at startup, which is the whole of the architecture: the
 program is a set of node types and a machine for moving data along declared
 links, and what a particular vehicle does is a file.
 
+**tcs-xtce and tcslog stand alone.** Two of the projects TCSpecial is built
+from are products in their own right, meant to be used either with TCSpecial
+or as independent tools by software that has nothing else of TCS: `tcs-xtce
+<https://github.com/vomlehn/tcs-xtce>`__, the XTCE packet compiler and the
+runtime the code it writes runs on, and `tcslog
+<https://github.com/vomlehn/tcslog>`__, the TCS Onboard Log. Neither depends
+on TCSpecial. Each has its repository, manual and packages, and its own
+``make install-tools`` to set up what building it needs, so either can be
+taken up without this one.
+
 **C/C++, Rust and Python are all supported.** A program that runs aboard -- the
 program of an app node, or a payload that is a program rather than a device --
 is talked to through file descriptors it inherits, which a program in any of the
@@ -3497,6 +3507,29 @@ that is not overridden. What is overridden is intended, and says why: for
 lintian in ``packaging/deb/<package>/lintian-overrides``, which each .deb
 carries, and for rpmlint in ``packaging/rpm/rpmlint.toml``, which is not
 shipped.
+
+The tools
+---------
+
+``make install-tools`` installs the tools that building, testing, checking,
+documenting and packaging tcspecial need, with the system's own package
+manager under sudo: apt-get on Debian and Ubuntu, dnf on Fedora and Red
+Hat's. It is ``bin/install-tools``, which a container, with nothing else
+installed, can run as root. Rust comes from rustup where rustup is there,
+and otherwise from the system's packages. ``DRY_RUN=1`` shows the commands
+and runs none, and ``PACKAGING=0`` leaves out lintian, rpmlint and the rest
+of what only ``make packages`` and ``make lint-packages`` need. What it
+cannot install it says: a Rust older than 1.92, which Slint needs, a Python
+older than 3.11, which tcs-helpers' checks need, and the two checkouts
+below.
+
+.. code-block:: console
+
+   $ make install-tools DRY_RUN=1
+   $ make install-tools
+
+tcs-xtce and tcslog have a ``make install-tools`` of their own, for what
+each needs, since each is used without tcspecial as well.
 
 ``make install``
 ----------------

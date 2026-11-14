@@ -5003,6 +5003,8 @@ dependencies = [
 [[package]]
 name = "tcsxtce"
 version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d4606a692526fbb3ffc6e5153126710bb4e84b58f2a89587700b601cfac3a08"
 dependencies = [
  "bnum",
 ]

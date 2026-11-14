@@ -59,8 +59,7 @@ README.html: README.md
 # follow a variable.
 include $(CURDIR)/../beside.mk
 TCS_XTCE := $(BESIDE)/tcs-xtce
-XTCE_PIN := $(shell sed -n \
-	's/^tcsxtce = { version = "=\([^"]*\)".*/\1/p' Cargo.toml)
+XTCE_PIN := $(shell sed -n 's/^tcsxtce = "=\(.*\)"$$/\1/p' Cargo.toml)
 XTCE_COMPILE := cd $(TCS_XTCE)/python && python3 -m tcs_xtce
 XTCE_DIGEST := cd $(TCS_XTCE)/python && python3 -m tcs_xtce.digest_cli
 # What makes the Python the generator writes import the runtime from

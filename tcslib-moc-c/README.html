@@ -280,17 +280,19 @@ gives the round trip and the two halves of it.</li>
 <code>NULL</code> or -1, and <code>tcs_last_error()</code> says why. The
 header says the rest.</p>
 <h2 id="building-with-it">Building with it</h2>
-<p>Cargo builds <code>libtcs_moc_c.a</code> and
-<code>libtcs_moc_c.so</code>, from the repository’s root:</p>
+<p>Cargo builds <code>libtcsmoc_c.a</code> and
+<code>libtcsmoc_c.so</code>, from the repository’s root, with an
+underscore because a crate’s name cannot have a hyphen; they are
+installed as <code>libtcsmoc-c</code>:</p>
 <pre><code>cargo build -p tcslib-moc-c
 cc  my_station.c   -I tcslib-moc-c/include \
-    target/debug/libtcs_moc_c.a -lpthread -ldl -lm
+    target/debug/libtcsmoc_c.a -lpthread -ldl -lm
 c++ my_station.cpp -I tcslib-moc-c/include \
-    target/debug/libtcs_moc_c.a -lpthread -ldl -lm</code></pre>
+    target/debug/libtcsmoc_c.a -lpthread -ldl -lm</code></pre>
 <p>Installed – by the <code>tcspecial-moc</code> package, or
 <code>make install</code> at the repository’s root – it is
-<code>/opt/tcs/lib/libtcs_moc_c.so.&lt;ABI&gt;</code>, with the link
-<code>libtcs_moc_c.so</code> to it, <code>libtcs_moc_c.a</code>, the
+<code>/opt/tcs/lib/libtcsmoc-c.so.&lt;ABI&gt;</code>, with the link
+<code>libtcsmoc-c.so</code> to it, <code>libtcsmoc-c.a</code>, the
 header as <code>/opt/tcs/include/tcslib-moc-c.h</code>, and
 <code>/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc</code>. A station then
 includes <code>&lt;tcslib-moc-c.h&gt;</code> and is built with
@@ -300,7 +302,7 @@ c++ my_station.cpp $(pkg-config --cflags --libs tcslib-moc-c)</code></pre>
 <h3 id="the-abi-version">The ABI version</h3>
 <p><code>&lt;ABI&gt;</code> is the library’s ABI version, the one whole
 number in <code>abi-version</code>, now 4. It is the shared library’s
-soname, <code>libtcs_moc_c.so.&lt;ABI&gt;</code>, which a station linked
+soname, <code>libtcsmoc-c.so.&lt;ABI&gt;</code>, which a station linked
 with the library asks for at run time; <code>build.rs</code> sets the
 soname from the file, and the Makefile installs the library under the
 same name, so the number is stated once. It is not the crate’s version,
@@ -348,7 +350,7 @@ node, each of which they do only when asked.</p>
 honest</h2>
 <p>It is written by hand, for people, so the proof that it says what the
 library does is a program that compiles against it and works.
-<code>tests/c_and_cpp.rs</code> builds <code>libtcs_moc_c.a</code> from
+<code>tests/c_and_cpp.rs</code> builds <code>libtcsmoc_c.a</code> from
 the source as it is, compiles both example programs against the header
 with gcc and g++ – warnings as errors – and runs each against a vehicle
 the test plays. The two must print the same lines, and the right ones,
@@ -374,9 +376,9 @@ F´ bridge stops its beacon thread this way.</li>
 <li><strong>Strings are borrowed.</strong> A string a function returns
 is good until the next call on the same handle or its
 <code>_close</code>. Copy it to keep it.</li>
-<li><strong>Linking.</strong> On Linux, <code>libtcs_moc_c.a</code>
-needs <code>-lpthread -ldl -lm</code> beside it, which is what the tests
-link with. That is enough where the C library has folded the rest into
+<li><strong>Linking.</strong> On Linux, <code>libtcsmoc-c.a</code> needs
+<code>-lpthread -ldl -lm</code> beside it, which is what the tests link
+with. That is enough where the C library has folded the rest into
 itself, as recent glibc has; the whole list for a system is what
 <code>cargo rustc -p tcslib-moc-c --lib --crate-type staticlib -- --print native-static-libs</code>
 prints, which here is

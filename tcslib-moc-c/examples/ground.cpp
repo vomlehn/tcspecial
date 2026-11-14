@@ -14,7 +14,7 @@
 // and the node to ask about. Run from the repository's root none need
 // be given, and it watches the ping example.
 //
-//     c++ ground.cpp -Iinclude target/debug/libtcs_moc_c.a
+//     c++ ground.cpp -Iinclude target/debug/libtcsmoc_c.a
 //         -lpthread -ldl -lm
 //
 // as one command.

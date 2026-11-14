@@ -4,7 +4,7 @@
 //! What keeps the header honest. It is written by hand, so the only proof that
 //! it says what the library does is a program that compiles against it and
 //! works: `examples/ground.c` with gcc and `examples/ground.cpp` with g++, each
-//! linked with the `libtcs_moc_c.a` this crate builds, each run against a
+//! linked with the `libtcsmoc_c.a` this crate builds, each run against a
 //! simulated vehicle that sends beacons as tcspecial serializes them, answers
 //! CONNECT, PING and QUERY_NODE, takes a datum sent up to the gateway node, and
 //! sends one datum down from it. The two must print the same lines, and the
@@ -39,7 +39,7 @@ fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-/// Finds where cargo puts `libtcs_moc_c.a`: the directory above this test's
+/// Finds where cargo puts `libtcsmoc_c.a`: the directory above this test's
 /// own.
 ///
 /// # Returns
@@ -55,10 +55,10 @@ fn library() -> PathBuf {
         .parent()
         .and_then(Path::parent)
         .expect("the target directory");
-    target.join("libtcs_moc_c.a")
+    target.join("libtcsmoc_c.a")
 }
 
-/// Builds `libtcs_moc_c.a` from the source as it is now, and says where it
+/// Builds `libtcsmoc_c.a` from the source as it is now, and says where it
 /// is.
 ///
 /// `cargo test` builds this crate for its tests as an rlib and leaves the
@@ -122,7 +122,7 @@ fn free() -> u16 {
 /// * `compiler` - The compiler to run: "gcc" or "g++".
 /// * `standard` - The language standard's flag, such as "-std=c11".
 /// * `source`   - The program's file, in `examples/`.
-/// * `library`  - The `libtcs_moc_c.a` to link with.
+/// * `library`  - The `libtcsmoc_c.a` to link with.
 /// * `out`      - Where the program is written.
 ///
 /// # Returns

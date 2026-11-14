@@ -10,7 +10,7 @@
  * C and C++ alike. The header is C, includable from C++ as it stands; every
  * declaration has C linkage, and nothing in it is C that C++ will not compile.
  *
- * Link with libtcs_moc_c.a (or libtcs_moc_c.so), and on Linux with
+ * Link with libtcsmoc-c.a (or libtcsmoc-c.so), and on Linux with
  * -lpthread -ldl -lm.
  *
  * Conventions, the same for every function:

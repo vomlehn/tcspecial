@@ -32,7 +32,7 @@ RUST = .
 #   sbin/        <package>-links, one per package, which an administrator
 #                runs to link that package's programs into /usr/local/bin
 #   libexec/     programs other programs run: the five test app programs
-#   lib/         libtcs_moc_c, its pkg-config file, and the Python packages,
+#   lib/         libtcsmoc-c, its pkg-config file, and the Python packages,
 #                in lib/python3/site-packages, which names no minor version
 #   include/     tcslib-moc-c.h
 #   share/       tcs-gui's data, the documents and the example configurations
@@ -818,9 +818,9 @@ TEST_CRATES := tcs-moc tcs-sim tcspecial
 RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
 
 # The versions, read from where each is stated so that it is stated once: the
-# workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcs_moc_c's
+# workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcsmoc-c's
 # own, which tcslib-moc-c.pc says, and tcslib-moc-c/abi-version for
-# libtcs_moc_c's ABI version, which is its soname -- libtcs_moc_c.so.<ABI>
+# libtcsmoc-c's ABI version, which is its soname -- libtcsmoc-c.so.<ABI>
 # -- and the name its file is installed under. The ABI version goes up only when
 # a program built against the old tcslib-moc-c.h would not work with the new
 # library: see tcslib-moc-c/build.rs, which reads the same file to set the
@@ -831,7 +831,7 @@ VERSION := $(shell sed -n \
 LIBTCS_VERSION := $(shell sed -n 's/^version *= *"\(.*\)"/\1/p' \
 		    tcslib-moc-c/Cargo.toml)
 LIBTCS_ABI := $(shell cat tcslib-moc-c/abi-version)
-LIBTCS_SONAME := libtcs_moc_c.so.$(LIBTCS_ABI)
+LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 
 # The example configurations, in both spellings, with their simulator files
 # and diagrams; the manual's figures are the diagrams, so it is given them as
@@ -848,7 +848,7 @@ EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 # whose storage is small and on ground stations alike, and a release build
 # carries its symbol tables and the standard library's debug information:
 # stripping takes a fifth to a quarter off what each package installs, and
-# libtcs_moc_c.a from 33 MB to 24 MB. Executables and shared libraries are
+# libtcsmoc-c.a from 33 MB to 24 MB. Executables and shared libraries are
 # stripped of everything they do not need to be linked or run
 # (--strip-unneeded); the static library only of its debug information
 # (--strip-debug), because a program linked with it needs its symbols. `make
@@ -973,12 +973,14 @@ install-tcspecial: tcs-helpers
 			$(DESTDIR)$(SYSTEMDDIR)/tcspecial.service; \
 	fi
 
-# What a ground station is built on: libtcs_moc_c for C and C++, the Python
+# What a ground station is built on: libtcsmoc-c for C and C++, the Python
 # packages, and the configuration editor with its data.
 #
-# libtcs_moc_c.so is installed under its soname, libtcs_moc_c.so.<ABI>,
-# which is what a program built against it asks for at run time, and linked to
-# by libtcs_moc_c.so, which is what the linker looks for. tcslib-moc-c.h goes
+# Cargo builds it as libtcsmoc_c, a crate's name having no hyphen, and it is
+# installed as libtcsmoc-c. libtcsmoc-c.so is installed under its soname,
+# libtcsmoc-c.so.<ABI>, which is what a program built against it asks for at
+# run time, and linked to by libtcsmoc-c.so, which is what the linker looks
+# for. tcslib-moc-c.h goes
 # in include/ itself, as <tcslib-moc-c.h>. The library is not executable, as
 # Debian wants a shared library to be; the RPM spec makes it so, as rpm wants.
 #
@@ -1001,13 +1003,14 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 		$(DESTDIR)$(BINDIR)
 	install -m 644 tcslib-moc-c/include/tcslib-moc-c.h \
 		$(DESTDIR)$(INCLUDEDIR)
-	install -m 644 $(RELEASE_DIR)/libtcs_moc_c.so \
+	install -m 644 $(RELEASE_DIR)/libtcsmoc_c.so \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
-	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcs_moc_c.so
-	install -m 644 $(RELEASE_DIR)/libtcs_moc_c.a $(DESTDIR)$(LIBDIR)
+	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcsmoc-c.so
+	install -m 644 $(RELEASE_DIR)/libtcsmoc_c.a \
+		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a
 	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME), \
-		$(DESTDIR)$(LIBDIR)/libtcs_moc_c.a)
+		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a)
 	$(call install_links,tcspecial-moc,$(GROUND_BIN))
 	$(SUBST) packaging/tcslib-moc-c.pc.in \
 		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
@@ -1144,8 +1147,8 @@ uninstall-files:
 	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(FLIGHT_LIBEXEC))
 	rm -f $(addprefix $(DESTDIR)$(SBINDIR)/,$(addsuffix -links,$(PACKAGES)))
 	rm -f $(DESTDIR)$(INCLUDEDIR)/tcslib-moc-c.h
-	rm -f $(DESTDIR)$(LIBDIR)/libtcs_moc_c.so \
-		$(DESTDIR)$(LIBDIR)/libtcs_moc_c.a \
+	rm -f $(DESTDIR)$(LIBDIR)/libtcsmoc-c.so \
+		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslib_protocol tcslib_moc \

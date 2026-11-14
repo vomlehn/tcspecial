@@ -11,7 +11,7 @@ Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
 Description: tcspecial's ground libraries and configuration editor
- What a ground station for tcspecial is built on: libtcs_moc_c, the TCSpecial
+ What a ground station for tcspecial is built on: libtcsmoc-c, the TCSpecial
  MOC Correspondent (tcslib-moc) for C and C++, with its header tcslib-moc-c.h
  and pkg-config file tcslib-moc-c.pc; the Python packages tcslib_protocol (TCS
  Link Support), tcslib_moc (the Correspondent) and tcs_ui; and tcs-gui, the

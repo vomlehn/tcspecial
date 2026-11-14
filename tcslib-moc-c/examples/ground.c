@@ -19,7 +19,7 @@
  * and send to; and the node to ask about. Run from the repository's root
  * none need be given, and it watches the ping example.
  *
- *     cc ground.c -Iinclude target/debug/libtcs_moc_c.a -lpthread -ldl -lm
+ *     cc ground.c -Iinclude target/debug/libtcsmoc_c.a -lpthread -ldl -lm
  */
 
 #include <stdio.h>

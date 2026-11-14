@@ -18,7 +18,7 @@ import sysconfig
 print(sysconfig.get_path("purelib", "posix_prefix", {"base": "/usr"}))')}
 
 %description
-What a ground station for tcspecial is built on: libtcs_moc_c, the TCSpecial
+What a ground station for tcspecial is built on: libtcsmoc-c, the TCSpecial
 MOC Correspondent (tcslib-moc) for C and C++, with its header tcslib-moc-c.h
 and pkg-config file tcslib-moc-c.pc; the Python packages tcslib_protocol (TCS
 Link Support), tcslib_moc (the Correspondent) and tcs_ui; and tcs-gui, the
@@ -34,7 +34,7 @@ echo /opt/tcs/lib/python3/site-packages \
 	> %{buildroot}%{python3_sitelib}/tcspecial-moc.pth
 # RPM finds what a shared library provides only in an executable file,
 # where Debian wants one that is not.
-chmod 755 %{buildroot}/opt/tcs/lib/libtcs_moc_c.so.[0-9]*
+chmod 755 %{buildroot}/opt/tcs/lib/libtcsmoc-c.so.[0-9]*
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -61,8 +61,8 @@ fi
 %dir /opt/tcs/share/doc
 /opt/tcs/bin/tcs-gui
 /opt/tcs/include/tcslib-moc-c.h
-/opt/tcs/lib/libtcs_moc_c.so*
-/opt/tcs/lib/libtcs_moc_c.a
+/opt/tcs/lib/libtcsmoc-c.so*
+/opt/tcs/lib/libtcsmoc-c.a
 /opt/tcs/lib/pkgconfig/tcslib-moc-c.pc
 /opt/tcs/lib/python3/site-packages
 /opt/tcs/share/tcs-gui

@@ -3633,8 +3633,8 @@ and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keep
 in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a class="reference internal" href="#where-the-logs-segments-go">Where the logs' segments
 go</a>).</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt></dt>
-<dd>What a ground station is built on. <tt class="docutils literal">lib/libtcs_moc_c.so.4</tt> and
-<tt class="docutils literal">lib/libtcs_moc_c.a</tt> with <tt class="docutils literal"><span class="pre">include/tcslib-moc-c.h</span></tt> and
+<dd>What a ground station is built on. <tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.so.4</span></tt> and
+<tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.a</span></tt> with <tt class="docutils literal"><span class="pre">include/tcslib-moc-c.h</span></tt> and
 <tt class="docutils literal"><span class="pre">lib/pkgconfig/tcslib-moc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
 <tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
 <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS,
@@ -3672,9 +3672,9 @@ under a supervisor</a>).</p>
 Debian's machine-readable format, and <tt class="docutils literal">changelog.Debian.gz</tt>, both made as the
 package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and lintian's overrides,
 in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The ground package also has a
-trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once <tt class="docutils literal">libtcs_moc_c.so.4</tt> is
+trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt> is
 installed or removed. The RPMs say the same in their own <tt class="docutils literal">License</tt>,
-<tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal">libtcs_moc_c.so.4</tt> is not
+<tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt> is not
 executable in the .deb, as Debian wants a shared library to be, and is in the
 RPM, where rpm reads what a library provides only from an executable file;
 otherwise the two hold the same files under <tt class="docutils literal">/opt/tcs</tt>.</p>
@@ -3728,9 +3728,9 @@ was copied.</p>
 </span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>install-files<span class="whitespace"> </span><span class="name variable">PREFIX</span><span class="operator">=</span><span class="name variable">$HOME</span>/tcs
 </pre>
 <p>Everything <tt class="docutils literal">make <span class="pre">install-files</span></tt> installs, and so everything in the packages,
-is stripped: the programs and <tt class="docutils literal">libtcs_moc_c.so.4</tt> with <tt class="docutils literal">strip
+is stripped: the programs and <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt> with <tt class="docutils literal">strip
 <span class="pre">--strip-unneeded</span></tt>, which leaves what they need to be run and linked with, and
-<tt class="docutils literal">libtcs_moc_c.a</tt> with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a
+<tt class="docutils literal"><span class="pre">libtcsmoc-c.a</span></tt> with <tt class="docutils literal">strip <span class="pre">--strip-debug</span></tt>, which keeps the symbols a
 program linked with it needs. That takes a fifth to a quarter off what each
 package installs: the flight package installs about 9 MB stripped and 12 MB not.
 <tt class="docutils literal">STRIP=0</tt> keeps everything as cargo built it, for a build that is to be
@@ -3808,18 +3808,18 @@ package's profile script puts it there -- a station includes
 <span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span>
 </pre>
-<p>That links with <tt class="docutils literal">libtcs_moc_c.so.4</tt>, which the loader finds through the
-ground package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">1</tt> is libtcs_moc_c's ABI
+<p>That links with <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt>, which the loader finds through the
+ground package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">4</tt> is libtcsmoc-c's ABI
 version, which is not the package's: it goes up only when a station built
 against the old <tt class="docutils literal"><span class="pre">tcslib-moc-c.h</span></tt> would not work with the new library, so an
 upgrade that keeps it needs no station rebuilt. See tcslib-moc-c's README. A
-station linked with <tt class="docutils literal">libtcs_moc_c.a</tt> instead names it and what it needs
+station linked with <tt class="docutils literal"><span class="pre">libtcsmoc-c.a</span></tt> instead names it and what it needs
 besides:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cc<span class="whitespace"> </span>station.c<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span><span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>/opt/tcs/lib/libtcs_moc_c.a<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>/opt/tcs/lib/libtcsmoc-c.a<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="generic prompt">    $</span><span class="operator">(</span>pkg-config<span class="whitespace"> </span>--static<span class="whitespace"> </span>--libs-only-l<span class="whitespace"> </span>tcslib-moc-c<span class="whitespace"> </span><span class="punctuation">|</span><span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">      </span>sed<span class="whitespace"> </span><span class="literal string single">'s/-ltcs_moc_c//'</span><span class="operator">)</span>
+</span><span class="whitespace">      </span>sed<span class="whitespace"> </span><span class="literal string single">'s/-ltcsmoc-c//'</span><span class="operator">)</span>
 </pre>
 </div>
 <div class="section" id="running-tcspecial-under-a-supervisor">

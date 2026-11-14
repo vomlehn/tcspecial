@@ -59,8 +59,8 @@ Everything installs under `/opt/tcs`, as three packages:
   the five test app programs in `libexec/`, the documents and the example
   configurations, and a systemd unit, `tcspecial.service`, installed but not
   enabled.
-* `tcspecial-moc`, what a ground station is built on: `libtcs_moc_c` for C
-  and C++ (`lib/libtcs_moc_c.so.4`, `lib/libtcs_moc_c.a`,
+* `tcspecial-moc`, what a ground station is built on: `libtcsmoc-c` for C
+  and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
   `include/tcslib-moc-c.h`, `lib/pkgconfig/tcslib-moc-c.pc`), the Python
   packages `tcslib_protocol`, `tcslib_moc` and `tcs_ui`, and `bin/tcs-gui` with
   its data.
@@ -112,7 +112,7 @@ something else already has, and takes `--dir DIR` for a directory other
 than `/usr/local/bin`. Removing a package takes its links away.
 
 Everything installed is stripped (`--strip-unneeded` for programs and
-`libtcs_moc_c.so.4`, `--strip-debug` for `libtcs_moc_c.a`), which takes a
+`libtcsmoc-c.so.4`, `--strip-debug` for `libtcsmoc-c.a`), which takes a
 fifth to a quarter off what each package installs. `STRIP=0` keeps everything as
 cargo built it: `make packages STRIP=0`.
 

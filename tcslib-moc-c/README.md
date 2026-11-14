@@ -100,20 +100,21 @@ why. The header says the rest.
 
 ## Building with it
 
-Cargo builds `libtcs_moc_c.a` and `libtcs_moc_c.so`, from the repository's
-root:
+Cargo builds `libtcsmoc_c.a` and `libtcsmoc_c.so`, from the repository's
+root, with an underscore because a crate's name cannot have a hyphen; they
+are installed as `libtcsmoc-c`:
 
 ```
 cargo build -p tcslib-moc-c
 cc  my_station.c   -I tcslib-moc-c/include \
-    target/debug/libtcs_moc_c.a -lpthread -ldl -lm
+    target/debug/libtcsmoc_c.a -lpthread -ldl -lm
 c++ my_station.cpp -I tcslib-moc-c/include \
-    target/debug/libtcs_moc_c.a -lpthread -ldl -lm
+    target/debug/libtcsmoc_c.a -lpthread -ldl -lm
 ```
 
 Installed -- by the `tcspecial-moc` package, or `make install` at the
-repository's root -- it is `/opt/tcs/lib/libtcs_moc_c.so.<ABI>`, with the
-link `libtcs_moc_c.so` to it, `libtcs_moc_c.a`, the header as
+repository's root -- it is `/opt/tcs/lib/libtcsmoc-c.so.<ABI>`, with the
+link `libtcsmoc-c.so` to it, `libtcsmoc-c.a`, the header as
 `/opt/tcs/include/tcslib-moc-c.h`, and `/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc`.
 A station then includes `<tcslib-moc-c.h>` and is built with pkg-config:
 
@@ -125,7 +126,7 @@ c++ my_station.cpp $(pkg-config --cflags --libs tcslib-moc-c)
 ### The ABI version
 
 `<ABI>` is the library's ABI version, the one whole number in `abi-version`, now
-4. It is the shared library's soname, `libtcs_moc_c.so.<ABI>`, which a
+4. It is the shared library's soname, `libtcsmoc-c.so.<ABI>`, which a
 station linked with the library asks for at run time; `build.rs` sets the soname
 from the file, and the Makefile installs the library under the same name, so the
 number is stated once. It is not the crate's version, and changes for another
@@ -170,7 +171,7 @@ the gateway node, each of which they do only when asked.
 
 It is written by hand, for people, so the proof that it says what the library
 does is a program that compiles against it and works. `tests/c_and_cpp.rs`
-builds `libtcs_moc_c.a` from the source as it is, compiles both example
+builds `libtcsmoc_c.a` from the source as it is, compiles both example
 programs against the header with gcc and g++ -- warnings as errors -- and runs
 each against a vehicle the test plays. The two must print the same lines, and
 the right ones, and they compare what they read against the header's own
@@ -192,7 +193,7 @@ header alone is also compiled as C99 and as C++11.
   finding nothing. The F´ bridge stops its beacon thread this way.
 - **Strings are borrowed.** A string a function returns is good until the
   next call on the same handle or its `_close`. Copy it to keep it.
-- **Linking.** On Linux, `libtcs_moc_c.a` needs `-lpthread -ldl -lm` beside
+- **Linking.** On Linux, `libtcsmoc-c.a` needs `-lpthread -ldl -lm` beside
   it, which is what the tests link with. That is enough where the C library has
   folded the rest into itself, as recent glibc has; the whole list for a system
   is what `cargo rustc -p tcslib-moc-c --lib --crate-type staticlib -- --print

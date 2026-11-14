@@ -1,8 +1,8 @@
-/// Gives `libtcs_moc_c.so` its soname, `libtcs_moc_c.so.<ABI>`.
+/// Gives `libtcsmoc-c.so` its soname, `libtcsmoc-c.so.<ABI>`.
 ///
 /// A shared library without one is linked into a program by whatever name it
-/// was found under, so a program built against `libtcs_moc_c.so` would ask
-/// for `libtcs_moc_c.so` at run time -- the development symlink, which
+/// was found under, so a program built against `libtcsmoc-c.so` would ask
+/// for `libtcsmoc-c.so` at run time -- the development symlink, which
 /// points at whichever library was installed last. With the soname, a program
 /// asks for the ABI it was built against, and is refused by the loader, rather
 /// than misbehaving, on a machine that has only an incompatible one.
@@ -35,5 +35,5 @@ fn main() {
             said.trim()
         )
     });
-    println!("cargo:rustc-cdylib-link-arg=-Wl,-soname,libtcs_moc_c.so.{abi}");
+    println!("cargo:rustc-cdylib-link-arg=-Wl,-soname,libtcsmoc-c.so.{abi}");
 }

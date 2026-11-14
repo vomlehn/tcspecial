@@ -9,9 +9,10 @@ station's beacons, the vehicle's data from a gateway node, and commands to \
 the vehicle, behind one header"""
 
 [lib]
-# libtcs_moc_c.a and libtcs_moc_c.so, which a C or C++ program links with
-# include/tcslib-moc-c.h; and the rlib, for this crate's own tests.
-name = "tcs_moc_c"
+# libtcsmoc_c.a and libtcsmoc_c.so, which a C or C++ program links with
+# include/tcslib-moc-c.h; and the rlib, for this crate's own tests. A crate's
+# name has no hyphen, so the Makefile installs them as libtcsmoc-c.
+name = "tcsmoc_c"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]

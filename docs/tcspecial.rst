@@ -3439,8 +3439,8 @@ There are three, because three kinds of machine take them:
    in ``/opt/tcs/bin``, beside tcspecial (see `Where the logs' segments
    go`_).
 ``tcspecial-moc``
-   What a ground station is built on. ``lib/libtcs_moc_c.so.4`` and
-   ``lib/libtcs_moc_c.a`` with ``include/tcslib-moc-c.h`` and
+   What a ground station is built on. ``lib/libtcsmoc-c.so.4`` and
+   ``lib/libtcsmoc-c.a`` with ``include/tcslib-moc-c.h`` and
    ``lib/pkgconfig/tcslib-moc-c.pc``; the Python packages ``tcslib_protocol``,
    ``tcslib_moc`` and ``tcs_ui`` in ``lib/python3/site-packages``;
    ``bin/tcs-gui`` with its descriptions in ``share/tcs-gui``; and the XTCS,
@@ -3481,9 +3481,9 @@ Each .deb also carries what Debian expects of every package, outside
 Debian's machine-readable format, and ``changelog.Debian.gz``, both made as the
 package is built, from ``LICENSE-MIT`` and the version; and lintian's overrides,
 in ``/usr/share/lintian/overrides/<package>``. The ground package also has a
-trigger that has dpkg run ``ldconfig`` once ``libtcs_moc_c.so.4`` is
+trigger that has dpkg run ``ldconfig`` once ``libtcsmoc-c.so.4`` is
 installed or removed. The RPMs say the same in their own ``License``,
-``%changelog``, ``%post`` and ``%postun``. ``libtcs_moc_c.so.4`` is not
+``%changelog``, ``%post`` and ``%postun``. ``libtcsmoc-c.so.4`` is not
 executable in the .deb, as Debian wants a shared library to be, and is in the
 RPM, where rpm reads what a library provides only from an executable file;
 otherwise the two hold the same files under ``/opt/tcs``.
@@ -3544,9 +3544,9 @@ was copied.
    $ make install-files PREFIX=$HOME/tcs
 
 Everything ``make install-files`` installs, and so everything in the packages,
-is stripped: the programs and ``libtcs_moc_c.so.4`` with ``strip
+is stripped: the programs and ``libtcsmoc-c.so.4`` with ``strip
 --strip-unneeded``, which leaves what they need to be run and linked with, and
-``libtcs_moc_c.a`` with ``strip --strip-debug``, which keeps the symbols a
+``libtcsmoc-c.a`` with ``strip --strip-debug``, which keeps the symbols a
 program linked with it needs. That takes a fifth to a quarter off what each
 package installs: the flight package installs about 9 MB stripped and 12 MB not.
 ``STRIP=0`` keeps everything as cargo built it, for a build that is to be
@@ -3639,20 +3639,20 @@ package's profile script puts it there -- a station includes
    $ cc  station.c   $(pkg-config --cflags --libs tcslib-moc-c)
    $ c++ station.cpp $(pkg-config --cflags --libs tcslib-moc-c)
 
-That links with ``libtcs_moc_c.so.4``, which the loader finds through the
-ground package's ``ld.so.conf.d`` file. The ``1`` is libtcs_moc_c's ABI
+That links with ``libtcsmoc-c.so.4``, which the loader finds through the
+ground package's ``ld.so.conf.d`` file. The ``4`` is libtcsmoc-c's ABI
 version, which is not the package's: it goes up only when a station built
 against the old ``tcslib-moc-c.h`` would not work with the new library, so an
 upgrade that keeps it needs no station rebuilt. See tcslib-moc-c's README. A
-station linked with ``libtcs_moc_c.a`` instead names it and what it needs
+station linked with ``libtcsmoc-c.a`` instead names it and what it needs
 besides:
 
 .. code-block:: console
 
    $ cc station.c $(pkg-config --cflags tcslib-moc-c) \
-       /opt/tcs/lib/libtcs_moc_c.a \
+       /opt/tcs/lib/libtcsmoc-c.a \
        $(pkg-config --static --libs-only-l tcslib-moc-c | \
-         sed 's/-ltcs_moc_c//')
+         sed 's/-ltcsmoc-c//')
 
 Running tcspecial under a supervisor
 ------------------------------------

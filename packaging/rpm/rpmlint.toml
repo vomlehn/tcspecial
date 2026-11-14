@@ -12,7 +12,7 @@ Filters = [
 	# An add-on package lives under /opt/<package>, as FHS 3.0 section
 	# 3.13 lays it out, and /opt/tcs is the tree every TCS package shares.
 	' dir-or-file-in-opt ',
-	# tcspecial-moc holds libtcs_moc_c and what is built against
+	# tcspecial-moc holds libtcsmoc-c and what is built against
 	# it, tcslib-moc-c.h, tcslib-moc-c.pc and the static library, by
 	# design: there is no -devel package for them to go in. The Python
 	# packages and the editor's data beside the library are not named for
@@ -21,10 +21,10 @@ Filters = [
 	'^tcspecial-moc\.[^:]+: [EW]: devel-file-in-non-devel-package ',
 	# With STRIP=1, the default, the static library is stripped of its
 	# debugging information on purpose, keeping the symbols a link needs.
-	' static-library-without-debuginfo /opt/tcs/lib/libtcs_moc_c\.a$',
+	' static-library-without-debuginfo /opt/tcs/lib/libtcsmoc-c\.a$',
 	# The library is linked with the GNU hash section alone, the modern
 	# default, and not the old SysV one as well.
-	' missing-hash-section /opt/tcs/lib/libtcs_moc_c\.so\.',
+	' missing-hash-section /opt/tcs/lib/libtcsmoc-c\.so\.',
 	# Words of the trade that rpmlint's dictionary does not have.
 	" spelling-error \\('(libtcs|tcslib|config|pc|schemas)',",
 	# tcspecial-moc was tcspecial-ground, and obsoletes it so that an

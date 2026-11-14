@@ -158,12 +158,12 @@ The TCSpecial libraries
     runs on, and the digest two programs check each other's XTCE with. The
     manual is tcs-xtce's, and covers the compiler as well.
 
-`The tcs-ccsds manual`_
+`The tcsccsds manual`_
     The CCSDS time codes, run aboard and on the ground; a chapter of the
     tcs-xtce manual.
 
-.. _The tcs-ccsds manual:
-   ../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcs-ccsds
+.. _The tcsccsds manual:
+   ../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcsccsds
 
 Non-production software
 -----------------------

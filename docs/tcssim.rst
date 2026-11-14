@@ -932,14 +932,11 @@ window, drawn without opening it.
       ``gpio-out-tmass2``'s says ``zone.heater_2`` -- and disabled -- its
       button is its power -- it is off whatever it is sent.
 
+#. tcspecial's thermostat switches it on. Nothing changes on the panel or in
+   the zone, so the panel is drawn as above: a disabled heater stays off.
+   What it was sent is kept.
+
 #. .. figure:: shots/tcssim-heater-2.png
-      :alt: The same panel after the vehicle has switched it on: still
-            Stopped, still zone.heater_1: disabled, so off.
-
-      tcspecial's thermostat switches it on. Nothing changes on the panel or
-      in the zone: a disabled heater stays off. What it was sent is kept.
-
-#. .. figure:: shots/tcssim-heater-3.png
       :alt: The same panel after Enable: Running in black, a Disable
             button, and the line zone.heater_1: heating.
 
@@ -947,13 +944,13 @@ window, drawn without opening it.
       ``zone.heater_1: heating`` -- rather than at the thermostat's next
       decision, which comes only when the decision changes.
 
-#. .. figure:: shots/tcssim-heater-4.png
+#. .. figure:: shots/tcssim-heater-3.png
       :alt: The same panel after the vehicle has switched it off: Running,
             and the line zone.heater_1: off.
 
       The thermostat switches it off, and the line says
-      ``zone.heater_1: off``. A
-      heater sends nothing, so its ``Pkts`` stays at nought throughout.
+      ``zone.heater_1: off``. A heater sends nothing, so its ``Pkts`` stays
+      at nought throughout.
 
 **Sizes that cannot be sent**
 

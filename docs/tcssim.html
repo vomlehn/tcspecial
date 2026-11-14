@@ -1213,24 +1213,22 @@ zone's <tt class="docutils literal">heater_1</tt>, so its line names that heater
 button is its power -- it is off whatever it is sent.</p>
 </div>
 </li>
-<li><div class="first figure">
-<img alt="The same panel after the vehicle has switched it on: still Stopped, still zone.heater_1: disabled, so off." src="shots/tcssim-heater-2.png" />
-<p class="caption">tcspecial's thermostat switches it on. Nothing changes on the panel or
-in the zone: a disabled heater stays off. What it was sent is kept.</p>
-</div>
+<li><p class="first">tcspecial's thermostat switches it on. Nothing changes on the panel or in
+the zone, so the panel is drawn as above: a disabled heater stays off.
+What it was sent is kept.</p>
 </li>
 <li><div class="first figure">
-<img alt="The same panel after Enable: Running in black, a Disable button, and the line zone.heater_1: heating." src="shots/tcssim-heater-3.png" />
+<img alt="The same panel after Enable: Running in black, a Disable button, and the line zone.heater_1: heating." src="shots/tcssim-heater-2.png" />
 <p class="caption"><tt class="docutils literal">Enable</tt> pressed. The <tt class="docutils literal">on</tt> it was sent is applied at once --
 <tt class="docutils literal">zone.heater_1: heating</tt> -- rather than at the thermostat's next
 decision, which comes only when the decision changes.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The same panel after the vehicle has switched it off: Running, and the line zone.heater_1: off." src="shots/tcssim-heater-4.png" />
+<img alt="The same panel after the vehicle has switched it off: Running, and the line zone.heater_1: off." src="shots/tcssim-heater-3.png" />
 <p class="caption">The thermostat switches it off, and the line says
-<tt class="docutils literal">zone.heater_1: off</tt>. A
-heater sends nothing, so its <tt class="docutils literal">Pkts</tt> stays at nought throughout.</p>
+<tt class="docutils literal">zone.heater_1: off</tt>. A heater sends nothing, so its <tt class="docutils literal">Pkts</tt> stays
+at nought throughout.</p>
 </div>
 </li>
 </ol>

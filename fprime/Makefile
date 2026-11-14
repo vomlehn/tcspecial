@@ -85,8 +85,8 @@ check-fprime:
 		exit 1; \
 	fi
 
-# tcslib-moc-c, which the bridge is linked with, and tcsverify, which writes its
-# model. tcspecial and tcssim too for the test, which runs them.
+# tcslib-moc-c, which the bridge is linked with, and tcsverify, which writes
+# its model. tcspecial and tcssim too for the test, which runs them.
 .PHONY: cargo
 cargo:
 	cd $(TOP) && cargo build -q -p tcslib-moc-c -p tcsverify -p tcspecial \
@@ -145,8 +145,8 @@ build: settings model
 test: build
 	rm -rf $(TELEMETRY)
 	mkdir $(TELEMETRY)
-	FPRIME_BIN=$(FPRIME_BIN) flock $(TCS_PORTS_LOCK) $(CURDIR)/bridge-test $(TOP) $(FPRIME_CONFIG) \
-		$(FPRIME_SIM) $(ARTIFACTS) $(RUN)
+	FPRIME_BIN=$(FPRIME_BIN) flock $(TCS_PORTS_LOCK) $(CURDIR)/bridge-test \
+		$(TOP) $(FPRIME_CONFIG) $(FPRIME_SIM) $(ARTIFACTS) $(RUN)
 
 .PHONY: clean
 clean:

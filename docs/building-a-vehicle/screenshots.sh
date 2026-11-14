@@ -33,10 +33,13 @@ if ! DISPLAY=$display xdpyinfo > /dev/null 2>&1; then
 	exit 1
 fi
 
-# Only the numbered stages: stage 10's cFS and Yamcs versions draw as stage
-# 10 does, and the guide shows no drawing of them.
-for stage in docs/building-a-vehicle/stage-[0-9][0-9]; do
-	n=${stage##*stage-}
+# Only the stages the guide shows a drawing of, since every picture made is
+# installed: stage 5's drawing is stage 4's, and the guide shows none of
+# stages 8 and 10 or of stage 10's cFS and Yamcs versions.
+figure='s|^\.\. figure:: shots/vehicle-stage-\([0-9][0-9]\)\.png$|\1|p'
+stages=$(sed -n "$figure" docs/building-a-vehicle.rst | sort -u)
+for n in $stages; do
+	stage=docs/building-a-vehicle/stage-$n
 	# Without WAYLAND_DISPLAY, so that tcsgui opens on the X display
 	# given rather than on the person's Wayland one.
 	env -u WAYLAND_DISPLAY HOME="$work/home" XDG_STATE_HOME="$work/state" \

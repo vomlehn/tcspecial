@@ -515,12 +515,13 @@ fn screenshots() {
 
     let heater = scene.panel("gpio-out-tmass1").grown(1.0);
     scene.shoot("tcssim-heater-1.png", Some(heater), 1.0);
+    // Switched on while disabled, the panel is unchanged, so that is not
+    // drawn again.
     scene.drive("gpio-out-tmass1", 1);
-    scene.shoot("tcssim-heater-2.png", Some(heater), 1.0);
     scene.press("gpio-out-tmass1", "Enable");
-    scene.shoot("tcssim-heater-3.png", Some(heater), 1.0);
+    scene.shoot("tcssim-heater-2.png", Some(heater), 1.0);
     scene.drive("gpio-out-tmass1", 0);
-    scene.shoot("tcssim-heater-4.png", Some(heater), 1.0);
+    scene.shoot("tcssim-heater-3.png", Some(heater), 1.0);
 
     // Changing the sizes: a packet made smaller than its segment, and put
     // back. The popup that says so hangs under the panel's buttons and

@@ -139,13 +139,11 @@ fn the_python_counts_payload_telemetry_apids_as_the_rust_does() {
     let payloads = "    <payloads>\n\
         \x20       <type name=\"network\">\n\
         \x20           <payload name=\"sensor\">\n\
-        \x20               <address>127.0.0.1</address>\n\
-        \x20               <port>16801</port>\n\
+        \x20               <address>127.0.0.1:16801</address>\n\
         \x20               <protocol>udp</protocol>\n\
         \x20           </payload>\n\
         \x20           <payload name=\"tank\">\n\
-        \x20               <address>127.0.0.1</address>\n\
-        \x20               <port>16802</port>\n\
+        \x20               <address>127.0.0.1:16802</address>\n\
         \x20               <protocol>udp</protocol>\n\
         \x20           </payload>\n\
         \x20       </type>\n\

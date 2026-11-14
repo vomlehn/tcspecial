@@ -3834,13 +3834,11 @@ vehicle:
 payloads:
   - type network:
       - payload: a
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [ground.a]
       - payload: b
-        address: \"127.0.0.1\"
-        port: \"7002\"
+        address: \"127.0.0.1:7002\"
         protocol: udp
         world-out: [ground.b]
 ",
@@ -4207,9 +4205,8 @@ payloads:
                 "gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:{port}\"
         ground_base: \"127.0.0.1:9100\"
-        port: \"{port}\"
         moc-out: [ping.gateway]
         world-in: [ping]
 vehicle:

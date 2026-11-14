@@ -125,10 +125,12 @@ Requirement
     tcspecial, tcslog, tcslog-tools, tcs-xtce or tcs-helpers -- may hold
     operational code and the other kinds side by side, and its name says
     nothing of either. Nor does it cover the ``.deb`` and ``.rpm`` packages
-    a project installs with, which are named for the project and for where
-    they install, and may hold both: the ``tcspecial`` package installs
-    tcs-verify beside tcspecial, and ``tcspecial-moc`` installs tcs-gui
-    beside the libraries a station is built on. Nor pkg-config files, which
+    a project installs with, which are named for the project and for what
+    they install. tcspecial's are split so that none holds both --
+    ``tcspecial``, the flight executive, and ``tcsmoc``, what a station is
+    built on, hold operational code and nothing else; ``tcs-tools`` and
+    ``tcspecial-test`` hold the rest -- but the names are not held to the
+    rule: ``tcspecial-test`` is no operational code. Nor pkg-config files, which
     tell a compiler how to build with a library: managing the compiler is
     outside how TCS manages its versions. Nor any other kind of name:
     installed directories, configuration keys, environment variables,
@@ -1510,11 +1512,11 @@ node, and there are three kinds of gateway:
    * - ``gateway_radio``
      - the ground, through the vehicle's radio
      - UDP
-     - ``address``, ``port``, ``ground_base``
+     - ``address``, ``ground_base``
    * - ``gateway_yamcs``
      - a Yamcs ground station
      - UDP, every packet behind a CCSDS primary header
-     - ``address``, ``port``, ``ground_base``, ``apid_base``
+     - ``address``, ``ground_base``, ``apid_base``
    * - ``gateway_cfs``
      - a cFS flight computer's software bus
      - as a peer of its Software Bus Network (SBN) application, over SBN's
@@ -1523,7 +1525,7 @@ node, and there are three kinds of gateway:
    * - ``gateway_fprime``
      - an F´ flight computer, through a bridge component in its deployment
      - UDP, in the radio's own protocol, the bridge playing the MOC
-     - ``address``, ``port``, ``bridge_base``, ``fprime_id_base``
+     - ``address``, ``bridge_base``, ``fprime_id_base``
 
 All four are in the ``gateways`` section, and all four have the terminals
 the radio's has: ``world-in``, which takes as many sources as the
@@ -1842,7 +1844,7 @@ Requirement
 Requirement
     A ``gateway_cfs`` node that the bus sends through -- a command binding
     comes from it, or a line leaves it -- states ``cmd_msgid``, as a
-    ``gateway_radio`` node states ``address`` and ``port``. What each node
+    ``gateway_radio`` node states ``address``. What each node
     drawn into it produces is published at ``tlm_base`` plus the source's
     device id.
 
@@ -1987,8 +1989,7 @@ and the deployment sends them to the ground with whatever it already uses.
    gateways:
      - type gateway_fprime:
          - gateway: fsw
-           address: "0.0.0.0"
-           port: "7600"
+           address: "0.0.0.0:7600"
            bridge_base: "10.0.0.1:7700"
            fprime_id_base: "0x3000"
            world-in: [heater_wanted, thermometer, zone_temp]
@@ -1999,7 +2000,7 @@ end decides what the configuration has to say and what can be made from it.
 Requirement
     A ``gateway_fprime`` node states ``bridge_base`` where a radio states
     ``ground_base``, with the same meaning and the same counting, and states
-    ``address`` and ``port`` under the same rule a radio does.
+    ``address`` under the same rule a radio does.
 
 Requirement
     ``fprime_id_base`` is where the F´ IDs of what tcspecial sends begin:
@@ -2086,7 +2087,7 @@ node's links drive here is a line or a program, which take text, and because a
 byte array is something nobody at F´'s ground system can type. It goes only
 while the bridge is matched for commanding, as tcsmoc-c holds every uplink
 to (see `On the ground`_), and is refused, saying so, before. A gateway node
-that binds no address and port aboard has no way up; the bridge runs on one, as
+that binds no address aboard has no way up; the bridge runs on one, as
 the far end of a bridge that only listens, and fails ``SEND_DATA`` alone, saying
 why.
 
@@ -2325,10 +2326,22 @@ Requirement
 
 Requirement
     A gateway node that the ground sends through -- a command binding comes
-    from it, or a line leaves it -- states the ``address`` and ``port``
-    tcspecial binds to receive what the ground sends. One that only receives
-    the vehicle's data states neither. ``ground_base`` is refused on every
-    other node.
+    from it, or a line leaves it -- states the ``address`` tcspecial binds
+    to receive what the ground sends, its host and port together,
+    ``127.0.0.1:5000``. One that only receives the vehicle's data states
+    none. ``ground_base`` is refused on every other node.
+
+Requirement
+    A host and a port are one attribute wherever a configuration states
+    them, as ``ground_base`` and every address in the ``tcspecial`` section
+    already were: a gateway node's and a network payload's ``address`` is
+    ``host:port`` -- a path for a unix socket, a host alone for a raw one --
+    and a simulator file's ``payload_address`` the same, the host alone for
+    any port. Two attributes for one address invite a file that states one
+    and not the other, and a reader that has to put them back together. A
+    file that still writes ``port`` or ``payload_port`` is refused, by line
+    (``tcsprotocol::graph::renamed``), and told to write the two together;
+    ``tools/convert-format.py`` rewrites it so.
 
 Numbers, as a configuration writes them
 ---------------------------------------
@@ -2687,7 +2700,7 @@ far apart the two clocks are -- which a ping is the one exchange able to show.
      - type ping:
          - { compute: pinger, world-out: ground }
 
-The ground sends its pings to the gateway link's ``address`` and ``port``, and
+The ground sends its pings to the gateway link's ``address``, and
 the answers arrive at its ``ground_base`` plus the ping node's device id, as any
 node's telemetry does.
 
@@ -3779,12 +3792,12 @@ Requirement
 
 Requirement
     For a UDP payload that is spoken to first, the ends swap roles: the
-    vehicle sends to the address and port the node states, from a port of
+    vehicle sends to the address the node states, from a port of
     its own that nothing has to find, and the payload is the end that waits
     at the stated address. A payload that is asked answers to the vehicle's
     port, where its answers are read.
 
-That is what the address already means. ``address`` and ``port`` say where the
+That is what the address already means. ``address`` says where the
 vehicle reaches the payload, and for a payload that is spoken to first the
 reading is the literal one.
 
@@ -7782,8 +7795,8 @@ is refused where the configuration is read, naming the five (see
 ``tcsprotocol::graph::reach``).
 
 Requirement
-    A ``raw`` node states an ``address`` and an ``ip_protocol`` from 1 to 254,
-    and no ``port``: an IP datagram has none, and the number and the host are
+    A ``raw`` node states an ``address``, a host with no port, and an
+    ``ip_protocol`` from 1 to 254: an IP datagram has no port, and the number and the host are
     what say which datagrams are the node's. 0 is refused, being no protocol
     on a raw socket, and so is 255, ``IPPROTO_RAW``, which can only send.
     ``ip_protocol`` on any other protocol is refused, naming the protocol.
@@ -10739,21 +10752,21 @@ pkg-config files and the naming rule
 Package names and the naming rule
 
     The packages TCS installs with are left out of the rule too: the
-    ``.deb`` and ``.rpm`` packages (``tcspecial``, ``tcspecial-moc``,
-    ``tcspecial-test``, ``tcslog``, ``tcslog-tools``, ``tcs-xtce``) and the
-    Python distributions pip builds (``tcs-xtce`` among them). Each is named
-    for its project and for where it installs, and several hold both kinds
-    of code: ``tcspecial`` installs tcs-verify beside tcspecial, and
-    ``tcspecial-moc`` installs tcs-gui beside the libraries a station is
-    built on.
+    ``.deb`` and ``.rpm`` packages (``tcspecial``, ``tcsmoc``,
+    ``tcs-tools``, ``tcspecial-test``, ``tcslog``, ``tcslog-tools``,
+    ``tcs-xtce``) and the Python distributions pip builds (``tcs-xtce``
+    among them). tcspecial's are split already, so that a vehicle or a
+    station can be given its operational code and nothing else:
+    ``tcspecial`` holds the flight executive and its manuals, ``tcsmoc``
+    what a station is built on, ``tcs-tools`` the editor, the checker and
+    the examples, and ``tcspecial-test`` the test station, the simulator
+    and the test apps.
 
-    Bringing them in would mean splitting each package that holds both
-    kinds in two, one of operational code and one of tools -- so that a
-    vehicle or a station could be given its operational code and nothing
-    else, and could tell from a package's name alone what it was being
-    given -- and then naming each by the rule. The cost is more packages to
-    build, test and install, and a dependency between each pair, for a
-    choice an installer makes today by which programs it runs.
+    Bringing the names in would mean naming each package by the rule, so
+    that a package's name alone says what it is being given --
+    ``tcspecial-test`` reads as operational code and holds none -- and
+    splitting the other projects' packages as tcspecial's are. The cost is
+    renaming packages that installations already know by name.
 
 Other names and the naming rule
 

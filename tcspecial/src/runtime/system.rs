@@ -1604,16 +1604,14 @@ payloads:
         world-out: [ground.exchanged]
   - type network:
       - payload: asked
-        address: \"127.0.0.1\"
-        port: \"7002\"
+        address: \"127.0.0.1:7002\"
         protocol: udp
         trigger: \"55\"
         trigger_interval: \"100 ms\"
         world-out: [ground.asked]
       - payload: floored
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:7001\"
         poll_interval: \"100 ms\"
-        port: \"7001\"
         protocol: udp
         world-out: [ground.floored]
 ",
@@ -1622,7 +1620,7 @@ payloads:
             text.push_str(
                 // One more network node, under the type the text ends with.
                 "      - { payload: always, protocol: udp, address: \
-                 \"127.0.0.1\", port: \"7003\", world-out: ground.always }\n",
+                 \"127.0.0.1:7003\", world-out: ground.always }\n",
             );
         }
         std::fs::write(&path, text).expect("written");
@@ -1772,9 +1770,8 @@ payloads:
         world-out: [ground.exchanged]
   - type network:
       - payload: floored
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:7001\"
         poll_interval: \"300 ms\"
-        port: \"7001\"
         protocol: udp
         world-out: [ground.floored]
 ",
@@ -1835,8 +1832,7 @@ payloads:
             "payloads:
   - type network:
       - payload: asked
-        address: \"127.0.0.1\"
-        port: \"7005\"
+        address: \"127.0.0.1:7005\"
         protocol: udp
         trigger: \"55\"
         trigger_interval: \"100 ms\"
@@ -1958,8 +1954,7 @@ vehicle:
             "payloads:
   - type network:
       - payload: asked
-        address: \"127.0.0.1\"
-        port: \"7009\"
+        address: \"127.0.0.1:7009\"
         protocol: udp
         trigger: \"55\"
         trigger_interval: \"100 ms\"
@@ -2099,8 +2094,7 @@ vehicle:
             "payloads:
   - type network:
       - payload: asked
-        address: \"127.0.0.1\"
-        port: \"7010\"
+        address: \"127.0.0.1:7010\"
         protocol: udp
         trigger: \"[55]\"
         trigger_interval: \"100 ms\"
@@ -2161,9 +2155,8 @@ vehicle:
             "payloads:
   - type network:
       - payload: asked
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:7006\"
         poll_interval: \"100 ms\"
-        port: \"7006\"
         protocol: udp
         world-out: [average.asked]
 vehicle:
@@ -2256,9 +2249,8 @@ vehicle:
             "payloads:
   - type network:
       - payload: asked
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:7007\"
         poll_interval: \"100 ms\"
-        port: \"7007\"
         protocol: udp
         world-out: [average.asked]
 vehicle:
@@ -3026,9 +3018,8 @@ vehicle:
             "gateways:
   - type gateway_radio:
       - gateway: ground
-        address: 127.0.0.1
+        address: \"127.0.0.1:5000\"
         ground_base: \"127.0.0.1:5100\"
-        port: \"5000\"
         moc-out: [pinger.ground]
         world-in: [pinger]
 vehicle:
@@ -3121,10 +3112,9 @@ vehicle:
                 "gateways:
   - type gateway_yamcs:
       - gateway: ground
-        address: 127.0.0.1
+        address: \"127.0.0.1:{gateway_port}\"
         apid_base: \"0x200\"
         ground_base: \"127.0.0.1:{}\"
-        port: \"{gateway_port}\"
         moc-out: [pinger.ground]
         world-in: [pinger]
 vehicle:

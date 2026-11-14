@@ -92,16 +92,14 @@
             <!-- A heater, driven by what the flight computer sends: the far
                  end of a UDP socket. -->
             <payload name="heater">
-                <address>127.0.0.1</address>
-                <port>8601</port>
+                <address>127.0.0.1:8601</address>
                 <protocol>udp</protocol>
                 <moc-in>fsw</moc-in>
             </payload>
             <!-- A thermometer whose readings go to the flight computer. -->
             <payload name="thermometer">
                 <read_size>16</read_size>
-                <address>127.0.0.1</address>
-                <port>8602</port>
+                <address>127.0.0.1:8602</address>
                 <protocol>udp</protocol>
                 <world-out>fsw.thermometer</world-out>
             </payload>

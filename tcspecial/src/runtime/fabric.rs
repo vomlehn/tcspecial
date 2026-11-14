@@ -2071,8 +2071,7 @@ mod tests {
 payloads:
   - type network:
       - payload: valve
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [readings.valve]
         moc-in: [commands]

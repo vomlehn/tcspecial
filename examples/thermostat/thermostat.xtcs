@@ -37,9 +37,8 @@
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5000</address>
                 <ground_base>127.0.0.1:5100</ground_base>
-                <port>5000</port>
                 <world-in>consensus_temp</world-in>
                 <world-in>gpio-out-tmass1</world-in>
                 <world-in>gpio-out-tmass2</world-in>

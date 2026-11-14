@@ -33,9 +33,8 @@ tcspecial:
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         ground_base: "127.0.0.1:5100"
-        port: "5000"
         world-in: [battery_amps, bus_volts, charge, shedding]
 
 vehicle:
@@ -104,16 +103,14 @@ payloads:
       # The science instrument's power switch, driven by what shedding decides
       # -- 1 to shed it, 0 to restore it.
       - payload: science
-        address: "127.0.0.1"
+        address: "127.0.0.1:5302"
         moc-in-type: "u8"
-        port: "5302"
         protocol: "udp"
         moc-in: [shedding]
       # The shunt in the battery's lead, which sends its current twice a
       # second of its own accord.
       - payload: shunt
-        address: "127.0.0.1"
-        port: "5301"
+        address: "127.0.0.1:5301"
         protocol: "udp"
         world-out-type: "i16"
         world-out:

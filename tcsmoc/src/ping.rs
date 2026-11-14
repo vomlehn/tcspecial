@@ -655,9 +655,8 @@ mod tests {
                 "gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:{port}\"
         ground_base: \"127.0.0.1:9000\"
-        port: \"{port}\"
 "
             ),
         )
@@ -692,9 +691,8 @@ mod tests {
                 "gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:{port}\"
         ground_base: \"127.0.0.1:9000\"
-        port: \"{port}\"
 "
             ),
         )

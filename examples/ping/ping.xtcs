@@ -50,9 +50,8 @@
                  the ground at ground_base plus the ping node's device id:
                  ping is the second name of the two, device id 1, so 7701. -->
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:7600</address>
                 <ground_base>127.0.0.1:7700</ground_base>
-                <port>7600</port>
                 <moc-out>ping.gateway</moc-out>
                 <world-in>ping</world-in>
             </gateway>

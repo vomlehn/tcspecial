@@ -30,9 +30,8 @@ payload_groups:
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: "10.0.0.1"
+        address: "10.0.0.1:5000"
         ground_base: "10.0.0.2:5100"
-        port: "5000"
         world-in: [temp1, temp2, temp3, ambient, thermostat]
 
 vehicle:

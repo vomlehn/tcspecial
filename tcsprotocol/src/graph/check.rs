@@ -2474,26 +2474,19 @@ mod tests {
                 ("state_interval", "1 s"),
             ],
             "device-file" => &[("path", "/dev/urandom")],
-            "network" => &[
-                ("protocol", "udp"),
-                ("address", "127.0.0.1"),
-                ("port", "5100"),
-            ],
+            "network" => &[("protocol", "udp"), ("address", "127.0.0.1:5100")],
             "gateway_radio" => &[
-                ("address", "10.0.0.1"),
-                ("port", "5000"),
+                ("address", "10.0.0.1:5000"),
                 ("ground_base", "10.0.0.2:5100"),
             ],
             "gateway_fprime" => &[
-                ("address", "10.0.0.1"),
-                ("port", "5000"),
+                ("address", "10.0.0.1:5000"),
                 ("bridge_base", "10.0.0.3:7700"),
                 ("fprime_id_base", "0x3000"),
             ],
             "gateway_cfs" => &[("cmd_msgid", "0x4281"), ("tlm_base", "0x4240")],
             "gateway_yamcs" => &[
-                ("address", "10.0.0.1"),
-                ("port", "5000"),
+                ("address", "10.0.0.1:5000"),
                 ("ground_base", "10.0.0.2:5100"),
                 ("apid_base", "0x200"),
             ],
@@ -2768,7 +2761,9 @@ mod tests {
 
         // Two gateways' apid_bases, and one's downlink under the other's.
         let mut second = node("other", "gateway_yamcs");
-        second.attributes.insert("port".into(), Scalar::of("5001"));
+        second
+            .attributes
+            .insert("address".into(), Scalar::of("10.0.0.1:5001"));
         second
             .attributes
             .insert("ground_base".into(), Scalar::of("10.0.0.2:6100"));
@@ -2782,7 +2777,9 @@ mod tests {
             &["apid_base of \"ground\"", "apid_base of \"other\"", "0x200"]
         ));
         let mut second = node("other", "gateway_yamcs");
-        second.attributes.insert("port".into(), Scalar::of("5001"));
+        second
+            .attributes
+            .insert("address".into(), Scalar::of("10.0.0.1:5001"));
         second
             .attributes
             .insert("ground_base".into(), Scalar::of("10.0.0.2:6100"));
@@ -3003,7 +3000,9 @@ mod tests {
     #[test]
     fn a_graph_answering_to_cfs_is_sound() {
         let mut heater = node("heater", "network");
-        heater.attributes.insert("port".into(), Scalar::of("5101"));
+        heater
+            .attributes
+            .insert("address".into(), Scalar::of("127.0.0.1:5101"));
         let g = answering_cfs(
             vec![node("a", "i2c"), node("fsw", "gateway_cfs"), heater],
             vec![link("a", &["fsw"]), link("fsw", &["heater"])],
@@ -3036,7 +3035,9 @@ mod tests {
         let mut fsw = node("fsw", "gateway_cfs");
         fsw.attributes.remove("cmd_msgid");
         let mut heater = node("heater", "network");
-        heater.attributes.insert("port".into(), Scalar::of("5101"));
+        heater
+            .attributes
+            .insert("address".into(), Scalar::of("127.0.0.1:5101"));
         let g =
             answering_cfs(vec![fsw, heater], vec![link("fsw", &["heater"])]);
         assert!(says(
@@ -3176,7 +3177,7 @@ mod tests {
             .insert("fprime_id_base".to_string(), Scalar::of("0x3004"));
         second
             .attributes
-            .insert("port".to_string(), Scalar::of("5001"));
+            .insert("address".to_string(), Scalar::of("10.0.0.1:5001"));
         let g = answering_fprime(
             vec![node("a", "i2c"), node("fsw", "gateway_fprime"), second],
             vec![link("a", &["fsw", "fsw2"])],
@@ -3622,8 +3623,8 @@ mod tests {
             }
             "network" => {
                 made.attributes.insert(
-                    "port".to_string(),
-                    Scalar::of((5100 + which).to_string()),
+                    "address".to_string(),
+                    Scalar::of(format!("127.0.0.1:{}", 5100 + which)),
                 );
             }
             _ => {
@@ -3732,36 +3733,31 @@ mod tests {
         let mut theirs = named("network", "b");
         theirs
             .attributes
-            .insert("address".to_string(), Scalar::of("localhost"));
+            .insert("address".to_string(), Scalar::of("localhost:5100"));
         let said = wanted(&two(mine.clone(), theirs.clone()))
             .expect("two nodes at one port");
         assert!(said.contains("5100"), "{said}");
         theirs
             .attributes
-            .insert("port".to_string(), Scalar::of("5101"));
+            .insert("address".to_string(), Scalar::of("localhost:5101"));
         assert_eq!(wanted(&two(mine.clone(), theirs.clone())), None);
 
-        // A Unix socket is named by a file, so it collides like a file and
-        // its port means nothing: two nodes with one path and different ports
-        // are one socket. (A port is written at all because the language asks
-        // every network node for one; what a Unix socket does with it is
-        // nothing.)
-        let named_socket = |name: &str, port: &str| {
+        // A Unix socket is named by a file, so it collides like a file: two
+        // nodes with one path are one socket.
+        let named_socket = |name: &str| {
             let mut made = named("network", name);
             made.attributes
                 .insert("protocol".to_string(), Scalar::of("unix_stream"));
             made.attributes
                 .insert("address".to_string(), Scalar::of("/tmp/node.sock"));
-            made.attributes.insert("port".to_string(), Scalar::of(port));
             made.attributes
                 .insert("max_length".to_string(), Scalar::of("64"));
             made.attributes
                 .insert("read_timeout".to_string(), Scalar::of("none"));
             made
         };
-        let said =
-            wanted(&two(named_socket("a", "5200"), named_socket("b", "5201")))
-                .expect("one socket path, whatever the ports say");
+        let said = wanted(&two(named_socket("a"), named_socket("b")))
+            .expect("one socket path");
         assert!(said.contains("/tmp/node.sock"), "{said}");
 
         // And a path is a path, whichever kind of node opens it: a device
@@ -3772,13 +3768,13 @@ mod tests {
             .attributes
             .insert("path".to_string(), Scalar::of("/tmp/node.sock"));
         assert!(
-            wanted(&two(named_socket("a", "5200"), over_it)).is_some(),
+            wanted(&two(named_socket("a"), over_it)).is_some(),
             "a device file and a socket on one path collide"
         );
 
         // And a node is not told it collides with itself.
         mine.attributes
-            .insert("port".to_string(), Scalar::of("5102"));
+            .insert("address".to_string(), Scalar::of("127.0.0.1:5102"));
         watching
             .attributes
             .insert("lines".to_string(), Scalar::of("3,4,5"));
@@ -4307,7 +4303,6 @@ mod tests {
     fn a_ground_link_that_receives_says_where() {
         let mut sends = node("gateway", "gateway_radio");
         sends.attributes.remove("address");
-        sends.attributes.remove("port");
         let g = graph(
             vec![node("a", "i2c"), sends.clone()],
             vec![link("a", &["gateway"])],
@@ -5332,8 +5327,7 @@ mod tests {
             );
             for (attribute, value) in [
                 ("protocol", "udp"),
-                ("address", "127.0.0.1"),
-                ("port", "6200"),
+                ("address", "127.0.0.1:6200"),
                 ("init", "\"0\""),
             ] {
                 graph.nodes[0]
@@ -5373,8 +5367,7 @@ mod tests {
         );
         for (attribute, value) in [
             ("protocol", "udp"),
-            ("address", "127.0.0.1"),
-            ("port", "6200"),
+            ("address", "127.0.0.1:6200"),
             ("init", "\"0\""),
             ("trigger", "\"READ\""),
         ] {
@@ -5408,8 +5401,7 @@ mod tests {
             );
             for (attribute, value) in [
                 ("protocol", "udp"),
-                ("address", "127.0.0.1"),
-                ("port", "6200"),
+                ("address", "127.0.0.1:6200"),
                 ("sends_from", "127.0.0.1:6201"),
             ]
             .iter()

@@ -99,10 +99,9 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
 gateways:
   - type gateway_yamcs:
       - gateway: ground
-        address: 127.0.0.1
+        address: \"127.0.0.1:{gateway_at}\"
         apid_base: \"0x200\"
         ground_base: \"127.0.0.1:{}\"
-        port: \"{gateway_at}\"
         moc-out: [pinger.ground]
         world-in: [pinger]
 vehicle:
@@ -272,12 +271,10 @@ fn an_untouched_payload_reports_framed_under_its_counted_apid() {
 payloads:
   - type network:
       - payload: first
-        address: \"127.0.0.1\"
-        port: \"{first_at}\"
+        address: \"127.0.0.1:{first_at}\"
         protocol: \"udp\"
       - payload: second
-        address: \"127.0.0.1\"
-        port: \"{second_at}\"
+        address: \"127.0.0.1:{second_at}\"
         protocol: \"udp\"
 ",
             tcsprotocol::InterfaceDigest::of_this_build(),

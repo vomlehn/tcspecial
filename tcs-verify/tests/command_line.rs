@@ -513,8 +513,7 @@ tcspecial:
 gateways:
   - type gateway_radio:
       - gateway: ground
-        address: \"127.0.0.1\"
-        port: \"5000\"
+        address: \"127.0.0.1:5000\"
         ground_base: \"127.0.0.1:5100\"
         moc-out: [pinger.ground]
         world-in: [pinger]
@@ -581,8 +580,8 @@ fn with_payloads_at(dir: &Path, ports: &[(&str, u16)]) -> PathBuf {
     text.push_str("payloads:\n  - type network:\n");
     for (name, port) in ports {
         text.push_str(&format!(
-            "      - payload: {name}\n        address: \"127.0.0.1\"\n        \
-             port: \"{port}\"\n        protocol: \"udp\"\n"
+            "      - payload: {name}\n        \
+             address: \"127.0.0.1:{port}\"\n        protocol: \"udp\"\n"
         ));
     }
     let path = dir.join("ports.ytcs");
@@ -602,7 +601,7 @@ fn a_gateway_port_past_the_last_fails_the_run() {
     let mut text = std::fs::read_to_string(&file).expect("read");
     for name in ["one", "two"] {
         let port = if name == "one" { 7001 } else { 7002 };
-        let at = format!("        port: \"{port}\"\n");
+        let at = format!("        address: \"127.0.0.1:{port}\"\n");
         text = text.replace(
             &at,
             &format!("{at}        world-out:\n          - ground.{name}\n"),

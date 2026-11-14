@@ -1570,10 +1570,8 @@ impl NodeType {
             NodeType::Network => &[
                 ("protocol", true),
                 ("address", true),
-                // Only with protocol raw, which takes no port and so is why
-                // port is not marked as always wanted.
+                // Only with protocol raw, whose address is a host alone.
                 ("ip_protocol", false),
-                ("port", false),
                 // Only on a udp or unix_dgram payload that speaks first.
                 ("sends_from", false),
                 // Only with protocol tcp or unix_stream, where max_length is
@@ -1695,19 +1693,17 @@ impl NodeType {
                     .expect("a type that is one of the app kinds")
             }
             NodeType::GatewayRadio => {
-                &[("ground_base", true), ("address", false), ("port", false)]
+                &[("ground_base", true), ("address", false)]
             }
             NodeType::GatewayYamcs => &[
                 ("ground_base", true),
                 ("apid_base", true),
                 ("address", false),
-                ("port", false),
             ],
             NodeType::GatewayFprime => &[
                 ("bridge_base", true),
                 ("fprime_id_base", true),
                 ("address", false),
-                ("port", false),
             ],
             NodeType::GatewayCfs => &[("tlm_base", true), ("cmd_msgid", false)],
             NodeType::Subdiagram => &[("file", true)],

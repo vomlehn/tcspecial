@@ -89,10 +89,9 @@
                  127.0.0.1:5105 as 0x3005. What the bridge sends up arrives
                  at address and port. -->
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5000</address>
                 <bridge_base>127.0.0.1:5100</bridge_base>
                 <fprime_id_base>0x3000</fprime_id_base>
-                <port>5000</port>
                 <world-in>camera</world-in>
                 <world-in>hull_kelvin_1</world-in>
                 <world-in>hull_kelvin_2</world-in>

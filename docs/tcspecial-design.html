@@ -700,10 +700,12 @@ operational code whatever it is built with.</li>
 tcspecial, tcslog, tcslog-tools, tcs-xtce or tcs-helpers -- may hold
 operational code and the other kinds side by side, and its name says
 nothing of either. Nor does it cover the <tt class="docutils literal">.deb</tt> and <tt class="docutils literal">.rpm</tt> packages
-a project installs with, which are named for the project and for where
-they install, and may hold both: the <tt class="docutils literal">tcspecial</tt> package installs
-tcs-verify beside tcspecial, and <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt> installs tcs-gui
-beside the libraries a station is built on. Nor pkg-config files, which
+a project installs with, which are named for the project and for what
+they install. tcspecial's are split so that none holds both --
+<tt class="docutils literal">tcspecial</tt>, the flight executive, and <tt class="docutils literal">tcsmoc</tt>, what a station is
+built on, hold operational code and nothing else; <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> and
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> hold the rest -- but the names are not held to the
+rule: <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> is no operational code. Nor pkg-config files, which
 tell a compiler how to build with a library: managing the compiler is
 outside how TCS manages its versions. Nor any other kind of name:
 installed directories, configuration keys, environment variables,
@@ -1993,12 +1995,12 @@ node, and there are three kinds of gateway:</p>
 <tr><td><tt class="docutils literal">gateway_radio</tt></td>
 <td>the ground, through the vehicle's radio</td>
 <td>UDP</td>
-<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt>, <tt class="docutils literal">ground_base</tt></td>
+<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">ground_base</tt></td>
 </tr>
 <tr><td><tt class="docutils literal">gateway_yamcs</tt></td>
 <td>a Yamcs ground station</td>
 <td>UDP, every packet behind a CCSDS primary header</td>
-<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt>, <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">apid_base</tt></td>
+<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">ground_base</tt>, <tt class="docutils literal">apid_base</tt></td>
 </tr>
 <tr><td><tt class="docutils literal">gateway_cfs</tt></td>
 <td>a cFS flight computer's software bus</td>
@@ -2009,7 +2011,7 @@ UDP protocol module</td>
 <tr><td><tt class="docutils literal">gateway_fprime</tt></td>
 <td>an F´ flight computer, through a bridge component in its deployment</td>
 <td>UDP, in the radio's own protocol, the bridge playing the MOC</td>
-<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt>, <tt class="docutils literal">bridge_base</tt>, <tt class="docutils literal">fprime_id_base</tt></td>
+<td><tt class="docutils literal">address</tt>, <tt class="docutils literal">bridge_base</tt>, <tt class="docutils literal">fprime_id_base</tt></td>
 </tr>
 </tbody>
 </table>
@@ -2315,7 +2317,7 @@ the digest it carries is the same digest.</dd>
 <dt>Requirement</dt>
 <dd>A <tt class="docutils literal">gateway_cfs</tt> node that the bus sends through -- a command binding
 comes from it, or a line leaves it -- states <tt class="docutils literal">cmd_msgid</tt>, as a
-<tt class="docutils literal">gateway_radio</tt> node states <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>. What each node
+<tt class="docutils literal">gateway_radio</tt> node states <tt class="docutils literal">address</tt>. What each node
 drawn into it produces is published at <tt class="docutils literal">tlm_base</tt> plus the source's
 device id.</dd>
 <dt>Requirement</dt>
@@ -2449,8 +2451,7 @@ and the deployment sends them to the ground with whatever it already uses.</p>
 </span><span class="name tag">gateways</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type gateway_fprime</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">fsw</span><span class="whitespace">
-        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0&quot;</span><span class="whitespace">
-        </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;7600&quot;</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0.0.0.0:7600&quot;</span><span class="whitespace">
         </span><span class="name tag">bridge_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;10.0.0.1:7700&quot;</span><span class="whitespace">
         </span><span class="name tag">fprime_id_base</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;0x3000&quot;</span><span class="whitespace">
         </span><span class="name tag">world-in</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">heater_wanted</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">thermometer</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">zone_temp</span><span class="punctuation indicator">]</span>
@@ -2461,7 +2462,7 @@ end decides what the configuration has to say and what can be made from it.</p>
 <dt>Requirement</dt>
 <dd>A <tt class="docutils literal">gateway_fprime</tt> node states <tt class="docutils literal">bridge_base</tt> where a radio states
 <tt class="docutils literal">ground_base</tt>, with the same meaning and the same counting, and states
-<tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> under the same rule a radio does.</dd>
+<tt class="docutils literal">address</tt> under the same rule a radio does.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal">fprime_id_base</tt> is where the F´ IDs of what tcspecial sends begin:
 each source drawn into the node is the channel at <tt class="docutils literal">fprime_id_base</tt> plus
@@ -2541,7 +2542,7 @@ node's links drive here is a line or a program, which take text, and because a
 byte array is something nobody at F´'s ground system can type. It goes only
 while the bridge is matched for commanding, as tcsmoc-c holds every uplink
 to (see <a class="reference internal" href="#on-the-ground">On the ground</a>), and is refused, saying so, before. A gateway node
-that binds no address and port aboard has no way up; the bridge runs on one, as
+that binds no address aboard has no way up; the bridge runs on one, as
 the far end of a bridge that only listens, and fails <tt class="docutils literal">SEND_DATA</tt> alone, saying
 why.</p>
 <p><tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils literal">RESTART</tt> each take the key and the target: the
@@ -2757,10 +2758,21 @@ each datum back to be kept, allocates it, and the ground programs here --
 tcs-moc and <tt class="docutils literal">lorem_gateway</tt> -- use <tt class="docutils literal">receive_into</tt>.</dd>
 <dt>Requirement</dt>
 <dd>A gateway node that the ground sends through -- a command binding comes
-from it, or a line leaves it -- states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>
-tcspecial binds to receive what the ground sends. One that only receives
-the vehicle's data states neither. <tt class="docutils literal">ground_base</tt> is refused on every
-other node.</dd>
+from it, or a line leaves it -- states the <tt class="docutils literal">address</tt> tcspecial binds
+to receive what the ground sends, its host and port together,
+<tt class="docutils literal">127.0.0.1:5000</tt>. One that only receives the vehicle's data states
+none. <tt class="docutils literal">ground_base</tt> is refused on every other node.</dd>
+<dt>Requirement</dt>
+<dd>A host and a port are one attribute wherever a configuration states
+them, as <tt class="docutils literal">ground_base</tt> and every address in the <tt class="docutils literal">tcspecial</tt> section
+already were: a gateway node's and a network payload's <tt class="docutils literal">address</tt> is
+<tt class="docutils literal">host:port</tt> -- a path for a unix socket, a host alone for a raw one --
+and a simulator file's <tt class="docutils literal">payload_address</tt> the same, the host alone for
+any port. Two attributes for one address invite a file that states one
+and not the other, and a reader that has to put them back together. A
+file that still writes <tt class="docutils literal">port</tt> or <tt class="docutils literal">payload_port</tt> is refused, by line
+(<tt class="docutils literal"><span class="pre">tcsprotocol::graph::renamed</span></tt>), and told to write the two together;
+<tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt> rewrites it so.</dd>
 </dl>
 </div>
 <div class="section" id="numbers-as-a-configuration-writes-them">
@@ -3109,7 +3121,7 @@ far apart the two clocks are -- which a ping is the one exchange able to show.</
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type ping</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> compute</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">pinger</span><span class="punctuation indicator">,</span><span class="name tag"> world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">ground</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
-<p>The ground sends its pings to the gateway link's <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt>, and
+<p>The ground sends its pings to the gateway link's <tt class="docutils literal">address</tt>, and
 the answers arrive at its <tt class="docutils literal">ground_base</tt> plus the ping node's device id, as any
 node's telemetry does.</p>
 <dl class="docutils">
@@ -4147,12 +4159,12 @@ check all ask it, so that the two ends of a link and the check of it
 cannot disagree about which end waits.</dd>
 <dt>Requirement</dt>
 <dd>For a UDP payload that is spoken to first, the ends swap roles: the
-vehicle sends to the address and port the node states, from a port of
+vehicle sends to the address the node states, from a port of
 its own that nothing has to find, and the payload is the end that waits
 at the stated address. A payload that is asked answers to the vehicle's
 port, where its answers are read.</dd>
 </dl>
-<p>That is what the address already means. <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> say where the
+<p>That is what the address already means. <tt class="docutils literal">address</tt> says where the
 vehicle reaches the payload, and for a payload that is spoken to first the
 reading is the literal one.</p>
 <dl class="docutils">
@@ -7955,8 +7967,8 @@ is refused where the configuration is read, naming the five (see
 <tt class="docutils literal"><span class="pre">tcsprotocol::graph::reach</span></tt>).</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A <tt class="docutils literal">raw</tt> node states an <tt class="docutils literal">address</tt> and an <tt class="docutils literal">ip_protocol</tt> from 1 to 254,
-and no <tt class="docutils literal">port</tt>: an IP datagram has none, and the number and the host are
+<dd>A <tt class="docutils literal">raw</tt> node states an <tt class="docutils literal">address</tt>, a host with no port, and an
+<tt class="docutils literal">ip_protocol</tt> from 1 to 254: an IP datagram has no port, and the number and the host are
 what say which datagrams are the node's. 0 is refused, being no protocol
 on a raw socket, and so is 255, <tt class="docutils literal">IPPROTO_RAW</tt>, which can only send.
 <tt class="docutils literal">ip_protocol</tt> on any other protocol is refused, naming the protocol.</dd>
@@ -10997,20 +11009,20 @@ files, should TCS install any, would raise the same question.</p>
 <p>Package names and the naming rule</p>
 <blockquote>
 <p>The packages TCS installs with are left out of the rule too: the
-<tt class="docutils literal">.deb</tt> and <tt class="docutils literal">.rpm</tt> packages (<tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>,
-<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal">tcslog</tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>, <tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>) and the
-Python distributions pip builds (<tt class="docutils literal"><span class="pre">tcs-xtce</span></tt> among them). Each is named
-for its project and for where it installs, and several hold both kinds
-of code: <tt class="docutils literal">tcspecial</tt> installs tcs-verify beside tcspecial, and
-<tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt> installs tcs-gui beside the libraries a station is
-built on.</p>
-<p>Bringing them in would mean splitting each package that holds both
-kinds in two, one of operational code and one of tools -- so that a
-vehicle or a station could be given its operational code and nothing
-else, and could tell from a package's name alone what it was being
-given -- and then naming each by the rule. The cost is more packages to
-build, test and install, and a dependency between each pair, for a
-choice an installer makes today by which programs it runs.</p>
+<tt class="docutils literal">.deb</tt> and <tt class="docutils literal">.rpm</tt> packages (<tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal">tcsmoc</tt>,
+<tt class="docutils literal"><span class="pre">tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal">tcslog</tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>,
+<tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>) and the Python distributions pip builds (<tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>
+among them). tcspecial's are split already, so that a vehicle or a
+station can be given its operational code and nothing else:
+<tt class="docutils literal">tcspecial</tt> holds the flight executive and its manuals, <tt class="docutils literal">tcsmoc</tt>
+what a station is built on, <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> the editor, the checker and
+the examples, and <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> the test station, the simulator
+and the test apps.</p>
+<p>Bringing the names in would mean naming each package by the rule, so
+that a package's name alone says what it is being given --
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> reads as operational code and holds none -- and
+splitting the other projects' packages as tcspecial's are. The cost is
+renaming packages that installations already know by name.</p>
 </blockquote>
 <p>Other names and the naming rule</p>
 <blockquote>

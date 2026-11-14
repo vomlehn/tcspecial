@@ -204,8 +204,7 @@ fn a_datum_received_into_a_buffer_allocates_nothing() {
 payloads:
   - type network:
       - payload: a
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [ground.a]
 ",
@@ -258,8 +257,7 @@ fn a_datum_longer_than_the_buffer_is_refused() {
 payloads:
   - type network:
       - payload: a
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [ground.a]
 ",

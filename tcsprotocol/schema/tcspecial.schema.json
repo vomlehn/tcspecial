@@ -95,14 +95,7 @@
           ]
         },
         "address": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        "port": {
+          "description": "Where the node binds aboard for the ground to reach, the host and the port together as address:port, an IPv6 host in brackets ([::1]:5000). A gateway node that states none binds nothing and only sends, to its ground_base.",
           "type": [
             "string",
             "number",
@@ -809,14 +802,7 @@
           ]
         },
         "address": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        "port": {
+          "description": "Where the node is, the host and the port together as address:port, where its type takes one.",
           "type": [
             "string",
             "number",
@@ -1493,14 +1479,7 @@
           ]
         },
         "address": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ]
-        },
-        "port": {
+          "description": "Where the payload is. A network payload over tcp or udp writes the host and the port together as address:port, an IPv6 host in brackets ([::1]:5000); over unix_stream or unix_dgram, the socket's path; on a raw socket (ip_protocol), the host alone, which has no port. An I2C device writes its address on the bus, 0x48.",
           "type": [
             "string",
             "number",

@@ -74,8 +74,7 @@
                  127.0.0.1:6101 where in stage 1 it heard it on 6100. -->
             <payload name="seismometer">
                 <read_size>16</read_size>
-                <address>127.0.0.1</address>
-                <port>5401</port>
+                <address>127.0.0.1:5401</address>
                 <protocol>udp</protocol>
             </payload>
         </type>

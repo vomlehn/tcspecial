@@ -496,8 +496,7 @@ science computer that sends each reading over UDP of its own accord.</p>
       # it is 0 and the ground hears it on 127.0.0.1:6100.
       - payload: seismometer
         read_size: &quot;16&quot;
-        address: &quot;127.0.0.1&quot;
-        port: &quot;5401&quot;
+        address: &quot;127.0.0.1:5401&quot;
         protocol: &quot;udp&quot;
 
 
@@ -1005,10 +1004,9 @@ decodes them by a mission database written in XTCE.</dd>
       # 127.0.0.1:5105 as 0x3005. What the bridge sends up arrives at address
       # and port.
       - gateway: gateway
-        address: &quot;127.0.0.1&quot;
+        address: &quot;127.0.0.1:5000&quot;
         bridge_base: &quot;127.0.0.1:5100&quot;
         fprime_id_base: &quot;0x3000&quot;
-        port: &quot;5000&quot;
         world-in:
           - camera
           - hull_kelvin_1

@@ -109,8 +109,7 @@
                  vehicle's data from. -->
             <payload name="seismometer">
                 <read_size>16</read_size>
-                <address>127.0.0.1</address>
-                <port>5401</port>
+                <address>127.0.0.1:5401</address>
                 <protocol>udp</protocol>
                 <world-out>gateway.seismometer</world-out>
             </payload>

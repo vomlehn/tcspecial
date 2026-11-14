@@ -46,9 +46,8 @@
                  device id of the node that sent it: the motor's status,
                  device id 2, at 127.0.0.1:3702. -->
             <gateway name="moc">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:3600</address>
                 <ground_base>127.0.0.1:3700</ground_base>
-                <port>3600</port>
                 <moc-out>motor_command.moc</moc-out>
                 <world-in>motor_status</world-in>
             </gateway>

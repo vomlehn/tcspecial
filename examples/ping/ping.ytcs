@@ -45,9 +45,8 @@ gateways:
       # node. The answer comes back to the ground at ground_base plus the ping
       # node's device id: ping is the second name of the two, device id 1, so 7701.
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:7600"
         ground_base: "127.0.0.1:7700"
-        port: "7600"
         moc-out:
           - ping.gateway
         world-in: [ping]

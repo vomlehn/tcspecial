@@ -4457,8 +4457,7 @@ pub fn thermostat_example() -> Document {
     );
 
     place(&mut document, "gateway", "gateway_radio", (790, 34));
-    set(&mut document, "gateway", "address", "10.0.0.1");
-    set(&mut document, "gateway", "port", "5000");
+    set(&mut document, "gateway", "address", "10.0.0.1:5000");
     // Where the ground station is: each node linked into this one sends to
     // this port plus its own device id, from the start.
     set(&mut document, "gateway", "ground_base", "10.0.0.2:5100");

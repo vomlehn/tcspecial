@@ -38,9 +38,8 @@ gateways:
       # moc-out for the tee. What comes down arrives at ground_base plus the
       # device id of the node that sent it.
       - gateway: moc
-        address: "127.0.0.1"
+        address: "127.0.0.1:8600"
         ground_base: "127.0.0.1:8700"
-        port: "8600"
         moc-out:
           - echo.moc
         world-in: [echo, readings]
@@ -49,23 +48,20 @@ payloads:
   - type network:
       # A heater, driven by what the ground sends: the far end of a UDP socket.
       - payload: heater
-        address: "127.0.0.1"
-        port: "8001"
+        address: "127.0.0.1:8001"
         protocol: "udp"
         moc-in: [echo]
       # A sensor whose readings go to the ground and are copied aboard.
       - payload: sensor
         read_size: "16"
-        address: "127.0.0.1"
-        port: "8002"
+        address: "127.0.0.1:8002"
         protocol: "udp"
         world-out:
           - readings.sensor
       # A payload whose data nobody wants yet.
       - payload: spare
         read_size: "16"
-        address: "127.0.0.1"
-        port: "8003"
+        address: "127.0.0.1:8003"
         protocol: "udp"
         world-out:
           - unheard.spare

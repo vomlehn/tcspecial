@@ -620,13 +620,11 @@ mod tests {
 payloads:
   - type network:
       - payload: a
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [ground.a]
       - payload: b
-        address: \"127.0.0.1\"
-        port: \"7002\"
+        address: \"127.0.0.1:7002\"
         protocol: udp
         world-out: [ground.b]
 ",
@@ -693,8 +691,7 @@ payloads:
 payloads:
   - type network:
       - payload: a
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [fsw.a]
 ",

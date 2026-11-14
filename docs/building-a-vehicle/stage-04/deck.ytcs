@@ -61,9 +61,8 @@ gateways:
       # the ground sends up arrives at address and port, which the ground's
       # setpoint command needs.
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         ground_base: "127.0.0.1:5100"
-        port: "5000"
         world-in: [probe_heater, regolith_kelvin, seismometer]
 
 vehicle:
@@ -124,8 +123,7 @@ payloads:
       # receive the vehicle's data from.
       - payload: seismometer
         read_size: "16"
-        address: "127.0.0.1"
-        port: "5401"
+        address: "127.0.0.1:5401"
         protocol: "udp"
         world-out:
           - gateway.seismometer

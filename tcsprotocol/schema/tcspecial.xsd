@@ -166,10 +166,11 @@
            a vote's are its inputs. See the `arrival` type above. -->
       <xs:element name="world-in" type="arrival"/>
       <xs:element name="moc-in" type="arrival"/>
-      <!-- Where a node is. -->
+      <!-- Where a node is. A socket's address is address:port over tcp
+           or udp ([::1]:5000 for IPv6), a path over a unix socket, and a
+           host alone on a raw one; an I2C device's is its bus address. -->
       <xs:element name="path" type="xs:string"/>
       <xs:element name="address" type="xs:string"/>
-      <xs:element name="port" type="xs:string"/>
       <!-- Where a ground link's data goes: address:port, the port counted on
            by each source node's device id. -->
       <xs:element name="ground_base" type="xs:string"/>

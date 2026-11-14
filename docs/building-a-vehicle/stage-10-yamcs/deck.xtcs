@@ -96,10 +96,9 @@
                  command among it, goes as a telecommand of APID
                  apid_base. -->
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5000</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:5100</ground_base>
-                <port>5000</port>
                 <world-in>camera</world-in>
                 <world-in>hull_kelvin_1</world-in>
                 <world-in>hull_kelvin_2</world-in>

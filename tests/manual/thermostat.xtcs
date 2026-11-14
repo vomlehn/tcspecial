@@ -36,9 +36,8 @@
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway">
-                <address>10.0.0.1</address>
+                <address>10.0.0.1:5000</address>
                 <ground_base>10.0.0.2:5100</ground_base>
-                <port>5000</port>
                 <world-in>temp1</world-in>
                 <world-in>temp2</world-in>
                 <world-in>temp3</world-in>

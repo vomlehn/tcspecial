@@ -62,8 +62,9 @@
         </xs:complexType>
       </xs:element>
       <xs:element name="protocol" type="xs:string"/>
+      <!-- Where the payload answers from: host:port, a host alone for
+           any port, 0.0.0.0:port for any interface, or a path. -->
       <xs:element name="payload_address" type="xs:string"/>
-      <xs:element name="payload_port" type="xs:string"/>
       <xs:element name="packet_interval" type="xs:string"/>
       <xs:element name="segment_interval" type="xs:string"/>
       <xs:element name="segment_size" type="xs:string"/>

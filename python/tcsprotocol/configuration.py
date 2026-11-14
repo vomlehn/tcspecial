@@ -939,18 +939,17 @@ class Configuration:
             its ``moc-out`` links.
 
         Raises:
-            ValueError: There is no such gateway node, or it states no address
-                        and port, or they are not a valid address and port.
+            ValueError: There is no such gateway node, or it states no
+                        address, or its address is not ``address:port``.
         """
         node = self._gateway(gateway)
         address = node.attributes.get("address")
-        port = node.attributes.get("port")
-        if address is None or port is None:
+        if address is None:
             raise ValueError(
-                f'{self.path}: "{gateway}" states no address and port, so it '
-                "binds nothing aboard and the ground has nowhere to send to it"
+                f'{self.path}: "{gateway}" states no address, so it binds '
+                "nothing aboard and the ground has nowhere to send to it"
             )
-        return HostPort.of(f'"{gateway}" address:port', f"{address}:{port}")
+        return HostPort.of(f'"{gateway}" address', address)
 
     def downlink(self, gateway, source):
         """Where the ground receives what ``source`` sends to the gateway node

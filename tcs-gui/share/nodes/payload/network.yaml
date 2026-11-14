@@ -23,18 +23,16 @@ attributes:
   - name: address
     required: true
     about: >
-      The host it is reached at, or bound at where the payload speaks first.
+      Where it is reached, or bound where the payload speaks first: the host
+      and the port together, as 127.0.0.1:5000 ([::1]:5000 for IPv6), over
+      udp or tcp; the socket's path over unix_stream or unix_dgram; and the
+      host alone over raw, which has no port.
   - name: ip_protocol
     required: false
     about: >
       With protocol raw, and only then: the IP protocol number its datagrams
       carry, 1 to 254 (253 and 254 are set aside for experiments). A raw
       socket needs CAP_NET_RAW.
-  - name: port
-    required: false
-    about: >
-      The port that goes with the address. Every protocol but raw needs one,
-      and raw takes none.
   - name: sends_from
     required: false
     about: >

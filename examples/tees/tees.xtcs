@@ -45,9 +45,8 @@
                  comes down arrives at ground_base plus the device id of the
                  node that sent it. -->
             <gateway name="moc">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:8600</address>
                 <ground_base>127.0.0.1:8700</ground_base>
-                <port>8600</port>
                 <moc-out>echo.moc</moc-out>
                 <world-in>echo</world-in>
                 <world-in>readings</world-in>
@@ -59,8 +58,7 @@
             <!-- A heater, driven by what the ground sends: the far end of a UDP
                  socket. -->
             <payload name="heater">
-                <address>127.0.0.1</address>
-                <port>8001</port>
+                <address>127.0.0.1:8001</address>
                 <protocol>udp</protocol>
                 <moc-in>echo</moc-in>
             </payload>
@@ -68,16 +66,14 @@
             <!-- aboard. -->
             <payload name="sensor">
                 <read_size>16</read_size>
-                <address>127.0.0.1</address>
-                <port>8002</port>
+                <address>127.0.0.1:8002</address>
                 <protocol>udp</protocol>
                 <world-out>readings.sensor</world-out>
             </payload>
             <!-- A payload whose data nobody wants yet. -->
             <payload name="spare">
                 <read_size>16</read_size>
-                <address>127.0.0.1</address>
-                <port>8003</port>
+                <address>127.0.0.1:8003</address>
                 <protocol>udp</protocol>
                 <world-out>unheard.spare</world-out>
             </payload>

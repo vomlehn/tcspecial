@@ -37,9 +37,8 @@
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5000</address>
                 <ground_base>127.0.0.1:5100</ground_base>
-                <port>5000</port>
                 <world-in>battery_amps</world-in>
                 <world-in>bus_volts</world-in>
                 <world-in>charge</world-in>
@@ -109,17 +108,15 @@
             <!-- The science instrument's power switch, driven by what shedding
                  decides: 1 to shed it, 0 to restore it. -->
             <payload name="science">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5302</address>
                 <moc-in-type>u8</moc-in-type>
-                <port>5302</port>
                 <protocol>udp</protocol>
                 <moc-in>shedding</moc-in>
             </payload>
             <!-- The shunt in the battery's lead, which sends its current
                  twice a second of its own accord. -->
             <payload name="shunt">
-                <address>127.0.0.1</address>
-                <port>5301</port>
+                <address>127.0.0.1:5301</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>battery_amps.shunt</world-out>

@@ -1208,7 +1208,7 @@ mod tests {
              address: \"127.0.0.1\"\n\
              payloads:\n  - type i2c:\n      - payload: t1\n        \
              address: \"0x48\"\n      - payload: t2\n  \
-             - type network:\n      - { payload: n, port: \"1\" }\n\
+             - type network:\n      - { payload: n, address: \"h:1\" }\n\
              tcs-gui:\n  nodes:\n    - { node: t1, x: 1, y: 2 }\n  \
              set-aside:\n    - { node: t1, concern: c }\n",
         )
@@ -1220,7 +1220,7 @@ mod tests {
              </type></gateways><payloads><type name=\"i2c\">\
              <payload name=\"t1\"><address>0x48</address></payload>\
              <payload name=\"t2\"/></type><type name=\"network\">\
-             <payload name=\"n\"><port>1</port></payload></type></payloads>\
+             <payload name=\"n\"><address>h:1</address></payload></type></payloads>\
              <tcs-gui><nodes><node name=\"t1\" x=\"1\" y=\"2\"/></nodes>\
              <set-aside><node name=\"t1\" concern=\"c\"/></set-aside>\
              </tcs-gui></configuration>",

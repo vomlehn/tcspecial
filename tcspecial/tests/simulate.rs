@@ -130,8 +130,7 @@ fn on_a_terminal(slave: &str) -> String {
 /// A network payload on this host.
 const ON_THE_NETWORK: &str = "  - type network:
       - payload: sensor
-        address: \"127.0.0.1\"
-        port: \"9\"
+        address: \"127.0.0.1:9\"
         protocol: \"udp\"
 ";
 

@@ -48,8 +48,7 @@ payloads:
   - type network:
       # Software on this host that sends its readings over UDP.
       - payload: sensor
-        address: "127.0.0.1"
-        port: "5001"
+        address: "127.0.0.1:5001"
         protocol: "udp"
 
 tcs-gui:

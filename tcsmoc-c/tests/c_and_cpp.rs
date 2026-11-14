@@ -227,9 +227,8 @@ fn against_a_vehicle(program: &Path) -> String {
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:{}\"
         ground_base: \"127.0.0.1:{}\"
-        port: \"{}\"
         moc-out: [ping.gateway]
         world-in: [ping]
 vehicle:
@@ -244,10 +243,10 @@ vehicle:
             free(),
             free(),
             port(&interpreter),
+            port(&uplink),
             // ping's name sorts after the gateway node's, so it is device
             // id 1 and its data arrives one above the base.
             ground_data - 1,
-            port(&uplink),
         ),
     )
     .expect("written");

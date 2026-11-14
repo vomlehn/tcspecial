@@ -170,7 +170,7 @@ impl Flown {
                     format!("127.0.0.1:{}", at(3510)),
                     format!("127.0.0.1:{}", common::free()),
                 ),
-                (format!("\"{}\"", at(3600)), format!("\"{uplink}\"")),
+                (format!(":{}\"", at(3600)), format!(":{uplink}\"")),
                 (
                     format!("\"127.0.0.1:{}\"", at(3700)),
                     format!("\"127.0.0.1:{}\"", common::free()),

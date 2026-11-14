@@ -107,10 +107,10 @@ fn a_tee_sends_each_datum_both_ways() {
     let (commands, take_at) = (bound(), free());
     let mut text = text;
     for (was, now) in [
-        ("\"8001\"", format!("\"{}\"", port(&heater))),
-        ("\"8002\"", format!("\"{sensor}\"")),
-        ("\"8003\"", format!("\"{}\"", free())),
-        ("\"8600\"", format!("\"{uplink}\"")),
+        (":8001\"", format!(":{}\"", port(&heater))),
+        (":8002\"", format!(":{sensor}\"")),
+        (":8003\"", format!(":{}\"", free())),
+        (":8600\"", format!(":{uplink}\"")),
         ("127.0.0.1:8700", format!("127.0.0.1:{base}")),
         ("127.0.0.1:8510", format!("127.0.0.1:{}", free())),
         ("0.0.0.0:8500", format!("127.0.0.1:{}", free())),

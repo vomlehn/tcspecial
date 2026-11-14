@@ -76,9 +76,8 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     <gateways>
         <type name=\"gateway_radio\">
             <gateway name=\"gateway\">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:{}</address>
                 <ground_base>127.0.0.1:{}</ground_base>
-                <port>{}</port>
                 <moc-out>ping.gateway</moc-out>
                 <world-in>ping</world-in>
             </gateway>
@@ -96,8 +95,8 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
 ",
             port(&beacon),
             port(&commands),
-            answers - 1,
             port(&uplink),
+            answers - 1,
         ),
     )
     .expect("written");

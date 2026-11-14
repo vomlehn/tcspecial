@@ -215,20 +215,17 @@ def with_more_nodes(directory):
         <payloads>
             <type name="network">
                 <payload name="pong">
-                    <address>127.0.0.1</address>
-                    <port>16800</port>
+                    <address>127.0.0.1:16800</address>
                     <protocol>udp</protocol>
                     <read_size>16</read_size>
                     <world-out>gateway.pong</world-out>
                 </payload>
                 <payload name="sensor">
-                    <address>127.0.0.1</address>
-                    <port>16801</port>
+                    <address>127.0.0.1:16801</address>
                     <protocol>udp</protocol>
                 </payload>
                 <payload name="tank">
-                    <address>127.0.0.1</address>
-                    <port>16802</port>
+                    <address>127.0.0.1:16802</address>
                     <protocol>udp</protocol>
                 </payload>
             </type>

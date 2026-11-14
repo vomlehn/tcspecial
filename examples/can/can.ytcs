@@ -40,9 +40,8 @@ gateways:
       # ground_base plus the device id of the node that sent it: the motor's
       # status, device id 2, at 127.0.0.1:3702.
       - gateway: moc
-        address: "127.0.0.1"
+        address: "127.0.0.1:3600"
         ground_base: "127.0.0.1:3700"
-        port: "3600"
         moc-out:
           - motor_command.moc
         world-in: [motor_status]

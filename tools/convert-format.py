@@ -89,6 +89,13 @@ Which kind of file it is shows in what it holds: a ``simulated_payloads`` or
 physics model, and an XML root ``<simulator>`` a simulator file. Each entry's
 settings are written in name order.
 
+A host and a port written as two attributes are written as one, as every
+address in a configuration is: a network payload's or a gateway's
+``address`` and ``port`` become ``address: "<host>:<port>"``, and a
+simulator file's ``payload_address`` and ``payload_port`` become
+``payload_address: "<host>:<port>"`` -- ``0.0.0.0:<port>`` where it gave a
+port alone. A unix socket's ``port`` said nothing, and is taken out.
+
 A file already in the new shape is left as it is, so running this twice
 changes nothing the second time. Every section, and everything else in the
 file, is left where it was.
@@ -1923,6 +1930,173 @@ def xml_root(text):
 # ---------------------------------------------------------------- main
 
 
+#: Each attribute a host is written in, with the one its port was written in
+#: beside it before the two were written together.
+HOST_AND_PORT = (("address", "port"), ("payload_address", "payload_port"))
+
+#: A key and its value on one line of YAML, block style: the margin, the key
+#: and the value, quoted or not.
+YAML_SCALAR = re.compile(r'^(\s*(?:- )?)([A-Za-z_][\w-]*): *"?([^"#]*?)"? *$')
+
+#: The same in XML: ``<key>value</key>`` on a line of its own.
+XML_SCALAR = re.compile(r"^(\s*)<([A-Za-z_][\w-]*)>([^<]*)</\2>\s*$")
+
+
+def joined(host, port):
+    """Writes a host and a port as one address.
+
+    Args:
+        host: The host, as it was written: a name, an IPv4 or IPv6 address,
+              or a path, or None where there was none.
+        port: The port, as it was written.
+
+    Returns:
+        ``host:port``, an IPv6 address in brackets; ``0.0.0.0:port`` where
+        there was no host; or the host alone where it is a path, whose port
+        meant nothing.
+    """
+    if host is None:
+        return f"0.0.0.0:{port}"
+    if host.startswith(("/", "@")):
+        return host
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"{host}:{port}"
+
+
+def scalar_line(line, language):
+    """Reads one line as a key and its value, where it is one.
+
+    Args:
+        line:     The line.
+        language: ``yaml`` or ``xml``.
+
+    Returns:
+        The margin, the key and the value; or None.
+    """
+    pattern = YAML_SCALAR if language == "yaml" else XML_SCALAR
+    found = pattern.match(line.rstrip("\n"))
+    return found.groups() if found else None
+
+
+def join_host_and_port(text, language):
+    """Writes each host and port that are two attributes as one.
+
+    A port is joined to the host its node writes at its own margin, in the
+    same node: the lines from the one above at a smaller margin to the one
+    below at a smaller margin. A flow mapping in YAML, ``{ address: "x",
+    port: "1" }``, is joined within its line.
+
+    Args:
+        text:     The file's text.
+        language: ``yaml`` or ``xml``.
+
+    Returns:
+        The text, with each pair joined.
+    """
+    lines = text.splitlines(keepends=True)
+    if language == "yaml":
+        lines = [join_in_flow(line) for line in lines]
+    margin = lambda line: len(line) - len(line.lstrip())
+    for host_key, port_key in HOST_AND_PORT:
+        at = 0
+        while at < len(lines):
+            said = scalar_line(lines[at], language)
+            if not said or said[1] != port_key:
+                at += 1
+                continue
+            own = margin(lines[at].replace("- ", "  ", 1))
+            first = at
+            while first > 0 and lines[first - 1].strip() and margin(
+                    lines[first - 1].replace("- ", "  ", 1)) >= own:
+                first -= 1
+            if first > 0 and lines[first - 1].strip().startswith("- "):
+                first -= 1
+            last = at
+            while last + 1 < len(lines) and margin(
+                    lines[last + 1].replace("- ", "  ", 1)) >= own \
+                    and lines[last + 1].strip() \
+                    and not lines[last + 1].lstrip().startswith("- "):
+                last += 1
+            host_at = None
+            for here in range(first, last + 1):
+                other = scalar_line(lines[here], language)
+                if other and other[1] == host_key:
+                    host_at = here
+            port = said[2].strip()
+            if host_at is None:
+                if host_key != "payload_address":
+                    at += 1
+                    continue
+                lines[at] = rewritten(lines[at], said, host_key,
+                                      joined(None, port), language)
+                continue
+            host = scalar_line(lines[host_at], language)
+            lines[host_at] = rewritten(lines[host_at], host, host_key,
+                                       joined(host[2].strip(), port),
+                                       language)
+            del lines[at]
+    return "".join(lines)
+
+
+def rewritten(line, said, key, value, language):
+    """Writes a line again with a key and value of its own.
+
+    Args:
+        line:     The line, for its end.
+        said:     Its margin, key and value, as ``scalar_line`` read them.
+        key:      The key to write.
+        value:    The value to write.
+        language: ``yaml`` or ``xml``.
+
+    Returns:
+        The line.
+    """
+    end = "\n" if line.endswith("\n") else ""
+    if language == "yaml":
+        return f'{said[0]}{key}: "{value}"{end}'
+    return f"{said[0]}<{key}>{escape(value)}</{key}>{end}"
+
+
+#: A key and its value inside a YAML flow mapping.
+FLOW_PAIR = re.compile(r'(?<=[{,])\s*([A-Za-z_][\w-]*): *("[^"]*"|[^,}]*)')
+
+
+def join_in_flow(line):
+    """Joins a host and a port written in one YAML flow mapping, on one
+    line.
+
+    Args:
+        line: The line.
+
+    Returns:
+        The line, with each pair in it joined.
+    """
+    if "{" not in line:
+        return line
+    for host_key, port_key in HOST_AND_PORT:
+        pairs = {m.group(1): m for m in FLOW_PAIR.finditer(line)}
+        if port_key not in pairs:
+            continue
+        port = pairs[port_key].group(2).strip().strip('"')
+        host = pairs.get(host_key)
+        value = joined(host.group(2).strip().strip('"') if host else None,
+                       port)
+        if host is None and host_key != "payload_address":
+            continue
+        drop = pairs[port_key]
+        # Out with the port and the comma before it, then the host's value.
+        start = line.rfind(",", 0, drop.start() + 1)
+        line = line[:start] + line[drop.end():]
+        if host is None:
+            line = line.replace("{", f'{{ {host_key}: "{value}",', 1)
+        else:
+            host = {m.group(1): m for m in FLOW_PAIR.finditer(line)}[host_key]
+            line = (line[:host.start(2)] + f'"{value}"'
+                    + line[host.end(2):])
+    return line
+
+
 def convert(text, language, name):
     """Rewrite a configuration in the new shape.
 
@@ -1938,11 +2112,14 @@ def convert(text, language, name):
     if language == "yaml":
         document = yaml.safe_load(text)
         if kind_of_file(document) != "configuration":
-            return convert_sim_yaml(text, document, report), report
-        return convert_yaml(text, report), report
-    if xml_root(text) == "simulator":
-        return convert_sim_xml(text, report), report
-    return convert_xml(text, report), report
+            new = convert_sim_yaml(text, document, report)
+        else:
+            new = convert_yaml(text, report)
+    elif xml_root(text) == "simulator":
+        new = convert_sim_xml(text, report)
+    else:
+        new = convert_xml(text, report)
+    return join_host_and_port(new, language), report
 
 
 def main(argv):

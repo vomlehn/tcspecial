@@ -40,9 +40,8 @@ gateways:
       # the device id of the node that sent it: the switch, device id 2, at
       # 127.0.0.1:3722.
       - gateway: moc
-        address: "127.0.0.1"
+        address: "127.0.0.1:3620"
         ground_base: "127.0.0.1:3720"
-        port: "3620"
         moc-out:
           - lamp.moc
         world-in: [switch]

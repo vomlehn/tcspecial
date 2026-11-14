@@ -33,9 +33,8 @@ tcspecial:
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         ground_base: "127.0.0.1:5100"
-        port: "5000"
         world-in: [altitude, descent_rate, guidance, touchdown]
 
 vehicle:
@@ -86,23 +85,20 @@ payloads:
   - type network:
       # The Doppler velocimeter, five a second.
       - payload: doppler
-        address: "127.0.0.1"
-        port: "5402"
+        address: "127.0.0.1:5402"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - descent_rate.doppler
       # The engine's throttle, driven by what guidance answers.
       - payload: engine
-        address: "127.0.0.1"
+        address: "127.0.0.1:5404"
         moc-in-type: "ratio"
-        port: "5404"
         protocol: "udp"
         moc-in: [guidance]
       # The radar altimeter, which sends ten readings a second.
       - payload: radar
-        address: "127.0.0.1"
-        port: "5401"
+        address: "127.0.0.1:5401"
         protocol: "udp"
         world-out-type: "u16"
         world-out:
@@ -111,8 +107,7 @@ payloads:
       # lander is down: straight to the ground.
       - payload: touchdown
         read_size: "16"
-        address: "127.0.0.1"
-        port: "5403"
+        address: "127.0.0.1:5403"
         protocol: "udp"
         world-out:
           - gateway.touchdown

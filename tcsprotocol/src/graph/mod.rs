@@ -2408,7 +2408,7 @@ tcspecial:
              127.0.0.1:5650\"
 gateways:
   - type gateway_radio:
-      - { gateway: gateway, address: \"10.0.0.1\", port: \"5000\", \
+      - { gateway: gateway, address: \"10.0.0.1:5000\", \
              ground_base: \"10.0.0.2:5100\", world-in: [zone] }
 ",
         )

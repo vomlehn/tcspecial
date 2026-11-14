@@ -30,8 +30,5 @@ attributes:
   - name: address
     required: false
     about: >
-      The address tcspecial binds for what the bridge sends: needed, with
-      port, when commands or a line come from this node.
-  - name: port
-    required: false
-    about: The port that goes with the address.
+      Where tcspecial binds for what the bridge sends, as address:port:
+      needed when commands or a line come from this node.

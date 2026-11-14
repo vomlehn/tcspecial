@@ -53,8 +53,9 @@ pub enum CommandType {
 /// queued behind what it asked for at leisure: a RESTART waiting behind a
 /// payload's statistics is a spacecraft that cannot be rescued while it is
 /// busy. On a space link the two become two virtual channels, which is where
-/// the priority between them is really decided; over IP they are two ports --
-/// `port` and `payload_port`; see [`crate::CIConfigJson`].
+/// the priority between them is really decided; over IP they are two
+/// sockets -- `tcs_cmd.recv` and `payload_command.dest_base`; see
+/// [`crate::CIConfigJson`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommandLink {
     /// The spacecraft's own link: ping it, arm it, restart it, configure it.

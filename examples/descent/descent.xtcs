@@ -37,9 +37,8 @@
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5000</address>
                 <ground_base>127.0.0.1:5100</ground_base>
-                <port>5000</port>
                 <world-in>altitude</world-in>
                 <world-in>descent_rate</world-in>
                 <world-in>guidance</world-in>
@@ -95,24 +94,21 @@
         <type name="network">
             <!-- The Doppler velocimeter, five a second. -->
             <payload name="doppler">
-                <address>127.0.0.1</address>
-                <port>5402</port>
+                <address>127.0.0.1:5402</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>descent_rate.doppler</world-out>
             </payload>
             <!-- The engine's throttle, driven by what guidance answers. -->
             <payload name="engine">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5404</address>
                 <moc-in-type>ratio</moc-in-type>
-                <port>5404</port>
                 <protocol>udp</protocol>
                 <moc-in>guidance</moc-in>
             </payload>
             <!-- The radar altimeter, which sends ten readings a second. -->
             <payload name="radar">
-                <address>127.0.0.1</address>
-                <port>5401</port>
+                <address>127.0.0.1:5401</address>
                 <protocol>udp</protocol>
                 <world-out-type>u16</world-out-type>
                 <world-out>altitude.radar</world-out>
@@ -121,8 +117,7 @@
                  that the lander is down: straight to the ground. -->
             <payload name="touchdown">
                 <read_size>16</read_size>
-                <address>127.0.0.1</address>
-                <port>5403</port>
+                <address>127.0.0.1:5403</address>
                 <protocol>udp</protocol>
                 <world-out>gateway.touchdown</world-out>
             </payload>

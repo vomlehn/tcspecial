@@ -55,10 +55,9 @@
                  device id 3, at 127.0.0.1:9703 as 0x3003, and
                  zone_temp, device id 4, at 127.0.0.1:9704 as 0x3004. -->
             <gateway name="fsw">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:9600</address>
                 <bridge_base>127.0.0.1:9700</bridge_base>
                 <fprime_id_base>0x3000</fprime_id_base>
-                <port>9600</port>
                 <moc-out>heater.fsw</moc-out>
                 <world-in>heater_wanted</world-in>
                 <world-in>thermometer</world-in>
@@ -71,8 +70,7 @@
             <!-- A heater, driven by what the flight computer sends - 1 for
                  on, 0 for off - the far end of a UDP socket. -->
             <payload name="heater">
-                <address>127.0.0.1</address>
-                <port>9001</port>
+                <address>127.0.0.1:9001</address>
                 <protocol>udp</protocol>
                 <moc-in>fsw</moc-in>
             </payload>
@@ -80,8 +78,7 @@
                  of a degree, whose readings go to the flight computer as
                  they are, and to zone_temp to be made a temperature. -->
             <payload name="thermometer">
-                <address>127.0.0.1</address>
-                <port>9002</port>
+                <address>127.0.0.1:9002</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>fsw.thermometer</world-out>

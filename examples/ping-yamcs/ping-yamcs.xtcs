@@ -67,10 +67,9 @@
                  of the two, device id 1, so 16701) as telemetry of APID
                  apid_base plus that device id, 0x201. -->
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:16600</address>
                 <apid_base>0x200</apid_base>
                 <ground_base>127.0.0.1:16700</ground_base>
-                <port>16600</port>
                 <moc-out>ping.gateway</moc-out>
                 <world-in>ping</world-in>
             </gateway>

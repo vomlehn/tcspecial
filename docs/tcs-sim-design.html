@@ -567,14 +567,11 @@ Refused for every other type</td>
 <tbody valign="top">
 <tr><td>payload_address</td>
 <td>string</td>
-<td>The socket the payload answers from: a host
-for a UDP payload, a path for a Unix
-datagram one. Optional, and only for those</td>
-</tr>
-<tr><td>payload_port</td>
-<td>number</td>
-<td>The port it answers from. Optional, and
-refused for a Unix datagram payload</td>
+<td>The socket the payload answers from: for a
+UDP payload host:port, the host alone for
+any port, 0.0.0.0:port for any interface;
+for a Unix datagram one, a path. Optional,
+and only for those</td>
 </tr>
 </tbody>
 </table>
@@ -701,7 +698,11 @@ socket the simulated payload answers from.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A simulated payload may be given the socket it binds for itself, as
-<tt class="docutils literal">payload_address</tt> and <tt class="docutils literal">payload_port</tt>. Nothing in the link needs it --
+<tt class="docutils literal">payload_address</tt>: the host and the port together, as every address
+is written, either of which may be left to the system -- the host alone
+for any port, <tt class="docutils literal"><span class="pre">0.0.0.0:&lt;port&gt;</span></tt> for any interface. A file that writes
+<tt class="docutils literal">payload_port</tt> beside it, as one did before the two were one, is
+refused and told to write them together. Nothing in the link needs it --
 a handler learns where its payload is from the first packet it gets -- but
 something outside the simulation may: a rule on a firewall, or a capture
 being read afterwards. Stated by neither file otherwise, so there is
@@ -713,8 +714,8 @@ configuration gives it, and a second address stated here would be two
 answers to where it is; a device, a line, a bus or a peripheral has no
 address at all.</dd>
 <dt>Requirement</dt>
-<dd>A Unix datagram payload answers from a path, so it takes a
-<tt class="docutils literal">payload_address</tt> and no <tt class="docutils literal">payload_port</tt>.</dd>
+<dd>A Unix datagram payload answers from a path, so its <tt class="docutils literal">payload_address</tt>
+is a path.</dd>
 <dt>Requirement</dt>
 <dd>Neither end may be the other. A payload told to bind its handler's own
 socket is refused here rather than left to fail at the bind, which says

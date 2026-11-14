@@ -152,12 +152,11 @@ that the two files can be checked against each other.
 +---------------------+--------+---------------------------------------------+
 | Attribute           | Type   | Meaning                                     |
 +=====================+========+=============================================+
-| payload_address     | string | The socket the payload answers from: a host |
-|                     |        | for a UDP payload, a path for a Unix        |
-|                     |        | datagram one. Optional, and only for those  |
-+---------------------+--------+---------------------------------------------+
-| payload_port        | number | The port it answers from. Optional, and     |
-|                     |        | refused for a Unix datagram payload         |
+| payload_address     | string | The socket the payload answers from: for a  |
+|                     |        | UDP payload host:port, the host alone for   |
+|                     |        | any port, 0.0.0.0:port for any interface;   |
+|                     |        | for a Unix datagram one, a path. Optional,  |
+|                     |        | and only for those                          |
 +---------------------+--------+---------------------------------------------+
 
 **Fault injection settings**, each defaulting to no fault at all:
@@ -264,7 +263,11 @@ socket the simulated payload answers from.
 
 Requirement
     A simulated payload may be given the socket it binds for itself, as
-    ``payload_address`` and ``payload_port``. Nothing in the link needs it --
+    ``payload_address``: the host and the port together, as every address
+    is written, either of which may be left to the system -- the host alone
+    for any port, ``0.0.0.0:<port>`` for any interface. A file that writes
+    ``payload_port`` beside it, as one did before the two were one, is
+    refused and told to write them together. Nothing in the link needs it --
     a handler learns where its payload is from the first packet it gets -- but
     something outside the simulation may: a rule on a firewall, or a capture
     being read afterwards. Stated by neither file otherwise, so there is
@@ -278,8 +281,8 @@ Requirement
     address at all.
 
 Requirement
-    A Unix datagram payload answers from a path, so it takes a
-    ``payload_address`` and no ``payload_port``.
+    A Unix datagram payload answers from a path, so its ``payload_address``
+    is a path.
 
 Requirement
     Neither end may be the other. A payload told to bind its handler's own

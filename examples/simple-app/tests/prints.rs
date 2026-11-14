@@ -64,8 +64,7 @@ fn configuration() -> (tempfile::TempDir, PathBuf, u16) {
 payloads:
   - type network:
       - payload: lorem
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [gateway.lorem]
 ",
@@ -241,8 +240,7 @@ gateways:
 payloads:
   - type network:
       - payload: lorem
-        address: \"127.0.0.1\"
-        port: \"7001\"
+        address: \"127.0.0.1:7001\"
         protocol: udp
         world-out: [gateway.lorem]
 ",

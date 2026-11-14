@@ -2158,9 +2158,8 @@ vehicle:
             "gateways:
   - type gateway_radio:
       - gateway: ground
-        address: 127.0.0.1
+        address: \"127.0.0.1:5000\"
         ground_base: \"127.0.0.1:5100\"
-        port: \"5000\"
         moc-out: [pinger.ground]
         world-in: [pinger]
 vehicle:

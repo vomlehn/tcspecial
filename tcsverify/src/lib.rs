@@ -1757,9 +1757,8 @@ payloads:
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: \"10.0.0.1\"
+        address: \"10.0.0.1:5000\"
         ground_base: \"10.0.0.2:5100\"
-        port: \"5000\"
         world-in: [sensor]
 ";
 
@@ -1781,12 +1780,13 @@ gateways:
         .replace(
             "        world-out: [gateway.sensor]\ngateways:\n",
             "        world-out: [gateway.sensor]\n  - type network:\n      \
-             - { payload: heater, protocol: udp, address: \"127.0.0.1\", \
-             port: \"8001\", moc-in: [echo] }\ngateways:\n",
+             - { payload: heater, protocol: udp, \
+             address: \"127.0.0.1:8001\", moc-in: [echo] }\ngateways:\n",
         )
         .replace(
-            "        port: \"5000\"\n",
-            "        port: \"5000\"\n        moc-out: [echo.gateway]\n",
+            "        address: \"10.0.0.1:5000\"\n",
+            "        address: \"10.0.0.1:5000\"\n        \
+             moc-out: [echo.gateway]\n",
         );
         let sim = "simulated_payloads:\n  \
                    - type i2c:\n      \
@@ -2103,8 +2103,7 @@ payloads:
         read_size: \"4\"
   - type network:
       - payload: DH1
-        address: \"127.0.0.1\"
-        port: \"5000\"
+        address: \"127.0.0.1:5000\"
         protocol: udp
 ";
 

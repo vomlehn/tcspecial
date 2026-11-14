@@ -83,8 +83,7 @@ vehicle:
 payloads:
   - type network:
       - payload: s
-        address: "127.0.0.1"
-        port: "9401"
+        address: "127.0.0.1:9401"
         protocol: "udp"
         world-out:
           - c.s

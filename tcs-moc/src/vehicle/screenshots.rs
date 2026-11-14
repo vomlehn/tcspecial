@@ -864,13 +864,13 @@ impl Station {
         let pings = tcsmoc::ping::route_of(&graph).map(|route| {
             let vehicle_ping =
                 UdpSocket::bind("127.0.0.1:0").expect("a ping socket");
-            let port = vehicle_ping.local_addr().unwrap().port();
+            let at = vehicle_ping.local_addr().unwrap().to_string();
             let mut aimed = graph.clone();
             if let Some(node) =
                 aimed.nodes.iter_mut().find(|n| n.name == route.gateway)
             {
                 node.attributes
-                    .insert("port".to_string(), Scalar::of(port.to_string()));
+                    .insert("address".to_string(), Scalar::of(at));
             }
             let (through, feed) =
                 ping_node(&ui, &ping_window, &aimed, &matched)

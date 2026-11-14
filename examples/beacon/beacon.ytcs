@@ -43,8 +43,7 @@ payloads:
       # aboard is not one. Its readings go to the ground over payload_telemetry,
       # as any payload's do when nothing aboard touches them.
       - payload: sensor
-        address: "127.0.0.1"
-        port: "5101"
+        address: "127.0.0.1:5101"
         protocol: "udp"
 
 tcs-gui:

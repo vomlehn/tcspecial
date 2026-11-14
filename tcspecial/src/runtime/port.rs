@@ -2494,7 +2494,7 @@ mod tests {
         let waits = UdpSocket::bind("127.0.0.1:0")
             .and_then(|taken| taken.local_addr())
             .expect("a free port");
-        let port = waits.port().to_string();
+        let waits_at = waits.to_string();
 
         let node = Node {
             name: "temp".to_string(),
@@ -2502,8 +2502,7 @@ mod tests {
             group: None,
             attributes: [
                 ("protocol", "udp"),
-                ("address", "127.0.0.1"),
-                ("port", port.as_str()),
+                ("address", waits_at.as_str()),
                 ("sends_from", sends_from.as_str()),
             ]
             .into_iter()
@@ -2580,7 +2579,7 @@ mod tests {
         sensor
             .set_read_timeout(Some(Duration::from_secs(2)))
             .expect("a timeout");
-        let at = sensor.local_addr().expect("where").port().to_string();
+        let at = sensor.local_addr().expect("where").to_string();
 
         let node = Node {
             name: "temp".to_string(),
@@ -2588,8 +2587,7 @@ mod tests {
             group: None,
             attributes: [
                 ("protocol", "udp"),
-                ("address", "127.0.0.1"),
-                ("port", at.as_str()),
+                ("address", at.as_str()),
                 ("trigger", "\"READ\""),
                 ("init", "\"RESET\""),
             ]

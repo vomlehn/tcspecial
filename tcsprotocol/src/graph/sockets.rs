@@ -522,7 +522,7 @@ mod tests {
             .expect("the cfs example has a heater");
         heater
             .attributes
-            .insert("port".to_string(), crate::Scalar::of("8634"));
+            .insert("address".to_string(), crate::Scalar::of("127.0.0.1:8634"));
         let found = clashes(&graph);
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].node.as_deref(), Some("heater"));

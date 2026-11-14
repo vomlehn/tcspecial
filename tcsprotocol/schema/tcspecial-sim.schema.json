@@ -189,20 +189,11 @@
             ]
           },
           "payload_address": {
-            "description": "Where tcs-sim answers from, where it has an address of its own to bind.",
+            "description": "Where tcs-sim answers from, where it has an address of its own to bind: the host and the port together, as 127.0.0.1:7000; a host alone, for whatever port the system gives; 0.0.0.0:7000, for that port on any interface; or a path, for a unix_dgram payload.",
             "type": [
               "string",
               "null"
             ]
-          },
-          "payload_port": {
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ],
-            "description": "And the port with it."
           },
           "packet_interval": {
             "type": [
@@ -472,20 +463,11 @@
           ]
         },
         "payload_address": {
-          "description": "Where tcs-sim answers from, where it has an address of its own to bind.",
+          "description": "Where tcs-sim answers from, where it has an address of its own to bind: the host and the port together, as 127.0.0.1:7000; a host alone, for whatever port the system gives; 0.0.0.0:7000, for that port on any interface; or a path, for a unix_dgram payload.",
           "type": [
             "string",
             "null"
           ]
-        },
-        "payload_port": {
-          "type": [
-            "string",
-            "number",
-            "boolean",
-            "null"
-          ],
-          "description": "And the port with it."
         },
         "packet_interval": {
           "type": [

@@ -155,9 +155,9 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     let (commands, take_at) = (bound(), free());
     let mut text = text;
     for (was, now) in [
-        ("\"9001\"", format!("\"{}\"", port(&heater))),
-        ("\"9002\"", format!("\"{thermometer}\"")),
-        ("\"9600\"", format!("\"{uplink}\"")),
+        (":9001\"", format!(":{}\"", port(&heater))),
+        (":9002\"", format!(":{thermometer}\"")),
+        (":9600\"", format!(":{uplink}\"")),
         ("127.0.0.1:9700", format!("127.0.0.1:{base}")),
         ("127.0.0.1:9510", format!("127.0.0.1:{}", free())),
         ("0.0.0.0:9500", format!("127.0.0.1:{}", free())),

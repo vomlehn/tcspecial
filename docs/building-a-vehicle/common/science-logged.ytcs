@@ -97,9 +97,8 @@ payloads:
       # has one place to receive the vehicle's data from.
       - payload: seismometer
         read_size: "16"
-        address: "127.0.0.1"
+        address: "127.0.0.1:5401"
         group: "science_readings"
-        port: "5401"
         protocol: "udp"
         world-out:
           - gateway.seismometer

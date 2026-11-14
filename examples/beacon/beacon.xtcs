@@ -50,8 +50,7 @@
                  readings go to the ground over payload_telemetry, as any
                  payload's do when nothing aboard touches them. -->
             <payload name="sensor">
-                <address>127.0.0.1</address>
-                <port>5101</port>
+                <address>127.0.0.1:5101</address>
                 <protocol>udp</protocol>
             </payload>
         </type>

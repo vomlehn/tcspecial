@@ -499,9 +499,8 @@ tcspecial:
 gateways:
   - type gateway_radio:
       - gateway: g
-        address: \"127.0.0.1\"
+        address: \"127.0.0.1:{}\"
         ground_base: \"127.0.0.1:10\"
-        port: \"{}\"
         moc-out: [p.g]
         world-in: [p]
 vehicle:

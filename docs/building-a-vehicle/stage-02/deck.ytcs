@@ -63,8 +63,7 @@ payloads:
       # hears it on 127.0.0.1:6101 where in stage 1 it heard it on 6100.
       - payload: seismometer
         read_size: "16"
-        address: "127.0.0.1"
-        port: "5401"
+        address: "127.0.0.1:5401"
         protocol: "udp"
   - type serial:
       # The regolith thermometer: a probe pushed into the ground beside the

@@ -433,23 +433,25 @@ fn simulator_parameters(out: &mut String, dh: &DHConfig, sim: &ResolvedSim) {
     // The socket this payload answers from, where the file asks for one. Not
     // where the payload is -- that is the payload configuration's line above
     // -- but the other end of the same link.
-    match (&sim.payload_address, sim.payload_port) {
-        (None, None) => {}
-        (address, port) => {
-            let _ = writeln!(
-                out,
-                "  payload_address  {}",
-                address.as_deref().unwrap_or("any interface")
-            );
-            let _ = writeln!(
-                out,
-                "  payload_port     {}",
-                match port {
-                    Some(port) => port.to_string(),
-                    None => "whichever the system gives".to_string(),
-                }
-            );
+    // Written as the file writes it, host and port together; a path, for a
+    // Unix socket, has no port to give.
+    let host = |address: &str| match address.contains(':') {
+        true => format!("[{address}]"),
+        false => address.to_string(),
+    };
+    let own = match (sim.payload_address.as_deref(), sim.payload_port) {
+        (None, None) => None,
+        (Some(address), Some(port)) => {
+            Some(format!("{}:{port}", host(address)))
         }
+        (Some(path), None) if path.contains('/') => Some(path.to_string()),
+        (Some(address), None) => {
+            Some(format!("{address}, the port whichever the system gives"))
+        }
+        (None, Some(port)) => Some(format!("0.0.0.0:{port}")),
+    };
+    if let Some(own) = own {
+        let _ = writeln!(out, "  payload_address  {own}");
     }
 
     let faults = &sim.faults;

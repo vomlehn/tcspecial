@@ -312,8 +312,7 @@ mod tests {
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: \"10.0.0.1\"
-        port: \"5000\"
+        address: \"10.0.0.1:5000\"
 {gateway_says}
 payloads:
   - type i2c:

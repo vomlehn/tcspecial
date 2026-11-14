@@ -24,9 +24,8 @@ tcspecial:
 gateways:
   - type gateway_radio:
       - gateway: gateway-1
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         ground_base: "127.0.0.1:5100"
-        port: "5000"
         world-in: [spi-1]
 
 payloads:

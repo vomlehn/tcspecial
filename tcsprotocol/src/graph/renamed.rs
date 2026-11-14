@@ -54,6 +54,10 @@ struct Renamed {
     new: &'static str,
     /// What else changed with the word, said after it, where anything did.
     then: &'static str,
+    /// Whether the word was folded into `new` rather than renamed to it:
+    /// `port` into `address`, which writes the host and the port together.
+    /// `then` then says how to write it.
+    merged: bool,
 }
 
 /// What a sink holds now, said after its new name.
@@ -73,30 +77,35 @@ const RENAMED: &[Renamed] = &[
         place: Place::Section,
         new: "gateways",
         then: "",
+        merged: false,
     },
     Renamed {
         old: "moc",
         place: Place::NodeType,
         new: "gateway_radio",
         then: "",
+        merged: false,
     },
     Renamed {
         old: "tee-moc",
         place: Place::NodeType,
         new: "tee-gateway",
         then: "",
+        merged: false,
     },
     Renamed {
         old: "null-moc",
         place: Place::NodeType,
         new: "null-gateway",
         then: "",
+        merged: false,
     },
     Renamed {
         old: "app_moc_veh",
         place: Place::NodeType,
         new: "app_gateway_veh",
         then: "",
+        merged: false,
     },
     // The four terminals, named for the side of the graph each stream
     // belongs to: the world a payload reads, and the MOC that commands it.
@@ -107,24 +116,28 @@ const RENAMED: &[Renamed] = &[
         place: Place::Key,
         new: "world-in",
         then: SINK,
+        merged: false,
     },
     Renamed {
         old: "payload-out",
         place: Place::Key,
         new: "world-out",
         then: SOURCE,
+        merged: false,
     },
     Renamed {
         old: "gateway-in",
         place: Place::Key,
         new: "moc-in",
         then: SINK,
+        merged: false,
     },
     Renamed {
         old: "gateway-out",
         place: Place::Key,
         new: "moc-out",
         then: SOURCE,
+        merged: false,
     },
     // One type of discrete lines with a direction became three, each with
     // the terminals of what its lines are, and the type says the direction
@@ -136,12 +149,14 @@ const RENAMED: &[Renamed] = &[
         then: " where its lines are watched, or gpio_out where they are \
                driven, or gpio_inout where they are driven and reported to \
                the ground -- and take direction out, which the type says now",
+        merged: false,
     },
     Renamed {
         old: "app-moc-arg",
         place: Place::Key,
         new: "app-gateway-arg",
         then: "",
+        merged: false,
     },
     // Named for the configuration editor, whose name has a hyphen now.
     Renamed {
@@ -149,6 +164,16 @@ const RENAMED: &[Renamed] = &[
         place: Place::Section,
         new: "tcs-gui",
         then: "",
+        merged: false,
+    },
+    Renamed {
+        old: "port",
+        place: Place::Key,
+        new: "address",
+        then: "write the host and the port together, as \
+               address: \"<host>:<port>\", as ground_base is; \
+               tools/convert-format.py rewrites a file so",
+        merged: true,
     },
 ];
 
@@ -160,12 +185,24 @@ const SIMULATOR_RENAMED: &[Renamed] = &[
         place: Place::Section,
         new: "tcs-gui",
         then: "",
+        merged: false,
     },
     Renamed {
         old: "tcssim",
         place: Place::Section,
         new: "tcs-sim",
         then: "",
+        merged: false,
+    },
+    Renamed {
+        old: "payload_port",
+        place: Place::Key,
+        new: "payload_address",
+        then: "write the host and the port together, as \
+               payload_address: \"<host>:<port>\", a host alone for any \
+               port and 0.0.0.0:<port> for any interface; \
+               tools/convert-format.py rewrites a file so",
+        merged: true,
     },
 ];
 
@@ -250,6 +287,12 @@ fn refused_from(
         Place::NodeType => format!("the node type {}", said.old),
         Place::Key => said.old.to_string(),
     };
+    if said.merged {
+        return Some(format!(
+            "at line {line}, {what} is part of {} now: {}",
+            said.new, said.then
+        ));
+    }
     Some(format!(
         "at line {line}, {what} is called {} now: rename it{}",
         said.new, said.then
@@ -285,6 +328,14 @@ fn in_yaml(
         // the file has neither types nor links.
         let entries = value.as_sequence().into_iter().flatten();
         for entry in entries.filter_map(serde_norway::Value::as_mapping) {
+            // An entry that is not a type is a group of a simulator file,
+            // whose keys are its settings.
+            found.extend(
+                entry
+                    .keys()
+                    .filter_map(|key| key.as_str())
+                    .filter_map(|k| renamed(table, Place::Key, k)),
+            );
             for (key, nodes) in entry {
                 let typed = key.as_str().and_then(|k| k.strip_prefix("type "));
                 if let Some(said) = typed
@@ -483,7 +534,9 @@ fn in_xml(
                             .flatten()
                     })
                 }
-                5 => renamed(table, Place::Key, &name),
+                // A node's keys; and, a level up, a simulator file's
+                // group's, whose settings are children of the group.
+                4 | 5 => renamed(table, Place::Key, &name),
                 _ => None,
             }
         };
@@ -804,13 +857,15 @@ mod tests {
                     )),
                     "{why}"
                 );
-                assert!(
-                    why.contains(&format!(
+                let told = if said.merged {
+                    format!(" is part of {} now: {}", said.new, said.then)
+                } else {
+                    format!(
                         " is called {} now: rename it{}",
                         said.new, said.then
-                    )),
-                    "{why}"
-                );
+                    )
+                };
+                assert!(why.contains(&told), "{why}");
                 asked += 1;
             }
         }
@@ -823,7 +878,10 @@ mod tests {
     /// through the same refusal.
     #[test]
     fn a_simulator_file_with_an_old_section_is_told_the_new_one() {
-        for said in SIMULATOR_RENAMED {
+        let sections = SIMULATOR_RENAMED
+            .iter()
+            .filter(|s| s.place == Place::Section);
+        for said in sections {
             let yaml = format!(
                 "description: a file\n{}:\n  ready: \"127.0.0.1:7900\"\n",
                 said.old
@@ -912,6 +970,16 @@ mod tests {
                 &format!("type {}:", said.new),
                 &format!("type {}:", said.old),
             ),
+            // A word folded into another is written beside what it was
+            // folded into, as it was: a port under the lines' path, which is
+            // where a file in the old words would have one.
+            Place::Key if said.merged => yaml_with(
+                "path: /dev/gpiochip0",
+                &format!(
+                    "{}: \"5000\"\n        path: /dev/gpiochip0",
+                    said.old
+                ),
+            ),
             Place::Key => {
                 yaml_with(&format!("{}:", said.new), &format!("{}:", said.old))
             }
@@ -940,6 +1008,13 @@ mod tests {
                 &format!("<type name=\"{}\">", said.new),
                 &format!("<type name=\"{}\">", said.old),
             ),
+            Place::Key if said.merged => xml_with(
+                "<path>/dev/gpiochip0</path>",
+                &format!(
+                    "<{0}>5000</{0}>\n<path>/dev/gpiochip0</path>",
+                    said.old
+                ),
+            ),
             Place::Key => {
                 xml_with(&format!("<{}", said.new), &format!("<{}", said.old))
                     .replace(
@@ -948,6 +1023,76 @@ mod tests {
                     )
             }
         }
+    }
+
+    /// A simulated payload's setting folded into another, `payload_port`
+    /// into `payload_address`, is refused at its line in both spellings and
+    /// told how it is written now; and a simulator file that is read is read
+    /// through the same refusal.
+    #[test]
+    fn a_simulator_file_with_a_folded_setting_is_told_how_to_write_it() {
+        let merged = SIMULATOR_RENAMED.iter().filter(|s| s.place == Place::Key);
+        let mut asked = 0;
+        for said in merged {
+            assert!(said.merged, "{}", said.old);
+            let told = |line: usize| {
+                format!(
+                    "at line {line}, {} is part of {} now: {}",
+                    said.old, said.new, said.then
+                )
+            };
+            let yaml = format!(
+                "simulated_payloads:\n  - type network:\n      \
+                 - payload: p\n        protocol: udp\n        \
+                 {}: 7000\n",
+                said.old
+            );
+            assert_eq!(
+                refused_in_simulator(&yaml, ConfigFormat::Yaml),
+                Some(told(5))
+            );
+            let why = crate::sim_config::SimConfigFile::parse(
+                &yaml,
+                ConfigFormat::Yaml,
+            )
+            .expect_err("a folded setting is refused")
+            .to_string();
+            assert!(why.contains(&told(5)), "{why}");
+
+            let xml = format!(
+                "<simulator>\n<simulated_payloads>\n\
+                 <type name=\"network\">\n<payload name=\"p\">\n\
+                 <protocol>udp</protocol>\n<{0}>7000</{0}>\n</payload>\n\
+                 </type>\n</simulated_payloads>\n</simulator>\n",
+                said.old
+            );
+            assert_eq!(
+                refused_in_simulator(&xml, ConfigFormat::Xml),
+                Some(told(6))
+            );
+
+            // And in a group's settings, which its payloads take.
+            let yaml = format!(
+                "simulated_payload_groups:\n  - group: g\n    {}: 7000\n",
+                said.old
+            );
+            assert_eq!(
+                refused_in_simulator(&yaml, ConfigFormat::Yaml),
+                Some(told(3))
+            );
+            let xml = format!(
+                "<simulator>\n<simulated_payload_groups>\n\
+                 <group name=\"g\">\n<{0}>7000</{0}>\n</group>\n\
+                 </simulated_payload_groups>\n</simulator>\n",
+                said.old
+            );
+            assert_eq!(
+                refused_in_simulator(&xml, ConfigFormat::Xml),
+                Some(told(4))
+            );
+            asked += 1;
+        }
+        assert!(asked > 0, "payload_port is in the list");
     }
 
     /// A comment that mentions the word on an earlier line does not move

@@ -63,8 +63,8 @@ fn example(dir: &Path) -> (std::path::PathBuf, u16) {
     for (was, now) in [
         ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:2234", format!("127.0.0.1:{}", free())),
-        ("\"8601\"", format!("\"{}\"", free())),
-        ("\"8602\"", format!("\"{thermometer}\"")),
+        (":8601\"", format!(":{}\"", free())),
+        (":8602\"", format!(":{thermometer}\"")),
         (
             "/tmp/telemetry",
             dir.join("telemetry").display().to_string(),

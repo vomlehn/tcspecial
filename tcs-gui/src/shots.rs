@@ -645,7 +645,7 @@ fn an_error_and_undo(out: &Path, work: &Path) {
 
     // A port that cannot be one, typed into the shunt's window.
     let node = session.node_window("shunt");
-    node.invoke_attribute_set("port".into(), "99999".into());
+    node.invoke_attribute_set("address".into(), "127.0.0.1:99999".into());
     node.invoke_closed();
     let alert = session
         .views
@@ -756,7 +756,7 @@ fn opening_with_errors(out: &Path, work: &Path) {
     let dir = copy_example(work, "battery");
     let top = dir.join("battery.ytcs");
     let text = std::fs::read_to_string(&top).expect("the example");
-    let wrong = text.replacen("port: \"5301\"", "port: \"99999\"", 1);
+    let wrong = text.replacen("\"127.0.0.1:5301\"", "\"127.0.0.1:99999\"", 1);
     assert_ne!(text, wrong, "the shunt's port is where it was");
     std::fs::write(&top, wrong).expect("the example is changed");
     let session = Session::open(&top, &dir.join("battery-sim.yaml"), true);

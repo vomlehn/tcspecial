@@ -1021,9 +1021,10 @@ mod tests {
             second
                 .attributes
                 .insert("fprime_id_base".to_string(), crate::Scalar::of(base));
-            second
-                .attributes
-                .insert("port".to_string(), crate::Scalar::of("9601"));
+            second.attributes.insert(
+                "address".to_string(),
+                crate::Scalar::of("127.0.0.1:9601"),
+            );
             second.attributes.insert(
                 "bridge_base".to_string(),
                 crate::Scalar::of("127.0.0.1:9800"),

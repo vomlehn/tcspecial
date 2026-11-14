@@ -60,10 +60,9 @@ gateways:
       # of the two, device id 1, so 16701 -- as telemetry of APID apid_base plus
       # that device id, 0x201.
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:16600"
         apid_base: "0x200"
         ground_base: "127.0.0.1:16700"
-        port: "16600"
         moc-out:
           - ping.gateway
         world-in: [ping]

@@ -74,9 +74,8 @@ gateways:
       # 5113. What the ground sends up arrives at address and port, which the
       # ground's setpoint command needs.
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         ground_base: "127.0.0.1:5100"
-        port: "5000"
         world-in:
           - hull_kelvin_1
           - hull_kelvin_2

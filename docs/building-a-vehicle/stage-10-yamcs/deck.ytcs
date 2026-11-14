@@ -87,10 +87,9 @@ gateways:
       # ground's setpoint command among it, goes as a telecommand of APID
       # apid_base.
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         apid_base: "0x400"
         ground_base: "127.0.0.1:5100"
-        port: "5000"
         world-in:
           - camera
           - hull_kelvin_1

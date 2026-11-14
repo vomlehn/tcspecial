@@ -1497,7 +1497,7 @@ mod tests {
                     let value = match name {
                         "group" => "steady_1hz",
                         "protocol" => "udp",
-                        "payload_address" => "127.0.0.1",
+                        "payload_address" => "127.0.0.1:7000",
                         "simulate" | "enable" => "true",
                         _ => "1",
                     };

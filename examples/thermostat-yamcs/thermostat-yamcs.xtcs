@@ -69,10 +69,9 @@
                  What Yamcs sends up to address:port goes as a telecommand
                  of APID apid_base. -->
             <gateway name="gateway">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:17600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:17700</ground_base>
-                <port>17600</port>
                 <world-in>consensus_temp</world-in>
                 <world-in>gpio-out-tmass1</world-in>
                 <world-in>gpio-out-tmass2</world-in>

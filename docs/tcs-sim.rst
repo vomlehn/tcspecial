@@ -75,8 +75,8 @@ still refused, naming it.
                           <enable value="true"/>
        protocol           which transport, for a network payload
        payload_address    the socket the payload answers from, if this file
-                          cares to say
-       payload_port       which port it answers from, likewise
+                          cares to say: host:port, as every address is
+                          written
        group              the group to take unstated settings from, if any
        ...                any of the settings below
 
@@ -160,18 +160,19 @@ Stating the type here makes that pairing an error instead.
    protocol               which transport, for a network payload, and refused
                           for any other type. Must be what that configuration
                           says
-   payload_address        the socket the simulated payload answers from: a
-                          host for a UDP payload, a path for a Unix datagram
-                          one. Optional, only for those two types, and not
-                          for a triggered one, which waits at the address the
+   payload_address        the socket the simulated payload answers from: for
+                          a UDP payload the host and the port together,
+                          127.0.0.1:7000, as every address is written -- the
+                          host alone for any port, 0.0.0.0:7000 for that port
+                          on any interface; for a Unix datagram one, a path.
+                          Optional, only for those two types, and not for a
+                          triggered one, which waits at the address the
                           tcspecial configuration gives
-   payload_port           the port it answers from. Optional, and refused for
-                          a Unix datagram payload, which answers from a path
 
 Where the payload *is* is not stated here at all: the simulator takes it from
 the tcspecial configuration, which decides it. Writing ``payload_interface``
-here -- or ``address`` or ``port``, which that file spelled them before -- is
-refused with the place they belong; they are the likeliest thing to be carried
+here -- or ``address``, which that file spelled it before -- is refused with
+the place it belongs; they are the likeliest thing to be carried
 across from the other file.
 
 What this file may say about an address is the other end of the same link: the
@@ -183,9 +184,10 @@ socket the simulated payload answers from.
      - type network:
          - payload: auto-send
            packet_interval: 1 s
-           payload_address: 127.0.0.1   # the socket this payload answers
-           payload_port: 7000           # from, not the one the handler
-           protocol: udp                # waits at
+           # The socket this payload answers from, not the one the
+           # handler waits at.
+           payload_address: 127.0.0.1:7000
+           protocol: udp
 
 Nothing in the link needs it -- a handler learns where its payload is from the
 first packet it gets -- but something outside the simulation may: a rule on a
@@ -193,7 +195,10 @@ firewall, or a capture being read afterwards. Only a datagram payload that
 is not asked has an address of its own to bind; a stream payload, and a
 datagram payload that is asked, is the end that waits, so it binds the
 address the tcspecial configuration gives it. A Unix datagram
-payload answers from a path, so it takes an address and no port. Neither end
+payload answers from a path, so its address is a path. A file that writes
+``payload_port`` beside ``payload_address``, as one did before the two were
+one, is refused and told to write them together;
+``tools/convert-format.py`` rewrites it so. Neither end
 may be the other: a payload told to bind its handler's own socket is refused
 rather than left to fail at the bind. Stating neither gets what every
 simulator configuration asked for before this existed -- any interface and a

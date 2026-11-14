@@ -46,9 +46,8 @@
                  node that sent it: the switch, device id 2, at
                  127.0.0.1:3722. -->
             <gateway name="moc">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:3620</address>
                 <ground_base>127.0.0.1:3720</ground_base>
-                <port>3620</port>
                 <moc-out>lamp.moc</moc-out>
                 <world-in>switch</world-in>
             </gateway>

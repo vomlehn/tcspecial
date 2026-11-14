@@ -29,9 +29,8 @@
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway-1">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:5000</address>
                 <ground_base>127.0.0.1:5100</ground_base>
-                <port>5000</port>
                 <world-in>spi-1</world-in>
             </gateway>
         </type>

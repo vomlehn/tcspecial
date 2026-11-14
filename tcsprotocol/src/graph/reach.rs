@@ -222,7 +222,7 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
     // section states, and has no socket of its own: an address on one is
     // somewhere somebody expects to be listened on, and nothing will be.
     if on_bus(node) {
-        for socket in ["address", "port", "protocol"] {
+        for socket in ["address", "protocol"] {
             if node.attributes.contains_key(socket) {
                 return Err(format!(
                     "\"{what}\" is a {} node, which is on the cFS software \
@@ -378,46 +378,34 @@ pub fn reach_of(node: &Node) -> Result<Reach, String> {
                 (false, None) => {}
             }
 
-            // A ground link that states neither address nor port binds
-            // nothing: it only sends, to its ground_base, and the ground has
-            // nowhere aboard to send to. One that receives -- commands, or a
-            // line out of it -- must state both, which `Graph::check` holds it
-            // to, knowing the links. Both or neither, whichever: half an
-            // address is a mistake on any node.
-            let has = |a: &str| node.attributes.contains_key(a);
-            if is_gateway(&node.node_type) && !has("address") && !has("port") {
+            // A ground link that states no address binds nothing: it only
+            // sends, to its ground_base, and the ground has nowhere aboard to
+            // send to. One that receives -- commands, or a line out of it --
+            // must state one, which `Graph::check` holds it to, knowing the
+            // links.
+            if is_gateway(&node.node_type)
+                && !node.attributes.contains_key("address")
+            {
                 EndpointConfig::Network(NetworkConfig {
                     protocol,
                     address: UNBOUND.to_string(),
                     port: 0,
                 })
             } else {
+                let stated = required(
+                    what,
+                    node,
+                    "address",
+                    "a network node",
+                    "where it is: address:port, a path for a unix socket, \
+                     or a host alone for a raw one",
+                )?;
+                let (address, port) =
+                    network_address_of(what, protocol, stated.as_str())?;
                 EndpointConfig::Network(NetworkConfig {
                     protocol,
-                    address: required(
-                        what,
-                        node,
-                        "address",
-                        "a network node",
-                        "the host it is at",
-                    )?
-                    .as_str()
-                    .to_string(),
-                    port: match protocol {
-                        // An IP datagram has no port: what tells one
-                        // payload's datagrams from another's is the protocol
-                        // number and the host.
-                        NetworkProtocol::Raw(_) if has("port") => {
-                            return Err(format!(
-                                "\"{what}\" is reached on a raw socket, which \
-                                 has no port: take port out, the ip_protocol \
-                                 and the address being what say which \
-                                 datagrams are its"
-                            ))
-                        }
-                        NetworkProtocol::Raw(_) => 0,
-                        _ => port_of(what, node)?,
-                    },
+                    address,
+                    port,
                 })
             }
         }
@@ -1043,12 +1031,10 @@ const UNBOUND: &str = "0.0.0.0";
 
 /// Whether a node's endpoint is bound aboard for the far end to reach.
 ///
-/// False only for a gateway node that states no address and no port, which
-/// only sends. Everything else opens what it describes.
+/// False only for a gateway node that states no address, which only
+/// sends. Everything else opens what it describes.
 pub fn binds(node: &Node) -> bool {
-    !is_gateway(&node.node_type)
-        || node.attributes.contains_key("address")
-        || node.attributes.contains_key("port")
+    !is_gateway(&node.node_type) || node.attributes.contains_key("address")
 }
 
 /// Where a gateway node's data goes: the `address:port` its kind's base
@@ -1178,7 +1164,6 @@ pub fn apid_base_of(node: &Node) -> Result<Option<u16>, String> {
 const LOCATORS: &[&str] = &[
     "path",
     "address",
-    "port",
     "protocol",
     "ip_protocol",
     "interface",
@@ -1196,9 +1181,10 @@ const LOCATORS: &[&str] = &[
 /// The attributes, out of [`LOCATORS`], that locate a node of that type.
 fn locators(kind: DHType) -> &'static [&'static str] {
     match kind.reached_as() {
-        // A host and a port, and which protocol is spoken to it -- or, on a
-        // raw socket, a host and the IP protocol its datagrams are.
-        DHType::Network => &["address", "port", "protocol", "ip_protocol"],
+        // A host and a port, written together, and which protocol is spoken
+        // to it -- or, on a raw socket, a host and the IP protocol its
+        // datagrams are.
+        DHType::Network => &["address", "protocol", "ip_protocol"],
         // A bus and the address of one device on it.
         DHType::I2c => &["path", "address"],
         // An interface and the identifier the frames carry: a CAN controller
@@ -1478,52 +1464,57 @@ fn ip_protocol_misplaced(
     Ok(())
 }
 
-/// The port a network node is at.
-fn port_of(what: &str, node: &Node) -> Result<u16, String> {
-    port_named(what, node, "port", "a network node", "the port it is at")
-}
-
-/// A port, under whichever attribute states it.
+/// Reads where a network node is, as its `address` states it: the host and
+/// the port together, `address:port`, as every address in a configuration
+/// is written; a path, for a unix socket, which has no port; or a host
+/// alone, for a raw socket, whose datagrams are told apart by their protocol
+/// number and host and not by a port.
 ///
 /// # Arguments
 ///
-/// * `what`      - The node's name, for the message.
-/// * `node`      - The node.
-/// * `attribute` - The attribute the port is under.
-/// * `is`        - What the node is, for the message: "a network node".
-/// * `wants`     - What the attribute gives, for the message.
+/// * `what`     - The node's name, for the message.
+/// * `protocol` - What is spoken to it.
+/// * `stated`   - Its `address`.
 ///
 /// # Returns
 ///
-/// The port.
+/// The host or path, and the port, which is 0 where there is none.
 ///
 /// # Errors
 ///
-/// A message if the attribute is missing, not a whole number, or not 1 to
-/// 65535.
-fn port_named(
+/// A message naming the node for an `address:port` that does not read, and
+/// for a raw socket's address that names a port.
+fn network_address_of(
     what: &str,
-    node: &Node,
-    attribute: &str,
-    is: &str,
-    wants: &str,
-) -> Result<u16, String> {
-    let stated = required(what, node, attribute, is, wants)?;
-    let port = number(what, attribute, stated)?;
-
-    // Nought is the one number a socket would accept and a configuration
-    // cannot mean: it asks the kernel for whichever port is free, so a
-    // configuration that stated it would describe a link nothing could be
-    // told where to find.
-    if port == 0 || port > u16::MAX as u32 {
-        return Err(format!(
-            "\"{what}\": {attribute} {port} is not a port -- a port is 1 to \
-             65535, and 0 is \"whichever one is free\", which a configuration \
-             cannot mean"
-        ));
+    protocol: NetworkProtocol,
+    stated: &str,
+) -> Result<(String, u16), String> {
+    match protocol {
+        NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
+            Ok((stated.to_string(), 0))
+        }
+        // An IP datagram has no port: what tells one payload's datagrams
+        // from another's is the protocol number and the host. An address
+        // with a colon that is not an IPv6 address names a port.
+        NetworkProtocol::Raw(_) => {
+            let host = stated.trim_start_matches('[').trim_end_matches(']');
+            if stated.contains(':') && host.parse::<std::net::IpAddr>().is_err()
+            {
+                return Err(format!(
+                    "\"{what}\" is reached on a raw socket, which has no \
+                     port: write its address as the host alone, the \
+                     ip_protocol and the address being what say which \
+                     datagrams are its"
+                ));
+            }
+            Ok((stated.to_string(), 0))
+        }
+        NetworkProtocol::Tcp | NetworkProtocol::Udp => {
+            host_port_of("address", stated)
+                .map(|at| (at.address, at.port))
+                .map_err(|why| format!("\"{what}\": {why}"))
+        }
     }
-
-    Ok(port as u16)
 }
 
 /// A term a configuration used to write, and what to write instead.
@@ -1692,27 +1683,32 @@ mod tests {
         assert!(said.contains("ground_base"), "{said}");
     }
 
-    /// A ground link that receives states where, both halves of it.
+    /// A ground link that receives states where, the host and the port
+    /// together; one that states nothing binds nothing; and one that states a
+    /// host alone is refused, half an address being a mistake.
     #[test]
-    fn a_ground_link_binds_both_halves_or_neither() {
+    fn a_ground_link_binds_its_whole_address_or_nothing() {
         let both = node(
             "gateway",
             "gateway_radio",
             &[
-                ("address", "127.0.0.1"),
-                ("port", "5000"),
+                ("address", "127.0.0.1:5000"),
                 ("ground_base", "127.0.0.1:5100"),
             ],
         );
         assert!(binds(&both));
         assert!(reach_of(&both).is_ok());
 
-        for (missing, said_of) in [("address", "address"), ("port", "port")] {
-            let mut half = both.clone();
-            half.attributes.remove(missing);
-            let said = reach_of(&half).expect_err("half an address");
-            assert!(said.contains(said_of), "{said}");
-        }
+        let mut neither = both.clone();
+        neither.attributes.remove("address");
+        assert!(!binds(&neither));
+        assert!(reach_of(&neither).is_ok(), "a link that only sends");
+
+        let mut half = both.clone();
+        half.attributes
+            .insert("address".to_string(), Scalar::of("127.0.0.1"));
+        let said = reach_of(&half).expect_err("half an address");
+        assert!(said.contains("address:port"), "{said}");
     }
 
     /// Only a gateway node has a ground_base.
@@ -1723,8 +1719,7 @@ mod tests {
             "network",
             &[
                 ("protocol", "udp"),
-                ("address", "127.0.0.1"),
-                ("port", "5001"),
+                ("address", "127.0.0.1:5001"),
                 ("ground_base", "127.0.0.1:5100"),
             ],
         );
@@ -1875,11 +1870,16 @@ mod tests {
         let said = reach_of(&node(
             "heaters",
             "gpio_out",
-            &[("path", "/dev/gpiochip0"), ("lines", "3"), ("port", "5000")],
+            &[
+                ("path", "/dev/gpiochip0"),
+                ("lines", "3"),
+                ("protocol", "udp"),
+            ],
         ))
-        .expect_err("a port on a set of lines");
+        .expect_err("a protocol on a set of lines");
         assert!(
-            said.contains("port does not locate it") && said.contains("path"),
+            said.contains("protocol does not locate it")
+                && said.contains("path"),
             "the complaint should say what does locate it: {said}"
         );
 
@@ -1887,11 +1887,7 @@ mod tests {
         let said = reach_of(&node(
             "gateway",
             "gateway_radio",
-            &[
-                ("address", "10.0.0.1"),
-                ("port", "5000"),
-                ("path", "/dev/null"),
-            ],
+            &[("address", "10.0.0.1:5000"), ("path", "/dev/null")],
         ))
         .expect_err("a path on a socket");
         assert!(said.contains("path does not locate it"), "{said}");
@@ -1956,12 +1952,12 @@ mod tests {
         for (name, node_type, attributes, wanted) in [
             ("temp_1", "i2c", vec![("path", "/dev/i2c-1")], "address"),
             ("temp_1", "i2c", vec![("address", "0x48")], "path"),
-            ("link", "gateway_radio", vec![("port", "5000")], "address"),
+            ("link", "network", vec![("protocol", "udp")], "address"),
             (
                 "link",
                 "gateway_radio",
                 vec![("address", "10.0.0.1")],
-                "port",
+                "address:port",
             ),
             ("file", "device-file", vec![], "path"),
             ("bus", "can", vec![("can_id", "0x201")], "interface"),
@@ -2087,7 +2083,7 @@ mod tests {
         let said = reach_of(&node(
             "link",
             "gateway_radio",
-            &[("address", "10.0.0.1"), ("port", "5000"), ("init", "[01]")],
+            &[("address", "10.0.0.1:5000"), ("init", "[01]")],
         ))
         .expect_err("a ground link has no state to start in");
         assert!(said.contains("link") && said.contains("init"), "{said}");
@@ -2202,16 +2198,28 @@ mod tests {
                 "{said}"
             );
         }
-        let said = raw(&[("ip_protocol", "253"), ("port", "5000")])
-            .expect_err("a port");
+        // An address that names a port is refused; an IPv6 address, all
+        // colons, names none.
+        let at = |address: &str| {
+            reach_of(&node(
+                "sounder",
+                "network",
+                &[
+                    ("address", address),
+                    ("protocol", "raw"),
+                    ("ip_protocol", "253"),
+                ],
+            ))
+        };
+        let said = at("10.0.0.7:5000").expect_err("a port");
         assert!(said.contains("no port"), "{said}");
+        assert!(at("::1").is_ok(), "an IPv6 host");
 
         let said = reach_of(&node(
             "link",
             "network",
             &[
-                ("address", "10.0.0.7"),
-                ("port", "5000"),
+                ("address", "10.0.0.7:5000"),
                 ("protocol", "udp"),
                 ("ip_protocol", "253"),
             ],
@@ -2239,13 +2247,13 @@ mod tests {
         assert!(said.contains("read_size"), "{said}");
     }
 
-    /// A port is a port, and nought is not one.
+    /// The port in an address is a port, and nought is not one.
     #[test]
     fn a_port_is_a_port() {
         let said = reach_of(&node(
             "link",
             "gateway_radio",
-            &[("address", "10.0.0.1"), ("port", "70000")],
+            &[("address", "10.0.0.1:70000")],
         ))
         .expect_err("a number that is not a port");
         assert!(said.contains("70000"), "{said}");
@@ -2253,10 +2261,10 @@ mod tests {
         let said = reach_of(&node(
             "link",
             "gateway_radio",
-            &[("address", "10.0.0.1"), ("port", "0")],
+            &[("address", "10.0.0.1:0")],
         ))
         .expect_err("port nought");
-        assert!(said.contains("whichever one is free"), "{said}");
+        assert!(said.contains("port 0"), "{said}");
     }
 
     /// A network node says which protocol is spoken to it; a gateway link need
@@ -2266,7 +2274,7 @@ mod tests {
         let said = reach_of(&node(
             "payload",
             "network",
-            &[("address", "127.0.0.1"), ("port", "5000")],
+            &[("address", "127.0.0.1:5000")],
         ))
         .expect_err("a socket with no protocol");
         assert!(said.contains("protocol"), "{said}");
@@ -2275,8 +2283,7 @@ mod tests {
             "payload",
             "network",
             &[
-                ("address", "127.0.0.1"),
-                ("port", "5000"),
+                ("address", "127.0.0.1:5000"),
                 ("protocol", "tcp"),
                 ("max_length", "64"),
                 ("read_timeout", "250 ms"),
@@ -2293,11 +2300,7 @@ mod tests {
         let said = reach_of(&node(
             "payload",
             "network",
-            &[
-                ("address", "127.0.0.1"),
-                ("port", "5000"),
-                ("protocol", "smoke"),
-            ],
+            &[("address", "127.0.0.1:5000"), ("protocol", "smoke")],
         ))
         .expect_err("a protocol that is not one");
         assert!(said.contains("smoke"), "{said}");
@@ -2309,11 +2312,8 @@ mod tests {
     #[test]
     fn a_stream_socket_says_where_a_packet_ends() {
         let socket = |protocol: &str, extra: &[(&str, &str)]| {
-            let mut attributes = vec![
-                ("protocol", protocol),
-                ("address", "127.0.0.1"),
-                ("port", "5000"),
-            ];
+            let mut attributes =
+                vec![("protocol", protocol), ("address", "127.0.0.1:5000")];
             attributes.extend_from_slice(extra);
             reached("network", &attributes)
         };
@@ -2877,8 +2877,7 @@ mod tests {
                 "network",
                 &[
                     ("protocol", "udp"),
-                    ("address", "127.0.0.1"),
-                    ("port", "6200"),
+                    ("address", "127.0.0.1:6200"),
                     ("sends_from", from),
                 ],
             )
@@ -2903,7 +2902,6 @@ mod tests {
                 &[
                     ("protocol", "unix_dgram"),
                     ("address", "/run/vehicle.sock"),
-                    ("port", "5200"),
                     ("sends_from", from),
                 ],
             )
@@ -2920,8 +2918,7 @@ mod tests {
             "network",
             &[
                 ("protocol", "tcp"),
-                ("address", "127.0.0.1"),
-                ("port", "6200"),
+                ("address", "127.0.0.1:6200"),
                 ("max_length", "64"),
                 ("read_timeout", "none"),
                 ("sends_from", "127.0.0.1:6201"),
@@ -2952,8 +2949,7 @@ mod tests {
                 "network",
                 &[
                     ("protocol", protocol),
-                    ("address", "127.0.0.1"),
-                    ("port", "5000"),
+                    ("address", "127.0.0.1:5000"),
                     ("trigger", "\"READ\""),
                 ]
                 .into_iter()

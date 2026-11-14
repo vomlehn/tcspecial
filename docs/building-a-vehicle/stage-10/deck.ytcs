@@ -80,10 +80,9 @@ gateways:
       # 127.0.0.1:5105 as 0x3005. What the bridge sends up arrives at address
       # and port.
       - gateway: gateway
-        address: "127.0.0.1"
+        address: "127.0.0.1:5000"
         bridge_base: "127.0.0.1:5100"
         fprime_id_base: "0x3000"
-        port: "5000"
         world-in:
           - camera
           - hull_kelvin_1

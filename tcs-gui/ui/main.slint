@@ -2673,9 +2673,10 @@ export component ParametersWindow inherits Window {
             wrap: word-wrap;
         }
         Text {
-            text: "Two ports, because there are two command links: a command "
-                + "about the spacecraft -- ping it, arm it, restart it -- is "
-                + "taken on port, and one about a payload on payload_port, so "
+            text: "Two addresses, because there are two command links: a "
+                + "command about the spacecraft -- ping it, arm it, restart "
+                + "it -- is taken at tcs_cmd.recv, and one about a payload at "
+                + "payload_command.dest_base, so "
                 + "what the ground needs in a hurry is never queued behind "
                 + "what it asked for at leisure.";
             font-size: Type.small;

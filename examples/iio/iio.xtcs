@@ -45,9 +45,8 @@
                  ground_base plus the device id of the node that sent it:
                  the sensor, device id 1, at 127.0.0.1:3741. -->
             <gateway name="moc">
-                <address>127.0.0.1</address>
+                <address>127.0.0.1:3640</address>
                 <ground_base>127.0.0.1:3740</ground_base>
-                <port>3640</port>
                 <world-in>sensor</world-in>
             </gateway>
         </type>

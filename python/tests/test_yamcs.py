@@ -103,12 +103,10 @@ vehicle:
 payloads:
   - type network:
       - payload: n
-        address: "127.0.0.1"
-        port: "9401"
+        address: "127.0.0.1:9401"
         protocol: "udp"
       - payload: o
-        address: "127.0.0.1"
-        port: "9402"
+        address: "127.0.0.1:9402"
         protocol: "udp"
 commands:
   - {{ from: m, sets: o.setpoint }}
@@ -137,8 +135,7 @@ def yamcs(directory, base="0x300", gateway="yamcs", renamed=None,
     if ping_from_m:
         text = text.replace('        ground_base: "127.0.0.1:9000"\n',
                             '        ground_base: "127.0.0.1:9000"\n'
-                            '        address: "127.0.0.1"\n'
-                            '        port: "9500"\n'
+                            '        address: "127.0.0.1:9500"\n'
                             "        moc-out:\n"
                             "          - p.m\n")
     for old, new in (renamed or {}).items():

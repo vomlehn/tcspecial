@@ -291,9 +291,9 @@ def uplinks(config):
         An :class:`Uplink` for each, by name.
 
     Raises:
-        ValueError: As :func:`telemetry`, or a node's address or port does
-                    not read, or it states one and not the other, or the
-                    document its data's nodes share does not read.
+        ValueError: As :func:`telemetry`, or a node's address is not
+                    ``address:port``, or the document its data's nodes
+                    share does not read.
         OSError: That document cannot be read.
     """
     links = []
@@ -301,7 +301,7 @@ def uplinks(config):
         if use.carries != "uplink":
             continue
         node = config.node(use.node)
-        binds = "address" in node.attributes or "port" in node.attributes
+        binds = "address" in node.attributes
         document = _shared_document(config, node)
         command = (Document(document).command()[0] if document
                    else use.node)

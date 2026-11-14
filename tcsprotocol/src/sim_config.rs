@@ -160,6 +160,8 @@ pub enum SimConfigError {
     },
     /// A payload asked to bind the very socket its handler binds.
     OneSocketForBothEnds { payload: String, what: String },
+    /// A `payload_address` that is not `host:port`, a host, or a path.
+    BadOwnAddress { payload: String, why: String },
     /// Where the payload is, written here, where it is not decided.
     TheOtherFilesBusiness {
         what: &'static str,
@@ -370,6 +372,10 @@ impl fmt::Display for SimConfigError {
                  {}",
                 payload, setting, why
             ),
+            SimConfigError::BadOwnAddress { payload, why } => write!(
+                f,
+                "simulated payload \"{payload}\": payload_address: {why}"
+            ),
             SimConfigError::OneSocketForBothEnds { payload, what } => write!(
                 f,
                 "simulated payload \"{}\" would bind {}, which is the \
@@ -383,9 +389,8 @@ impl fmt::Display for SimConfigError {
                     "{} \"{}\" states {}, which belongs in the tcspecial \
                      configuration file: the simulator takes where a payload \
                      is from there. What this file may say is where the \
-                     payload answers from -- payload_address and payload_port, \
-                     the payload's own end of the link -- which nothing else \
-                     states",
+                     payload answers from -- payload_address, the payload's \
+                     own end of the link -- which nothing else states",
                     what, name, given
                 )
             }
@@ -476,6 +481,7 @@ impl SimConfigError {
             | SimConfigError::NotForThisKind { payload, .. }
             | SimConfigError::NoAddressOfItsOwn { payload, .. }
             | SimConfigError::OneSocketForBothEnds { payload, .. }
+            | SimConfigError::BadOwnAddress { payload, .. }
             | SimConfigError::CannotSimulate { payload, .. }
             | SimConfigError::BadAttachment { payload, .. } => {
                 About::SimPayload(payload.clone())
@@ -840,7 +846,6 @@ fn what_it_is(
         let foreign = [
             ("a protocol", settings.protocol.is_some()),
             ("payload_address", settings.payload_address.is_some()),
-            ("payload_port", settings.payload_port.is_some()),
         ];
         return match foreign.iter().find(|(_, stated)| *stated) {
             Some((setting, _)) => Err(SimConfigError::NotForThisKind {
@@ -900,72 +905,42 @@ fn what_it_is(
         network.protocol,
         NetworkProtocol::Udp | NetworkProtocol::UnixDgram
     );
-    if !datagram {
-        for (setting, stated) in [
-            ("payload_address", settings.payload_address.is_some()),
-            ("payload_port", settings.payload_port.is_some()),
-        ] {
-            if stated {
-                return Err(SimConfigError::NoAddressOfItsOwn {
-                    payload: name.to_string(),
-                    setting,
-                    why: "a stream payload is the end that waits, so it binds \
-                          the address the payload configuration gives it",
-                });
-            }
-        }
+    if !datagram && settings.payload_address.is_some() {
+        return Err(SimConfigError::NoAddressOfItsOwn {
+            payload: name.to_string(),
+            setting: "payload_address",
+            why: "a stream payload is the end that waits, so it binds \
+                  the address the payload configuration gives it",
+        });
     }
 
     // A datagram payload that is asked waits too: tcspecial speaks first,
     // sending its trigger to the address the payload configuration gives, so
     // the payload binds that and answers whoever asked.
-    if datagram && !crate::graph::interface::speaks_first(true, triggered) {
-        for (setting, stated) in [
-            ("payload_address", settings.payload_address.is_some()),
-            ("payload_port", settings.payload_port.is_some()),
-        ] {
-            if stated {
-                return Err(SimConfigError::NoAddressOfItsOwn {
-                    payload: name.to_string(),
-                    setting,
-                    why:
-                        "a triggered payload is the end that waits: tcspecial \
-                          sends its trigger to the address the payload \
-                          configuration gives, so it binds that address",
-                });
-            }
-        }
+    if datagram
+        && !crate::graph::interface::speaks_first(true, triggered)
+        && settings.payload_address.is_some()
+    {
+        return Err(SimConfigError::NoAddressOfItsOwn {
+            payload: name.to_string(),
+            setting: "payload_address",
+            why: "a triggered payload is the end that waits: tcspecial \
+                  sends its trigger to the address the payload \
+                  configuration gives, so it binds that address",
+        });
     }
 
     // And a payload whose node says where it sends from sends from there: the
     // vehicle reads nothing else, so a simulated payload told another address
     // here would be a payload the vehicle turned away. Said once, in the
     // tcspecial configuration, which is the file both ends read it from.
-    if sends_from.is_some() {
-        for (setting, stated) in [
-            ("payload_address", settings.payload_address.is_some()),
-            ("payload_port", settings.payload_port.is_some()),
-        ] {
-            if stated {
-                return Err(SimConfigError::NoAddressOfItsOwn {
-                    payload: name.to_string(),
-                    setting,
-                    why: "its node in the tcspecial configuration states \
-                          sends_from, which is where it sends from and the one \
-                          address the vehicle reads it from",
-                });
-            }
-        }
-    }
-
-    // A Unix socket is named by a path, so the payload's own end is a path
-    // too and a port there would name nothing.
-    if named_by_a_path && settings.payload_port.is_some() {
+    if sends_from.is_some() && settings.payload_address.is_some() {
         return Err(SimConfigError::NoAddressOfItsOwn {
             payload: name.to_string(),
-            setting: "payload_port",
-            why: "a Unix datagram socket is named by a path, so \
-                  payload_address is where this payload answers from",
+            setting: "payload_address",
+            why: "its node in the tcspecial configuration states \
+                  sends_from, which is where it sends from and the one \
+                  address the vehicle reads it from",
         });
     }
 
@@ -980,20 +955,66 @@ fn what_it_is(
                 what: network.address.clone(),
             });
         }
-    } else if settings.payload_port == Some(network.port)
-        && settings
-            .payload_address
-            .as_deref()
-            .map(|address| one_host(address) == one_host(&network.address))
-            .unwrap_or(false)
-    {
-        return Err(SimConfigError::OneSocketForBothEnds {
-            payload: name.to_string(),
-            what: format!("{}:{}", network.address, network.port),
-        });
+    } else if let Some(said) = settings.payload_address.as_deref() {
+        let (host, port) = own_end(name, said, false)?;
+        if port == Some(network.port)
+            && one_host(&host) == one_host(&network.address)
+        {
+            return Err(SimConfigError::OneSocketForBothEnds {
+                payload: name.to_string(),
+                what: format!("{}:{}", network.address, network.port),
+            });
+        }
     }
 
     Ok(())
+}
+
+/// Reads where a simulated payload binds its own end, as its
+/// `payload_address` states it.
+///
+/// For a UDP payload, the host and the port together, `host:port`, as every
+/// address is written; the host alone for any port it is given; and
+/// `0.0.0.0:<port>` for that port on any interface. For a Unix datagram
+/// payload, a path, which has no port.
+///
+/// # Arguments
+///
+/// * `payload` - The payload's name, for the message.
+/// * `said`    - Its `payload_address`.
+/// * `by_path` - Whether its socket is named by a path.
+///
+/// # Returns
+///
+/// The host or path, and the port, `None` for any.
+///
+/// # Errors
+///
+/// [`SimConfigError::BadOwnAddress`] for a port that is not a port.
+fn own_end(
+    payload: &str,
+    said: &str,
+    by_path: bool,
+) -> Result<(String, Option<u16>), SimConfigError> {
+    let said = said.trim();
+    if by_path {
+        return Ok((said.to_string(), None));
+    }
+    // A host alone: an address, IPv4 or IPv6 in brackets or not, or a name,
+    // which has no colon.
+    let bare = said.trim_start_matches('[').trim_end_matches(']');
+    if bare.parse::<std::net::IpAddr>().is_ok() || !said.contains(':') {
+        return Ok((bare.to_string(), None));
+    }
+    let at =
+        crate::types::sender_of("payload_address", said).map_err(|why| {
+            SimConfigError::BadOwnAddress {
+                payload: payload.to_string(),
+                why,
+            }
+        })?;
+    let host = at.address.trim_start_matches('[').trim_end_matches(']');
+    Ok((host.to_string(), (at.port != 0).then_some(at.port)))
 }
 
 /// Settings a group or a simulated payload may state.
@@ -1108,10 +1129,6 @@ pub struct SimSettings {
     /// interface, and a port the system chooses.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub payload_address: Option<String>,
-    /// The port the simulated payload binds for itself. Refused for a Unix
-    /// datagram socket, which is named by a path.
-    #[serde(default, deserialize_with = "blank_is_unstated")]
-    pub payload_port: Option<u16>,
 
     /// How long between packets, as a length of time: `1 s`, `500 ms`.
     ///
@@ -1337,7 +1354,6 @@ pub const SETTINGS: &[&str] = &[
     "enable",
     "protocol",
     "payload_address",
-    "payload_port",
     "packet_interval",
     "segment_interval",
     "segment_size",
@@ -1380,7 +1396,6 @@ impl SimSettings {
                 .payload_address
                 .clone()
                 .or_else(|| base.payload_address.clone()),
-            payload_port: self.payload_port.or(base.payload_port),
             // A group may join every payload in it to one terminal, which
             // is what a trio of sensors read together is: the group says
             // the terminal once and the three entries say nothing.
@@ -2572,6 +2587,20 @@ impl SimConfigFile {
             };
             let attached = lined(&payload.name, attached, &dh.endpoint)?;
 
+            // Its own end, as payload_address says it, read once here.
+            let by_path = matches!(
+                &dh.endpoint,
+                EndpointConfig::Network(network) if matches!(
+                    network.protocol,
+                    NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram
+                )
+            );
+            let own = settings
+                .payload_address
+                .as_deref()
+                .map(|said| own_end(&payload.name, said, by_path))
+                .transpose()?;
+
             Ok(ResolvedSim {
                 attached,
                 enabled: settings.enable.unwrap_or(false),
@@ -2582,11 +2611,11 @@ impl SimConfigFile {
                         Some(at.ip().to_string())
                     }
                     Some(crate::SendsFrom::Path(path)) => Some(path.clone()),
-                    None => settings.payload_address.clone(),
+                    None => own.as_ref().map(|(host, _)| host.clone()),
                 },
                 payload_port: match &dh.sends_from {
                     Some(crate::SendsFrom::Socket(at)) => Some(at.port()),
-                    _ => settings.payload_port,
+                    _ => own.as_ref().and_then(|(_, port)| *port),
                 },
                 packet_interval,
                 segment_interval: how_often(
@@ -3353,8 +3382,7 @@ simulated_payloads:
                 "writing {plain} should name the file it belongs in: {said}"
             );
             assert!(
-                said.contains("payload_address")
-                    && said.contains("payload_port"),
+                said.contains("payload_address"),
                 "and what this file may say instead: {said}"
             );
         }
@@ -3408,30 +3436,39 @@ simulated_payloads:
             (None, None)
         );
 
-        let told = settled(
-            "        payload_address: 127.0.0.1\n        payload_port: 7000\n",
-            &udp,
-        )
-        .expect("resolves");
+        let told = settled("        payload_address: 127.0.0.1:7000\n", &udp)
+            .expect("resolves");
         assert_eq!(told[0].payload_address.as_deref(), Some("127.0.0.1"));
         assert_eq!(told[0].payload_port, Some(7000));
 
-        // A port alone is the common case -- bind this port on any interface
-        // -- and an address alone leaves the port to the system.
-        assert!(settled("        payload_port: 7000\n", &udp).is_ok());
-        assert!(settled("        payload_address: 127.0.0.1\n", &udp).is_ok());
+        // A port on any interface is the common case, and a host alone
+        // leaves the port to the system.
+        let any = settled("        payload_address: 0.0.0.0:7000\n", &udp)
+            .expect("resolves");
+        assert_eq!(any[0].payload_address.as_deref(), Some("0.0.0.0"));
+        assert_eq!(any[0].payload_port, Some(7000));
+        let host = settled("        payload_address: 127.0.0.1\n", &udp)
+            .expect("resolves");
+        assert_eq!(host[0].payload_port, None);
+
+        // A port that is not one is refused, naming the setting.
+        let said = format!(
+            "{}",
+            settled("        payload_address: 127.0.0.1:seven\n", &udp)
+                .unwrap_err()
+        );
+        assert!(
+            said.contains("payload_address") && said.contains("seven"),
+            "{said}"
+        );
 
         // But not the handler's own socket: two sockets cannot be one, and a
         // payload told to bind it would fail at the bind with nothing to say
         // about which file was wrong.
         let said = format!(
             "{}",
-            settled(
-                "        payload_address: localhost\n        \
-                 payload_port: 5000\n",
-                &udp
-            )
-            .unwrap_err()
+            settled("        payload_address: localhost:5000\n", &udp)
+                .unwrap_err()
         );
         assert!(
             said.contains("the handler's own end") && said.contains("5000"),
@@ -3468,7 +3505,10 @@ simulated_payloads:
             (Some("127.0.0.1"), Some(7001))
         );
 
-        for stated in ["payload_address: 127.0.0.1", "payload_port: 7001"] {
+        for stated in [
+            "payload_address: 127.0.0.1",
+            "payload_address: 127.0.0.1:7001",
+        ] {
             let said = format!(
                 "{}",
                 file(&format!("        {stated}\n"))
@@ -3501,7 +3541,10 @@ simulated_payloads:
         file("")
             .resolve(std::slice::from_ref(&asked))
             .expect("one that states nothing resolves");
-        for stated in ["payload_address: 127.0.0.1", "payload_port: 7000"] {
+        for stated in [
+            "payload_address: 127.0.0.1",
+            "payload_address: 0.0.0.0:7000",
+        ] {
             let said = format!(
                 "{}",
                 file(&format!("        {stated}\n"))
@@ -3534,19 +3577,19 @@ simulated_payloads:
              - type network:\n      \
              - payload: DH0\n        \
              packet_interval: 100 ms\n        \
-             payload_port: 7000\n        \
+             payload_address: 0.0.0.0:7000\n        \
              protocol: tcp\n        \
              simulate: true\n",
         );
         let said = format!("{}", file.resolve(&[stream]).unwrap_err());
         assert!(
-            said.contains("payload_port")
+            said.contains("payload_address")
                 && said.contains("the end that waits"),
             "{said}"
         );
 
-        // A Unix datagram payload answers from a path, so it takes an address
-        // and no port.
+        // A Unix datagram payload answers from a path, so its address is
+        // one.
         let mut socket = handler("DH0", 4);
         socket.endpoint = EndpointConfig::Network(NetworkConfig {
             protocol: NetworkProtocol::UnixDgram,
@@ -3565,13 +3608,6 @@ simulated_payloads:
         let own = "        payload_address: /tmp/dh-payload.sock\n";
         assert!(path(own).is_ok());
 
-        let said =
-            format!("{}", path("        payload_port: 7000\n").unwrap_err());
-        assert!(
-            said.contains("payload_port") && said.contains("named by a path"),
-            "{said}"
-        );
-
         // And not the handler's own path.
         let said = format!(
             "{}",
@@ -3585,7 +3621,7 @@ simulated_payloads:
              - type device-file:\n      \
              - payload: DH0\n        \
              packet_interval: continuous\n        \
-             payload_port: 7000\n        \
+             payload_address: 0.0.0.0:7000\n        \
              simulate: true\n",
         );
         let said = format!("{}", file.resolve(&[device("DH0")]).unwrap_err());

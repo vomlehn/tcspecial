@@ -271,8 +271,8 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     for (was, now) in [
         ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:2234", format!("127.0.0.1:{}", port(&socket))),
-        ("\"8601\"", format!("\"{}\"", port(&heater))),
-        ("\"8602\"", format!("\"{thermometer}\"")),
+        (":8601\"", format!(":{}\"", port(&heater))),
+        (":8602\"", format!(":{thermometer}\"")),
         (
             "/tmp/telemetry",
             dir.path().join("telemetry").display().to_string(),

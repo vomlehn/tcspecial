@@ -17,8 +17,8 @@ manual <tcspecial.html#running-the-programs>`__, describes, and tcspecial's
 ``--simulate`` says which payloads it stands in for.
 
 .. figure:: tcs-sim-between.svg
-   :alt: tcs-moc, tcspecial and tcs-sim side by side on the thermostat
-         example. tcs-moc starts the other two and asks tcs-sim, at its
+   :alt: tcs-sim, tcspecial and tcs-moc side by side, from left to right,
+         on the thermostat example. tcs-moc starts the other two and asks tcs-sim, at its
          tcs-sim.ready address, whether it is ready; it sends tcspecial
          commands and takes its telemetry. tcs-sim has a panel for each
          simulated payload: the sensors temp_1, temp_2 and temp_3, and the
@@ -1035,8 +1035,9 @@ added to ``temp_3``'s entry:
 See Also
 ========
 
-`The TCSpecial manuals <manual.html>`__
-    What each of TCSpecial's manuals covers.
+`TCS Design and Documentation <manual.html>`__
+    Every TCS manual and design document, production and non-production
+    software apart.
 
 `The tcspecial manual <tcspecial.html>`__
     The flight software, its configuration files, the examples, installing and

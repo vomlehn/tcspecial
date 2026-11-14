@@ -335,10 +335,11 @@ See Also
     is often out of contact. The manual says how to write a log, read it
     back, and what each outcome of reading means.
 
-`TCSpecial manuals <https://vomlehn.github.io/tcspecial/docs/manual.html>`__
-    TCSpecial is flight software that connects the devices aboard a
-    vehicle to the places their data has to reach, aboard and on the
-    ground. The manual says how to configure, build and run it.
+`TCS Design and Documentation <tcs-docs_>`_
+    Every TCS manual and design document, production and non-production
+    software apart, from the TCSpecial Flight Executive's manual on.
+
+.. _tcs-docs: https://vomlehn.github.io/tcspecial/docs/manual.html
 
 `TCSpecial design <https://vomlehn.github.io/tcspecial/docs/design.html>`__
     How TCSpecial's flight software, libraries and ground programs are

@@ -1,6 +1,6 @@
-=================
-TCSpecial Manuals
-=================
+============================
+TCS Design and Documentation
+============================
 
 .. warning::
    TCSpecial is an alpha release. It is not fully tested, it is not feature
@@ -75,9 +75,10 @@ On a desktop
 ------------
 
 .. figure:: tcs-desktop.svg
-   :alt: One desktop computer, with no vehicle and no hardware. make runmocy
-         starts tcs-moc, which starts tcspecial and tcs-sim on the same
-         configuration. tcs-moc sends tcspecial commands and shows the
+   :alt: One desktop computer, with no vehicle and no hardware: tcs-sim at
+         the left, tcspecial in the middle and tcs-moc at the right. make
+         runmocy starts tcs-moc, which starts tcspecial and tcs-sim on the
+         same configuration. tcs-moc sends tcspecial commands and shows the
          telemetry and beacons it sends back, over sockets on 127.0.0.1.
          tcspecial reads and writes the devices tcs-sim simulates, behind
          pseudo-terminals and loopback sim_addresses, as it would real ones.
@@ -85,9 +86,10 @@ On a desktop
 
    The same software, every connection made on one desktop.
 
-None of it needs a vehicle. On one desktop, **tcs-moc** stands in for the
-mission operations center and **tcs-sim** for the payloads, and between them
-runs the same tcspecial that flies. ``make runmocy`` starts all three on one
+None of it needs a vehicle. On one desktop, **tcs-sim** stands in for the
+payloads, on a physics model of the world they act on, and **tcs-moc** for
+the mission operations center, and between them runs the same tcspecial that
+flies. ``make runmocy`` starts all three on one
 configuration, and every connection in the figure above is made on the
 desktop: commands, telemetry and beacons over sockets on the loopback
 interface, and the devices as pseudo-terminals and loopback addresses that
@@ -105,41 +107,150 @@ The link's XTCE can be read and edited with **tcs-xtcee**, the XTCE editor
 that comes with tcs-xtce, and every TCS project builds its packages with
 the make rules and scripts of **tcs-helpers**.
 
+Production and non-production software
+=======================================
+
+The TCS software is in two kinds, and its documents are divided the same
+way. **Production** software runs aboard the vehicle or in the mission
+operations center, and is written and reviewed as such; its names have a
+letter straight after ``tcs`` or ``tcslog``: tcspecial, tcsmoc, tcslog. The
+rest -- the tools that write, check, simulate, test and build -- is
+**non-production**, and its names have a hyphen or an underscore there:
+tcs-gui, tcs-sim, tcslog-tools. Production software is built only from
+production software. See `Production code and its names
+<tcspecial-design.html#production-code-and-its-names>`__ in the tcspecial
+design.
+
+Read from a checkout, the links to the other TCS projects lead to their
+documents in a checkout of each beside this one, as the build expects
+(``../tcs-xtce`` and so on); read on the web, to their published pages.
+Where neither has them, their repositories do: `tcs-xtce
+<https://github.com/vomlehn/tcs-xtce>`__, `tcslog
+<https://github.com/vomlehn/tcslog>`__, `tcslog-tools
+<https://github.com/vomlehn/tcslog-tools>`__ and `tcs-helpers
+<https://github.com/vomlehn/tcs-helpers>`__.
+
 The manuals
 ===========
 
-TCSpecial is several programs, each with a manual of its own:
+Production software
+-------------------
 
 `The tcspecial manual <tcspecial.html>`__
-    The flight software, and what is common to all the programs: the
-    configuration files and what each payload, computation and gateway in
-    them says, the shipped examples, installing, running the programs
-    together, the commands the vehicle answers to, the crates used and
-    the license.
+    The TCSpecial Flight Executive, and what is common to all the programs:
+    the configuration files and what each payload, computation and gateway
+    in them says, the shipped examples, installing, running the programs
+    together, the commands the vehicle answers to, the crates used and the
+    license.
+
+The TCSpecial libraries
+    `tcsmoc <../tcsmoc/README.html>`__, the TCSpecial MOC Correspondent, in
+    the MOC, in Rust, and `tcsmoc-c <../tcsmoc-c/README.html>`__, its C
+    interface; `tcsprotocol <../tcsprotocol/README.html>`__, TCS Link
+    Support, used aboard and in the MOC.
+
+`The tcslog manual <../../tcslog/docs/manual.html>`__
+    The TCS Onboard Log: the library that keeps telemetry aboard until there
+    is a link to send it down.
+
+`The tcs-xtce manual <../../tcs-xtce/docs/tcs-xtce.html>`__, for tcsxtce
+    tcsxtce, tcs-xtce's runtime: what the packet code tcs-xtce generates
+    runs on, and the digest two programs check each other's XTCE with. The
+    manual is tcs-xtce's, and covers the compiler as well.
+
+`The tcs-ccsds manual`_
+    The CCSDS time codes, run aboard and on the ground; a chapter of the
+    tcs-xtce manual.
+
+.. _The tcs-ccsds manual:
+   ../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcs-ccsds
+
+Non-production software
+-----------------------
 
 `The tcs-gui manual <tcs-gui.html>`__
     The editor. tcs-gui draws a configuration and its simulator
     configuration as diagrams of nodes and links, checks them as they are
     edited, and writes them back.
 
-`The tcs-moc manual <tcs-moc.html>`__
-    The simulated operations center. tcs-moc shows what the vehicle sends
-    the ground, panel by panel and in plots, and sends it commands.
-
 `The tcs-sim manual <tcs-sim.html>`__
     The payload simulator. tcs-sim answers for a vehicle's payloads as their
     devices would; its manual also describes the simulator configuration
     that says how.
 
+`The tcs-moc manual <tcs-moc.html>`__
+    The simulated operations center. tcs-moc shows what the vehicle sends
+    the ground, panel by panel and in plots, and sends it commands.
+
 `The tcs-verify manual <tcs-verify.html>`__
     The checker. tcs-verify reads a configuration and says what is wrong
     with it, running none of it.
 
-The other documents beside these:
+`The tcs-xtce manual <../../tcs-xtce/docs/tcs-xtce.html>`__
+    The compiler from XTCE to Rust, C, C++ and Python, which generates the
+    code that packs and unpacks the link's packets. `The tcs-xtce manuals
+    <../../tcs-xtce/docs/manual.html>`__ list it and the others below.
 
-`The TCSpecial design <design.html>`__
-    How TCSpecial's flight software, libraries and ground programs are
-    built, and why.
+`The tcs-xtcee manual <../../tcs-xtce/docs/tcs-xtcee.html>`__
+    The XTCE editor.
+
+`The tcslog-tools manual <../../tcslog-tools/docs/tcslog-tools.html>`__
+    The programs that read a tcslog log on the ground.
+
+`The tcs-helpers README <../../tcs-helpers/README.html>`__
+    The make rules and scripts the TCS projects share to build their
+    packages, check their names and keep their pages up to date.
+
+The design documents
+====================
+
+`The TCSpecial design documents <design.html>`__ list TCSpecial's own, and
+`the tcs-xtce design documents <../../tcs-xtce/docs/design.html>`__
+tcs-xtce's.
+
+Production software
+-------------------
+
+`The tcspecial design <tcspecial-design.html>`__
+    The TCSpecial Flight Executive and what the programs share: the
+    terminology, the node architecture and typed links, gateways and what
+    the vehicle answers to, how a graph runs, the interface and the link,
+    fault resiliency and restarts, and the requirements.
+
+`The tcslog design <../../tcslog/docs/design.html>`__
+    The TCS Onboard Log: its on-disk format, interfaces and status codes.
+
+`The tcs-xtce design <../../tcs-xtce/docs/tcs-xtce-design.html>`__, for tcsxtce
+    How tcsxtce, the runtime, packs and unpacks packets and computes the
+    digest. The design is tcs-xtce's, and covers the compiler as well.
+
+Non-production software
+-----------------------
+
+`The tcs-gui design <tcs-gui-design.html>`__
+    The editor: how it draws, reads and writes a configuration, its undo
+    history, autosave and recovery.
+
+`The tcs-sim design <tcs-sim-design.html>`__
+    The payload simulator: its configuration files, the physics model,
+    fault injection, and the program.
+
+`The tcs-moc design <tcs-moc-design.html>`__
+    The simulated operations center: its window, what it reads, and where
+    the addresses it talks to come from.
+
+`The tcs-verify design <tcs-verify-design.html>`__
+    The configuration checker.
+
+`The tcs-xtce design <../../tcs-xtce/docs/tcs-xtce-design.html>`__
+    The compiler: the XML binding, the code generators and the model they
+    share.
+
+`The tcs-xtcee design <../../tcs-xtce/docs/tcs-xtcee-design.html>`__
+    The XTCE editor.
+
+Other documents
+===============
 
 `Building a vehicle <building-a-vehicle.html>`__
     From the shipped examples to a whole vehicle, a stage at a time: the
@@ -158,59 +269,5 @@ The other documents beside these:
     System (cFS) and JPL's F´ (F Prime). Work in progress.
 
 `Examples <../examples/README.html>`__
-    The shipped example configurations, and what each one shows.
-
-The libraries
-    `tcsmoc <../tcsmoc/README.html>`__ in the MOC, in Rust, and
-    `tcsmoc-c <../tcsmoc-c/README.html>`__, its C interface;
-    `tcsprotocol
-    <../tcsprotocol/README.html>`__, used aboard and in the MOC.
-
-The rest of the TCS software
-============================
-
-TCSpecial is built from, and works with, the other TCS projects. Each is a
-repository of its own. Read from a checkout, the links below lead to its
-documents in a checkout of it beside this one, as the build expects
-(``../tcs-xtce`` and so on); read on the web, to its published pages.
-Where neither has them, its repository does.
-
-tcs-xtce (`repository <https://github.com/vomlehn/tcs-xtce>`__)
-    The XTCE tools. TCSpecial's link to the ground is described in XTCE,
-    and tcs-xtce generates the code that packs and unpacks it.
-
-    - `The tcs-xtce manuals <../../tcs-xtce/docs/manual.html>`__, which
-      list:
-
-      - `the tcs-xtce manual <../../tcs-xtce/docs/tcs-xtce.html>`__, the
-        compiler from XTCE to Rust, C, C++ and Python;
-      - `the tcs-ccsds manual
-        <../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcs-ccsds>`__,
-        the CCSDS time codes, a chapter of the tcs-xtce manual;
-      - `the tcs-xtcee manual <../../tcs-xtce/docs/tcs-xtcee.html>`__, the
-        XTCE editor.
-
-    - `The tcs-xtce design documents <../../tcs-xtce/docs/design.html>`__,
-      which list `the tcs-xtce design
-      <../../tcs-xtce/docs/tcs-xtce-design.html>`__ and `the tcs-xtcee
-      design <../../tcs-xtce/docs/tcs-xtcee-design.html>`__.
-    - `The tcs-xtce examples <../../tcs-xtce/examples/README.html>`__.
-
-tcslog (`repository <https://github.com/vomlehn/tcslog>`__)
-    The library that keeps telemetry aboard until there is a link to send
-    it down.
-
-    - `The tcslog manual <../../tcslog/docs/manual.html>`__.
-    - `The tcslog design <../../tcslog/docs/design.html>`__.
-
-tcslog-tools (`repository <https://github.com/vomlehn/tcslog-tools>`__)
-    The programs that read a tcslog log on the ground.
-
-    - `The tcslog-tools manual
-      <../../tcslog-tools/docs/tcslog-tools.html>`__.
-
-tcs-helpers (`repository <https://github.com/vomlehn/tcs-helpers>`__)
-    The make rules and scripts the TCS projects share to build their
-    packages and keep their pages up to date.
-
-    - `The tcs-helpers README <../../tcs-helpers/README.html>`__.
+    The shipped example configurations, and what each one shows; and `the
+    tcs-xtce examples <../../tcs-xtce/examples/README.html>`__.

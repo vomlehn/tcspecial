@@ -365,7 +365,9 @@ ul.auto-toc {
 <h1 class="title">TCSpecial Design</h1>
 
 <p>How TCSpecial works inside, and why. Each of its programs has a design
-document of its own, as it has a manual of its own:</p>
+document of its own, as it has a manual of its own.</p>
+<div class="section" id="production-software">
+<h1>Production software</h1>
 <dl class="docutils">
 <dt><a class="reference external" href="tcspecial-design.html">The tcspecial design</a></dt>
 <dd>The flight software, and what the programs share: the terminology, the
@@ -374,20 +376,28 @@ to, compute elements and app nodes, how a graph runs, what is checked
 before anything runs, the interface and the link, fault resiliency and
 restarts, payloads and their link terms, platforms and porting, testing
 with simulated devices, and the requirements.</dd>
+</dl>
+</div>
+<div class="section" id="non-production-software">
+<h1>Non-production software</h1>
+<dl class="docutils">
 <dt><a class="reference external" href="tcs-gui-design.html">The tcs-gui design</a></dt>
 <dd>The editor: how it draws, reads and writes a configuration, its
 descriptions of the node types, its undo history, autosave and
 recovery.</dd>
-<dt><a class="reference external" href="tcs-moc-design.html">The tcs-moc design</a></dt>
-<dd>The simulated operations center: its window, what it reads, and where
-the addresses it talks to come from.</dd>
 <dt><a class="reference external" href="tcs-sim-design.html">The tcs-sim design</a></dt>
 <dd>The payload simulator: its configuration files, the physics model,
 fault injection, and the program.</dd>
+<dt><a class="reference external" href="tcs-moc-design.html">The tcs-moc design</a></dt>
+<dd>The simulated operations center: its window, what it reads, and where
+the addresses it talks to come from.</dd>
 <dt><a class="reference external" href="tcs-verify-design.html">The tcs-verify design</a></dt>
 <dd>The configuration checker.</dd>
 </dl>
-<p>How to use each program is in its manual: see <a class="reference external" href="manual.html">the TCSpecial manuals</a>.</p>
+<p>How to use each program is in its manual, and what is production software
+and what is not is said in <a class="reference external" href="manual.html">TCS Design and Documentation</a>,
+which lists these, the manuals and the other TCS projects' documents.</p>
+</div>
 </div>
 </body>
 </html>

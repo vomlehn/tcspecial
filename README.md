@@ -197,9 +197,9 @@ To Do
 
 See also
 ========
-* [The TCSpecial manuals](https://vomlehn.github.io/tcspecial/docs/manual.html):
-  what each program's manual covers, and the documents of the other TCS
-  projects, of which TCSpecial is the hub.
+* [TCS Design and Documentation](https://vomlehn.github.io/tcspecial/docs/manual.html):
+  every TCS manual and design document, production and non-production
+  software apart, of which TCSpecial is the hub.
 * [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
   how to write a configuration, and how to run the flight software and the

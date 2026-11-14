@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1040" height="520" viewBox="0 0 1040 520" role="img" aria-labelledby="title desc">
   <title id="title">TCSpecial on a desktop</title>
-  <desc id="desc">The whole system on one desktop computer, with no vehicle and no hardware. make runmocy starts tcs-moc, and tcs-moc starts tcspecial and tcs-sim, all three on the same configuration. tcs-moc stands in for the mission operations center: it sends tcspecial commands and shows the telemetry and beacons it sends back, all through sockets on the loopback interface, 127.0.0.1. tcspecial is the same flight software that runs aboard a vehicle. tcs-sim stands in for the payloads: it simulates each device, on a physics model, behind a pseudo-terminal or a loopback sim_address, and tcspecial reads and drives them as it would the real devices. The kernel's dummy devices, such as i2c-stub and gpio-sim, can stand in for others. tcs-moc and tcs-sim each show a window.</desc>
+  <desc id="desc">The whole system on one desktop computer, with no vehicle and no hardware, drawn as tcs-gui draws a configuration: the payloads at the left, the vehicle in the middle and the mission operations center at the right. make runmocy starts tcs-moc, and tcs-moc starts tcspecial and tcs-sim, all three on the same configuration. tcs-moc stands in for the mission operations center: it sends tcspecial commands and shows the telemetry and beacons it sends back, all through sockets on the loopback interface, 127.0.0.1. tcspecial is the same flight software that runs aboard a vehicle. tcs-sim stands in for the payloads: it simulates each device, on a physics model, behind a pseudo-terminal or a loopback sim_address, and tcspecial reads and drives them as it would the real devices. The kernel's dummy devices, such as i2c-stub and gpio-sim, can stand in for others. tcs-moc and tcs-sim each show a window.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -32,18 +32,23 @@
   <text class="heading" x="34" y="42">ONE DESKTOP: NO VEHICLE, NO HARDWARE</text>
   <text class="code" x="34" y="66">$ make runmocy TCSPECIAL_CONFIG_FILE=examples/thermostat/thermostat</text>
 
-  <!-- tcs-moc -->
-  <rect class="moc" x="40" y="100" width="260" height="300" rx="8"/>
-  <rect class="bar" x="41" y="101" width="258" height="22" rx="7"/>
+  <!-- tcs-sim: the payloads, on a physics model, at the left, as tcs-gui
+       and tcspecial's visual window draw them -->
+  <rect class="sim" x="40" y="100" width="264" height="300" rx="8"/>
+  <rect class="bar" x="41" y="101" width="262" height="22" rx="7"/>
   <text class="label" x="52" y="117">window</text>
-  <text class="name" x="56" y="150">tcs-moc</text>
-  <text class="kind" x="56" y="172">stands in for the mission</text>
-  <text class="kind" x="56" y="188">operations center</text>
-  <text class="kind" x="56" y="220">• sends commands</text>
-  <text class="kind" x="56" y="240">• shows telemetry and</text>
-  <text class="kind" x="68" y="256">beacons, in panels and plots</text>
-  <text class="kind" x="56" y="276">• starts tcspecial and tcs-sim</text>
-  <text class="kind" x="68" y="296">on the same configuration</text>
+  <text class="name" x="56" y="150">tcs-sim</text>
+  <text class="kind" x="56" y="172">stands in for the payloads,</text>
+  <text class="kind" x="56" y="188">on a physics model</text>
+  <rect class="dev" x="56" y="206" width="232" height="50" rx="5"/>
+  <text class="label" x="68" y="226">pseudo-terminals</text>
+  <text class="kind" x="68" y="244">serial, SPI, rpmsg, IIO</text>
+  <rect class="dev" x="56" y="266" width="232" height="50" rx="5"/>
+  <text class="label" x="68" y="286">loopback sim_address</text>
+  <text class="kind" x="68" y="304">GPIO, HDLC, thermal-mass sensors</text>
+  <text class="kind" x="56" y="340">The kernel's dummy devices</text>
+  <text class="kind" x="56" y="356">(i2c-stub, gpio-sim, vcan,</text>
+  <text class="kind" x="56" y="372">iio_dummy) can stand in too.</text>
 
   <!-- tcspecial -->
   <rect class="flight" x="400" y="100" width="240" height="300" rx="8"/>
@@ -55,40 +60,36 @@
   <text class="kind" x="416" y="232">as they would the real ones</text>
   <text class="kind" x="416" y="264">no window</text>
 
-  <!-- tcs-sim -->
-  <rect class="sim" x="740" y="100" width="264" height="300" rx="8"/>
-  <rect class="bar" x="741" y="101" width="262" height="22" rx="7"/>
-  <text class="label" x="752" y="117">window</text>
-  <text class="name" x="756" y="150">tcs-sim</text>
-  <text class="kind" x="756" y="172">stands in for the payloads,</text>
-  <text class="kind" x="756" y="188">on a physics model</text>
-  <rect class="dev" x="756" y="206" width="232" height="50" rx="5"/>
-  <text class="label" x="768" y="226">pseudo-terminals</text>
-  <text class="kind" x="768" y="244">serial, SPI, rpmsg, IIO</text>
-  <rect class="dev" x="756" y="266" width="232" height="50" rx="5"/>
-  <text class="label" x="768" y="286">loopback sim_address</text>
-  <text class="kind" x="768" y="304">GPIO, HDLC, thermal-mass sensors</text>
-  <text class="kind" x="756" y="340">The kernel's dummy devices</text>
-  <text class="kind" x="756" y="356">(i2c-stub, gpio-sim, vcan,</text>
-  <text class="kind" x="756" y="372">iio_dummy) can stand in too.</text>
+  <!-- tcs-moc: the mission operations center, at the right -->
+  <rect class="moc" x="744" y="100" width="260" height="300" rx="8"/>
+  <rect class="bar" x="745" y="101" width="258" height="22" rx="7"/>
+  <text class="label" x="756" y="117">window</text>
+  <text class="name" x="760" y="150">tcs-moc</text>
+  <text class="kind" x="760" y="172">stands in for the mission</text>
+  <text class="kind" x="760" y="188">operations center</text>
+  <text class="kind" x="760" y="220">• sends commands</text>
+  <text class="kind" x="760" y="240">• shows telemetry and</text>
+  <text class="kind" x="772" y="256">beacons, in panels and plots</text>
+  <text class="kind" x="760" y="276">• starts tcspecial and tcs-sim</text>
+  <text class="kind" x="772" y="296">on the same configuration</text>
 
   <!-- Connections -->
-  <path class="up" d="M300,190 H398"/>
-  <text class="label" x="312" y="180">commands</text>
-  <path class="down" d="M400,250 H302"/>
-  <text class="label" x="312" y="242">telemetry,</text>
-  <text class="label" x="312" y="270">beacons</text>
-  <text class="kind" x="312" y="300">sockets on</text>
-  <text class="code" x="312" y="316">127.0.0.1</text>
+  <path class="io" d="M308,236 H396"/>
+  <text class="label" x="318" y="224">reads and</text>
+  <text class="label" x="318" y="258">writes</text>
 
-  <path class="io" d="M644,236 H736"/>
-  <text class="label" x="650" y="224">reads and</text>
-  <text class="label" x="650" y="258">writes</text>
+  <path class="down" d="M640,190 H742"/>
+  <text class="label" x="652" y="168">telemetry,</text>
+  <text class="label" x="652" y="182">beacons</text>
+  <path class="up" d="M744,250 H642"/>
+  <text class="label" x="652" y="242">commands</text>
+  <text class="kind" x="652" y="300">sockets on</text>
+  <text class="code" x="652" y="316">127.0.0.1</text>
 
-  <path class="start" d="M170,400 V450 H520 V404"/>
-  <path class="start" d="M520,450 H872 V404"/>
-  <text class="kind" x="232" y="470">tcs-moc starts both (dotted)</text>
+  <path class="start" d="M874,400 V450 H520 V404"/>
+  <path class="start" d="M520,450 H172 V404"/>
+  <text class="kind" x="600" y="470">tcs-moc starts both (dotted)</text>
 
-  <text class="kind" x="560" y="470">Dashed: up, as to a vehicle. Solid: down, as to</text>
-  <text class="kind" x="560" y="486">the ground. Double-headed: both ways, as a device.</text>
+  <text class="kind" x="40" y="470">Dashed: up, as to a vehicle. Solid: down, as to</text>
+  <text class="kind" x="40" y="486">the ground. Double-headed: both ways, as a device.</text>
 </svg>

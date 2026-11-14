@@ -1051,8 +1051,9 @@ arrived and leaves the status to the commands and to the beacon.
 See Also
 ========
 
-`The TCSpecial manuals <manual.html>`__
-    What each of TCSpecial's manuals covers.
+`TCS Design and Documentation <manual.html>`__
+    Every TCS manual and design document, production and non-production
+    software apart.
 
 `The tcspecial manual <tcspecial.html>`__
     The flight software, its configuration files, the examples, installing and

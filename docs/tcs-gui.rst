@@ -966,8 +966,8 @@ see `the tcspecial manual <tcspecial.html>`__.
 See Also
 ========
 
-* `The TCSpecial manual <manual.html>`__, the summary that leads to each
-  program's manual.
+* `TCS Design and Documentation <manual.html>`__, the summary that leads to
+  each program's manual.
 * `The tcspecial manual <tcspecial.html>`__: the flight software and the
   configuration files tcs-gui edits.
 * `The tcs-sim manual <tcs-sim.html>`__: the simulator and its file, including

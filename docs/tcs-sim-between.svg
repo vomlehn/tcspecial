@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="540" viewBox="0 0 820 540" role="img" aria-labelledby="title desc">
   <title id="title">Where tcs-sim sits</title>
-  <desc id="desc">The thermostat example on a desk. tcs-moc starts tcspecial and tcs-sim and asks tcs-sim, at the address its simulator file gives as tcs-sim.ready, whether it has made its simulated payloads. tcs-moc sends tcspecial commands and receives its telemetry. tcs-sim has one panel for each simulated payload: three temperature sensors, temp_1, temp_2 and temp_3, and the two heater switches, gpio-out-tmass1 and gpio-out-tmass2, each reached by tcspecial at its sim_address, a loopback UDP address. The sensors send readings to tcspecial (arrow 1), which converts and votes them and has its thermostat send the heater switches on or off (arrow 2). Inside tcs-sim the switches drive the zone's two heater inputs in the physics model's world, and the sensors read the zone's temperature, so the readings follow from what the vehicle decided. The person at tcs-sim's window enables and disables payloads and changes their sizes and intervals (arrow 3). thermostat.ytcs is read by all three programs; thermostat-sim.yaml is tcs-sim's, and tcs-moc reads it to show what tcs-sim simulates.</desc>
+  <desc id="desc">The thermostat example on a desk, drawn as tcs-gui draws a configuration: tcs-sim, with the payloads and the world they act on, at the left, tcspecial in the middle and tcs-moc at the right. tcs-moc starts tcspecial and tcs-sim and asks tcs-sim, at the address its simulator file gives as tcs-sim.ready, whether it has made its simulated payloads. tcs-moc sends tcspecial commands and receives its telemetry. tcs-sim has one panel for each simulated payload: three temperature sensors, temp_1, temp_2 and temp_3, and the two heater switches, gpio-out-tmass1 and gpio-out-tmass2, each reached by tcspecial at its sim_address, a loopback UDP address. The sensors send readings to tcspecial (arrow 1), which converts and votes them and has its thermostat send the heater switches on or off (arrow 2). Inside tcs-sim the switches drive the zone's two heater inputs in the physics model's world, and the sensors read the zone's temperature, so the readings follow from what the vehicle decided. The person at tcs-sim's window enables and disables payloads and changes their sizes and intervals (arrow 3). thermostat.ytcs is read by all three programs; thermostat-sim.yaml is tcs-sim's, and tcs-moc reads it to show what tcs-sim simulates.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -27,17 +27,40 @@
   </defs>
   <rect width="820" height="540" fill="#ffffff"/>
 
+  <!-- Drawn as tcs-gui and tcspecial's visual window draw a configuration:
+       the payloads and the world they act on at the left, the vehicle in the
+       middle and the operations center at the right. -->
+
   <!-- tcs-moc starts the other two, and asks tcs-sim whether it is ready -->
-  <path class="start" d="M105,100 V40 H700 V98"/>
+  <path class="start" d="M715,100 V40 H120 V98"/>
   <path class="start" d="M410,40 V98"/>
   <text class="label" x="128" y="32">starts both, and asks tcs-sim whether it is ready, at tcs-sim.ready</text>
 
-  <!-- tcs-moc -->
-  <rect class="prog" x="20" y="100" width="170" height="150" rx="8"/>
-  <text class="name" x="36" y="128">tcs-moc</text>
-  <text class="kind" x="36" y="148">the MOC: commands</text>
-  <text class="kind" x="36" y="164">the vehicle and shows</text>
-  <text class="kind" x="36" y="180">its telemetry</text>
+  <!-- tcs-sim -->
+  <rect class="sim" x="20" y="100" width="200" height="340" rx="8"/>
+  <text class="name" x="44" y="128">tcs-sim</text>
+  <text class="kind" x="44" y="148">a panel per payload</text>
+  <rect class="panel" x="44" y="162" width="160" height="26" rx="3"/>
+  <text class="code" x="54" y="180">temp_1</text>
+  <rect class="panel" x="44" y="192" width="160" height="26" rx="3"/>
+  <text class="code" x="54" y="210">temp_2</text>
+  <rect class="panel" x="44" y="222" width="160" height="26" rx="3"/>
+  <text class="code" x="54" y="240">temp_3</text>
+  <rect class="panel" x="44" y="282" width="160" height="26" rx="3"/>
+  <text class="code" x="54" y="300">gpio-out-tmass1</text>
+  <rect class="panel" x="44" y="312" width="160" height="26" rx="3"/>
+  <text class="code" x="54" y="330">gpio-out-tmass2</text>
+  <rect class="world" x="44" y="356" width="160" height="72" rx="4"/>
+  <text class="label" x="54" y="374">the world:</text>
+  <text class="code" x="54" y="392">zone</text>
+  <text class="kind" x="94" y="392">thermal_mass</text>
+  <text class="kind" x="54" y="420">heater_1, heater_2 in</text>
+  <!-- inside tcs-sim: the switches drive the zone, the sensors read it -->
+  <path class="inner" d="M124,338 V354"/>
+  <path class="inner" d="M44,392 H28 V175 H42"/>
+  <path class="inner" d="M28,205 H42"/>
+  <path class="inner" d="M28,235 H42"/>
+  <text class="kind" x="-7" y="268" transform="rotate(-90 41 268)">temperature</text>
 
   <!-- tcspecial -->
   <rect class="prog" x="300" y="100" width="220" height="340" rx="8"/>
@@ -59,61 +82,42 @@
   <text class="code" x="326" y="366">gpio-out-tmass1, 2</text>
   <text class="kind" x="326" y="382">the heater switches</text>
 
-  <!-- tcs-moc and tcspecial -->
-  <path class="up" d="M300,150 H192"/>
-  <text class="label" x="204" y="142">telemetry</text>
-  <path class="down" d="M190,210 H298"/>
-  <text class="label" x="204" y="202">commands</text>
+  <!-- tcs-sim and tcspecial -->
+  <path class="up" d="M206,205 H298"/>
+  <circle cx="286" cy="190" r="9" fill="#0072B2"/>
+  <text class="num" x="282" y="194">1</text>
+  <text class="label" x="274" y="194" text-anchor="end">readings</text>
+  <path class="down" d="M300,368 H260 V297 H206"/>
+  <circle cx="280" cy="352" r="9" fill="#D55E00"/>
+  <text class="num" x="276" y="356">2</text>
+  <text class="label" x="296" y="388" text-anchor="end">on / off</text>
+  <text class="kind" x="296" y="226" style="font-size: 11px" text-anchor="end">UDP, at</text>
+  <text class="kind" x="296" y="242" style="font-size: 11px" text-anchor="end">sim_address</text>
 
-  <!-- tcs-sim -->
-  <rect class="sim" x="600" y="100" width="200" height="340" rx="8"/>
-  <text class="name" x="616" y="128">tcs-sim</text>
-  <text class="kind" x="616" y="148">a panel per payload</text>
-  <rect class="panel" x="616" y="162" width="168" height="26" rx="3"/>
-  <text class="code" x="626" y="180">temp_1</text>
-  <rect class="panel" x="616" y="192" width="168" height="26" rx="3"/>
-  <text class="code" x="626" y="210">temp_2</text>
-  <rect class="panel" x="616" y="222" width="168" height="26" rx="3"/>
-  <text class="code" x="626" y="240">temp_3</text>
-  <rect class="panel" x="616" y="282" width="168" height="26" rx="3"/>
-  <text class="code" x="626" y="300">gpio-out-tmass1</text>
-  <rect class="panel" x="616" y="312" width="168" height="26" rx="3"/>
-  <text class="code" x="626" y="330">gpio-out-tmass2</text>
-  <rect class="world" x="616" y="356" width="168" height="72" rx="4"/>
-  <text class="label" x="626" y="374">the world:</text>
-  <text class="code" x="626" y="392">zone</text>
-  <text class="kind" x="666" y="392">thermal_mass</text>
-  <text class="kind" x="626" y="420">heater_1, heater_2 in</text>
-  <!-- inside tcs-sim: the switches drive the zone, the sensors read it -->
-  <path class="inner" d="M700,338 V354"/>
-  <path class="inner" d="M790,392 H794 V175 H786"/>
-  <path class="inner" d="M794,205 H786"/>
-  <path class="inner" d="M794,235 H786"/>
-  <text class="kind" x="742" y="268" transform="rotate(-90 790 268)">temperature</text>
+  <!-- tcs-moc -->
+  <rect class="prog" x="630" y="100" width="170" height="150" rx="8"/>
+  <text class="name" x="646" y="128">tcs-moc</text>
+  <text class="kind" x="646" y="148">the MOC: commands</text>
+  <text class="kind" x="646" y="164">the vehicle and shows</text>
+  <text class="kind" x="646" y="180">its telemetry</text>
 
-  <!-- tcspecial and tcs-sim -->
-  <path class="up" d="M614,205 H522"/>
-  <circle cx="540" cy="190" r="9" fill="#0072B2"/>
-  <text class="num" x="536" y="194">1</text>
-  <text class="label" x="554" y="194">readings</text>
-  <path class="down" d="M520,368 H560 V297 H614"/>
-  <circle cx="540" cy="352" r="9" fill="#D55E00"/>
-  <text class="num" x="536" y="356">2</text>
-  <text class="label" x="530" y="388">on / off</text>
-  <text class="kind" x="524" y="226" style="font-size: 11px">UDP, at</text>
-  <text class="kind" x="524" y="242" style="font-size: 11px">sim_address</text>
+  <!-- tcspecial and tcs-moc -->
+  <path class="up" d="M520,150 H628"/>
+  <text class="label" x="534" y="142">telemetry</text>
+  <path class="down" d="M630,210 H522"/>
+  <text class="label" x="534" y="202">commands</text>
 
   <!-- the person at tcs-sim's window -->
-  <path class="you" d="M700,486 V442"/>
-  <circle cx="680" cy="466" r="9" fill="#009E73"/>
-  <text class="num" x="676" y="470">3</text>
-  <text class="label" x="560" y="504">you, at its window: Enable and Disable,</text>
-  <text class="label" x="560" y="520">packet and segment sizes, intervals</text>
+  <path class="you" d="M120,486 V442"/>
+  <circle cx="140" cy="466" r="9" fill="#009E73"/>
+  <text class="num" x="136" y="470">3</text>
+  <text class="label" x="20" y="504">you, at its window: Enable and Disable,</text>
+  <text class="label" x="20" y="520">packet and segment sizes, intervals</text>
 
   <!-- the files -->
-  <text class="label" x="20" y="480">Files read:</text>
-  <text class="code" x="20" y="500">thermostat.ytcs</text>
-  <text class="kind" x="150" y="500">by all three</text>
-  <text class="code" x="20" y="520">thermostat-sim.yaml</text>
-  <text class="kind" x="178" y="520">by tcs-sim; tcs-moc reads it to show</text>
+  <text class="label" x="430" y="480">Files read:</text>
+  <text class="code" x="430" y="500">thermostat.ytcs</text>
+  <text class="kind" x="560" y="500">by all three</text>
+  <text class="code" x="430" y="520">thermostat-sim.yaml</text>
+  <text class="kind" x="588" y="520">by tcs-sim; tcs-moc reads it to show</text>
 </svg>

@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
-<title>TCSpecial Manuals</title>
+<title>TCS Design and Documentation</title>
 <style type="text/css">
 
 /*
@@ -361,8 +361,8 @@ ul.auto-toc {
 </style>
 </head>
 <body>
-<div class="document" id="tcspecial-manuals">
-<h1 class="title">TCSpecial Manuals</h1>
+<div class="document" id="tcs-design-and-documentation">
+<h1 class="title">TCS Design and Documentation</h1>
 
 <div class="admonition warning">
 <p class="first admonition-title">Warning</p>
@@ -429,17 +429,19 @@ that has come down from the vehicle.</p>
 <div class="section" id="on-a-desktop">
 <h2>On a desktop</h2>
 <div class="figure">
-<object data="tcs-desktop.svg" style="width: 100%;" type="image/svg+xml">One desktop computer, with no vehicle and no hardware. make runmocy
-starts tcs-moc, which starts tcspecial and tcs-sim on the same
-configuration. tcs-moc sends tcspecial commands and shows the
+<object data="tcs-desktop.svg" style="width: 100%;" type="image/svg+xml">One desktop computer, with no vehicle and no hardware: tcs-sim at
+the left, tcspecial in the middle and tcs-moc at the right. make
+runmocy starts tcs-moc, which starts tcspecial and tcs-sim on the
+same configuration. tcs-moc sends tcspecial commands and shows the
 telemetry and beacons it sends back, over sockets on 127.0.0.1.
 tcspecial reads and writes the devices tcs-sim simulates, behind
 pseudo-terminals and loopback sim_addresses, as it would real ones.</object>
 <p class="caption">The same software, every connection made on one desktop.</p>
 </div>
-<p>None of it needs a vehicle. On one desktop, <strong>tcs-moc</strong> stands in for the
-mission operations center and <strong>tcs-sim</strong> for the payloads, and between them
-runs the same tcspecial that flies. <tt class="docutils literal">make runmocy</tt> starts all three on one
+<p>None of it needs a vehicle. On one desktop, <strong>tcs-sim</strong> stands in for the
+payloads, on a physics model of the world they act on, and <strong>tcs-moc</strong> for
+the mission operations center, and between them runs the same tcspecial that
+flies. <tt class="docutils literal">make runmocy</tt> starts all three on one
 configuration, and every connection in the figure above is made on the
 desktop: commands, telemetry and beacons over sockets on the loopback
 interface, and the devices as pseudo-terminals and loopback addresses that
@@ -456,36 +458,125 @@ that comes with tcs-xtce, and every TCS project builds its packages with
 the make rules and scripts of <strong>tcs-helpers</strong>.</p>
 </div>
 </div>
+<div class="section" id="production-and-non-production-software">
+<h1>Production and non-production software</h1>
+<p>The TCS software is in two kinds, and its documents are divided the same
+way. <strong>Production</strong> software runs aboard the vehicle or in the mission
+operations center, and is written and reviewed as such; its names have a
+letter straight after <tt class="docutils literal">tcs</tt> or <tt class="docutils literal">tcslog</tt>: tcspecial, tcsmoc, tcslog. The
+rest -- the tools that write, check, simulate, test and build -- is
+<strong>non-production</strong>, and its names have a hyphen or an underscore there:
+tcs-gui, tcs-sim, tcslog-tools. Production software is built only from
+production software. See <a class="reference external" href="tcspecial-design.html#production-code-and-its-names">Production code and its names</a> in the tcspecial
+design.</p>
+<p>Read from a checkout, the links to the other TCS projects lead to their
+documents in a checkout of each beside this one, as the build expects
+(<tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt> and so on); read on the web, to their published pages.
+Where neither has them, their repositories do: <a class="reference external" href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>, <a class="reference external" href="https://github.com/vomlehn/tcslog">tcslog</a>, <a class="reference external" href="https://github.com/vomlehn/tcslog-tools">tcslog-tools</a> and <a class="reference external" href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a>.</p>
+</div>
 <div class="section" id="the-manuals">
 <h1>The manuals</h1>
-<p>TCSpecial is several programs, each with a manual of its own:</p>
+<div class="section" id="production-software">
+<h2>Production software</h2>
 <dl class="docutils">
 <dt><a class="reference external" href="tcspecial.html">The tcspecial manual</a></dt>
-<dd>The flight software, and what is common to all the programs: the
-configuration files and what each payload, computation and gateway in
-them says, the shipped examples, installing, running the programs
-together, the commands the vehicle answers to, the crates used and
-the license.</dd>
+<dd>The TCSpecial Flight Executive, and what is common to all the programs:
+the configuration files and what each payload, computation and gateway
+in them says, the shipped examples, installing, running the programs
+together, the commands the vehicle answers to, the crates used and the
+license.</dd>
+<dt>The TCSpecial libraries</dt>
+<dd><a class="reference external" href="../tcsmoc/README.html">tcsmoc</a>, the TCSpecial MOC Correspondent, in
+the MOC, in Rust, and <a class="reference external" href="../tcsmoc-c/README.html">tcsmoc-c</a>, its C
+interface; <a class="reference external" href="../tcsprotocol/README.html">tcsprotocol</a>, TCS Link
+Support, used aboard and in the MOC.</dd>
+<dt><a class="reference external" href="../../tcslog/docs/manual.html">The tcslog manual</a></dt>
+<dd>The TCS Onboard Log: the library that keeps telemetry aboard until there
+is a link to send it down.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce.html">The tcs-xtce manual</a>, for tcsxtce</dt>
+<dd>tcsxtce, tcs-xtce's runtime: what the packet code tcs-xtce generates
+runs on, and the digest two programs check each other's XTCE with. The
+manual is tcs-xtce's, and covers the compiler as well.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcs-ccsds">The tcs-ccsds manual</a></dt>
+<dd>The CCSDS time codes, run aboard and on the ground; a chapter of the
+tcs-xtce manual.</dd>
+</dl>
+</div>
+<div class="section" id="non-production-software">
+<h2>Non-production software</h2>
+<dl class="docutils">
 <dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
 <dd>The editor. tcs-gui draws a configuration and its simulator
 configuration as diagrams of nodes and links, checks them as they are
 edited, and writes them back.</dd>
-<dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
-<dd>The simulated operations center. tcs-moc shows what the vehicle sends
-the ground, panel by panel and in plots, and sends it commands.</dd>
 <dt><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a></dt>
 <dd>The payload simulator. tcs-sim answers for a vehicle's payloads as their
 devices would; its manual also describes the simulator configuration
 that says how.</dd>
+<dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
+<dd>The simulated operations center. tcs-moc shows what the vehicle sends
+the ground, panel by panel and in plots, and sends it commands.</dd>
 <dt><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a></dt>
 <dd>The checker. tcs-verify reads a configuration and says what is wrong
 with it, running none of it.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce.html">The tcs-xtce manual</a></dt>
+<dd>The compiler from XTCE to Rust, C, C++ and Python, which generates the
+code that packs and unpacks the link's packets. <a class="reference external" href="../../tcs-xtce/docs/manual.html">The tcs-xtce manuals</a> list it and the others below.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtcee.html">The tcs-xtcee manual</a></dt>
+<dd>The XTCE editor.</dd>
+<dt><a class="reference external" href="../../tcslog-tools/docs/tcslog-tools.html">The tcslog-tools manual</a></dt>
+<dd>The programs that read a tcslog log on the ground.</dd>
+<dt><a class="reference external" href="../../tcs-helpers/README.html">The tcs-helpers README</a></dt>
+<dd>The make rules and scripts the TCS projects share to build their
+packages, check their names and keep their pages up to date.</dd>
 </dl>
-<p>The other documents beside these:</p>
+</div>
+</div>
+<div class="section" id="the-design-documents">
+<h1>The design documents</h1>
+<p><a class="reference external" href="design.html">The TCSpecial design documents</a> list TCSpecial's own, and
+<a class="reference external" href="../../tcs-xtce/docs/design.html">the tcs-xtce design documents</a>
+tcs-xtce's.</p>
+<div class="section" id="production-software-1">
+<h2>Production software</h2>
 <dl class="docutils">
-<dt><a class="reference external" href="design.html">The TCSpecial design</a></dt>
-<dd>How TCSpecial's flight software, libraries and ground programs are
-built, and why.</dd>
+<dt><a class="reference external" href="tcspecial-design.html">The tcspecial design</a></dt>
+<dd>The TCSpecial Flight Executive and what the programs share: the
+terminology, the node architecture and typed links, gateways and what
+the vehicle answers to, how a graph runs, the interface and the link,
+fault resiliency and restarts, and the requirements.</dd>
+<dt><a class="reference external" href="../../tcslog/docs/design.html">The tcslog design</a></dt>
+<dd>The TCS Onboard Log: its on-disk format, interfaces and status codes.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce-design.html">The tcs-xtce design</a>, for tcsxtce</dt>
+<dd>How tcsxtce, the runtime, packs and unpacks packets and computes the
+digest. The design is tcs-xtce's, and covers the compiler as well.</dd>
+</dl>
+</div>
+<div class="section" id="non-production-software-1">
+<h2>Non-production software</h2>
+<dl class="docutils">
+<dt><a class="reference external" href="tcs-gui-design.html">The tcs-gui design</a></dt>
+<dd>The editor: how it draws, reads and writes a configuration, its undo
+history, autosave and recovery.</dd>
+<dt><a class="reference external" href="tcs-sim-design.html">The tcs-sim design</a></dt>
+<dd>The payload simulator: its configuration files, the physics model,
+fault injection, and the program.</dd>
+<dt><a class="reference external" href="tcs-moc-design.html">The tcs-moc design</a></dt>
+<dd>The simulated operations center: its window, what it reads, and where
+the addresses it talks to come from.</dd>
+<dt><a class="reference external" href="tcs-verify-design.html">The tcs-verify design</a></dt>
+<dd>The configuration checker.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce-design.html">The tcs-xtce design</a></dt>
+<dd>The compiler: the XML binding, the code generators and the model they
+share.</dd>
+<dt><a class="reference external" href="../../tcs-xtce/docs/tcs-xtcee-design.html">The tcs-xtcee design</a></dt>
+<dd>The XTCE editor.</dd>
+</dl>
+</div>
+</div>
+<div class="section" id="other-documents">
+<h1>Other documents</h1>
+<dl class="docutils">
 <dt><a class="reference external" href="building-a-vehicle.html">Building a vehicle</a></dt>
 <dd>From the shipped examples to a whole vehicle, a stage at a time: the
 payloads, computations, files and gateway of a lander's science deck.
@@ -499,62 +590,8 @@ that flies, as a checklist.</dd>
 <dd>The plan for making the tcs projects work with NASA's core Flight
 System (cFS) and JPL's F´ (F Prime). Work in progress.</dd>
 <dt><a class="reference external" href="../examples/README.html">Examples</a></dt>
-<dd>The shipped example configurations, and what each one shows.</dd>
-<dt>The libraries</dt>
-<dd><a class="reference external" href="../tcsmoc/README.html">tcsmoc</a> in the MOC, in Rust, and
-<a class="reference external" href="../tcsmoc-c/README.html">tcsmoc-c</a>, its C interface;
-<a class="reference external" href="../tcsprotocol/README.html">tcsprotocol</a>, used aboard and in the MOC.</dd>
-</dl>
-</div>
-<div class="section" id="the-rest-of-the-tcs-software">
-<h1>The rest of the TCS software</h1>
-<p>TCSpecial is built from, and works with, the other TCS projects. Each is a
-repository of its own. Read from a checkout, the links below lead to its
-documents in a checkout of it beside this one, as the build expects
-(<tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt> and so on); read on the web, to its published pages.
-Where neither has them, its repository does.</p>
-<dl class="docutils">
-<dt>tcs-xtce (<a class="reference external" href="https://github.com/vomlehn/tcs-xtce">repository</a>)</dt>
-<dd><p class="first">The XTCE tools. TCSpecial's link to the ground is described in XTCE,
-and tcs-xtce generates the code that packs and unpacks it.</p>
-<ul class="last simple">
-<li><a class="reference external" href="../../tcs-xtce/docs/manual.html">The tcs-xtce manuals</a>, which
-list:<ul>
-<li><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce.html">the tcs-xtce manual</a>, the
-compiler from XTCE to Rust, C, C++ and Python;</li>
-<li><a class="reference external" href="../../tcs-xtce/docs/tcs-xtce.html#ccsds-time-codes-tcs-ccsds">the tcs-ccsds manual</a>,
-the CCSDS time codes, a chapter of the tcs-xtce manual;</li>
-<li><a class="reference external" href="../../tcs-xtce/docs/tcs-xtcee.html">the tcs-xtcee manual</a>, the
-XTCE editor.</li>
-</ul>
-</li>
-<li><a class="reference external" href="../../tcs-xtce/docs/design.html">The tcs-xtce design documents</a>,
-which list <a class="reference external" href="../../tcs-xtce/docs/tcs-xtce-design.html">the tcs-xtce design</a> and <a class="reference external" href="../../tcs-xtce/docs/tcs-xtcee-design.html">the tcs-xtcee
-design</a>.</li>
-<li><a class="reference external" href="../../tcs-xtce/examples/README.html">The tcs-xtce examples</a>.</li>
-</ul>
-</dd>
-<dt>tcslog (<a class="reference external" href="https://github.com/vomlehn/tcslog">repository</a>)</dt>
-<dd><p class="first">The library that keeps telemetry aboard until there is a link to send
-it down.</p>
-<ul class="last simple">
-<li><a class="reference external" href="../../tcslog/docs/manual.html">The tcslog manual</a>.</li>
-<li><a class="reference external" href="../../tcslog/docs/design.html">The tcslog design</a>.</li>
-</ul>
-</dd>
-<dt>tcslog-tools (<a class="reference external" href="https://github.com/vomlehn/tcslog-tools">repository</a>)</dt>
-<dd><p class="first">The programs that read a tcslog log on the ground.</p>
-<ul class="last simple">
-<li><a class="reference external" href="../../tcslog-tools/docs/tcslog-tools.html">The tcslog-tools manual</a>.</li>
-</ul>
-</dd>
-<dt>tcs-helpers (<a class="reference external" href="https://github.com/vomlehn/tcs-helpers">repository</a>)</dt>
-<dd><p class="first">The make rules and scripts the TCS projects share to build their
-packages and keep their pages up to date.</p>
-<ul class="last simple">
-<li><a class="reference external" href="../../tcs-helpers/README.html">The tcs-helpers README</a>.</li>
-</ul>
-</dd>
+<dd>The shipped example configurations, and what each one shows; and <a class="reference external" href="../../tcs-xtce/examples/README.html">the
+tcs-xtce examples</a>.</dd>
 </dl>
 </div>
 </div>

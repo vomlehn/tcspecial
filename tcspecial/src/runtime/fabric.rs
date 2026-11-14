@@ -889,8 +889,7 @@ impl Fabric {
 
         let (shared, handed) = (self.shared.clone(), Arc::new(worker));
         let theirs = handed.clone();
-        match std::thread::Builder::new()
-            .name(format!("node {name}"))
+        match crate::runtime::thread::named(format!("node {name}"))
             .spawn(move || serve(&theirs, &shared))
         {
             Ok(thread) => {

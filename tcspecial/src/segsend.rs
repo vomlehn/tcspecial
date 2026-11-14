@@ -42,7 +42,6 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
-use std::thread;
 
 use log::{error, info};
 
@@ -150,8 +149,7 @@ impl SegSend {
             })?;
         let (queue, waiting) = sync_channel::<Name>(WAITING);
         let shown = program.display().to_string();
-        thread::Builder::new()
-            .name(SEGSEND.to_string())
+        crate::runtime::thread::named(SEGSEND)
             .spawn(move || send_each(&program_c, &shown, waiting))
             .map_err(|e| {
                 format!("the thread that runs {SEGSEND} cannot be started: {e}")
@@ -579,7 +577,7 @@ mod tests {
             if what() {
                 return true;
             }
-            thread::sleep(Duration::from_millis(10));
+            std::thread::sleep(Duration::from_millis(10));
         }
         false
     }

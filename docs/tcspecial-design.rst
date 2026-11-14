@@ -1070,9 +1070,10 @@ Requirement
     bus's own), and a warning, run aboard as an unbounded type's is, for a
     device or app node that sends ``bytes`` and says nothing that bounds
     them (``Problem::Unsized``). Every shipped configuration's senders say
-    their size. The most is held to ``DATUM_BYTES`` until each buffer is
-    sized by its node, and a consolidator's sum waits for the
-    consolidator.
+    their size. Each buffer is sized by its node's largest datum, the
+    fabric's, a tee's and the ground's (``Routes::largest_of``,
+    ``GatewayReceiver::datum_bytes``), and ``DATUM_BYTES`` is gone. A
+    consolidator's sum waits for the consolidator.
 
 Requirement
     What a node takes at its ``moc-in`` is sized by that terminal's type, as
@@ -1131,6 +1132,19 @@ Requirement
     ``LimitMEMLOCK=infinity`` in a systemd unit, ``ulimit -l`` under another
     supervisor -- for a vehicle and a desk alike, and the systemd unit
     shipped with tcspecial sets it.
+
+Requirement
+    Each of tcspecial's threads is given a small stack,
+    ``runtime::thread::STACK_BYTES``, rather than the 2 MiB a Rust thread
+    has, so that what is locked is mostly what tcspecial uses. It is twice
+    what the deepest thread needs in a debug build, as the tests measure it,
+    and every thread the flight software runs on is made by
+    ``runtime::thread::named``, so none takes the default by being made
+    elsewhere.
+
+    **Built** (2026-11-14): 256 KiB, for the nodes', the commands', the
+    beacons', the signals' and segsend's threads. The lock itself is not
+    built yet.
 
 Requirement
     Whether there is memory enough is not tcspecial's to judge. A total of

@@ -27,6 +27,8 @@
 //!   the function that loads a configuration by its checksum, which a
 //!   RESTART asks too; [`held`] is which configurations a RESTART may
 //!   name.
+//! * [`thread`] is how each of tcspecial's threads is made, with a small
+//!   stack.
 //! * [`matched`] is whether the ground has matched this start's
 //!   configuration, which the beacons, the commands and every link to the
 //!   ground ask.
@@ -51,3 +53,4 @@ pub mod schedule;
 pub mod signals;
 pub mod start;
 pub mod system;
+pub mod thread;

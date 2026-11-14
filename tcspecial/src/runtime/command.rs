@@ -290,8 +290,8 @@ impl Commands {
             let malformed = bus.malformed();
             let serving = serving(malformed.clone());
             let answers = bus.publisher();
-            let thread =
-                std::thread::spawn(move || serving.run_on_bus(reader, answers));
+            let thread = crate::runtime::thread::named("commands")
+                .spawn(move || serving.run_on_bus(reader, answers))?;
             return Ok(Commands {
                 spacecraft_at: at,
                 nodes_at: at,
@@ -339,7 +339,8 @@ impl Commands {
 
         let malformed = Arc::new(AtomicU64::new(0));
         let serving = serving(malformed.clone());
-        let thread = std::thread::spawn(move || serving.run(spacecraft, nodes));
+        let thread = crate::runtime::thread::named("commands")
+            .spawn(move || serving.run(spacecraft, nodes))?;
 
         Ok(Commands {
             spacecraft_at,

@@ -1585,9 +1585,10 @@ gateway's most (<tt class="docutils literal">most_datum</tt>), each node's large
 bus's own), and a warning, run aboard as an unbounded type's is, for a
 device or app node that sends <tt class="docutils literal">bytes</tt> and says nothing that bounds
 them (<tt class="docutils literal"><span class="pre">Problem::Unsized</span></tt>). Every shipped configuration's senders say
-their size. The most is held to <tt class="docutils literal">DATUM_BYTES</tt> until each buffer is
-sized by its node, and a consolidator's sum waits for the
-consolidator.</p>
+their size. Each buffer is sized by its node's largest datum, the
+fabric's, a tee's and the ground's (<tt class="docutils literal"><span class="pre">Routes::largest_of</span></tt>,
+<tt class="docutils literal"><span class="pre">GatewayReceiver::datum_bytes</span></tt>), and <tt class="docutils literal">DATUM_BYTES</tt> is gone. A
+consolidator's sum waits for the consolidator.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>What a node takes at its <tt class="docutils literal"><span class="pre">moc-in</span></tt> is sized by that terminal's type, as
@@ -1639,6 +1640,18 @@ on would hide it.</dd>
 <tt class="docutils literal">LimitMEMLOCK=infinity</tt> in a systemd unit, <tt class="docutils literal">ulimit <span class="pre">-l</span></tt> under another
 supervisor -- for a vehicle and a desk alike, and the systemd unit
 shipped with tcspecial sets it.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">Each of tcspecial's threads is given a small stack,
+<tt class="docutils literal"><span class="pre">runtime::thread::STACK_BYTES</span></tt>, rather than the 2 MiB a Rust thread
+has, so that what is locked is mostly what tcspecial uses. It is twice
+what the deepest thread needs in a debug build, as the tests measure it,
+and every thread the flight software runs on is made by
+<tt class="docutils literal"><span class="pre">runtime::thread::named</span></tt>, so none takes the default by being made
+elsewhere.</p>
+<p class="last"><strong>Built</strong> (2026-11-14): 256 KiB, for the nodes', the commands', the
+beacons', the signals' and segsend's threads. The lock itself is not
+built yet.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>Whether there is memory enough is not tcspecial's to judge. A total of
 its buffers would leave out its stacks and its code, and what a Linux

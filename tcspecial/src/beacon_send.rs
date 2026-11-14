@@ -12,7 +12,6 @@
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
 use std::time::{Duration, SystemTime};
 
 use log::{error, info, trace};
@@ -318,7 +317,9 @@ impl BeaconSend {
         };
 
         let b_clone = b.clone();
-        thread::spawn(move || b_clone.beacon_send(out));
+        crate::runtime::thread::named("beacons")
+            .spawn(move || b_clone.beacon_send(out))
+            .expect("the beacon thread starts");
         b
     }
 

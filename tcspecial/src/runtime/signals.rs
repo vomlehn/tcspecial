@@ -79,8 +79,7 @@ pub fn start(stop: fn()) {
     unsafe {
         libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut())
     };
-    let thread = std::thread::Builder::new()
-        .name("signals".to_string())
+    let thread = crate::runtime::thread::named("signals")
         .spawn(move || take(stop))
         .expect("the signal thread starts");
     if let Ok(mut held) = THREAD.lock() {

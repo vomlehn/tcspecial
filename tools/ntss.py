@@ -20,6 +20,9 @@ project's top-level directory named for one, such as tcspecial's cfs and
 fprime, which hold a cFS mission's definitions and an F' component built
 with that project's own tools. See OTHER_PROJECTS.
 
+A file with no extension is a shell or Python script as its first line,
+its #! line, says.
+
 Only files git tracks are read, so build output is never counted, and
 symbolic links are not followed, so a file one project links from another
 is counted once, where it lives.
@@ -45,7 +48,9 @@ both.
 Run as `python3 tools/ntss.py`, which is what `make ntss` does. With
 --csv, it prints instead one comma-separated row per subproject, with a
 header row, for a spreadsheet: `make ntss CSV=1`. --tcs-helpers names the
-tcs-helpers checkout, ../tcs-helpers by default.
+tcs-helpers checkout, ../tcs-helpers by default, and each --skip a
+checkout not to count, such as an old copy of a project: `make ntss`
+skips those NTSS_SKIP names.
 """
 
 import argparse
@@ -131,6 +136,8 @@ def language(path):
             return None
         if re.match(rb"#!\s*\S*(/|env\s+)(ba|da)?sh\b", first):
             return "Shell"
+        if re.match(rb"#!\s*\S*(/|env\s+)python[0-9.]*\b", first):
+            return "Python"
     return None
 
 
@@ -385,14 +392,18 @@ def statements(path, kind):
     return sum(1 for line in code.splitlines() if line.strip())
 
 
-def projects():
+def projects(skip):
     """Finds the projects.
 
+    Args:
+        skip: The names of checkouts not to count.
+
     Returns:
-        Each ../tcs* git checkout, by name.
+        Each ../tcs* git checkout, by name, but those skipped.
     """
     return sorted(p for p in TOP.glob("tcs*")
               if re.fullmatch(r"tcs[a-z0-9-]*", p.name)
+              and p.name not in skip
               and (p / ".git").exists())
 
 
@@ -667,9 +678,14 @@ def main():
                         default=TOP / "tcs-helpers",
                         help="the tcs-helpers checkout "
                              "(default: ../tcs-helpers)")
+    parser.add_argument("--skip", action="append", default=[],
+                        metavar="NAME",
+                        help="a checkout beside this one not to count; "
+                             "may be repeated")
     args = parser.parse_args()
     is_production = load_is_production(args.tcs_helpers)
-    results = [(p.name, count(p, is_production)) for p in projects()]
+    results = [(p.name, count(p, is_production))
+               for p in projects(set(args.skip))]
     if args.csv:
         print_csv(results)
     else:

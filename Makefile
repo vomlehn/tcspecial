@@ -928,11 +928,15 @@ install-build:
 # every ../tcs* checkout beside this one, production code's apart from the
 # rest: see tools/ntss.py for what is counted. Printed, not kept: the counts
 # are of other repositories too, as they stand when it is run. CSV=1 prints
-# them as comma-separated values, for a spreadsheet.
+# them as comma-separated values, for a spreadsheet. NTSS_SKIP names the
+# checkouts beside this one not to count: tcspecial-factor is an old copy
+# of tcspecial, which would count it twice.
+NTSS_SKIP ?= tcspecial-factor
+
 .PHONY: ntss
 ntss:
 	python3 tools/ntss.py --tcs-helpers $(TCS_HELPERS) \
-		$(if $(filter 1,$(CSV)),--csv)
+		$(addprefix --skip ,$(NTSS_SKIP)) $(if $(filter 1,$(CSV)),--csv)
 
 # Install the tools building, testing, checking, documenting and packaging
 # this project need, with the system's own package manager, under sudo:

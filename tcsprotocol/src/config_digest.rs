@@ -162,16 +162,21 @@ pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
 /// that its included files are in it and so that the YAML and the XML
 /// spellings of one configuration digest alike. In it: the `tcspecial`
 /// section, the payload groups, the nodes with their attributes, the links,
-/// the command bindings, and the names its include list gives its other
-/// files. Not in it: the editor's own section, where the nodes are drawn,
+/// the names each node lists under its `world-in` and its `moc-in`, the
+/// command bindings, and the names its include list gives its other files. Not in it: the editor's own section, where the nodes are drawn,
 /// and the description, neither of which changes what anything does.
 ///
 /// Each list in one order, whatever order the files wrote it in: the nodes
 /// by name -- which is also the order their device ids are counted in, so
 /// the digest says which port each node's data reaches the ground on -- the
-/// links by the node they leave, each one's destinations sorted, the groups
-/// by name, the bindings by where they come from and what they set, and the
-/// included files by name. See [`interpretation_of_graph`].
+/// links by the node they leave, the groups by name, the bindings by where
+/// they come from and what they set, and the included files by name. The
+/// exceptions are a node's four terminal lists: what it lists under its
+/// `world-in` and `moc-in`, and the destinations under its `world-out` and
+/// `moc-out`, each digested in the order the files list it. A node that
+/// takes or sends several lines may make something of their order -- the
+/// order a consolidated datum's fields are in, say -- and the vehicle and
+/// the ground must then agree about it. See [`interpretation_of_graph`].
 pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
     digest_of_value(&interpretation_of_graph(graph))
 }
@@ -370,14 +375,12 @@ pub fn interpretation_of_graph(
             })
         })
         .collect();
+    // Each link's destinations in the order its source lists them, under its
+    // world-out or moc-out, as a node's sinks are: see digest_of_graph.
     let mut links: Vec<(&str, Vec<&str>)> = graph
         .links
         .iter()
-        .map(|link| {
-            let mut to = link.to.each();
-            to.sort_unstable();
-            (link.from.as_str(), to)
-        })
+        .map(|link| (link.from.as_str(), link.to.each()))
         .collect();
     links.sort();
     let links: Vec<Value> = links
@@ -401,12 +404,31 @@ pub fn interpretation_of_graph(
         .map(|(from, sets)| json!({ "from": from, "sets": sets }))
         .collect();
 
+    // Each node's sinks, in the order its entry lists them, by node, as its
+    // sources' destinations are above. Only the nodes that list some.
+    let sinks: Vec<Value> = graph
+        .named
+        .sinks
+        .iter()
+        .filter(|(_, sinks)| {
+            !sinks.world_in.is_empty() || !sinks.moc_in.is_empty()
+        })
+        .map(|(node, sinks)| {
+            json!({
+                "node": node,
+                "world-in": sinks.world_in,
+                "moc-in": sinks.moc_in,
+            })
+        })
+        .collect();
+
     let mut interpretation = json!({
         "version": crate::graph::VERSION,
         "tcspecial": tcspecial,
         "payload_groups": groups,
         "nodes": nodes,
         "links": links,
+        "sinks": sinks,
         "commands": commands,
     });
     // The files it includes, each by its subdiagram's name and its path, so
@@ -695,8 +717,10 @@ mod tests {
         assert_eq!(digest_of_graph(&reordered).expect("it digests"), digest);
     }
 
-    /// Nothing in a configuration is in an order that means anything: the
-    /// same graph with every list in another order digests alike.
+    /// The order of the nodes, the links, the groups and the bindings means
+    /// nothing: the same graph with those lists in another order digests
+    /// alike. A node's terminal lists are another matter: see
+    /// `a_sink_list_in_another_order_is_another_configuration`.
     #[test]
     fn a_graph_in_another_order_digests_alike() {
         let graph = example_graph("thermostat", "ytcs");
@@ -705,12 +729,6 @@ mod tests {
         let mut shuffled = graph.clone();
         shuffled.nodes.reverse();
         shuffled.links.reverse();
-        for link in &mut shuffled.links {
-            let mut to: Vec<String> =
-                link.to.each().into_iter().map(str::to_string).collect();
-            to.reverse();
-            link.to = crate::graph::Destinations::of(to);
-        }
         shuffled.groups.reverse();
         shuffled.commands.reverse();
         assert_eq!(digest_of_graph(&shuffled).expect("it digests"), digest);
@@ -739,9 +757,11 @@ mod tests {
 
     /// Two files that differ only in the order they write things in are one
     /// configuration: the types of a section, the nodes of a type, a node's
-    /// attributes, its links and their destinations, the groups, the
-    /// command bindings, the includes, and the entries of an attribute that
-    /// is a set.
+    /// attributes, the groups, the command bindings, the includes, and the
+    /// entries of an attribute that is a set. Not a node's terminal lists --
+    /// its `world-in`, `moc-in`, `world-out` and `moc-out` -- whose order is
+    /// their own: see
+    /// `a_sink_list_in_another_order_is_another_configuration`.
     #[test]
     fn a_file_in_another_order_digests_alike() {
         let dir = tempfile::tempdir().expect("a directory");
@@ -776,8 +796,8 @@ mod tests {
              - { compute: y, world-in: [v] }\n      \
              - { compute: x, world-in: [v] }\n  - type compute:\n      \
              - compute: v\n        \
-             world-out:\n          - y.v\n          \
-             - x.v\n        world-in: [in2, in1, in0]\n        \
+             world-out:\n          - x.v\n          \
+             - y.v\n        world-in: [in0, in1, in2]\n        \
              function: vote\n\
              payload_groups:\n  - { name: g2, interval: 2 s }\n  \
              - { name: g1, interval: 1 s }\n\
@@ -813,6 +833,61 @@ mod tests {
         );
         assert_eq!(unordered("serial", "trigger", "[01 02]"), None);
         assert_eq!(unordered("serial", "init", "[01 02]"), None);
+    }
+
+    /// A node's terminal lists -- the names under its `world-in` and
+    /// `moc-in`, and the destinations under its `world-out` and `moc-out` --
+    /// are digested in the order its entry lists them, so that a node that
+    /// makes something of their order is held to one order on the vehicle
+    /// and the ground alike. The same names in another order are another
+    /// configuration.
+    #[test]
+    fn a_sink_list_in_another_order_is_another_configuration() {
+        let graph = example_graph("thermostat", "ytcs");
+        let digest = digest_of_graph(&graph).expect("it digests");
+
+        let mut reordered = graph.clone();
+        let (node, sinks) = reordered
+            .named
+            .sinks
+            .iter_mut()
+            .find(|(_, sinks)| sinks.world_in.len() > 1)
+            .expect("a node with several world-in names");
+        let node = node.clone();
+        sinks.world_in.reverse();
+        assert_ne!(
+            digest_of_graph(&reordered).expect("it digests"),
+            digest,
+            "{node}'s world-in reversed digests as it was"
+        );
+
+        let mut reordered = graph.clone();
+        if let Some(sinks) = reordered
+            .named
+            .sinks
+            .values_mut()
+            .find(|sinks| sinks.moc_in.len() > 1)
+        {
+            sinks.moc_in.reverse();
+            assert_ne!(digest_of_graph(&reordered).expect("digests"), digest);
+        }
+
+        let mut reordered = graph.clone();
+        let link = reordered
+            .links
+            .iter_mut()
+            .find(|link| link.to.each().len() > 1)
+            .expect("a source with several destinations");
+        let from = link.from.clone();
+        let mut to: Vec<String> =
+            link.to.each().into_iter().map(str::to_string).collect();
+        to.reverse();
+        link.to = crate::graph::Destinations::of(to);
+        assert_ne!(
+            digest_of_graph(&reordered).expect("it digests"),
+            digest,
+            "{from}'s destinations reversed digest as they were"
+        );
     }
 
     /// A simulator file's digest is of what it and its model say: two

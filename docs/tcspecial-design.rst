@@ -7941,20 +7941,32 @@ Requirement
     sections or the order of one payload's attributes.
 
 Requirement
-    Nothing in a configuration is in an order that means anything. The order
-    of the sections, of the types in a section, of the nodes of a type, of a
-    node's attributes, of its links and their destinations, of the payload
-    groups, of the command bindings, of the included files and of the entries
-    of an attribute that is a set are all spelling, and two files that differ
-    only in them are one configuration.
+    The order of the sections, of the types in a section, of the nodes of a
+    type, of a node's attributes, of the payload groups, of the command
+    bindings, of the included files and of the entries of an attribute that is
+    a set are all spelling, and two files that differ only in them are one
+    configuration.
+
+Requirement
+    A node's four terminal lists are in an order of their own, and their
+    order is part of the configuration: the names it lists under its
+    ``world-in`` and ``moc-in``, and the destinations it lists under its
+    ``world-out`` and ``moc-out``. A node that takes or sends several lines
+    may make something of their order -- the order of a consolidated datum's
+    fields, say -- and the vehicle and the ground must then agree about it,
+    so each list is digested in the order the file writes it, and the same
+    names in another order are another configuration. The two spellings of a
+    configuration list each in the same order.
 
 Requirement
     There is one canonical order, and everything that needs an order takes it:
     nodes by name; a node's attributes by name; links by the node they leave,
-    each one's destinations by name; payload groups by name; command bindings by
-    where they come from and then what they set; included files by name; and the
-    entries of a set-valued attribute -- a vote's inputs, gpio ``lines``,
-    ``terminators`` -- in one spelling, sorted.
+    each one's destinations in the order written; each node's ``world-in``
+    and ``moc-in`` names in the order written, the nodes by name; payload
+    groups by name; command bindings by where they come from and then what
+    they set; included files by name; and the entries of a set-valued
+    attribute -- a vote's inputs, gpio ``lines``, ``terminators`` -- in one
+    spelling, sorted.
     ``tcsprotocol::config_digest::interpretation_of_graph`` is the one place
     it is written down.
 

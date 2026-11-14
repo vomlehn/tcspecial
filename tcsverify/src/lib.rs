@@ -689,19 +689,30 @@ fn keys_of(
     if one.is_empty() && two.is_empty() {
         return None;
     }
-    let rules: [&[&str]; 4] = [&[], &["name"], &["from"], &["from", "sets"]];
+    let rules: [&[&str]; 5] =
+        [&[], &["name"], &["node"], &["from"], &["from", "sets"]];
     rules
         .into_iter()
         .find_map(|rule| Some((keyed(one, rule)?, keyed(two, rule)?)))
 }
 
+/// The lists whose order is digested, by the name the comparison reaches
+/// them by: a link's destinations, and a node's sinks. The order of these
+/// can mean something to the node -- the order of a consolidated datum's
+/// fields, say -- so the same entries in another order are another
+/// configuration.
+const ORDERED: [&str; 3] = ["to", "world-in", "moc-in"];
+
 /// Finds every place two value trees differ, each with the path to it.
 ///
 /// Objects are compared key by key, lists of keyed entries as sets, key by
-/// key, and other lists place by place. The order of a list is never a
-/// difference: nothing in a configuration is in an order that means
-/// anything, so two spellings that differ only in order agree. A key that is
-/// null on one side and missing on the other is no difference.
+/// key, and other lists place by place. The order of a list is a difference
+/// only for a node's terminal lists -- what it lists under its `world-in`
+/// and `moc-in`, and a link's destinations, under the node's `world-out` or
+/// `moc-out` -- whose order is digested, a node being free to make something
+/// of it: see [`ORDERED`]. Nothing else in a configuration is in an order
+/// that means anything, so two spellings that differ only in that agree. A
+/// key that is null on one side and missing on the other is no difference.
 ///
 /// # Arguments
 ///
@@ -741,8 +752,24 @@ fn differences_between(
         (Value::Array(a), Value::Array(b)) => match keys_of(a, b) {
             // Entries with keys: matched by key, so one entry missing is one
             // difference rather than every entry after it, and the order
-            // they come in is none.
+            // they come in is none -- but for a terminal list, where the
+            // same entries in another order are a difference too.
             Some((ka, kb)) => {
+                let ordered = path
+                    .last()
+                    .is_some_and(|last| ORDERED.contains(&last.as_str()));
+                let same: bool = {
+                    let (mut sa, mut sb) = (ka.clone(), kb.clone());
+                    sa.sort();
+                    sb.sort();
+                    sa == sb
+                };
+                if ordered && same && ka != kb {
+                    out.push((
+                        path.clone(),
+                        Said::Both(ka.join(", "), kb.join(", ")),
+                    ));
+                }
                 for (key, x) in ka.iter().zip(a) {
                     path.push(key.clone());
                     match kb.iter().position(|k| k == key) {
@@ -1524,8 +1551,8 @@ mod tests {
             "{said:?}"
         );
         // And the line to it, a destination one has and the other does not,
-        // each way: a link's destinations are a set, whatever order they are
-        // written in.
+        // each way: one difference for each, not one for every destination
+        // after it.
         for name in ["gpio-out-tmass1", "heater"] {
             assert!(
                 said.iter().any(|m| m.contains(&format!("/ to / {name}:"))),
@@ -1539,12 +1566,20 @@ mod tests {
                 .any(|m| m.contains("links / gpio-out-tmass1.world-out")),
             "{said:?}"
         );
-        assert!(said.len() <= 6, "{said:?}");
+        // And its sinks, which the renamed node lists, each way.
+        for name in ["gpio-out-tmass1", "heater"] {
+            assert!(
+                said.iter().any(|m| m.contains(&format!("sinks / {name}:"))),
+                "{said:?}"
+            );
+        }
+        assert!(said.len() <= 8, "{said:?}");
     }
 
-    /// The order anything is written in means nothing -- a node's device id
-    /// is its place among the names -- so two spellings that differ only in
-    /// order agree, and a list is compared as the set it is.
+    /// The order most things are written in means nothing -- a node's
+    /// device id is its place among the names -- so two spellings that
+    /// differ only in that agree, and such a list is compared as the set it
+    /// is.
     #[test]
     fn lists_in_another_order_agree() {
         let one = serde_json::json!({
@@ -1557,7 +1592,7 @@ mod tests {
         });
         let two = serde_json::json!({
             "nodes": [{ "name": "b" }, { "name": "a" }],
-            "links": [{ "from": "a", "to": ["y", "x"] }],
+            "links": [{ "from": "a", "to": ["x", "y"] }],
             "commands": [
                 { "from": "g", "sets": "b.q" },
                 { "from": "g", "sets": "a.p" }
@@ -1582,6 +1617,38 @@ mod tests {
             paths,
             ["commands / g a.p", "links / a / to / x", "nodes / a"],
             "{paths:?}"
+        );
+    }
+
+    /// A node's terminal lists are in an order of their own, which is
+    /// digested: the same destinations, or the same sinks, in another order
+    /// are one difference, which says both orders.
+    #[test]
+    fn a_terminal_list_in_another_order_is_a_difference() {
+        let one = serde_json::json!({
+            "links": [{ "from": "a", "to": ["x", "y"] }],
+            "sinks": [{ "node": "v", "world-in": ["p", "q"], "moc-in": [] }],
+        });
+        let two = serde_json::json!({
+            "links": [{ "from": "a", "to": ["y", "x"] }],
+            "sinks": [{ "node": "v", "world-in": ["q", "p"], "moc-in": [] }],
+        });
+        let mut out = Vec::new();
+        differences_between(&one, &two, &mut Vec::new(), &mut out);
+        let said: Vec<String> = out
+            .iter()
+            .map(|(path, said)| match said {
+                Said::Both(a, b) => format!("{}: {a} | {b}", path.join(" / ")),
+                _ => path.join(" / "),
+            })
+            .collect();
+        assert_eq!(
+            said,
+            [
+                "links / a / to: x, y | y, x",
+                "sinks / v / world-in: p, q | q, p"
+            ],
+            "{said:?}"
         );
     }
 

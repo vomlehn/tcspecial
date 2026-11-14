@@ -3821,8 +3821,11 @@ impl Document {
     ) -> Vec<(&'static str, Vec<Bound>, Option<String>)> {
         let mut leaving: Vec<(&'static str, Vec<Bound>, Option<String>)> =
             Vec::new();
-        // In the one order: the terminals by name, and each one's
-        // destinations by the node they reach and then the input.
+        // The terminals by name, and each one's destinations in the order the
+        // document holds its links in -- the order the file listed them, and
+        // a line drawn since after them -- because that order is part of the
+        // configuration: a node may make something of it, and it is
+        // digested.
         for terminal in ["moc-out", "world-out"] {
             let mut destinations: Vec<Bound> = Vec::new();
             // One line carries one comment, so the attribute's comment is the
@@ -3852,9 +3855,6 @@ impl Document {
                 }
             }
             if !destinations.is_empty() {
-                destinations.sort_by(|a, b| {
-                    (&a.target, &a.name).cmp(&(&b.target, &b.name))
-                });
                 leaving.push((terminal, destinations, comment));
             }
         }
@@ -3868,7 +3868,8 @@ impl Document {
     /// every line arriving there that is not among them yet, so that a file
     /// the editor writes never sends a line to a name its far end does not
     /// list. A line drawn in the editor arrives by a name of its own: see
-    /// `Link::arrives_by`. In name order.
+    /// `Link::arrives_by`. In the order the node gave them, which is part of
+    /// the configuration.
     ///
     /// # Arguments
     ///
@@ -3916,10 +3917,9 @@ impl Document {
                     names.push(name);
                 }
             }
-            // In the order of their text, a sink's names being a set whose
-            // order means nothing, as a listed attribute's entries are: so one
-            // document is one file however its lines were drawn.
-            names.sort_unstable();
+            // In the order the node gave them, and a line drawn since after
+            // them: a sink's order is part of the configuration, which a node
+            // may make something of and which is digested.
             if !names.is_empty() {
                 sinks.push((sink, names));
             }
@@ -6337,11 +6337,13 @@ mod tests {
             });
         }
 
+        // Once, for the sink and not for each line, and in the order the
+        // lines were drawn in, which is part of the configuration.
         let yaml = document.to_yaml();
         assert_eq!(
-            yaml.matches("world-in: [temp_1, temp_2]\n").count(),
+            yaml.matches("world-in: [temp_2, temp_1]\n").count(),
             1,
-            "once, for the sink and not for each line: {yaml}"
+            "once, in the order drawn: {yaml}"
         );
     }
 

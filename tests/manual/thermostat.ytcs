@@ -33,7 +33,7 @@ gateways:
         address: "10.0.0.1"
         ground_base: "10.0.0.2:5100"
         port: "5000"
-        world-in: [ambient, temp1, temp2, temp3, thermostat]
+        world-in: [temp1, temp2, temp3, ambient, thermostat]
 
 vehicle:
   - type compute:
@@ -58,8 +58,8 @@ vehicle:
         scale: "0.0625"
         type-in: "i16"
         world-out:
-          - ambient.in0
           - gateway.temp1
+          - ambient.in0
           - housekeeping.temp1
         world-in: [temp_1]
       - compute: temp2
@@ -68,8 +68,8 @@ vehicle:
         scale: "0.0625"
         type-in: "i16"
         world-out:
-          - ambient.in1
           - gateway.temp2
+          - ambient.in1
           - housekeeping.temp2
         world-in: [temp_2]
       - compute: temp3
@@ -78,8 +78,8 @@ vehicle:
         scale: "0.0078"
         type-in: "u32"
         world-out:
-          - ambient.in2
           - gateway.temp3
+          - ambient.in2
           - housekeeping.temp3
         world-in: [temp_3]
       # setpoint is set from the ground; half_band is how far
@@ -100,8 +100,8 @@ vehicle:
           - heaters_1.thermostat
           - heaters_2.thermostat
         world-out:
-          - gateway.thermostat
           - housekeeping.thermostat
+          - gateway.thermostat
         world-in: [ambient]
   - type log:
       - compute: housekeeping

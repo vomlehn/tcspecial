@@ -47,10 +47,14 @@ the thermostat is in the file the thermostat example includes.
 
    examples/thermostat/../thermostat-common/thermostat.ytcs:72: error: nodes / thermostat / attributes / setpoint: examples/thermostat/thermostat.xtcs says "290" and examples/thermostat/thermostat.ytcs says "293.15"
 
-The order anything is written in is not compared: nothing in a configuration
-is in an order that means anything, and a node's device id comes from its
-name, not from where the file writes it. A list is compared as the set it is,
-so one entry missing is one difference. A file that cannot be read is not
+The order most things are written in is not compared: a node's device id
+comes from its name, not from where the file writes it, and the order of the
+nodes, their attributes, the groups and the bindings means nothing. A list is
+compared as the set it is, so one entry missing is one difference. The
+exception is a node's terminal lists -- the names under its ``world-in`` and
+``moc-in``, and the destinations under its ``world-out`` and ``moc-out`` --
+whose order is part of the configuration: the same names in another order
+are one difference, which says both orders. A file that cannot be read is not
 compared, and says so.
 
 A good set prints nothing. A bad one prints a line per problem, each naming
@@ -97,7 +101,7 @@ that::
 and before the problems::
 
    $ cargo run --bin tcs-verify -- --digest examples/thermostat/thermostat.ytcs
-   examples/thermostat/thermostat.ytcs: md5 bd9fd88e7cf85dbd02d6cb834f0b9eaf
+   examples/thermostat/thermostat.ytcs: md5 37c3be05e62fe33a48d76d3bb31eeabc
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one

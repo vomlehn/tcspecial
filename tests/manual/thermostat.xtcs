@@ -39,10 +39,10 @@
                 <address>10.0.0.1</address>
                 <ground_base>10.0.0.2:5100</ground_base>
                 <port>5000</port>
-                <world-in>ambient</world-in>
                 <world-in>temp1</world-in>
                 <world-in>temp2</world-in>
                 <world-in>temp3</world-in>
+                <world-in>ambient</world-in>
                 <world-in>thermostat</world-in>
             </gateway>
         </type>
@@ -71,8 +71,8 @@
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
                 <type-in>i16</type-in>
-                <world-out>ambient.in0</world-out>
                 <world-out>gateway.temp1</world-out>
+                <world-out>ambient.in0</world-out>
                 <world-out>housekeeping.temp1</world-out>
                 <world-in>temp_1</world-in>
             </compute>
@@ -81,8 +81,8 @@
                 <offset>273.15</offset>
                 <scale>0.0625</scale>
                 <type-in>i16</type-in>
-                <world-out>ambient.in1</world-out>
                 <world-out>gateway.temp2</world-out>
+                <world-out>ambient.in1</world-out>
                 <world-out>housekeeping.temp2</world-out>
                 <world-in>temp_2</world-in>
             </compute>
@@ -91,8 +91,8 @@
                 <offset>255.37</offset>
                 <scale>0.0078</scale>
                 <type-in>u32</type-in>
-                <world-out>ambient.in2</world-out>
                 <world-out>gateway.temp3</world-out>
+                <world-out>ambient.in2</world-out>
                 <world-out>housekeeping.temp3</world-out>
                 <world-in>temp_3</world-in>
             </compute>
@@ -112,8 +112,8 @@
                      the cold too. -->
                 <moc-out>heaters_1.thermostat</moc-out>
                 <moc-out>heaters_2.thermostat</moc-out>
-                <world-out>gateway.thermostat</world-out>
                 <world-out>housekeeping.thermostat</world-out>
+                <world-out>gateway.thermostat</world-out>
                 <world-in>ambient</world-in>
             </compute>
         </type>

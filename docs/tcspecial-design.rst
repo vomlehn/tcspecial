@@ -2826,6 +2826,115 @@ Requirement
     hearing of it. Without ``age``, a reading stands until its input sends
     another.
 
+A **consolidator** turns several readings of different things into one
+datum, so that what belongs together reaches the ground together: a payload
+group's readings in one packet, rather than one packet each arriving in
+whatever order the link delivers them. A reading assembled out of two
+packets is a reading that half arrives when one of them is lost; one datum
+arrives whole or not at all.
+
+**Planned** (2026-11-14); not built. What follows is the design to build it
+to.
+
+The difficulty is that its inputs do not keep one time. A payload read on a
+group's interval delivers when it is read, one that sends on its own
+delivers when it has something, and any of them may deliver nothing for a
+while -- so at any moment some of what the datum is to hold may be missing,
+or old. The consolidator does not wait for all of it, which would let one
+silent payload stop the datum for good, and it does not fill a gap with a
+dummy or a stale value as though it were fresh, which the ground could not
+tell from a reading. It sends what it has, and says of each input whether
+it is new.
+
+Requirement
+    A consolidator is a computation, ``function: consolidator``. Its inputs
+    are the names its ``world-in`` lists, each linked from one other node's
+    ``world-out``, at least two, each named once; the links bind exactly
+    those, as a vote's do. Several nodes' readings may be consolidated, and
+    so may the readings of one node and of computations made from them.
+
+Requirement
+    Each input's type is the type of the source linked to it, which must be
+    one a structure's field may be: a number, a value of a unit or a
+    boolean, of a fixed width. A string or bytes is refused, because its
+    length would make the datum's, and so is a structure, because a
+    structure's fields are not structures; consolidating one by its fields
+    is left for later. A consolidator is the one computation whose
+    inputs need not share a type, and states no ``type-in``: each input's
+    is its source's.
+
+Requirement
+    What it sends is one structure, made from the configuration: a field for
+    each input, in the order its ``world-in`` lists them -- an order the
+    configuration digest covers, so the vehicle and the ground agree about
+    it -- each named after its input and of its input's type, and after
+    them a field ``state`` saying, two bits an input in the same order,
+    whether each is **fresh** (arrived since the last datum was sent),
+    **repeated** (sent before, and nothing new since) or **never** (nothing
+    has arrived from it since tcspecial started). The configuration's own
+    XTCE describes the structure as an aggregate, as it does any structure,
+    so the ground decodes it with nothing new. A structure holds at most
+    sixteen fields, so a consolidator takes at most fifteen inputs.
+
+Requirement
+    It keeps, for each input, the latest reading and its state, in storage
+    sized when the configuration is loaded from the inputs' types. A reading
+    that arrives replaces the one held, and a second arriving before a datum
+    is sent replaces the first: the datum carries the latest. Nothing is
+    allocated as it runs.
+
+Requirement
+    When it sends is said by ``send``, a list of any of three triggers, of
+    which at least one is given:
+
+    * ``all_fresh``: as soon as every input is fresh;
+    * ``interval``: every ``interval``, a length of time, which is then
+      given too;
+    * ``moc``: when anything arrives at its ``moc-in``, linked from a
+      gateway, whatever it is -- so the ground can ask for a datum, with no
+      new command and no change to the interface.
+
+    ``all_fresh`` alone is refused, as a vote over every input would be: one
+    input that stops would stop the datum for good. It is given with
+    ``interval``, ``moc`` or both, which send what there is when it does not
+    come.
+
+Requirement
+    A datum is sent at the end of the pass in which a trigger fires, not at
+    the arrival that fired it: inputs at different depths of the graph reach
+    a node in different waves of one pass, and a datum sent mid-pass would
+    hold some of a pass's readings and not the rest. Once it is sent, every
+    fresh input becomes repeated. Two triggers firing in one pass send one
+    datum.
+
+Requirement
+    Deferred until the rest is settled: an ``age``, after which a held
+    reading is said to be expired rather than repeated, for the whole node
+    or for each input; and a frame, a datum of tagged items each carrying
+    the node and the link it came from, for inputs so unequal in rate that a
+    fixed structure would mostly repeat itself. A frame's length would vary,
+    which every ground station would then have to handle, and the fixed
+    structure is built first.
+
+To build it, in order:
+
+1. tcsprotocol: the function, its attributes (``send``, ``interval``) and its
+   checks; keeping its inputs' names as a vote's are kept, which the reader
+   (``graph::grouped``) and the matching of links to names (``graph::mirror``)
+   do now for a vote alone; and the output structure, worked out from the
+   inputs' types, which its own XTCE and the link types use.
+2. tcspecial: the held readings and their states; a hook at the end of a
+   pass that sends, which ``Port::flush`` is the place for and which
+   produces nothing for any node now; the interval, scheduled as a group's
+   is; and ``moc-in`` as a trigger.
+3. The ground and the tools: the structure in the configuration's own XTCE;
+   ``tcs-verify --summary``; tcs-gui, which draws it and edits its
+   attributes; and tcsmoc and its Python spelling, which read ``state``.
+4. The node-types guide, an example in both spellings, and tests: an input
+   that never arrives; one that arrives twice between sends; inputs
+   arriving in different waves of one pass; each trigger alone and
+   together; and the checks refusing what they refuse.
+
 App nodes
 ---------
 

@@ -3279,6 +3279,108 @@ not left acting on a quantity nobody is measuring without the ground
 hearing of it. Without <tt class="docutils literal">age</tt>, a reading stands until its input sends
 another.</dd>
 </dl>
+<p>A <strong>consolidator</strong> turns several readings of different things into one
+datum, so that what belongs together reaches the ground together: a payload
+group's readings in one packet, rather than one packet each arriving in
+whatever order the link delivers them. A reading assembled out of two
+packets is a reading that half arrives when one of them is lost; one datum
+arrives whole or not at all.</p>
+<p><strong>Planned</strong> (2026-11-14); not built. What follows is the design to build it
+to.</p>
+<p>The difficulty is that its inputs do not keep one time. A payload read on a
+group's interval delivers when it is read, one that sends on its own
+delivers when it has something, and any of them may deliver nothing for a
+while -- so at any moment some of what the datum is to hold may be missing,
+or old. The consolidator does not wait for all of it, which would let one
+silent payload stop the datum for good, and it does not fill a gap with a
+dummy or a stale value as though it were fresh, which the ground could not
+tell from a reading. It sends what it has, and says of each input whether
+it is new.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A consolidator is a computation, <tt class="docutils literal">function: consolidator</tt>. Its inputs
+are the names its <tt class="docutils literal"><span class="pre">world-in</span></tt> lists, each linked from one other node's
+<tt class="docutils literal"><span class="pre">world-out</span></tt>, at least two, each named once; the links bind exactly
+those, as a vote's do. Several nodes' readings may be consolidated, and
+so may the readings of one node and of computations made from them.</dd>
+<dt>Requirement</dt>
+<dd>Each input's type is the type of the source linked to it, which must be
+one a structure's field may be: a number, a value of a unit or a
+boolean, of a fixed width. A string or bytes is refused, because its
+length would make the datum's, and so is a structure, because a
+structure's fields are not structures; consolidating one by its fields
+is left for later. A consolidator is the one computation whose
+inputs need not share a type, and states no <tt class="docutils literal"><span class="pre">type-in</span></tt>: each input's
+is its source's.</dd>
+<dt>Requirement</dt>
+<dd>What it sends is one structure, made from the configuration: a field for
+each input, in the order its <tt class="docutils literal"><span class="pre">world-in</span></tt> lists them -- an order the
+configuration digest covers, so the vehicle and the ground agree about
+it -- each named after its input and of its input's type, and after
+them a field <tt class="docutils literal">state</tt> saying, two bits an input in the same order,
+whether each is <strong>fresh</strong> (arrived since the last datum was sent),
+<strong>repeated</strong> (sent before, and nothing new since) or <strong>never</strong> (nothing
+has arrived from it since tcspecial started). The configuration's own
+XTCE describes the structure as an aggregate, as it does any structure,
+so the ground decodes it with nothing new. A structure holds at most
+sixteen fields, so a consolidator takes at most fifteen inputs.</dd>
+<dt>Requirement</dt>
+<dd>It keeps, for each input, the latest reading and its state, in storage
+sized when the configuration is loaded from the inputs' types. A reading
+that arrives replaces the one held, and a second arriving before a datum
+is sent replaces the first: the datum carries the latest. Nothing is
+allocated as it runs.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">When it sends is said by <tt class="docutils literal">send</tt>, a list of any of three triggers, of
+which at least one is given:</p>
+<ul class="simple">
+<li><tt class="docutils literal">all_fresh</tt>: as soon as every input is fresh;</li>
+<li><tt class="docutils literal">interval</tt>: every <tt class="docutils literal">interval</tt>, a length of time, which is then
+given too;</li>
+<li><tt class="docutils literal">moc</tt>: when anything arrives at its <tt class="docutils literal"><span class="pre">moc-in</span></tt>, linked from a
+gateway, whatever it is -- so the ground can ask for a datum, with no
+new command and no change to the interface.</li>
+</ul>
+<p class="last"><tt class="docutils literal">all_fresh</tt> alone is refused, as a vote over every input would be: one
+input that stops would stop the datum for good. It is given with
+<tt class="docutils literal">interval</tt>, <tt class="docutils literal">moc</tt> or both, which send what there is when it does not
+come.</p>
+</dd>
+<dt>Requirement</dt>
+<dd>A datum is sent at the end of the pass in which a trigger fires, not at
+the arrival that fired it: inputs at different depths of the graph reach
+a node in different waves of one pass, and a datum sent mid-pass would
+hold some of a pass's readings and not the rest. Once it is sent, every
+fresh input becomes repeated. Two triggers firing in one pass send one
+datum.</dd>
+<dt>Requirement</dt>
+<dd>Deferred until the rest is settled: an <tt class="docutils literal">age</tt>, after which a held
+reading is said to be expired rather than repeated, for the whole node
+or for each input; and a frame, a datum of tagged items each carrying
+the node and the link it came from, for inputs so unequal in rate that a
+fixed structure would mostly repeat itself. A frame's length would vary,
+which every ground station would then have to handle, and the fixed
+structure is built first.</dd>
+</dl>
+<p>To build it, in order:</p>
+<ol class="arabic simple">
+<li>tcsprotocol: the function, its attributes (<tt class="docutils literal">send</tt>, <tt class="docutils literal">interval</tt>) and its
+checks; keeping its inputs' names as a vote's are kept, which the reader
+(<tt class="docutils literal"><span class="pre">graph::grouped</span></tt>) and the matching of links to names (<tt class="docutils literal"><span class="pre">graph::mirror</span></tt>)
+do now for a vote alone; and the output structure, worked out from the
+inputs' types, which its own XTCE and the link types use.</li>
+<li>tcspecial: the held readings and their states; a hook at the end of a
+pass that sends, which <tt class="docutils literal"><span class="pre">Port::flush</span></tt> is the place for and which
+produces nothing for any node now; the interval, scheduled as a group's
+is; and <tt class="docutils literal"><span class="pre">moc-in</span></tt> as a trigger.</li>
+<li>The ground and the tools: the structure in the configuration's own XTCE;
+<tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt>; tcs-gui, which draws it and edits its
+attributes; and tcsmoc and its Python spelling, which read <tt class="docutils literal">state</tt>.</li>
+<li>The node-types guide, an example in both spellings, and tests: an input
+that never arrives; one that arrives twice between sends; inputs
+arriving in different waves of one pass; each trigger alone and
+together; and the checks refusing what they refuse.</li>
+</ol>
 </div>
 <div class="section" id="app-nodes">
 <h2><a class="toc-backref" href="#toc-entry-33">App nodes</a></h2>

@@ -18,29 +18,40 @@ fn root() -> PathBuf {
 /// # Arguments
 ///
 /// * `dir`   - The directory to search, recursively.
+/// * `above` - The directories `dir` is in, each as it really is.
 /// * `found` - Where each file's path is added.
 ///
 /// # Panics
 ///
-/// If a directory or one of its entries cannot be read.
-fn slint_files(dir: &Path, found: &mut Vec<PathBuf>) {
+/// If a directory or one of its entries cannot be read, or `dir` leads
+/// back, through a link, to a directory it is in: a loop.
+fn slint_files(dir: &Path, above: &mut Vec<PathBuf>, found: &mut Vec<PathBuf>) {
+    let real = std::fs::canonicalize(dir).expect("a directory");
+    assert!(
+        !above.contains(&real),
+        "{}: a loop, back to {}",
+        dir.display(),
+        real.display()
+    );
+    above.push(real);
     for entry in std::fs::read_dir(dir).expect("a directory") {
         let path = entry.expect("an entry").path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if path.is_dir() {
             if name != "target" && !name.starts_with('.') {
-                slint_files(&path, found);
+                slint_files(&path, above, found);
             }
         } else if name.ends_with(".slint") {
             found.push(path);
         }
     }
+    above.pop();
 }
 
 #[test]
 fn every_window_is_set_in_the_one_default_size() {
     let mut files = Vec::new();
-    slint_files(&root(), &mut files);
+    slint_files(&root(), &mut Vec::new(), &mut files);
 
     let mut windows = 0;
     for file in &files {
@@ -98,7 +109,7 @@ fn the_python_windows_use_the_same_size() {
 #[test]
 fn every_text_box_and_button_is_set_in_the_one_size() {
     let mut files = Vec::new();
-    slint_files(&root(), &mut files);
+    slint_files(&root(), &mut Vec::new(), &mut files);
 
     let mut checked = 0;
     for file in &files {
@@ -183,7 +194,7 @@ fn points(size: &str) -> Option<f32> {
 #[test]
 fn no_text_is_set_smaller_than_the_one_size() {
     let mut files = Vec::new();
-    slint_files(&root(), &mut files);
+    slint_files(&root(), &mut Vec::new(), &mut files);
 
     for file in &files {
         let text = std::fs::read_to_string(file).expect("it reads");

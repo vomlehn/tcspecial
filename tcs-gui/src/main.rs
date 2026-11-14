@@ -8183,7 +8183,13 @@ fn descriptions() -> &'static [nodes::Described] {
     static FOUND: std::sync::OnceLock<Vec<nodes::Described>> =
         std::sync::OnceLock::new();
     FOUND.get_or_init(|| {
-        let (described, trouble) = nodes::described();
+        // A loop in the tree is the one thing about it that stops the
+        // editor: what it would offer from a tree read round and round is
+        // not the tree anyone wrote.
+        let (described, trouble) = nodes::described().unwrap_or_else(|why| {
+            eprintln!("tcs-gui: {why}");
+            std::process::exit(1)
+        });
         for said in trouble {
             eprintln!("tcs-gui: {said}");
         }
@@ -9886,7 +9892,8 @@ mod tests {
     fn the_vehicle_pane_offers_what_the_tree_describes() {
         let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("share/nodes");
-        let (described, trouble) = nodes::read_tree(&tree);
+        let (described, trouble) =
+            nodes::read_tree(&tree).expect("the tree has no loop");
         assert_eq!(trouble, Vec::<String>::new());
 
         // Every description is offered, in whichever pane its type belongs to.

@@ -1123,12 +1123,29 @@ fn described() -> Vec<PathBuf> {
     ///
     /// * `root`  - The top of the tree, which the paths are made relative to.
     /// * `here`  - The directory to search, recursively.
+    /// * `above` - The directories `here` is in, each as it really is.
     /// * `found` - Where each file's path is added.
     ///
     /// # Panics
     ///
-    /// If a directory or one of its entries cannot be read.
-    fn walk(root: &Path, here: &Path, found: &mut Vec<PathBuf>) {
+    /// If a directory or one of its entries cannot be read, or `here` leads
+    /// back, through a link, to a directory it is in: a loop, which the
+    /// editor refuses too.
+    fn walk(
+        root: &Path,
+        here: &Path,
+        above: &mut Vec<PathBuf>,
+        found: &mut Vec<PathBuf>,
+    ) {
+        let real = std::fs::canonicalize(here)
+            .unwrap_or_else(|e| panic!("{}: {e}", here.display()));
+        assert!(
+            !above.contains(&real),
+            "{}: a loop, back to {}",
+            here.display(),
+            real.display()
+        );
+        above.push(real);
         let mut entries: Vec<PathBuf> = std::fs::read_dir(here)
             .unwrap_or_else(|e| panic!("{}: {e}", here.display()))
             .map(|entry| entry.expect("an entry").path())
@@ -1136,7 +1153,7 @@ fn described() -> Vec<PathBuf> {
         entries.sort();
         for path in entries {
             if path.is_dir() {
-                walk(root, &path, found);
+                walk(root, &path, above, found);
             } else if matches!(
                 path.extension().and_then(|e| e.to_str()),
                 Some("yaml") | Some("yml") | Some("xml")
@@ -1148,10 +1165,11 @@ fn described() -> Vec<PathBuf> {
                 );
             }
         }
+        above.pop();
     }
 
     let mut found = Vec::new();
-    walk(&nodes(), &nodes(), &mut found);
+    walk(&nodes(), &nodes(), &mut Vec::new(), &mut found);
     assert!(!found.is_empty(), "the description tree is empty");
     found
 }

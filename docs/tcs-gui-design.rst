@@ -2220,6 +2220,13 @@ would be an editor a typo turns off. What is wrong goes to the error output, as
 an unreadable preferences file does. Two descriptions of one name are refused
 the same way -- a name picks out one node here as it does in a configuration.
 
+A loop in the tree is the exception, and stops the editor at its start, naming
+the link: a directory that leads, through a symbolic link, back to one it is
+in. Everything under a loop is under it again without end, so a tree read
+until the kernel stopped the path would be offered as though it were the tree
+somebody wrote. Two links to one directory are not a loop, and what they find
+twice is two descriptions of one name, refused as above.
+
 Schemas Beside the Tree
 =======================
 

@@ -257,12 +257,20 @@ struct SaidAttribute {
 ///
 /// The descriptions read, sorted by path, and a message for every directory or
 /// file that could not be read and for every name described more than once.
-pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
+///
+/// # Errors
+///
+/// A tree with a loop in it -- a directory that leads, through a symbolic
+/// link, back to one it is in -- is refused whole, naming the link: what is
+/// under a loop is under it again without end, and a tree read as far as
+/// the kernel lets a path go would offer what it found there as though that
+/// were the tree.
+pub fn read_tree(root: &Path) -> Result<(Vec<Described>, Vec<String>), String> {
     let mut described = Vec::new();
     let mut trouble = Vec::new();
 
     let mut found = Vec::new();
-    walk(root, root, &mut found, &mut trouble);
+    walk(root, root, &mut Vec::new(), &mut found, &mut trouble)?;
     found.sort();
 
     for path in found {
@@ -288,7 +296,7 @@ pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
         }
     }
 
-    (described, trouble)
+    Ok((described, trouble))
 }
 
 /// Every description file under `where_`, as paths relative to `root`.
@@ -298,22 +306,49 @@ pub fn read_tree(root: &Path) -> (Vec<Described>, Vec<String>) {
 /// * `root`    - The top of the tree, which the paths found are made relative
 ///               to.
 /// * `where_`  - The directory to search, recursively.
+/// * `above`   - The directories `where_` is in, from `root` down, each as
+///               it really is, with every link followed.
 /// * `found`   - Where each YAML or XML file found is added.
 /// * `trouble` - Where a message is added for each directory or entry that
 ///               cannot be read.
+///
+/// # Errors
+///
+/// A loop: `where_` is, through a link, one of the directories it is in.
 fn walk(
     root: &Path,
     where_: &Path,
+    above: &mut Vec<PathBuf>,
     found: &mut Vec<PathBuf>,
     trouble: &mut Vec<String>,
-) {
+) -> Result<(), String> {
+    // A directory reached twice by one path down is a loop, and the walk
+    // would go round it until the kernel stopped it. Reached twice by two
+    // paths is not, and the descriptions found twice are said below as two
+    // of one name.
+    let real = match std::fs::canonicalize(where_) {
+        Ok(real) => real,
+        Err(e) => {
+            trouble.push(format!("{}: {e}", where_.display()));
+            return Ok(());
+        }
+    };
+    if above.contains(&real) {
+        return Err(format!(
+            "{}: the description tree has a loop in it, since this leads \
+             back to {}, a directory it is in: remove the link that makes it",
+            where_.display(),
+            real.display()
+        ));
+    }
     let entries = match std::fs::read_dir(where_) {
         Ok(entries) => entries,
         Err(e) => {
             trouble.push(format!("{}: {e}", where_.display()));
-            return;
+            return Ok(());
         }
     };
+    above.push(real);
 
     for entry in entries {
         let entry = match entry {
@@ -325,7 +360,7 @@ fn walk(
         };
         let path = entry.path();
         if path.is_dir() {
-            walk(root, &path, found, trouble);
+            walk(root, &path, above, found, trouble)?;
             continue;
         }
         // Only the two formats, and silently: a tree people edit has a README
@@ -341,6 +376,8 @@ fn walk(
             }
         }
     }
+    above.pop();
+    Ok(())
 }
 
 /// One description, read from `root`-relative `path`.
@@ -767,10 +804,14 @@ pub fn nodes_in(data: &Path) -> PathBuf {
 ///
 /// The descriptions and the trouble found, as [`read_tree`] gives them; both
 /// empty where there is no tree.
-pub fn described() -> (Vec<Described>, Vec<String>) {
+///
+/// # Errors
+///
+/// A loop in the tree, as [`read_tree`] refuses it.
+pub fn described() -> Result<(Vec<Described>, Vec<String>), String> {
     match data_dir().map(|data| nodes_in(&data)) {
         Some(tree) if tree.is_dir() => read_tree(&tree),
-        _ => (Vec::new(), Vec::new()),
+        _ => Ok((Vec::new(), Vec::new())),
     }
 }
 
@@ -802,7 +843,8 @@ mod tests {
     /// The shipped tree reads, and says what it is expected to say.
     #[test]
     fn the_shipped_descriptions_read() {
-        let (described, trouble) = read_tree(&shipped());
+        let (described, trouble) =
+            read_tree(&shipped()).expect("the tree has no loop");
         assert_eq!(trouble, Vec::<String>::new());
 
         let names: Vec<&str> =
@@ -919,7 +961,8 @@ mod tests {
     /// as a box to type `treu` into.
     #[test]
     fn every_kind_is_one_the_window_knows() {
-        let (described, trouble) = read_tree(&shipped());
+        let (described, trouble) =
+            read_tree(&shipped()).expect("the tree has no loop");
         assert!(trouble.is_empty(), "{trouble:?}");
 
         // What `tcsprotocol` reads as true or false:
@@ -991,7 +1034,8 @@ mod tests {
     /// statement there is.
     #[test]
     fn the_trees_terminals_are_the_schemas() {
-        let (described, trouble) = read_tree(&shipped());
+        let (described, trouble) =
+            read_tree(&shipped()).expect("the tree has no loop");
         assert!(trouble.is_empty(), "{trouble:?}");
         assert!(!described.is_empty());
 
@@ -1038,7 +1082,8 @@ mod tests {
     /// field with an empty line beside it is a field somebody has to guess at.
     #[test]
     fn a_description_of_a_whole_type_says_what_the_type_says() {
-        let (described, trouble) = read_tree(&shipped());
+        let (described, trouble) =
+            read_tree(&shipped()).expect("the tree has no loop");
         assert!(trouble.is_empty(), "{trouble:?}");
 
         for one in &described {
@@ -1104,7 +1149,8 @@ mod tests {
     fn every_description_has_its_rust() {
         let code =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcspecial/src/node");
-        let (described, _) = read_tree(&shipped());
+        let (described, _) =
+            read_tree(&shipped()).expect("the tree has no loop");
         assert!(!described.is_empty());
 
         let mut families: Vec<PathBuf> = Vec::new();
@@ -1189,7 +1235,8 @@ mod tests {
     /// a field the checking then refuses, or leaves out one it requires.
     #[test]
     fn a_computations_description_asks_for_what_it_takes() {
-        let (described, _) = read_tree(&shipped());
+        let (described, _) =
+            read_tree(&shipped()).expect("the tree has no loop");
         let computations: Vec<&Described> = described
             .iter()
             .filter(|one| one.node_type == "compute")
@@ -1226,7 +1273,8 @@ mod tests {
     /// every attribute any computation has.
     #[test]
     fn a_node_is_matched_to_the_description_that_fits_it() {
-        let (described, _) = read_tree(&shipped());
+        let (described, _) =
+            read_tree(&shipped()).expect("the tree has no loop");
 
         let said = |pairs: &[(&str, &str)]| {
             pairs
@@ -1321,7 +1369,8 @@ mod tests {
         // Not a description at all, and not complained about either.
         std::fs::write(root.join("README"), "The tree.\n").expect("a readme");
 
-        let (described, trouble) = read_tree(root);
+        let (described, trouble) =
+            read_tree(root).expect("the tree has no loop");
         let names: Vec<&str> =
             described.iter().map(|one| one.node.as_str()).collect();
         assert_eq!(names, vec!["mean"], "the good one is still read");
@@ -1334,6 +1383,37 @@ mod tests {
             trouble.iter().any(|said| said.contains("nameless.yaml")),
             "{trouble:?}"
         );
+    }
+
+    /// A tree with a loop in it is refused whole, naming the link; two
+    /// links to one directory are not a loop.
+    #[test]
+    fn a_loop_in_the_tree_is_refused() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let root = where_.path();
+        std::fs::create_dir_all(root.join("compute")).expect("a family");
+        std::fs::write(
+            root.join("compute/mean.yaml"),
+            "node: mean\ntype: compute\nabout: An average.\n",
+        )
+        .expect("a description");
+
+        // Two ways down to one directory: not a loop, and said as two
+        // descriptions of one name.
+        std::os::unix::fs::symlink("compute", root.join("again"))
+            .expect("a link");
+        let (_, trouble) = read_tree(root).expect("two ways down is no loop");
+        assert!(
+            trouble.iter().any(|said| said.contains("\"mean\"")),
+            "{trouble:?}"
+        );
+
+        // A way back up: a loop.
+        std::os::unix::fs::symlink("..", root.join("compute/up"))
+            .expect("a link");
+        let refused = read_tree(root).expect_err("a loop is refused");
+        assert!(refused.contains("/up:"), "{refused}");
+        assert!(refused.contains("loop"), "{refused}");
     }
 
     /// Two descriptions of one name are refused, naming it.
@@ -1350,7 +1430,8 @@ mod tests {
             .expect("a description");
         }
 
-        let (described, trouble) = read_tree(root);
+        let (described, trouble) =
+            read_tree(root).expect("the tree has no loop");
         assert_eq!(described.len(), 2, "both are read");
         assert!(
             trouble.iter().any(|said| said.contains("\"mean\"")),
@@ -1372,7 +1453,8 @@ mod tests {
         let tree = nodes_in(&data);
         assert!(tree.is_dir(), "{}", tree.display());
 
-        let (described, trouble) = read_tree(&tree);
+        let (described, trouble) =
+            read_tree(&tree).expect("the tree has no loop");
         assert!(!described.is_empty());
         assert_eq!(trouble, Vec::<String>::new());
     }
@@ -1395,7 +1477,8 @@ mod tests {
     fn the_compute_fields_are_every_computations_terms() {
         let tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("share/nodes");
-        let (described, trouble) = read_tree(&tree);
+        let (described, trouble) =
+            read_tree(&tree).expect("the tree has no loop");
         assert!(trouble.is_empty(), "{trouble:?}");
 
         let offered = tcs_diagram::style::NodeType::Compute.attributes();

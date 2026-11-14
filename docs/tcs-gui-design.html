@@ -2433,6 +2433,12 @@ later, and an editor that offered nothing because one file has a typo in it
 would be an editor a typo turns off. What is wrong goes to the error output, as
 an unreadable preferences file does. Two descriptions of one name are refused
 the same way -- a name picks out one node here as it does in a configuration.</p>
+<p>A loop in the tree is the exception, and stops the editor at its start, naming
+the link: a directory that leads, through a symbolic link, back to one it is
+in. Everything under a loop is under it again without end, so a tree read
+until the kernel stopped the path would be offered as though it were the tree
+somebody wrote. Two links to one directory are not a loop, and what they find
+twice is two descriptions of one name, refused as above.</p>
 </div>
 <div class="section" id="schemas-beside-the-tree">
 <h1><a class="toc-backref" href="#toc-entry-45">Schemas Beside the Tree</a></h1>

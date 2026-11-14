@@ -10,7 +10,7 @@ the vehicle, behind one header"""
 
 [lib]
 # libtcsmoc_c.a and libtcsmoc_c.so, which a C or C++ program links with
-# include/tcslib-moc-c.h; and the rlib, for this crate's own tests. A crate's
+# include/tcsmoc-c.h; and the rlib, for this crate's own tests. A crate's
 # name has no hyphen, so the Makefile installs them as libtcsmoc-c.
 name = "tcsmoc_c"
 crate-type = ["staticlib", "cdylib", "rlib"]

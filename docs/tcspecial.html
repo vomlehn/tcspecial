@@ -505,7 +505,7 @@ is talked to through file descriptors it inherits, which a program in any of the
 three already knows how to read and write, so it may be written in C, C++, Rust
 or Python. On the ground, a station is built on <tt class="docutils literal"><span class="pre">tcslib-moc</span></tt> in Rust, on
 <tt class="docutils literal"><span class="pre">tcslib-moc-c</span></tt> in C or C++ -- the same library behind one header,
-<tt class="docutils literal"><span class="pre">tcslib-moc-c/include/tcslib-moc-c.h</span></tt> -- or on its Python spelling under
+<tt class="docutils literal"><span class="pre">tcslib-moc-c/include/tcsmoc-c.h</span></tt> -- or on its Python spelling under
 <tt class="docutils literal">python/</tt>. Every interface offered to C is offered to C++ as well: a C header
 can be included from C++ as it stands, and nothing in it is C that C++ will not
 compile.</p>
@@ -3634,8 +3634,8 @@ in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a clas
 go</a>).</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt></dt>
 <dd>What a ground station is built on. <tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.so.4</span></tt> and
-<tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.a</span></tt> with <tt class="docutils literal"><span class="pre">include/tcslib-moc-c.h</span></tt> and
-<tt class="docutils literal"><span class="pre">lib/pkgconfig/tcslib-moc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
+<tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.a</span></tt> with <tt class="docutils literal"><span class="pre">include/tcsmoc-c.h</span></tt> and
+<tt class="docutils literal"><span class="pre">lib/pkgconfig/tcsmoc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
 <tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
 <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS,
 YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
@@ -3803,22 +3803,22 @@ dependencies, and are not installed.</p>
 <h2><a class="toc-backref" href="#toc-entry-57">A C or C++ ground station</a></h2>
 <p>With <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on <tt class="docutils literal">PKG_CONFIG_PATH</tt> -- the ground
 package's profile script puts it there -- a station includes
-<tt class="docutils literal"><span class="pre">&lt;tcslib-moc-c.h&gt;</span></tt> and is built with what <tt class="docutils literal"><span class="pre">tcslib-moc-c.pc</span></tt> says:</p>
+<tt class="docutils literal"><span class="pre">&lt;tcsmoc-c.h&gt;</span></tt> and is built with what <tt class="docutils literal"><span class="pre">tcsmoc-c.pc</span></tt> says:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span><span class="whitespace">
-</span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span>
+<span class="generic prompt">$ </span>cc<span class="whitespace">  </span>station.c<span class="whitespace">   </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcsmoc-c<span class="keyword">)</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>c++<span class="whitespace"> </span>station.cpp<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>--libs<span class="whitespace"> </span>tcsmoc-c<span class="keyword">)</span>
 </pre>
 <p>That links with <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt>, which the loader finds through the
 ground package's <tt class="docutils literal">ld.so.conf.d</tt> file. The <tt class="docutils literal">4</tt> is libtcsmoc-c's ABI
 version, which is not the package's: it goes up only when a station built
-against the old <tt class="docutils literal"><span class="pre">tcslib-moc-c.h</span></tt> would not work with the new library, so an
+against the old <tt class="docutils literal"><span class="pre">tcsmoc-c.h</span></tt> would not work with the new library, so an
 upgrade that keeps it needs no station rebuilt. See tcslib-moc-c's README. A
 station linked with <tt class="docutils literal"><span class="pre">libtcsmoc-c.a</span></tt> instead names it and what it needs
 besides:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>cc<span class="whitespace"> </span>station.c<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>tcslib-moc-c<span class="keyword">)</span><span class="whitespace"> </span><span class="literal string escape">\
+<span class="generic prompt">$ </span>cc<span class="whitespace"> </span>station.c<span class="whitespace"> </span><span class="keyword">$(</span>pkg-config<span class="whitespace"> </span>--cflags<span class="whitespace"> </span>tcsmoc-c<span class="keyword">)</span><span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>/opt/tcs/lib/libtcsmoc-c.a<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="generic prompt">    $</span><span class="operator">(</span>pkg-config<span class="whitespace"> </span>--static<span class="whitespace"> </span>--libs-only-l<span class="whitespace"> </span>tcslib-moc-c<span class="whitespace"> </span><span class="punctuation">|</span><span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="generic prompt">    $</span><span class="operator">(</span>pkg-config<span class="whitespace"> </span>--static<span class="whitespace"> </span>--libs-only-l<span class="whitespace"> </span>tcsmoc-c<span class="whitespace"> </span><span class="punctuation">|</span><span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">      </span>sed<span class="whitespace"> </span><span class="literal string single">'s/-ltcsmoc-c//'</span><span class="operator">)</span>
 </pre>
 </div>

@@ -13,7 +13,7 @@ Filters = [
 	# 3.13 lays it out, and /opt/tcs is the tree every TCS package shares.
 	' dir-or-file-in-opt ',
 	# tcspecial-moc holds libtcsmoc-c and what is built against
-	# it, tcslib-moc-c.h, tcslib-moc-c.pc and the static library, by
+	# it, tcsmoc-c.h, tcsmoc-c.pc and the static library, by
 	# design: there is no -devel package for them to go in. The Python
 	# packages and the editor's data beside the library are not named for
 	# its version either.

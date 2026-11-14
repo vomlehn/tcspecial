@@ -47,7 +47,7 @@ is talked to through file descriptors it inherits, which a program in any of the
 three already knows how to read and write, so it may be written in C, C++, Rust
 or Python. On the ground, a station is built on ``tcslib-moc`` in Rust, on
 ``tcslib-moc-c`` in C or C++ -- the same library behind one header,
-``tcslib-moc-c/include/tcslib-moc-c.h`` -- or on its Python spelling under
+``tcslib-moc-c/include/tcsmoc-c.h`` -- or on its Python spelling under
 ``python/``. Every interface offered to C is offered to C++ as well: a C header
 can be included from C++ as it stands, and nothing in it is C that C++ will not
 compile.
@@ -3440,8 +3440,8 @@ There are three, because three kinds of machine take them:
    go`_).
 ``tcspecial-moc``
    What a ground station is built on. ``lib/libtcsmoc-c.so.4`` and
-   ``lib/libtcsmoc-c.a`` with ``include/tcslib-moc-c.h`` and
-   ``lib/pkgconfig/tcslib-moc-c.pc``; the Python packages ``tcslib_protocol``,
+   ``lib/libtcsmoc-c.a`` with ``include/tcsmoc-c.h`` and
+   ``lib/pkgconfig/tcsmoc-c.pc``; the Python packages ``tcslib_protocol``,
    ``tcslib_moc`` and ``tcs_ui`` in ``lib/python3/site-packages``;
    ``bin/tcs-gui`` with its descriptions in ``share/tcs-gui``; and the XTCS,
    YTCS and simulator schemas in ``share/tcspecial/schema``.
@@ -3632,26 +3632,26 @@ A C or C++ ground station
 
 With ``/opt/tcs/lib/pkgconfig`` on ``PKG_CONFIG_PATH`` -- the ground
 package's profile script puts it there -- a station includes
-``<tcslib-moc-c.h>`` and is built with what ``tcslib-moc-c.pc`` says:
+``<tcsmoc-c.h>`` and is built with what ``tcsmoc-c.pc`` says:
 
 .. code-block:: console
 
-   $ cc  station.c   $(pkg-config --cflags --libs tcslib-moc-c)
-   $ c++ station.cpp $(pkg-config --cflags --libs tcslib-moc-c)
+   $ cc  station.c   $(pkg-config --cflags --libs tcsmoc-c)
+   $ c++ station.cpp $(pkg-config --cflags --libs tcsmoc-c)
 
 That links with ``libtcsmoc-c.so.4``, which the loader finds through the
 ground package's ``ld.so.conf.d`` file. The ``4`` is libtcsmoc-c's ABI
 version, which is not the package's: it goes up only when a station built
-against the old ``tcslib-moc-c.h`` would not work with the new library, so an
+against the old ``tcsmoc-c.h`` would not work with the new library, so an
 upgrade that keeps it needs no station rebuilt. See tcslib-moc-c's README. A
 station linked with ``libtcsmoc-c.a`` instead names it and what it needs
 besides:
 
 .. code-block:: console
 
-   $ cc station.c $(pkg-config --cflags tcslib-moc-c) \
+   $ cc station.c $(pkg-config --cflags tcsmoc-c) \
        /opt/tcs/lib/libtcsmoc-c.a \
-       $(pkg-config --static --libs-only-l tcslib-moc-c | \
+       $(pkg-config --static --libs-only-l tcsmoc-c | \
          sed 's/-ltcsmoc-c//')
 
 Running tcspecial under a supervisor

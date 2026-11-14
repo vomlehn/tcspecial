@@ -10,8 +10,8 @@
  * Nothing is allocated once the deployment is running. Every handle is
  * made, and every buffer is a member, when configure() is called as the
  * topology is set up; a datum is taken into a member and a channel written
- * from it. What tcslib-moc-c does inside tcslib-moc-c.h's calls is what
- * tcslib-moc-c.h says of them.
+ * from it. What tcslib-moc-c does inside tcsmoc-c.h's calls is what
+ * tcsmoc-c.h says of them.
  */
 
 #ifndef TCS_TCSBRIDGE_HPP
@@ -27,7 +27,7 @@
 #include "Tcs/TcsBridge/DatumSerializableAc.hpp"
 #include "Tcs/TcsBridge/FppConstantsAc.hpp"
 #include "Tcs/TcsBridge/TcsBridgeComponentAc.hpp"
-#include "tcslib-moc-c.h"
+#include "tcsmoc-c.h"
 
 namespace Tcs {
 
@@ -235,7 +235,7 @@ private:
 		   const Fw::CmdStringArg &node, U32 &id);
 
 	// The handles, made by configure(). The configuration is read from both
-	// threads, as tcslib-moc-c.h allows; the beacon watch only from its
+	// threads, as tcsmoc-c.h allows; the beacon watch only from its
 	// own, its waker from stop(), and the rest only from the component's.
 	tcs_configuration *m_configuration;
 	tcs_beacons *m_beacons;

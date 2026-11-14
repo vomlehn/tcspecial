@@ -27,7 +27,7 @@ argue from this order and say so.
   simulated devices, `bus` for a vehicle on a cFS software bus (the station's
   SBN peer, and `SimulatedCfs`, the cFS end as tcs-sim simulates it).
 - `tcslib-moc-c` -- tcslib-moc for C and C++: beacons, data and commands behind
-  one hand-written header, `include/tcslib-moc-c.h`, which `tests/c_and_cpp.rs`
+  one hand-written header, `include/tcsmoc-c.h`, which `tests/c_and_cpp.rs`
   holds to the library by compiling a ground station against it with gcc and
   g++.
 - `tcspecial` -- the flight software.

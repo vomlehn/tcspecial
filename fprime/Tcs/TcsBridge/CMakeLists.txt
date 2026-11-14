@@ -31,7 +31,7 @@ register_fprime_module(
 )
 target_include_directories(${FPRIME_CURRENT_MODULE}
 	PUBLIC "${TCSPECIAL_ROOT}/tcslib-moc-c/include")
-# What tcslib-moc-c.h says a program built on libtcsmoc_c.a links with
+# What tcsmoc-c.h says a program built on libtcsmoc_c.a links with
 # besides.
 target_link_libraries(${FPRIME_CURRENT_MODULE}
 	PUBLIC "${TCS_LIBRARY}" pthread dl m)

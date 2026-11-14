@@ -46,7 +46,7 @@ void copy(char *to, size_t size, const char *from)
 
 /** Gives the stage of the beacon watch as the channel has it.
  *
- * @param stage  The stage, as tcslib-moc-c.h has it.
+ * @param stage  The stage, as tcsmoc-c.h has it.
  * @return       The stage, as TcsBridge.fpp has it. */
 Stage stageOf(tcs_stage stage)
 {

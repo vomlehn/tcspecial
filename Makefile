@@ -34,7 +34,7 @@ RUST = .
 #   libexec/     programs other programs run: the five test app programs
 #   lib/         libtcsmoc-c, its pkg-config file, and the Python packages,
 #                in lib/python3/site-packages, which names no minor version
-#   include/     tcslib-moc-c.h
+#   include/     tcsmoc-c.h
 #   share/       tcs-gui's data, the documents and the example configurations
 #
 # HOOKS=1 also installs what makes /opt/tcs usable without being told: a
@@ -819,10 +819,10 @@ RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
 
 # The versions, read from where each is stated so that it is stated once: the
 # workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcsmoc-c's
-# own, which tcslib-moc-c.pc says, and tcslib-moc-c/abi-version for
+# own, which tcsmoc-c.pc says, and tcslib-moc-c/abi-version for
 # libtcsmoc-c's ABI version, which is its soname -- libtcsmoc-c.so.<ABI>
 # -- and the name its file is installed under. The ABI version goes up only when
-# a program built against the old tcslib-moc-c.h would not work with the new
+# a program built against the old tcsmoc-c.h would not work with the new
 # library: see tcslib-moc-c/build.rs, which reads the same file to set the
 # soname, for exactly when.
 VERSION := $(shell sed -n \
@@ -980,8 +980,8 @@ install-tcspecial: tcs-helpers
 # installed as libtcsmoc-c. libtcsmoc-c.so is installed under its soname,
 # libtcsmoc-c.so.<ABI>, which is what a program built against it asks for at
 # run time, and linked to by libtcsmoc-c.so, which is what the linker looks
-# for. tcslib-moc-c.h goes
-# in include/ itself, as <tcslib-moc-c.h>. The library is not executable, as
+# for. tcsmoc-c.h goes
+# in include/ itself, as <tcsmoc-c.h>. The library is not executable, as
 # Debian wants a shared library to be; the RPM spec makes it so, as rpm wants.
 #
 # The Python is installed by pip into a directory of its own, without
@@ -1001,7 +1001,7 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 		$(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PYTHONDIR)
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(BINDIR)
-	install -m 644 tcslib-moc-c/include/tcslib-moc-c.h \
+	install -m 644 tcslib-moc-c/include/tcsmoc-c.h \
 		$(DESTDIR)$(INCLUDEDIR)
 	install -m 644 $(RELEASE_DIR)/libtcsmoc_c.so \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
@@ -1012,9 +1012,9 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME), \
 		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a)
 	$(call install_links,tcspecial-moc,$(GROUND_BIN))
-	$(SUBST) packaging/tcslib-moc-c.pc.in \
-		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
-	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
+	$(SUBST) packaging/tcsmoc-c.pc.in \
+		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
+	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 # The schemas the Python reads are tcslib-protocol/schema, which install-data
 # puts under $(SCHEMADIR): the installed package reaches them through a link, as
 # python/tcslib_protocol/schema does in the source tree, rather than carrying a
@@ -1146,11 +1146,11 @@ uninstall-files:
 		$(TEST_BIN))
 	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(FLIGHT_LIBEXEC))
 	rm -f $(addprefix $(DESTDIR)$(SBINDIR)/,$(addsuffix -links,$(PACKAGES)))
-	rm -f $(DESTDIR)$(INCLUDEDIR)/tcslib-moc-c.h
+	rm -f $(DESTDIR)$(INCLUDEDIR)/tcsmoc-c.h
 	rm -f $(DESTDIR)$(LIBDIR)/libtcsmoc-c.so \
 		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
-	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcslib-moc-c.pc
+	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslib_protocol tcslib_moc \
 		tcs-ui tcspecial_moc-*.dist-info)
 	rm -rf $(TCS_GUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \

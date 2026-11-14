@@ -1,4 +1,4 @@
-// A ground station in C++, on tcslib-moc-c.h.
+// A ground station in C++, on tcsmoc-c.h.
 //
 // The same program as ground.c, written as C++ is: the header included as it
 // stands, each handle held by a std::unique_ptr that closes it, and strings
@@ -27,7 +27,7 @@
 #include <string>
 #include <vector>
 
-#include "tcslib-moc-c.h"
+#include "tcsmoc-c.h"
 
 namespace {
 

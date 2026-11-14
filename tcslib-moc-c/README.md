@@ -4,7 +4,7 @@
 C++.** It is the library a ground station
 written in C or C++ is built on: the vehicle's beacons, the vehicle's data
 from a gateway node, and commands to the vehicle, behind one header,
-`include/tcslib-moc-c.h`.
+`include/tcsmoc-c.h`.
 
 It is not a second implementation of anything. Each function is a call into
 [tcslib-moc](../tcslib-moc/README.md), so a C or C++ ground station reads the
@@ -115,12 +115,12 @@ c++ my_station.cpp -I tcslib-moc-c/include \
 Installed -- by the `tcspecial-moc` package, or `make install` at the
 repository's root -- it is `/opt/tcs/lib/libtcsmoc-c.so.<ABI>`, with the
 link `libtcsmoc-c.so` to it, `libtcsmoc-c.a`, the header as
-`/opt/tcs/include/tcslib-moc-c.h`, and `/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc`.
-A station then includes `<tcslib-moc-c.h>` and is built with pkg-config:
+`/opt/tcs/include/tcsmoc-c.h`, and `/opt/tcs/lib/pkgconfig/tcsmoc-c.pc`.
+A station then includes `<tcsmoc-c.h>` and is built with pkg-config:
 
 ```
-cc  my_station.c   $(pkg-config --cflags --libs tcslib-moc-c)
-c++ my_station.cpp $(pkg-config --cflags --libs tcslib-moc-c)
+cc  my_station.c   $(pkg-config --cflags --libs tcsmoc-c)
+c++ my_station.cpp $(pkg-config --cflags --libs tcsmoc-c)
 ```
 
 ### The ABI version
@@ -131,12 +131,12 @@ station linked with the library asks for at run time; `build.rs` sets the soname
 from the file, and the Makefile installs the library under the same name, so the
 number is stated once. It is not the crate's version, and changes for another
 reason. Add one to it when, and only when, a station built against the old
-`tcslib-moc-c.h` would not work with the new library:
+`tcsmoc-c.h` would not work with the new library:
 
 - a function's signature changes, or its behaviour changes in a way a
   station relying on the old behaviour would notice;
 - a function is removed;
-- a struct or enum in `tcslib-moc-c.h` changes its layout or its values, a
+- a struct or enum in `tcsmoc-c.h` changes its layout or its values, a
   constant such as `TCS_TEXT_BYTES` included.
 
 Adding a function, or anything else an old station cannot notice, leaves it

@@ -9,10 +9,10 @@
 ///
 /// The ABI version is `abi-version`, a whole number on one line, kept apart
 /// from the crate's version because it changes for another reason: it goes up
-/// by one when, and only when, a program built against the old `tcslib-moc-c.h`
+/// by one when, and only when, a program built against the old `tcsmoc-c.h`
 /// would no longer work with the new library -- a function's signature or
 /// behaviour changing incompatibly, a function removed, or a struct or enum in
-/// `tcslib-moc-c.h` changing its layout or its values. Adding a function, or
+/// `tcsmoc-c.h` changing its layout or its values. Adding a function, or
 /// anything else an old program cannot notice, leaves it alone. The Makefile
 /// reads the same file for the names it installs the library under, so the two
 /// cannot disagree.

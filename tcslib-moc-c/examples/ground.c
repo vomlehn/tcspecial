@@ -1,5 +1,5 @@
 /*
- * A ground station in C, on tcslib-moc-c.h.
+ * A ground station in C, on tcsmoc-c.h.
  *
  * What a ground station does, in the order it does it: read the
  * configuration, wait for the vehicle's first beacon, which matches the
@@ -25,7 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "tcslib-moc-c.h"
+#include "tcsmoc-c.h"
 
 /* The example's configuration, without its extension. */
 static const char *const STEM = "examples/ping/ping";

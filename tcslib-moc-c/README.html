@@ -174,7 +174,7 @@
 for C and C++.</strong> It is the library a ground station written in C
 or C++ is built on: the vehicle’s beacons, the vehicle’s data from a
 gateway node, and commands to the vehicle, behind one header,
-<code>include/tcslib-moc-c.h</code>.</p>
+<code>include/tcsmoc-c.h</code>.</p>
 <p>It is not a second implementation of anything. Each function is a
 call into <a href="../tcslib-moc/README.md">tcslib-moc</a>, so a C or
 C++ ground station reads the configuration, counts ports and ages
@@ -293,12 +293,12 @@ c++ my_station.cpp -I tcslib-moc-c/include \
 <code>make install</code> at the repository’s root – it is
 <code>/opt/tcs/lib/libtcsmoc-c.so.&lt;ABI&gt;</code>, with the link
 <code>libtcsmoc-c.so</code> to it, <code>libtcsmoc-c.a</code>, the
-header as <code>/opt/tcs/include/tcslib-moc-c.h</code>, and
-<code>/opt/tcs/lib/pkgconfig/tcslib-moc-c.pc</code>. A station then
-includes <code>&lt;tcslib-moc-c.h&gt;</code> and is built with
+header as <code>/opt/tcs/include/tcsmoc-c.h</code>, and
+<code>/opt/tcs/lib/pkgconfig/tcsmoc-c.pc</code>. A station then
+includes <code>&lt;tcsmoc-c.h&gt;</code> and is built with
 pkg-config:</p>
-<pre><code>cc  my_station.c   $(pkg-config --cflags --libs tcslib-moc-c)
-c++ my_station.cpp $(pkg-config --cflags --libs tcslib-moc-c)</code></pre>
+<pre><code>cc  my_station.c   $(pkg-config --cflags --libs tcsmoc-c)
+c++ my_station.cpp $(pkg-config --cflags --libs tcsmoc-c)</code></pre>
 <h3 id="the-abi-version">The ABI version</h3>
 <p><code>&lt;ABI&gt;</code> is the library’s ABI version, the one whole
 number in <code>abi-version</code>, now 4. It is the shared library’s
@@ -307,13 +307,13 @@ with the library asks for at run time; <code>build.rs</code> sets the
 soname from the file, and the Makefile installs the library under the
 same name, so the number is stated once. It is not the crate’s version,
 and changes for another reason. Add one to it when, and only when, a
-station built against the old <code>tcslib-moc-c.h</code> would not work
+station built against the old <code>tcsmoc-c.h</code> would not work
 with the new library:</p>
 <ul>
 <li>a function’s signature changes, or its behaviour changes in a way a
 station relying on the old behaviour would notice;</li>
 <li>a function is removed;</li>
-<li>a struct or enum in <code>tcslib-moc-c.h</code> changes its layout
+<li>a struct or enum in <code>tcsmoc-c.h</code> changes its layout
 or its values, a constant such as <code>TCS_TEXT_BYTES</code>
 included.</li>
 </ul>

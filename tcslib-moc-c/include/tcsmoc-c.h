@@ -1,5 +1,5 @@
 /*
- * tcslib-moc-c.h -- tcslib-moc for C and C++.
+ * tcsmoc-c.h -- tcslib-moc for C and C++.
  *
  * What a ground station is built on, behind one header: the vehicle's beacons,
  * the vehicle's data from a gateway node, data up to a gateway node, and
@@ -32,8 +32,8 @@
  *     ends "...".
  */
 
-#ifndef TCSLIB_MOC_C_H
-#define TCSLIB_MOC_C_H
+#ifndef TCSMOC_C_H
+#define TCSMOC_C_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -773,4 +773,4 @@ void tcs_pinger_close(tcs_pinger *pinger);
 }
 #endif
 
-#endif /* TCSLIB_MOC_C_H */
+#endif /* TCSMOC_C_H */

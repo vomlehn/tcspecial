@@ -1,4 +1,4 @@
-//! The C/C++ ground station, built against `tcslib-moc-c.h` as C and as C++,
+//! The C/C++ ground station, built against `tcsmoc-c.h` as C and as C++,
 //! run against a vehicle the Rust plays.
 //!
 //! What keeps the header honest. It is written by hand, so the only proof that
@@ -115,7 +115,7 @@ fn free() -> u16 {
     port(&bound())
 }
 
-/// Compiles a ground station against `tcslib-moc-c.h` and the library.
+/// Compiles a ground station against `tcsmoc-c.h` and the library.
 ///
 /// # Arguments
 ///
@@ -504,7 +504,7 @@ fn the_header_stands_alone_in_c_and_in_cpp() {
     let source = dir.path().join("only.c");
     std::fs::write(
         &source,
-        "#include \"tcslib-moc-c.h\"\nint main(void) { return 0; }\n",
+        "#include \"tcsmoc-c.h\"\nint main(void) { return 0; }\n",
     )
     .expect("written");
     for (compiler, language, standard) in

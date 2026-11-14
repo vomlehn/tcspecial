@@ -2,7 +2,7 @@
 //!
 //! What a ground station is built on -- the vehicle's beacons, its data from a
 //! gateway node, and commands to it -- behind one header,
-//! `include/tcslib-moc-c.h`, which says the whole of the interface and is
+//! `include/tcsmoc-c.h`, which says the whole of the interface and is
 //! includable from C and C++ alike. Nothing here is a second implementation of
 //! anything: each function is the C spelling of a call into `tcslib-moc`, so a
 //! C or C++ station reads the configuration, counts ports and ages beacons
@@ -2897,7 +2897,7 @@ mod tests {
     fn the_header_states_these_sizes() {
         let header = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("include/tcslib-moc-c.h"),
+                .join("include/tcsmoc-c.h"),
         )
         .expect("the header reads");
         for (name, size) in [

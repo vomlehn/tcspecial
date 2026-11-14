@@ -61,7 +61,7 @@ Everything installs under `/opt/tcs`, as three packages:
   enabled.
 * `tcspecial-moc`, what a ground station is built on: `libtcsmoc-c` for C
   and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
-  `include/tcslib-moc-c.h`, `lib/pkgconfig/tcslib-moc-c.pc`), the Python
+  `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python
   packages `tcslib_protocol`, `tcslib_moc` and `tcs_ui`, and `bin/tcs-gui` with
   its data.
 * `tcspecial-test`, the test ground station and simulator: `bin/tcs-moc` and
@@ -85,7 +85,7 @@ without them:
      make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix
      pip install ./python                    # the Python alone
      cargo install --path tcs-verify --root /opt/tcs
-     cc station.c $(pkg-config --cflags --libs tcslib-moc-c)
+     cc station.c $(pkg-config --cflags --libs tcsmoc-c)
 
 `HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
 the search paths: `/etc/profile.d/<package>.sh`,

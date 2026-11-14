@@ -3,7 +3,7 @@
 # To tcspecial the bridge is a ground station: it opens the configuration the
 # vehicle flies, sends CONNECT and compares checksums, takes beacons, sends
 # commands and data and receives data, all over the radio's UDP protocol,
-# through tcslib-moc-c's tcslib-moc-c.h. To the rest of the deployment it is a
+# through tcslib-moc-c's tcsmoc-c.h. To the rest of the deployment it is a
 # component like any other: commands in, events and telemetry channels out.
 #
 # Which channels it has, and their IDs, are the configuration's: the model

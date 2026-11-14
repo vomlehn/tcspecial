@@ -5,7 +5,7 @@ exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include
 
-Name: tcslib-moc-c
+Name: tcsmoc-c
 Description: tcslib-moc for C and C++: ground station beacons, data and commands
 URL: https://github.com/vomlehn/tcspecial
 Version: @LIBTCS_VERSION@

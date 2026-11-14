@@ -64,6 +64,7 @@
                  buffer and prints the number it was given, which is the
                  path to write here. -->
             <payload name="sensor">
+                <read_size>16</read_size>
                 <path>/dev/iio:device1</path>
                 <world-out>moc.sensor</world-out>
             </payload>

@@ -110,6 +110,7 @@ payloads:
       # The switch on a landing leg, whose 1 is the ground's word that the
       # lander is down: straight to the ground.
       - payload: touchdown
+        read_size: "16"
         address: "127.0.0.1"
         port: "5403"
         protocol: "udp"

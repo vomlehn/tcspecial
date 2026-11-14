@@ -55,6 +55,7 @@ payloads:
         moc-in: [echo]
       # A sensor whose readings go to the ground and are copied aboard.
       - payload: sensor
+        read_size: "16"
         address: "127.0.0.1"
         port: "8002"
         protocol: "udp"
@@ -62,6 +63,7 @@ payloads:
           - readings.sensor
       # A payload whose data nobody wants yet.
       - payload: spare
+        read_size: "16"
         address: "127.0.0.1"
         port: "8003"
         protocol: "udp"

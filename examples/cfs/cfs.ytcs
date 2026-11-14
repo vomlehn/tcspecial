@@ -83,6 +83,7 @@ payloads:
         moc-in: [fsw]
       # A thermometer whose readings go to the flight computer.
       - payload: thermometer
+        read_size: "16"
         address: "127.0.0.1"
         port: "8602"
         protocol: "udp"

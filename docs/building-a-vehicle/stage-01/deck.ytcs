@@ -61,6 +61,7 @@ payloads:
       # sorted, counting from nought, and the seismometer is the only node, so
       # it is 0 and the ground hears it on 127.0.0.1:6100.
       - payload: seismometer
+        read_size: "16"
         address: "127.0.0.1"
         port: "5401"
         protocol: "udp"

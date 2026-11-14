@@ -97,6 +97,7 @@ payloads:
       # stage runs on a desk with no camera. The path is from the repository's
       # root, which is where tcspecial is run from.
       - payload: camera
+        world-out-type: "bytes(64)"
         app-payload-arg: "10"
         executable: "docs/building-a-vehicle/camera.py"
         world-out:

@@ -67,6 +67,7 @@
             <!-- A sensor whose readings go to the ground and are copied -->
             <!-- aboard. -->
             <payload name="sensor">
+                <read_size>16</read_size>
                 <address>127.0.0.1</address>
                 <port>8002</port>
                 <protocol>udp</protocol>
@@ -74,6 +75,7 @@
             </payload>
             <!-- A payload whose data nobody wants yet. -->
             <payload name="spare">
+                <read_size>16</read_size>
                 <address>127.0.0.1</address>
                 <port>8003</port>
                 <protocol>udp</protocol>

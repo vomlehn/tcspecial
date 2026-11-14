@@ -62,6 +62,7 @@ payloads:
       # seismometer, so adding it made the seismometer 1, and the ground now
       # hears it on 127.0.0.1:6101 where in stage 1 it heard it on 6100.
       - payload: seismometer
+        read_size: "16"
         address: "127.0.0.1"
         port: "5401"
         protocol: "udp"

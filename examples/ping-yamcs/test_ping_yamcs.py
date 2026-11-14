@@ -218,6 +218,7 @@ def with_more_nodes(directory):
                     <address>127.0.0.1</address>
                     <port>16800</port>
                     <protocol>udp</protocol>
+                    <read_size>16</read_size>
                     <world-out>gateway.pong</world-out>
                 </payload>
                 <payload name="sensor">

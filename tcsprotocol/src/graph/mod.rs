@@ -50,6 +50,7 @@ pub mod exports;
 pub mod fprime;
 pub mod grouped;
 pub mod interface;
+pub mod largest;
 pub mod link_types;
 pub mod mirror;
 pub mod own_xtce;
@@ -2422,7 +2423,8 @@ gateways:
              payloads:\n  \
              - type i2c:\n      \
              - { payload: zone_sensor, path: \"/dev/i2c-1\", \
-             address: \"0x48\", world-out: gateway.zone }\n",
+             address: \"0x48\", read_size: \"2\", \
+             world-out: gateway.zone }\n",
         )
         .unwrap();
 

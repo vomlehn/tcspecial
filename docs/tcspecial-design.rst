@@ -1062,6 +1062,16 @@ Requirement
     A node whose largest datum is more than a datum may be is refused,
     naming the node, its size and the gateway's most.
 
+    **Built** (2026-11-14): ``tcsprotocol::graph::largest`` -- the
+    gateway's most (``most_datum``), each node's largest datum
+    (``largest_datum``), the refusal (``Problem::TooLarge``, and the cFS
+    bus's own), and a warning, run aboard as an unbounded type's is, for a
+    device or app node that sends ``bytes`` and says nothing that bounds
+    them (``Problem::Unsized``). Every shipped configuration's senders say
+    their size. The most is held to ``DATUM_BYTES`` until each buffer is
+    sized by its node, and a consolidator's sum waits for the
+    consolidator.
+
 Requirement
     What a node takes at its ``moc-in`` is sized by that terminal's type, as
     everything else is, a string or bytes there stating its most. A datum

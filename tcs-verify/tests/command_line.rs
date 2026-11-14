@@ -49,6 +49,7 @@ payloads:
     for id in 0..count {
         text.push_str(&format!(
             "      - payload: DH{id}\n        path: /dev/null{id}\n        \
+             read_size: \"16\"\n        \
              world-out: [nowhere{id}.DH{id}]\n"
         ));
     }

@@ -123,6 +123,7 @@
                  with no camera. The path is from the repository's root,
                  which is where tcspecial is run from. -->
             <payload name="camera">
+                <world-out-type>bytes(64)</world-out-type>
                 <app-payload-arg>10</app-payload-arg>
                 <executable>docs/building-a-vehicle/camera.py</executable>
                 <world-out>gateway.camera</world-out>

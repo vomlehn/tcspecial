@@ -52,6 +52,7 @@ payloads:
       # to the repository's root because that is where tcspecial is
       # run from: see examples/Makefile.
       - payload: lorem
+        world-out-type: "bytes(64)"
         app-payload-arg: "1"
         executable: "examples/simple-app/lorem_pl.py"
         world-out:

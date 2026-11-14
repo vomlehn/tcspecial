@@ -120,6 +120,7 @@
             <!-- The switch on a landing leg, whose 1 is the ground's word
                  that the lander is down: straight to the ground. -->
             <payload name="touchdown">
+                <read_size>16</read_size>
                 <address>127.0.0.1</address>
                 <port>5403</port>
                 <protocol>udp</protocol>

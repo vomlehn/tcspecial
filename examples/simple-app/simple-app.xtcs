@@ -61,6 +61,7 @@
             <!-- relative to the repository's root because that is -->
             <!-- where tcspecial is run from: see examples/Makefile. -->
             <payload name="lorem">
+                <world-out-type>bytes(64)</world-out-type>
                 <app-payload-arg>1</app-payload-arg>
                 <executable>examples/simple-app/lorem_pl.py</executable>
                 <world-out>gateway-1.lorem</world-out>

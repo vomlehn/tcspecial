@@ -226,11 +226,31 @@ pub enum Problem {
     /// held to the most any datum may be. So it is a warning, as an
     /// unfinished node is, and unlike an unfinished node it does not stop
     /// tcspecial: see [`Problem::refused_aboard`]. `attribute` is where it
-    /// is said and `said` what is said there.
+    /// is said, `said` what is said there, and `most` the most any datum
+    /// may be, which it is held to.
     Unbounded {
         node: String,
         attribute: String,
         said: String,
+        most: usize,
+    },
+    /// A device or app node whose `world-out` carries `bytes` because it
+    /// states no type, and that says nothing else that bounds it: no
+    /// `read_size`, no line's `max_length`, an interface that does not.
+    ///
+    /// Warned of, and run aboard, as [`Problem::Unbounded`] is, for the same
+    /// reason: what it sends is held to the most any datum may be (see
+    /// [`crate::graph::largest`]), which is `most`.
+    Unsized { node: String, most: usize },
+    /// A node whose largest datum, as the configuration says it, is more
+    /// than one datagram of the gateway's link carries: `bytes` against
+    /// `most`. A datum crosses as one datagram, and one larger would be
+    /// fragmented or refused, so it is an error. A cFS bus says this its own
+    /// way, naming `sbn.max_message`.
+    TooLarge {
+        node: String,
+        bytes: usize,
+        most: usize,
     },
     /// A port, message ID, APID or F´ ID that two of the configuration's
     /// links share, or that counting from its base takes past where such a
@@ -404,6 +424,8 @@ impl Problem {
             }
             Problem::BadNode { node, .. } => About::Node(node.clone()),
             Problem::Unbounded { node, .. } => About::Node(node.clone()),
+            Problem::Unsized { node, .. } => About::Node(node.clone()),
+            Problem::TooLarge { node, .. } => About::Node(node.clone()),
             Problem::Clash { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
@@ -440,7 +462,8 @@ impl Problem {
             | Problem::NodeOnNoLink { .. }
             | Problem::Unconnected { .. }
             // And a string or bytes whose most is not yet written.
-            | Problem::Unbounded { .. } => Severity::Warning,
+            | Problem::Unbounded { .. }
+            | Problem::Unsized { .. } => Severity::Warning,
             _ => Severity::Error,
         }
     }
@@ -455,9 +478,10 @@ impl Problem {
     ///
     /// # Returns
     ///
-    /// False for [`Problem::Unbounded`], and true for everything else.
+    /// False for [`Problem::Unbounded`] and [`Problem::Unsized`], and true
+    /// for everything else.
     pub fn refused_aboard(&self) -> bool {
-        !matches!(self, Problem::Unbounded { .. })
+        !matches!(self, Problem::Unbounded { .. } | Problem::Unsized { .. })
     }
 
     /// What to print, one problem per line.
@@ -672,12 +696,25 @@ impl Problem {
                 node,
                 attribute,
                 said,
+                most,
             } => format!(
                 "\"{node}\": {attribute} is {said}, which states no most: \
                  write it as {said}(<most>), the most bytes one may hold, \
                  so that what carries it is sized by it rather than held to \
-                 the most any datum may be, {} bytes",
-                crate::types::DATUM_BYTES
+                 the most any datum may be, {most} bytes"
+            ),
+            Problem::TooLarge { node, bytes, most } => format!(
+                "\"{node}\" can send {bytes} bytes at once, and the most one \
+                 datagram of the gateway's link carries is {most}: a datum \
+                 crosses as one datagram, so give it a smaller read_size, \
+                 max_length or most"
+            ),
+            Problem::Unsized { node, most } => format!(
+                "\"{node}\" states no world-out-type, so it sends bytes, and \
+                 says nothing that bounds them: give it a world-out-type of \
+                 bytes(<most>), or a read_size, so that what carries its \
+                 data is sized by it rather than held to the most any datum \
+                 may be, {most} bytes"
             ),
             Problem::LogSourceMismatch {
                 log,
@@ -981,18 +1018,9 @@ impl Graph {
             let Some(node) = self.node(&link.source) else {
                 continue;
             };
-            // What one read of it can be: what it asks for, where it says,
-            // the most a line of it is, where it is a stream, and the most a
-            // datum carries otherwise.
-            let largest = crate::graph::reach::reach_of(node)
-                .ok()
-                .and_then(|reach| {
-                    reach
-                        .read_size
-                        .map(|size| size as usize)
-                        .or(reach.stream.map(|rule| rule.max_length as usize))
-                })
-                .unwrap_or(crate::types::DATUM_BYTES);
+            // Its largest datum, as everything sized by it asks.
+            let largest =
+                crate::graph::largest::largest_datum(self, node).bytes;
             if largest + header > most {
                 too_large.push((
                     Some(node.name.clone()),
@@ -1676,12 +1704,20 @@ impl Graph {
         for (node, why) in super::link_types::problems(self) {
             problems.push(Problem::BadNode { node, why });
         }
+        let most = super::largest::most_datum(self);
         for (node, attribute, said) in super::link_types::unbounded(self) {
             problems.push(Problem::Unbounded {
                 node,
                 attribute,
                 said,
+                most,
             });
+        }
+        for node in super::largest::unbounded_senders(self) {
+            problems.push(Problem::Unsized { node, most });
+        }
+        for (node, bytes) in super::largest::too_large(self) {
+            problems.push(Problem::TooLarge { node, bytes, most });
         }
 
         // What each command binding sets, which the node it names must take
@@ -2350,6 +2386,7 @@ mod tests {
                 node: "modem".into(),
                 attribute: "world-out-type".into(),
                 said: "bytes".into(),
+                most: crate::graph::largest::most_datum(&g),
             }
         );
         assert_eq!(problem.severity(), Severity::Warning);
@@ -3063,8 +3100,15 @@ mod tests {
     /// `sbn.max_message` is refused naming the node and both sizes.
     #[test]
     fn a_datum_too_large_for_the_bus_is_refused() {
+        // A read larger than the bus carries. One that nothing bounds is
+        // held to what the bus carries, and so always fits.
+        let mut large = node("a", "i2c");
+        large.attributes.remove("world-out-type");
+        large
+            .attributes
+            .insert("read_size".into(), Scalar::of("4096"));
         let g = answering_cfs(
-            vec![node("a", "i2c"), node("fsw", "gateway_cfs")],
+            vec![large, node("fsw", "gateway_cfs")],
             vec![link("a", &["fsw"])],
         );
         let mut said =
@@ -3278,17 +3322,27 @@ mod tests {
             // Written to, so each says what asks it for a reading.
             one.attributes
                 .insert("trigger".to_string(), Scalar::of("[55]"));
-            // And sending what the apps take, which is bytes.
+            // And sending what the apps take, which is bytes, two at a
+            // time.
             one.attributes.remove("world-out-type");
+            one.attributes
+                .insert("read_size".to_string(), Scalar::of("2"));
         }
+        // Each app that sends says how much it may send at once.
+        let app = |name: &str, node_type: &str| {
+            let mut made = node(name, node_type);
+            made.attributes
+                .insert("world-out-type".to_string(), Scalar::of("bytes(64)"));
+            made
+        };
 
         let sound = graph(
             vec![
                 sensor,
                 answers,
-                node("through", "app_all_veh"),
+                app("through", "app_all_veh"),
                 node("fore", "app_payload_veh"),
-                node("back", "app_gateway_veh"),
+                app("back", "app_gateway_veh"),
                 node("c", "gateway_radio"),
             ],
             vec![

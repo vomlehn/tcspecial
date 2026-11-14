@@ -1752,6 +1752,7 @@ payloads:
         address: \"0x48\"
         group: temps
         path: \"/dev/i2c-1\"
+        read_size: \"2\"
         world-out: [gateway.sensor]
 gateways:
   - type gateway_radio:
@@ -2152,12 +2153,15 @@ payloads:
             "  - type device-file:
       - payload: first
         path: /dev/urandom
+        read_size: \"4\"
         world-out: [nowhere.first]
       - payload: second
         path: /dev/full
+        read_size: \"4\"
         world-out: [elsewhere.second]
       - payload: third
         path: /dev/random
+        read_size: \"4\"
         world-out: [anywhere.third]
       # and GOOD's own:
 ",
@@ -2172,7 +2176,7 @@ payloads:
         // names, which is the one order a configuration has.
         let lines: Vec<usize> =
             report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![25, 28, 31], "{:?}", report.findings);
+        assert_eq!(lines, vec![25, 29, 33], "{:?}", report.findings);
         for (finding, missing) in
             report
                 .findings
@@ -2464,6 +2468,7 @@ payloads:
             // A link to a node that is not there, which is one error each.
             payloads.push_str(&format!(
                 "      - payload: DH{id}\n        path: /dev/null{id}\n        \
+                 read_size: \"4\"\n        \
                  world-out: [nowhere{id}.DH{id}]\n"
             ));
         }

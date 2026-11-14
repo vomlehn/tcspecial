@@ -96,6 +96,7 @@ payloads:
       # everything for the ground does once there is one, so that the ground
       # has one place to receive the vehicle's data from.
       - payload: seismometer
+        read_size: "16"
         address: "127.0.0.1"
         group: "science_readings"
         port: "5401"

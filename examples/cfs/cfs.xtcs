@@ -99,6 +99,7 @@
             </payload>
             <!-- A thermometer whose readings go to the flight computer. -->
             <payload name="thermometer">
+                <read_size>16</read_size>
                 <address>127.0.0.1</address>
                 <port>8602</port>
                 <protocol>udp</protocol>

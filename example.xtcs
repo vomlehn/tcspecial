@@ -41,6 +41,7 @@
             <payload name="spi-1">
                 <max_speed>1000000</max_speed>
                 <path>/dev/spidev0.0</path>
+                <read_size>16</read_size>
                 <sim_address>127.0.0.1:7951</sim_address>
                 <spi_mode>0</spi_mode>
                 <world-out>gateway-1.spi-1</world-out>

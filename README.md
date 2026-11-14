@@ -118,6 +118,60 @@ cargo built it: `make packages STRIP=0`.
 
 See "Installing" in docs/tcspecial.rst for where everything goes and why.
 
+# Where things are
+
+Each top-level directory, production code first: see "Production code and
+its names" in [the design](docs/tcspecial-design.rst).
+
+Production code, which a mission depends on while it operates:
+
+* [`tcspecial/`](tcspecial/): the flight software, the TCSpecial Flight
+  Executive.
+* [`tcsprotocol/`](tcsprotocol/): TCS Link Support, what the vehicle and
+  the ground share: the protocol, and how every configuration is read and
+  checked.
+* [`tcsmoc/`](tcsmoc/) and [`tcsmoc-c/`](tcsmoc-c/): the TCSpecial MOC
+  Correspondent, what a ground station is built on, in Rust and for C and
+  C++.
+* [`tcsverify/`](tcsverify/): the configuration checker as a library, which
+  tcspecial and every program that reads a configuration asks.
+* [`tcsui/`](tcsui/): the window pieces a ground station shows a vehicle
+  with.
+* [`tcsapp/`](tcsapp/): the file interfaces an app node's program runs with.
+* [`python/`](python/): the Python spellings of tcsprotocol, tcsmoc and
+  tcsui, for ground stations written in Python.
+
+Non-production code:
+
+* [`tcs-gui/`](tcs-gui/): the graphical configuration editor.
+* [`tcs-moc/`](tcs-moc/): the test ground station.
+* [`tcs-sim/`](tcs-sim/): the payload simulator.
+* [`tcs-verify/`](tcs-verify/): the configuration checker as a program.
+* [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-gui
+  and tcspecial's visual window, which never flies.
+* [`app_pl/`](app_pl/), [`app_all_pl/`](app_all_pl/),
+  [`app_payload_veh/`](app_payload_veh/),
+  [`app_gateway_veh/`](app_gateway_veh/) and
+  [`app_all_veh/`](app_all_veh/): the five test apps, one for each app node
+  type.
+* [`examples/`](examples/): working configurations and the programs they
+  run; see [its README](examples/README.md).
+* [`docs/`](docs/): every manual and design document, and the guide to
+  building a vehicle.
+* [`tests/`](tests/): the configurations the tests read -- the ids, the
+  refused ones, the simulated devices -- and `tests/manual/`, the editor's
+  example.
+* [`cfs/`](cfs/) and [`fprime/`](fprime/): tcspecial beside NASA's cFS and
+  JPL's F´, and the F´ component that bridges to it; see
+  [docs/third-party.rst](docs/third-party.rst).
+* [`packaging/`](packaging/): what the `.deb` and `.rpm` packages are made
+  from: their control files, specs and install hooks.
+* [`bin/`](bin/): scripts for a desk, such as those that make and remove the
+  kernel's dummy devices (`bin/mk-kernel-dummies`).
+* [`tools/`](tools/): one-off conversions, such as
+  `tools/convert-format.py`, which rewrites a configuration from the old
+  shape into the new.
+
 # Stuff
 
 TCSpecial supports standard network protocols and devices for communication, as

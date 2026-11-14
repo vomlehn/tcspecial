@@ -74,19 +74,18 @@ of two kinds, by where it runs:
   executive; tcslog, its onboard log; tcsapp, which app nodes' programs run
   with; and tcs-xtce's packet runtime, tcsxtce.
 * **MOC code** runs in the mission operations center, in or under a ground
-  station: tcsmoc and tcsmoc-c, which a station is built on, and tcsui, the
-  window pieces a station shows the vehicle with.
+  station: tcsmoc and tcsmoc-c, which a station is built on.
 
 Code can be both: tcsprotocol, what the two ends share, runs aboard the
 vehicle and in the MOC alike.
 
 **Non-production code** is everything else: what is used to write, check,
-simulate, test, build or package production code, on a desk or a test
-bench, and that a mission never depends on while it operates. tcs-gui, the
+simulate, test, build or package production code, on a desk or a test bench,
+and that a mission never depends on while it operates. tcs-gui, the
 configuration editor; tcs-sim, the payload simulator; tcs-moc, the test
-ground station; tcs-verify, the configuration checker as a program;
-tcs-diagram; the XTCE compiler; the test apps; and tcs-helpers, which
-packages the rest.
+ground station; tcs-ui, the window pieces tcs-moc and the desk tools share;
+tcs-verify, the configuration checker as a program; tcs-diagram; the XTCE
+compiler; the test apps; and tcs-helpers, which packages the rest.
 
 Requirement
     A name says which kind a thing is. Find its prefix -- ``tcslog`` if the
@@ -988,6 +987,161 @@ Requirement
     signed kinds for an integer, a ``bool`` for a ``boolean``, and a
     ``Datum`` for the rest. The cFS bridge publishes each datum as its type
     lays it out, which is what a cFS app reading it decodes.
+
+How large a datum may be
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Planned** (2026-11-14); not built. Until it is, a datum is at most
+``tcsprotocol::DATUM_BYTES``, 4,096 bytes, fixed when tcspecial is built,
+every node's buffers are that size, and the requirements elsewhere that
+name it hold.
+
+Requirement
+    No datum is longer than one datagram of the link it crosses carries: a
+    datum crosses as one datagram, and one larger would be fragmented, so
+    lost whole when any fragment is, or refused. How long that is, is a
+    fact of the link, not a choice of a mission, so it is not an attribute:
+    ``tcsprotocol`` asks the gateway, in one function every check and every
+    buffer calls, and each gateway kind answers from what the configuration
+    already says of it -- a UDP link 65,507 bytes (524,056 bits) over IPv4
+    and 65,527 over IPv6, by its addresses; a cFS bus ``sbn.max_message``
+    less the packet's headers. That answer replaces ``DATUM_BYTES`` as the
+    most anything may be: a line's ``max_length``, a read's, a string's or
+    bytes'.
+
+Requirement
+    A string or bytes type states the most it may hold, as ``string(64)``
+    or ``bytes(256)``, from 1 to that most; ``string`` or ``bytes``
+    alone is refused, naming the terminal and asking for its most. The
+    configuration then says the size of every datum any node produces, and
+    a node's buffers can be sized from it.
+
+Requirement
+    Every node that produces data says the **largest datum** it can
+    produce, in bytes, worked out from what the configuration says of it
+    when the configuration is checked. It is said in one place, a function
+    of each node type in ``tcsprotocol::node``, and everything that sizes
+    by it calls that:
+
+    * a device: what one read of it may deliver -- its ``read_size``, a
+      line's ``max_length``, the width of its type, the most its interface
+      carries in one read;
+    * a computation, a program or an app node: the width of the type it
+      sends -- four bytes for a value, one for a decision, a structure's
+      fields together, a string's or bytes' most -- and a vote what its
+      inputs are;
+    * a consolidator: the sum, over its inputs, of each input's largest
+      datum in bits and its length field's width, with two bits of state
+      each, rounded up to a whole byte; it is worked out from its sources',
+      which are worked out first, as the graph has no cycle a consolidator
+      could be on without a node breaking it;
+    * a tee: its source's.
+
+    A node whose largest datum is more than a datum may be is refused,
+    naming the node, its size and the gateway's most.
+
+Requirement
+    What a node takes at its ``moc-in`` is sized by that terminal's type, as
+    everything else is, a string or bytes there stating its most. A datum
+    from the ground longer than that is refused at the gateway, and counted
+    there, and never reaches the node.
+
+Requirement
+    ``tcs-verify --summary`` gives each node's largest datum, and the
+    gateway's most.
+
+Requirement
+    Each node's buffers are no larger than it needs, sized from those
+    figures when the configuration is loaded, so nothing is allocated as it
+    runs: the fabric's two banks for a node from its own largest datum, a
+    read's buffer from its device's, and what a node takes in from the
+    largest of its sources'. A sensor of two bytes has banks of two, and
+    memory aboard follows what the configuration says, not the largest
+    anything may be.
+
+Requirement
+    The ground sizes the same way, from the same figures: tcsmoc, tcsmoc-c
+    and the Python spelling read the configuration and call the same
+    function, so a station's buffer for a source is that source's largest
+    datum, and the vehicle and the ground cannot disagree about it.
+
+Requirement
+    tcspecial locks its memory into RAM when it starts, with ``mlockall``
+    for what it has and what it will have, before it loads a
+    configuration, so that every buffer is real once it is made: a
+    shortage is then a failure to load, not a process killed mid-pass when
+    a buffer is first written. On another kernel, its own call for this
+    does the same.
+
+Requirement
+    A lock that fails, or a buffer that cannot be made once locked, fails
+    the configuration's load, which falls back to the next configuration
+    as `Starting, and the restart flag`_ says, the start saying in its log
+    why. The configuration on tcspecial's command line has none to fall
+    back to: a start running it that cannot lock says so in its log and
+    its startup summary and runs unlocked, since that configuration must
+    always start (see `What is assumed`_), and a vehicle that would not
+    start for want of a lock would be lost for want of a setting.
+
+Requirement
+    Under ``--simulate=some`` or ``all`` -- a desk, a test bench -- a lock
+    that fails stops the start at once, whichever configuration it was
+    loading, the command line's among them, saying why on its error output:
+    nothing falls back and nothing runs unlocked. A desk is set up to lock,
+    as a vehicle is, so a lock that fails there is not expected, and may be
+    the first sign of a failure a vehicle would meet; a start that carried
+    on would hide it.
+
+Requirement
+    The manual says how a system lets tcspecial lock what it needs --
+    ``LimitMEMLOCK=infinity`` in a systemd unit, ``ulimit -l`` under another
+    supervisor -- for a vehicle and a desk alike, and the systemd unit
+    shipped with tcspecial sets it.
+
+Requirement
+    Whether there is memory enough is not tcspecial's to judge. A total of
+    its buffers would leave out its stacks and its code, and what a Linux
+    system holds for itself -- its file buffers above all -- follows what
+    the whole system does, so a figure for what is free would be a guess.
+    How much memory tcspecial is given, and the limit on what it may lock,
+    are the vehicle's: the system it runs on, its supervisor, a cgroup.
+
+Requirement
+    A source of a cFS gateway whose largest datum, with the packet's
+    headers, is more than ``sbn.max_message``, the build's
+    ``CFE_MISSION_SB_MAX_SB_MSG_SIZE``, is refused, naming it and both
+    sizes, as now: the gateway's answer above is that, and a datum crosses
+    the bus as one message, which SBN drops if it is longer, saying so only
+    in an event on the cFS side. cFS's own housekeeping app holds a combined
+    packet to 1,500 bytes by default, which is a choice of that app, not a
+    limit of the bus.
+
+Requirement
+    An F´ gateway sets no limit. A datum reaches the F´ bridge as a
+    datagram, and the bridge turns it into channels (see `F´:
+    gateway_fprime`_); F´'s ``FW_COM_BUFFER_MAX_SIZE``, 512 bytes by
+    default, bounds the packets F´ makes of those channels, which is F´'s
+    business. A consolidator's datum is taken apart by the bridge into a
+    channel for each input, as tcsmoc takes it apart for any station, not
+    sent as one ``Tcs.Datum``, which would keep only its first 64 bytes.
+
+To build it: the gateway's answer, the bounded string and bytes, and each
+node type's largest datum in tcsprotocol; ``DATUM_BYTES`` removed and every
+use of it given the node's own size; the buffers aboard sized at load from
+those; the lock at start, its failure as a failed load, and as a stopped
+start under simulation; the manual's setting up of the lock, and the systemd
+unit's; ``--summary``'s sizes; tcsmoc, tcsmoc-c and the Python spelling
+sized from the configuration they read; every shipped configuration that
+says ``string`` or ``bytes`` given its most, in both spellings, and every
+digest written down from them made again -- each one changes, which the
+release's new minor version says, so nothing older is expected to load them;
+tcs-gui; the manual's and the node-types guide's 4,096; and tests: a string
+at its most, at the gateway's most and one past it, over IPv4 and IPv6, a
+lock refused under each configuration a start may load, with and without
+simulation, a datum from the ground too long for its terminal, ``string``
+alone refused, a cFS gateway refused for a bus too small, each node type's
+largest datum, a consolidator's summed from its inputs', and a node whose
+largest is too large refused.
 
 The configuration's own XTCE
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2842,7 +2996,7 @@ delivers when it has something, and any of them may deliver nothing for a
 while -- so at any moment some of what the datum is to hold may be missing,
 or old. The consolidator does not wait for all of it, which would let one
 silent payload stop the datum for good, and it does not fill a gap with a
-dummy or a stale value as though it were fresh, which the ground could not
+dummy or an old value as though it were new, which the ground could not
 tell from a reading. It sends what it has, and says of each input whether
 it is new.
 
@@ -2854,27 +3008,162 @@ Requirement
     so may the readings of one node and of computations made from them.
 
 Requirement
-    Each input's type is the type of the source linked to it, which must be
-    one a structure's field may be: a number, a value of a unit or a
-    boolean, of a fixed width. A string or bytes is refused, because its
-    length would make the datum's, and so is a structure, because a
-    structure's fields are not structures; consolidating one by its fields
-    is left for later. A consolidator is the one computation whose
-    inputs need not share a type, and states no ``type-in``: each input's
-    is its source's.
+    Each input's type is the type of the source linked to it, and may be
+    any type a link carries: a number, a value of a unit, a boolean, a
+    string, bytes or a structure. A consolidator is the one computation
+    whose inputs need not share a type, and states no ``type-in``: each
+    input's is its source's.
 
 Requirement
-    What it sends is one structure, made from the configuration: a field for
-    each input, in the order its ``world-in`` lists them -- an order the
-    configuration digest covers, so the vehicle and the ground agree about
-    it -- each named after its input and of its input's type, and after
-    them a field ``state`` saying, two bits an input in the same order,
-    whether each is **fresh** (arrived since the last datum was sent),
-    **repeated** (sent before, and nothing new since) or **never** (nothing
-    has arrived from it since tcspecial started). The configuration's own
-    XTCE describes the structure as an aggregate, as it does any structure,
-    so the ground decodes it with nothing new. A structure holds at most
-    sixteen fields, so a consolidator takes at most fifteen inputs.
+    It states no ``type-out`` either. What it sends is of a type of its own
+    kind, a **consolidation**, which the configuration never writes but
+    which is worked out from it: the block of states, then each input's
+    name and type, in the order its ``world-in`` lists them. A structure is
+    written in its node; a consolidation is derived from the links, so it
+    cannot disagree with its inputs, and since the digest covers their
+    types and their order, the ground derives the same one from the same
+    configuration, as it knows any datum's type.
+
+Requirement
+    A consolidation may be linked to a gateway, a log or a tee, and to
+    nothing else; any other link from a consolidator is refused, naming
+    the link. A log of ``fixed: <n>`` takes one only if every input is of a
+    fixed width and ``n`` is the datum's width. A computation would have
+    to take it apart, which none is written to do; an app node would have
+    to know its layout; and a consolidator taking another would put a
+    block of states inside a block of states, when it could take the same
+    inputs itself. Any of these may be allowed later without changing the
+    layout; a fixed, checkable shape comes first.
+
+Requirement
+    Each input is encoded as a **bit string**, and the bit strings are
+    packed end to end, with no padding between them: the next begins at the
+    bit after the last ends, wherever in a byte that is. Only the datum as a
+    whole is padded, with zero bits, to a whole number of bytes.
+
+Requirement
+    The datum is in network byte order, most significant byte first, and
+    its bits in the order XTCE gives them when it packs into big-endian
+    data: most significant bit first, so the datum's first bit is the top
+    bit of its first byte, and a field that ends partway through a byte
+    leaves the next to begin at the bit below. Each field -- a state, a
+    length, a number -- is written most significant bit first, a signed
+    number in two's complement, each at the width its type has in
+    ``types.xtce``. The ground's unpacking reads what XTCE would describe,
+    and a description of the datum in XTCE, should one be wanted, says
+    nothing XTCE cannot.
+
+Requirement
+    A boolean is one bit in a consolidation, ``1`` for true, alone or as a
+    structure's field: a link through an omnidirectional antenna, or an
+    acoustic one under water, carries so little that seven bits saved on
+    each flag are worth what packing them costs the processor, and status
+    and fault flags are what such data is full of. The one-bit encoding is
+    stated in ``types.xtce`` beside the byte a boolean is everywhere else,
+    so each width is still stated once, and the consolidator and the
+    ground's unpacking both take it from there.
+
+Requirement
+    A boolean is checked as it arrives, before it is packed: a byte that is
+    neither 0 nor 1 is not a reading, and is counted and treated as though
+    nothing had arrived, the reading held before it standing. One bit
+    cannot be a bad value, so what is not a boolean is caught where it
+    still can be.
+
+Requirement
+    The datum begins with the inputs' states, as one block: two bits for
+    each input, in the order its ``world-in`` lists them, before the first
+    input's bit string. The ground reads the block first and so knows,
+    before it reads any input, which are worth reading; and the block is
+    of a fixed width, so where the first input begins is the same in every
+    datum. A state is ``00`` for none, ``01`` for held and ``10`` for new;
+    ``11`` is unused, and a datum carrying it is refused on the ground as
+    damaged. None is ``00`` so that a datum of zeros says that nothing has
+    arrived, rather than something.
+
+Requirement
+    An input of a fixed width -- a number, a value of a unit, a boolean, or
+    a structure of those -- is a bit string of its width, the same every
+    time, and carries no length. The ground knows the width from the
+    configuration, as it knows every other field's: the configuration's own
+    XTCE says it, and the configuration digest in every beacon says that the
+    vehicle and the ground read the same configuration.
+
+Requirement
+    An input whose length varies -- a string, bytes -- is its length and
+    then its bit string. The length is a count of bytes, not bits, because
+    these are a whole number of bytes. It is written in a field of a fixed
+    width for that input, just wide enough for the most the input may hold:
+    a string of at most 64 bytes has a seven-bit length, one of at most
+    4,096 bytes a thirteen-bit one. The configuration says each input's
+    most, so the vehicle and the ground know each field's width. This asks
+    that a string or bytes type state its most, as ``string(64)``, which
+    `How large a datum may be`_ asks of every one.
+
+Requirement
+    The ground is not asked to unpack a datum: TCS does. tcsmoc, and
+    tcsmoc-c and the Python spelling built on it, take a consolidator's
+    datum apart into its inputs, each with its state, and a ground station
+    built on them -- Yamcs among them -- is given the inputs and never sees
+    the datum. A held input is passed on only where its state goes with it:
+    passed as a plain reading it would look like a new one, so where the
+    station is given readings and nothing more, only new inputs reach it,
+    and a held one is left out as a none is. That is what lets the bit
+    strings go unpadded: Yamcs decodes a number at any bit, but not a string
+    or bytes that starts partway through a byte, and with the unpacking
+    TCS's own, nothing on the ground has to.
+
+Requirement
+    A log that takes a consolidation keeps it packed, as it was sent, the
+    smaller for it. What reads a log's segment files on the ground --
+    tcsmoc's reader of them and tcslog-tools -- takes a consolidation apart
+    with the same function the live data is taken apart with, so a datum
+    from the log reaches a station as it would have live, its states with
+    it.
+
+Requirement
+    ``tcs-verify --fprime-model`` gives each input of a consolidator a
+    channel of its own, named by the consolidator and the input --
+    ``pack.temp1`` -- and of the input's type, and the F´ bridge writes
+    each input there. A channel has no state, so a held input is not
+    written to it, as it is not passed to any station that is given
+    readings and nothing more; a new one is.
+
+Requirement
+    tcs-moc shows a consolidator as a row for each input, each saying in
+    words whether it is new, held or none. A test station can show a
+    state, so a held value is shown, marked held; the words, not a colour,
+    carry it.
+
+Requirement
+    The ``tcspecial`` section states ``max_consolidator_inputs``, the most
+    inputs one consolidator may have, at least 2, and required, for the
+    reason its other attributes are: a configuration that has not been
+    asked the question has not answered it. 32 is suggested -- their
+    states then take 64 bits -- and, as cFS's and F´'s packetizers find,
+    more readings than that are better served by a second consolidator
+    than by a larger one.
+
+Requirement
+    A consolidator with more inputs than ``max_consolidator_inputs``, or
+    whose largest datum -- the sum of its inputs', with their lengths and
+    states -- is more than a datum may be (see `How large a datum may
+    be`_), is refused where it is checked.
+
+Requirement
+    What it sends after the states is each input's bit string, in the order
+    its ``world-in`` lists them -- an order the configuration digest covers,
+    so the vehicle and the ground agree about it. Each input's state is one
+    of:
+
+    * **new**: a reading has arrived since the last datum was sent;
+    * **held**: none has; the value is the latest reading tcspecial has;
+    * **none**: nothing has arrived from it since tcspecial started, and its
+      bit string is zeros of its width, or an empty one.
+
+    A state says what the vehicle knows, never what the ground has seen: a
+    held value went down in the last datum, which may have been lost, so it
+    is still a reading the ground may not have.
 
 Requirement
     It keeps, for each input, the latest reading and its state, in storage
@@ -2887,29 +3176,61 @@ Requirement
     When it sends is said by ``send``, a list of any of three triggers, of
     which at least one is given:
 
-    * ``all_fresh``: as soon as every input is fresh;
+    * ``all_new``: as soon as every input is new;
     * ``interval``: every ``interval``, a length of time, which is then
       given too;
     * ``moc``: when anything arrives at its ``moc-in``, linked from a
       gateway, whatever it is -- so the ground can ask for a datum, with no
       new command and no change to the interface.
 
-    ``all_fresh`` alone is refused, as a vote over every input would be: one
+    ``all_new`` alone is refused, as a vote over every input would be: one
     input that stops would stop the datum for good. It is given with
     ``interval``, ``moc`` or both, which send what there is when it does not
     come.
+
+Requirement
+    An ``interval`` that comes round when no input is new sends nothing:
+    the link is too narrow for a datum that says only what the last one
+    said. A datum asked for at ``moc-in`` is always sent, new or not, so
+    the ground that thinks the last one lost can have the held values
+    again by asking.
+
+Requirement
+    ``interval`` may be set from the ground with ``SET_NODE`` where the
+    configuration's ``commands`` section binds it, as any attribute may.
+    ``send`` may not: which triggers a consolidator has is the shape of the
+    node, fixed when the configuration is checked.
 
 Requirement
     A datum is sent at the end of the pass in which a trigger fires, not at
     the arrival that fired it: inputs at different depths of the graph reach
     a node in different waves of one pass, and a datum sent mid-pass would
     hold some of a pass's readings and not the rest. Once it is sent, every
-    fresh input becomes repeated. Two triggers firing in one pass send one
+    new input becomes held. Two triggers firing in one pass send one
     datum.
 
 Requirement
+    A consolidator keeps counters of its own beside every node's, which
+    ``QUERY_NODE`` answers with: the datums it has sent, for each trigger;
+    for each input, how many datums went with it held and how many with it
+    none; and the booleans refused for being neither 0 nor 1. They cost the
+    link nothing until the ground asks, and say, input by input, what cFS's
+    housekeeping app's ``MissingDataCtr`` says for a whole packet.
+
+Requirement
+    An input may be linked to a gateway as well as to a consolidator, as
+    any source may have several links; the reading then crosses the link
+    twice, which ``tcs-verify --summary`` points out.
+
+Requirement
+    A datum carries no time, as no datum does: the ground stamps it as it
+    arrives. When a held reading was taken is the question an age would
+    answer, and is deferred with it; an age of a few bits for each input
+    is likely to cost the link less than a 64-bit time for the datum.
+
+Requirement
     Deferred until the rest is settled: an ``age``, after which a held
-    reading is said to be expired rather than repeated, for the whole node
+    reading is said to be expired rather than held, for the whole node
     or for each input; and a frame, a datum of tagged items each carrying
     the node and the link it came from, for inputs so unequal in rate that a
     fixed structure would mostly repeat itself. A frame's length would vary,
@@ -2918,22 +3239,37 @@ Requirement
 
 To build it, in order:
 
-1. tcsprotocol: the function, its attributes (``send``, ``interval``) and its
-   checks; keeping its inputs' names as a vote's are kept, which the reader
-   (``graph::grouped``) and the matching of links to names (``graph::mirror``)
-   do now for a vote alone; and the output structure, worked out from the
-   inputs' types, which its own XTCE and the link types use.
+1. tcsprotocol: `How large a datum may be`_, built first, and
+   ``max_consolidator_inputs``, which every shipped configuration is then
+   given, in both spellings, its digest changing with the release's new
+   minor version, as that section's changes do; the function, its attributes
+   (``send``, ``interval``) and its checks; keeping its inputs' names as a
+   vote's are kept, which the reader (``graph::grouped``) and the matching
+   of links to names (``graph::mirror``) do now for a vote alone; and the
+   datum's layout -- each input's bit string, and its length where that
+   varies -- worked out from the inputs' types, which the unpacking on the
+   ground uses too.
 2. tcspecial: the held readings and their states; a hook at the end of a
    pass that sends, which ``Port::flush`` is the place for and which
    produces nothing for any node now; the interval, scheduled as a group's
    is; and ``moc-in`` as a trigger.
-3. The ground and the tools: the structure in the configuration's own XTCE;
-   ``tcs-verify --summary``; tcs-gui, which draws it and edits its
-   attributes; and tcsmoc and its Python spelling, which read ``state``.
+3. The ground and the tools: tcsmoc, tcsmoc-c and the Python spelling, which
+   unpack a datum into its inputs and their states, live and from a log's
+   segment files, and tcslog-tools likewise; tcs-moc's rows; the F´ model's
+   channels and the bridge that writes them; each input in the
+   configuration's own XTCE as the parameter it is now; ``tcs-verify
+   --summary``, with each input also linked to a gateway; and tcs-gui, which
+   draws it and edits its attributes and ``max_consolidator_inputs``.
 4. The node-types guide, an example in both spellings, and tests: an input
-   that never arrives; one that arrives twice between sends; inputs
-   arriving in different waves of one pass; each trigger alone and
-   together; and the checks refusing what they refuse.
+   that never arrives; one that arrives twice between sends; inputs arriving
+   in different waves of one pass; each trigger alone and together; an
+   interval with nothing new, and a datum asked for with nothing new; the
+   counters; ``interval`` set from the ground; booleans of one bit, alone
+   and in a structure, and a byte that is not a boolean; bit strings that
+   end partway through a byte, and length fields of different widths; an
+   input at its most, and one empty; and the checks refusing what they
+   refuse, a consolidator with too many inputs and one whose datum could be
+   larger than a datum may be among them.
 
 App nodes
 ---------

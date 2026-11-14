@@ -61,6 +61,92 @@ about such a choice should cite this list rather than taste.
    vehicle arrangements must be reachable without disturbing what already
    flies -- but never at the cost of the three above.
 
+Production code and its names
+-----------------------------
+
+TCS is code of two kinds, which are written, reviewed and changed with
+different care, and a name says which kind a thing is.
+
+**Production code** is code a mission depends on while it operates. It is
+of two kinds, by where it runs:
+
+* **Vehicle code** runs aboard the vehicle: tcspecial, the flight
+  executive; tcslog, its onboard log; tcsapp, which app nodes' programs run
+  with; and tcs-xtce's packet runtime, tcsxtce.
+* **MOC code** runs in the mission operations center, in or under a ground
+  station: tcsmoc and tcsmoc-c, which a station is built on, and tcsui, the
+  window pieces a station shows the vehicle with.
+
+Code can be both: tcsprotocol, what the two ends share, runs aboard the
+vehicle and in the MOC alike.
+
+**Non-production code** is everything else: what is used to write, check,
+simulate, test, build or package production code, on a desk or a test
+bench, and that a mission never depends on while it operates. tcs-gui, the
+configuration editor; tcs-sim, the payload simulator; tcs-moc, the test
+ground station; tcs-verify, the configuration checker as a program;
+tcs-diagram; the XTCE compiler; the test apps; and tcs-helpers, which
+packages the rest.
+
+Requirement
+    A name says which kind a thing is. Find its prefix -- ``tcslog`` if the
+    name starts with it, ``tcs`` otherwise -- and look at what follows. A
+    letter, or nothing, names production code: ``tcspecial``, ``tcsmoc``,
+    ``tcsprotocol``, ``tcslog``, ``tcslogc``. A hyphen or an underscore names
+    non-production code: ``tcs-gui``, ``tcs-verify``, ``tcs_xtce``,
+    ``tcslog-tools``. A name says nothing of whether production code is
+    vehicle code or MOC code; this document does.
+
+Requirement
+    The names the rule covers are these:
+
+    * **Published names**, the names a thing is published under for others
+      to build on, such as a crate's on crates.io.
+    * **Libraries**: Rust crates; C and C++ libraries, whose file is ``lib``
+      and the name of the crate it is built from (``libtcsmoc-c`` from
+      ``tcsmoc-c``), and never ``libtcslib...``; and Python packages.
+    * **Executables**. tcspecial is the one production program, and is
+      production code whatever it is built with.
+    * **Header files**, which take the name of their library
+      (``tcsmoc-c.h`` for ``libtcsmoc-c``), and so its kind.
+
+Requirement
+    The rule does not cover projects. A project -- a repository, such as
+    tcspecial, tcslog, tcslog-tools, tcs-xtce or tcs-helpers -- may hold
+    production and non-production code side by side, and its name says
+    nothing of either. Nor does it cover the ``.deb`` and ``.rpm`` packages
+    a project installs with, which are named for the project and for where
+    they install, and may hold both: the ``tcspecial`` package installs
+    tcs-verify beside tcspecial, and ``tcspecial-moc`` installs tcs-gui
+    beside the libraries a station is built on. Nor pkg-config files, which
+    tell a compiler how to build with a library: managing the compiler is
+    outside how TCS manages its versions. Nor any other kind of name:
+    installed directories, configuration keys, environment variables,
+    systemd units and documents. `Possible Future Directions`_ says what
+    bringing each in would take.
+
+Requirement
+    Production code is built only from production code. A library or
+    program with a production name depends on, links with and imports
+    nothing with a non-production name.
+
+    tcspecial's visual window, ``--visual``, is the one allowance. A
+    tcspecial built with it, and with tcs-diagram, which draws the window, is
+    a desk build, never one that flies; the one that flies is built
+    without it.
+
+Requirement
+    The rule is held in one place and checked rather than remembered:
+    ``make production-names``, part of ``make check``, runs tcs-helpers'
+    ``production-names``, which states the rule for every TCS project and
+    fails where production code is built from or imports non-production
+    code. tcs-helpers' pre-commit hook runs it too, on a commit that
+    changes a dependency. A
+    tcspecial built for installing with the visual window is a warning
+    there, not an error. A dependency TCS has not yet brought into line is
+    listed there as an exception, with why, and warned of on every run until
+    it is gone.
+
 Terminology
 ===========
 
@@ -10132,6 +10218,78 @@ Support for operating systems other than Linux
 
     The EndpointWaitable trait, and each device interface, could be
     extended to other operating systems: see `Platforms and Porting`_.
+
+
+Possible Future Directions
+==========================
+
+pkg-config files and the naming rule
+
+    A pkg-config file tells a C or C++ build how to compile and link with an
+    installed library: ``pkg-config --cflags --libs tcsmoc-c`` gives the
+    ``-I``, ``-L`` and ``-l`` a ground station built on ``libtcsmoc-c``
+    needs, and CMake and Meson read the same file. TCS installs one beside
+    each of its C and C++ libraries, in ``/opt/tcs/lib/pkgconfig``:
+    ``tcsmoc-c.pc``, ``tcslogc.pc`` and tcs-xtce's.
+
+    They are left out of the rule that names production and non-production
+    code (`Production code and its names`_). What they manage is the
+    compiler, which is outside how TCS manages its versions, and they carry
+    no code of their own. As it is, each is named after its library, so its
+    name says what its library's does, but nothing requires that.
+
+    Bringing them in would mean, first, naming each after its library, as a
+    header is, so that a station's build cannot ask for a tool's library by
+    a production name; and then holding each ``Requires`` line of a
+    production library's file to production libraries, as
+    ``make production-names`` holds a crate's dependencies. It would also be
+    the place to tie the ``Version`` a file states to the library's ABI
+    version, which its soname states now. CMake's package configuration
+    files, should TCS install any, would raise the same question.
+
+Package names and the naming rule
+
+    The packages TCS installs with are left out of the rule too: the
+    ``.deb`` and ``.rpm`` packages (``tcspecial``, ``tcspecial-moc``,
+    ``tcspecial-test``, ``tcslog``, ``tcslog-tools``, ``tcs-xtce``) and the
+    Python distributions pip builds (``tcs-xtce`` among them). Each is named
+    for its project and for where it installs, and several hold both kinds
+    of code: ``tcspecial`` installs tcs-verify beside tcspecial, and
+    ``tcspecial-moc`` installs tcs-gui beside the libraries a station is
+    built on.
+
+    Bringing them in would mean splitting each package that holds both
+    kinds in two, one of production code and one of tools -- so that a
+    vehicle or a station could be given its production code and nothing
+    else, and could tell from a package's name alone what it was being
+    given -- and then naming each by the rule. The cost is more packages to
+    build, test and install, and a dependency between each pair, for a
+    choice an installer makes today by which programs it runs.
+
+Other names and the naming rule
+
+    The rule covers published names, libraries, executables and header
+    files. Several other kinds of name are TCS's, are left out of it as
+    things stand, and could be brought in later:
+
+    * **Installed directories and data files**: ``/opt/tcs/share/tcspecial``,
+      ``/etc/opt/tcs/tcspecial``, tcs-gui's data under ``/opt/tcs/share``,
+      and the directories the programs keep their state in. Most are named
+      after their project or program now.
+    * **Configuration sections and keys**: ``tcs-gui:`` and ``tcs-sim:`` in
+      a simulator file, which are named after the programs that read them.
+    * **Environment variables**: ``TCS_GUI_FILE``, ``TCS_TCSPECIAL_LOG``,
+      ``TCS_CFS_CONFIGURATION`` and the rest, which, being upper case and
+      joined by underscores, cannot show a hyphen at all, so the rule could
+      only reach them through another spelling of its own.
+    * **systemd units**: ``tcspecial.service``.
+    * **Documents**: ``docs/tcs-gui.rst``, ``docs/tcspecial-design.rst`` and
+      the rest, named after the program or project each describes.
+
+    Each would want to say, as the rule does for a library, whether what it
+    names is production code; most would inherit that from the program or
+    library they belong to, as a header does from its library. None carries
+    code, so for now a name of one of these says only what it belongs to.
 
 
 Development Approach

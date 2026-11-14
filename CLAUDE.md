@@ -53,6 +53,35 @@ A node type is three modules with the same name in three crates: its
 attributes and checks in `tcsprotocol::node`, the flight-side node in
 `tcspecial::node`, and the simulator's simulated device in `tcs_sim::node`.
 
+## Names
+
+A TCS name says whether it is production code, which a mission depends on
+while it operates, on the vehicle or in the MOC, or non-production code.
+Find the prefix, `tcslog` if the name starts with it and `tcs` otherwise. A
+letter after it, or nothing, is production (`tcspecial`, `tcsmoc`,
+`tcsprotocol`, `tcslog`); a hyphen or an underscore is non-production
+(`tcs-gui`, `tcs-verify`, `tcs_xtce`, `tcslog-tools`). Name new work by it,
+and rename what moves from one side to the other.
+
+- **Published names**, such as a crate's on crates.io, follow the rule.
+- **Executables**: tcspecial is the one production program, even when built
+  with `--visual`. Every other program is a tool.
+- **Libraries** -- crates, C and C++ library files, Python packages -- follow
+  the rule. A C or C++ library is `lib` and its crate's name: `libtcsmoc-c`
+  is built from `tcsmoc-c`. Never name a library file `libtcslib...`.
+- **Header files** take their library's name (`tcsmoc-c.h`), and so its
+  side.
+- **Projects** (repositories) and the `.deb` and `.rpm` packages they
+  install with may hold both kinds, and the rule does not cover them, nor
+  pkg-config files, which are the compiler's business.
+
+Production code is built only from production code. "Production code and
+its names" in `docs/tcspecial-design.rst` gives the requirements and defines
+production (vehicle and MOC) and non-production code; `make
+production-names`, part of `make check` and of tcs-helpers' pre-commit
+hook, holds the workspace to it, and tcs-helpers' `bin/production-names` is
+the one statement of the rule, for every TCS project.
+
 ## Vocabulary
 
 - **node**: anything in the graph -- a device reached over an interface, a

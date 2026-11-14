@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.8.0
+TCS_HELPERS_REQUIRED := 0.9.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcsprotocol/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -195,7 +195,12 @@ help:
 	@echo "                     (make them first with sudo" \
 		"bin/mk-kernel-dummies)"
 	@echo "  make check       - cargo check, clippy, a format check," \
-		"the spellings compared and an HTML check"
+		"the spellings"
+	@echo "                     compared, the names checked and an" \
+		"HTML check"
+	@echo "  make production-names - Fail where production code is" \
+		"built from a"
+	@echo "                     tool's crate"
 	@echo "  make screenshots - Make the GUI manuals' screenshots" \
 		"again, drawn in memory"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
@@ -495,6 +500,27 @@ xtce:
 xtce-check:
 	cd $(RUST) && cargo run -q --bin tcs-verify -- --xtce-check \
 		$(OWN_XTCE_CONFIGURATIONS) >/dev/null
+
+# Fail where production code -- what flies, and what a ground station is
+# built on -- is built from or imports code with a non-production name, a
+# name with a hyphen or an underscore after tcs or tcslog. The rule, and the
+# check, are tcs-helpers' production-names, which every TCS project runs;
+# see "Production code and its names" in docs/tcspecial-design.rst. The
+# tcspecial checked is the one install-build builds, with every crate
+# installed, whose features cargo pools: should it have the visual window,
+# that is a warning, since such a build is for the desk and never flies.
+# tcs-xtce is excepted, and warned of, until tcsprotocol takes its packet
+# runtime and digest from tcsxtce.
+PRODUCTION_NAMES_EXCEPT := tcs-xtce=tcsprotocol takes its packet runtime \
+	and digest from tcs-xtce until they are published as tcsxtce, the \
+	production crate: switch to it then
+.PHONY: production-names
+production-names: tcs-helpers
+	$(TCS_HELPERS)/bin/production-names \
+		$(addprefix --install ,$(INSTALL_CRATES)) \
+		--desk-feature tcspecial/visual=tcs-diagram \
+		--except '$(PRODUCTION_NAMES_EXCEPT)' \
+		--pyproject python/pyproject.toml
 
 # Compare the two spellings of every one of them.
 #
@@ -1236,7 +1262,8 @@ endif
 #
 # And every configuration compared in its two spellings, which must say the
 # same thing: a change made to one and not the other leaves both files valid,
-# and an edit by hand is made to one file at a time.
+# and an edit by hand is made to one file at a time. And the names held to
+# what they say: production code is built only from production code.
 .PHONY: check
 check:
 	@echo "Running cargo check..."
@@ -1260,6 +1287,7 @@ check:
 	cd $(RUST) && cargo fmt -- --check
 	$(MAKE) --no-print-directory comparespellings
 	$(MAKE) --no-print-directory xtce-check
+	$(MAKE) --no-print-directory production-names
 	$(MAKE) --no-print-directory html-check
 
 # The F´ bridge, which F´'s own tools build rather than cargo: see

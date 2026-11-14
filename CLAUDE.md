@@ -78,8 +78,9 @@ and rename what moves from one side to the other.
 Production code is built only from production code. "Production code and
 its names" in `docs/tcspecial-design.rst` gives the requirements and defines
 production (vehicle and MOC) and non-production code; `make
-production-names`, part of `make check`, holds the workspace to it, and
-`tests/production-names.py` is the one statement of the rule.
+production-names`, part of `make check` and of tcs-helpers' pre-commit
+hook, holds the workspace to it, and tcs-helpers' `bin/production-names` is
+the one statement of the rule, for every TCS project.
 
 ## Vocabulary
 

@@ -137,9 +137,11 @@ Requirement
 
 Requirement
     The rule is held in one place and checked rather than remembered:
-    ``make production-names``, part of ``make check``, runs
-    ``tests/production-names.py``, which states the rule and fails where
-    production code is built from or imports non-production code. A
+    ``make production-names``, part of ``make check``, runs tcs-helpers'
+    ``production-names``, which states the rule for every TCS project and
+    fails where production code is built from or imports non-production
+    code. tcs-helpers' pre-commit hook runs it too, on a commit that
+    changes a dependency. A
     tcspecial built for installing with the visual window is a warning
     there, not an error. A dependency TCS has not yet brought into line is
     listed there as an exception, with why, and warned of on every run until

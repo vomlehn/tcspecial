@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.8.0
+TCS_HELPERS_REQUIRED := 0.9.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcsprotocol/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -502,15 +502,25 @@ xtce-check:
 		$(OWN_XTCE_CONFIGURATIONS) >/dev/null
 
 # Fail where production code -- what flies, and what a ground station is
-# built on -- is built from code with a tool's name, which is a name with a
-# hyphen or an underscore after tcs or tcslog. The rule and its reasons are
-# tests/production-names.py's. The tcspecial checked is the one
-# install-build builds, with every crate installed, whose features cargo
-# pools: should it have the visual window, that is a warning, since such a
-# build is for the desk and is never one to fly.
+# built on -- is built from or imports code with a non-production name, a
+# name with a hyphen or an underscore after tcs or tcslog. The rule, and the
+# check, are tcs-helpers' production-names, which every TCS project runs;
+# see "Production code and its names" in docs/tcspecial-design.rst. The
+# tcspecial checked is the one install-build builds, with every crate
+# installed, whose features cargo pools: should it have the visual window,
+# that is a warning, since such a build is for the desk and never flies.
+# tcs-xtce is excepted, and warned of, until tcsprotocol takes its packet
+# runtime and digest from tcsxtce.
+PRODUCTION_NAMES_EXCEPT := tcs-xtce=tcsprotocol takes its packet runtime \
+	and digest from tcs-xtce until they are published as tcsxtce, the \
+	production crate: switch to it then
 .PHONY: production-names
-production-names:
-	python3 -I tests/production-names.py $(INSTALL_CRATES)
+production-names: tcs-helpers
+	$(TCS_HELPERS)/bin/production-names \
+		$(addprefix --install ,$(INSTALL_CRATES)) \
+		--desk-feature tcspecial/visual=tcs-diagram \
+		--except '$(PRODUCTION_NAMES_EXCEPT)' \
+		--pyproject python/pyproject.toml
 
 # Compare the two spellings of every one of them.
 #

@@ -708,9 +708,11 @@ without it.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>The rule is held in one place and checked rather than remembered:
-<tt class="docutils literal">make <span class="pre">production-names</span></tt>, part of <tt class="docutils literal">make check</tt>, runs
-<tt class="docutils literal"><span class="pre">tests/production-names.py</span></tt>, which states the rule and fails where
-production code is built from or imports non-production code. A
+<tt class="docutils literal">make <span class="pre">production-names</span></tt>, part of <tt class="docutils literal">make check</tt>, runs tcs-helpers'
+<tt class="docutils literal"><span class="pre">production-names</span></tt>, which states the rule for every TCS project and
+fails where production code is built from or imports non-production
+code. tcs-helpers' pre-commit hook runs it too, on a commit that
+changes a dependency. A
 tcspecial built for installing with the visual window is a warning
 there, not an error. A dependency TCS has not yet brought into line is
 listed there as an exception, with why, and warned of on every run until

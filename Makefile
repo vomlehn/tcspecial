@@ -195,7 +195,12 @@ help:
 	@echo "                     (make them first with sudo" \
 		"bin/mk-kernel-dummies)"
 	@echo "  make check       - cargo check, clippy, a format check," \
-		"the spellings compared and an HTML check"
+		"the spellings"
+	@echo "                     compared, the names checked and an" \
+		"HTML check"
+	@echo "  make production-names - Fail where production code is" \
+		"built from a"
+	@echo "                     tool's crate"
 	@echo "  make screenshots - Make the GUI manuals' screenshots" \
 		"again, drawn in memory"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
@@ -495,6 +500,17 @@ xtce:
 xtce-check:
 	cd $(RUST) && cargo run -q --bin tcs-verify -- --xtce-check \
 		$(OWN_XTCE_CONFIGURATIONS) >/dev/null
+
+# Fail where production code -- what flies, and what a ground station is
+# built on -- is built from code with a tool's name, which is a name with a
+# hyphen or an underscore after tcs or tcslog. The rule and its reasons are
+# tests/production-names.py's. The tcspecial checked is the one
+# install-build builds, with every crate installed, whose features cargo
+# pools: should it have the visual window, that is a warning, since such a
+# build is for the desk and is never one to fly.
+.PHONY: production-names
+production-names:
+	python3 -I tests/production-names.py $(INSTALL_CRATES)
 
 # Compare the two spellings of every one of them.
 #
@@ -1236,7 +1252,8 @@ endif
 #
 # And every configuration compared in its two spellings, which must say the
 # same thing: a change made to one and not the other leaves both files valid,
-# and an edit by hand is made to one file at a time.
+# and an edit by hand is made to one file at a time. And the names held to
+# what they say: production code is built only from production code.
 .PHONY: check
 check:
 	@echo "Running cargo check..."
@@ -1260,6 +1277,7 @@ check:
 	cd $(RUST) && cargo fmt -- --check
 	$(MAKE) --no-print-directory comparespellings
 	$(MAKE) --no-print-directory xtce-check
+	$(MAKE) --no-print-directory production-names
 	$(MAKE) --no-print-directory html-check
 
 # The F´ bridge, which F´'s own tools build rather than cargo: see

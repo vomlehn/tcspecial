@@ -1,1 +1,1 @@
-../../../../tcs-xtce/python/tcs_xtce/_error.py
+../../../../tcs-xtce/python/tcsxtce/_error.py

@@ -39,11 +39,11 @@ two consequences:
   configuration says, and a second statement of that would be a second digest
   on the day the first changes.
 
-The interface digest every beacon carries is worked out with tcs-xtce's digest,
-and the fixed commands, the beacon and the ping are packed with its packet
-runtime, `tcsxtce`; neither is the standard library or published, so both are
+The interface digest every beacon carries is worked out, and the fixed
+commands, the beacon and the ping are packed, with tcs-xtce's runtime,
+`tcsxtce`, which is not the standard library and is not published, so it is
 taken from a checkout of [tcs-xtce](https://github.com/vomlehn/tcs-xtce) beside
-this tree, `../tcs-xtce`. The modules of them these need are linked into
+this tree, `../tcs-xtce`. The modules of it these need are linked into
 `tcsprotocol/_xtce`, and the XTCE documents it
 is taken over into `tcsprotocol/xtce`, a link to the crate's
 `tcsprotocol/xtce`: so there is one copy of each, and installing the package

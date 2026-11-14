@@ -17,16 +17,12 @@
 //! the interface it was written for as the `tcspecial` section's `interface`,
 //! and every program refuses one that is not its build's own; `tcs-verify
 //! --interface-digest` prints it. A ground station reads its own copy with
-//! `InterfaceDigest::of_files`, under the `digest` feature, and compares the
-//! two: the digest reads XTCE, which is ground software's, so nothing aboard
-//! turns it on. See "The configuration
+//! [`InterfaceDigest::of_files`] and compares the two. See "The configuration
 //! names its interface" in `docs/tcspecial-design.rst`.
 
 use std::fmt;
-#[cfg(any(test, feature = "digest"))]
 use std::path::Path;
 
-#[cfg(any(test, feature = "digest"))]
 use crate::error::{TcsError, TcsResult};
 use crate::interface_digest::INTERFACE_DIGEST;
 
@@ -74,9 +70,8 @@ impl InterfaceDigest {
     ///
     /// [`TcsError::Config`], naming the documents, if they cannot be read or
     /// digested.
-    #[cfg(any(test, feature = "digest"))]
     pub fn of_files<P: AsRef<Path>>(paths: &[P]) -> TcsResult<InterfaceDigest> {
-        tcs_xtce::digest::digest_files_bytes(paths)
+        tcsxtce::digest::digest_files_bytes(paths)
             .map(InterfaceDigest)
             .map_err(|why| {
                 let named: Vec<String> = paths

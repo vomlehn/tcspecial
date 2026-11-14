@@ -4909,13 +4909,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcs-xtce"
-version = "0.7.0"
-dependencies = [
- "tcsxtce",
-]
-
-[[package]]
 name = "tcsapp"
 version = "0.1.0"
 dependencies = [
@@ -4985,7 +4978,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_norway",
- "tcs-xtce",
  "tcsxtce",
  "tempfile",
  "thiserror 1.0.69",

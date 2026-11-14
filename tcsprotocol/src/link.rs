@@ -941,7 +941,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("xtce")
             .join(name);
-        let digest = tcs_xtce::digest::digest_files_bytes(&[path])
+        let digest = tcsxtce::digest::digest_files_bytes(&[path])
             .expect("the document digests");
         digest.iter().map(|b| format!("{b:02x}")).collect()
     }

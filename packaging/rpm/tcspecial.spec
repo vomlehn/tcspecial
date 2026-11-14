@@ -4,12 +4,12 @@ Summary:        Telemetry and control, special: spacecraft flight software
 Group:          Applications/System
 
 %description
-tcspecial runs a spacecraft's payloads as nodes in a configured graph and
-relays their data and commands to and from the mission operations center
-over UDP. This package is what flies: tcspecial itself, tcsverify,
-the five test app programs under /opt/tcs/libexec, the manual, and the
-example configurations. A systemd unit, tcspecial.service, is installed but
-not enabled.
+tcspecial, the TCSpecial Flight Executive, runs a spacecraft's payloads as
+nodes in a configured graph and relays their data and commands to and from the
+mission operations center over UDP. This package is what flies: tcspecial
+itself, tcsverify, the five test app programs under /opt/tcs/libexec, the
+manual, and the example configurations. A systemd unit, tcspecial.service, is
+installed but not enabled.
 
 %install
 cp -a %{tcs_stage}/. %{buildroot}/

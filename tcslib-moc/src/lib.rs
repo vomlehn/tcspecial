@@ -1,7 +1,8 @@
-//! TCSpecial Ground Software Library (tcslib-moc)
+//! The TCSpecial MOC Correspondent (tcslib-moc)
 //!
-//! This library provides a client interface for ground software to communicate
-//! with the TCSpecial command interpreter running on spacecraft.
+//! The MOC's correspondent with the TCSpecial Flight Executive: ground software
+//! commands the Flight Executive's command interpreter, aboard the spacecraft,
+//! through it.
 //!
 //! It is also how ground software gets the vehicle's data from a gateway node
 //! -- see [`gateway`] -- how it listens for the spacecraft's beacons, which is

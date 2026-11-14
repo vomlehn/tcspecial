@@ -49,17 +49,20 @@ In flight
 
    A vehicle running tcspecial, and the ground station that commands it.
 
-Aboard the vehicle, **tcspecial** runs the payloads. Each payload is
+Aboard the vehicle, the TCSpecial Flight Executive, **tcspecial**, runs the
+payloads. Each payload is
 reached through an interface of its own -- I\ :superscript:`2`\ C, SPI, a
 serial line, CAN, GPIO lines, a socket to a program aboard, and others --
 and is a device node in the configuration's graph. Compute nodes vote
 between redundant sensors, convert units and run thermostats; a gateway
 node is the vehicle's end of the link to the ground. tcspecial keeps a
-record aboard of what it sent down, in a log written by **tcslog**, a
-library of its own.
+record aboard of what it sent down, in a log written by the TCS Onboard
+Log, **tcslog**, a library of its own.
 
 On the ground, a mission control system such as Yamcs (https://yamcs.org)
-holds the other end of the link through **tcslib-moc**, the TCS ground library.
+holds the other end of the link through the TCSpecial MOC Correspondent,
+**tcslib-moc**. Both ends share TCS Link Support, **tcslib-protocol**, which
+says what goes on the link.
 tcslib-moc sends the vehicle its commands, receives its telemetry and beacons,
 and knows from the vehicle's configuration where each datum arrives and
 what it is; Yamcs's mission database is generated from the same

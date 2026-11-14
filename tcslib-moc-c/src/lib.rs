@@ -1,4 +1,4 @@
-//! tcslib-moc for C and C++.
+//! The TCSpecial MOC Correspondent (tcslib-moc) for C and C++.
 //!
 //! What a ground station is built on -- the vehicle's beacons, its data from a
 //! gateway node, and commands to it -- behind one header,

@@ -4567,7 +4567,8 @@ Features
   
   * Running on spacecraft
 
-    * tcspecial: process running on spacecraft
+    * tcspecial, the TCSpecial Flight Executive: process running on
+      spacecraft
 
 * Testing software is:
 
@@ -4580,14 +4581,15 @@ Features
   configuration, which holds the payload configuration section, and the
   simulator configuration beside it:
 
-    * tcslib-moc: ground software library providing simple integration with
-      mission control software
+    * tcslib-moc, the TCSpecial MOC Correspondent: ground software library
+      providing simple integration with mission control software
 
-    * tcslib-protocol: software library containing the commands, the telemetry,
-      and the configuration languages -- what tcspecial and tcslib-moc share,
-      and what the two GUIs share with them: every configuration file format is
-      parsed here, including the simulator's, and a time or a sample of a
-      transfer is formatted here so that both windows show it the same way
+    * tcslib-protocol, TCS Link Support: software library containing the
+      commands, the telemetry, and the configuration languages -- what tcspecial
+      and tcslib-moc share, and what the two GUIs share with them: every
+      configuration file format is parsed here, including the simulator's, and a
+      time or a sample of a transfer is formatted here so that both windows show
+      it the same way
 
     * the configuration: the nodes tcspecial serves, tcsmoc watches and
       commands, and tcssim simulates the payloads of -- one file, named on

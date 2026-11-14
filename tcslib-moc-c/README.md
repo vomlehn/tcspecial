@@ -1,6 +1,7 @@
 # tcslib-moc-c
 
-**tcslib-moc-c is tcslib-moc for C and C++.** It is the library a ground station
+**tcslib-moc-c is tcslib-moc, the TCSpecial MOC Correspondent, for C and
+C++.** It is the library a ground station
 written in C or C++ is built on: the vehicle's beacons, the vehicle's data
 from a gateway node, and commands to the vehicle, behind one header,
 `include/tcslib-moc-c.h`.

@@ -405,16 +405,19 @@ operations center, where Yamcs uses tcslib-moc for its end of the link,
 and commands come back up.</object>
 <p class="caption">A vehicle running tcspecial, and the ground station that commands it.</p>
 </div>
-<p>Aboard the vehicle, <strong>tcspecial</strong> runs the payloads. Each payload is
+<p>Aboard the vehicle, the TCSpecial Flight Executive, <strong>tcspecial</strong>, runs the
+payloads. Each payload is
 reached through an interface of its own -- I<sup>2</sup>C, SPI, a
 serial line, CAN, GPIO lines, a socket to a program aboard, and others --
 and is a device node in the configuration's graph. Compute nodes vote
 between redundant sensors, convert units and run thermostats; a gateway
 node is the vehicle's end of the link to the ground. tcspecial keeps a
-record aboard of what it sent down, in a log written by <strong>tcslog</strong>, a
-library of its own.</p>
+record aboard of what it sent down, in a log written by the TCS Onboard
+Log, <strong>tcslog</strong>, a library of its own.</p>
 <p>On the ground, a mission control system such as Yamcs (<a class="reference external" href="https://yamcs.org">https://yamcs.org</a>)
-holds the other end of the link through <strong>tcslib-moc</strong>, the TCS ground library.
+holds the other end of the link through the TCSpecial MOC Correspondent,
+<strong>tcslib-moc</strong>. Both ends share TCS Link Support, <strong>tcslib-protocol</strong>, which
+says what goes on the link.
 tcslib-moc sends the vehicle its commands, receives its telemetry and beacons,
 and knows from the vehicle's configuration where each datum arrives and
 what it is; Yamcs's mission database is generated from the same

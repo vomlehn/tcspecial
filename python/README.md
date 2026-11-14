@@ -2,7 +2,8 @@
 
 Python 3 spellings of the Rust libraries a ground station is built on, for a
 ground station written in Python. Each package is named after the crate it is
-written after, and each module after the Rust it says again:
+written after, and each module after the Rust it says again: `tcslib_moc` is
+the TCSpecial MOC Correspondent, and `tcslib_protocol` TCS Link Support.
 
 | Python | Written after | What it is |
 |---|---|---|

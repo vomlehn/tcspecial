@@ -1,7 +1,8 @@
-//! TCSpecial - Spacecraft Command Interpreter and Data Handler Manager
+//! The TCSpecial Flight Executive (tcspecial): spacecraft command interpreter
+//! and data handler manager
 //!
-//! TCSpecial is flight software: it runs on the spacecraft and manages
-//! communication between ground operations and payloads.
+//! The Flight Executive is flight software: it runs on the spacecraft and
+//! manages communication between ground operations and payloads.
 
 pub mod beacon_send;
 pub mod config;

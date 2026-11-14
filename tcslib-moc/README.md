@@ -1,7 +1,9 @@
 # tcslib-moc
 
-**tcslib-moc is the library a ground station is built on.** It is the ground's
-side of the link to a spacecraft running tcspecial: everything a program on
+**tcslib-moc, the TCSpecial MOC Correspondent, is the library a ground
+station is built on.** It is the ground's
+side of the link to a spacecraft running tcspecial, the TCSpecial Flight
+Executive: everything a program on
 the ground needs in order to command the vehicle, receive the vehicle's data,
 and know that the vehicle is there.
 

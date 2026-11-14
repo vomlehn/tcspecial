@@ -1,9 +1,9 @@
 # tcslib-protocol
 
-**tcslib-protocol is what the ground software and the vehicle software share.**
-The "gs" is ground and space. Anything both ends of the link have to agree on is
-written here, once, and both ends use it: the vehicle (tcspecial) on one side,
-the ground stations and tools on the other.
+**tcslib-protocol, TCS Link Support, is what the ground software and the
+vehicle software share.** Anything both ends of the link have to agree on is
+written here, once, and both ends use it: the vehicle (tcspecial, the TCSpecial
+Flight Executive) on one side, the ground stations and tools on the other.
 
 That agreement covers two things.
 

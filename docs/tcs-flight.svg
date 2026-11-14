@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1040" height="560" viewBox="0 0 1040 560" role="img" aria-labelledby="title desc">
   <title id="title">TCSpecial in flight</title>
-  <desc id="desc">A vehicle runs tcspecial. On its left are its payloads, each on an interface of its own: temperature sensors on an I2C bus, a battery monitor on a SPI bus, an altimeter on a serial line, a motor controller on a CAN bus, heaters on GPIO lines, and a science program aboard reached through a socket. tcspecial reads and drives each through a device node, computes from what they read in compute nodes, keeps a record aboard, in a tcslog log, of what it sends to the ground, and sends it to the ground through a gateway node. The vehicle and the mission operations center talk over the space link: telemetry and beacons go down, commands go up. On the ground, Yamcs is the mission control system, and it uses tcslib-moc, the TCS ground library, for its end of the link: tcslib-moc sends commands and receives the telemetry, and its mission database is generated from the vehicle's configuration.</desc>
+  <desc id="desc">A vehicle runs tcspecial, the TCSpecial Flight Executive. On its left are its payloads, each on an interface of its own: temperature sensors on an I2C bus, a battery monitor on a SPI bus, an altimeter on a serial line, a motor controller on a CAN bus, heaters on GPIO lines, and a science program aboard reached through a socket. tcspecial reads and drives each through a device node, computes from what they read in compute nodes, keeps a record aboard, in a log kept by tcslog, the TCS Onboard Log, of what it sends to the ground, and sends it to the ground through a gateway node. The vehicle and the mission operations center talk over the space link: telemetry and beacons go down, commands go up. On the ground, Yamcs is the mission control system, and it uses tcslib-moc, the TCSpecial MOC Correspondent, for its end of the link: tcslib-moc sends commands and receives the telemetry, and its mission database is generated from the vehicle's configuration.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -61,7 +61,7 @@
   <text class="heading" x="256" y="44">VEHICLE</text>
   <rect class="soft" x="262" y="56" width="328" height="412" rx="8"/>
   <text class="name" x="276" y="80">tcspecial</text>
-  <text class="kind" x="364" y="80">flight software</text>
+  <text class="kind" x="364" y="80">the TCSpecial Flight Executive</text>
 
   <rect class="node" x="276" y="94" width="104" height="356" rx="6"/>
   <text class="label" x="288" y="116">device</text>
@@ -84,10 +84,11 @@
   <text class="kind" x="510" y="238">from the</text>
   <text class="kind" x="510" y="254">ground</text>
 
-  <rect class="node" x="404" y="330" width="174" height="66" rx="6"/>
+  <rect class="node" x="404" y="330" width="174" height="82" rx="6"/>
   <text class="name" x="416" y="354">tcslog</text>
-  <text class="kind" x="416" y="374">keeps a record aboard of</text>
-  <text class="kind" x="416" y="389">what is sent to the ground</text>
+  <text class="kind" x="416" y="374">the TCS Onboard Log:</text>
+  <text class="kind" x="416" y="389">keeps a record aboard of</text>
+  <text class="kind" x="416" y="404">what is sent to the ground</text>
 
   <path class="flow" d="M380,220 H402"/>
   <path class="flow" d="M480,220 H498"/>
@@ -105,10 +106,10 @@
   <text class="kind" x="794" y="136">mission control system</text>
   <rect class="lib" x="794" y="160" width="198" height="120" rx="6"/>
   <text class="name" x="806" y="184">tcslib-moc</text>
-  <text class="kind" x="806" y="204">the TCS ground library:</text>
-  <text class="kind" x="806" y="222">sends commands,</text>
-  <text class="kind" x="806" y="240">receives telemetry and</text>
-  <text class="kind" x="806" y="258">beacons</text>
+  <text class="kind" x="806" y="204">the TCSpecial MOC</text>
+  <text class="kind" x="806" y="222">Correspondent: sends</text>
+  <text class="kind" x="806" y="240">commands, receives</text>
+  <text class="kind" x="806" y="258">telemetry and beacons</text>
   <text class="kind" x="794" y="306">its mission database is</text>
   <text class="kind" x="794" y="324">generated from the vehicle's</text>
   <text class="kind" x="794" y="342">configuration</text>

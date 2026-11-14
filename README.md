@@ -1,12 +1,12 @@
 # TCSpecial
 TCSpecial: flight software that relays commands and telemetry between an operation center and payloads
 
-This is TCSpecial, flight software for running on devices that relay data from set of
-payloads to a remote operations center (OC). It has been designed within the context
-of spacecraft operating at distances of several light seconds, such as the Moon, 
-which has influenced the design to work with non-reliable communication links.
-However, it will work find over any distance and is extensible to use reliable links
-and.
+This is TCSpecial. Its TCSpecial Flight Executive is flight software for
+devices that relay data between a set of payloads and a remote operations
+center (OC). It was designed for spacecraft several light seconds away, such
+as at the Moon, which shaped it to work over unreliable communication links.
+However, it works over any distance, and can be extended to use reliable
+links.
 
 > **Warning:** TCSpecial is an alpha release. It is not fully tested, it
 > is not feature complete, and it is subject to rapid change. Until 1.0,
@@ -15,8 +15,8 @@ and.
 > against it. Feedback is welcome, even at this stage: open an issue at
 > https://github.com/vomlehn/tcspecial/issues.
 
-Work is under way on integrating TCSpecial, with its telemetry log
-[tcslog](https://github.com/vomlehn/tcslog) and its packet compiler
+Work is under way on integrating TCSpecial, with its telemetry log, the TCS
+Onboard Log [tcslog](https://github.com/vomlehn/tcslog), and its packet compiler
 [tcs-xtce](https://github.com/vomlehn/tcs-xtce), with NASA's core Flight System
 (cFS) and JPL's F´ (F Prime): see docs/third-party.rst.
 
@@ -175,10 +175,9 @@ Key TCSpecial features are:
 
 * Operations Center
 
-  * The TCSpecial library (tcslib-moc) is used to send commands and receive
-    telemetry from
-    the spacecraft. This can be integrated with mission control software such
-    Yamcs.
+  * The TCSpecial MOC Correspondent (tcslib-moc) is used to send commands and
+    receive telemetry from the spacecraft. This can be integrated with mission
+    control software such Yamcs.
 
 * Test Software
 
@@ -215,7 +214,8 @@ manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
 
 * [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html) and
   [tcslib-moc-c](https://vomlehn.github.io/tcspecial/tcslib-moc-c/README.html): the libraries a ground station is
-  built on, and what the ground and the vehicle share.
+  built on, and what the ground and the vehicle share: the TCSpecial MOC
+  Correspondent, TCS Link Support, and the Correspondent for C and C++.
 
 * [Third-party integration](https://vomlehn.github.io/tcspecial/docs/third-party.html): how tcspecial would
   work with cFS and F´.

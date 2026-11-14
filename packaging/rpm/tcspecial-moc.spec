@@ -18,11 +18,11 @@ import sysconfig
 print(sysconfig.get_path("purelib", "posix_prefix", {"base": "/usr"}))')}
 
 %description
-What a ground station for tcspecial is built on: libtcs_moc_c,
-tcslib-moc for C and C++, with its header tcslib-moc-c.h and pkg-config file
-tcslib-moc-c.pc; the Python packages tcslib_protocol, tcslib_moc and tcsui;
-and tcsgui, the graphical configuration editor, with its node descriptions
-and schemas.
+What a ground station for tcspecial is built on: libtcs_moc_c, the TCSpecial
+MOC Correspondent (tcslib-moc) for C and C++, with its header tcslib-moc-c.h
+and pkg-config file tcslib-moc-c.pc; the Python packages tcslib_protocol (TCS
+Link Support), tcslib_moc (the Correspondent) and tcsui; and tcsgui, the
+graphical configuration editor, with its node descriptions and schemas.
 
 %install
 cp -a %{tcs_stage}/. %{buildroot}/

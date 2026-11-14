@@ -18,11 +18,11 @@ help:
 	@echo "  make link-packet     - Regenerate the commands' and answers'" \
 		"Rust codec"
 	@echo "                         from xtce/link.xtce"
-	@echo "  make fixed-packet    - Regenerate the fixed commands' Rust and" \
-		"Python codecs"
+	@echo "  make fixed-packet    - Regenerate the fixed commands' Rust" \
+		"and Python codecs"
 	@echo "                         from xtce/fixed.xtce"
-	@echo "  make beacon-packet   - Regenerate the beacon's Rust and Python" \
-		"codecs"
+	@echo "  make beacon-packet   - Regenerate the beacon's Rust and" \
+		"Python codecs"
 	@echo "                         from xtce/beacon.xtce"
 	@echo "  make ping-packet     - Regenerate the ping's Rust and Python" \
 		"codecs"
@@ -52,16 +52,21 @@ README.html: README.md
 # and committed, so that building needs no Python; run this after changing the
 # XML, and commit what it writes. The generator is tcs-xtce's Python package,
 # used from a checkout of https://github.com/vomlehn/tcs-xtce beside this
-# repository, at the release the tcs-xtce crate is pinned to in Cargo.toml, as
-# the code it writes calls that crate: see the tcs-xtce target. Always the one
+# repository, at the release tcsxtce, the runtime the code it writes calls, is
+# pinned to in Cargo.toml: see the tcs-xtce target. Always the one
 # beside the main checkout, from a worktree too (../beside.mk), because that is
 # where python/tcsprotocol/_xtce finds its Python runtime, and a link cannot
 # follow a variable.
 include $(CURDIR)/../beside.mk
 TCS_XTCE := $(BESIDE)/tcs-xtce
-XTCE_PIN := $(shell sed -n 's/^tcs-xtce = "=\(.*\)"$$/\1/p' Cargo.toml)
+XTCE_PIN := $(shell sed -n \
+	's/^tcsxtce = { version = "=\([^"]*\)".*/\1/p' Cargo.toml)
 XTCE_COMPILE := cd $(TCS_XTCE)/python && python3 -m tcs_xtce
 XTCE_DIGEST := cd $(TCS_XTCE)/python && python3 -m tcs_xtce.digest_cli
+# What makes the Python the generator writes import the runtime from
+# python/tcsprotocol/_xtce, where it imports tcsxtce.
+PY_RUNTIME := \
+	's/^from tcsxtce import packet as pk$$/from ._xtce import packet as pk/'
 
 # Stop, saying what to do, unless the tcs-xtce checkout is there, at the
 # version Cargo.toml pins the crate to, and has its XML binding,
@@ -80,7 +85,7 @@ tcs-xtce:
 	if [ "$$version" != "$(XTCE_PIN)" ]; then \
 		echo "The tcs-xtce checkout at $(TCS_XTCE) is version" \
 			"$$version, and tcsprotocol/Cargo.toml pins" \
-			"the crate to $(XTCE_PIN): check out v$(XTCE_PIN)" \
+			"tcsxtce to $(XTCE_PIN): check out v$(XTCE_PIN)" \
 			"there, or change the pin and regenerate." >&2; \
 		exit 1; \
 	fi
@@ -136,7 +141,7 @@ $(FIXED_RS): $(FIXED_XML) | tcs-xtce
 $(FIXED_PY): $(FIXED_XML) | tcs-xtce
 	$(XTCE_COMPILE) $(CURDIR)/$(FIXED_XML) $(abspath $(FIXED_PY)) \
 		--lang python --source-name tcsprotocol/$(FIXED_XML)
-	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
+	sed -i $(PY_RUNTIME) \
 		$(FIXED_PY)
 
 # The beacon is stated in xtce/beacon.xtce, which never changes either, and
@@ -157,7 +162,7 @@ $(BEACON_RS): $(BEACON_XML) | tcs-xtce
 $(BEACON_PY): $(BEACON_XML) | tcs-xtce
 	$(XTCE_COMPILE) $(CURDIR)/$(BEACON_XML) $(abspath $(BEACON_PY)) \
 		--lang python --source-name tcsprotocol/$(BEACON_XML)
-	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
+	sed -i $(PY_RUNTIME) \
 		$(BEACON_PY)
 
 # A ping and the ping node's answer are stated in xtce/ping.xtce, the ping
@@ -183,7 +188,7 @@ $(PING_RS): $(PING_XML) | tcs-xtce
 $(PING_PY): $(PING_XML) | tcs-xtce
 	$(XTCE_COMPILE) $(CURDIR)/$(PING_XML) $(abspath $(PING_PY)) \
 		--lang python --source-name tcsprotocol/$(PING_XML)
-	sed -i 's/^from tcs_xtce import packet as pk$$/from ._xtce import packet as pk/' \
+	sed -i $(PY_RUNTIME) \
 		$(PING_PY)
 
 # Every type a link between two nodes can carry is stated once, in
@@ -216,14 +221,14 @@ $(UNIT_RS): $(TYPES_XML) unit-table.py
 	rustfmt --edition 2021 $@
 
 # The digest of the interface: the tcs-xtce digest of xtce/link.xtce and
-# xtce/types.xtce together, which
-# every beacon carries and every configuration names as its `interface`, so
-# that the ground can tell whether it read the document tcspecial was built
-# from. fixed.xtce and beacon.xtce are not part of it: no change to the
-# ordinary interface can touch the fixed commands or the beacon, and their
-# own digests are pinned by a test in src/link.rs. Generated, and committed, for the reason the codecs are; a
-# test in src/interface.rs computes it again from the document and fails if
-# this has not been rerun.
+# xtce/types.xtce together, which every beacon carries and every configuration
+# names as its `interface`, so that the ground can tell whether it read the
+# document tcspecial was built from. fixed.xtce and beacon.xtce are not part
+# of it: no change to the ordinary interface can touch the fixed commands or
+# the beacon, and their own digests are pinned by a test in src/link.rs.
+# Generated, and committed, for the reason the codecs are; a test in
+# src/interface.rs computes it again from the document and fails if this has
+# not been rerun.
 INTERFACE_XML := xtce/link.xtce xtce/types.xtce
 INTERFACE_RS := src/interface_digest.rs
 

@@ -17,16 +17,30 @@ serde_norway = "0.9.42"
 quick-xml = { version = "0.42", features = ["serialize"] }
 md5 = "0.8"
 # Packs and unpacks the commands and answers, from the code tcs-xtce generated
-# from xtce/link.xtce. The version is the one the tcs-xtce checkout beside
+# from xtce/link.xtce: tcsxtce, tcs-xtce's packet runtime, the one part of
+# tcs-xtce that flies. The version is the one the tcs-xtce checkout beside
 # this tree, whose generator wrote that code, must be at, as the code calls
-# this runtime: see the tcs-xtce target in Makefile.
-tcs-xtce = "=0.6.0"
+# this runtime: see the tcs-xtce target in Makefile. The path is that
+# checkout's, until tcsxtce is on crates.io.
+tcsxtce = { version = "=0.7.0", path = "../../tcs-xtce/rust/tcsxtce" }
+# The digest, which reads XTCE and so is ground software: only for
+# InterfaceDigest::of_files, under the digest feature, which nothing aboard
+# turns on.
+tcs-xtce = { version = "=0.7.0", path = "../../tcs-xtce/rust", optional = true }
 # Writes and reads the count before a string or bytes sent the ground where
 # no XTCE decodes it: unsigned LEB128. See link_type::Count.
 leb128 = "0.2"
 
+[features]
+# InterfaceDigest::of_files, for a ground station that reads its own copy of
+# the interface's XTCE documents.
+digest = ["dep:tcs-xtce"]
+
 [dev-dependencies]
 tempfile = "3"
+# The tests compute the interface's digest from its documents, to check the
+# constant this build says.
+tcs-xtce = { version = "=0.7.0", path = "../../tcs-xtce/rust" }
 
 [lints]
 workspace = true

@@ -6,7 +6,7 @@
 //! CCSDS CRC-16, computed through this by tcs-xtce's routine, so that there
 //! is one CRC in the system and one implementation of it.
 
-use tcs_xtce::packet::{checksum, Checksum};
+use tcsxtce::packet::{checksum, Checksum};
 
 /// The CCSDS CRC-16: polynomial `0x1021`, initial remainder `0xFFFF`, no
 /// reflection and no final XOR. The CRC catalogue calls it CRC-16/IBM-3740.

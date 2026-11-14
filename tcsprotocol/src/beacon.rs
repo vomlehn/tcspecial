@@ -35,7 +35,7 @@
 use std::fmt;
 use std::fmt::Write as _;
 
-use tcs_xtce::packet::{Codec, FixedString, Packet, PacketError};
+use tcsxtce::packet::{Codec, FixedString, Packet, PacketError};
 
 use crate::beacon_packet as packet;
 

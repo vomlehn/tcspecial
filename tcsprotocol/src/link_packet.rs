@@ -3,7 +3,7 @@
 // Any changes made to this file will be lost when it is regenerated;
 // change the XTCE document instead and rerun `python3 -m tcs_xtce`.
 // tcs-xtce: https://github.com/vomlehn/tcs-xtce
-// Rust crate: https://crates.io/crates/tcs-xtce
+// Runtime crate: https://crates.io/crates/tcsxtce
 //! Packet codecs for the `TcsLink` mission.
 //!
 //! Generated with `--dynamic-allocations false`: arrays, strings and binary
@@ -21,7 +21,7 @@
 )]
 
 use std::fmt::{self, Write as _};
-use tcs_xtce::packet::{
+use tcsxtce::packet::{
     self as pk, BitReader, BitWriter, IntEncoding, Packet, PacketError, Result,
     StringSpec,
 };

@@ -4910,11 +4910,9 @@ dependencies = [
 
 [[package]]
 name = "tcs-xtce"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd7333d5769eef1ae25acb24f165558a227e00f69477df5db20004524810501b"
+version = "0.7.0"
 dependencies = [
- "bnum",
+ "tcsxtce",
 ]
 
 [[package]]
@@ -4988,6 +4986,7 @@ dependencies = [
  "serde_json",
  "serde_norway",
  "tcs-xtce",
+ "tcsxtce",
  "tempfile",
  "thiserror 1.0.69",
 ]
@@ -5007,6 +5006,13 @@ dependencies = [
  "serde_json",
  "tcsprotocol",
  "tempfile",
+]
+
+[[package]]
+name = "tcsxtce"
+version = "0.7.0"
+dependencies = [
+ "bnum",
 ]
 
 [[package]]

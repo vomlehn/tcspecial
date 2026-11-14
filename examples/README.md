@@ -239,7 +239,7 @@ again in Python: `python/tcsmoc/beacon.py` after `tcsmoc::beacon`,
 `python/tcsui/beacon_panel.py` after `tcsui`, and
 `python/tcsprotocol` for the ping format, the beacon and the configuration.
 The interface digest beacons are checked against is worked out with tcs-xtce's
-Python runtime, from the tcs-xtce checkout beside this tree.
+digest, from the tcs-xtce checkout beside this tree.
 `ping-common/ping_ground.py` is the ping's own part, with no window, and
 `ping-common/ping_window.py` the window, both shared with `ping-yamcs`. The Rust
 crate beside them is the tests that hold the Python to the Rust; `cargo test`

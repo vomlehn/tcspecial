@@ -572,7 +572,7 @@ mod tests {
     #[test]
     fn xtce_holds_to_the_rust() {
         use crate::ping_packet::{Ping as PingFields, PingReply};
-        use tcs_xtce::packet::{FixedString, Packet};
+        use tcsxtce::packet::{FixedString, Packet};
 
         /// A field, as the generated code holds it.
         fn text<const N: usize>(said: &str) -> FixedString<N> {
@@ -627,7 +627,7 @@ mod tests {
     #[test]
     fn xtce_has_the_rusts_largest_sizes() {
         use crate::ping_packet::{Ping as PingFields, PingReply};
-        use tcs_xtce::packet::Packet;
+        use tcsxtce::packet::Packet;
 
         assert_eq!(PingFields::MAX_BYTES, MESSAGE_BYTES);
         assert_eq!(PingReply::MAX_BYTES, REPLY_BYTES);
@@ -638,7 +638,7 @@ mod tests {
     #[test]
     fn xtce_refuses_what_the_rust_refuses_of_an_answer() {
         use crate::ping_packet::PingReply;
-        use tcs_xtce::packet::Packet;
+        use tcsxtce::packet::Packet;
 
         for answer in [
             "pong #1 1760900000.000000001 1760900000.250000000",

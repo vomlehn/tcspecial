@@ -3,7 +3,7 @@
 # Any changes made to this file will be lost when it is regenerated;
 # change the XTCE document instead and rerun `python3 -m tcs_xtce`.
 # tcs-xtce: https://github.com/vomlehn/tcs-xtce
-# Rust crate: https://crates.io/crates/tcs-xtce
+# Runtime crate: https://crates.io/crates/tcsxtce
 """Packet codecs for the ``TcsFixed`` mission."""
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ class StatusType(enum.IntEnum):
     """Enumeration ``/TcsFixed/StatusType``.
 
     Decoding keeps values the enumeration does not list (see
-    :func:`tcs_xtce.packet.enum_value`)."""
+    :func:`tcsxtce.packet.enum_value`)."""
 
     SUCCESS = 0
     FAILURE = 1

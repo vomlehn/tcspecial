@@ -30,7 +30,7 @@
 
 use std::fmt;
 
-use tcs_xtce::packet::{Codec, FixedBytes, FixedString, Packet, PacketError};
+use tcsxtce::packet::{Codec, FixedBytes, FixedString, Packet, PacketError};
 
 use crate::commands::{
     Attribute, Command, CommandHeader, CommandType, ConnectCommand,

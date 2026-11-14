@@ -2979,8 +2979,8 @@ its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
-out with tcs-xtce's Python runtime, which is taken from the tcs-xtce
-checkout beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>. It shows the beacon
+out with tcs-xtce's digest, which is taken from the tcs-xtce checkout
+beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:</p>
 <ul class="simple">
@@ -4848,10 +4848,10 @@ built with <tt class="docutils literal">visual</tt></td>
 <td><a class="reference external" href="https://github.com/rust-lang/socket2">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/tcs-xtce">tcs-xtce</a></td>
-<td>=0.4.0</td>
-<td><a class="reference external" href="https://docs.rs/tcs-xtce/0.4.0">0.4.0</a></td>
-<td>tcsprotocol</td>
-<td>The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are taken from a checkout of it beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>, at the same version.</td>
+<td>=0.7.0</td>
+<td>0.7.0</td>
+<td>tcsprotocol (tests, and its <tt class="docutils literal">digest</tt> feature)</td>
+<td>The interface digest, computed from the XTCE documents, which is ground software and never flies. Its generator and Python digest are taken from a checkout of it beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>, at the same version.</td>
 <td><a class="reference external" href="https://github.com/vomlehn/tcs-xtce">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/tcslog">tcslog</a></td>
@@ -4860,6 +4860,13 @@ built with <tt class="docutils literal">visual</tt></td>
 <td>tcspecial</td>
 <td>The vehicle's telemetry log: segment files, and recovering them after a power loss.</td>
 <td><a class="reference external" href="https://github.com/vomlehn/tcslog">repository</a></td>
+</tr>
+<tr><td><a class="reference external" href="https://crates.io/crates/tcsxtce">tcsxtce</a></td>
+<td>=0.7.0</td>
+<td>0.7.0</td>
+<td>tcsprotocol</td>
+<td>tcs-xtce's packet runtime, the one part of tcs-xtce that flies: what the generated link packet code calls to pack and unpack the commands and answers. Its Python is taken from the checkout of tcs-xtce beside this tree, as the generator is.</td>
+<td><a class="reference external" href="https://github.com/vomlehn/tcs-xtce">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/tempfile">tempfile</a></td>
 <td>3, 3.27.0</td>

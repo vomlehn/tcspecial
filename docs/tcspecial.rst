@@ -2718,8 +2718,8 @@ The ground station is a Python 3 program, ``ping_gateway.py``, that uses nothing
 outside the standard library to read the XML spelling of its configuration --
 its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
-out with tcs-xtce's Python runtime, which is taken from the tcs-xtce
-checkout beside this tree, ``../tcs-xtce``. It shows the beacon
+out with tcs-xtce's digest, which is taken from the tcs-xtce checkout
+beside this tree, ``../tcs-xtce``. It shows the beacon
 panel, the last ping sent and when, the last answer received and when, and
 three times:
 
@@ -4792,10 +4792,10 @@ that satisfies both.
      - Sets a socket up before it is bound, which the standard library cannot.
      - `repository <https://github.com/rust-lang/socket2>`__
    * - `tcs-xtce <https://crates.io/crates/tcs-xtce>`__
-     - =0.4.0
-     - `0.4.0 <https://docs.rs/tcs-xtce/0.4.0>`__
-     - tcsprotocol
-     - The runtime the generated link packet code calls to pack and unpack the commands and answers, and the interface digest. Its generator and Python runtime are taken from a checkout of it beside this tree, ``../tcs-xtce``, at the same version.
+     - =0.7.0
+     - 0.7.0
+     - tcsprotocol (tests, and its ``digest`` feature)
+     - The interface digest, computed from the XTCE documents, which is ground software and never flies. Its generator and Python digest are taken from a checkout of it beside this tree, ``../tcs-xtce``, at the same version.
      - `repository <https://github.com/vomlehn/tcs-xtce>`__
    * - `tcslog <https://crates.io/crates/tcslog>`__
      - 0.3.1
@@ -4803,6 +4803,12 @@ that satisfies both.
      - tcspecial
      - The vehicle's telemetry log: segment files, and recovering them after a power loss.
      - `repository <https://github.com/vomlehn/tcslog>`__
+   * - `tcsxtce <https://crates.io/crates/tcsxtce>`__
+     - =0.7.0
+     - 0.7.0
+     - tcsprotocol
+     - tcs-xtce's packet runtime, the one part of tcs-xtce that flies: what the generated link packet code calls to pack and unpack the commands and answers. Its Python is taken from the checkout of tcs-xtce beside this tree, as the generator is.
+     - `repository <https://github.com/vomlehn/tcs-xtce>`__
    * - `tempfile <https://crates.io/crates/tempfile>`__
      - 3, 3.27.0
      - `3.27.0 <https://docs.rs/tempfile/3.27.0>`__

@@ -303,8 +303,8 @@ doc-headers: tcs-xtce
 	python3 -I $(TCS_XTCE)/tests/doc_headers.py
 
 # Stop, saying what to do, unless the tcs-xtce checkout beside this one is
-# there, at the version tcsprotocol pins the tcs-xtce crate to, and ready to
-# run: the tests reach its Python runtime through python/tcsprotocol/_xtce,
+# there, at the version tcsprotocol pins tcsxtce, its runtime, to, and ready
+# to run: the tests reach its Python through python/tcsprotocol/_xtce,
 # and installing the ground package copies it from there.
 .PHONY: tcs-xtce
 tcs-xtce:

@@ -19,7 +19,7 @@
 //!
 //! The second link is one socket, at `payload_command.dest_base` with nothing
 //! added to it. The node id in the message says which node a command is about
-//! -- see [`tcslib_protocol::NodeId`] -- so the socket need not. A socket per
+//! -- see [`tcsprotocol::NodeId`] -- so the socket need not. A socket per
 //! node would spend ports on computations and logs that nothing addresses from
 //! the ground.
 //!
@@ -68,8 +68,8 @@ use log::{error, trace, warn};
 use nix::poll::{poll, PollFd, PollFlags};
 use std::os::fd::BorrowedFd;
 
-use tcslib_protocol::config_digest::{ConfigDigest, ConfigVersion};
-use tcslib_protocol::{
+use tcsprotocol::config_digest::{ConfigDigest, ConfigVersion};
+use tcsprotocol::{
     answer_to, came_from, sequence_is_before, AnswerPacker, ArmKey, CIConfig,
     Command, CommandLink, CommandStatus, ConnectTelemetry, HostPort,
     NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
@@ -87,7 +87,7 @@ use crate::telemetry_log::TelemetryLog;
 /// The most a command datagram may be.
 ///
 /// A whole datagram, and not the longest command,
-/// `tcslib_protocol::COMMAND_BYTES`: a datagram longer than any command is then
+/// `tcsprotocol::COMMAND_BYTES`: a datagram longer than any command is then
 /// read whole and refused for what it is, rather than cut to a command's length
 /// and read as one.
 const COMMAND_BYTES: usize = 65535;
@@ -131,13 +131,13 @@ struct Link {
 }
 
 /// How a command link's packets are framed under Yamcs: see
-/// [`tcslib_protocol::ccsds`].
+/// [`tcsprotocol::ccsds`].
 struct LinkFraming {
     /// The APID every command must carry as a telecommand: `tcs_cmd.apid`.
     apid: u16,
     /// What frames the answers, as telemetry under the same APID, with the
     /// link's own sequence count.
-    answers: tcslib_protocol::ccsds::Sender,
+    answers: tcsprotocol::ccsds::Sender,
 }
 
 impl LinkFraming {
@@ -155,8 +155,8 @@ impl LinkFraming {
     ///
     /// `TcsError::Config` for an APID past eleven bits.
     fn of(apid: u16) -> TcsResult<LinkFraming> {
-        let answers = tcslib_protocol::ccsds::Sender::new(
-            tcslib_protocol::ccsds::PacketType::Telemetry,
+        let answers = tcsprotocol::ccsds::Sender::new(
+            tcsprotocol::ccsds::PacketType::Telemetry,
             apid,
         )
         .map_err(|fault| TcsError::Config(format!("tcs_cmd.apid: {fault}")))?;
@@ -474,7 +474,7 @@ struct Serving {
     /// log holds everything that went to the ground.
     log: TelemetryLog,
     /// Whether the ground has matched this start. Until it has, every
-    /// command but the three [`tcslib_protocol::CommandType::taken_unmatched`]
+    /// command but the three [`tcsprotocol::CommandType::taken_unmatched`]
     /// names is answered `Unmatched` and not acted on.
     matched: Matched,
     stopping: Arc<AtomicBool>,
@@ -504,7 +504,7 @@ struct Serving {
     restarting: bool,
     /// The newest command sequence this start has taken, on either link, or
     /// none before the first. A command older than it is answered `Stale`
-    /// and not acted on: see [`tcslib_protocol::CommandType::always_taken`].
+    /// and not acted on: see [`tcsprotocol::CommandType::always_taken`].
     ///
     /// Not kept across a restart, because it need not be: the link
     /// delivers in order, so a command sent before a RESTART arrives before
@@ -832,12 +832,12 @@ impl Serving {
         // says it is the ground's.
         let start = match &link.framing {
             None => 0,
-            Some(framing) => match tcslib_protocol::ccsds::read_header(
+            Some(framing) => match tcsprotocol::ccsds::read_header(
                 &buffer[..size],
-                tcslib_protocol::ccsds::PacketType::Telecommand,
+                tcsprotocol::ccsds::PacketType::Telecommand,
                 framing.apid,
             ) {
-                Ok(_) => tcslib_protocol::ccsds::HEADER_BYTES,
+                Ok(_) => tcsprotocol::ccsds::HEADER_BYTES,
                 Err(fault) => {
                     let count =
                         self.malformed.fetch_add(1, Ordering::Relaxed) + 1;
@@ -1140,8 +1140,8 @@ impl Serving {
                         sequence,
                         CommandStatus::NotFound,
                         cmd.node,
-                        tcslib_protocol::DHSample::new(),
-                        tcslib_protocol::DHSample::new(),
+                        tcsprotocol::DHSample::new(),
+                        tcsprotocol::DHSample::new(),
                     ))
                 }
             },
@@ -1308,7 +1308,7 @@ impl Serving {
     /// # Arguments
     ///
     /// * `node` - The id the ground sent.
-    fn no_such_node(&self, node: tcslib_protocol::NodeId) {
+    fn no_such_node(&self, node: tcsprotocol::NodeId) {
         error!(
             "there is no node {node} in this configuration, which has {}: the \
              ground is reading a configuration this vehicle is not flying",
@@ -1345,7 +1345,7 @@ impl Serving {
     /// `Failure` where the pass could not do the work.
     fn set_state(
         &self,
-        node: tcslib_protocol::NodeId,
+        node: tcsprotocol::NodeId,
         enabled: bool,
     ) -> CommandStatus {
         let Some(state) = self.states.at(node) else {
@@ -1356,7 +1356,7 @@ impl Serving {
 
         // A node the ground may not start or stop -- a ping node, which is how
         // the ground knows the vehicle is there -- is refused and left as it
-        // was: see `tcslib_protocol::graph::starts_and_stops`. Before anything
+        // was: see `tcsprotocol::graph::starts_and_stops`. Before anything
         // below, because stopping begins the moment this is asked.
         if !state.is_switchable() {
             warn!(
@@ -1433,9 +1433,9 @@ impl Serving {
     /// reason for a refusal, empty on success.
     fn set_attribute(
         &self,
-        node: tcslib_protocol::NodeId,
-        attribute: tcslib_protocol::Attribute,
-        value: tcslib_protocol::Value,
+        node: tcsprotocol::NodeId,
+        attribute: tcsprotocol::Attribute,
+        value: tcsprotocol::Value,
     ) -> (CommandStatus, Reason) {
         let Some(state) = self.states.at(node) else {
             self.no_such_node(node);
@@ -1466,8 +1466,8 @@ impl Serving {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslib_protocol::graph::Graph;
-    use tcslib_protocol::{Command, NodeCommand, NodeId};
+    use tcsprotocol::graph::Graph;
+    use tcsprotocol::{Command, NodeCommand, NodeId};
 
     /// A configuration whose command links are on loopback ports the system
     /// chooses, and whose ground is this test.
@@ -1493,7 +1493,7 @@ mod tests {
             port,
         };
         CIConfig {
-            links: tcslib_protocol::Links::Sockets(tcslib_protocol::Sockets {
+            links: tcsprotocol::Links::Sockets(tcsprotocol::Sockets {
                 address: "127.0.0.1".to_string(),
                 port: 0,
                 // Both links take commands from the one socket this test
@@ -1512,12 +1512,12 @@ mod tests {
             // Nothing to write: what is being tested is what goes out.
             log_dir: None,
             log_segment_bytes: 65_536,
-            restart_arm_valid: tcslib_protocol::RESTART_ARM_VALID_DEFAULT,
-            gateway: tcslib_protocol::gateway::GatewayKind::Radio,
-            interface: tcslib_protocol::InterfaceDigest::of_this_build(),
+            restart_arm_valid: tcsprotocol::RESTART_ARM_VALID_DEFAULT,
+            gateway: tcsprotocol::gateway::GatewayKind::Radio,
+            interface: tcsprotocol::InterfaceDigest::of_this_build(),
             configurations: None,
-            configurations_kept: tcslib_protocol::CONFIGURATIONS_KEPT_DEFAULT,
-            load_trials: tcslib_protocol::LOAD_TRIALS_DEFAULT,
+            configurations_kept: tcsprotocol::CONFIGURATIONS_KEPT_DEFAULT,
+            load_trials: tcsprotocol::LOAD_TRIALS_DEFAULT,
             // Nothing reads it: the state file is counted where beacons
             // start, which this does not.
             state_file: String::new(),
@@ -1756,7 +1756,7 @@ vehicle:
     /// telemetry are not answered and are counted as malformed.
     #[test]
     fn under_yamcs_commands_and_answers_are_framed() {
-        use tcslib_protocol::ccsds::{read_header, PacketType, Sender};
+        use tcsprotocol::ccsds::{read_header, PacketType, Sender};
         let graph = two_nodes();
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
         let (bench, _) = a_pass_answering(|_| Ok(()));
@@ -1767,8 +1767,8 @@ vehicle:
             .set_read_timeout(Some(Duration::from_millis(500)))
             .expect("a timeout");
         let mut ci = links_for(&ground);
-        if let tcslib_protocol::Links::Sockets(sockets) = &mut ci.links {
-            sockets.framing = Some(tcslib_protocol::CcsdsFraming {
+        if let tcsprotocol::Links::Sockets(sockets) = &mut ci.links {
+            sockets.framing = Some(tcsprotocol::CcsdsFraming {
                 beacon_apid: 0x100,
                 cmd_apid: 0x101,
                 payload_apid_base: 0x300,
@@ -1799,9 +1799,8 @@ vehicle:
             answer.truncate(size);
             Some(answer)
         };
-        let ping = |sequence| {
-            Command::Ping(tcslib_protocol::PingCommand::new(sequence))
-        };
+        let ping =
+            |sequence| Command::Ping(tcsprotocol::PingCommand::new(sequence));
         let mut tc = Sender::new(PacketType::Telecommand, 0x101).unwrap();
         let at = commands.spacecraft_address();
 
@@ -1855,9 +1854,7 @@ vehicle:
             Command::StartNode(NodeCommand::start(sequence, NodeId::of(1)))
         };
         let connect = |sequence, digest| {
-            Command::Connect(tcslib_protocol::ConnectCommand::new(
-                sequence, digest,
-            ))
+            Command::Connect(tcsprotocol::ConnectCommand::new(sequence, digest))
         };
 
         assert_eq!(
@@ -1868,7 +1865,7 @@ vehicle:
             status(ask(
                 &ground,
                 at,
-                &Command::Ping(tcslib_protocol::PingCommand::new(2))
+                &Command::Ping(tcsprotocol::PingCommand::new(2))
             )),
             CommandStatus::Unmatched
         );
@@ -1964,7 +1961,7 @@ vehicle:
         match ask(
             &ground,
             at,
-            &Command::Ping(tcslib_protocol::PingCommand::new(7)),
+            &Command::Ping(tcsprotocol::PingCommand::new(7)),
         ) {
             Some(Telemetry::Ping(tm)) => {
                 assert_eq!(
@@ -1976,7 +1973,7 @@ vehicle:
             other => panic!("expected a ping answer, got {other:?}"),
         }
 
-        let connect = Command::Connect(tcslib_protocol::ConnectCommand::new(
+        let connect = Command::Connect(tcsprotocol::ConnectCommand::new(
             8,
             ConfigDigest([0x5Au8; 16]),
         ));
@@ -2006,7 +2003,7 @@ vehicle:
     fn a_command_older_than_one_taken_is_stale() {
         let graph = two_nodes();
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let ids = tcslib_protocol::graph::telemetry::ids(&graph);
+        let ids = tcsprotocol::graph::telemetry::ids(&graph);
         let inside = NodeId::of(ids["inside"]);
         let (bench, done) = a_pass_answering(|_| Ok(()));
         let (ground, commands) = started_with(states.clone(), bench);
@@ -2041,9 +2038,9 @@ vehicle:
             CommandStatus::Success
         );
 
-        let ping = Command::Ping(tcslib_protocol::PingCommand::new(3));
+        let ping = Command::Ping(tcsprotocol::PingCommand::new(3));
         assert_eq!(status(ask(&ground, at, &ping)), CommandStatus::Success);
-        let connect = Command::Connect(tcslib_protocol::ConnectCommand::new(
+        let connect = Command::Connect(tcsprotocol::ConnectCommand::new(
             2,
             ConfigDigest([0x5Au8; 16]),
         ));
@@ -2086,7 +2083,7 @@ vehicle:
     fn a_node_is_stopped_and_started_by_its_id() {
         let graph = two_nodes();
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let ids = tcslib_protocol::graph::telemetry::ids(&graph);
+        let ids = tcsprotocol::graph::telemetry::ids(&graph);
         let inside = NodeId::of(ids["inside"]);
 
         let (bench, done) = a_pass_answering(|_| Ok(()));
@@ -2176,9 +2173,8 @@ vehicle:
         .expect("written");
         let graph = Graph::load(&path).expect("it reads");
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let pinger = NodeId::of(
-            tcslib_protocol::graph::telemetry::ids(&graph)["pinger"],
-        );
+        let pinger =
+            NodeId::of(tcsprotocol::graph::telemetry::ids(&graph)["pinger"]);
 
         let (bench, done) = a_pass_answering(|_| Ok(()));
         let (ground, commands) = started_with(states.clone(), bench);
@@ -2231,11 +2227,11 @@ vehicle:
     /// configuration does not allow what was asked. The log tells them apart.
     #[test]
     fn an_attribute_the_configuration_binds_is_set() {
-        use tcslib_protocol::SetNodeCommand;
+        use tcsprotocol::SetNodeCommand;
 
         let graph = two_nodes();
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let ids = tcslib_protocol::graph::telemetry::ids(&graph);
+        let ids = tcsprotocol::graph::telemetry::ids(&graph);
         let average = NodeId::of(ids["average"]);
 
         // The pass is simulated, and refuses what a fabric would refuse: an
@@ -2275,9 +2271,9 @@ vehicle:
             done.lock().expect("the record").last(),
             Some(&Work::Set {
                 node: "average".into(),
-                attribute: tcslib_protocol::Attribute::of("setpoint")
+                attribute: tcsprotocol::Attribute::of("setpoint")
                     .expect("a name"),
-                value: tcslib_protocol::Value::of(b"295.0").expect("a value"),
+                value: tcsprotocol::Value::of(b"295.0").expect("a value"),
             }),
             "the pass is asked to set it, and told what to"
         );
@@ -2341,7 +2337,7 @@ vehicle:
     fn a_node_that_will_not_open_is_answered_with_the_failure() {
         let graph = two_nodes();
         let states = Arc::new(NodeStates::of(&graph).expect("states"));
-        let ids = tcslib_protocol::graph::telemetry::ids(&graph);
+        let ids = tcsprotocol::graph::telemetry::ids(&graph);
         let inside = NodeId::of(ids["inside"]);
 
         let (bench, _) = a_pass_answering(|work| match work {
@@ -2437,7 +2433,7 @@ vehicle:
         match ask(
             &ground,
             commands.node_address(),
-            &Command::Ping(tcslib_protocol::PingCommand::new(6)),
+            &Command::Ping(tcsprotocol::PingCommand::new(6)),
         ) {
             Some(Telemetry::Ping(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::InvalidCommand)
@@ -2567,7 +2563,7 @@ vehicle:
         let restart = |sequence, key, target| match ask(
             &ground,
             at,
-            &Command::Restart(tcslib_protocol::RestartCommand::new(
+            &Command::Restart(tcsprotocol::RestartCommand::new(
                 sequence,
                 ArmKey(key),
                 target,
@@ -2579,7 +2575,7 @@ vehicle:
         let arm = |sequence, key, target| match ask(
             &ground,
             at,
-            &Command::RestartArm(tcslib_protocol::RestartArmCommand::new(
+            &Command::RestartArm(tcsprotocol::RestartArmCommand::new(
                 sequence,
                 ArmKey(key),
                 target,
@@ -2625,7 +2621,7 @@ vehicle:
         match ask(
             &ground,
             at,
-            &Command::Connect(tcslib_protocol::ConnectCommand::new(9, running)),
+            &Command::Connect(tcsprotocol::ConnectCommand::new(9, running)),
         ) {
             Some(Telemetry::Connect(tm)) => {
                 assert_eq!(tm.header.status, CommandStatus::Unmatched);
@@ -2688,7 +2684,7 @@ vehicle:
         let restart = |sequence, target| match ask(
             &ground,
             at,
-            &Command::Restart(tcslib_protocol::RestartCommand::new(
+            &Command::Restart(tcsprotocol::RestartCommand::new(
                 sequence,
                 ArmKey(42),
                 target,
@@ -2700,7 +2696,7 @@ vehicle:
         let arm = match ask(
             &ground,
             at,
-            &Command::RestartArm(tcslib_protocol::RestartArmCommand::new(
+            &Command::RestartArm(tcsprotocol::RestartArmCommand::new(
                 1,
                 ArmKey(42),
                 armed_onto,
@@ -2765,7 +2761,7 @@ vehicle:
             serving
                 .answer(
                     CommandLink::Spacecraft,
-                    &Command::Restart(tcslib_protocol::RestartCommand::new(
+                    &Command::Restart(tcsprotocol::RestartCommand::new(
                         1,
                         ArmKey(7),
                         running,
@@ -2819,13 +2815,11 @@ vehicle:
             serving
                 .answer(
                     CommandLink::Spacecraft,
-                    &Command::RestartArm(
-                        tcslib_protocol::RestartArmCommand::new(
-                            sequence,
-                            ArmKey(key),
-                            running,
-                        ),
-                    ),
+                    &Command::RestartArm(tcsprotocol::RestartArmCommand::new(
+                        sequence,
+                        ArmKey(key),
+                        running,
+                    )),
                 )
                 .status()
         };

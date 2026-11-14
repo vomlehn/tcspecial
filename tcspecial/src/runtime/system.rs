@@ -34,9 +34,9 @@ use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::graph::telemetry::{Reaches, Telemetered};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::link_type::Count;
+use tcsprotocol::graph::telemetry::{Reaches, Telemetered};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::link_type::Count;
 
 use std::sync::Arc;
 
@@ -54,9 +54,9 @@ use crate::runtime::route::Routes;
 use crate::runtime::schedule::Schedule;
 use crate::segsend::SegSend;
 
-/// How large a datum may be: see [`tcslib_protocol::DATUM_BYTES`], which is
+/// How large a datum may be: see [`tcsprotocol::DATUM_BYTES`], which is
 /// where the configuration is held to it.
-pub use tcslib_protocol::DATUM_BYTES;
+pub use tcsprotocol::DATUM_BYTES;
 
 /// How long a pass may wait when a node is polled rather than scheduled.
 ///
@@ -84,7 +84,7 @@ pub const POLL_PAUSE: Duration = Duration::from_millis(20);
 /// fixed size, as the SET_NODE carried them. So handing work over allocates
 /// nothing; what the work itself takes is the pass's to say.
 ///
-/// As large as a setting, for the reason `tcslib_protocol::Command` is: a
+/// As large as a setting, for the reason `tcsprotocol::Command` is: a
 /// setting boxed would be an allocation for each one handed over.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -101,8 +101,8 @@ pub enum Work {
     /// half of another.
     Set {
         node: Arc<str>,
-        attribute: tcslib_protocol::Attribute,
-        value: tcslib_protocol::Value,
+        attribute: tcsprotocol::Attribute,
+        value: tcsprotocol::Value,
     },
 }
 
@@ -267,7 +267,7 @@ impl Workbench {
 /// twice is two places to keep in step.
 type Opener = Box<
     dyn FnMut(
-        &tcslib_protocol::graph::Node,
+        &tcsprotocol::graph::Node,
         &Routes,
         &Abandon,
     ) -> Result<Box<dyn Port>, String>,
@@ -298,7 +298,7 @@ pub struct System {
     /// Kept rather than looked up from the graph, which the caller owns and
     /// need not keep: a node the ground re-enables has to be opened from what
     /// the file said about it, and the file said it once.
-    nodes: BTreeMap<String, tcslib_protocol::graph::Node>,
+    nodes: BTreeMap<String, tcsprotocol::graph::Node>,
     /// The routing, which opening a node needs as much as the node does.
     routes: Routes,
     /// What a node becomes, kept so that a node can become it again.
@@ -398,7 +398,7 @@ impl System {
         graph: &Graph,
         now: Instant,
         mut opener: impl FnMut(
-                &tcslib_protocol::graph::Node,
+                &tcsprotocol::graph::Node,
                 &Routes,
                 &Abandon,
             ) -> Result<Box<dyn Port>, String>
@@ -840,7 +840,7 @@ impl std::fmt::Debug for System {
 /// How a node in no group that states how often is read.
 ///
 /// Three, because what the timer drives depends on the interface -- see
-/// `tcslib_protocol::graph::interface` -- and on whether the node is asked.
+/// `tcsprotocol::graph::interface` -- and on whether the node is asked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pace {
     /// A `trigger_interval` on a part that originates nothing: the whole
@@ -906,15 +906,15 @@ impl Pace {
 /// Its pace: a `trigger_interval` is [`Pace::Ask`] on a part that sends and
 /// [`Pace::Exchange`] otherwise, a `poll_interval` is [`Pace::Floor`];
 /// `None` is a node read on every pass.
-fn pace_of(node: &tcslib_protocol::graph::Node) -> Option<Pace> {
+fn pace_of(node: &tcsprotocol::graph::Node) -> Option<Pace> {
     let read = |name: &str| {
         node.attributes.get(name).and_then(|said| {
-            tcslib_protocol::graph::parse_interval(said.as_str().trim()).ok()
+            tcsprotocol::graph::parse_interval(said.as_str().trim()).ok()
         })
     };
     if let Some(interval) = read("trigger_interval") {
         return Some(
-            if tcslib_protocol::graph::interface::sends(&node.node_type) {
+            if tcsprotocol::graph::interface::sends(&node.node_type) {
                 Pace::Ask(interval)
             } else {
                 Pace::Exchange(interval)
@@ -954,7 +954,7 @@ fn pace_of(node: &tcslib_protocol::graph::Node) -> Option<Pace> {
 ///
 /// True if the node is polled.
 fn is_polled(
-    node: &tcslib_protocol::graph::Node,
+    node: &tcsprotocol::graph::Node,
     routes: &Routes,
     port: &dyn Port,
 ) -> bool {
@@ -972,7 +972,7 @@ fn is_polled(
 }
 
 /// One source's link to the ground: bound at tcspecial's end and sending to
-/// the ground's, as `tcslib_protocol::graph::telemetry` counts them.
+/// the ground's, as `tcsprotocol::graph::telemetry` counts them.
 ///
 /// Written to and never read. The ground's end is written down, so this sends
 /// there from the first reading rather than waiting to be spoken to.
@@ -1054,7 +1054,7 @@ fn counted_if(link: &Telemetered, port: Box<dyn Port>) -> Box<dyn Port> {
 /// length with it, so that what the ground is told reads the same however
 /// the gateway frames it. Under Yamcs the count is 32 bits, as the
 /// configuration's own XTCE states it; elsewhere it is in groups of seven
-/// bits, one byte for most (`tcslib_protocol::link_type::Count`). Between nodes
+/// bits, one byte for most (`tcsprotocol::link_type::Count`). Between nodes
 /// nothing is counted.
 ///
 /// The datum is written behind its count into a buffer made once, as large
@@ -1084,8 +1084,8 @@ impl Counted {
             inner,
             count,
             buffer: Vec::with_capacity(
-                tcslib_protocol::link_type::COUNT_BYTES
-                    + tcslib_protocol::types::DATUM_BYTES,
+                tcsprotocol::link_type::COUNT_BYTES
+                    + tcsprotocol::types::DATUM_BYTES,
             ),
         }
     }
@@ -1113,11 +1113,7 @@ impl Port for Counted {
         arriving: Arriving<'_>,
         data: &[u8],
     ) -> Result<(), String> {
-        tcslib_protocol::link_type::counted(
-            data,
-            self.count,
-            &mut self.buffer,
-        )?;
+        tcsprotocol::link_type::counted(data, self.count, &mut self.buffer)?;
         self.inner.give(arriving, &self.buffer)
     }
 
@@ -1263,7 +1259,7 @@ impl Port for Downlink {
 ///
 /// Why the node would not open, as its kind of port says.
 pub fn open(
-    node: &tcslib_protocol::graph::Node,
+    node: &tcsprotocol::graph::Node,
     routes: &Routes,
     abandon: &Abandon,
     segsend: &SegSend,
@@ -1291,7 +1287,7 @@ pub fn open(
         // A Yamcs gateway is a radio's, its packets framed: see
         // `EndpointPort::open`, which checks and takes off each header.
         "gateway_radio" | "gateway_yamcs"
-            if !tcslib_protocol::graph::reach::binds(node)
+            if !tcsprotocol::graph::reach::binds(node)
                 || Use::of(routes, &node.name).is_err() =>
         {
             Ok(Box::new(NullPort::of()))
@@ -1313,11 +1309,11 @@ pub fn open(
         // file interfaces `tcsapp` describes. Three of the five kinds are the
         // vehicle's own and two are payloads -- a payload that is a program
         // rather than a device -- and one port holds any of them.
-        other if tcslib_protocol::node::app::Kind::of(other).is_some() => {
+        other if tcsprotocol::node::app::Kind::of(other).is_some() => {
             Ok(Box::new(AppPort::open(node)?))
         }
         // Everything else is reached over an interface, and what a node says
-        // about reaching it is tcslib_protocol::graph::reach's business.
+        // about reaching it is tcsprotocol::graph::reach's business.
         _ => Ok(Box::new(EndpointPort::open(node, routes, abandon)?)),
     }
 }
@@ -1357,10 +1353,7 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 // than which of the two streams it is run with, which its type
                 // already says. See `crate::node::vehicle::app_payload_veh`
                 // and its four neighbours.
-                other
-                    if tcslib_protocol::node::app::Kind::of(other)
-                        .is_some() =>
-                {
+                other if tcsprotocol::node::app::Kind::of(other).is_some() => {
                     "a program".to_string()
                 }
                 // A ground link, where nothing the vehicle sends passes
@@ -1370,7 +1363,7 @@ pub fn described(graph: &Graph) -> BTreeMap<String, String> {
                 // and saying "no link touches it" of one would be reporting a
                 // fault that is not there. See `open`, which holds such a
                 // node as a `NullPort` for the same reason.
-                gateway if tcslib_protocol::gateway::is_gateway(gateway) => {
+                gateway if tcsprotocol::gateway::is_gateway(gateway) => {
                     match Use::of(&routes, &node.name) {
                         Ok(Use::Read) => "read".to_string(),
                         Ok(Use::Driven) => "driven".to_string(),
@@ -1423,9 +1416,9 @@ mod tests {
         Arc::new(AtomicUsize::new(0))
     }
 
-    use tcslib_protocol::graph::telemetry::Via;
-    use tcslib_protocol::graph::Node;
-    use tcslib_protocol::Scalar;
+    use tcsprotocol::graph::telemetry::Via;
+    use tcsprotocol::graph::Node;
+    use tcsprotocol::Scalar;
 
     /// A device that answers with whatever it was given, in order.
     ///
@@ -2637,7 +2630,7 @@ vehicle:
     /// makes the passes. Each counts its own.
     #[test]
     fn setting_a_setpoint_allocates_nothing() {
-        use tcslib_protocol::{Command, NodeId, SetNodeCommand};
+        use tcsprotocol::{Command, NodeId, SetNodeCommand};
 
         let where_ = tempfile::tempdir().expect("a directory");
         let delivered = tally();
@@ -2655,12 +2648,11 @@ vehicle:
             .map(|sequence| {
                 // A setpoint is a kelvin, as the thermostat's type-in is.
                 let kelvin = if sequence % 2 == 0 { 280.0 } else { 300.0 };
-                let value =
-                    tcslib_protocol::node::vehicle::compute::value_bytes(
-                        kelvin,
-                        tcslib_protocol::unit::Unit::Kelvin,
-                    )
-                    .expect("a temperature");
+                let value = tcsprotocol::node::vehicle::compute::value_bytes(
+                    kelvin,
+                    tcsprotocol::unit::Unit::Kelvin,
+                )
+                .expect("a temperature");
                 Command::SetNode(
                     SetNodeCommand::new(
                         sequence,
@@ -2808,7 +2800,7 @@ vehicle:
     /// the beacon thread do for each, but for the socket.
     #[test]
     fn answering_and_beaconing_allocate_nothing() {
-        use tcslib_protocol::{
+        use tcsprotocol::{
             came_from, AnswerPacker, Beacon, BeaconPacker, Command,
             CommandStatus, ConfigDigest, ConfigVersion, HostPort, NodeId,
             PingTelemetry, SetNodeCommand, Telemetry,
@@ -2834,8 +2826,8 @@ vehicle:
             SetNodeCommand::new(
                 9,
                 NodeId(3),
-                &"a".repeat(tcslib_protocol::ATTRIBUTE_BYTES),
-                &[0x5a; tcslib_protocol::VALUE_BYTES],
+                &"a".repeat(tcsprotocol::ATTRIBUTE_BYTES),
+                &[0x5a; tcsprotocol::VALUE_BYTES],
             )
             .expect("the longest fits"),
         )
@@ -2896,7 +2888,7 @@ vehicle:
             .map(|datum| {
                 match crate::node::vehicle::compute::from_value(
                     datum,
-                    tcslib_protocol::unit::Unit::Kelvin,
+                    tcsprotocol::unit::Unit::Kelvin,
                     "the ground",
                 ) {
                     Ok(number) => format!("{number}"),
@@ -3085,9 +3077,8 @@ vehicle:
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         let answers = sent.lock().expect("the record").clone();
         assert_eq!(answers.len(), 1, "{answers:?}");
-        let pong =
-            tcslib_protocol::node::vehicle::ping::read_reply(&answers[0])
-                .expect("an answer");
+        let pong = tcsprotocol::node::vehicle::ping::read_reply(&answers[0])
+            .expect("an answer");
         assert_eq!(pong.ping.count, 1);
         assert!(answers[0].starts_with(b"ping #1 1760900000.000000001 "));
 
@@ -3108,7 +3099,7 @@ vehicle:
     /// The real ports, opened as tcspecial opens them, on loopback.
     #[test]
     fn under_yamcs_the_uplink_and_a_downlink_are_framed() {
-        use tcslib_protocol::ccsds::{read_header, PacketType, Sender};
+        use tcsprotocol::ccsds::{read_header, PacketType, Sender};
         let free = || {
             std::net::UdpSocket::bind("127.0.0.1:0")
                 .and_then(|socket| socket.local_addr())
@@ -3194,9 +3185,9 @@ vehicle:
             .expect("framed telemetry");
         // An answer is a string: under Yamcs, after the 32-bit count of its
         // bytes, as XTCE encodes it.
-        let start = tcslib_protocol::link_type::uncounted(data, Count::Xtce)
+        let start = tcsprotocol::link_type::uncounted(data, Count::Xtce)
             .expect("counted as XTCE counts it");
-        assert_eq!(start, tcslib_protocol::link_type::COUNT_BYTES);
+        assert_eq!(start, tcsprotocol::link_type::COUNT_BYTES);
         assert!(data[start..].starts_with(b"ping #2 1760900000.000000001 "));
         assert_eq!(&pong[2..4], &[0xC0, 0x00], "the downlink's first");
     }
@@ -3258,9 +3249,9 @@ vehicle:
         let start = Instant::now();
         let mut vehicle = vehicle(start, &[]);
 
-        let kelvin = tcslib_protocol::node::vehicle::compute::value_bytes(
+        let kelvin = tcsprotocol::node::vehicle::compute::value_bytes(
             300.0,
-            tcslib_protocol::unit::Unit::Kelvin,
+            tcsprotocol::unit::Unit::Kelvin,
         )
         .expect("a temperature");
         assert_eq!(
@@ -3378,13 +3369,13 @@ vehicle:
         let asking = std::thread::spawn(move || {
             let set = bench.ask(Work::Set {
                 node: "thermostat".into(),
-                attribute: tcslib_protocol::Attribute::of("setpoint")
+                attribute: tcsprotocol::Attribute::of("setpoint")
                     .expect("a name"),
                 // A setpoint is a kelvin, as the thermostat's type-in is.
-                value: tcslib_protocol::Value::of(
-                    &tcslib_protocol::node::vehicle::compute::value_bytes(
+                value: tcsprotocol::Value::of(
+                    &tcsprotocol::node::vehicle::compute::value_bytes(
                         280.0,
-                        tcslib_protocol::unit::Unit::Kelvin,
+                        tcsprotocol::unit::Unit::Kelvin,
                     )
                     .expect("a temperature"),
                 )
@@ -3394,9 +3385,8 @@ vehicle:
             // come back refused rather than applied.
             let unbound = bench.ask(Work::Set {
                 node: "thermostat".into(),
-                attribute: tcslib_protocol::Attribute::of("above")
-                    .expect("a name"),
-                value: tcslib_protocol::Value::of(b"5.0").expect("a value"),
+                attribute: tcsprotocol::Attribute::of("above").expect("a name"),
+                value: tcsprotocol::Value::of(b"5.0").expect("a value"),
             });
             finished.store(true, std::sync::atomic::Ordering::SeqCst);
             (set, unbound)

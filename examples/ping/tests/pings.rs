@@ -3,7 +3,7 @@
 //! This test is tcspecial, as far as the ground station can tell: it sends
 //! beacons serialized as tcspecial serializes them, from where the
 //! configuration says they come from, and it answers each ping with
-//! `tcslib_protocol::node::vehicle::ping::reply`, the function the `ping` node
+//! `tcsprotocol::node::vehicle::ping::reply`, the function the `ping` node
 //! answers with. So what the ground station prints is what it makes of the
 //! vehicle's own bytes, and a change to either -- the beacon's layout, the ping
 //! format -- that the Python has not followed fails here.
@@ -18,9 +18,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tcslib_protocol::config_digest::{digest_of_file, ConfigVersion};
-use tcslib_protocol::node::vehicle::ping;
-use tcslib_protocol::Beacon;
+use tcsprotocol::config_digest::{digest_of_file, ConfigVersion};
+use tcsprotocol::node::vehicle::ping;
+use tcsprotocol::Beacon;
 
 /// A socket on a port nothing holds.
 fn bound() -> UdpSocket {
@@ -171,14 +171,14 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     {
         let mut buffer = [0u8; 256];
         let (size, from) = commands.recv_from(&mut buffer).expect("a CONNECT");
-        let Ok(tcslib_protocol::Command::Connect(cmd)) =
-            tcslib_protocol::Command::read(&buffer[..size])
+        let Ok(tcsprotocol::Command::Connect(cmd)) =
+            tcsprotocol::Command::read(&buffer[..size])
         else {
             panic!("a CONNECT first");
         };
         assert_eq!(cmd.digest, digest, "carrying the station's checksum");
-        let answer = tcslib_protocol::Telemetry::Connect(
-            tcslib_protocol::ConnectTelemetry::new(
+        let answer = tcsprotocol::Telemetry::Connect(
+            tcsprotocol::ConnectTelemetry::new(
                 cmd.header.sequence,
                 ConfigVersion::of_this_build(),
                 digest,
@@ -201,11 +201,11 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             .expect("answered");
         // A ping node sends a string, and the vehicle sends a string down
         // after a count of its bytes, as it is counted on a link that no
-        // XTCE describes: see tcslib_protocol::graph::telemetry's count.
+        // XTCE describes: see tcsprotocol::graph::telemetry's count.
         let mut down = Vec::new();
-        tcslib_protocol::link_type::counted(
+        tcsprotocol::link_type::counted(
             answer.as_bytes(),
-            tcslib_protocol::link_type::Count::Groups,
+            tcsprotocol::link_type::Count::Groups,
             &mut down,
         )
         .expect("counted");

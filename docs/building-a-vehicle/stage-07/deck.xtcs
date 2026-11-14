@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcsprotocol/schema/tcspecial.xsd">
     <!-- Stage 7 of "Building a Vehicle" (docs/building-a-vehicle.rst): the
          vehicle of stage 6, split into files. Each subsystem is a file of
          its own in ../common, included here as a subdiagram, and this file

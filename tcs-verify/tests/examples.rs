@@ -10,8 +10,8 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::graph::Graph;
-use tcslib_verify::verify;
+use tcsprotocol::graph::Graph;
+use tcsverify::verify;
 
 const SIM_SUFFIX: &str = "-sim.yaml";
 
@@ -136,7 +136,7 @@ fn sim_for(config: &Path) -> PathBuf {
 }
 
 /// Every shipped configuration names this build's interface: a change to
-/// `tcslib-protocol/xtce/link.xtce` that left one behind fails here, saying the
+/// `tcsprotocol/xtce/link.xtce` that left one behind fails here, saying the
 /// one command that brings them all up to date.
 #[test]
 fn every_shipped_configuration_names_this_builds_interface() {
@@ -151,7 +151,7 @@ fn every_shipped_configuration_names_this_builds_interface() {
     files.extend(entries(&root.join("tests/manual")).filter(|path| {
         path.extension().is_some_and(|e| e == "ytcs" || e == "xtcs")
     }));
-    let ours = tcslib_protocol::InterfaceDigest::of_this_build().to_string();
+    let ours = tcsprotocol::InterfaceDigest::of_this_build().to_string();
     let mut stale = Vec::new();
     for path in &files {
         let text = std::fs::read_to_string(path).expect("it reads");
@@ -174,7 +174,7 @@ fn every_shipped_configuration_names_this_builds_interface() {
 
 /// Every shipped configuration's own XTCE is what tcs-verify writes, in both
 /// spellings: a change to a configuration or to
-/// `tcslib-protocol/xtce/types.xtce` that left one behind fails here, saying
+/// `tcsprotocol/xtce/types.xtce` that left one behind fails here, saying
 /// the one command that brings them all up to date.
 #[test]
 fn every_shipped_configurations_own_xtce_is_current() {
@@ -226,8 +226,7 @@ fn every_example_verifies() {
             sim.display()
         );
 
-        let report =
-            verify(&config, Some(&sim), tcslib_verify::Limits::EVERYTHING);
+        let report = verify(&config, Some(&sim), tcsverify::Limits::EVERYTHING);
         let findings: Vec<String> =
             report.findings.iter().map(|f| f.to_string()).collect();
         assert!(
@@ -406,13 +405,13 @@ fn every_node_in_the_manual_verifies() {
     let dir = tempfile::tempdir().expect("a directory");
 
     let mut checked = 0;
-    for name in tcslib_protocol::MANUALS {
+    for name in tcsprotocol::MANUALS {
         let manual = root.join("docs").join(name);
         let text = std::fs::read_to_string(&manual)
             .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
         for (line, block) in yaml_blocks(&text) {
             let first = block.lines().next().unwrap_or_default();
-            let sections = tcslib_protocol::graph::Section::ALL;
+            let sections = tcsprotocol::graph::Section::ALL;
             let file = if first.starts_with("payload_groups:")
                 || sections
                     .iter()
@@ -428,7 +427,7 @@ fn every_node_in_the_manual_verifies() {
                 let nested: String =
                     block.lines().map(|l| format!("{l}\n")).collect();
                 let under =
-                    tcslib_protocol::graph::section_of(node_type.trim()).name();
+                    tcsprotocol::graph::section_of(node_type.trim()).name();
                 format!("{section}{under}:\n{nested}")
             } else if first.starts_with("- name:") {
                 let node_type = block
@@ -440,8 +439,7 @@ fn every_node_in_the_manual_verifies() {
                     });
                 let nested: String =
                     block.lines().map(|l| format!("  {l}\n")).collect();
-                let under =
-                    tcslib_protocol::graph::section_of(node_type).name();
+                let under = tcsprotocol::graph::section_of(node_type).name();
                 format!("{section}{under}:\n{nested}")
             } else {
                 continue;
@@ -452,7 +450,7 @@ fn every_node_in_the_manual_verifies() {
 
             let path = dir.path().join(format!("{name}-{line}.ytcs"));
             std::fs::write(&path, &file).unwrap();
-            let report = verify(&path, None, tcslib_verify::Limits::EVERYTHING);
+            let report = verify(&path, None, tcsverify::Limits::EVERYTHING);
             assert!(
                 !report.found_anything(),
                 "the example at {name}:{line} does not verify: {:?}\n{file}",

@@ -4,9 +4,9 @@
 Two halves borrowed and one of its own, as the beacon example is put together
 in Rust:
 
-* the beacon, from ``python/tcslib_moc/beacon.py`` and
-  ``python/tcslib_ui/beacon_panel.py`` -- the Python spellings of
-  ``tcslib_moc::beacon`` and ``tcslib_ui`` -- so the window says whether the
+* the beacon, from ``python/tcsmoc/beacon.py`` and
+  ``python/tcsui/beacon_panel.py`` -- the Python spellings of
+  ``tcsmoc::beacon`` and ``tcsui`` -- so the window says whether the
   vehicle is alive before anybody presses anything;
 * the ping, from ``examples/ping-common/ping_ground.py``, which sends each
   ping up to the ``gateway`` node and times the ``ping`` node's answer, and
@@ -21,7 +21,7 @@ node's answers included -- until it has taken one, and a station that only
 pings cannot count on a commanding one's being there. It sends it again each
 second no answer comes, or the answer carries another configuration's
 checksum, until the vehicle answers with this one's, and says so; see
-``python/tcslib_moc/listening.py``. It is sent from the configuration's
+``python/tcsmoc/listening.py``. It is sent from the configuration's
 ``tcs_cmd.send``, so nothing else -- tcs-moc -- may be using that address
 meanwhile. ``--pings`` waits for the match before its first ping.
 
@@ -70,10 +70,10 @@ sys.path.insert(0, str(ROOT / "python"))
 # ping link and the window.
 sys.path.insert(0, str(HERE.parent / "ping-common"))
 
-from tcslib_moc.beacon import Beacons, Schedule  # noqa: E402
-from tcslib_moc.listening import Listening  # noqa: E402
-from tcslib_moc.processes import Vehicle  # noqa: E402
-from tcslib_protocol import configuration  # noqa: E402
+from tcsmoc.beacon import Beacons, Schedule  # noqa: E402
+from tcsmoc.listening import Listening  # noqa: E402
+from tcsmoc.processes import Vehicle  # noqa: E402
+from tcsprotocol import configuration  # noqa: E402
 from ping_ground import Pinger, report  # noqa: E402
 from ping_window import run_the_window, the_one  # noqa: E402
 
@@ -267,7 +267,7 @@ def connecting(setup):
         is no reason to stop connecting, so a failure to say it is let go.
 
         Args:
-            heard: The :class:`tcslib_moc.listening.Heard`.
+            heard: The :class:`tcsmoc.listening.Heard`.
         """
         try:
             if heard.running is not None and not heard.matched:

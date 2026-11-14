@@ -2,7 +2,7 @@
 //!
 //! The ground station is Python and reads the XML spelling, the standard
 //! library having no YAML; the vehicle and every Rust ground program read
-//! through `tcslib-protocol`. Where the beacons are and how often they come,
+//! through `tcsprotocol`. Where the beacons are and how often they come,
 //! where a ping goes up and where its answer comes down are worked out on both
 //! sides, so this holds the Python's answers for `ping.xtcs` to the Rust's for
 //! `ping.ytcs` -- which is also the two spellings being held to one another.
@@ -13,12 +13,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use tcslib_protocol::config_digest::digest_of_file;
-use tcslib_protocol::graph::parameters::{beacon_interval_of, beacon_of};
-use tcslib_protocol::graph::reach::reach_of;
-use tcslib_protocol::graph::telemetry::{self, Via};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::EndpointConfig;
+use tcsprotocol::config_digest::digest_of_file;
+use tcsprotocol::graph::parameters::{beacon_interval_of, beacon_of};
+use tcsprotocol::graph::reach::reach_of;
+use tcsprotocol::graph::telemetry::{self, Via};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::EndpointConfig;
 
 fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()

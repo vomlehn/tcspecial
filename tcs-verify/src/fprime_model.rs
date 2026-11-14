@@ -1,7 +1,7 @@
 //! Writing the F´ model of a configuration's bridge, for `--fprime-model`.
 //!
 //! What the model is, and every rule about it, is
-//! [`tcslib_protocol::graph::fprime`]'s. This only writes it: the FPP the
+//! [`tcsprotocol::graph::fprime`]'s. This only writes it: the FPP the
 //! `TcsBridge` component includes and the C++ built beside it, into the
 //! directory the component's build reads them from. Here rather than in the
 //! component's build because tcs-verify is where a configuration is checked,
@@ -10,7 +10,7 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::graph::{fprime, Graph};
+use tcsprotocol::graph::{fprime, Graph};
 
 /// What the FPP is called, which `TcsBridge.fpp` includes by this name.
 pub const FPPI: &str = "TcsBridgeModel.fppi";
@@ -44,7 +44,7 @@ pub fn write(
 ) -> Result<(String, Vec<PathBuf>), String> {
     let shown = configuration.display().to_string();
     let graph = Graph::load(configuration).map_err(|e| format!("{e}"))?;
-    let digest = tcslib_protocol::config_digest::digest_of_graph(&graph)
+    let digest = tcsprotocol::config_digest::digest_of_graph(&graph)
         .map_err(|e| format!("{shown}: no digest: {e}"))?
         .to_string();
     let models = fprime::every(&graph)

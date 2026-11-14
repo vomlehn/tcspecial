@@ -130,7 +130,7 @@ SINKS = ("moc-in", "world-in")
 ARRIVES = {"moc-out": "moc-in", "world-out": "world-in"}
 
 #: The attributes a node writes as a list, whose entries are a set:
-#: ``tcslib_protocol::graph::LISTED``.
+#: ``tcsprotocol::graph::LISTED``.
 LISTED = ("terminators",)
 
 #: The indentation of each level of the new shape in YAML: the section's

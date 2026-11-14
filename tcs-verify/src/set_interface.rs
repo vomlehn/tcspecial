@@ -2,7 +2,7 @@
 //!
 //! A configuration names the interface it is written for as its `tcspecial`
 //! section's `interface`, and every program refuses one that is not its
-//! build's. So a change to `tcslib-protocol/xtce/link.xtce` or `types.xtce` --
+//! build's. So a change to `tcsprotocol/xtce/link.xtce` or `types.xtce` --
 //! a new interface -- leaves every configuration to be given the new digest.
 //! This does it to a file as it stands: the one value is rewritten, or the
 //! attribute added where the section has none, and every other byte of the file
@@ -15,7 +15,7 @@
 
 use std::path::Path;
 
-use tcslib_protocol::InterfaceDigest;
+use tcsprotocol::InterfaceDigest;
 
 /// What setting the interface did to a file's text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -271,9 +271,9 @@ pub fn set_in_file(path: &Path) -> Result<Set, String> {
     let said = |why: String| format!("{}: {why}", path.display());
     let ours = InterfaceDigest::of_this_build().to_string();
     let xml = matches!(
-        tcslib_protocol::ConfigFormat::of_file(path)
+        tcsprotocol::ConfigFormat::of_file(path)
             .map_err(|e| said(e.to_string()))?,
-        tcslib_protocol::ConfigFormat::Xml
+        tcsprotocol::ConfigFormat::Xml
     );
     let text = std::fs::read_to_string(path)
         .map_err(|e| said(format!("cannot be read: {e}")))?;
@@ -293,18 +293,18 @@ pub fn set_in_file(path: &Path) -> Result<Set, String> {
     });
     std::fs::write(&beside, &new)
         .map_err(|e| said(format!("cannot be written: {e}")))?;
-    let checked = tcslib_protocol::graph::Graph::load(&beside)
+    let checked = tcsprotocol::graph::Graph::load(&beside)
         .map_err(|e| e.to_string())
         .and_then(|graph| {
             let section = graph
                 .tcspecial
                 .ok_or("it lost its tcspecial section".to_string())?;
-            let flat = tcslib_protocol::graph::parameters::flatten(&section);
+            let flat = tcsprotocol::graph::parameters::flatten(&section);
             let named = flat
                 .get("interface")
                 .map(|value| value.as_str().trim().to_string())
                 .unwrap_or_default();
-            tcslib_protocol::graph::parameters::interface_of(&named).map(|_| ())
+            tcsprotocol::graph::parameters::interface_of(&named).map(|_| ())
         });
     if let Err(why) = checked {
         let _ = std::fs::remove_file(&beside);

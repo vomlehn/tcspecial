@@ -17,7 +17,7 @@ fn app() -> PathBuf {
 /// The arguments an `app_payload_veh` is run with.
 ///
 /// The node's name, then the argument for the one stream its kind handles:
-/// the list tcspecial builds, which is `tcslib_protocol::node::app`'s to say.
+/// the list tcspecial builds, which is `tcsprotocol::node::app`'s to say.
 fn arguments() -> Vec<String> {
     vec!["fore".to_string(), "--readings".to_string()]
 }

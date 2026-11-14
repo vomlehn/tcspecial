@@ -3,12 +3,12 @@ import {
     ScrollView
 } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcs-verify/ui/copy.slint";
-// The beacon's panel, shared with the other ground programs: see tcslib-ui.
-// What it shows is worked out in Rust, from what tcslib_moc::beacon reports.
-import { BeaconPanel } from "../../tcslib-ui/ui/beacon.slint";
-import { PingPanel } from "../../tcslib-ui/ui/ping.slint";
-import { Fonts } from "../../tcslib-ui/ui/fonts.slint";
-import { Colors } from "../../tcslib-ui/ui/colors.slint";
+// The beacon's panel, shared with the other ground programs: see tcsui.
+// What it shows is worked out in Rust, from what tcsmoc::beacon reports.
+import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
+import { PingPanel } from "../../tcsui/ui/ping.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcs-moc and tcs-sim share, beside tcs-verify, whose report it
 // shows.
@@ -685,14 +685,14 @@ export component MainWindow inherits Window {
     // spoken rather than as the window not having been written.
     in-out property <string> beacon-last-msg: "<none>";
     // What the field beside the indicator says of a restart: see
-    // `tcslib_ui::RESTARTED_CONNECT`.
+    // `tcsui::RESTARTED_CONNECT`.
     in-out property <string> beacon-restart: "";
 
     callback link-clicked();
     callback ping-clicked();
     // Whether the configuration has a ping node the ground can reach both
     // ways, and so whether there is a Ping node button: see
-    // `tcslib_moc::ping::route_of`. Not the PING above, which asks whether the
+    // `tcsmoc::ping::route_of`. Not the PING above, which asks whether the
     // command link reaches the vehicle; this asks a node of the vehicle the
     // time and times the answer.
     in property <bool> can-ping-node: false;
@@ -817,9 +817,9 @@ export component MainWindow inherits Window {
                     // what the link beside it is asking for. It is not the
                     // link, which the panel's own border says.
                     //
-                    // The panel is tcslib-ui's, so that this window and the
+                    // The panel is tcsui's, so that this window and the
                     // beacon example show an operator the same thing: see
-                    // ../../tcslib-ui/ui/beacon.slint.
+                    // ../../tcsui/ui/beacon.slint.
                     BeaconPanel {
                         indicator-color: root.indicator-color;
                         last-received: root.beacon-last-recv;

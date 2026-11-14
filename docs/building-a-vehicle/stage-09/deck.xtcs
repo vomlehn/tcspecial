@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcsprotocol/schema/tcspecial.xsd">
     <!-- Stage 9 of "Building a Vehicle" (docs/building-a-vehicle.rst): a
          payload with code of its own. The deck's camera has software
          already, so it is run as a program by an app_pl node rather than

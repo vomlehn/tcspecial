@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
 
 description: "A payload that is a program, sending a line of text a word at a
   time"
@@ -35,7 +35,7 @@ gateways:
       # drawn into it produces as UDP datagrams to ground_base's address, at its
       # port plus that node's device id: lorem is id 1, so its words go to
       # 127.0.0.1:5101. Ground software gets them from this node with a function
-      # call, tcslib_moc::gateway::GatewayReceiver::receive: run `lorem_gateway`
+      # call, tcsmoc::gateway::GatewayReceiver::receive: run `lorem_gateway`
       # to be that ground. It states no address or port of its own, because
       # nothing comes back up.
       - gateway: gateway-1

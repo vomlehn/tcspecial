@@ -20,7 +20,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use log::info;
 use nix::poll::PollFlags;
-use tcslib_protocol::{
+use tcsprotocol::{
     BitOrder, CsActive, SpiConfig, SpiMode, TcsError, TcsResult,
 };
 

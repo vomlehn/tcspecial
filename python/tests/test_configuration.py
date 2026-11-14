@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_protocol import configuration  # noqa: E402
-from tcslib_protocol.configuration import HostPort, came_from  # noqa: E402
+from tcsprotocol import configuration  # noqa: E402
+from tcsprotocol.configuration import HostPort, came_from  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 PING = ROOT / "examples" / "ping" / "ping.xtcs"
@@ -87,7 +87,7 @@ class ConfigurationTest(unittest.TestCase):
 
     def test_ids_tell_case_apart_and_sort_by_code_point(self):
         """Names that differ only in case are two names, and ids follow the
-        names' code points, as tests/ids/case.ids says and tcslib_protocol's
+        names' code points, as tests/ids/case.ids says and tcsprotocol's
         Rust test of the same file holds it to."""
         ids = Path(__file__).resolve().parents[2] / "tests" / "ids"
         config = configuration.load(str(ids / "case.ytcs"))
@@ -125,7 +125,7 @@ class ConfigurationTest(unittest.TestCase):
                 config.uplink("m")
 
     def test_every_file_the_two_readers_refuse_is_refused(self):
-        # tests/refused, which tcslib_protocol::graph::grouped holds the Rust
+        # tests/refused, which tcsprotocol::graph::grouped holds the Rust
         # reader to as well: the two refuse the same things, at the line of
         # each.
         files = sorted((ROOT / "tests" / "refused").iterdir())

@@ -2,14 +2,14 @@
 //!
 //! What a beacon is, how stale the last one is and what its number says about
 //! the ones before it are not this program's business: they are the same for
-//! any ground station, and they live in [`tcslib_moc::beacon`]. What a panel
-//! showing them looks like is `tcslib-ui`, whose markup this window imports.
+//! any ground station, and they live in [`tcsmoc::beacon`]. What a panel
+//! showing them looks like is `tcsui`, whose markup this window imports.
 //!
 //! What is left here is this window's own: a thread to run the loop on, the
 //! window to put the answers in, the question to ask the operator when the
 //! beacons announce a configuration this MOC did not read, the contact flag
 //! the panels act on, handing each beacon to the window's commands, and
-//! keeping the window's match with the vehicle, which tcslib-moc decides.
+//! keeping the window's match with the vehicle, which tcsmoc decides.
 //!
 //! It used to be the whole of it -- the socket, the digest comparison, the
 //! sequence counting, the colours and the blink schedule, in one file with
@@ -23,9 +23,9 @@ use std::thread;
 
 use slint::{SharedString, Weak};
 
-use tcslib_moc::beacon::{Arrived, Beacons, Contact};
-use tcslib_moc::matched::Matched;
-use tcslib_ui::Shown;
+use tcsmoc::beacon::{Arrived, Beacons, Contact};
+use tcsmoc::matched::Matched;
+use tcsui::Shown;
 
 use crate::MainWindow;
 
@@ -105,7 +105,7 @@ pub struct BeaconReceive;
 impl BeaconReceive {
     /// Starts watching, on a thread of its own.
     ///
-    /// The watch is opened by the caller, with `tcslib_moc::beacon::open`, so
+    /// The watch is opened by the caller, with `tcsmoc::beacon::open`, so
     /// that a ground station that cannot bind where beacons arrive says so
     /// with the rest of what it found at startup, rather than leaving it to
     /// look like a spacecraft that is not beaconing.

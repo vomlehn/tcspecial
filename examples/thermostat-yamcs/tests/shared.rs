@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 
-use tcslib_protocol::config_digest::interpretation_of_simulator;
-use tcslib_protocol::sim_config::SimConfigFile;
+use tcsprotocol::config_digest::interpretation_of_simulator;
+use tcsprotocol::sim_config::SimConfigFile;
 
 /// Where the examples are.
 ///

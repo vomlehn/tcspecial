@@ -6,14 +6,14 @@ license.workspace = true
 publish = false
 description = """\
 What the tests of the examples through Yamcs share: an interpreter of the \
-mission database tcslib_protocol/yamcs.py generates, which works it on the \
+mission database tcsprotocol/yamcs.py generates, which works it on the \
 vehicle's own packets as Yamcs would"""
 
 # Not an example: nothing here is run or configured. The tests of
 # ping-yamcs and thermostat-yamcs take it as a dev-dependency, so that the
 # interpreter they hold the generated XTCE to is written once.
 [dependencies]
-tcslib-protocol = { path = "../../tcslib-protocol" }
+tcsprotocol = { path = "../../tcsprotocol" }
 tempfile = "3.27.0"
 # Reads the Yamcs wrapper's XTCE, which the tests hold to the vehicle's
 # framing.

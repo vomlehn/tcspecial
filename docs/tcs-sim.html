@@ -617,7 +617,7 @@ zone stating its own <tt class="docutils literal">environment</tt>, which is the
 a component with <tt class="docutils literal">name:</tt> and <tt class="docutils literal">type:</tt> of its own; and a simulator file
 still declaring masses itself.</p>
 <p>Where tcs-gui drew each component is kept last in the simulator file, in a
-<tt class="docutils literal">tcs-gui</tt> section of its own, as a configuration keeps its nodes' places:</p>
+<tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section of its own, as a configuration keeps its nodes' places:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs-gui</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
@@ -925,7 +925,7 @@ has a closed form, so it is as exact as the rest. A lag follows the body's
 temperature as if it changed at a steady rate between two readings.</p>
 <p>The random draws come from a generator for each component and each sensor,
 seeded from the run's seed and its name, so a run with the same seed varies
-the same way. The seed is a setting of the <tt class="docutils literal">tcs-sim</tt> section; without one,
+the same way. The seed is a setting of the <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section; without one,
 tcs-sim chooses it and says which it chose, so a run worth repeating can be:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">
@@ -941,7 +941,7 @@ and supplies varying by two percent.</p>
 <p><strong>Simulating the thermostat</strong></p>
 <p>tcs-sim can simulate thermostat nodes as well, so that the loop closes
 in the simulator alone, with no tcspecial running. Name the node in the
-<tt class="docutils literal">tcs-sim</tt> section -- or several, separated by commas, for a vehicle with a
+<tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section -- or several, separated by commas, for a vehicle with a
 thermostat for each of several zones:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">

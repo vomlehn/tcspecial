@@ -10,14 +10,14 @@ TCSpecial flight software: the spacecraft's command interpreter and data \
 handler manager, being integrated with NASA's cFS and JPL's F Prime"""
 
 [dependencies]
-tcslib-protocol = { path = "../tcslib-protocol" }
+tcsprotocol = { path = "../tcsprotocol" }
 # The file interfaces an app node's program is run with, and the starting of
 # one: see tcsapp. The same crate an app itself is written against, so that the
 # protocol is stated once.
 tcsapp = { path = "../tcsapp" }
 # The checks tcs-verify makes, asked of the configuration before anything is
 # opened, so that what this refuses to start on is what tcs-verify reports.
-tcslib-verify = { path = "../tcslib-verify" }
+tcsverify = { path = "../tcsverify" }
 serde = { version = "1.0", features = ["derive"] }
 libc = "0.2"
 thiserror = "1.0"
@@ -28,7 +28,7 @@ socket2 = "0.6.2"
 tcslog = "0.3.1"
 # For the visual window only: see the `visual` feature.
 slint = { version = "1.18", optional = true }
-tcslib-diagram = { path = "../tcslib-diagram", optional = true }
+tcs-diagram = { path = "../tcs-diagram", optional = true }
 
 [build-dependencies]
 # Compiles the visual window's markup, and only for a build that has it.
@@ -46,7 +46,7 @@ slint-build = { version = "1.18", optional = true }
 # The network type over UDP, TCP and Unix-domain sockets is in every build --
 # the link to the ground is UDP -- and so is every node that reaches no
 # interface. `raw` is the raw protocol of the network type. The words are
-# tcslib_protocol::graph::built::OPTIONAL_TYPES, which a test holds these to;
+# tcsprotocol::graph::built::OPTIONAL_TYPES, which a test holds these to;
 # see "Which Node Types Are Built" in docs/tcspecial-design.rst.
 [features]
 default = [
@@ -69,7 +69,7 @@ default = [
 # each link lit as data crosses it. Not a default and never in a build that
 # flies -- it brings a window toolkit into the flight software -- so a
 # tcspecial without it says so when it is asked for one. See src/visual.
-visual = ["dep:slint", "dep:slint-build", "dep:tcslib-diagram"]
+visual = ["dep:slint", "dep:slint-build", "dep:tcs-diagram"]
 device-file = []
 serial = []
 i2c = []
@@ -94,7 +94,7 @@ tempfile = "3.27.0"
 # The ground's end of a cFS software bus, which tests/cfs_ground.rs commands
 # the vehicle through: only the tests are built with it, never the flight
 # program.
-tcslib-moc = { path = "../tcslib-moc" }
+tcsmoc = { path = "../tcsmoc" }
 
 [lints]
 workspace = true

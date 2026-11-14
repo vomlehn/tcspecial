@@ -15,7 +15,7 @@
 
   What this checks is shape. Whether a type's terminals are the ones the flight
   software believes in is a question about meaning, and the answer is a test
-  rather than a schema: `tcslib_protocol::graph::terminals` is the table the
+  rather than a schema: `tcsprotocol::graph::terminals` is the table the
   vehicle is flown by, and the tree has to agree with it.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

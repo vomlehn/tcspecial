@@ -1,10 +1,10 @@
 """A station's peer of a cFS software bus, against a far end played here.
 
 The test is the simulated cFS end -- a UDP socket speaking SBN's wire format, as
-``tcslib_protocol.sbn`` and ``tcslib_protocol.cfs`` state it -- with the vehicle
+``tcsprotocol.sbn`` and ``tcsprotocol.cfs`` state it -- with the vehicle
 behind it: it answers the station's announcement, takes its subscriptions,
 publishes a beacon and answers a CONNECT, as
-``tcslib-moc/src/bus.rs``'s tests play the peers of the Rust.
+``tcsmoc/src/bus.rs``'s tests play the peers of the Rust.
 """
 
 import socket
@@ -17,12 +17,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_moc import beacon, bus  # noqa: E402
-from tcslib_moc.beacon import Arrived, Schedule  # noqa: E402
-from tcslib_moc.bus import Liveness  # noqa: E402
-from tcslib_moc.listening import Listening, command_link_of  # noqa: E402
-from tcslib_protocol import cfs, configuration, fixed_packet, sbn  # noqa: E402
-from tcslib_protocol.beacon import Beacon  # noqa: E402
+from tcsmoc import beacon, bus  # noqa: E402
+from tcsmoc.beacon import Arrived, Schedule  # noqa: E402
+from tcsmoc.bus import Liveness  # noqa: E402
+from tcsmoc.listening import Listening, command_link_of  # noqa: E402
+from tcsprotocol import cfs, configuration, fixed_packet, sbn  # noqa: E402
+from tcsprotocol.beacon import Beacon  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 HASH = "3b339a5e0f686cef822a5d6ea95004222ab7af33"
@@ -240,7 +240,7 @@ class GroundTest(unittest.TestCase):
 
 def telemetry(msgid, data):
     """A telemetry packet as the vehicle publishes one, laid out by hand as
-    ``tcslib-protocol/src/cfs.rs``'s ``write_telemetry`` lays it.
+    ``tcsprotocol/src/cfs.rs``'s ``write_telemetry`` lays it.
 
     Args:
         msgid: Its message ID.
@@ -256,7 +256,7 @@ def telemetry(msgid, data):
 
 def command_of(packet):
     """A command packet's message ID, function code and data, read as
-    ``tcslib-protocol/src/cfs.rs``'s ``read_command`` reads them.
+    ``tcsprotocol/src/cfs.rs``'s ``read_command`` reads them.
 
     Args:
         packet: The packet.

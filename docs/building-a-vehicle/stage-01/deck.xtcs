@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcsprotocol/schema/tcspecial.xsd">
     <!-- Stage 1 of "Building a Vehicle" (docs/building-a-vehicle.rst): one
          payload, the seismometer, its readings going straight to the
          ground. It is examples/minimal with the payload named for what it

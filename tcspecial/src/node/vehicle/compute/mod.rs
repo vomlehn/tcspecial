@@ -45,14 +45,14 @@ pub mod to_value;
 pub mod vote;
 
 use crate::runtime::node_state::Abandon;
-use tcslib_protocol::graph::Node;
-use tcslib_protocol::node::vehicle::compute::{self, Computation};
-use tcslib_protocol::unit::Unit;
+use tcsprotocol::graph::Node;
+use tcsprotocol::node::vehicle::compute::{self, Computation};
+use tcsprotocol::unit::Unit;
 
 /// The most a computation hands on at once.
 ///
 /// A built-in's result is a value -- four bytes, see
-/// `tcslib_protocol::node::vehicle::compute::VALUE_BYTES` -- or a decision of
+/// `tcsprotocol::node::vehicle::compute::VALUE_BYTES` -- or a decision of
 /// at most eight; a program's may be a structure, at most sixteen fields of at
 /// most eight bytes each, which is this.
 pub const OUT_BYTES: usize = 128;
@@ -70,7 +70,7 @@ pub struct Out {
 
 impl Out {
     /// Makes a value, as every computation's result over values is: see
-    /// `tcslib_protocol::node::vehicle::compute::as_value`.
+    /// `tcsprotocol::node::vehicle::compute::as_value`.
     ///
     /// # Arguments
     ///
@@ -135,7 +135,7 @@ impl Out {
     /// The decision, in the form it takes on a link.
     pub fn decision(
         asserted: bool,
-        sends: tcslib_protocol::link_type::Basic,
+        sends: tcsprotocol::link_type::Basic,
     ) -> Out {
         let width = sends.width().unwrap_or(1);
         let mut bytes = [0u8; OUT_BYTES];
@@ -273,7 +273,7 @@ pub trait Function: Send {
 ///               waiting for three until something tells it how many links
 ///               arrive.
 /// * `unit`    - What the values arriving at it are in, for a computation
-///               that reads values: see `tcslib_protocol::graph::units`.
+///               that reads values: see `tcsprotocol::graph::units`.
 /// * `abandon` - The node's own wakeup, which a `process` gives up its wait
 ///               for an answer on when the node is disabled.
 ///
@@ -294,7 +294,7 @@ pub fn make(
     abandon: &Abandon,
 ) -> Result<Box<dyn Function>, String> {
     // What the node says, by the rules the ground tool checks it against: see
-    // tcslib_protocol::node::vehicle::compute. Every complaint from there
+    // tcsprotocol::node::vehicle::compute. Every complaint from there
     // already names the node and the computation.
     let what = compute::params_of(&node.name, &node.attributes)?;
 
@@ -359,19 +359,17 @@ pub fn make(
     }
 }
 
-// The form a value takes on a link is `tcslib-protocol`'s, with the range it
+// The form a value takes on a link is `tcsprotocol`'s, with the range it
 // can carry: it is one fact the vehicle writes and the ground reads back, and
 // the range is also a rule about what a configuration may say, which
 // `tcs-verify` checks on a desk. Named here because every computation in this
 // tree calls these by their short names, and because this is where a reader of
 // the arithmetic looks for them.
-pub(crate) use tcslib_protocol::node::vehicle::compute::{
-    from_value, value_bytes,
-};
+pub(crate) use tcsprotocol::node::vehicle::compute::{from_value, value_bytes};
 // What the vehicle no longer makes as it runs -- a value as a `Vec` -- and the
 // tests still compare against.
 #[cfg(test)]
-pub(crate) use tcslib_protocol::node::vehicle::compute::as_value;
+pub(crate) use tcsprotocol::node::vehicle::compute::as_value;
 
 #[cfg(test)]
 mod tests {
@@ -389,18 +387,17 @@ mod tests {
     fn the_thermostat_runs_from_counts_to_a_decision() {
         let sensor = |scale: f64, offset: f64| {
             to_value::ToValue::of(
-                tcslib_protocol::node::vehicle::compute::ToValueParams {
-                    format:
-                        tcslib_protocol::node::vehicle::compute::Format::I16Be,
+                tcsprotocol::node::vehicle::compute::ToValueParams {
+                    format: tcsprotocol::node::vehicle::compute::Format::I16Be,
                     scale,
                     offset,
-                    unit: tcslib_protocol::unit::Unit::Kelvin,
+                    unit: tcsprotocol::unit::Unit::Kelvin,
                 },
                 "to_kelvin",
             )
         };
 
-        use tcslib_protocol::node::vehicle::compute::{Algorithm, VoteParams};
+        use tcsprotocol::node::vehicle::compute::{Algorithm, VoteParams};
 
         // Three sensors of one make, for simplicity: a sixteenth of a degree
         // a count, above freezing.
@@ -419,16 +416,16 @@ mod tests {
                 algorithm: Algorithm::Median,
                 age: None,
             },
-            tcslib_protocol::unit::Unit::Kelvin,
+            tcsprotocol::unit::Unit::Kelvin,
         );
 
         let mut thermostat = thermostat::Thermostat::of(
-            tcslib_protocol::node::vehicle::compute::ThermostatParams {
+            tcsprotocol::node::vehicle::compute::ThermostatParams {
                 setpoint: 293.15,
                 half_band: 2.0,
-                sends: tcslib_protocol::link_type::Basic::U8,
+                sends: tcsprotocol::link_type::Basic::U8,
             },
-            tcslib_protocol::unit::Unit::Kelvin,
+            tcsprotocol::unit::Unit::Kelvin,
         );
 
         /// Runs one pass: three readings in, a decision out if there is one.
@@ -525,7 +522,7 @@ mod tests {
     /// another, each with its own conversion, averaged into one number.
     #[test]
     fn three_unlike_sensors_average_to_one_temperature() {
-        use tcslib_protocol::node::vehicle::compute::{
+        use tcsprotocol::node::vehicle::compute::{
             Algorithm, Format, ToValueParams, VoteParams,
         };
 
@@ -535,7 +532,7 @@ mod tests {
                     format,
                     scale,
                     offset: 273.15,
-                    unit: tcslib_protocol::unit::Unit::Kelvin,
+                    unit: tcsprotocol::unit::Unit::Kelvin,
                 },
                 "to_kelvin",
             )
@@ -555,7 +552,7 @@ mod tests {
                 algorithm: Algorithm::Median,
                 age: None,
             },
-            tcslib_protocol::unit::Unit::Kelvin,
+            tcsprotocol::unit::Unit::Kelvin,
         );
 
         // All three sitting at 20 above freezing, in their own units.
@@ -569,7 +566,7 @@ mod tests {
         let out = voted.give(Some("in2"), &c).unwrap().expect("a vote");
 
         let averaged =
-            from_value(&out, tcslib_protocol::unit::Unit::Kelvin, "the mean")
+            from_value(&out, tcsprotocol::unit::Unit::Kelvin, "the mean")
                 .unwrap();
         assert!(
             (averaged - 293.15).abs() < 0.01,
@@ -601,10 +598,8 @@ mod tests {
     #[test]
     fn an_unknown_function_is_refused() {
         let mut attributes = BTreeMap::new();
-        attributes.insert(
-            "function".to_string(),
-            tcslib_protocol::Scalar::of("sorcery"),
-        );
+        attributes
+            .insert("function".to_string(), tcsprotocol::Scalar::of("sorcery"));
         let node = Node {
             name: "n".to_string(),
             node_type: "compute".to_string(),
@@ -621,7 +616,7 @@ mod tests {
 
     /// A node whose computation is wrong is refused by the one set of rules.
     ///
-    /// Which is in `tcslib_protocol::node::vehicle::compute` now, so the ground
+    /// Which is in `tcsprotocol::node::vehicle::compute` now, so the ground
     /// tool applies it too: what this holds is that `make` goes through those
     /// rules rather than having a second set of its own.
     #[test]
@@ -629,16 +624,12 @@ mod tests {
         let mut attributes = BTreeMap::new();
         attributes.insert(
             "function".to_string(),
-            tcslib_protocol::Scalar::of("to_kelvin"),
+            tcsprotocol::Scalar::of("to_kelvin"),
         );
-        attributes.insert(
-            "format".to_string(),
-            tcslib_protocol::Scalar::of("i16_be"),
-        );
-        attributes.insert(
-            "offset".to_string(),
-            tcslib_protocol::Scalar::of("273.15"),
-        );
+        attributes
+            .insert("format".to_string(), tcsprotocol::Scalar::of("i16_be"));
+        attributes
+            .insert("offset".to_string(), tcsprotocol::Scalar::of("273.15"));
         let node = Node {
             name: "k_1".to_string(),
             node_type: "compute".to_string(),

@@ -7,7 +7,7 @@
 //! why a mission that changes what it carries does not change these.
 //!
 //! What a file may say about one, and what is wrong with what it says, is
-//! `tcslib_protocol::node::vehicle`.
+//! `tcsprotocol::node::vehicle`.
 
 // A program of the vehicle's own, taking part in the graph over the file
 // interfaces `tcsapp` describes: three node types, which differ in which of

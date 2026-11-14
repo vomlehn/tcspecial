@@ -421,7 +421,7 @@ mod tests {
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslib_protocol::Faults;
+    use tcsprotocol::Faults;
 
     /// Says whether an interface is up, from the flags the kernel keeps for
     /// it.

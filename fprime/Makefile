@@ -85,11 +85,11 @@ check-fprime:
 		exit 1; \
 	fi
 
-# tcslib-moc-c, which the bridge is linked with, and tcs-verify, which writes
+# tcsmoc-c, which the bridge is linked with, and tcs-verify, which writes
 # its model. tcspecial and tcs-sim too for the test, which runs them.
 .PHONY: cargo
 cargo:
-	cd $(TOP) && cargo build -q -p tcslib-moc-c -p tcs-verify -p tcspecial \
+	cd $(TOP) && cargo build -q -p tcsmoc-c -p tcs-verify -p tcspecial \
 		-p tcs-sim
 
 # The model, written from the configuration once tcs-verify has checked it.

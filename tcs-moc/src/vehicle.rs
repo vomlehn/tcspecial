@@ -3,15 +3,15 @@
 //! A vehicle is a graph of nodes, and what the window shows is that graph: each
 //! node drawn into a gateway node sends to the gateway node's `ground_base`
 //! plus its device id, and each payload nothing touches sends over
-//! `payload_telemetry` -- see `tcslib_protocol::graph::telemetry`. So there is
-//! one panel per source, filled through `tcslib_moc::gateway`, the same
+//! `payload_telemetry` -- see `tcsprotocol::graph::telemetry`. So there is
+//! one panel per source, filled through `tcsmoc::gateway`, the same
 //! function call any ground software uses.
 //!
 //! # What the buttons send
 //!
 //! The vehicle takes commands on two links, and binds the second once for
 //! every node, the node's id in the message saying which -- see
-//! `tcslib_protocol::NodeId`. So Enable and Disable on a panel are START_NODE
+//! `tcsprotocol::NodeId`. So Enable and Disable on a panel are START_NODE
 //! and STOP_NODE about the node that panel is for, by the device id the panel
 //! already shows.
 //!
@@ -45,21 +45,21 @@ use std::thread;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
 use tcs_verify::startup::Startup;
-use tcslib_moc::gateway::GatewayReceiver;
-use tcslib_moc::gateway::DATUM_BYTES;
-use tcslib_moc::matched::Matched;
-use tcslib_moc::ping::{Pinger, Uplink};
-use tcslib_moc::simulator;
-use tcslib_protocol::graph::reach::reach_of;
-use tcslib_protocol::graph::telemetry::{self, Reaches, Telemetered, Via};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::link_type::LinkType;
-use tcslib_protocol::ready::SetUpFor;
-use tcslib_protocol::sim_config::SimConfigFile;
-use tcslib_protocol::simulate::Mode;
-use tcslib_protocol::unit::Unit;
-use tcslib_protocol::{DHSample, Timestamp};
-use tcslib_ui::PingShown;
+use tcsmoc::gateway::GatewayReceiver;
+use tcsmoc::gateway::DATUM_BYTES;
+use tcsmoc::matched::Matched;
+use tcsmoc::ping::{Pinger, Uplink};
+use tcsmoc::simulator;
+use tcsprotocol::graph::reach::reach_of;
+use tcsprotocol::graph::telemetry::{self, Reaches, Telemetered, Via};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::link_type::LinkType;
+use tcsprotocol::ready::SetUpFor;
+use tcsprotocol::sim_config::SimConfigFile;
+use tcsprotocol::simulate::Mode;
+use tcsprotocol::unit::Unit;
+use tcsprotocol::{DHSample, Timestamp};
+use tcsui::PingShown;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
@@ -85,7 +85,7 @@ const NO_TARGET: &str = "this window's configuration could not be digested, \
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct RestartTarget {
     /// The configuration's checksum, which the two commands carry.
-    pub(crate) digest: tcslib_protocol::ConfigDigest,
+    pub(crate) digest: tcsprotocol::ConfigDigest,
     /// The file it was read from, where the operator named one.
     pub(crate) file: Option<std::path::PathBuf>,
     /// Whether it is this window's own configuration.
@@ -136,7 +136,7 @@ impl RestartTarget {
 /// that cannot be read, or the problems the checks found.
 pub(crate) fn restart_target_of(
     said: &str,
-    ours: Option<tcslib_protocol::ConfigDigest>,
+    ours: Option<tcsprotocol::ConfigDigest>,
 ) -> Result<RestartTarget, String> {
     let said = said.trim();
     if said.is_empty() {
@@ -148,7 +148,7 @@ pub(crate) fn restart_target_of(
             })
             .ok_or_else(|| NO_TARGET.to_string());
     }
-    if let Some(digest) = tcslib_protocol::ConfigDigest::of_hex(said) {
+    if let Some(digest) = tcsprotocol::ConfigDigest::of_hex(said) {
         return Ok(RestartTarget {
             digest,
             file: None,
@@ -162,8 +162,7 @@ pub(crate) fn restart_target_of(
              lower-case hex digits"
         ));
     }
-    let report =
-        tcslib_verify::verify(path, None, tcslib_verify::Limits::EVERYTHING);
+    let report = tcsverify::verify(path, None, tcsverify::Limits::EVERYTHING);
     if report.found_errors() {
         let problems: Vec<String> = report
             .lines()
@@ -176,7 +175,7 @@ pub(crate) fn restart_target_of(
             problems.join("; ")
         ));
     }
-    let digest = tcslib_protocol::config_digest::digest_of_file(path)
+    let digest = tcsprotocol::config_digest::digest_of_file(path)
         .map_err(|e| format!("{said}: {e}"))?;
     Ok(RestartTarget {
         digest,
@@ -197,7 +196,7 @@ pub(crate) fn restart_target_of(
 /// The target, or why what is typed is not one.
 fn restart_target_shown(
     said: &str,
-    ours: Option<tcslib_protocol::ConfigDigest>,
+    ours: Option<tcsprotocol::ConfigDigest>,
 ) -> String {
     match restart_target_of(said, ours) {
         Ok(target) => target.said(),
@@ -337,7 +336,7 @@ struct MatchSeen<'a> {
     /// it; empty where no beacon has been heard.
     theirs: &'a str,
     /// This station's configuration's checksum, where it has one.
-    ours: Option<tcslib_protocol::ConfigDigest>,
+    ours: Option<tcsprotocol::ConfigDigest>,
     /// Whether the station is matched for listening: the last beacon is
     /// recent, has its restart flag clear, and carries `ours`.
     listening: bool,
@@ -370,7 +369,7 @@ struct MatchSeen<'a> {
 ///
 /// The heading, `Last Response` and the pop-up's text.
 fn unmatched_refusal(
-    kind: tcslib_protocol::CommandType,
+    kind: tcsprotocol::CommandType,
     refused: &str,
     seen: MatchSeen<'_>,
 ) -> Refusal {
@@ -439,7 +438,7 @@ const UNANSWERED_HEADING: &str = "No CONNECT has been answered yet";
 /// nothing where neither is known.
 fn checksums_said(
     ui: &MainWindow,
-    ours: Option<tcslib_protocol::ConfigDigest>,
+    ours: Option<tcsprotocol::ConfigDigest>,
 ) -> String {
     checksums_of(&ui.get_beacon_checksum(), ours)
 }
@@ -458,7 +457,7 @@ fn checksums_said(
 /// nothing where neither is known.
 fn checksums_of(
     theirs: &str,
-    ours: Option<tcslib_protocol::ConfigDigest>,
+    ours: Option<tcsprotocol::ConfigDigest>,
 ) -> String {
     match (theirs.is_empty(), ours) {
         (false, Some(ours)) => format!(
@@ -519,7 +518,7 @@ fn show_notice(ui: &MainWindow, heading: &str, message: &str, asks: bool) {
 fn refused_unmatched(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
-    kind: tcslib_protocol::CommandType,
+    kind: tcsprotocol::CommandType,
 ) -> bool {
     let refused = {
         let mut guard = link.lock().unwrap();
@@ -541,7 +540,7 @@ fn refused_unmatched(
             theirs: &theirs,
             ours,
             listening,
-            flagged: ui.get_beacon_restart() == tcslib_ui::RESTARTED_CONNECT,
+            flagged: ui.get_beacon_restart() == tcsui::RESTARTED_CONNECT,
         },
     );
     eprintln!("{}: {}", refusal.heading, refusal.message);
@@ -789,7 +788,7 @@ fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
     sim_path
         .and_then(|path| SimConfigFile::load(path).ok())
         .and_then(|sim| {
-            tcslib_protocol::graph::simulated::handlers(graph, &sim).ok()
+            tcsprotocol::graph::simulated::handlers(graph, &sim).ok()
         })
         .is_some_and(|handlers| !handlers.is_empty())
 }
@@ -891,9 +890,9 @@ fn simulator_for(
         .map_err(|e| format!("{sim_path}: {e}"))?;
     let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
     let ours = SetUpFor {
-        configuration: tcslib_protocol::config_digest::digest_of_graph(graph)
+        configuration: tcsprotocol::config_digest::digest_of_graph(graph)
             .map_err(|e| format!("{payload_path}: {e}"))?,
-        simulator: tcslib_protocol::config_digest::digest_of_simulator_file(
+        simulator: tcsprotocol::config_digest::digest_of_simulator_file(
             sim_path,
         )
         .map_err(|e| format!("{sim_path}: {e}"))?,
@@ -977,11 +976,11 @@ fn simulator_for(
 ///
 /// # Errors
 ///
-/// What `tcslib_moc::command_links_of` says is wrong with the section.
+/// What `tcsmoc::command_links_of` says is wrong with the section.
 fn command_links_of(
     graph: &Graph,
 ) -> Result<Option<(String, String, Commanded)>, String> {
-    let Some(links) = tcslib_moc::command_links_of(graph)? else {
+    let Some(links) = tcsmoc::command_links_of(graph)? else {
         return Ok(None);
     };
     Ok(Some((
@@ -1011,7 +1010,7 @@ fn hear_what_the_vehicle_read(
     ui: &MainWindow,
     link: &Mutex<CiLink>,
     agreed: &Agreed,
-    digest: tcslib_protocol::ConfigDigest,
+    digest: tcsprotocol::ConfigDigest,
 ) {
     ui.set_last_response(SharedString::from(connect_said(
         link, agreed, digest,
@@ -1039,7 +1038,7 @@ fn hear_what_the_vehicle_read(
 fn connect_said(
     link: &Mutex<CiLink>,
     agreed: &Agreed,
-    digest: tcslib_protocol::ConfigDigest,
+    digest: tcsprotocol::ConfigDigest,
 ) -> String {
     let answer = {
         let mut guard = link.lock().unwrap();
@@ -1052,12 +1051,12 @@ fn connect_said(
     // The CONNECT carries no build version, since the vehicle acts on the
     // checksum alone; the answer carries the vehicle's, which is shown
     // against this window's own.
-    let version = tcslib_protocol::ConfigVersion::of_this_build();
+    let version = tcsprotocol::ConfigVersion::of_this_build();
     match answer {
         Ok((theirs, their_digest)) => {
             eprintln!(
                 "CONNECT answer: {}",
-                tcslib_moc::beacon::what_it_read(theirs, their_digest)
+                tcsmoc::beacon::what_it_read(theirs, their_digest)
             );
             let same = their_digest == digest;
             if let Ok(mut held) = agreed.lock() {
@@ -1119,7 +1118,7 @@ fn query_every_node(
     agreed: &Agreed,
     model: &impl Model<Data = DHInfo>,
 ) {
-    if refused_unmatched(ui, link, tcslib_protocol::CommandType::QueryNode) {
+    if refused_unmatched(ui, link, tcsprotocol::CommandType::QueryNode) {
         return;
     }
     ask_nodes(ui, link, agreed, model, None);
@@ -1131,20 +1130,14 @@ struct Asked {
     /// The panel's row, which what was found is shown in.
     row: usize,
     /// The node's id, which the question names.
-    node: tcslib_protocol::NodeId,
+    node: tcsprotocol::NodeId,
 }
 
 /// What a node's QUERY_NODE came to: the status it was answered with,
 /// whether the node is running and what it has moved; or why there was no
 /// answer.
-type Answered = Result<
-    (
-        tcslib_protocol::CommandStatus,
-        bool,
-        tcslib_protocol::NodeCounts,
-    ),
-    String,
->;
+type Answered =
+    Result<(tcsprotocol::CommandStatus, bool, tcsprotocol::NodeCounts), String>;
 
 /// The nodes of the panels, each panel's node once, in the panels' order:
 /// every one, or with `declined`, every one the operator has not stopped.
@@ -1170,7 +1163,7 @@ fn to_ask(
             let info = model.row_data(row)?;
             Some(Asked {
                 row,
-                node: tcslib_protocol::NodeId(
+                node: tcsprotocol::NodeId(
                     u32::try_from(info.dev_id).unwrap_or(u32::MAX),
                 ),
             })
@@ -1235,7 +1228,7 @@ fn show_node_answers(
         match answer {
             // No such node aboard: a tcspecial flying another configuration,
             // which nobody here can speak for.
-            Ok((tcslib_protocol::CommandStatus::NotFound, _, _)) => {
+            Ok((tcsprotocol::CommandStatus::NotFound, _, _)) => {
                 info.status = SharedString::from(UNKNOWN_STATUS);
                 said.push(format!("{}: {}", info.name, info.status));
                 model.set_row_data(*row, info);
@@ -1308,7 +1301,7 @@ fn ask_nodes(
 ///
 /// Neither moment is one at which a QUERY_NODE can always go. Every command
 /// but CONNECT, RESTART_ARM and RESTART waits for this window to be matched
-/// for commanding (see `tcslib_moc::matched`): a beacon carrying this window's
+/// for commanding (see `tcsmoc::matched`): a beacon carrying this window's
 /// checksum with its restart flag clear, and a CONNECT of this window's
 /// answered since the match last ended. A first beacon usually comes before
 /// Connect has been pressed, with the link down, and a fresh start's carries
@@ -1341,7 +1334,7 @@ pub(crate) struct Asking {
     /// Every panel's node, in the panels' order.
     nodes: Arc<Vec<Asked>>,
     /// This window's configuration's checksum, which a CONNECT carries.
-    digest: Option<tcslib_protocol::ConfigDigest>,
+    digest: Option<tcsprotocol::ConfigDigest>,
     /// Whether the question is owed: set as contact is made, cleared as it
     /// is asked and as contact is lost.
     owed: Arc<AtomicBool>,
@@ -1402,7 +1395,7 @@ impl Asking {
         link: &Arc<Mutex<CiLink>>,
         agreed: &Agreed,
         declined: &crate::Declined,
-        digest: Option<tcslib_protocol::ConfigDigest>,
+        digest: Option<tcsprotocol::ConfigDigest>,
         model: &impl Model<Data = DHInfo>,
     ) -> Asking {
         Asking {
@@ -1545,7 +1538,7 @@ fn describes(info: &DHInfo) -> String {
 /// # Returns
 ///
 /// The popup's lines, one count to a line.
-fn counted(counts: &tcslib_protocol::NodeCounts) -> String {
+fn counted(counts: &tcsprotocol::NodeCounts) -> String {
     let moved = match counts.last_moved {
         Some(at) => at.time_of_day(),
         // Never, which is not the same as a long time ago: the first has not
@@ -1595,7 +1588,7 @@ fn counted(counts: &tcslib_protocol::NodeCounts) -> String {
 ///                 nothing.
 /// * `attribute` - The attribute's name, as typed.
 /// * `value`     - The value, as typed, sent as a datum of the attribute's
-///                 type (see `tcslib_protocol::graph::settings`); text that is
+///                 type (see `tcsprotocol::graph::settings`); text that is
 ///                 not one is refused here and nothing is sent.
 ///
 /// # Panics
@@ -1616,7 +1609,7 @@ fn set_a_nodes_attribute(
         return;
     };
     let node =
-        tcslib_protocol::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+        tcsprotocol::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
     let name = info.name.to_string();
 
     if attribute.trim().is_empty() || value.is_empty() {
@@ -1626,7 +1619,7 @@ fn set_a_nodes_attribute(
         return;
     }
 
-    let encoded = match tcslib_protocol::graph::settings::encoded(
+    let encoded = match tcsprotocol::graph::settings::encoded(
         graph,
         &name,
         attribute.trim(),
@@ -1640,7 +1633,7 @@ fn set_a_nodes_attribute(
             return;
         }
     };
-    if refused_unmatched(ui, link, tcslib_protocol::CommandType::SetNode) {
+    if refused_unmatched(ui, link, tcsprotocol::CommandType::SetNode) {
         return;
     }
     if !may_command_nodes(agreed) {
@@ -1737,14 +1730,14 @@ fn command_a_node(
         return;
     };
     let node =
-        tcslib_protocol::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
+        tcsprotocol::NodeId(u32::try_from(info.dev_id).unwrap_or(u32::MAX));
     let name = info.name.to_string();
     let verb = if enable { "START_NODE" } else { "STOP_NODE" };
 
     let kind = if enable {
-        tcslib_protocol::CommandType::StartNode
+        tcsprotocol::CommandType::StartNode
     } else {
-        tcslib_protocol::CommandType::StopNode
+        tcsprotocol::CommandType::StopNode
     };
     if refused_unmatched(ui, link, kind) {
         return;
@@ -1886,7 +1879,7 @@ pub(crate) fn command_buttons(
     ui: &MainWindow,
     link: &Arc<Mutex<CiLink>>,
     agreed: &Agreed,
-    digest: Option<tcslib_protocol::ConfigDigest>,
+    digest: Option<tcsprotocol::ConfigDigest>,
     model: &Rc<VecModel<DHInfo>>,
     declined: &crate::Declined,
     asking: &Asking,
@@ -1967,8 +1960,7 @@ pub(crate) fn command_buttons(
         let link = link.clone();
         ui.on_ping_clicked(move || {
             let ui = weak.unwrap();
-            if refused_unmatched(&ui, &link, tcslib_protocol::CommandType::Ping)
-            {
+            if refused_unmatched(&ui, &link, tcsprotocol::CommandType::Ping) {
                 return;
             }
             let answer =
@@ -2189,7 +2181,7 @@ pub(crate) fn command_buttons(
                     if refused_unmatched(
                         &ui,
                         &link,
-                        tcslib_protocol::CommandType::Ping,
+                        tcsprotocol::CommandType::Ping,
                     ) {
                         return;
                     }
@@ -2448,7 +2440,7 @@ fn take_down_at_a_start(
 /// # Returns
 ///
 /// The line.
-pub(crate) fn packets_said(counts: &tcslib_moc::matched::Counts) -> String {
+pub(crate) fn packets_said(counts: &tcsmoc::matched::Counts) -> String {
     format!(
         "Packets: {} received = {} processed + {} malformed + {} mismatched",
         counts.received(),
@@ -2465,11 +2457,11 @@ pub(crate) fn packets_said(counts: &tcslib_moc::matched::Counts) -> String {
 /// # Returns
 ///
 /// The key.
-fn window_arm_key() -> tcslib_protocol::ArmKey {
+fn window_arm_key() -> tcsprotocol::ArmKey {
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_nanos() as u64);
-    tcslib_protocol::ArmKey(nanos ^ (u64::from(std::process::id()) << 32))
+    tcsprotocol::ArmKey(nanos ^ (u64::from(std::process::id()) << 32))
 }
 
 /// The ping node's answers, on their way to the pinger and its window.
@@ -2493,7 +2485,7 @@ struct PingFeed {
 }
 
 /// Hands what the ping node sent down to the pinger, and says the window has
-/// something to show. Allocates nothing: see `tcslib_moc::ping::Pinger`.
+/// something to show. Allocates nothing: see `tcsmoc::ping::Pinger`.
 ///
 /// # Arguments
 ///
@@ -2632,7 +2624,7 @@ fn serve(
         };
         if let Some(feed) = pings.as_ref().filter(|_| source.pings) {
             // The ground's clock, now: a datum is timed as it is taken.
-            if let Ok(at) = tcslib_protocol::node::vehicle::ping::now() {
+            if let Ok(at) = tcsprotocol::node::vehicle::ping::now() {
                 take_answer(feed, data, at);
             }
         }
@@ -2691,7 +2683,7 @@ fn ping_node(
     graph: &Graph,
     matched: &Matched,
 ) -> Result<Option<(String, PingFeed)>, String> {
-    let Some(route) = tcslib_moc::ping::route_of(graph) else {
+    let Some(route) = tcsmoc::ping::route_of(graph) else {
         return Ok(None);
     };
     let uplink = Uplink::open(graph, &route.gateway)
@@ -2737,14 +2729,13 @@ fn ping_node(
                 window.set_sent(SharedString::from(said));
                 return;
             }
-            let sent =
-                tcslib_protocol::node::vehicle::ping::now().and_then(|at| {
-                    let mut pinger =
-                        pinger.lock().map_err(|_| "the pinger".to_string())?;
-                    let message = pinger.ping(at)?;
-                    uplink.send(message.as_bytes())?;
-                    Ok(PingShown::of(pinger.exchange()))
-                });
+            let sent = tcsprotocol::node::vehicle::ping::now().and_then(|at| {
+                let mut pinger =
+                    pinger.lock().map_err(|_| "the pinger".to_string())?;
+                let message = pinger.ping(at)?;
+                uplink.send(message.as_bytes())?;
+                Ok(PingShown::of(pinger.exchange()))
+            });
             match sent {
                 Ok(shown) => show_ping(&window, &shown),
                 Err(why) => eprintln!("ping: {why}"),
@@ -2819,14 +2810,14 @@ pub fn run(
     // Which sources send values, and in what unit, asked of the configuration
     // once: a panel then shows a reading as the number it is, with its unit,
     // and everything else as bytes. See
-    // `tcslib_protocol::graph::units::unit_of` for why this is the
+    // `tcsprotocol::graph::units::unit_of` for why this is the
     // configuration's answer rather than a guess from the data.
     let units: Arc<BTreeMap<String, Unit>> = Arc::new(
         graph
             .nodes
             .iter()
             .filter_map(|node| {
-                tcslib_protocol::graph::units::unit_of(&graph, &node.name)
+                tcsprotocol::graph::units::unit_of(&graph, &node.name)
                     .map(|unit| (node.name.clone(), unit))
             })
             .collect(),
@@ -2847,11 +2838,11 @@ pub fn run(
     // every beacon, and a beacon whose digest differs asks the operator
     // whether to continue anyway -- the panels say where each source's data
     // arrives, and a different configuration may send it somewhere else.
-    let digest = match tcslib_protocol::config_digest::digest_of_graph(&graph) {
+    let digest = match tcsprotocol::config_digest::digest_of_graph(&graph) {
         Ok(digest) => {
             eprintln!(
                 "tcs-moc v{} md5 {digest}",
-                tcslib_protocol::config_digest::ConfigVersion::of_this_build()
+                tcsprotocol::config_digest::ConfigVersion::of_this_build()
             );
             Some(digest)
         }
@@ -2868,7 +2859,7 @@ pub fn run(
     // clear of the restart flag and carries this configuration's checksum,
     // and whether a Connect of this window's has been answered with it.
     // The beacon watch keeps it; the command link, the data receivers and
-    // the counts under Last Response read it. See `tcslib_moc::matched`.
+    // the counts under Last Response read it. See `tcsmoc::matched`.
     let matched = match digest {
         Some(digest) => Matched::for_configuration(digest),
         None => Matched::with_no_checksum(),
@@ -2950,7 +2941,7 @@ pub fn run(
     let pm_tcspecial = Arc::new(ProcessManager::new());
     pm_tcspecial.start_child(tcspecial, payload_path, mode);
 
-    let contact = Arc::new(Mutex::new(tcslib_moc::beacon::Contact::Lost));
+    let contact = Arc::new(Mutex::new(tcsmoc::beacon::Contact::Lost));
     // The question about the nodes owed as contact is made, where there is a
     // link to ask it on: see `Asking`.
     let asking = link.as_ref().map(|link| {
@@ -2960,22 +2951,22 @@ pub fn run(
     // late one is; a configuration whose interval cannot be read gets the
     // standard schedule, and says so.
     let interval =
-        match tcslib_protocol::graph::parameters::beacon_interval_of(&graph) {
+        match tcsprotocol::graph::parameters::beacon_interval_of(&graph) {
             Ok(interval) => {
-                interval.unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL)
+                interval.unwrap_or(tcsmoc::beacon::STANDARD_INTERVAL)
             }
             Err(e) => {
                 startup.warning(format!(
                 "The beacon interval cannot be read, so the beacon indicator \
                  ages as though it were {:?}: {e}",
-                tcslib_moc::beacon::STANDARD_INTERVAL
+                tcsmoc::beacon::STANDARD_INTERVAL
             ));
-                tcslib_moc::beacon::STANDARD_INTERVAL
+                tcsmoc::beacon::STANDARD_INTERVAL
             }
         };
     // At the socket the beacon link states, or from the station's peer of a
-    // software bus: see `tcslib_moc::beacon::open`.
-    let _beacon_receive = match tcslib_moc::beacon::open(
+    // software bus: see `tcsmoc::beacon::open`.
+    let _beacon_receive = match tcsmoc::beacon::open(
         &graph,
         crate::config::constants::beacon_schedule(interval),
         digest,
@@ -3016,13 +3007,13 @@ pub fn run(
         }
     };
 
-    // The ground's end of every link, through tcslib_moc::gateway: one receiver
+    // The ground's end of every link, through tcsmoc::gateway: one receiver
     // per gateway node and one for the payloads that report over
     // payload_telemetry, each on a thread of its own. A port that cannot be
     // bound is said with the rest of what was found, and costs its panels their
     // data. The ping node, where there is one the ground can reach both ways: a
     // window of its own, opened by Ping node, that pings it and times the
-    // answer. See `tcslib_moc::ping`.
+    // answer. See `tcsmoc::ping`.
     let ping_window = PingWindow::new().unwrap();
     let pings = match ping_node(&ui, &ping_window, &graph, &matched) {
         Ok(pings) => pings,
@@ -3051,7 +3042,7 @@ pub fn run(
     let gateways: Vec<&str> = graph
         .nodes
         .iter()
-        .filter(|n| tcslib_protocol::gateway::is_gateway(&n.node_type))
+        .filter(|n| tcsprotocol::gateway::is_gateway(&n.node_type))
         .map(|n| n.name.as_str())
         .filter(|name| {
             links
@@ -3207,9 +3198,9 @@ pub(crate) mod tests {
     /// The datagram.
     fn as_sent(data: &[u8]) -> Vec<u8> {
         let mut out = Vec::new();
-        tcslib_protocol::link_type::counted(
+        tcsprotocol::link_type::counted(
             data,
-            tcslib_protocol::link_type::Count::Groups,
+            tcsprotocol::link_type::Count::Groups,
             &mut out,
         )
         .expect("counted");
@@ -3222,7 +3213,7 @@ pub(crate) mod tests {
     /// them, and one without is its checksum and its file.
     #[test]
     fn a_restart_target_is_a_file_or_a_checksum_or_this_windows() {
-        use tcslib_protocol::ConfigDigest;
+        use tcsprotocol::ConfigDigest;
 
         let ours = ConfigDigest([0x5A; 16]);
         let own = restart_target_of("", Some(ours)).expect("this window's");
@@ -3245,7 +3236,7 @@ pub(crate) mod tests {
             .expect("a configuration with nothing wrong with it");
         assert_eq!(
             target.digest,
-            tcslib_protocol::config_digest::digest_of_file(&file).unwrap()
+            tcsprotocol::config_digest::digest_of_file(&file).unwrap()
         );
         assert_eq!(target.file.as_deref(), Some(file.as_path()));
         let said = target.said();
@@ -3282,7 +3273,7 @@ pub(crate) mod tests {
     /// from `crate::tests::every_panels_data_is_inside_the_window`.
     pub(crate) fn the_restart_controls_go_onto_the_restart_target() {
         use std::net::UdpSocket;
-        use tcslib_protocol::{
+        use tcsprotocol::{
             Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
             Telemetry,
         };
@@ -3315,16 +3306,16 @@ pub(crate) mod tests {
                     }
                     Command::RestartArm(cmd) => {
                         seen.push(("arm", cmd.target));
-                        tcslib_protocol::answer_to(
+                        tcsprotocol::answer_to(
                             &command,
-                            tcslib_protocol::CommandStatus::Success,
+                            tcsprotocol::CommandStatus::Success,
                         )
                     }
                     Command::Restart(cmd) => {
                         seen.push(("restart", cmd.target));
-                        tcslib_protocol::answer_to(
+                        tcsprotocol::answer_to(
                             &command,
-                            tcslib_protocol::CommandStatus::Success,
+                            tcsprotocol::CommandStatus::Success,
                         )
                     }
                     other => panic!("the window sent {:?}", other.cmd_type()),
@@ -3340,7 +3331,7 @@ pub(crate) mod tests {
         let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::default());
         ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
         ui.set_ci_address(SharedString::from(at.clone()));
-        let matched = tcslib_moc::matched::Matched::for_configuration(ours);
+        let matched = tcsmoc::matched::Matched::for_configuration(ours);
         let link = Arc::new(Mutex::new(CiLink::down_commanding(
             "127.0.0.1:0",
             Commanded {
@@ -3434,7 +3425,7 @@ pub(crate) mod tests {
     pub(crate) fn a_command_pressed_unmatched_is_said_in_a_pop_up() {
         use i_slint_backend_testing::ElementQuery;
         use std::net::UdpSocket;
-        use tcslib_protocol::{Command, CommandType, ConfigDigest, HostPort};
+        use tcsprotocol::{Command, CommandType, ConfigDigest, HostPort};
 
         let ours = ConfigDigest([0x5Au8; 16]);
         let theirs = ConfigDigest([0x11u8; 16]);
@@ -3471,9 +3462,9 @@ pub(crate) mod tests {
                 let command =
                     Command::read(&buffer[..size]).expect("a command");
                 seen.push(command.cmd_type());
-                let answer = tcslib_protocol::answer_to(
+                let answer = tcsprotocol::answer_to(
                     &command,
-                    tcslib_protocol::CommandStatus::Success,
+                    tcsprotocol::CommandStatus::Success,
                 );
                 vehicle
                     .send_to(&answer.to_bytes(), from)
@@ -3624,13 +3615,13 @@ pub(crate) mod tests {
     /// checksums that agree.
     #[test]
     fn an_unmatched_refusal_fits_its_case() {
-        use tcslib_protocol::{CommandType, ConfigDigest};
+        use tcsprotocol::{CommandType, ConfigDigest};
 
         let ours = ConfigDigest([0x5Au8; 16]);
         let other = ConfigDigest([0x11u8; 16]).to_string();
         let same = ours.to_string();
         let refused =
-            tcslib_protocol::TcsError::Unmatched(CommandType::Ping).to_string();
+            tcsprotocol::TcsError::Unmatched(CommandType::Ping).to_string();
         let seen = |theirs, listening, flagged| MatchSeen {
             theirs,
             ours: Some(ours),
@@ -3736,7 +3727,7 @@ pub(crate) mod tests {
     /// making nothing for the window itself.
     #[test]
     fn a_ping_answer_reaches_the_pinger_and_the_window_is_told() {
-        use tcslib_protocol::node::vehicle::ping;
+        use tcsprotocol::node::vehicle::ping;
 
         let port = std::net::UdpSocket::bind("127.0.0.1:0")
             .and_then(|socket| socket.local_addr())
@@ -4018,7 +4009,7 @@ payloads:
             .expect("the sensor");
         sensor
             .attributes
-            .insert("read_size".to_string(), tcslib_protocol::Scalar::of("6"));
+            .insert("read_size".to_string(), tcsprotocol::Scalar::of("6"));
         assert_eq!(sizes(&graph), said(&[("sensor", "6 bytes")]));
     }
 
@@ -4143,7 +4134,7 @@ payloads:
     /// what became of each packet add up to the first.
     #[test]
     fn the_packets_line_says_all_four_counts() {
-        let said = packets_said(&tcslib_moc::matched::Counts {
+        let said = packets_said(&tcsmoc::matched::Counts {
             processed: 7,
             malformed: 1,
             mismatched: 4,
@@ -4162,18 +4153,16 @@ payloads:
         let link = Arc::new(Mutex::new(CiLink::down_commanding(
             "127.0.0.1:0",
             Commanded {
-                from: tcslib_protocol::HostPort {
+                from: tcsprotocol::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 0,
                 },
-                to: tcslib_protocol::HostPort {
+                to: tcsprotocol::HostPort {
                     address: "127.0.0.1".to_string(),
                     port: 1,
                 },
             },
-            Matched::for_configuration(tcslib_protocol::ConfigDigest(
-                [0x5A; 16],
-            )),
+            Matched::for_configuration(tcsprotocol::ConfigDigest([0x5A; 16])),
         )));
         let agreed: Agreed = Arc::new(Mutex::new(Some(true)));
         link.lock().unwrap().connect("127.0.0.1:1").expect("up");
@@ -4203,7 +4192,7 @@ payloads:
     /// what is checked is the press and the answer and not tcspecial.
     pub(crate) fn pressing_send_ping_pings_the_node_and_times_its_answer() {
         use std::net::UdpSocket;
-        use tcslib_protocol::node::vehicle::ping;
+        use tcsprotocol::node::vehicle::ping;
 
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
@@ -4236,7 +4225,7 @@ vehicle:
 
         let ui = MainWindow::new().expect("a window");
         let ping_window = PingWindow::new().expect("the ping window");
-        let ours = tcslib_protocol::ConfigDigest([0x5A; 16]);
+        let ours = tcsprotocol::ConfigDigest([0x5A; 16]);
         let matched = Matched::for_configuration(ours);
         let (through, feed) = ping_node(&ui, &ping_window, &graph, &matched)
             .expect("it can be pinged")
@@ -4286,12 +4275,7 @@ vehicle:
         // Matched, as a clear beacon of this configuration and a CONNECT
         // answered with it make it: a ping goes up, numbered from one, and is
         // shown.
-        matched.beacon(
-            false,
-            Some(ours),
-            tcslib_moc::beacon::Stage::Heard,
-            false,
-        );
+        matched.beacon(false, Some(ours), tcsmoc::beacon::Stage::Heard, false);
         matched.connect_answered(ours, matched.before_connect());
         assert!(matched.for_commanding());
         press();
@@ -4308,7 +4292,7 @@ vehicle:
         assert_eq!(ping_window.get_sent().as_str(), sent);
         assert_eq!(
             ping_window.get_received_time().as_str(),
-            tcslib_moc::ping::NO_PRECISE_TIME,
+            tcsmoc::ping::NO_PRECISE_TIME,
             "nothing has answered it"
         );
 
@@ -4371,7 +4355,7 @@ vehicle:
     pub(crate) fn pressing_connect_and_enable_commands_the_vehicle() {
         use i_slint_backend_testing::ElementHandle;
         use std::net::UdpSocket;
-        use tcslib_protocol::{
+        use tcsprotocol::{
             Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
             NodeTelemetry, Telemetry,
         };
@@ -4381,12 +4365,7 @@ vehicle:
         // the beacon thread would say: matched for listening, so that a
         // Connect answered with its checksum matches it for commanding.
         let matched = Matched::for_configuration(ours);
-        matched.beacon(
-            false,
-            Some(ours),
-            tcslib_moc::beacon::Stage::Heard,
-            false,
-        );
+        matched.beacon(false, Some(ours), tcsmoc::beacon::Stage::Heard, false);
 
         // A simulated vehicle: one socket for both links, since what is being
         // tested is that a press gets an answer back and not which socket it
@@ -4424,14 +4403,14 @@ vehicle:
                     Command::StopNode(cmd) => {
                         Telemetry::StopNode(NodeTelemetry::stopped(
                             seq,
-                            tcslib_protocol::CommandStatus::Success,
+                            tcsprotocol::CommandStatus::Success,
                             cmd.node,
                         ))
                     }
                     Command::StartNode(cmd) => {
                         Telemetry::StartNode(NodeTelemetry::started(
                             seq,
-                            tcslib_protocol::CommandStatus::Success,
+                            tcsprotocol::CommandStatus::Success,
                             cmd.node,
                         ))
                     }
@@ -4440,24 +4419,22 @@ vehicle:
                             cmd.attribute.to_string(),
                             cmd.value.to_vec(),
                         ));
-                        Telemetry::SetNode(
-                            tcslib_protocol::SetNodeTelemetry::new(
-                                seq,
-                                tcslib_protocol::CommandStatus::Success,
-                                cmd.node,
-                            ),
-                        )
+                        Telemetry::SetNode(tcsprotocol::SetNodeTelemetry::new(
+                            seq,
+                            tcsprotocol::CommandStatus::Success,
+                            cmd.node,
+                        ))
                     }
                     Command::QueryNode(cmd) => {
                         Telemetry::QueryNode(
-                            tcslib_protocol::QueryNodeTelemetry::new(
+                            tcsprotocol::QueryNodeTelemetry::new(
                                 seq,
-                                tcslib_protocol::CommandStatus::Success,
+                                tcsprotocol::CommandStatus::Success,
                                 cmd.node,
                                 // Stopped, so the panel has something to show
                                 // that it could not have known without asking.
                                 false,
-                                tcslib_protocol::NodeCounts {
+                                tcsprotocol::NodeCounts {
                                     taken_bytes: 480,
                                     reads: 40,
                                     asks: 40,
@@ -4682,7 +4659,7 @@ vehicle:
             was_set.lock().expect("the record").clone(),
             Some((
                 "setpoint".to_string(),
-                tcslib_protocol::node::vehicle::compute::value_bytes(
+                tcsprotocol::node::vehicle::compute::value_bytes(
                     300.0,
                     Unit::Kelvin
                 )
@@ -4766,18 +4743,8 @@ vehicle:
         // checksum. Contact made again sends a CONNECT unpressed, the link
         // being up and its last CONNECT having agreed, and asks once it is
         // matched again: no Disconnect and Connect.
-        matched.beacon(
-            false,
-            Some(ours),
-            tcslib_moc::beacon::Stage::Aging,
-            false,
-        );
-        matched.beacon(
-            false,
-            Some(ours),
-            tcslib_moc::beacon::Stage::Heard,
-            false,
-        );
+        matched.beacon(false, Some(ours), tcsmoc::beacon::Stage::Aging, false);
+        matched.beacon(false, Some(ours), tcsmoc::beacon::Stage::Heard, false);
         assert!(!matched.for_commanding(), "the outage ended the match");
         // Not where the beacons that ended it heard a start of tcspecial:
         // that is the operator's to Connect to.
@@ -4795,15 +4762,15 @@ vehicle:
         assert_eq!(
             sent,
             vec![
-                tcslib_protocol::CommandType::Connect,
-                tcslib_protocol::CommandType::QueryNode,
-                tcslib_protocol::CommandType::StopNode,
-                tcslib_protocol::CommandType::SetNode,
-                tcslib_protocol::CommandType::QueryNode,
-                tcslib_protocol::CommandType::StartNode,
-                tcslib_protocol::CommandType::QueryNode,
-                tcslib_protocol::CommandType::Connect,
-                tcslib_protocol::CommandType::QueryNode
+                tcsprotocol::CommandType::Connect,
+                tcsprotocol::CommandType::QueryNode,
+                tcsprotocol::CommandType::StopNode,
+                tcsprotocol::CommandType::SetNode,
+                tcsprotocol::CommandType::QueryNode,
+                tcsprotocol::CommandType::StartNode,
+                tcsprotocol::CommandType::QueryNode,
+                tcsprotocol::CommandType::Connect,
+                tcsprotocol::CommandType::QueryNode
             ],
             "the commands the presses and contact made should have sent, and \
              no query of a node the operator had stopped"

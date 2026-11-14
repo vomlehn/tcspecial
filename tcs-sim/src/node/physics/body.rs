@@ -1,7 +1,7 @@
 //! A body: a mass falling under gravity, pushed by a force, losing the mass
 //! it burns, until it reaches the ground.
 //!
-//! Its terminals are `tcslib_protocol::node::physics::body`'s: `force`, in
+//! Its terminals are `tcsprotocol::node::physics::body`'s: `force`, in
 //! newtons, and
 //! `flow`, in kilograms a second, each the sum of what is joined to it;
 //! `altitude`, in metres; `velocity`, in metres a second, up more than
@@ -37,12 +37,12 @@
 //! stops at that moment, and the body is set down: altitude and velocity
 //! nought, `contact` asserted. It stays down until its force lifts it.
 
-use tcslib_protocol::node::physics::body::Resolved;
+use tcsprotocol::node::physics::body::Resolved;
 
 use super::component::Component;
 
 /// Its terminals' places, in
-/// `tcslib_protocol::node::physics::body::TERMINALS`'s order, which a test
+/// `tcsprotocol::node::physics::body::TERMINALS`'s order, which a test
 /// holds this to.
 const FORCE: usize = 0;
 const FLOW: usize = 1;
@@ -286,7 +286,7 @@ impl Component for Body {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslib_protocol::node::physics::body::TERMINALS;
+    use tcsprotocol::node::physics::body::TERMINALS;
 
     /// The places here are the type's.
     #[test]

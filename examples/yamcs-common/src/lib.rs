@@ -1,8 +1,8 @@
 //! What the tests of the examples through Yamcs share, ping-yamcs's and
 //! thermostat-yamcs's: the mission database's wrapper
-//! `tcslib_protocol/yamcs.py` generates for a configuration, read as XML, and
+//! `tcsprotocol/yamcs.py` generates for a configuration, read as XML, and
 //! worked as Yamcs would work it on the packets the vehicle frames with
-//! `tcslib_protocol::ccsds`.
+//! `tcsprotocol::ccsds`.
 //!
 //! * [`generated_mdb`] has the Python generate the wrapper, as the ground
 //!   programs write it for Yamcs, and [`read_xml`] reads it;
@@ -28,7 +28,7 @@ use quick_xml::escape::unescape;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::Reader;
 
-use tcslib_protocol::ccsds::{PacketType, Sender, HEADER_BYTES};
+use tcsprotocol::ccsds::{PacketType, Sender, HEADER_BYTES};
 
 /// One element of an XTCE document, with what is in it.
 #[derive(Debug, Default)]
@@ -233,7 +233,7 @@ pub fn python(script: &str, path: &[&Path], arguments: &[&Path]) -> String {
     String::from_utf8(ran.stdout).expect("text")
 }
 
-/// The mission database's wrapper `tcslib_protocol/yamcs.py` generates for a
+/// The mission database's wrapper `tcsprotocol/yamcs.py` generates for a
 /// configuration, as the ground programs write it for Yamcs.
 ///
 /// # Arguments
@@ -252,7 +252,7 @@ pub fn generated_mdb(configuration: &Path) -> Element {
     let written = dir.path().join("tcs-ccsds.xtce");
     python(
         "from pathlib import Path\n\
-         from tcslib_protocol import configuration, yamcs\n\
+         from tcsprotocol import configuration, yamcs\n\
          yamcs.write_mdb(configuration.load(sys.argv[1]), Path(sys.argv[2]))\n",
         &[],
         &[configuration, &written],
@@ -957,9 +957,9 @@ pub fn framed(apid: u16, data: &[u8]) -> Vec<u8> {
 /// The count and the datum.
 pub fn counted(data: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
-    tcslib_protocol::link_type::counted(
+    tcsprotocol::link_type::counted(
         data,
-        tcslib_protocol::link_type::Count::Xtce,
+        tcsprotocol::link_type::Count::Xtce,
         &mut out,
     )
     .expect("counted");

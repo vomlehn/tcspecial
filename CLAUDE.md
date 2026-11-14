@@ -18,15 +18,15 @@ argue from this order and say so.
 
 ## The crates
 
-- `tcslib-protocol` -- what the ground and the vehicle share: the command and
+- `tcsprotocol` -- what the ground and the vehicle share: the command and
   telemetry protocol, and how every configuration file is read and checked.
   A rule about what a configuration may say belongs here, and nowhere else.
-- `tcslib-moc` -- what a ground station is built on (only in the MOC):
+- `tcsmoc` -- what a ground station is built on (only in the MOC):
   `TcsClient` for commands, `gateway::GatewayReceiver` for the vehicle's data,
   `beacon` for its beacons, `simulator` for waiting until tcs-sim has made its
   simulated devices, `bus` for a vehicle on a cFS software bus (the station's
   SBN peer, and `SimulatedCfs`, the cFS end as tcs-sim simulates it).
-- `tcslib-moc-c` -- tcslib-moc for C and C++: beacons, data and commands behind
+- `tcsmoc-c` -- tcsmoc for C and C++: beacons, data and commands behind
   one hand-written header, `include/tcsmoc-c.h`, which `tests/c_and_cpp.rs`
   holds to the library by compiling a ground station against it with gcc and
   g++.
@@ -34,14 +34,14 @@ argue from this order and say so.
 - `tcs-moc` -- the test ground station (GUI).
 - `tcs-sim` -- the payload simulator (GUI).
 - `tcs-gui` -- the graphical configuration editor.
-- `tcslib-verify` -- checks a configuration and gives every problem with its
+- `tcsverify` -- checks a configuration and gives every problem with its
   file and line. tcspecial, tcs-verify, tcs-moc, tcs-sim and tcs-gui all
   check through its `verify`, so they agree about what is wrong.
 - `tcs-verify` -- the program that prints those problems, and what only the
   tool does: `--summary`, `--set-interface`, `--xtce`, `--fprime-model`, and
   the start-up window tcs-moc and tcs-sim share.
-- `tcslib-ui` -- window pieces the ground programs share.
-- `tcslib-diagram` -- how a configuration is drawn: the working panes, node
+- `tcsui` -- window pieces the ground programs share.
+- `tcs-diagram` -- how a configuration is drawn: the working panes, node
   shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcs-gui
   draws with it, and so does tcspecial's visual window (`--visual`, in a
   build with the `visual` feature, which never flies).
@@ -50,7 +50,7 @@ argue from this order and say so.
 - `examples/` -- configurations and programs; see `examples/README.md`.
 
 A node type is three modules with the same name in three crates: its
-attributes and checks in `tcslib_protocol::node`, the flight-side node in
+attributes and checks in `tcsprotocol::node`, the flight-side node in
 `tcspecial::node`, and the simulator's simulated device in `tcs_sim::node`.
 
 ## Vocabulary
@@ -63,7 +63,7 @@ attributes and checks in `tcslib_protocol::node`, the flight-side node in
   software bus, joined as an SBN peer. Its section is `gateway:`, and
   `tee-gateway`, `null-gateway` and `app_gateway_veh` stand beside it. All
   of these were `moc` once; a file still saying so is refused, told the new
-  word (`tcslib_protocol::graph::renamed`).
+  word (`tcsprotocol::graph::renamed`).
 - **MOC**: the mission operations center, on the ground. Still the word for
   the ground itself -- tcs-moc, "the MOC sends" -- and for the terminals
   below, but never for a node.
@@ -107,7 +107,7 @@ make html-check                 # every committed page made again, and current
 ```
 
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
-`tcslib-moc/`, `tcslib-moc-c/` and `tcslib-protocol/` builds their HTML pages.
+`tcsmoc/`, `tcsmoc-c/` and `tcsprotocol/` builds their HTML pages.
 
 tcspecial, tcs-sim and tcs-moc take `--simulate=none|some|all`. Left out it is
 `none`, the flight setting, under which tcspecial refuses every simulated
@@ -115,7 +115,7 @@ and dummy device and tcs-sim will not start, so a run on a desk gives
 `--simulate=all`, as the Makefiles' run targets do. tcspecial judges each
 payload a simulated device (tcs-sim's: a pseudo-terminal, a socket), a dummy
 device (the kernel's: i2c-stub, gpio-sim, vcan, iio_dummy) or a real device
-from what is at its endpoint (`tcslib_protocol::simulate`), never from a file.
+from what is at its endpoint (`tcsprotocol::simulate`), never from a file.
 `network` and `device-file` nodes are always real devices and not judged.
 Which payloads are meant to be simulated is the simulator file's `simulate`,
 which tcs-sim holds to the same judgement; tcspecial never reads that file.

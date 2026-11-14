@@ -18,7 +18,7 @@ namespace Tcs {
 
 namespace {
 
-/* The beacon watch's thread's stack: tcslib-moc-c's, which is Rust's, and
+/* The beacon watch's thread's stack: tcsmoc-c's, which is Rust's, and
  * sized as Rust sizes a thread's, since a pass needs more than F´'s usual
  * 64 KiB. And how long the thread waits before trying again after a pass
  * fails. */
@@ -252,7 +252,7 @@ const Datum &TcsBridge::asDatum(const tcs_datum &datum)
 bool TcsBridge::asValue(const tcs_datum &datum, const char *unit,
 			F64 &value)
 {
-	// Read by tcslib-moc-c, which reads it as the vehicle wrote it, so that
+	// Read by tcsmoc-c, which reads it as the vehicle wrote it, so that
 	// what a value is -- its width, its unit's step, its byte order -- is
 	// said once. One that is not a value is written to no channel: a
 	// number made of whatever four bytes were there would be a reading
@@ -270,7 +270,7 @@ bool TcsBridge::asValue(const tcs_datum &datum, const char *unit,
 
 bool TcsBridge::asDecision(const tcs_datum &datum, bool &on)
 {
-	// Read by tcslib-moc-c, so that what a decision is is said once. One
+	// Read by tcsmoc-c, so that what a decision is is said once. One
 	// that is not a decision is written to no channel: what a channel said
 	// was decided would be a guess.
 	int read = 0;
@@ -286,7 +286,7 @@ bool TcsBridge::asDecision(const tcs_datum &datum, bool &on)
 
 bool TcsBridge::asUnsigned(const tcs_datum &datum, size_t width, U64 &value)
 {
-	// Read by tcslib-moc-c, so that what a whole number is -- its width,
+	// Read by tcsmoc-c, so that what a whole number is -- its width,
 	// its byte order -- is said once. One of another width is written to no
 	// channel.
 	uint64_t read = 0;
@@ -510,7 +510,7 @@ void TcsBridge::restartCommand(const char *command,
 	if (!this->open(command, opCode, cmdSeq)) {
 		return;
 	}
-	// Empty is this configuration's checksum, which tcslib-moc-c is told by
+	// Empty is this configuration's checksum, which tcsmoc-c is told by
 	// NULL: a plain restart. Anything else it holds to being a checksum,
 	// and refuses unsent where it is not one.
 	const char *onto = target.length() == 0 ? nullptr : target.toChar();
@@ -563,7 +563,7 @@ void TcsBridge::SEND_DATA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 		return;
 	}
 	// The text's bytes, as F´ gave them, without its NUL: one datum, in one
-	// datagram, refused by tcslib-moc-c unless the bridge is matched for
+	// datagram, refused by tcsmoc-c unless the bridge is matched for
 	// commanding.
 	const FwSizeType length = data.length();
 	if (tcs_uplink_send(m_uplink,

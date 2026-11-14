@@ -60,7 +60,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use tcslib_protocol::Scalar;
+use tcsprotocol::Scalar;
 
 /// One vehicle node, as its description file says it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -83,7 +83,7 @@ pub struct Described {
     /// configuration says what the vehicle carries and what each node is told,
     /// and "an i2c node receives what asks it for a reading" is true of every
     /// i2c node there will ever be. It was written in Rust, in
-    /// `tcslib_protocol::graph::terminals`, where nobody editing a node type
+    /// `tcsprotocol::graph::terminals`, where nobody editing a node type
     /// could see it; `tests::the_tree_agrees_with_the_schemas_terminals` keeps
     /// the two in step.
     pub terminals: Terminals,
@@ -100,7 +100,7 @@ pub struct Described {
 /// Four flags rather than two lists of names, because that is what a file can
 /// state plainly and what a reader of one can check at a glance: a type either
 /// has somewhere for a stream to arrive or it has not. The names the four
-/// answer to are `tcslib_protocol::graph::terminals`'s -- `payload-sink` is the
+/// answer to are `tcsprotocol::graph::terminals`'s -- `payload-sink` is the
 /// terminal called `world-in` -- and `Terminals::each` is the one place that
 /// correspondence is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -121,7 +121,7 @@ impl Terminals {
     /// The one statement of which flag is which terminal, so that a test can
     /// hold the tree against the schema's own table without either side
     /// repeating the other. Which is its only caller so far: the editor still
-    /// takes its terminals from `tcslib_protocol::graph::terminals`, and the
+    /// takes its terminals from `tcsprotocol::graph::terminals`, and the
     /// tree is held against that -- see
     /// `tests::the_trees_terminals_are_the_schemas`.
     ///
@@ -167,7 +167,7 @@ pub const TEXT: &str = "text";
 ///
 /// One word each, and the list is short on purpose: a kind earns its place by
 /// changing what the window offers or what it checks, not by naming a rule.
-/// The rules themselves are `tcslib-protocol`' -- `whole::whole_u32`,
+/// The rules themselves are `tcsprotocol`' -- `whole::whole_u32`,
 /// `graph::parse_interval`, `trigger::trigger_bytes`,
 /// `node::vehicle::Restart::of` -- and this says which of them a field is
 /// typed into, so the window can offer the right thing and say what is wanted
@@ -331,7 +331,7 @@ fn walk(
         // Only the two formats, and silently: a tree people edit has a README
         // in it and an editor's leftovers beside it, and a complaint about
         // every one of those would bury the complaint that matters.
-        if tcslib_protocol::ConfigFormat::from_data_path(&path).is_none() {
+        if tcsprotocol::ConfigFormat::from_data_path(&path).is_none() {
             continue;
         }
         match path.strip_prefix(root) {
@@ -361,7 +361,7 @@ fn walk(
 /// that is not `true` or `false`.
 fn read_one(root: &Path, path: &Path) -> Result<Described, String> {
     let whole = root.join(path);
-    let said: Said = tcslib_protocol::load_data_file(&whole)
+    let said: Said = tcsprotocol::load_data_file(&whole)
         .map_err(|e| format!("{}: {e}", whole.display()))?;
 
     let named = |what: &str| format!("{}: {what}", whole.display());
@@ -664,7 +664,7 @@ fn beside_this_program() -> Option<PathBuf> {
 /// is writing by hand or with another tool: tell them, in their own editor,
 /// that `payloads` is a section and `payload` is not. They check the shape of a
 /// file; whether a configuration can be flown is `tcs-verify`'s to say. See
-/// `tcslib-protocol/schema/README`. They are tcslib-protocol's and not this
+/// `tcsprotocol/schema/README`. They are tcsprotocol's and not this
 /// editor's, because they define the formats every program reads; the schemas
 /// of this editor's own description files stay in its `share/schema`.
 ///
@@ -726,17 +726,16 @@ pub const SIM_JSON_SCHEMA: &str = "tcspecial-sim.schema.json";
 /// The schema's path, relative to `destination` or absolute.
 pub fn schema_reference(destination: &Path, schema: &str) -> String {
     // The source tree, from the file outwards. Six levels is past the deepest a
-    // configuration sits in this repository (`tcslib-protocol/tests/actual`)
+    // configuration sits in this repository (`tcsprotocol/tests/actual`)
     // with room to spare, and a search without a limit is a search that walks
     // to the root of the filesystem.
     let here = destination.parent().unwrap_or(Path::new(""));
     let mut up = PathBuf::new();
     let mut back = String::new();
     for _ in 0..=6 {
-        let candidate =
-            here.join(&up).join("tcslib-protocol/schema").join(schema);
+        let candidate = here.join(&up).join("tcsprotocol/schema").join(schema);
         if candidate.is_file() {
-            return format!("{back}tcslib-protocol/schema/{schema}");
+            return format!("{back}tcsprotocol/schema/{schema}");
         }
         up.push("..");
         back.push_str("../");
@@ -914,7 +913,7 @@ mod tests {
     /// The reader refuses a kind it does not know, so what this adds is the
     /// other direction: that the words in the tree are the words the window
     /// offers controls for, and that the ones which say `boolean` are the
-    /// attributes `tcslib-protocol` reads as true or false. Two statements of
+    /// attributes `tcsprotocol` reads as true or false. Two statements of
     /// one fact, so one is held against the other -- an attribute that became a
     /// true or false in the rules and stayed text here would be a field offered
     /// as a box to type `treu` into.
@@ -923,7 +922,7 @@ mod tests {
         let (described, trouble) = read_tree(&shipped());
         assert!(trouble.is_empty(), "{trouble:?}");
 
-        // What `tcslib-protocol` reads as true or false:
+        // What `tcsprotocol` reads as true or false:
         // `endpoint_config::parse_flag` for a device's own flags, and
         // `node::vehicle::Restart::of` for whether a program comes back.
         let booleans = [
@@ -981,7 +980,7 @@ mod tests {
     /// The tree's terminals are the ones the vehicle is flown by.
     ///
     /// The flags in a description are what a person reads and edits; the table
-    /// in `tcslib_protocol::graph::terminals` is what the checking and the
+    /// in `tcsprotocol::graph::terminals` is what the checking and the
     /// flight software read. Two statements of one fact, so one has to be held
     /// against the other -- and it is the tree that is checked, because the
     /// table is the one the vehicle obeys.
@@ -998,7 +997,7 @@ mod tests {
 
         for one in &described {
             let Some(table) =
-                tcslib_protocol::graph::terminals::terminals_of(&one.node_type)
+                tcsprotocol::graph::terminals::terminals_of(&one.node_type)
             else {
                 continue;
             };
@@ -1122,7 +1121,7 @@ mod tests {
             // `vehicle/compute/mean.yaml` is `vehicle/compute/mean.rs`, or
             // the directory `vehicle/compute/mean/` -- but for the three
             // kinds of discrete lines, which are one module, `payload/gpio/`.
-            let stem = if tcslib_protocol::node::payload::gpio::Kind::of(
+            let stem = if tcsprotocol::node::payload::gpio::Kind::of(
                 &one.path.file_stem().unwrap_or_default().to_string_lossy(),
             )
             .is_some()
@@ -1185,7 +1184,7 @@ mod tests {
     ///
     /// The other correspondence, and the one that would drift: the parameters
     /// of each computation are the flight software's own list -- see
-    /// `tcslib_protocol::node::vehicle::compute::attributes_of` -- and a
+    /// `tcsprotocol::node::vehicle::compute::attributes_of` -- and a
     /// description that asked for something else would be a panel that fills in
     /// a field the checking then refuses, or leaves out one it requires.
     #[test]
@@ -1201,12 +1200,11 @@ mod tests {
             let function = one.sets.get("function").unwrap_or_else(|| {
                 panic!("{}: a computation says which", one.node)
             });
-            let takes = tcslib_protocol::node::vehicle::compute::attributes_of(
-                function,
-            )
-            .unwrap_or_else(|| {
-                panic!("{}: there is no such computation", one.node)
-            });
+            let takes =
+                tcsprotocol::node::vehicle::compute::attributes_of(function)
+                    .unwrap_or_else(|| {
+                        panic!("{}: there is no such computation", one.node)
+                    });
 
             // What the file asks for, plus what it fills in itself, is what
             // the computation takes -- no more and no less.
@@ -1381,7 +1379,7 @@ mod tests {
 
     /// The compute fields are every computation's own terms.
     ///
-    /// Here rather than beside the table in tcslib-diagram's style.rs, because
+    /// Here rather than beside the table in tcs-diagram's style.rs, because
     /// the computations are read from this editor's description tree.
     ///
     /// The window asks a node of a described kind for what its description
@@ -1400,16 +1398,17 @@ mod tests {
         let (described, trouble) = read_tree(&tree);
         assert!(trouble.is_empty(), "{trouble:?}");
 
-        let offered = tcslib_diagram::style::NodeType::Compute.attributes();
+        let offered = tcs_diagram::style::NodeType::Compute.attributes();
         let mut asked = 0;
         for one in described.iter().filter(|one| one.node_type == "compute") {
             let function = one.sets.get("function").unwrap_or_else(|| {
                 panic!("{}: a computation sets its function", one.node)
             });
-            let terms = tcslib_protocol::node::vehicle::compute::attributes_of(
-                function,
-            )
-            .unwrap_or_else(|| panic!("{function} is not a computation"));
+            let terms =
+                tcsprotocol::node::vehicle::compute::attributes_of(function)
+                    .unwrap_or_else(|| {
+                        panic!("{function} is not a computation")
+                    });
             for term in terms {
                 assert!(
                     offered.iter().any(|(name, _)| name == term),
@@ -1431,10 +1430,8 @@ mod tests {
         for (name, _) in offered {
             assert!(
                 functions.iter().any(|function| {
-                    tcslib_protocol::node::vehicle::compute::attributes_of(
-                        function,
-                    )
-                    .is_some_and(|terms| terms.contains(name))
+                    tcsprotocol::node::vehicle::compute::attributes_of(function)
+                        .is_some_and(|terms| terms.contains(name))
                 }),
                 "\"{name}\" is offered and no computation takes it"
             );

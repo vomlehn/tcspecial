@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst), answering to
 # a cFS flight computer: the deck of stage 9, joined to the computer's software

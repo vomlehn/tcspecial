@@ -1,14 +1,14 @@
 //! One module per node type: the flight side, in three families.
 //!
 //! What opens the real thing and moves bytes through it. The attributes come
-//! from `tcslib_protocol::node`, which checks them, and the simulated device
+//! from `tcsprotocol::node`, which checks them, and the simulated device
 //! the simulator puts at the far end is `tcs_sim::node`; the three trees carry
 //! the same names so that a type is `node/payload/i2c` wherever you are
 //! standing.
 //!
 //! The families are the configuration's own sections and the editor's working
 //! panes: `vehicle` is what the vehicle itself runs and `payload` is what it
-//! carries. See `tcslib_protocol::graph::section_of`, which is the one
+//! carries. See `tcsprotocol::graph::section_of`, which is the one
 //! statement of which family a type belongs to.
 //!
 //! An app node is a program rather than an interface, and the five kinds of one
@@ -16,14 +16,14 @@
 //! are the vehicle's own, and `payload/app_pl` and `payload/app_all_pl` are
 //! payloads -- what the vehicle carries, where what it carries was written by
 //! the mission. What any of them may be told is one rule in one place,
-//! `tcslib_protocol::node::app`, and the interfaces their programs are run with
+//! `tcsprotocol::node::app`, and the interfaces their programs are run with
 //! are `tcsapp`.
 //!
 //! There is no `gateway` directory, and that is not an omission: a ground link
 //! is a network endpoint, so what opens one is `payload/network`. See
-//! `tcslib_protocol::node`, which has the argument.
+//! `tcsprotocol::node`, which has the argument.
 //!
-//! See `tcslib_protocol::node` for why there are three trees rather than one.
+//! See `tcsprotocol::node` for why there are three trees rather than one.
 
 /// What the vehicle carries, and the ground link with it: a device on a bus, a
 /// line the vehicle drives, a socket to something aboard or on the ground, a

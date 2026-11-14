@@ -1,6 +1,6 @@
 //! A heater: a resistance on a supply, switched on and off.
 //!
-//! Its terminals are `tcslib_protocol::node::physics::heater`'s: `on`, the
+//! Its terminals are `tcsprotocol::node::physics::heater`'s: `on`, the
 //! decision it is driven to; `heat`, in watts, what it gives out; `current`, in
 //! amperes, what it draws. Both outputs are nought while it is off. `heating`
 //! is one while it is on and nought while it is off.
@@ -24,13 +24,13 @@
 
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tcslib_protocol::node::physics::heater::Resolved;
+use tcsprotocol::node::physics::heater::Resolved;
 
 use super::component::Component;
 use super::random::{seed_for, settled, wandered};
 
 /// Its terminals' places, in
-/// `tcslib_protocol::node::physics::heater::TERMINALS`'s order, which a test
+/// `tcsprotocol::node::physics::heater::TERMINALS`'s order, which a test
 /// holds this to.
 const ON: usize = 0;
 const HEAT: usize = 1;
@@ -104,8 +104,8 @@ impl Component for Heater {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslib_protocol::node::physics::heater::TERMINALS;
-    use tcslib_protocol::node::physics::Wander;
+    use tcsprotocol::node::physics::heater::TERMINALS;
+    use tcsprotocol::node::physics::Wander;
 
     /// The places here are the type's.
     #[test]

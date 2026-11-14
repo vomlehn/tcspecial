@@ -13,9 +13,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_moc.listening import Listening  # noqa: E402
-from tcslib_protocol import fixed_packet  # noqa: E402
-from tcslib_protocol.configuration import CommandLink, HostPort  # noqa: E402
+from tcsmoc.listening import Listening  # noqa: E402
+from tcsprotocol import fixed_packet  # noqa: E402
+from tcsprotocol.configuration import CommandLink, HostPort  # noqa: E402
 
 
 def a_socket():

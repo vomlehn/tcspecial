@@ -1,11 +1,11 @@
 //! The Yamcs wrapper reads what the vehicle frames, and frames what the
 //! vehicle reads.
 //!
-//! The mission database's wrapper, which `tcslib_protocol/yamcs.py` generates
-//! from the configuration and `python/tcslib_protocol/yamcs.xtce`, tells Yamcs
+//! The mission database's wrapper, which `tcsprotocol/yamcs.py` generates
+//! from the configuration and `python/tcsprotocol/yamcs.xtce`, tells Yamcs
 //! how a packet on the link is laid out: a CCSDS primary header, and after it,
 //! by APID, what follows. The vehicle frames and unframes with
-//! `tcslib_protocol::ccsds`. Nothing but a run against Yamcs itself would show
+//! `tcsprotocol::ccsds`. Nothing but a run against Yamcs itself would show
 //! the two disagreeing -- a header width, a length off by one, a restriction on
 //! the wrong APID -- so this generates the wrapper, as `ping_yamcs.py` does,
 //! and works it as Yamcs would on the vehicle's own packets:
@@ -13,15 +13,15 @@
 //! * each packet the vehicle sends down -- a beacon, a ping's answer,
 //!   CONNECT's answer and another command's, and in a copy of the example
 //!   with more nodes, a payload's data through the gateway node and a
-//!   payload's telemetry -- framed by `tcslib-protocol` and
+//!   payload's telemetry -- framed by `tcsprotocol` and
 //!   decoded by the wrapper, must land in the container meant for it, with
 //!   the header's fields and the body where the wrapper says: a ping's
 //!   answer field by field, as the ping node's interface document
-//!   (`tcslib-protocol/xtce/ping.xtce`) lays it out, every byte of it read;
+//!   (`tcsprotocol/xtce/ping.xtce`) lays it out, every byte of it read;
 //! * each command Yamcs sends up -- CONNECT and a ping, the ping as the
 //!   document's fields -- encoded by the wrapper, with its length filled in as
-//!   Yamcs fills it in, must be unframed by `tcslib-protocol` and read as the
-//!   command it is: the ping as the text `tcslib-protocol` writes.
+//!   Yamcs fills it in, must be unframed by `tcsprotocol` and read as the
+//!   command it is: the ping as the text `tcsprotocol` writes.
 //!
 //! The interpreter, `yamcs_common`'s, which thermostat-yamcs's tests share,
 //! does what the wrapper uses of XTCE and no more: a wrapper that grows past
@@ -29,13 +29,13 @@
 
 use std::time::Duration;
 
-use tcslib_protocol::ccsds::{read_header, PacketType, HEADER_BYTES};
-use tcslib_protocol::graph::telemetry;
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::node::vehicle::ping;
-use tcslib_protocol::telemetry::{ConnectTelemetry, PingTelemetry, Telemetry};
-use tcslib_protocol::types::CommandStatus;
-use tcslib_protocol::{Beacon, Command, ConfigDigest, ConfigVersion};
+use tcsprotocol::ccsds::{read_header, PacketType, HEADER_BYTES};
+use tcsprotocol::graph::telemetry;
+use tcsprotocol::graph::Graph;
+use tcsprotocol::node::vehicle::ping;
+use tcsprotocol::telemetry::{ConnectTelemetry, PingTelemetry, Telemetry};
+use tcsprotocol::types::CommandStatus;
+use tcsprotocol::{Beacon, Command, ConfigDigest, ConfigVersion};
 
 mod common;
 
@@ -44,7 +44,7 @@ use yamcs_common::{
     counted, decode, encode, framed, generated_mdb, Element, Given,
 };
 
-/// The wrapper `tcslib_protocol/yamcs.py` generates for the example's
+/// The wrapper `tcsprotocol/yamcs.py` generates for the example's
 /// configuration, as `ping_yamcs.py` writes it for Yamcs.
 ///
 /// # Returns
@@ -93,7 +93,7 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
 }
 
 /// The text of each of a ping's answer's fields, as the ping node's
-/// interface document names them, for an answer `tcslib-protocol` writes.
+/// interface document names them, for an answer `tcsprotocol` writes.
 ///
 /// # Arguments
 ///
@@ -217,7 +217,7 @@ fn connect_encodes_as_the_vehicle_reads_it() {
 
 /// A ping, as Yamcs sends it by the wrapper as the ping node's document's
 /// command, its fields as text, is unframed by the vehicle under the gateway
-/// node's `apid_base` and read as the ping `tcslib-protocol` writes; and the
+/// node's `apid_base` and read as the ping `tcsprotocol` writes; and the
 /// vehicle's answer to it decodes back into the same fields.
 #[test]
 fn a_ping_encodes_as_its_text() {
@@ -266,7 +266,7 @@ fn a_ping_encodes_as_its_text() {
 }
 
 /// In a copy of the example with more nodes, the data of each, framed under the
-/// APID `tcslib-protocol` counts for it -- "pong"'s through the gateway node,
+/// APID `tcsprotocol` counts for it -- "pong"'s through the gateway node,
 /// "sensor"'s and "tank"'s over `payload_telemetry` -- is that node's
 /// container, its parameter the data whole; and the ping node's answers and the
 /// ping are as they were.

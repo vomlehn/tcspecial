@@ -1,8 +1,8 @@
-"""Waiting for the simulator, held to ``tcslib-moc/src/simulator.rs``'s tests.
+"""Waiting for the simulator, held to ``tcsmoc/src/simulator.rs``'s tests.
 
 The same cases: a simulator that becomes ready is waited for, a failure and a
 difference are said at once, and silence and starting are told apart. And the
-messages are those ``tcslib-protocol/src/ready.rs`` writes.
+messages are those ``tcsprotocol/src/ready.rs`` writes.
 """
 
 import socket
@@ -14,8 +14,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_moc import simulator  # noqa: E402
-from tcslib_protocol import ready  # noqa: E402
+from tcsmoc import simulator  # noqa: E402
+from tcsprotocol import ready  # noqa: E402
 
 
 def set_up(mode):

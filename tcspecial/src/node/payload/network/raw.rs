@@ -35,7 +35,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
 use socket2::{Domain, Protocol, Socket, Type};
-use tcslib_protocol::{NetworkConfig, NetworkProtocol, TcsError, TcsResult};
+use tcsprotocol::{NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
 use crate::endpoint::{
     wait_for_fds, EndpointReadable, EndpointWaitable, EndpointWritable,
@@ -229,7 +229,7 @@ impl EndpointWritable for RawEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslib_protocol::IpProtocol;
+    use tcsprotocol::IpProtocol;
 
     /// Makes the network configuration of a node reached over raw IP on
     /// protocol 253, one of the two set aside for experiments.

@@ -15,8 +15,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_protocol import configuration, fixed, fixed_packet  # noqa: E402
-from tcslib_protocol import interface  # noqa: E402
+from tcsprotocol import configuration, fixed, fixed_packet  # noqa: E402
+from tcsprotocol import interface  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 

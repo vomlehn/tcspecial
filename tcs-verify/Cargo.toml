@@ -7,9 +7,9 @@ description = """\
 Checks a tcspecial configuration file, and the simulator file beside it"""
 
 [dependencies]
-tcslib-protocol = { path = "../tcslib-protocol" }
+tcsprotocol = { path = "../tcsprotocol" }
 # The checks this program prints, which are the library's: see lib.rs.
-tcslib-verify = { path = "../tcslib-verify" }
+tcsverify = { path = "../tcsverify" }
 
 [dev-dependencies]
 tempfile = "3"

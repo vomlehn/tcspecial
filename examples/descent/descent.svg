@@ -135,7 +135,7 @@
   <path class="vehicleward" d="M330,710 L380,710" marker-end="url(#arrow-orange)"/>
   <text class="label" x="390" y="714">data link, toward the vehicle</text>
   <path class="call" d="M610,710 L660,710" marker-end="url(#arrow-call)"/>
-  <text class="label" x="670" y="714">function call, from tcslib_moc::gateway</text>
+  <text class="label" x="670" y="714">function call, from tcsmoc::gateway</text>
   <rect class="payload" x="50" y="740" width="22" height="16" rx="4"/>
   <text class="label" x="80" y="753">payload</text>
   <rect class="vehicle" x="170" y="740" width="22" height="16" rx="4"/>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
     <description>A ping, with Yamcs as the ground station, over CCSDS packets</description>
     <tcspecial>
         <!-- The ping example with Yamcs at the ground end. The gateway is

@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # Stage 6 of "Building a Vehicle" (docs/building-a-vehicle.rst): redundant
 # sensors and a vote. Three temperature sensors on the deck's hull, each

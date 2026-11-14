@@ -1,6 +1,6 @@
 """The beacon's facts and its panel, held to the Rust's own examples.
 
-The tests of ``tcslib-moc/src/beacon.rs`` and ``tcslib-ui/src/lib.rs`` said
+The tests of ``tcsmoc/src/beacon.rs`` and ``tcsui/src/lib.rs`` said
 again, with the same figures. The beacons are written here as text, field by
 field, rather than by the code under test; ``examples/ping/tests/pings.rs``
 sends this program beacons the Rust writes, so a change to the layout is caught
@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_moc import beacon  # noqa: E402
-from tcslib_moc.beacon import (  # noqa: E402
+from tcsmoc import beacon  # noqa: E402
+from tcsmoc.beacon import (  # noqa: E402
     Blink,
     Contact,
     Counted,
@@ -22,10 +22,10 @@ from tcslib_moc.beacon import (  # noqa: E402
     Stage,
     Step,
 )
-from tcslib_protocol import interface  # noqa: E402
-from tcslib_protocol.beacon import (BEACON_BYTES, Beacon,  # noqa: E402
+from tcsprotocol import interface  # noqa: E402
+from tcsprotocol.beacon import (BEACON_BYTES, Beacon,  # noqa: E402
                                     BeaconError)
-from tcslib_protocol.configuration import HostPort  # noqa: E402
+from tcsprotocol.configuration import HostPort  # noqa: E402
 
 MS = 1_000_000
 SECOND = 1_000_000_000
@@ -75,7 +75,7 @@ def schedule():
 
 class StageTest(unittest.TestCase):
     def test_each_stage_is_called_what_it_is(self):
-        # Stage::label in tcslib_moc::beacon, word for word.
+        # Stage::label in tcsmoc::beacon, word for word.
         self.assertEqual(
             [stage.label() for stage in Stage],
             ["Unheard", "Heard", "Aging", "Waiting"],
@@ -174,7 +174,7 @@ class ScheduleTest(unittest.TestCase):
                 return Stage.AGING
             return Stage.HEARD
 
-        # tcslib_moc::beacon's thresholds, figure for figure.
+        # tcsmoc::beacon's thresholds, figure for figure.
         self.assertEqual(
             (beacon.BLINKING_AFTER_MISSED, beacon.AGING_AFTER_MISSED,
              beacon.WAITING_AFTER_MISSED),
@@ -196,7 +196,7 @@ class ScheduleTest(unittest.TestCase):
 
 
 class LayoutTest(unittest.TestCase):
-    """tcslib_protocol/beacon.py, held to the layout and to the Rust's own
+    """tcsprotocol/beacon.py, held to the layout and to the Rust's own
     example."""
 
     def test_a_beacon_is_its_fields_as_text_a_colon_between_each(self):
@@ -220,7 +220,7 @@ class LayoutTest(unittest.TestCase):
     def test_this_trees_interface_is_the_one_the_rust_was_built_with(self):
         # The constant `make interface-digest` wrote for the Rust, read from
         # its source: one digest, computed by two runtimes, must agree.
-        source = (Path(__file__).resolve().parents[2] / "tcslib-protocol"
+        source = (Path(__file__).resolve().parents[2] / "tcsprotocol"
                   / "src" / "interface_digest.rs").read_text()
         rust = bytes(int(byte, 16)
                      for byte in __import__("re").findall(r"0x([0-9a-f]{2})",
@@ -229,7 +229,7 @@ class LayoutTest(unittest.TestCase):
 
     def test_the_beacon_is_what_the_hand_written_packer_wrote(self):
         # What the hand-written packer that came before the generated code
-        # wrote for these beacons, which tcslib-protocol/src/beacon.rs holds the
+        # wrote for these beacons, which tcsprotocol/src/beacon.rs holds the
         # Rust to as well.
         digest = bytes.fromhex("d41d8cd98f00b204e9800998ecf8427e")
         face = bytes([0xAB] * 16)
@@ -408,16 +408,16 @@ class LoopTest(unittest.TestCase):
 
 
 def beacon_link():
-    from tcslib_protocol.configuration import BeaconLink
+    from tcsprotocol.configuration import BeaconLink
     return BeaconLink(send=HostPort("0.0.0.0", 7500),
                       recv=HostPort("127.0.0.1", 7510))
 
 
 class PanelTest(unittest.TestCase):
-    """What the panel shows for each stage: tcslib_ui's palette."""
+    """What the panel shows for each stage: tcsui's palette."""
 
     def test_the_indicator_ages_through_the_palette(self):
-        from tcslib_ui.beacon_panel import indicator, palette
+        from tcsui.beacon_panel import indicator, palette
 
         s = Schedule.standard()
         self.assertEqual(indicator(s.after(None, AT), False), palette.UNKNOWN)
@@ -435,7 +435,7 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(indicator(s.at(11_500 * MS), True), palette.OFF)
 
     def test_once_heard_the_indicator_is_never_grey_again(self):
-        from tcslib_ui.beacon_panel import indicator, palette
+        from tcsui.beacon_panel import indicator, palette
 
         s = Schedule.standard()
         for ms in range(0, 60_000, 100):
@@ -448,7 +448,7 @@ class PanelTest(unittest.TestCase):
 
     def test_the_panel_shows_what_it_was_given(self):
         import tkinter
-        from tcslib_ui.beacon_panel import NOTHING_YET, BeaconPanel, Shown
+        from tcsui.beacon_panel import NOTHING_YET, BeaconPanel, Shown
 
         try:
             window = tkinter.Tk()
@@ -472,10 +472,10 @@ class PanelTest(unittest.TestCase):
         finally:
             window.destroy()
 
-    def test_the_palette_is_tcslib_uis(self):
-        from tcslib_ui.beacon_panel import palette
+    def test_the_palette_is_tcsuis(self):
+        from tcsui.beacon_panel import palette
 
-        # tcslib_ui::palette, byte for byte.
+        # tcsui::palette, byte for byte.
         self.assertEqual(palette.UNKNOWN, "#c4c4c4")
         self.assertEqual(palette.OFF, "#ffffff")
         self.assertEqual(palette.WELL, "#22c55e")

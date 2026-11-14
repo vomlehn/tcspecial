@@ -1,16 +1,16 @@
 //! What the tests read out of the example's configuration through
-//! `tcslib-protocol`: the Rust's answers, which the Python's and the Yamcs
+//! `tcsprotocol`: the Rust's answers, which the Python's and the Yamcs
 //! wrapper's are held to. How the wrapper is generated and read is
 //! `yamcs_common`'s, which thermostat-yamcs's tests share.
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::config_digest::digest_of_file;
-use tcslib_protocol::graph::parameters::{beacon_of, ci_config_of, flatten};
-use tcslib_protocol::graph::reach::{apid_base_of, reach_of};
-use tcslib_protocol::graph::telemetry::{self, Via};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::EndpointConfig;
+use tcsprotocol::config_digest::digest_of_file;
+use tcsprotocol::graph::parameters::{beacon_of, ci_config_of, flatten};
+use tcsprotocol::graph::reach::{apid_base_of, reach_of};
+use tcsprotocol::graph::telemetry::{self, Via};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::EndpointConfig;
 
 /// Where the example is.
 ///

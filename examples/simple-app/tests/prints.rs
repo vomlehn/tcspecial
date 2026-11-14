@@ -3,7 +3,7 @@
 //! This test is the vehicle: it sends the words the payload would have sent to
 //! the port a gateway node's data arrives at -- its `ground_base` plus the
 //! sending node's device id -- which is what tcspecial does. The ground
-//! station gets them from the gateway node with `tcslib_moc::gateway`, so it is
+//! station gets them from the gateway node with `tcsmoc::gateway`, so it is
 //! given a configuration of its own, whose gateway node is somewhere free. What
 //! this reads is what the ground station printed.
 
@@ -24,9 +24,9 @@ use std::process::{Child, Command, Stdio};
 /// The datagram.
 fn sent(word: &[u8]) -> Vec<u8> {
     let mut out = Vec::new();
-    tcslib_protocol::link_type::counted(
+    tcsprotocol::link_type::counted(
         word,
-        tcslib_protocol::link_type::Count::Groups,
+        tcsprotocol::link_type::Count::Groups,
         &mut out,
     )
     .expect("counted");
@@ -246,7 +246,7 @@ payloads:
         protocol: udp
         world-out: [gateway.lorem]
 ",
-            tcslib_moc::InterfaceDigest::of_this_build(),
+            tcsmoc::InterfaceDigest::of_this_build(),
             free(),
             free(),
             free(),
@@ -258,8 +258,7 @@ payloads:
         ),
     )
     .expect("written");
-    let ours =
-        tcslib_moc::config_digest::digest_of_file(&path).expect("a digest");
+    let ours = tcsmoc::config_digest::digest_of_file(&path).expect("a digest");
 
     let mut ground = Command::new(env!("CARGO_BIN_EXE_lorem_gateway"))
         .arg(&path)
@@ -286,8 +285,8 @@ payloads:
                 panic!("no CONNECT #{asked} ({e}): it said {said}");
             }
         };
-        let Ok(tcslib_moc::Command::Connect(cmd)) =
-            tcslib_moc::Command::read(&buffer[..size])
+        let Ok(tcsmoc::Command::Connect(cmd)) =
+            tcsmoc::Command::read(&buffer[..size])
         else {
             panic!("CONNECT #{asked} is a CONNECT");
         };
@@ -295,13 +294,12 @@ payloads:
         answered = Some((cmd.header.sequence, from));
     }
     let (sequence, from) = answered.expect("two were sent");
-    let answer =
-        tcslib_moc::Telemetry::Connect(tcslib_moc::ConnectTelemetry::new(
-            sequence,
-            tcslib_moc::ConfigVersion::of_this_build(),
-            ours,
-            sequence,
-        ));
+    let answer = tcsmoc::Telemetry::Connect(tcsmoc::ConnectTelemetry::new(
+        sequence,
+        tcsmoc::ConfigVersion::of_this_build(),
+        ours,
+        sequence,
+    ));
     vehicle_commands
         .send_to(&answer.to_bytes(), from)
         .expect("the answer");

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
     <!-- The vehicle the two ping examples share, which each includes: the
          ping node, which answers each ping it is sent. What differs
          between the two is in each example's own file: the tcspecial
@@ -19,7 +19,7 @@
     <vehicle>
         <type name="ping">
             <!-- Answers each ping with the vehicle's time on the end: see
-                 tcslib_protocol::node::vehicle::ping for what a ping and its
+                 tcsprotocol::node::vehicle::ping for what a ping and its
                  answer say. -->
             <compute name="ping">
                 <world-out>gateway.ping</world-out>

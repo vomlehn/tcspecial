@@ -20,7 +20,7 @@
 /* Missed health pings allowed before a warning, and before F´ gives up on
  * the component, for each active component that answers them. The bridge
  * answers none: a command to the vehicle may hold its thread for as long as
- * tcslib-moc-c waits for an answer, which is not a hung thread. */
+ * tcsmoc-c waits for an answer, which is not a hung thread. */
 namespace PingEntries {
 namespace BridgeTest_rateGroup1Comp {
 enum { WARN = 3, FATAL = 5 };

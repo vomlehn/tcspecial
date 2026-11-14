@@ -43,7 +43,7 @@ use std::mem;
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslib_protocol::{
+use tcsprotocol::{
     ClockType, Encoding, FrameCheck, HdlcConfig, Standard, TcsError, TcsResult,
 };
 
@@ -382,7 +382,7 @@ fn framing_of(config: &HdlcConfig) -> RawHdlcProto {
         },
         // The kernel calls a frame check a line's parity, which is the one
         // place this project's word and the kernel's differ: see
-        // tcslib_protocol::node::payload::hdlc.
+        // tcsprotocol::node::payload::hdlc.
         parity: match config.frame_check {
             FrameCheck::None => PARITY_NONE,
             FrameCheck::Crc16Pr0 => PARITY_CRC16_PR0,

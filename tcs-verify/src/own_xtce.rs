@@ -1,14 +1,14 @@
 //! Writing a configuration's own XTCE beside it, for `--xtce`, and saying
 //! whether the one there is what would be written, for `--xtce-check`.
 //!
-//! What the document says is [`tcslib_protocol::graph::own_xtce`]'s. This names
+//! What the document says is [`tcsprotocol::graph::own_xtce`]'s. This names
 //! its file -- the configuration's, with `.xtce` for its extension, so that
 //! both spellings of a configuration name one document -- and writes it, or
 //! compares it.
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::graph::{own_xtce, Graph};
+use tcsprotocol::graph::{own_xtce, Graph};
 
 /// What was found of a configuration's own XTCE.
 #[derive(Debug, Clone, PartialEq, Eq)]

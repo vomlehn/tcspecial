@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
 
 description: "A lander's terminal descent: a radar altimeter's altitude
   flown down by a guidance program throttling the engine, a Doppler

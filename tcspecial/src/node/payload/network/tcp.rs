@@ -16,7 +16,7 @@ use std::time::Instant;
 
 use log::info;
 use nix::poll::PollFlags;
-use tcslib_protocol::{NetworkConfig, TcsError, TcsResult};
+use tcsprotocol::{NetworkConfig, TcsError, TcsResult};
 
 use crate::config::constants::{
     ENDPOINT_BUFFER_SIZE, ENDPOINT_CONNECT_BUDGET, ENDPOINT_DELAY_INIT,
@@ -339,7 +339,7 @@ mod tests {
     fn a_refused_connection_is_retried_until_it_is_accepted() {
         use std::net::{TcpListener, TcpStream};
         use std::time::{Duration, Instant};
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         // A port with nothing on it yet, which is what refuses.
         let probe = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -386,7 +386,7 @@ mod tests {
     fn a_connection_nothing_ever_accepts_is_reported() {
         use std::net::TcpListener;
         use std::time::Instant;
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         let probe = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = probe.local_addr().unwrap();

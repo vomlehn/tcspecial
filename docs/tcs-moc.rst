@@ -726,7 +726,7 @@ command link unread, since all of it was sent before the match. Taking a
 restart ends the match at once, and no ``CONNECT`` matches again until the
 start that comes back.
 
-On the ground, tcs-moc -- and any station built on tcslib-moc or the C/C++
+On the ground, tcs-moc -- and any station built on tcsmoc or the C/C++
 library -- is *matched for listening* while the last beacon it has heard is
 recent (the indicator says the vehicle is heard from), has the flag clear and
 carries the checksum of the configuration this station read. A clear flag

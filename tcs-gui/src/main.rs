@@ -63,8 +63,8 @@ use slint::{Model, ModelRc, VecModel};
 // panes, the node shapes, the routes, the colours and the settings that say
 // where the panes are divided. Named here so that `crate::pane` and the rest
 // read as they did while these were this program's own.
-use tcslib_diagram::look::ground_of;
-use tcslib_diagram::{look, pane, physics, route, style};
+use tcs_diagram::look::ground_of;
+use tcs_diagram::{look, pane, physics, route, style};
 
 use document::{Concern, Document, Fault};
 use editor::Editor;
@@ -75,7 +75,7 @@ use pane::{
 };
 use style::NodeType;
 use subdiagram::{Home, Qualified};
-use tcslib_protocol::graph::check::{Problem, Severity};
+use tcsprotocol::graph::check::{Problem, Severity};
 
 slint::include_modules!();
 
@@ -1455,10 +1455,9 @@ fn wire(
             // A terminal with one link on it is a line being picked up
             // by its end; one with none, or with several, is a line
             // about to be drawn. See Drawing::holding.
-            let sink =
-                tcslib_protocol::graph::terminals::stream_of(&at.terminal)
-                    .map(|(sink, _)| sink)
-                    .unwrap_or(false);
+            let sink = tcsprotocol::graph::terminals::stream_of(&at.terminal)
+                .map(|(sink, _)| sink)
+                .unwrap_or(false);
             let held = {
                 let editor = editor_for_press.borrow();
                 let theirs = attached(editor.document(), &at, sink);
@@ -1641,8 +1640,7 @@ fn wire(
             let shown = Qualified::parse(&node).node;
             if offers.is_empty() {
                 let boxed = is_box(editor.borrow().document(), &node);
-                let at =
-                    tcslib_protocol::graph::terminals::answers(&from.terminal);
+                let at = tcsprotocol::graph::terminals::answers(&from.terminal);
                 let nothing = match at {
                     // A box whose file shows nothing there: what to
                     // do about that is inside it.
@@ -2015,7 +2013,7 @@ fn put(
     ui.set_physics_links(ModelRc::from(Rc::new(VecModel::from(physics_links))));
     // A subdiagram's page has an edge, in its margins, where what comes
     // from outside it arrives and what leaves it goes: see
-    // tcslib_diagram::style::edge_box. The top page has nothing outside it.
+    // tcs_diagram::style::edge_box. The top page has nothing outside it.
     match home {
         Some(_) => {
             ui.set_edge_width(style::EDGE as f32);
@@ -2095,7 +2093,7 @@ fn sheet_left(dividers: Dividers, home: &Home) -> i32 {
 }
 
 /// Where what is inside a page begins and ends: see
-/// `tcslib_diagram::pane::inside_of`, which tcspecial's visual window draws by
+/// `tcs_diagram::pane::inside_of`, which tcspecial's visual window draws by
 /// too.
 fn inside_of(dividers: Dividers) -> (i32, i32) {
     pane::inside_of(dividers)
@@ -2116,7 +2114,7 @@ fn inside_f(dividers: Dividers) -> (f32, f32) {
 ///
 /// # Returns
 ///
-/// Each terminal, where `tcslib_diagram::style::edge_box` puts it.
+/// Each terminal, where `tcs_diagram::style::edge_box` puts it.
 fn edge_views(dividers: Dividers) -> Vec<EdgeView> {
     style::edge_terminals(inside_f(dividers))
         .into_iter()
@@ -3461,11 +3459,8 @@ fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
         return (Vec::new(), Vec::new());
     }
     let simulator = simulator.filter(|path| path.exists());
-    let report = tcslib_verify::verify(
-        config,
-        simulator,
-        tcslib_verify::Limits::EVERYTHING,
-    );
+    let report =
+        tcsverify::verify(config, simulator, tcsverify::Limits::EVERYTHING);
 
     let document = editor.document();
     let faults = document.faults();
@@ -3488,7 +3483,7 @@ fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
         }
         let node = match finding.problem.as_ref().map(|problem| problem.about())
         {
-            Some(tcslib_protocol::About::Node(name)) => name,
+            Some(tcsprotocol::About::Node(name)) => name,
             _ => String::new(),
         };
         let at = (!node.is_empty()).then(|| at_of(&node)).flatten();
@@ -3541,7 +3536,7 @@ fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
 /// # Returns
 ///
 /// The menu's words for it.
-fn said_where(finding: &tcslib_verify::Finding, on_node: bool) -> String {
+fn said_where(finding: &tcsverify::Finding, on_node: bool) -> String {
     if on_node {
         return finding.message.clone();
     }
@@ -4401,7 +4396,7 @@ where
 
 /// Puts the tcspecial parameters into their window.
 ///
-/// Every attribute the section may have, in the order `tcslib-protocol` lists
+/// Every attribute the section may have, in the order `tcsprotocol` lists
 /// them -- the ones that must be stated first -- with the empty required ones
 /// marked. Built from that list rather than from what the document happens to
 /// hold, so that a section somebody has never filled in shows nine fields to
@@ -4418,8 +4413,8 @@ fn put_parameters(window: &ParametersWindow, editor: &Editor) {
     // configuration needs is marked.
     let kind = said
         .get("gateway")
-        .and_then(|said| tcslib_protocol::gateway::GatewayKind::of(said).ok());
-    let fields: Vec<FieldView> = tcslib_protocol::graph::parameters::ATTRIBUTES
+        .and_then(|said| tcsprotocol::gateway::GatewayKind::of(said).ok());
+    let fields: Vec<FieldView> = tcsprotocol::graph::parameters::ATTRIBUTES
         .iter()
         .map(|(attribute, needed)| {
             let value = said.get(*attribute).cloned().unwrap_or_default();
@@ -4547,7 +4542,7 @@ fn settings_of(
             is_heading: false,
             simulated: true,
             // The simulator's settings are described by
-            // `tcslib_protocol::sim_config` rather than by the tree, so they
+            // `tcsprotocol::sim_config` rather than by the tree, so they
             // are boxes to write in until that says what each takes.
             kind: nodes::TEXT.into(),
         })
@@ -5338,9 +5333,9 @@ fn views_of(
                 .map(|f| f.describe());
 
             // A subdiagram that is not open shows what is in it: see
-            // tcslib_diagram::view::box_summary.
+            // tcs_diagram::view::box_summary.
             let summary = (node.node_type == "subdiagram").then(|| {
-                tcslib_diagram::view::box_summary(
+                tcs_diagram::view::box_summary(
                     document.nodes_in(&Some(node.name.clone())).len(),
                     document.crossings(&node.name),
                 )
@@ -5360,9 +5355,9 @@ fn views_of(
 
     // Every node, whichever page it is on, because a line to one on another
     // page is drawn to a stub whose height is taken from it; and the lines
-    // with an end on this one. The drawing is tcslib-diagram's, which
+    // with an end on this one. The drawing is tcs-diagram's, which
     // tcspecial's visual window draws by too: see
-    // tcslib_diagram::view::link_looks.
+    // tcs_diagram::view::link_looks.
     let mut sheet = on_sheet(document, home, dividers);
     // And on a subdiagram's page, each node it exports that no line joins
     // outside yet is drawn joined to the edge all the same: what the edge
@@ -5370,14 +5365,14 @@ fn views_of(
     // nothing drawn would look like one that is not.
     let unjoined = unjoined_exports(document, home);
     if !unjoined.is_empty() {
-        sheet.push(tcslib_diagram::view::OnSheet {
+        sheet.push(tcs_diagram::view::OnSheet {
             name: NOT_JOINED_OUTSIDE.to_string(),
             node_type: "subdiagram",
             at: (0, 0),
             here: false,
             drawn: {
                 let (left, right) = inside_of(dividers);
-                tcslib_diagram::view::Drawn::AtTheEdge(left, right)
+                tcs_diagram::view::Drawn::AtTheEdge(left, right)
             },
         });
     }
@@ -5385,12 +5380,12 @@ fn views_of(
         .into_iter()
         .chain(&unjoined)
         .collect();
-    let lines: Vec<tcslib_diagram::view::LineOnSheet> =
+    let lines: Vec<tcs_diagram::view::LineOnSheet> =
         drawn.iter().map(|link| line_on_sheet(link)).collect();
     // The line chosen from the errors button is lit, as tcspecial's visual
     // window lights a line data crosses: a wide pale line under it, which
     // says which one it is by its width as well as its colour.
-    let links: Vec<LinkView> = tcslib_diagram::view::link_looks(&sheet, &lines)
+    let links: Vec<LinkView> = tcs_diagram::view::link_looks(&sheet, &lines)
         .into_iter()
         .zip(&drawn)
         .map(|(look, link)| LinkView {
@@ -5441,11 +5436,11 @@ fn physics_views_of(
     // This page's components only: each is drawn on the page it was placed
     // on, and a connection or join to one on another page is drawn nowhere,
     // as one to a component the world has not.
-    let components: Vec<tcslib_diagram::physics::Component> = world
+    let components: Vec<tcs_diagram::physics::Component> = world
         .components
         .iter()
         .filter(|(name, _)| world.on_page(name, home.as_deref()))
-        .map(|(name, component)| tcslib_diagram::physics::Component {
+        .map(|(name, component)| tcs_diagram::physics::Component {
             name,
             kind: &component.kind,
             faulty: faulty(name),
@@ -5480,15 +5475,14 @@ fn physics_views_of(
                 simulator.groups.get(group)?.get("connects")
             });
         if let Some(connects) = connects {
-            for terminal in tcslib_protocol::sim_config::terminals_of(connects)
-            {
+            for terminal in tcsprotocol::sim_config::terminals_of(connects) {
                 said.push((drawn.clone(), terminal.to_string()));
             }
         }
     }
-    let joins: Vec<tcslib_diagram::physics::Join> = said
+    let joins: Vec<tcs_diagram::physics::Join> = said
         .iter()
-        .map(|(payload, terminal)| tcslib_diagram::physics::Join {
+        .map(|(payload, terminal)| tcs_diagram::physics::Join {
             payload,
             terminal,
         })
@@ -5497,7 +5491,7 @@ fn physics_views_of(
     // Physics pane being just left of them, inside a subdiagram's edge as on
     // the top page.
     let sheet = on_sheet(document, home, dividers);
-    let (nodes, links) = tcslib_diagram::physics::looks(
+    let (nodes, links) = tcs_diagram::physics::looks(
         &components,
         &connections,
         &joins,
@@ -5652,7 +5646,7 @@ fn wire_physics(
         let home = home.clone();
         window.on_drop_physics(move |kind, x, y| {
             let dividers = views.borrow().divider.get();
-            let at = tcslib_diagram::physics::confine(
+            let at = tcs_diagram::physics::confine(
                 snap((
                     x.round() as i32 - sheet_left(dividers, &home),
                     y.round() as i32,
@@ -5721,7 +5715,7 @@ fn wire_physics(
                 else {
                     return;
                 };
-                let now = tcslib_diagram::physics::confine(
+                let now = tcs_diagram::physics::confine(
                     snap((
                         drawn.0 + dx.round() as i32,
                         drawn.1 + dy.round() as i32,
@@ -5792,7 +5786,7 @@ fn wire_physics(
                         (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT,
                         (place.at.1 + ty) as f32 + physics::TERMINAL_MIDDLE,
                     );
-                    Some(tcslib_diagram::route::drawing(anchor, (x - shift, y)))
+                    Some(tcs_diagram::route::drawing(anchor, (x - shift, y)))
                 })
                 .unwrap_or_default();
             window.set_drawing_route(route.into());
@@ -5955,7 +5949,7 @@ fn physics_places(
     editor: &Editor,
     dividers: Dividers,
     home: &Home,
-) -> Vec<(String, String, tcslib_diagram::physics::Place)> {
+) -> Vec<(String, String, tcs_diagram::physics::Place)> {
     let Some(simulator) = &editor.document().simulator else {
         return Vec::new();
     };
@@ -5981,11 +5975,11 @@ fn physics_places(
 /// point, can mean.
 ///
 /// Over another component, each pair of terminals the two can be connected by,
-/// the way the line was drawn: `tcslib_protocol::node::physics::connectable`
+/// the way the line was drawn: `tcsprotocol::node::physics::connectable`
 /// says which. Over a payload on the top page, or the box of a subdiagram,
 /// which is all of a subdiagram the top page shows, each payload there and each
 /// terminal of the component, the way the line was drawn, its simulated payload
-/// may be joined to: `tcslib_protocol::sim_config::may_join` says which. A join
+/// may be joined to: `tcsprotocol::sim_config::may_join` says which. A join
 /// already made is offered too, marked as made, so that the menu says why it
 /// cannot be chosen rather than leaving somebody to wonder where it went.
 ///
@@ -6040,7 +6034,7 @@ fn physics_joins(
             (other, &end.component, their_kind, &kind)
         };
         return Some(
-            tcslib_protocol::node::physics::connectable(outputs_of, inputs_of)
+            tcsprotocol::node::physics::connectable(outputs_of, inputs_of)
                 .into_iter()
                 .map(|(output, input)| {
                     let (from, to) =
@@ -6059,14 +6053,14 @@ fn physics_joins(
     // coordinates; and the payloads it is, or on the top page holds.
     let left = sheet_left(dividers, home) as f32;
     let under = node_under(document, home, (x - left, y))?;
-    let Some(terminals) = tcslib_protocol::node::physics::terminals_of(&kind)
+    let Some(terminals) = tcsprotocol::node::physics::terminals_of(&kind)
     else {
         return Some(Vec::new());
     };
     let way = if end.output {
-        tcslib_protocol::node::physics::terminal::Direction::Out
+        tcsprotocol::node::physics::terminal::Direction::Out
     } else {
-        tcslib_protocol::node::physics::terminal::Direction::In
+        tcsprotocol::node::physics::terminal::Direction::In
     };
     let mut meant = Vec::new();
     for node in &document.nodes {
@@ -6086,12 +6080,12 @@ fn physics_joins(
             .map(String::as_str)
             .unwrap_or_default();
         let joined: Vec<&str> =
-            tcslib_protocol::sim_config::terminals_of(said).collect();
+            tcsprotocol::sim_config::terminals_of(said).collect();
         let watches = watches_lines(&node.node_type);
         for terminal in terminals {
             let named = format!("{}.{}", end.component, terminal.name);
             if terminal.direction == way
-                && tcslib_protocol::sim_config::may_join(watches, terminal)
+                && tcsprotocol::sim_config::may_join(watches, terminal)
             {
                 let made = joined.contains(&named.as_str());
                 meant.push((
@@ -6115,7 +6109,7 @@ fn physics_joins(
 /// the `moc` terminals carry what drives a payload, which drives an input
 /// of the component -- a heater's switch, a zone's own heater -- and the
 /// `world` ones what it reports, which is an output it reports -- a zone's
-/// temperature. `tcslib_protocol::sim_config::may_join` says which of those a
+/// temperature. `tcsprotocol::sim_config::may_join` says which of those a
 /// payload may join, as it does for a line drawn from the component.
 ///
 /// # Arguments
@@ -6157,9 +6151,9 @@ fn payload_joins(
         })
         .map(|(name, kind, _)| (name, kind))?;
     let way = if from.terminal.starts_with("moc-") {
-        tcslib_protocol::node::physics::terminal::Direction::In
+        tcsprotocol::node::physics::terminal::Direction::In
     } else {
-        tcslib_protocol::node::physics::terminal::Direction::Out
+        tcsprotocol::node::physics::terminal::Direction::Out
     };
     let payload = crate::sim::Simulator::key_of(&node.name);
     let said = simulator
@@ -6169,14 +6163,14 @@ fn payload_joins(
         .map(String::as_str)
         .unwrap_or_default();
     let joined: Vec<&str> =
-        tcslib_protocol::sim_config::terminals_of(said).collect();
+        tcsprotocol::sim_config::terminals_of(said).collect();
     let watches = watches_lines(&node.node_type);
-    let meant = tcslib_protocol::node::physics::terminals_of(&kind)
+    let meant = tcsprotocol::node::physics::terminals_of(&kind)
         .unwrap_or_default()
         .iter()
         .filter(|terminal| {
             terminal.direction == way
-                && tcslib_protocol::sim_config::may_join(watches, terminal)
+                && tcsprotocol::sim_config::may_join(watches, terminal)
         })
         .map(|terminal| {
             let named = format!("{component}.{}", terminal.name);
@@ -6230,13 +6224,13 @@ fn physics_offers(
 /// # Arguments
 ///
 /// * `node_type` - The payload's type, which says: see
-///                 `tcslib_protocol::node::payload::gpio::Kind`.
+///                 `tcsprotocol::node::payload::gpio::Kind`.
 ///
 /// # Returns
 ///
 /// Whether it watches lines.
 fn watches_lines(node_type: &str) -> bool {
-    tcslib_protocol::node::payload::gpio::Kind::of(node_type)
+    tcsprotocol::node::payload::gpio::Kind::of(node_type)
         .is_some_and(|kind| kind.watches())
 }
 
@@ -6471,7 +6465,7 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(chosen.map_or("", |_| component).into());
     let fields: Vec<&'static str> = chosen
-        .and_then(|c| tcslib_protocol::node::physics::settings_of(&c.kind))
+        .and_then(|c| tcsprotocol::node::physics::settings_of(&c.kind))
         .map(|settings| settings.to_vec())
         .unwrap_or_default();
     let empty = BTreeMap::new();
@@ -6515,15 +6509,15 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
         let mut kinds: Vec<&str> = kinds.to_vec();
         kinds.sort_unstable();
         for kind in kinds {
-            let look = tcslib_diagram::physics::node_look(
-                &tcslib_diagram::physics::Component {
+            let look = tcs_diagram::physics::node_look(
+                &tcs_diagram::physics::Component {
                     name: kind,
                     kind,
                     faulty: false,
                     placed: None,
                 },
                 (8, 2),
-                tcslib_diagram::physics::SIZE,
+                tcs_diagram::physics::SIZE,
             );
             entries.push(PaletteEntry {
                 heading: "".into(),
@@ -6537,7 +6531,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
 }
 
 /// The physics component types by family, as the physics list heads them: every
-/// one of `tcslib_protocol::node::physics::TYPES` once, which a test holds it
+/// one of `tcsprotocol::node::physics::TYPES` once, which a test holds it
 /// to.
 const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
     ("Thermal", &["heater", "thermal_mass"]),
@@ -6578,13 +6572,13 @@ fn ends_of(
     home: &Home,
     dividers: Dividers,
 ) -> route::Ends {
-    tcslib_diagram::view::ends(
+    tcs_diagram::view::ends(
         &on_sheet(document, home, dividers),
         &line_on_sheet(link),
     )
 }
 
-/// Lists every node of the document as tcslib-diagram draws it, each saying
+/// Lists every node of the document as tcs-diagram draws it, each saying
 /// whether it is on `home`'s page.
 ///
 /// # Arguments
@@ -6601,8 +6595,8 @@ fn on_sheet<'a>(
     document: &'a Document,
     home: &Home,
     dividers: Dividers,
-) -> Vec<tcslib_diagram::view::OnSheet<'a>> {
-    use tcslib_diagram::view::{Drawn, OnSheet};
+) -> Vec<tcs_diagram::view::OnSheet<'a>> {
+    use tcs_diagram::view::{Drawn, OnSheet};
     document
         .nodes
         .iter()
@@ -6676,7 +6670,7 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
     let mut lines = Vec::new();
     for (terminal, nodes) in exports.each() {
         let Some((sink, _)) =
-            tcslib_protocol::graph::terminals::stream_of(terminal)
+            tcsprotocol::graph::terminals::stream_of(terminal)
         else {
             continue;
         };
@@ -6697,7 +6691,7 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
             if crossing {
                 continue;
             }
-            let outside = tcslib_protocol::graph::terminals::answers(terminal)
+            let outside = tcsprotocol::graph::terminals::answers(terminal)
                 .unwrap_or_default();
             lines.push(if sink {
                 Link::joining(NOT_JOINED_OUTSIDE, Some(outside), &at.node, None)
@@ -6714,7 +6708,7 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
     lines
 }
 
-/// Gives one of the document's links as tcslib-diagram draws it.
+/// Gives one of the document's links as tcs-diagram draws it.
 ///
 /// # Arguments
 ///
@@ -6723,8 +6717,8 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
 /// # Returns
 ///
 /// The link's ends, origin, input and comment, borrowed from it.
-fn line_on_sheet(link: &Link) -> tcslib_diagram::view::LineOnSheet<'_> {
-    tcslib_diagram::view::LineOnSheet {
+fn line_on_sheet(link: &Link) -> tcs_diagram::view::LineOnSheet<'_> {
+    tcs_diagram::view::LineOnSheet {
         from: &link.from,
         origin: link.origin.as_deref(),
         to: &link.to,
@@ -6891,7 +6885,7 @@ fn offers_model(offers: &[Offer]) -> ModelRc<JoinOffer> {
 ///
 /// a new line, from `from` to each terminal of the node it pairs with -- a
 /// `world-out` with a `world-in` and a `moc-out` with a `moc-in`, which is
-/// `tcslib_protocol::graph::terminals::pairs_with`, the rule the checking holds
+/// `tcsprotocol::graph::terminals::pairs_with`, the rule the checking holds
 /// a written-out configuration to. A line may be drawn from either end, so
 /// pressed on a sink this offers the node's source. Into a node that declares
 /// its inputs, as a mean does, one for each input, because which input a
@@ -6907,7 +6901,7 @@ fn offers_model(offers: &[Offer]) -> ModelRc<JoinOffer> {
 /// Greyed rather than left out: anything from a node to itself, a line the
 /// document has already, and a second line into an input something else feeds,
 /// unless the node takes several -- the ground's: see
-/// `tcslib_protocol::graph::terminals::merges`. An editor that cannot make a
+/// `tcsprotocol::graph::terminals::merges`. An editor that cannot make a
 /// bad link is worth more than one that makes it and explains afterwards.
 ///
 /// # Arguments
@@ -6943,12 +6937,11 @@ fn offered(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
         return box_offers(document, from, node);
     }
     let Some((sink_pressed, _)) =
-        tcslib_protocol::graph::terminals::stream_of(&from.terminal)
+        tcsprotocol::graph::terminals::stream_of(&from.terminal)
     else {
         return Vec::new();
     };
-    let Some(wanted) =
-        tcslib_protocol::graph::terminals::answers(&from.terminal)
+    let Some(wanted) = tcsprotocol::graph::terminals::answers(&from.terminal)
     else {
         return Vec::new();
     };
@@ -7145,7 +7138,7 @@ fn repeated(
 /// A sink is fed by one source: two would interleave two streams that
 /// nothing downstream could tell apart. The ground's is the exception, and
 /// takes as many as the configuration gives it: see
-/// `tcslib_protocol::graph::terminals::merges`.
+/// `tcsprotocol::graph::terminals::merges`.
 ///
 /// # Arguments
 ///
@@ -7166,13 +7159,13 @@ fn fed(
     except: Option<&Link>,
 ) -> Option<String> {
     let found = document.node(node)?;
-    if tcslib_protocol::graph::terminals::merges(&found.node_type) {
+    if tcsprotocol::graph::terminals::merges(&found.node_type) {
         return None;
     }
     // A declared input is told apart by its name, and a terminal by where the
     // drawing puts the lines arriving at it.
     let declared = input.filter(|input| {
-        tcslib_protocol::graph::terminals::stream_of(input).is_none()
+        tcsprotocol::graph::terminals::stream_of(input).is_none()
     });
     document
         .links
@@ -7310,13 +7303,13 @@ fn anchored(
     if let Some(held) = &from.holding {
         let ends = ends_of(document, held, home, dividers);
         let (sink_pressed, _) =
-            tcslib_protocol::graph::terminals::stream_of(&from.terminal)?;
+            tcsprotocol::graph::terminals::stream_of(&from.terminal)?;
         // The end that is not the one in hand.
         return Some(if sink_pressed { ends.from } else { ends.to });
     }
 
     // Taken from the page's own edge, which is the subdiagram's box seen
-    // from inside: see `tcslib_diagram::style::edge_box`.
+    // from inside: see `tcs_diagram::style::edge_box`.
     if home.as_deref() == Some(from.node.as_str()) {
         let (at, _) =
             style::edge_attachment(&from.terminal, inside_f(dividers))?;
@@ -7402,8 +7395,7 @@ fn edge_offers(
         .iter()
         .find(|t| t.spelling() == found.node_type)
         .is_some_and(|t| t.terminals().has(terminal));
-    let Some((sink, _)) =
-        tcslib_protocol::graph::terminals::stream_of(terminal)
+    let Some((sink, _)) = tcsprotocol::graph::terminals::stream_of(terminal)
     else {
         return Vec::new();
     };
@@ -7486,8 +7478,7 @@ fn outside_offers(
     if found.home.as_deref() != Some(home) {
         return Vec::new();
     }
-    let Some(wanted) = tcslib_protocol::graph::terminals::answers(terminal)
-    else {
+    let Some(wanted) = tcsprotocol::graph::terminals::answers(terminal) else {
         return Vec::new();
     };
     let bare = Qualified::parse(node).node;
@@ -7612,12 +7603,11 @@ fn reached_at(
 /// Each offer, greyed where it cannot be made, as `offered` greys them.
 fn box_offers(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
     let Some((sink_pressed, _)) =
-        tcslib_protocol::graph::terminals::stream_of(&from.terminal)
+        tcsprotocol::graph::terminals::stream_of(&from.terminal)
     else {
         return Vec::new();
     };
-    let Some(wanted) =
-        tcslib_protocol::graph::terminals::answers(&from.terminal)
+    let Some(wanted) = tcsprotocol::graph::terminals::answers(&from.terminal)
     else {
         return Vec::new();
     };
@@ -7659,10 +7649,8 @@ fn box_offers(document: &Document, from: &Drawing, node: &str) -> Vec<Offer> {
                 // is one a node declares.
                 let to = match (arriving_said.is_empty(), &input) {
                     (false, Some(input))
-                        if tcslib_protocol::graph::terminals::stream_of(
-                            input,
-                        )
-                        .is_none() =>
+                        if tcsprotocol::graph::terminals::stream_of(input)
+                            .is_none() =>
                     {
                         format!("{arriving_said}.{input}")
                     }
@@ -7834,11 +7822,11 @@ fn seed(editor: &mut Editor) {
     // one Undo deep rather than one per parameter: what was seeded was one
     // thing, and nobody asked for it a field at a time.
     let mut edits = Vec::new();
-    for (attribute, _) in tcslib_protocol::graph::parameters::ATTRIBUTES {
+    for (attribute, _) in tcsprotocol::graph::parameters::ATTRIBUTES {
         // Empty, with one exception the schema itself names: the beacon's
         // interval has an answer that is right until somebody has a reason,
         // where a socket has none. See `parameters::default_of`.
-        let now = tcslib_protocol::graph::parameters::default_of(attribute)
+        let now = tcsprotocol::graph::parameters::default_of(attribute)
             .unwrap_or_default()
             .to_string();
         edits.push(Edit::SetTcspecial {
@@ -8247,7 +8235,7 @@ fn stated(sets: &str) -> Vec<(String, String)> {
 
 /// Draws a node of this type as the window wants it.
 ///
-/// The look is tcslib-diagram's, which tcspecial's visual window draws from
+/// The look is tcs-diagram's, which tcspecial's visual window draws from
 /// too; this adds what only the editor has, which is whether it is selected.
 ///
 /// # Arguments
@@ -8255,7 +8243,7 @@ fn stated(sets: &str) -> Vec<(String, String)> {
 /// * `name`      - The node's name, as drawn.
 /// * `node_type` - Its type, as spelled in a file.
 /// * `function`  - Its `function`, where it states one: a compute node's
-///                 type line names it. See tcslib_diagram::view::type_line.
+///                 type line names it. See tcs_diagram::view::type_line.
 /// * `at`        - Its upper left corner.
 /// * `fault`     - What is wrong with it, if anything; only whether there is
 ///                 something is drawn.
@@ -8278,7 +8266,7 @@ fn view_of(
     summary: Option<&str>,
 ) -> NodeView {
     node_view(
-        tcslib_diagram::view::node_look(
+        tcs_diagram::view::node_look(
             name,
             node_type,
             function,
@@ -8294,14 +8282,14 @@ fn view_of(
 ///
 /// # Arguments
 ///
-/// * `look`     - The look tcslib-diagram gives the node.
+/// * `look`     - The look tcs-diagram gives the node.
 /// * `selected` - Whether it is drawn as chosen.
 ///
 /// # Returns
 ///
 /// The look, as the markup's `NodeView`.
-fn node_view(look: tcslib_diagram::view::NodeLook, selected: bool) -> NodeView {
-    let terminal = |look: tcslib_diagram::view::TerminalLook| TerminalView {
+fn node_view(look: tcs_diagram::view::NodeLook, selected: bool) -> NodeView {
+    let terminal = |look: tcs_diagram::view::TerminalLook| TerminalView {
         shown: look.shown,
         x: look.x,
         y: look.y,
@@ -8339,7 +8327,7 @@ fn node_view(look: tcslib_diagram::view::NodeLook, selected: bool) -> NodeView {
         terminal_row: look.terminal_row,
         type_left: look.type_band.0,
         type_right: look.type_band.1,
-        type_size: tcslib_diagram::style::TYPE_SIZE as f32,
+        type_size: tcs_diagram::style::TYPE_SIZE as f32,
     }
 }
 
@@ -8351,12 +8339,12 @@ fn node_view(look: tcslib_diagram::view::NodeLook, selected: bool) -> NodeView {
 ///
 /// # Arguments
 ///
-/// * `look` - The look tcslib-diagram gives the line.
+/// * `look` - The look tcs-diagram gives the line.
 ///
 /// # Returns
 ///
 /// The look, as the markup's `LinkView`.
-fn link_view(look: tcslib_diagram::view::LinkLook) -> LinkView {
+fn link_view(look: tcs_diagram::view::LinkLook) -> LinkView {
     LinkView {
         glow: colour(&look::lighter(&look.ink)),
         ink: colour(&look.ink),
@@ -8398,8 +8386,7 @@ fn line_under(
         .filter_map(|row| {
             let line = links.row_data(row)?;
             let away = route::distance_to(&line.route, at)?;
-            let reach =
-                tcslib_diagram::view::line_width(line.wide) / 2.0 + SLACK;
+            let reach = tcs_diagram::view::line_width(line.wide) / 2.0 + SLACK;
             (away <= reach).then_some((row, away))
         })
         .min_by(|a, b| a.1.total_cmp(&b.1))
@@ -8538,12 +8525,12 @@ fn the_physics_list_offers_every_type_once() {
         .flat_map(|(_, kinds)| kinds.iter().copied())
         .collect();
     offered.sort_unstable();
-    let mut known: Vec<&str> = tcslib_protocol::node::physics::TYPES.to_vec();
+    let mut known: Vec<&str> = tcsprotocol::node::physics::TYPES.to_vec();
     known.sort_unstable();
     assert_eq!(offered, known);
 }
 
-/// A hex string as a Slint colour. See tcslib_diagram::look::rgb.
+/// A hex string as a Slint colour. See tcs_diagram::look::rgb.
 fn colour(hex: &str) -> slint::Color {
     let (red, green, blue) = look::rgb(hex);
     slint::Color::from_argb_u8(0xff, red, green, blue)
@@ -8570,16 +8557,16 @@ mod tests {
                 .unwrap_or_else(|why| panic!("{}: {why}", path.display()))
         };
         read(root.join("ui/main.slint"))
-            + &read(root.join("../tcslib-diagram/ui/diagram.slint"))
+            + &read(root.join("../tcs-diagram/ui/diagram.slint"))
     }
 
-    // The palette, which moved to tcslib-diagram with the drawing and is held
+    // The palette, which moved to tcs-diagram with the drawing and is held
     // to its rules here, where sight.rs is.
     use super::*;
     use document::Document;
     use slint::Model;
     use style::ERROR_TINT;
-    use tcslib_diagram::look::{
+    use tcs_diagram::look::{
         came_later, ramp_order, tint_of, GATEWAY_LINE, GATEWAY_RUNGS, MARK,
         PAYLOAD_LINE, PAYLOAD_RUNGS, VEHICLE_RUNGS,
     };
@@ -8868,7 +8855,7 @@ mod tests {
         let shrink = 0.75;
         assert!(markup.contains("property <float> shrink: 0.75;"));
         let wanted =
-            ABOVE_THE_FIRST + tcslib_diagram::physics::SIZE.1 as f32 * shrink;
+            ABOVE_THE_FIRST + tcs_diagram::physics::SIZE.1 as f32 * shrink;
         let got = tall * settings::DEFAULT_LIST_PHYSICS as f32 / 100.0;
         assert!(
             got >= wanted,
@@ -9628,11 +9615,8 @@ mod tests {
 
         // The unfinished node is the rules' alone, and it is a concern about
         // the node, said as tcs-verify says it, and not an error.
-        let report = tcslib_verify::verify(
-            &path,
-            None,
-            tcslib_verify::Limits::EVERYTHING,
-        );
+        let report =
+            tcsverify::verify(&path, None, tcsverify::Limits::EVERYTHING);
         let warning = report
             .findings
             .iter()
@@ -9718,7 +9702,7 @@ mod tests {
     /// given, which would fill the menu's line before it said anything.
     #[test]
     fn an_error_in_a_file_is_said_by_the_file_name() {
-        let finding = tcslib_verify::Finding {
+        let finding = tcsverify::Finding {
             file: std::path::PathBuf::from(
                 "/home/someone/battery/battery-sim.yaml",
             ),
@@ -12559,7 +12543,7 @@ mod tests {
     /// asked it to cover.
     ///
     /// The bands are written down in `pane::NAMES` and drawn in
-    /// tcslib-diagram's `diagram.slint`, so this reads the markup and holds the
+    /// tcs-diagram's `diagram.slint`, so this reads the markup and holds the
     /// two against each other: a band made deeper in the window without this
     /// would leave the row reserved shallower than the row that is drawn, and a
     /// node would be placed over a name.
@@ -12637,12 +12621,12 @@ mod tests {
         let (top, height) = pane::NAMES;
         assert_eq!(top, 0, "a band is drawn, so it starts at the pane's top");
         // And Fonts.window is twelve points, which is sixteen pixels: see
-        // tcslib-ui/ui/fonts.slint.
+        // tcsui/ui/fonts.slint.
         let fonts = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../tcslib-ui/ui/fonts.slint"),
+                .join("../tcsui/ui/fonts.slint"),
         )
-        .expect("tcslib-ui's fonts read");
+        .expect("tcsui's fonts read");
         assert!(
             fonts.contains("out property <length> window: 12pt;"),
             "Fonts.window is no longer twelve points, so pane::NAMES is out of \
@@ -12960,11 +12944,11 @@ mod tests {
         // and answers none of them, because a value nobody chose looks as
         // chosen as one somebody did.
         let said = &editor.document().tcspecial;
-        for (attribute, _) in tcslib_protocol::graph::parameters::ATTRIBUTES {
+        for (attribute, _) in tcsprotocol::graph::parameters::ATTRIBUTES {
             assert_eq!(
                 said.get(*attribute).map(String::as_str),
                 Some(
-                    tcslib_protocol::graph::parameters::default_of(attribute)
+                    tcsprotocol::graph::parameters::default_of(attribute)
                         .unwrap_or("")
                 ),
                 "{attribute} should be offered with whatever it defaults to"
@@ -13964,7 +13948,7 @@ mod tests {
             world.placed.get(&name).copied(),
             // Kept from where the working panes begin, which the Physics
             // pane is left of: the sheet's point less its width.
-            Some(tcslib_diagram::physics::confine(
+            Some(tcs_diagram::physics::confine(
                 snap((into.0 - dividers().physics, into.1)),
                 dividers()
             )),
@@ -16139,18 +16123,17 @@ mod tests {
             .collect();
         let offered: Vec<String> =
             fields.iter().map(|f| f.name.to_string()).collect();
-        let expected: Vec<String> =
-            tcslib_protocol::graph::parameters::ATTRIBUTES
-                .iter()
-                .map(|(name, _)| (*name).to_string())
-                .collect();
+        let expected: Vec<String> = tcsprotocol::graph::parameters::ATTRIBUTES
+            .iter()
+            .map(|(name, _)| (*name).to_string())
+            .collect();
         assert_eq!(offered, expected, "the fields are not the attributes");
         // The seven that must be stated say so. Said and not insisted on:
         // an empty one is a question not yet answered, which is why none of
         // this is a fault.
         assert_eq!(
             fields.iter().filter(|f| f.required).count(),
-            tcslib_protocol::graph::parameters::ATTRIBUTES
+            tcsprotocol::graph::parameters::ATTRIBUTES
                 .iter()
                 .filter(|(_, needed)| needed.required(None))
                 .count()

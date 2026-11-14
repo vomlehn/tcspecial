@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcsprotocol/schema/tcspecial.xsd">
     <!-- Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst):
          choosing the gateway. The deck of stage 9, answering to an F´
          flight computer rather than to the ground by radio: the tcspecial
@@ -30,7 +30,7 @@
         <!-- The vehicle answers to an F´ flight computer. Its links are
              still the radio's, UDP in the radio's protocol, because the
              far end of each is the F´ deployment's TcsBridge component,
-             which is a ground station built on tcslib-moc-c as far as
+             which is a ground station built on tcsmoc-c as far as
              tcspecial can tell. -->
         <gateway>fprime</gateway>
         <interface>c7820f9bfe585feab72247ece0a2261d</interface>

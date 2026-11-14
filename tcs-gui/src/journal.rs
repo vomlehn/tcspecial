@@ -295,7 +295,7 @@ pub enum Edit {
     },
     /// A node of a subdiagram's file made reachable at one of its terminals
     /// from outside that file, or no longer reachable there: see
-    /// `tcslib_protocol::graph::exports`. `node` is its own name, as the file's
+    /// `tcsprotocol::graph::exports`. `node` is its own name, as the file's
     /// `exports` lists it. Undone by the same edit the other way.
     SetExport {
         home: String,
@@ -333,7 +333,7 @@ pub struct Link {
     pub from: String,
     /// Which data source of the origin the line leaves by, where the type has
     /// more than one. `None` is a node with one, which needs no naming -- see
-    /// `tcslib_protocol::graph::terminals`.
+    /// `tcsprotocol::graph::terminals`.
     ///
     /// Written into the file as part of the `from`:
     /// `from: through.world-out`. Kept apart from the name here because
@@ -349,7 +349,7 @@ pub struct Link {
     /// Two things are written here, because the file writes both in the same
     /// place: a computation's named input -- `in0` -- and a data sink of a type
     /// that has more than one, which is a terminal. Which it is, is a question
-    /// for the name: `tcslib_protocol::graph::terminals::stream_of` knows the
+    /// for the name: `tcsprotocol::graph::terminals::stream_of` knows the
     /// four terminals and nothing else does.
     pub input: Option<String>,
     /// The name the line arrives by, as the file wrote it after the dot:
@@ -454,7 +454,7 @@ impl Link {
         }
         match self.input.as_deref() {
             Some(input)
-                if tcslib_protocol::graph::terminals::stream_of(input)
+                if tcsprotocol::graph::terminals::stream_of(input)
                     .is_none() =>
             {
                 input.to_string()

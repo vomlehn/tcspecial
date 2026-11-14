@@ -394,7 +394,7 @@ that description holds, and the extra is not payload configuration: how often a
 payload produces a packet, and how it divides a packet into segments, are
 choices about a simulation. They are stated in a separate file, which only
 tcs-sim acts on. A shipped pair is <tt class="docutils literal">examples/minimal/minimal.ytcs</tt> and
-<tt class="docutils literal"><span class="pre">minimal-sim.yaml</span></tt> beside it; the parser is <tt class="docutils literal"><span class="pre">tcslib_protocol::sim_config</span></tt>.</p>
+<tt class="docutils literal"><span class="pre">minimal-sim.yaml</span></tt> beside it; the parser is <tt class="docutils literal"><span class="pre">tcsprotocol::sim_config</span></tt>.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The parser lives with the other three configuration languages rather than
@@ -773,7 +773,7 @@ The types are <tt class="docutils literal">heater</tt>, <tt class="docutils lite
 other is refused; a <tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was
 called before, is told the name it has now. A type is written once, with a
 component under it. Each type's settings, terminals and rules are stated
-once, in <tt class="docutils literal"><span class="pre">tcslib_protocol::node::physics</span></tt>; its arithmetic is the
+once, in <tt class="docutils literal"><span class="pre">tcsprotocol::node::physics</span></tt>; its arithmetic is the
 simulator's, in <tt class="docutils literal"><span class="pre">tcs_sim::physics</span></tt>.</dd>
 <dt>Requirement</dt>
 <dd>A <tt class="docutils literal">thermal_mass</tt> has two heaters of its own, <tt class="docutils literal">heater_1</tt> and
@@ -1115,7 +1115,7 @@ that no such sensor reaches, or that reaches no such heater, is refused.</dd>
 <dd>It reads what each sensor's simulated payload sends, as it leaves: a dropped
 reading never arrives, and a truncated or corrupted one arrives as the
 vehicle would see it. The bytes are read as the conversion the sensor feeds
-reads them, <tt class="docutils literal"><span class="pre">Format::counts</span></tt> in tcslib-protocol being the one reading both
+reads them, <tt class="docutils literal"><span class="pre">Format::counts</span></tt> in tcsprotocol being the one reading both
 use, and a reading that conversion would refuse is ignored.</dd>
 <dt>Requirement</dt>
 <dd>It decides on the median of each sensor's latest reading, as the example

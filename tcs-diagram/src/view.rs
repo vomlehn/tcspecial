@@ -1,0 +1,1017 @@
+//! What a page of a configuration looks like, as numbers and text.
+//!
+//! A node becomes a [`NodeLook`] and a line between two nodes a [`LinkLook`]:
+//! every path, size and colour the markup in `ui/diagram.slint` paints, worked
+//! out here where it can be tested. The editor turns these into the structs
+//! its window takes, and so does tcspecial's visual window, so that the two
+//! draw one configuration alike.
+//!
+//! What is drawn is said in the configuration's own terms and nothing more: a
+//! node is a name, a type and where it was put ([`OnSheet`]), and a line is
+//! the two ends it joins ([`LineOnSheet`]). Which page a node is on, what is
+//! selected and what is being dragged are the editor's, and it says so by
+//! which nodes and lines it hands over.
+
+use crate::look::{line_ink, tint_of, MARK};
+use crate::pane::size_of;
+use crate::route;
+use crate::style::{self, Edge, Face, NodeType, Outline, Weight, ERROR_TINT};
+
+/// One terminal of a node: whether its type has it, and where it is drawn.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerminalLook {
+    pub shown: bool,
+    pub x: f32,
+    pub y: f32,
+    /// Whether the arrow points right, towards the ground. See
+    /// [`style::Corner::rightward`].
+    pub rightward: bool,
+}
+
+/// One node, as the markup's `NodeView` wants it, but for the two things only
+/// a window knows: whether it is selected, and the colours as its toolkit's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodeLook {
+    pub name: String,
+    pub node_type: String,
+    /// What is written along the top of the node: see [`type_line`].
+    pub type_line: String,
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+    /// `square`, `rounded`, `parallelogram` or `hexagon`.
+    pub outline: &'static str,
+    pub shape: String,
+    pub edge: String,
+    pub inner: String,
+    pub border: f32,
+    /// `plain` or `mono`.
+    pub face: &'static str,
+    pub label_size: f32,
+    pub label_weight: i32,
+    pub label_italic: bool,
+    /// What the body is painted, as hex.
+    pub tint: String,
+    /// What is drawn on the body, as hex. See [`MARK`].
+    pub mark: &'static str,
+    pub faulty: bool,
+    pub summary: String,
+    pub openable: bool,
+    pub moc_in: TerminalLook,
+    pub moc_out: TerminalLook,
+    pub world_in: TerminalLook,
+    pub world_out: TerminalLook,
+    pub terminal_column: f32,
+    pub inset: f32,
+    /// How tall a row of terminals is: see [`style::TERMINAL_ROW`].
+    pub terminal_row: f32,
+    /// Where the type is written along the top, from the node's left side:
+    /// see [`style::type_band`].
+    pub type_band: (f32, f32),
+}
+
+/// What a subdiagram's box says of a page nobody is looking at: how many
+/// nodes it holds, and how many lines cross its edge. Those are the two
+/// things worth knowing about a diagram you are not looking at, and they
+/// are what "simplified" means here -- not a smaller drawing of the
+/// contents, which would be unreadable.
+///
+/// # Arguments
+///
+/// * `inside`   - How many nodes the subdiagram holds.
+/// * `crossing` - How many lines have one end inside it and one outside,
+///                one per destination.
+///
+/// # Returns
+///
+/// The line the box shows.
+pub fn box_summary(inside: usize, crossing: usize) -> String {
+    format!(
+        "{inside} node{} · {crossing} crossing{}",
+        if inside == 1 { "" } else { "s" },
+        if crossing == 1 { "" } else { "s" }
+    )
+}
+
+/// What the line along the top of a node says it is: its type, and for a
+/// compute node the function it computes.
+///
+/// A compute node is one type and many things -- a vote, a conversion to
+/// kelvin, a thermostat, a program -- and its shape and colour are the type's,
+/// so the line along its top is the one place that says which it is. A page of
+/// computations each written "compute" is a page whose reader has to open every
+/// node to find the thermostat. The function stands alone rather than after
+/// "compute, ": the shape already says compute, and the band between two
+/// terminals is narrow. One with no function yet says "compute", which is
+/// all that is known of it.
+///
+/// # Arguments
+///
+/// * `node_type` - The node type's spelling.
+/// * `function`  - The node's `function`, where it states one.
+///
+/// # Returns
+///
+/// The words to write.
+pub fn type_line(node_type: &str, function: Option<&str>) -> String {
+    match function.map(str::trim) {
+        Some(function) if node_type == "compute" && !function.is_empty() => {
+            function.to_string()
+        }
+        _ => node_type.to_string(),
+    }
+}
+
+/// What a node of this type looks like, at `at`.
+///
+/// `faulty` paints it in the error colour; `summary` is what a closed
+/// subdiagram holds, and nothing for any other type.
+///
+/// # Arguments
+///
+/// * `name`      - The node's name, as its label shows it.
+/// * `node_type` - The node type's spelling; a type this build does not
+///                 know is drawn as a small square in the error colour.
+/// * `function`  - The node's `function`, where it states one: see
+///                 [`type_line`].
+/// * `at`        - Where the node's upper left corner is, in pixels.
+/// * `faulty`    - Whether the node is marked faulty.
+/// * `summary`   - What a closed subdiagram holds, or `None`.
+///
+/// # Returns
+///
+/// Everything the markup needs to draw the node.
+pub fn node_look(
+    name: &str,
+    node_type: &str,
+    function: Option<&str>,
+    at: (i32, i32),
+    faulty: bool,
+    summary: Option<&str>,
+) -> NodeLook {
+    let found = NodeType::ALL.iter().find(|t| t.spelling() == node_type);
+    let appearance = found.map(|t| t.appearance());
+    let terminals = found.map(|t| t.terminals()).unwrap_or(style::Terminals {
+        sinks: &[],
+        sources: &[],
+    });
+
+    // A type this build does not know is drawn as a small open square, which
+    // is a shape no real type uses, and marked faulty. Showing it beats
+    // refusing to open the file: a configuration written for a later build is
+    // readable, and what cannot be placed is visibly what cannot be placed.
+    let (
+        outline,
+        edge,
+        weight,
+        size,
+        tint,
+        face,
+        label_size,
+        label_weight,
+        label_italic,
+    ) = match appearance {
+        Some(a) => (
+            a.outline,
+            a.edge,
+            a.weight,
+            a.size,
+            tint_of(node_type),
+            a.face,
+            a.label_size,
+            a.label_weight,
+            a.label_italic,
+        ),
+        None => (
+            Outline::Square,
+            Edge::Single,
+            Weight::Narrow,
+            (104u32, 40u32),
+            ERROR_TINT.to_string(),
+            Face::Plain,
+            11,
+            400,
+            true,
+        ),
+    };
+
+    NodeLook {
+        name: name.to_string(),
+        node_type: node_type.to_string(),
+        type_line: type_line(node_type, function),
+        x: at.0 as f32,
+        y: at.1 as f32,
+        width: size.0 as f32,
+        height: size.1 as f32,
+        outline: match outline {
+            Outline::Square => "square",
+            Outline::Rounded => "rounded",
+            Outline::Parallelogram => "parallelogram",
+            Outline::Hexagon => "hexagon",
+        },
+        // The shape to fill, the line to stroke and the second line of a
+        // doubled edge, all as paths in the node's own coordinates, for every
+        // outline. See style::polygon_of, which all three come from.
+        shape: style::shape_of(outline, size),
+        edge: style::edge_of(outline, edge, size),
+        inner: style::inner_of(outline, edge, size),
+        border: match weight {
+            Weight::Narrow => 1.0,
+            Weight::Wide => 3.0,
+        },
+        face: match face {
+            Face::Plain => "plain",
+            Face::Mono => "mono",
+        },
+        label_size: label_size as f32,
+        label_weight: label_weight as i32,
+        label_italic,
+        tint,
+        // What is drawn *on* the body, now that the body is painted in the
+        // tint: see NodeView::mark.
+        mark: MARK,
+        faulty,
+        summary: summary.unwrap_or_default().to_string(),
+        // A diagram of its own can be opened; nothing else can.
+        openable: node_type == "subdiagram",
+        // The terminals this type has, each drawn in its own corner. A type
+        // this build does not know has none: the shape already says it cannot
+        // be placed, and four arrows on it would be four claims about a type
+        // nothing here can describe.
+        moc_in: terminal_look("moc-in", terminals, outline, size, at),
+        moc_out: terminal_look("moc-out", terminals, outline, size, at),
+        world_in: terminal_look("world-in", terminals, outline, size, at),
+        world_out: terminal_look("world-out", terminals, outline, size, at),
+        // The column the name is padded away from, plus whatever the outline
+        // is missing at its widest: a slanted shape moves its terminals in,
+        // and a name padded by the column alone would be padded into them.
+        terminal_column: (style::TERMINAL_COLUMN as i32
+            + style::room_of(outline, size)) as f32,
+        // The room anything drawn inside the shape has to leave at the sides,
+        // which is nothing unless the shape leans: see style::room_of.
+        inset: style::room_of(outline, size) as f32,
+        terminal_row: style::TERMINAL_ROW as f32,
+        type_band: {
+            let (left, right) = style::type_band(
+                outline,
+                size,
+                at,
+                (terminals.has("world-in"), terminals.has("world-out")),
+            );
+            (left as f32, right as f32)
+        },
+    }
+}
+
+/// One terminal of a node.
+///
+/// Whether this type has it and where it goes. The corner and the arrow are
+/// `style`'s to say -- see [`style::corner_of`] -- so that the rule "the
+/// vehicleward stream along the top going right, the groundward stream along
+/// the bottom going left" is stated once and tested where it is stated.
+///
+/// # Arguments
+///
+/// * `terminal`  - The terminal's name.
+/// * `terminals` - The terminals the node's type has.
+/// * `outline`   - The node's outline.
+/// * `size`      - The node's width and height, in pixels.
+/// * `at`        - Where the node is, in pixels, which is what puts each
+///                 terminal on the grid: see `style::terminal_at`.
+///
+/// # Returns
+///
+/// Whether the terminal is shown, where its box goes relative to the
+/// node, and whether its arrow points right.
+fn terminal_look(
+    terminal: &str,
+    terminals: style::Terminals,
+    outline: Outline,
+    size: (u32, u32),
+    at: (i32, i32),
+) -> TerminalLook {
+    let corner = style::corner_of(terminal);
+    let (x, y) = corner
+        .map(|corner| style::terminal_at(outline, corner, size, at))
+        .unwrap_or_default();
+    TerminalLook {
+        shown: terminals.has(terminal),
+        x: x as f32,
+        y: y as f32,
+        rightward: corner.is_some_and(|corner| corner.rightward),
+    }
+}
+
+/// A node, as a drawing needs it: what it is called, what it is and where it
+/// was put.
+///
+/// `here` says whether it is on the page being drawn. A node on another page
+/// is still handed over, because a line to it is drawn to a stub whose height
+/// is taken from it.
+///
+/// `name` is the name the lines use for it, which for a node on a subdiagram's
+/// page is the name qualified by that page -- `zone/temp_1` -- and so not
+/// always a name the configuration wrote down.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OnSheet<'a> {
+    pub name: String,
+    pub node_type: &'a str,
+    pub at: (i32, i32),
+    pub here: bool,
+    /// Where its lines are drawn to: see [`Drawn`].
+    pub drawn: Drawn,
+}
+
+/// Where a node's lines are drawn to on a page.
+///
+/// A line between two files of a configuration crosses the edge of an included
+/// file -- see `tcsprotocol::graph::exports` -- and is drawn to that edge
+/// on both sides of it: to the subdiagram's box on the page the box is on, and
+/// to the page's own edge on the subdiagram's page. Either way the line is
+/// labelled with the node it really reaches, the edge saying no more than which
+/// way the data goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Drawn {
+    /// Where it is, or a stub where it is on another page.
+    #[default]
+    Itself,
+    /// At the terminals of its subdiagram's box, which is the node's `at`
+    /// and `node_type` here.
+    AtItsBox,
+    /// At the edge of the subdiagram's page being drawn, being outside it:
+    /// the terminal facing the node's own, in the margin past what is inside
+    /// the page, which begins and ends here. See [`style::edge_box`].
+    AtTheEdge(i32, i32),
+}
+
+/// One line between two nodes, as a drawing needs it.
+///
+/// One per destination, as the configuration's links are read: a link to
+/// three places is three lines. `origin` is the terminal it leaves by and
+/// `input` the input or terminal it arrives at, where the file names them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineOnSheet<'a> {
+    pub from: &'a str,
+    pub origin: Option<&'a str>,
+    pub to: &'a str,
+    pub input: Option<&'a str>,
+    pub comment: Option<&'a str>,
+}
+
+/// One line, as the markup's `LinkView` wants it, but for the colours as its
+/// toolkit's.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkLook {
+    /// What it is drawn in, as hex, which says which stream it carries: see
+    /// [`line_ink`].
+    pub ink: String,
+    pub route: String,
+    pub head: String,
+    pub marker: String,
+    pub label_x: f32,
+    pub label_y: f32,
+    /// A line into a named input, drawn wide.
+    pub wide: bool,
+    pub label: String,
+    pub comment: String,
+    /// What a pointer resting on the line is told: which node and input it
+    /// leaves and reaches, and what somebody wrote about it. See [`tip_of`].
+    pub tip: String,
+}
+
+/// How wide a line is drawn, as the markup draws it: a link into a named
+/// input wide, and one into a node's only input narrow.
+///
+/// Here as well as in the markup so that a window drawing something in
+/// proportion to a line -- tcspecial's lit line, three times as wide -- has
+/// the line's width to be in proportion to.
+///
+/// # Arguments
+///
+/// * `wide` - Whether the line goes into a named input.
+///
+/// # Returns
+///
+/// The line's width, in pixels.
+pub fn line_width(wide: bool) -> f32 {
+    if wide {
+        WIDE_LINE
+    } else {
+        NARROW_LINE
+    }
+}
+
+/// The two widths of a line, in pixels. `LinkLine` in `ui/diagram.slint`
+/// draws them, and a test holds the two to each other.
+pub const NARROW_LINE: f32 = 2.5;
+pub const WIDE_LINE: f32 = 5.0;
+
+/// The node of this name, among `nodes`.
+fn node<'a>(nodes: &'a [OnSheet<'a>], name: &str) -> Option<&'a OnSheet<'a>> {
+    nodes.iter().find(|node| node.name == name)
+}
+
+/// Where a line starts and finishes, and which way it points at each end.
+///
+/// Each end at the terminal it is attached to, which is where the line has to
+/// start and finish now that a link is drawn from a terminal: a line that left
+/// the middle of a node's right edge while its arrow sat in the lower left
+/// corner would be two statements about one link. See [`style::attachment`].
+///
+/// The direction comes with the point, and that is the other half of it. A
+/// vehicleward link leaves a node's left side and arrives at the next one's
+/// right side, so "out of the source, across, into the target" is no longer
+/// always left to right -- see [`route::Ends`].
+///
+/// An end on another page is a stub: at the left edge for a line arriving
+/// from elsewhere, and to the right of its source for one leaving.
+///
+/// # Arguments
+///
+/// * `nodes` - Every node the page's lines may reach, on this page or
+///             another.
+/// * `line`  - The line.
+///
+/// # Returns
+///
+/// The line's two ends and the way it points at each.
+pub fn ends(nodes: &[OnSheet], line: &LineOnSheet) -> route::Ends {
+    let from = node(nodes, line.from);
+    let to = node(nodes, line.to);
+
+    let joined = |node: &OnSheet, named: Option<&str>, sink: bool| {
+        let terminal = style::terminal_for(node.node_type, named, sink)?;
+        style::attachment(node.node_type, node.at, terminal)
+    };
+    // Which data sink the line arrives at, where the link does not say. The one
+    // that pairs with the source it left: a link leaving `moc-out` arrives at a
+    // `moc-in`, that being the same stream named at its other end -- see
+    // tcsprotocol::graph::terminals::answers. Without this the drawing fell
+    // back to the groundward sink whatever the link carried, so a command from
+    // the ground was drawn arriving at the corner the readings leave by.
+    let pairing = |from: Option<&OnSheet>, origin: Option<&str>| {
+        let from = from?;
+        let leaves = style::terminal_for(from.node_type, origin, false)?;
+        tcsprotocol::graph::terminals::answers(leaves)
+    };
+
+    // A node outside a subdiagram's page, drawn at the page's edge: at the
+    // edge terminal facing its own, a `world-out` outside being a
+    // `world-in` at the edge.
+    let at_the_edge = |node: &OnSheet, own: Option<&str>| {
+        let Drawn::AtTheEdge(left, right) = node.drawn else {
+            return None;
+        };
+        let facing = tcsprotocol::graph::terminals::answers(own?)?;
+        style::edge_attachment(facing, (left as f32, right as f32))
+    };
+
+    let ((x1, y1), leaves_right) = match from {
+        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(..)) => {
+            at_the_edge(
+                node,
+                style::terminal_for(node.node_type, line.origin, false),
+            )
+            .unwrap_or(((0.0, 24.0), true))
+        }
+        Some(node) if node.here => joined(node, line.origin, false)
+            .unwrap_or_else(|| {
+                // A type this build does not know, drawn as a node with no
+                // terminals: the middle of its right edge, where every link
+                // used to leave.
+                let (w, h) = size_of(node.node_type);
+                (
+                    (
+                        (node.at.0 + w as i32) as f32,
+                        (node.at.1 + h as i32 / 2) as f32,
+                    ),
+                    true,
+                )
+            }),
+        // Off this page: a stub at the left edge.
+        _ => (
+            (0.0, to.map(|n| n.at.1 as f32 + 24.0).unwrap_or(24.0)),
+            true,
+        ),
+    };
+    let ((x2, y2), arrives_right) = match to {
+        Some(node) if matches!(node.drawn, Drawn::AtTheEdge(..)) => {
+            // The terminal the line arrives at outside, which is the one
+            // that pairs with where it leaves.
+            let arrives = pairing(from, line.origin);
+            at_the_edge(node, arrives).unwrap_or(((x1 + 72.0, y1), true))
+        }
+        Some(node) if node.here => {
+            // What the link wrote, where that is a terminal this type has; the
+            // terminal that pairs with the source otherwise. A computation's
+            // own input -- `in0` -- is neither, and falls through to the
+            // pairing one: a mean's three lines arrive where its readings do.
+            let wanted = line
+                .input
+                .filter(|input| {
+                    NodeType::ALL
+                        .iter()
+                        .find(|t| t.spelling() == node.node_type)
+                        .is_some_and(|t| t.terminals().has(input))
+                })
+                .or_else(|| pairing(from, line.origin));
+            joined(node, wanted, true).unwrap_or_else(|| {
+                let (_, h) = size_of(node.node_type);
+                ((node.at.0 as f32, (node.at.1 + h as i32 / 2) as f32), true)
+            })
+        }
+        // Off this page: a stub to the right of its source.
+        _ => ((x1 + 72.0, y1), true),
+    };
+
+    route::Ends::new((x1, y1), (x2, y2), leaves_right, arrives_right)
+}
+
+/// Whether a node of this name is on the page.
+fn here(nodes: &[OnSheet], name: &str) -> bool {
+    node(nodes, name).is_some_and(|node| node.here)
+}
+
+/// What every line looks like, in the order given.
+///
+/// Each is laid clear of the ones laid before it -- two lines that run along
+/// one track are one line on the screen, and the one drawn first is not on it
+/// at all; see [`route::lay`] -- so the order is the order of the file, and
+/// the same configuration is drawn the same way every time it is opened.
+///
+/// `lines` is the lines of this page: each has at least one end on it, and
+/// one whose other end is elsewhere is drawn to a stub, labelled with the far
+/// node's name.
+///
+/// # Arguments
+///
+/// * `nodes` - Every node the lines may reach, on this page or another.
+/// * `lines` - The page's lines, in the order the configuration holds them.
+///
+/// # Returns
+///
+/// Each line's look, in the same order.
+pub fn link_looks(nodes: &[OnSheet], lines: &[LineOnSheet]) -> Vec<LinkLook> {
+    // What a line may not run through: every node on this page, where it is
+    // and how big it is. Worked out once for the page rather than once per
+    // link, and handed to the router, which knows about geometry and nothing
+    // about documents.
+    let obstacles: Vec<route::Obstacle> = nodes
+        .iter()
+        .filter(|node| node.here && node.drawn == Drawn::Itself)
+        .map(|node| {
+            let (width, height) = size_of(node.node_type);
+            route::Obstacle::new(
+                node.at.0 as f32,
+                node.at.1 as f32,
+                width as f32,
+                height as f32,
+            )
+        })
+        .collect();
+
+    let mut taken: Vec<Vec<(f32, f32)>> = Vec::new();
+    // The comments already drawn, each with the node its line leaves. A
+    // comment written over a list of links -- the thermostat's, over the two
+    // heaters it drives -- is the list's, and each line in it carries it; drawn
+    // on every one, it is the same words twice, laid over each other where the
+    // lines run together. Drawn on the first line of the list only, and kept
+    // on all of them, so the file is written as it was.
+    let mut commented: Vec<(&str, &str)> = Vec::new();
+    // The labels already placed, as boxes: see `label_box`.
+    let mut labelled: Vec<(f32, f32, f32, f32)> = Vec::new();
+    lines
+        .iter()
+        .map(|line| {
+            let ends = ends(nodes, line);
+
+            // The label says which input it arrives at, and names the far
+            // node where that node is on another page.
+            let from_here = here(nodes, line.from);
+            let crossing = !from_here || !here(nodes, line.to);
+            let far_end = if from_here { line.to } else { line.from };
+            // And the node an edge stands for, where an end is drawn at one:
+            // by its own name, the edge already saying which file it is in.
+            let stood_for = [line.from, line.to].into_iter().find(|name| {
+                node(nodes, name).is_some_and(|n| n.drawn != Drawn::Itself)
+            });
+            let (crossing, far_end) = match stood_for {
+                Some(name) => (true, name.rsplit('/').next().unwrap_or(name)),
+                None => (crossing, far_end),
+            };
+            //
+            // A terminal is not one of those, and is not labelled: it is drawn
+            // as the corner the line is attached to and as the arrow in it,
+            // which says the same thing in the place a reader is already
+            // looking. A label reading "world-in" beside every line would
+            // be the name of the thing the picture is showing.
+            let named_input = line.input.filter(|input| {
+                tcsprotocol::graph::terminals::stream_of(input).is_none()
+            });
+            let label = match (named_input, crossing) {
+                (Some(input), false) => input.to_string(),
+                (Some(input), true) => format!("{far_end} . {input}"),
+                (None, true) => far_end.to_string(),
+                (None, false) => String::new(),
+            };
+
+            // The line itself, laid once and clear of the lines already laid.
+            // Everything else about its drawing comes from these points, so
+            // the path, the marker and the label cannot disagree about where
+            // the line went.
+            let points = route::lay(ends, &obstacles, &taken);
+            let drawn = route::drawn_route(&points);
+            let marker = route::marker_on(&points);
+            // The label goes at the middle of the route's longest run, which
+            // is on the line wherever the line had to go -- or along that run
+            // from the middle, where a label already placed is there: lines
+            // that run side by side have their middles side by side.
+            let size = label_size(&label);
+            let (label_x, label_y) = route::label_places(ends, &points, size)
+                .into_iter()
+                .find(|at| {
+                    let mine = label_box(*at, size);
+                    !labelled.iter().any(|theirs| overlap(mine, *theirs))
+                })
+                .unwrap_or_else(|| route::label_on(ends, &points));
+            if !label.is_empty() {
+                labelled.push(label_box((label_x, label_y), size));
+            }
+            taken.push(points);
+
+            LinkLook {
+                // Which stream it carries, as a colour: see `line_ink`.
+                ink: line_ink(node(nodes, line.from).and_then(|from| {
+                    style::terminal_for(from.node_type, line.origin, false)
+                })),
+                route: drawn,
+                head: route::arrow(ends),
+                marker,
+                label_x,
+                label_y,
+                wide: named_input.is_some(),
+                label,
+                comment: match line.comment {
+                    Some(said) if !commented.contains(&(line.from, said)) => {
+                        commented.push((line.from, said));
+                        said.to_string()
+                    }
+                    _ => String::new(),
+                },
+                tip: tip_of(line.from, line.to, named_input, line.comment),
+            }
+        })
+        .collect()
+}
+
+/// What a pointer resting on a line is told about it: the node it leaves,
+/// the node it reaches and the input there where it names one, and under
+/// those whatever somebody wrote about it.
+///
+/// Said whole, on every line, where the drawing must be brief: a comment
+/// written over a list of links is drawn on the first of them only, and a
+/// label at all only where an input is named, but a person pointing at one
+/// line is asking about that line.
+///
+/// # Arguments
+///
+/// * `from`    - The node the line leaves, or a component's terminal.
+/// * `to`      - The node it reaches, or a component's terminal.
+/// * `input`   - The input it arrives at, where it names one.
+/// * `comment` - What somebody wrote about it, if anything.
+///
+/// # Returns
+///
+/// The tip: the ends on one line, and each paragraph of the comment on
+/// one of its own.
+pub fn tip_of(
+    from: &str,
+    to: &str,
+    input: Option<&str>,
+    comment: Option<&str>,
+) -> String {
+    let mut tip = match input {
+        Some(input) => format!("{from} \u{2192} {to}.{input}"),
+        None => format!("{from} \u{2192} {to}"),
+    };
+    // The comment's own line breaks are where its file was wrapped, which
+    // is not where the tip is: each paragraph is run together, for the tip
+    // to wrap at its own width.
+    for paragraph in comment.unwrap_or_default().split("\n\n") {
+        let mut words = paragraph.split_whitespace().peekable();
+        if words.peek().is_some() {
+            tip.push('\n');
+            tip.push_str(&words.collect::<Vec<_>>().join(" "));
+        }
+    }
+    tip
+}
+
+/// About how much room a link's label takes, in pixels: as wide as its
+/// letters and one line of the window's type tall.
+///
+/// An estimate, because the width of a string is the toolkit's to know and
+/// this is worked out before anything is drawn. Generous rather than tight:
+/// labels kept a little further apart than they needed to be are still read,
+/// where two that touch are not.
+///
+/// # Arguments
+///
+/// * `label` - What the label says.
+///
+/// # Returns
+///
+/// Its width and height; nothing for no label.
+fn label_size(label: &str) -> (f32, f32) {
+    // Twelve points is sixteen pixels; a letter is about half of that wide,
+    // and a line a third again as tall.
+    const LETTER: f32 = 8.0;
+    const LINE: f32 = 21.0;
+    if label.is_empty() {
+        (0.0, 0.0)
+    } else {
+        (label.chars().count() as f32 * LETTER, LINE)
+    }
+}
+
+/// Where a label put at `at` is drawn, as its left, top, right and bottom.
+///
+/// The markup writes a label from `at` rightwards, its top fourteen pixels
+/// above it: see `ui/diagram.slint`.
+///
+/// # Arguments
+///
+/// * `at`   - Where the label is put, in pixels.
+/// * `size` - Its width and height, as `label_size` gives them.
+///
+/// # Returns
+///
+/// The box.
+fn label_box(at: (f32, f32), size: (f32, f32)) -> (f32, f32, f32, f32) {
+    let top = at.1 - 14.0;
+    (at.0, top, at.0 + size.0, top + size.1)
+}
+
+/// Whether two boxes overlap, edges touching not counted.
+///
+/// # Arguments
+///
+/// * `a` - One box, as `label_box` gives it.
+/// * `b` - The other.
+///
+/// # Returns
+///
+/// Whether some area is in both.
+fn overlap(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> bool {
+    a.0 < b.2 && b.0 < a.2 && a.1 < b.3 && b.1 < a.3
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A comment over a list of links is drawn once, on the first, though
+    /// every line in the list carries it; one of another node's is drawn as
+    /// well.
+    #[test]
+    fn a_comment_over_several_lines_is_drawn_once() {
+        let at = |name: &'static str, node_type, x| OnSheet {
+            name: name.into(),
+            node_type,
+            at: (x, 40),
+            here: true,
+            drawn: Drawn::Itself,
+        };
+        let nodes = [
+            at("thermostat", "compute", 400),
+            at("heater1", "gpio_out", 40),
+            at("heater2", "gpio_out", 40),
+            at("log", "log", 600),
+        ];
+        let said = "asserted below the setpoint";
+        let line = |from, to, origin| LineOnSheet {
+            from,
+            origin: Some(origin),
+            to,
+            input: None,
+            comment: Some(said),
+        };
+        let lines = [
+            line("thermostat", "heater1", "moc-out"),
+            line("thermostat", "heater2", "moc-out"),
+            line("log", "heater1", "moc-out"),
+        ];
+        let drawn: Vec<String> = link_looks(&nodes, &lines)
+            .into_iter()
+            .map(|look| look.comment)
+            .collect();
+        assert_eq!(drawn, [said, "", said]);
+
+        // The tip is each line's own, so every line of the list says it.
+        let tips: Vec<String> = link_looks(&nodes, &lines)
+            .into_iter()
+            .map(|look| look.tip)
+            .collect();
+        assert_eq!(
+            tips,
+            [
+                format!("thermostat \u{2192} heater1\n{said}"),
+                format!("thermostat \u{2192} heater2\n{said}"),
+                format!("log \u{2192} heater1\n{said}"),
+            ]
+        );
+    }
+
+    /// A tip names both ends, and the input where the line names one, and
+    /// runs each paragraph of a comment together, the file's line breaks
+    /// being where the file was wrapped and not where the tip is.
+    #[test]
+    fn a_tip_names_both_ends_and_rewraps_its_comment() {
+        assert_eq!(tip_of("a", "b", None, None), "a \u{2192} b");
+        assert_eq!(tip_of("a", "b", Some("x"), Some("")), "a \u{2192} b.x");
+        assert_eq!(
+            tip_of("a", "b", None, Some("one\n  two\n\nthree\n")),
+            "a \u{2192} b\none two\nthree"
+        );
+    }
+
+    /// Lines that run side by side have their labels apart, each still on
+    /// its own line, where at the middles of their runs the labels were
+    /// written over each other.
+    #[test]
+    fn the_labels_of_lines_side_by_side_do_not_overlap() {
+        let at = |name: &'static str, node_type, x, y| OnSheet {
+            name: name.into(),
+            node_type,
+            at: (x, y),
+            here: true,
+            drawn: Drawn::Itself,
+        };
+        let nodes =
+            [at("sensor", "i2c", 40, 40), at("mean", "compute", 400, 400)];
+        let line = |input| LineOnSheet {
+            from: "sensor",
+            origin: Some("world-out"),
+            to: "mean",
+            input: Some(input),
+            comment: None,
+        };
+        let lines = [line("in0"), line("in1"), line("in2"), line("in3")];
+        let looks = link_looks(&nodes, &lines);
+        let boxes: Vec<_> = looks
+            .iter()
+            .map(|look| {
+                label_box((look.label_x, look.label_y), label_size(&look.label))
+            })
+            .collect();
+        for (n, one) in boxes.iter().enumerate() {
+            for two in &boxes[n + 1..] {
+                assert!(
+                    !overlap(*one, *two),
+                    "labels over each other: {boxes:?}"
+                );
+            }
+        }
+    }
+
+    /// A compute node's type line names its function, and every other node's
+    /// its type; and the markup writes that line, not the type.
+    #[test]
+    fn a_compute_node_is_called_by_its_function() {
+        assert_eq!(type_line("compute", Some("vote")), "vote");
+        assert_eq!(type_line("compute", Some("thermostat")), "thermostat");
+        // Not yet answered: all that is known is that it computes.
+        assert_eq!(type_line("compute", None), "compute");
+        assert_eq!(type_line("compute", Some(" ")), "compute");
+        // A function on anything else is no part of what it is.
+        assert_eq!(type_line("log", Some("vote")), "log");
+        let look =
+            node_look("ambient", "compute", Some("vote"), (0, 0), false, None);
+        assert_eq!(
+            (look.node_type.as_str(), look.type_line.as_str()),
+            ("compute", "vote")
+        );
+        assert!(
+            include_str!("../ui/diagram.slint")
+                .contains("text: node.type-line;"),
+            "NodeShape no longer writes the type line along the top"
+        );
+    }
+
+    /// The markup draws the two widths this says, so a window drawing in
+    /// proportion to a line is in proportion to the line it can see.
+    #[test]
+    fn the_widths_are_the_ones_the_markup_draws() {
+        let markup = include_str!("../ui/diagram.slint");
+        assert!(
+            markup.contains(&format!(
+                "stroke-width: link.wide ? {WIDE_LINE}px : {NARROW_LINE}px;"
+            )),
+            "LinkLine no longer draws {WIDE_LINE}px and {NARROW_LINE}px"
+        );
+        // And a lit line, under it, three times as wide.
+        assert!(
+            markup.contains(&format!(
+                "stroke-width: 3 * (link.wide ? {WIDE_LINE}px : \
+                 {NARROW_LINE}px);"
+            )),
+            "a lit line is no longer three times the width of the line it \
+             lights"
+        );
+    }
+
+    /// A line that crosses a subdiagram's edge is drawn to it: to the box's
+    /// terminal on the page the box is on, and to the page's own edge on the
+    /// subdiagram's page, labelled either way with the node it reaches.
+    #[test]
+    fn a_line_across_a_subdiagrams_edge_is_drawn_to_it() {
+        let line = LineOnSheet {
+            from: "temp_1",
+            origin: Some("world-out"),
+            to: "zone/temp1",
+            input: None,
+            comment: None,
+        };
+
+        // On the top page, at the box's world-in.
+        let top = [
+            OnSheet {
+                name: "temp_1".into(),
+                node_type: "i2c",
+                at: (40, 80),
+                here: true,
+                drawn: Drawn::Itself,
+            },
+            OnSheet {
+                name: "zone/temp1".into(),
+                node_type: "subdiagram",
+                at: (400, 80),
+                here: true,
+                drawn: Drawn::AtItsBox,
+            },
+        ];
+        let ((x, y), _) =
+            style::attachment("subdiagram", (400, 80), "world-in").unwrap();
+        assert_eq!(ends(&top, &line).to, (x, y));
+        assert_eq!(link_looks(&top, &[line])[0].label, "temp1");
+
+        // And on the subdiagram's page, from the edge's world-in.
+        let inside = [
+            OnSheet {
+                name: "temp_1".into(),
+                node_type: "i2c",
+                at: (40, 80),
+                here: false,
+                drawn: Drawn::AtTheEdge(-200, 960),
+            },
+            OnSheet {
+                name: "zone/temp1".into(),
+                node_type: "compute",
+                at: (400, 80),
+                here: true,
+                drawn: Drawn::Itself,
+            },
+        ];
+        let (at, _) =
+            style::edge_attachment("world-in", (-200.0, 960.0)).unwrap();
+        assert_eq!(ends(&inside, &line).from, at);
+        assert_eq!(link_looks(&inside, &[line])[0].label, "temp_1");
+    }
+
+    /// A line between two nodes on the page leaves the one and reaches the
+    /// other, in the colour of the stream it carries, and is labelled with
+    /// the named input it arrives at.
+    #[test]
+    fn a_line_between_two_nodes_is_drawn_in_its_streams_colour() {
+        let nodes = [
+            OnSheet {
+                name: "temp".into(),
+                node_type: "i2c",
+                at: (40, 80),
+                here: true,
+                drawn: Default::default(),
+            },
+            OnSheet {
+                name: "mean".into(),
+                node_type: "compute",
+                at: (400, 80),
+                here: true,
+                drawn: Default::default(),
+            },
+        ];
+        let lines = [LineOnSheet {
+            from: "temp",
+            origin: None,
+            to: "mean",
+            input: Some("in0"),
+            comment: None,
+        }];
+        let looks = link_looks(&nodes, &lines);
+        assert_eq!(looks.len(), 1);
+        assert_eq!(looks[0].ink, crate::look::PAYLOAD_LINE);
+        assert_eq!(looks[0].label, "in0");
+        assert!(looks[0].wide);
+        assert!(looks[0].route.starts_with('M'), "{}", looks[0].route);
+    }
+}

@@ -75,7 +75,7 @@ pub fn run_udp_node(
     // configuration gives, and the answer goes back to whoever asked. The
     // rule is the vehicle's own, so the two ends cannot disagree about it.
     let speaks_first =
-        tcslib_protocol::graph::interface::speaks_first(true, config.triggered);
+        tcsprotocol::graph::interface::speaks_first(true, config.triggered);
 
     // What this end answers from. Nothing has to find a device that speaks
     // first at a particular port -- the handler learns where it is from the
@@ -283,8 +283,8 @@ mod tests {
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslib_protocol::Faults;
-    use tcslib_protocol::Timestamp;
+    use tcsprotocol::Faults;
+    use tcsprotocol::Timestamp;
 
     /// A UDP device sends because it is running, not because it was asked.
     ///

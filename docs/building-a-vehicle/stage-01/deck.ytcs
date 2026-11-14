@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # Stage 1 of "Building a Vehicle" (docs/building-a-vehicle.rst): one payload,
 # the seismometer, its readings going straight to the ground. It is

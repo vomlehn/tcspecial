@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # Stage 8 of "Building a Vehicle" (docs/building-a-vehicle.rst): a log aboard.
 # The science subsystem keeps what it measures in a log node, for when the link

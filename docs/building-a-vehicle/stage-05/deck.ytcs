@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # Stage 5 of "Building a Vehicle" (docs/building-a-vehicle.rst): rates and
 # groups. The seismometer and the regolith thermometer are read together, as a

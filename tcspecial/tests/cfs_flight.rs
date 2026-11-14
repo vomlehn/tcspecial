@@ -2,7 +2,7 @@
 //! that the wire format tcspecial speaks is SBN's and not only ours.
 //!
 //! `tests/cfs.rs` plays the cFS end with a socket speaking the format as
-//! `tcslib_protocol::sbn` states it, so it can only show that the vehicle keeps
+//! `tcsprotocol::sbn` states it, so it can only show that the vehicle keeps
 //! to that statement. Here the far end is cFS itself, built from a cFS checkout
 //! with SBN v7.0.1 and its UDP module, and this test is its ground: it commands
 //! cFS through CI_LAB, which publishes what arrives on UDP on the software bus,
@@ -18,9 +18,9 @@ use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::config_digest::digest_of_graph;
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::{
+use tcsprotocol::config_digest::digest_of_graph;
+use tcsprotocol::graph::Graph;
+use tcsprotocol::{
     cfs, Beacon, Command, CommandStatus, ConnectCommand, NodeCommand, NodeId,
     Telemetry,
 };

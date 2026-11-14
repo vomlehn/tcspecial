@@ -8,7 +8,7 @@
 # rather than looking beside itself and finding nothing. Where this is not a
 # git checkout, a release unpacked, it is the directory this tree is in.
 #
-# tcs-xtce is found here too. python/tcslib_protocol/_xtce's links to its
+# tcs-xtce is found here too. python/tcsprotocol/_xtce's links to its
 # runtime are relative, and so point beside the tree itself; from a worktree,
 # where there is none, the package looks beside the main checkout instead, by
 # the same rule as this: see its __init__.py.

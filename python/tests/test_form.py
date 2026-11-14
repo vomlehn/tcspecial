@@ -1,10 +1,10 @@
 """What a node sends the ground, as the configuration's own XTCE says it,
 and the Yamcs parameter type it is given for it.
 
-The Python spelling of ``tcslib_protocol::graph::fprime::Form::of``, which
+The Python spelling of ``tcsprotocol::graph::fprime::Form::of``, which
 ``examples/thermostat-yamcs/tests/agrees.rs`` holds to the Rust for every node
 of every example that reaches the ground; and the typed parameters
-``tcslib_protocol.yamcs`` copies from the configuration's own XTCE for a node
+``tcsprotocol.yamcs`` copies from the configuration's own XTCE for a node
 whose data no interface document lays out.
 """
 
@@ -15,10 +15,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_protocol import configuration, interface  # noqa: E402
+from tcsprotocol import configuration, interface  # noqa: E402
 from tests import loaded  # noqa: E402
-from tcslib_protocol import yamcs as generated  # noqa: E402
-from tcslib_protocol.form import (  # noqa: E402
+from tcsprotocol import yamcs as generated  # noqa: E402
+from tcsprotocol.form import (  # noqa: E402
     DATUM, DECISION, UNITS, Form, form_of, unit_of_type_name)
 
 #: A vehicle that answers to Yamcs: a sensor "s" converted by "c" (to

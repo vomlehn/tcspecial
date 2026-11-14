@@ -5,7 +5,7 @@ say what each node type asks for and how tcs-gui draws it.
     node.schema.json     the same, written in YAML
 
 The schemas of the configurations tcs-gui edits -- XTCS and YTCS -- are not
-here: they are tcslib-protocol's, in tcslib-protocol/schema, since every program
+here: they are tcsprotocol's, in tcsprotocol/schema, since every program
 reads those formats.
 
 Installed by `make install-data` under $(PREFIX)/share/tcs-gui/schema.

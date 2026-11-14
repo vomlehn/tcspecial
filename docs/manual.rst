@@ -43,7 +43,7 @@ In flight
          Compute nodes work on what they read, a gateway node sends it to
          the ground, and tcslog keeps a record aboard of what was sent.
          Telemetry and beacons go down the space link to the mission
-         operations center, where Yamcs uses tcslib-moc for its end of the link,
+         operations center, where Yamcs uses tcsmoc for its end of the link,
          and commands come back up.
    :width: 100%
 
@@ -61,9 +61,9 @@ Log, **tcslog**, a library of its own.
 
 On the ground, a mission control system such as Yamcs (https://yamcs.org)
 holds the other end of the link through the TCSpecial MOC Correspondent,
-**tcslib-moc**. Both ends share TCS Link Support, **tcslib-protocol**, which
+**tcsmoc**. Both ends share TCS Link Support, **tcsprotocol**, which
 says what goes on the link.
-tcslib-moc sends the vehicle its commands, receives its telemetry and beacons,
+tcsmoc sends the vehicle its commands, receives its telemetry and beacons,
 and knows from the vehicle's configuration where each datum arrives and
 what it is; Yamcs's mission database is generated from the same
 configuration, so the two ends cannot disagree about the link. The link's
@@ -97,7 +97,7 @@ on, and parts of it moved to real devices one at a time.
 
 A configuration is written with **tcs-gui**, which draws it as a diagram of
 nodes and links, and checked with **tcs-verify**, which says what is wrong
-with it without running any of it. Both read it through **tcslib-protocol**, the
+with it without running any of it. Both read it through **tcsprotocol**, the
 library the vehicle and the ground share, so the error a person sees on the
 desktop is the one the vehicle would refuse the file with.
 
@@ -161,10 +161,10 @@ The other documents beside these:
     The shipped example configurations, and what each one shows.
 
 The libraries
-    `tcslib-moc <../tcslib-moc/README.html>`__ in the MOC, in Rust, and
-    `tcslib-moc-c <../tcslib-moc-c/README.html>`__, its C interface;
-    `tcslib-protocol
-    <../tcslib-protocol/README.html>`__, used aboard and in the MOC.
+    `tcsmoc <../tcsmoc/README.html>`__ in the MOC, in Rust, and
+    `tcsmoc-c <../tcsmoc-c/README.html>`__, its C interface;
+    `tcsprotocol
+    <../tcsprotocol/README.html>`__, used aboard and in the MOC.
 
 The rest of the TCS software
 ============================

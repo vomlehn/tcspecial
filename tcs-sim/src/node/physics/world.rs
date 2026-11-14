@@ -30,7 +30,7 @@
 //!
 //! Nothing the world does follows the order a model's file is written in. Its
 //! components are in name order and its connections in the order of the names
-//! of what they join, as `tcslib_protocol::node::physics::Model` holds them, so
+//! of what they join, as `tcsprotocol::node::physics::Model` holds them, so
 //! the outputs an input sums are added in one order, and of two events due at
 //! one moment the component whose name sorts first has its event first: see
 //! [`Queue`].
@@ -45,8 +45,8 @@
 use std::sync::{Condvar, Mutex, MutexGuard};
 use std::time::Instant;
 
-use tcslib_protocol::node::physics::terminal::{Direction, Terminal};
-use tcslib_protocol::node::physics::{Joined, Model, Place, Resolution};
+use tcsprotocol::node::physics::terminal::{Direction, Terminal};
+use tcsprotocol::node::physics::{Joined, Model, Place, Resolution};
 
 use super::battery::Battery;
 use super::body::Body;
@@ -433,9 +433,9 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslib_protocol::node::physics::terminal::{Kind, Terminal};
-    use tcslib_protocol::node::physics::{settings_of, terminals_of, TYPES};
-    use tcslib_protocol::unit::Unit;
+    use tcsprotocol::node::physics::terminal::{Kind, Terminal};
+    use tcsprotocol::node::physics::{settings_of, terminals_of, TYPES};
+    use tcsprotocol::unit::Unit;
 
     /// Every type's terminals fit the room a component's inputs are given,
     /// and every type is one the world can make.

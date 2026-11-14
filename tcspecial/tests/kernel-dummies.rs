@@ -32,10 +32,10 @@ use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::graph::telemetry;
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::node::payload::gpio;
-use tcslib_protocol::simulate::Host;
+use tcsprotocol::graph::telemetry;
+use tcsprotocol::graph::Graph;
+use tcsprotocol::node::payload::gpio;
+use tcsprotocol::simulate::Host;
 
 mod common;
 
@@ -365,8 +365,7 @@ fn virtual_can() -> Result<String, String> {
         .unwrap_or_default();
     names.sort();
     for name in names {
-        if !tcslib_protocol::node::payload::can::judged(&host, &name).is_dummy()
-        {
+        if !tcsprotocol::node::payload::can::judged(&host, &name).is_dummy() {
             continue;
         }
         // A bus that is there and down binds a socket and then fails every
@@ -834,7 +833,7 @@ fn iio_dummy() -> Result<Sensor, String> {
                     .is_dir();
             continue;
         }
-        if !tcslib_protocol::node::payload::iio::is_dummy(&host, &device) {
+        if !tcsprotocol::node::payload::iio::is_dummy(&host, &device) {
             continue;
         }
         let (scan, enable) = if sys.join("buffer0").is_dir() {
@@ -899,9 +898,9 @@ fn an_iio_payload_is_flown_on_a_dummy_sensor() {
     // Nothing to poke: the kernel's trigger fills the buffer on its own.
     let heard = heard_while(&ground, || {}, |datum| !datum.is_empty());
     // Bytes, after the count of them, in groups of seven bits.
-    let start = tcslib_protocol::link_type::uncounted(
+    let start = tcsprotocol::link_type::uncounted(
         &heard,
-        tcslib_protocol::link_type::Count::Groups,
+        tcsprotocol::link_type::Count::Groups,
     )
     .expect("counted");
     let got = &heard[start..];

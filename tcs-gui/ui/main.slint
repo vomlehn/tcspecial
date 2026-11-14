@@ -2,16 +2,16 @@ import {
     Button, CheckBox, ComboBox, LineEdit, ScrollView, TextEdit
 } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcs-verify/ui/copy.slint";
-import { Fonts } from "../../tcslib-ui/ui/fonts.slint";
-import { Colors } from "../../tcslib-ui/ui/colors.slint";
+import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Colors } from "../../tcsui/ui/colors.slint";
 // How a configuration is drawn, shared with tcspecial's visual window: the
 // node shapes, the link lines, the ground they are drawn on, and the globals
-// and structs they take. See tcslib-diagram. Exported again from here so that
+// and structs they take. See tcs-diagram. Exported again from here so that
 // this program's Rust sees them as its own.
 import {
     Session, Space, Type, TerminalView, NodeView, LinkView, NodeShape,
     LinkLine, SheetGround, PhysicsGround, Terminal
-} from "../../tcslib-diagram/ui/diagram.slint";
+} from "../../tcs-diagram/ui/diagram.slint";
 export { Session, Space, Type, TerminalView, NodeView, LinkView }
 
 // One thing that might be wrong, as the concerns window shows it.
@@ -43,7 +43,7 @@ export struct JoinOffer {
 
 // One of a subdiagram's edge terminals, where its box would have it: its
 // name, where it is drawn in the working panes' own coordinates, and which
-// way its arrow points. See tcslib_diagram::style::edge_box.
+// way its arrow points. See tcs_diagram::style::edge_box.
 export struct EdgeView {
     terminal: string,
     x: length,
@@ -313,7 +313,7 @@ component FieldRow inherits HorizontalLayout {
     // to be wrong.
     //
     // Unticked is both "false" and a file that says nothing, those meaning the
-    // same thing -- see `tcslib_protocol::node::vehicle::Restart::of` -- and
+    // same thing -- see `tcsprotocol::node::vehicle::Restart::of` -- and
     // ticking it writes the word, so what the file ends up saying is a word
     // somebody chose and not a box they left alone.
     if root.field.kind == "boolean": CheckBox {
@@ -552,7 +552,7 @@ component Surface inherits Rectangle {
     in property <[LinkView]> links: [];
     // The line a gesture is drawing, as SVG path data in canvas coordinates,
     // and empty when no gesture is running. Dashed, and in pieces because a
-    // path here has no dash pattern: see tcslib_diagram::route::drawing.
+    // path here has no dash pattern: see tcs_diagram::route::drawing.
     in property <string> drawing-route: "";
     // The two selection panes' contents, and the two working panes' geometry.
     //
@@ -566,7 +566,7 @@ component Surface inherits Rectangle {
     in property <[PaletteEntry]> payload-palette: [];
     // The physics components a simulator file's world may hold, which the
     // physics list offers; and whether there is a simulator file to put one
-    // in. See tcslib_diagram::physics.
+    // in. See tcs_diagram::physics.
     in property <[PaletteEntry]> physics-palette: [];
     in property <bool> has-world: false;
     // The Physics pane, left of the payloads: how wide it is, what its
@@ -574,7 +574,7 @@ component Surface inherits Rectangle {
     // whole canvas, whose nought is the Physics pane's left edge. Every
     // window shows it, a subdiagram's too: the physics model is the
     // simulator file's and one world, so each page shows the same one and
-    // joins its own payloads to it. See tcslib_diagram::pane.
+    // joins its own payloads to it. See tcs_diagram::pane.
     in property <length> physics-width: 0px;
     in property <color> physics-ground: white;
     in property <[NodeView]> physics-nodes: [];
@@ -585,14 +585,14 @@ component Surface inherits Rectangle {
     in property <length> working-width: 0px;
     // How long the sheet is, in the coordinates the file holds: one length
     // for all three panes, which is what makes them scroll together. From
-    // Rust -- see tcslib_diagram::pane::WORKING_HEIGHT -- as the width is.
+    // Rust -- see tcs_diagram::pane::WORKING_HEIGHT -- as the width is.
     in property <length> working-height: 0px;
     // What each pane's own tint is: light, neutral, and the light end of the
     // hue family its own nodes are drawn in, so that a node's colour says which
     // pane it belongs in. It paints two things -- the heading band at the top
     // of that working pane, and the selection pane a node of its is taken from
     // -- and not the working pane itself, which is one sheet with the other
-    // two. From Rust -- see tcslib_diagram::style::Ground -- for the reason the
+    // two. From Rust -- see tcs_diagram::style::Ground -- for the reason the
     // tints come from there: what a colour means is a rule with tests on it,
     // and this file paints.
     in property <color> gateway-ground: white;
@@ -612,7 +612,7 @@ component Surface inherits Rectangle {
     //
     // Two-way, because both ends of it have something to say: a person
     // scrolling moves it, and placing a node sets it so the new node is at the
-    // top of the view -- see tcslib_diagram::pane::place_in. The offset is the
+    // top of the view -- see tcs_diagram::pane::place_in. The offset is the
     // viewport's, which is negative as it scrolls down, but in the sheet's
     // own pixels rather than the window's, so that Rust reads it back as the
     // top of the view whatever the sheet is drawn at: see `zoom`.
@@ -691,7 +691,7 @@ component Surface inherits Rectangle {
     // inside it is -- the Physics pane and the working panes -- which holds
     // the page's edge, and the edge's terminals, in the working panes' own
     // coordinates. Nought and none on the top page, which has nothing
-    // outside it. See tcslib_diagram::style::edge_box.
+    // outside it. See tcs_diagram::style::edge_box.
     in property <length> edge-width: 0px;
     in property <[EdgeView]> edge-terminals: [];
     // A line taken from one of the edge's terminals, by name.
@@ -907,12 +907,12 @@ component Surface inherits Rectangle {
     callback link-delete(int);
     // Which line is under a point, in the working panes' coordinates, by its
     // place in `links`, or -1 for none: worked out in Rust, which has the
-    // lines' routes as points. See tcslib_diagram::route::distance_to.
+    // lines' routes as points. See tcs_diagram::route::distance_to.
     pure callback link-at(length, length) -> int;
     // What a pointer resting on the sheet is told about the line under it,
     // or nothing for none: a configuration's line by the point in the
     // working panes' coordinates, and a physics line, failing that, by the
-    // point in the whole sheet's. See tcslib_diagram::view::tip_of.
+    // point in the whole sheet's. See tcs_diagram::view::tip_of.
     pure callback tip-at(length, length, length) -> string;
     // What the tip says now: nothing while no line is pointed at, and
     // nothing while a line is being drawn, whose pointer is busy.
@@ -1269,7 +1269,7 @@ component Surface inherits Rectangle {
                     // selection panes a node is taken from.
                     // The Physics pane, left of the configuration's sheet, and
                     // the sheet itself beside it, in the coordinates its file
-                    // holds: see tcslib_diagram::pane. The physics links under
+                    // holds: see tcs_diagram::pane. The physics links under
                     // everything, the sheet being transparent, and the physics
                     // nodes over it, in their own pane.
                     page := Rectangle {
@@ -1983,7 +1983,7 @@ export component MainWindow inherits Window {
     callback alert-acknowledged();
     // The line a gesture is drawing, as SVG path data in canvas coordinates,
     // and empty when no gesture is running. Dashed, and in pieces because a
-    // path here has no dash pattern: see tcslib_diagram::route::drawing.
+    // path here has no dash pattern: see tcs_diagram::route::drawing.
     in property <string> drawing-route: "";
     // The two selection panes' contents, and the two working panes' geometry.
     //
@@ -2030,7 +2030,7 @@ export component MainWindow inherits Window {
     in property <length> working-width: 0px;
     // How long the sheet is, in the coordinates the file holds: one length
     // for all three panes, which is what makes them scroll together. From
-    // Rust -- see tcslib_diagram::pane::WORKING_HEIGHT -- as the width is.
+    // Rust -- see tcs_diagram::pane::WORKING_HEIGHT -- as the width is.
     in property <length> working-height: 0px;
     // Where the sheet is scrolled to, and how much of it is in view: two-way,
     // because a person scrolling moves it and placing a node sets it.
@@ -2630,7 +2630,7 @@ export component ParametersWindow inherits Window {
     preferred-width: 440px;
     preferred-height: 560px;
 
-    // One per attribute of the section, in the order tcslib-protocol lists
+    // One per attribute of the section, in the order tcsprotocol lists
     // them: what must be stated first, and the rest after.
     in property <[FieldView]> fields: [];
     // What went wrong with the last write, if anything. Shown here as well as

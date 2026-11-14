@@ -486,9 +486,9 @@ dependencies = [
  "libc",
  "slint",
  "slint-build",
- "tcslib-moc",
- "tcslib-protocol",
- "tcslib-ui",
+ "tcsmoc",
+ "tcsprotocol",
+ "tcsui",
 ]
 
 [[package]]
@@ -3691,7 +3691,7 @@ checksum = "b330c9d1b92dfe68442ca20b009c717d5f0b1e3cf4965e62f704c3c6e95a1305"
 name = "ping-yamcs-example"
 version = "0.1.0"
 dependencies = [
- "tcslib-protocol",
+ "tcsprotocol",
  "tempfile",
  "yamcs-common",
 ]
@@ -3700,7 +3700,7 @@ dependencies = [
 name = "ping_example"
 version = "0.1.0"
 dependencies = [
- "tcslib-protocol",
+ "tcsprotocol",
  "tempfile",
 ]
 
@@ -4439,8 +4439,8 @@ name = "simple_app"
 version = "0.1.0"
 dependencies = [
  "tcsapp",
- "tcslib-moc",
- "tcslib-protocol",
+ "tcsmoc",
+ "tcsprotocol",
  "tempfile",
 ]
 
@@ -4830,6 +4830,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcs-diagram"
+version = "0.1.0"
+dependencies = [
+ "tcsprotocol",
+]
+
+[[package]]
 name = "tcs-gui"
 version = "0.1.0"
 dependencies = [
@@ -4847,9 +4854,9 @@ dependencies = [
  "similar",
  "slint",
  "slint-build",
- "tcslib-diagram",
- "tcslib-protocol",
- "tcslib-verify",
+ "tcs-diagram",
+ "tcsprotocol",
+ "tcsverify",
  "tempfile",
 ]
 
@@ -4864,11 +4871,11 @@ dependencies = [
  "slint",
  "slint-build",
  "tcs-verify",
- "tcslib-moc",
- "tcslib-protocol",
- "tcslib-ui",
- "tcslib-verify",
+ "tcsmoc",
  "tcspecial",
+ "tcsprotocol",
+ "tcsui",
+ "tcsverify",
  "tempfile",
 ]
 
@@ -4886,9 +4893,9 @@ dependencies = [
  "slint",
  "slint-build",
  "tcs-verify",
- "tcslib-moc",
- "tcslib-protocol",
- "tcslib-verify",
+ "tcsmoc",
+ "tcsprotocol",
+ "tcsverify",
  "tempfile",
 ]
 
@@ -4896,8 +4903,8 @@ dependencies = [
 name = "tcs-verify"
 version = "0.1.0"
 dependencies = [
- "tcslib-protocol",
- "tcslib-verify",
+ "tcsprotocol",
+ "tcsverify",
  "tempfile",
 ]
 
@@ -4919,34 +4926,58 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcslib-diagram"
-version = "0.1.0"
+name = "tcslog"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6de5ca8b28338458130aeee17af9691f2c0ae54ddf694c61e0ee4e577f6eb477"
 dependencies = [
- "tcslib-protocol",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "tcslib-moc"
+name = "tcsmoc"
 version = "0.1.0"
 dependencies = [
  "libc",
  "serde",
- "tcslib-protocol",
+ "tcsprotocol",
  "tempfile",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "tcslib-moc-c"
+name = "tcsmoc-c"
 version = "0.1.0"
 dependencies = [
- "tcslib-moc",
- "tcslib-protocol",
+ "tcsmoc",
+ "tcsprotocol",
  "tempfile",
 ]
 
 [[package]]
-name = "tcslib-protocol"
+name = "tcspecial"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "libc",
+ "log",
+ "nix 0.27.1",
+ "serde",
+ "slint",
+ "slint-build",
+ "socket2",
+ "tcs-diagram",
+ "tcsapp",
+ "tcslog",
+ "tcsmoc",
+ "tcsprotocol",
+ "tcsverify",
+ "tempfile",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tcsprotocol"
 version = "0.1.0"
 dependencies = [
  "leb128",
@@ -4962,51 +4993,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcslib-ui"
+name = "tcsui"
 version = "0.1.0"
 dependencies = [
  "slint",
- "tcslib-moc",
+ "tcsmoc",
 ]
 
 [[package]]
-name = "tcslib-verify"
+name = "tcsverify"
 version = "0.1.0"
 dependencies = [
  "serde_json",
- "tcslib-protocol",
+ "tcsprotocol",
  "tempfile",
-]
-
-[[package]]
-name = "tcslog"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6de5ca8b28338458130aeee17af9691f2c0ae54ddf694c61e0ee4e577f6eb477"
-dependencies = [
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "tcspecial"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "libc",
- "log",
- "nix 0.27.1",
- "serde",
- "slint",
- "slint-build",
- "socket2",
- "tcsapp",
- "tcslib-diagram",
- "tcslib-moc",
- "tcslib-protocol",
- "tcslib-verify",
- "tcslog",
- "tempfile",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5042,7 +5042,7 @@ name = "thermostat-yamcs-example"
 version = "0.1.0"
 dependencies = [
  "serde_json",
- "tcslib-protocol",
+ "tcsprotocol",
  "tempfile",
  "yamcs-common",
 ]
@@ -6412,7 +6412,7 @@ name = "yamcs-common"
 version = "0.1.0"
 dependencies = [
  "quick-xml 0.42.0",
- "tcslib-protocol",
+ "tcsprotocol",
  "tempfile",
 ]
 

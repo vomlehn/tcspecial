@@ -9,9 +9,9 @@ tcs-moc Design
 How tcs-moc, the simulated operations center, works and why.
 
 The tcs-moc is a GUI program used to control simulated payloads interacting with
-tcspecial using the TCSpecial MOC Correspondent (tcslib-moc) over a datagram
+tcspecial using the TCSpecial MOC Correspondent (tcsmoc) over a datagram
 connection to tcspecial.
-For testing purposes, tcs-moc uses tcslib-moc, along with simulated payloads, to
+For testing purposes, tcs-moc uses tcsmoc, along with simulated payloads, to
 support a simple GUI.
 
 Tcs-moc gets the payload definition from a file named on its command line, and
@@ -80,7 +80,7 @@ Requirement
     half of a blink, a last beacon a moved clock puts in the future -- it is
     white. Grey says nothing has been heard; an indicator that went from green
     back to grey would say the spacecraft had never been heard from, and look
-    like a window that had just opened. ``tcslib_ui::indicator`` is the rule,
+    like a window that had just opened. ``tcsui::indicator`` is the rule,
     and the Python panel says it again with the same tests.
 
 **Where the beacon's code lives**
@@ -94,7 +94,7 @@ Requirement
     datagram, the digest comparison, the beacons that did not arrive and how
     stale the last one is. No toolkit is linked into it, because a ground
     station with no screen -- a logger, a test, a program that only watches --
-    needs the facts and not the look. It is ``tcslib_moc::beacon``.
+    needs the facts and not the look. It is ``tcsmoc::beacon``.
 
 Requirement
     How stale the last beacon is, is a named stage and not a colour. A stage
@@ -106,7 +106,7 @@ Requirement
 
 Requirement
     The panel is shared markup, imported by every window that shows it, with
-    what to show on it worked out beside it: ``tcslib-ui``. Two windows show it
+    what to show on it worked out beside it: ``tcsui``. Two windows show it
     -- this one, beside its command link, and the ``beacon`` example, which
     shows it and nothing else -- and an operator who has read one has read the
     other, where an indicator in a different place or a label in different

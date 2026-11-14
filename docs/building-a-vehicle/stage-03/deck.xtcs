@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcsprotocol/schema/tcspecial.xsd">
     <!-- Stage 3 of "Building a Vehicle" (docs/building-a-vehicle.rst): a
          computation between a payload and the ground: the regolith
          thermometer's readings made temperatures in kelvin. A

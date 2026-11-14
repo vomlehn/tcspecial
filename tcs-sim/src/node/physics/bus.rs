@@ -1,12 +1,12 @@
 //! A power bus: what the sources supply less what the loads demand.
 //!
-//! Its terminals are `tcslib_protocol::node::physics::bus`'s: `supply` and
+//! Its terminals are `tcsprotocol::node::physics::bus`'s: `supply` and
 //! `demand`, each the sum of what is joined to it, and `current`, what is left
 //! over, all in amperes.
 
 use super::component::Component;
 
-/// Its terminals' places, in `tcslib_protocol::node::physics::bus::TERMINALS`'s
+/// Its terminals' places, in `tcsprotocol::node::physics::bus::TERMINALS`'s
 /// order, which a test holds this to.
 const SUPPLY: usize = 0;
 const DEMAND: usize = 1;
@@ -39,7 +39,7 @@ impl Component for Bus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcslib_protocol::node::physics::bus::TERMINALS;
+    use tcsprotocol::node::physics::bus::TERMINALS;
 
     /// The places here are the type's; what is left over is the supply
     /// less the demand, either way.

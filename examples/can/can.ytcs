@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
 
 description: "A payload on a CAN bus: its frames to the ground, and the
   ground's commands to it as frames"

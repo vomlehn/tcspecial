@@ -26,8 +26,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use tcslib_protocol::unit::Unit;
-use tcslib_protocol::{DHSample, Timestamp};
+use tcsprotocol::unit::Unit;
+use tcsprotocol::{DHSample, Timestamp};
 
 /// What one payload last sent to the ground, as the ground received it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,7 +59,7 @@ pub struct Arrival {
     /// From the configuration and never from the data. Every four bytes are a
     /// value, so a decision of four characters would be shown as a
     /// number by anything that guessed from the width -- see
-    /// `tcslib_protocol::graph::units::unit_of`.
+    /// `tcsprotocol::graph::units::unit_of`.
     pub unit: Option<Unit>,
 }
 
@@ -92,7 +92,7 @@ mod tests {
         );
         let mut data = DHSample::new();
         data.record(
-            &tcslib_protocol::node::vehicle::compute::as_value(
+            &tcsprotocol::node::vehicle::compute::as_value(
                 293.15,
                 Unit::Kelvin,
             )
@@ -126,7 +126,7 @@ mod tests {
     /// A panel's two lines of an arrival: when it came, and what it was.
     ///
     /// What the ground received, which is the whole of what this module is for:
-    /// a node's data reaches the ground through `tcslib_moc::gateway`, which is
+    /// a node's data reaches the ground through `tcsmoc::gateway`, which is
     /// where the receiving is tested.
     #[test]
     fn an_arrival_says_when_it_came_and_what_it_was() {

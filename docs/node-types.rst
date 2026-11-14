@@ -69,9 +69,9 @@ Three Modules of One Name
 A payload type is three modules with the same name, one in each of three
 crates:
 
-``tcslib_protocol::node``
+``tcsprotocol::node``
     Its attributes, and every rule about what a configuration may say about it.
-    tcslib-protocol is shared by the ground and the vehicle, so a rule written
+    tcsprotocol is shared by the ground and the vehicle, so a rule written
     here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all
     apply, and they all report it alike. A rule about what a configuration may
     say belongs here and nowhere else.
@@ -93,15 +93,15 @@ Every node has up to four terminals, named for the way data travels:
 ``world-in`` and ``world-out`` carry a payload's readings towards the ground,
 and ``moc-in`` and ``moc-out`` carry what the ground sends back. A new type says
 which of the four it has, in ``terminals_of`` in
-``tcslib-protocol/src/graph/terminals.rs``, by returning one of the
+``tcsprotocol/src/graph/terminals.rs``, by returning one of the
 ``Terminals`` constants there or a new one. A type whose terminals are its own
 business, as a computation's named inputs are, returns ``None``.
 
 Each terminal carries one type, and both ends of every link state it: a link
 whose ends disagree is refused as the configuration is loaded, saying which
 attribute to change. Nothing is inferred and nothing is converted between nodes.
-The types are stated once, in ``tcslib-protocol/xtce/types.xtce``, and named in
-``tcslib-protocol/src/link_type.rs``: the integers ``u8`` to ``i64``,
+The types are stated once, in ``tcsprotocol/xtce/types.xtce``, and named in
+``tcsprotocol/src/link_type.rs``: the integers ``u8`` to ``i64``,
 ``boolean``, the quantities (``kelvin``, ``volt``, ``ampere``, ``watt``,
 ``metre``, ``metre_per_second``, ``newton``, ``kilogram_per_second``,
 ``ratio``), ``string``, ``bytes``, and structures of up to sixteen named fields,
@@ -109,7 +109,7 @@ The types are stated once, in ``tcslib-protocol/xtce/types.xtce``, and named in
 or ``bytes`` field in one is refused. A new node type adds no type there.
 
 What a node type carries is decided in one function, ``carries`` in
-``tcslib-protocol/src/graph/link_types.rs``, which takes a node and a terminal
+``tcsprotocol/src/graph/link_types.rs``, which takes a node and a terminal
 and says what that terminal carries. There are four ways a type can answer:
 
 Stated by the configuration
@@ -169,17 +169,17 @@ the node at the edge turns them into the type it sends.
 
 Only towards the ground is anything added: a string or bytes, which has no width
 of its own, is sent the ground after a count of its bytes, chosen for each
-source by ``Telemetered::count`` in ``tcslib-protocol/src/graph/telemetry.rs``
-and written by ``counted`` in ``tcslib-protocol/src/link_type.rs``. A node never
+source by ``Telemetered::count`` in ``tcsprotocol/src/graph/telemetry.rs``
+and written by ``counted`` in ``tcsprotocol/src/link_type.rs``. A node never
 writes the count itself. Each configuration's own XTCE, which ``tcs-verify
 --xtce`` writes, says what each node sends the ground, and it takes that from
 ``carries``, so a new type that answers ``carries`` needs nothing more there.
 
 Adding a Payload Type
 =====================
-In ``tcslib-protocol``
+In ``tcsprotocol``
 ----------------------
-The module, ``tcslib-protocol/src/node/payload/<type>/mod.rs``, registered with
+The module, ``tcsprotocol/src/node/payload/<type>/mod.rs``, registered with
 a ``pub mod`` in ``node/payload/mod.rs``, holds:
 
 - ``pub const TYPE``, the type's spelling;
@@ -193,7 +193,7 @@ a ``pub mod`` in ``node/payload/mod.rs``, holds:
   and ``--simulate`` decides which are allowed;
 - its tests.
 
-The type is then made known to the rest of tcslib-protocol:
+The type is then made known to the rest of tcsprotocol:
 
 ``src/types.rs``
     A ``DHType`` variant, added to ``DHType::ALL`` with the array's length
@@ -292,7 +292,7 @@ Adding a Vehicle Type
 A vehicle type has no device, so it has no Cargo feature, no endpoint, no
 judgement and no simulated device. Instead:
 
-- in tcslib-protocol, its module in ``node/vehicle/`` with ``params_of`` and its
+- in tcsprotocol, its module in ``node/vehicle/`` with ``params_of`` and its
   checks, registered in ``node/vehicle/mod.rs``; its name in
   ``VEHICLE_TYPES`` in ``src/graph/mod.rs``; its attribute rules in
   ``graph/check.rs``; its terminals in ``terminals_of``; and its branch in
@@ -301,7 +301,7 @@ judgement and no simulated device. Instead:
   (``src/runtime/fabric.rs``), and arms in ``open``, ``described`` and
   ``is_polled`` in ``src/runtime/system.rs``, which match the type by name.
 
-``types_in`` in ``tcslib-protocol/src/graph/mod.rs`` is the one statement of
+``types_in`` in ``tcsprotocol/src/graph/mod.rs`` is the one statement of
 which types each section of a configuration takes, built from ``DHType::ALL``,
 the app kinds, the gateway kinds and ``VEHICLE_TYPES``, and the schema tests
 hold the schemas to it.
@@ -316,14 +316,14 @@ A function is the ``compute`` type's ``function``. In tcspecial it is a file,
 registered with a ``pub mod`` and an arm in ``make``. Like an endpoint, it
 runs in the main loop and allocates nothing there.
 
-In tcslib-protocol, ``node/vehicle/compute/mod.rs`` holds the function's
+In tcsprotocol, ``node/vehicle/compute/mod.rs`` holds the function's
 ``Computation`` variant and ``function``, ``functions`` (a hand-written
 list), ``attributes_of``, ``params_of`` with its ``Params``, and
 ``produces``. Its terminals' types come from ``carries``, which gives a
 function ``type-in`` and ``type-out``, both required, unless it has a branch
 of its own as ``vote`` and ``to_kelvin`` have. A function that narrows
 which types it takes, as ``process`` takes only types with a text form
-(``tcslib-protocol/src/link_text.rs``), refuses the others in ``params_of``,
+(``tcsprotocol/src/link_text.rs``), refuses the others in ``params_of``,
 naming the attribute and the types it may be.
 
 tcs-gui offers a function as a node of its own, from
@@ -333,12 +333,12 @@ how it shows what a node sends follows from the type, in ``form.py``.
 
 Adding a Gateway Type
 =====================
-A gateway type is a ``GatewayKind`` in ``tcslib-protocol/src/gateway.rs``, in
+A gateway type is a ``GatewayKind`` in ``tcsprotocol/src/gateway.rs``, in
 ``ALL``, ``name``, ``is_built``, ``on_bus``, ``framed`` and ``node_type``. If
 its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
 string or bytes must be XTCE's, so ``Telemetered::count`` must give it
 ``Count::Xtce``. The Python ground lists gateway types by hand, in
-``GATEWAY_BASES`` and ``ON_BUS`` in ``python/tcslib_protocol/configuration.py``.
+``GATEWAY_BASES`` and ``ON_BUS`` in ``python/tcsprotocol/configuration.py``.
 Its description in tcs-gui is at the top of ``tcs-gui/share/nodes/``, and since
 it has no node module, it is one of the exemptions in
 ``every_description_has_its_rust`` in ``tcs-gui/src/nodes.rs``.
@@ -359,7 +359,7 @@ its path is added to the sorted list in ``the_shipped_descriptions_read``.
 
 A configuration is written in YAML or XML, and the two spellings must say
 the same thing. So a new type goes into both configuration schemas,
-``tcslib-protocol/schema/tcspecial.schema.json`` and ``tcspecial.xsd``: its name
+``tcsprotocol/schema/tcspecial.schema.json`` and ``tcspecial.xsd``: its name
 in the section's type list, and each new attribute in the JSON node
 definitions and the XSD's ``nodeWords``. A payload type also goes into both
 simulator schemas, ``tcspecial-sim.schema.json`` and ``tcspecial-sim.xsd``.
@@ -367,7 +367,7 @@ The Python ground reads its type lists from the JSON schema, so it follows.
 
 Drawing It
 ==========
-How a type is drawn is in ``tcslib-diagram/src/style.rs``: a ``NodeType``
+How a type is drawn is in ``tcs-diagram/src/style.rs``: a ``NodeType``
 variant, in ``ALL`` with its length, ``spelling``, ``family``,
 ``is_payload``, ``attributes`` (which must be the description's, in the
 same order and with the same ``required``), and ``appearance``, its edge,
@@ -410,7 +410,7 @@ should fail without the fix: check that it does.
 Many tests enumerate every type, and a new type that was missed somewhere
 fails one of them: the schema tests in ``tcs-gui/tests/schema.rs``, which
 hold the schemas to ``types_in`` and ``DHType::ALL``; the description tests
-in ``tcs-gui/src/nodes.rs``; the drawing tests in ``tcslib-diagram``;
+in ``tcs-gui/src/nodes.rs``; the drawing tests in ``tcs-diagram``;
 ``the_features_are_the_optional_types`` and ``tcspecial/tests/types.rs``;
 and ``tcs-verify/tests/examples.rs``. No test holds ``NodeType::ALL`` to
 ``types_in``, so a type missing from the drawing is caught only through the
@@ -431,7 +431,7 @@ A Checklist
 ===========
 For a payload type ``foo``:
 
-1. tcslib-protocol: ``node/payload/foo/mod.rs``, with ``TYPE``, its ``Params``,
+1. tcsprotocol: ``node/payload/foo/mod.rs``, with ``TYPE``, its ``Params``,
    ``group_kind_of``, ``judged`` and tests, and ``pub mod foo``.
 2. ``types.rs``: ``DHType`` and ``ALL``, ``spelling``, ``article``,
    ``spellings``, ``EndpointConfig``, ``kind``, ``as_kind``,
@@ -448,7 +448,7 @@ For a payload type ``foo``:
    ``endpoint.rs``.
 7. tcs-gui: the description, its place in the list of descriptions, both
    configuration schemas and both simulator schemas.
-8. tcslib-diagram: ``NodeType`` and its ``appearance``, two ways unlike every
+8. tcs-diagram: ``NodeType`` and its ``appearance``, two ways unlike every
    other type that are not colour.
 9. The design, the manual, ``CLAUDE.md`` and the examples, and their HTML.
 10. The checks above.

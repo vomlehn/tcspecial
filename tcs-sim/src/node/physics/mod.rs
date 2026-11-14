@@ -2,7 +2,7 @@
 //!
 //! Where `node` holds the simulations of the hardware at the far end of each
 //! node, this holds what that hardware would sense and change: the components
-//! of the vehicle's physics model -- see `tcslib_protocol::node::physics` --
+//! of the vehicle's physics model -- see `tcsprotocol::node::physics` --
 //! each a part simulated alone, joined into one [`world::World`] that is
 //! advanced from event to event as the simulated payloads ask about it. So what
 //! a sensor reports follows from what the vehicle did.
@@ -31,11 +31,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::node::physics::Place;
-use tcslib_protocol::node::vehicle::compute::{
-    from_value, Format, ToValueParams,
-};
-use tcslib_protocol::unit::Unit;
+use tcsprotocol::node::physics::Place;
+use tcsprotocol::node::vehicle::compute::{from_value, Format, ToValueParams};
+use tcsprotocol::unit::Unit;
 
 use sensor::Sensor;
 use world::World;
@@ -57,7 +55,7 @@ pub enum Attachment {
         offset: f64,
         /// Taken from the conversion the readings go to, so the vehicle
         /// reads back what the output is: see
-        /// `tcslib_protocol::graph::simulated::reading_of`.
+        /// `tcsprotocol::graph::simulated::reading_of`.
         reading: ToValueParams,
         /// What the sensor gets wrong, and what it has got wrong so far.
         sensor: Arc<Sensor>,
@@ -551,10 +549,10 @@ pub(crate) mod tests {
     use crate::payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
-    use tcslib_protocol::node::physics::terminal::At;
-    use tcslib_protocol::node::physics::WorldSection;
-    use tcslib_protocol::sim_config::SensorErrors;
-    use tcslib_protocol::unit::Unit;
+    use tcsprotocol::node::physics::terminal::At;
+    use tcsprotocol::node::physics::WorldSection;
+    use tcsprotocol::sim_config::SensorErrors;
+    use tcsprotocol::unit::Unit;
 
     /// Reads a model's components and connections, written as they would be
     /// at the left margin, as the physics of a world whose ambient
@@ -573,7 +571,7 @@ pub(crate) mod tests {
     /// What the reader says of it.
     pub(crate) fn parsed(
         text: &str,
-    ) -> tcslib_protocol::error::TcsResult<WorldSection> {
+    ) -> tcsprotocol::error::TcsResult<WorldSection> {
         let physics: String =
             text.lines().map(|line| format!("  {line}\n")).collect();
         WorldSection::parse(&format!(
@@ -789,11 +787,9 @@ connections:
             power: Arc::new(Power::new(true, false)),
         });
         let force = place("engine.force");
-        let half = tcslib_protocol::node::vehicle::compute::value_bytes(
-            0.5,
-            Unit::Ratio,
-        )
-        .expect("a ratio");
+        let half =
+            tcsprotocol::node::vehicle::compute::value_bytes(0.5, Unit::Ratio)
+                .expect("a ratio");
         driven(&throttle, "engine", &half);
         assert!((world.read(force, Instant::now()) - 8000.0).abs() < 1e-6);
         driven(&throttle, "engine", b"1");

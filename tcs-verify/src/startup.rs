@@ -1,6 +1,6 @@
 //! What a program found as it started, gathered to be said before its window.
 //!
-//! Every program that reads a configuration asks [`tcslib_verify::verify`] about it
+//! Every program that reads a configuration asks [`tcsverify::verify`] about it
 //! first, so that each says what `tcs-verify` says about the same files, in the
 //! same words. What a program then finds for itself -- a socket it cannot
 //! make, a file it can read but not run -- is added beside those, so that a
@@ -15,8 +15,8 @@
 
 use std::path::Path;
 
-use tcslib_protocol::graph::check::Severity;
-use tcslib_verify::Report;
+use tcsprotocol::graph::check::Severity;
+use tcsverify::Report;
 
 /// Everything a program has to say about how it is starting.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -110,8 +110,8 @@ impl Startup {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use tcslib_protocol::graph::check::Severity;
-    use tcslib_verify::Finding;
+    use tcsprotocol::graph::check::Severity;
+    use tcsverify::Finding;
 
     /// Makes a finding of "wrong" at line 1 of a file.
     ///

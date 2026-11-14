@@ -4,8 +4,8 @@
 //! A vehicle that answers to cFS has no command socket, no beacon socket and no
 //! telemetry sockets of its own. Everything it takes and sends crosses one UDP
 //! socket to one SBN peer, as cFS packets told apart by message ID: see "cFS:
-//! gateway_cfs" in `docs/tcspecial-design.rst`, [`tcslib_protocol::sbn`] for
-//! the wire, and [`tcslib_protocol::cfs`] for the packets on it.
+//! gateway_cfs" in `docs/tcspecial-design.rst`, [`tcsprotocol::sbn`] for
+//! the wire, and [`tcsprotocol::cfs`] for the packets on it.
 //!
 //! # Who does what
 //!
@@ -43,11 +43,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
 use log::{error, info, warn};
-use tcslib_protocol::graph::telemetry::{Carries, MsgIdUse};
-use tcslib_protocol::sbn::{
+use tcsprotocol::graph::telemetry::{Carries, MsgIdUse};
+use tcsprotocol::sbn::{
     self, kind, Due, Header, Liveness, SubscriptionRefusal,
 };
-use tcslib_protocol::{came_from, cfs, CommandLink, HostPort};
+use tcsprotocol::{came_from, cfs, CommandLink, HostPort};
 
 use crate::runtime::fabric::{Arriving, Port, Taken};
 
@@ -184,7 +184,7 @@ impl Bus {
     ///
     /// * `bus`  - The section's settled links on the bus.
     /// * `used` - Every message ID the configuration uses:
-    ///            [`tcslib_protocol::graph::telemetry::msgids`].
+    ///            [`tcsprotocol::graph::telemetry::msgids`].
     ///
     /// # Returns
     ///
@@ -195,7 +195,7 @@ impl Bus {
     /// A message naming the attribute to change, where `sbn.local` will not
     /// bind or `sbn.peer` does not resolve.
     pub fn open(
-        bus: &tcslib_protocol::Bus,
+        bus: &tcsprotocol::Bus,
         used: &[MsgIdUse],
     ) -> Result<(Bus, BusReader), String> {
         let sbn = &bus.sbn;
@@ -959,8 +959,8 @@ impl Inbox {
     /// # Returns
     ///
     /// The inbox, with nothing waiting in it.
-    fn new(sbn: &tcslib_protocol::Sbn) -> Inbox {
-        let room = (sbn.max_message as usize).min(tcslib_protocol::DATUM_BYTES);
+    fn new(sbn: &tcsprotocol::Sbn) -> Inbox {
+        let room = (sbn.max_message as usize).min(tcsprotocol::DATUM_BYTES);
         Inbox {
             ring: Mutex::new(Ring {
                 slots: (0..INBOX_SLOTS).map(|_| (0, vec![0; room])).collect(),
@@ -1092,8 +1092,8 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::Path;
 
-    use tcslib_protocol::graph::parameters::{ci_config_of, flatten};
-    use tcslib_protocol::graph::Graph;
+    use tcsprotocol::graph::parameters::{ci_config_of, flatten};
+    use tcsprotocol::graph::Graph;
 
     /// The example's spacecraft, and the two processors.
     const SPACECRAFT: u32 = 0x42;
@@ -1256,7 +1256,7 @@ mod tests {
             .and_then(|json| json.to_ci_config())
             .expect("the section reads");
         let used =
-            tcslib_protocol::graph::telemetry::msgids(&graph).expect("sound");
+            tcsprotocol::graph::telemetry::msgids(&graph).expect("sound");
         let settled = ci.bus().expect("on the bus");
         let (bus, reader) = Bus::open(settled, &used).expect("it opens");
         let peer = Peer {

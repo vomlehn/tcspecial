@@ -1,0 +1,22 @@
+[package]
+name = "tcsmoc"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+The TCSpecial MOC Correspondent, the MOC's side of the TCSpecial link: \
+commands to the Flight Executive, the vehicle's data from a gateway node, and \
+its beacons"""
+
+[dependencies]
+tcsprotocol = { path = "../tcsprotocol" }
+serde = { version = "1.0", features = ["derive"] }
+libc = "0.2"
+thiserror = "1.0"
+#log = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

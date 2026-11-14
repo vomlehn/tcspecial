@@ -1,7 +1,7 @@
 """The ground station's own CONNECT, its ``-v`` and the spelling it reads.
 
 That it starts the vehicle, and the vehicle goes when it does, is
-``tcslib_moc.processes``'s, and tested in ``python/tests/test_processes.py``.
+``tcsmoc.processes``'s, and tested in ``python/tests/test_processes.py``.
 """
 
 import sys
@@ -22,8 +22,8 @@ class ConnectTest(unittest.TestCase):
         import socket
         import types
 
-        from tcslib_protocol import fixed_packet
-        from tcslib_protocol.configuration import CommandLink, HostPort
+        from tcsprotocol import fixed_packet
+        from tcsprotocol.configuration import CommandLink, HostPort
 
         vehicle = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         vehicle.bind(("127.0.0.1", 0))

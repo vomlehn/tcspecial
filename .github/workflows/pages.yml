@@ -3,7 +3,7 @@
 # https://vomlehn.github.io/tcspecial/, on every push to main.
 #
 # GitHub's own Pages build, which this replaces, stops at a symbolic link that
-# leads outside the repository, and python/tcslib_protocol/_xtce holds four:
+# leads outside the repository, and python/tcsprotocol/_xtce holds four:
 # they reach the Python runtime in the tcs-xtce checkout beside this one, so
 # that its code is stated once (see python/README.md). On GitHub there is no
 # checkout beside, so the links lead nowhere and every build since they were

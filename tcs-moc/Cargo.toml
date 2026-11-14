@@ -7,17 +7,17 @@ description = "TCSpecial Mission Operations Center test GUI"
 build = "build.rs"
 
 [dependencies]
-tcslib-moc = { path = "../tcslib-moc" }
+tcsmoc = { path = "../tcsmoc" }
 # The panels this window is made of, and what to show on them.
-tcslib-ui = { path = "../tcslib-ui" }
-tcslib-protocol = { path = "../tcslib-protocol" }
+tcsui = { path = "../tcsui" }
+tcsprotocol = { path = "../tcsprotocol" }
 # No payload types: nothing here reaches a payload through tcspecial's code.
 # With its defaults this would turn every type back on in any build that
 # named tcs-moc and tcspecial together, which is how a vehicle's build would
 # come to contain types it was built without.
 tcspecial = { path = "../tcspecial", default-features = false }
 # Asked about the payload set before anything opens: see main.
-tcslib-verify = { path = "../tcslib-verify" }
+tcsverify = { path = "../tcsverify" }
 # What it found, said in the window that opens before the main one.
 tcs-verify = { path = "../tcs-verify" }
 slint = "1.3"

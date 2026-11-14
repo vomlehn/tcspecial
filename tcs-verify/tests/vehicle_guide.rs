@@ -15,8 +15,8 @@
 
 use std::path::{Path, PathBuf};
 
-use tcslib_protocol::graph::Graph;
-use tcslib_verify::verify;
+use tcsprotocol::graph::Graph;
+use tcsverify::verify;
 
 /// The directory the guide's stages are in.
 ///
@@ -68,8 +68,7 @@ fn every_stage_verifies() {
             sim.display()
         );
 
-        let report =
-            verify(&config, Some(&sim), tcslib_verify::Limits::EVERYTHING);
+        let report = verify(&config, Some(&sim), tcsverify::Limits::EVERYTHING);
         let findings: Vec<String> =
             report.findings.iter().map(|f| f.to_string()).collect();
         assert!(
@@ -132,11 +131,11 @@ fn load(path: &Path) -> Graph {
 }
 
 /// Every stage, in both spellings, names this build's interface: a change to
-/// `tcslib-protocol/xtce/link.xtce` that left one behind fails here, saying the
+/// `tcsprotocol/xtce/link.xtce` that left one behind fails here, saying the
 /// one command that brings them all up to date.
 #[test]
 fn every_stage_names_this_builds_interface() {
-    let ours = tcslib_protocol::InterfaceDigest::of_this_build().to_string();
+    let ours = tcsprotocol::InterfaceDigest::of_this_build().to_string();
     let mut stale = Vec::new();
     for yaml in stages() {
         for path in [yaml.clone(), yaml.with_extension("xtcs")] {

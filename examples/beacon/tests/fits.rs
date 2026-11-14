@@ -97,7 +97,7 @@ fn the_window_is_just_large_enough_for_what_it_holds() {
 #[test]
 fn the_widest_messages_are_the_widest_a_beacon_says() {
     use beacon_example::widest_messages;
-    use tcslib_moc::beacon::NO_BEACON_MESSAGE;
+    use tcsmoc::beacon::NO_BEACON_MESSAGE;
 
     let messages = widest_messages();
     assert_eq!(messages.len(), 17);

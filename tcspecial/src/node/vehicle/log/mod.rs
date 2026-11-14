@@ -28,9 +28,9 @@
 //! no fixed number of inputs: there is nothing downstream for an arrival to be
 //! ambiguous to.
 
-use tcslib_protocol::graph::Node;
-use tcslib_protocol::node::vehicle::log::{params_of, LogFormat, LogParams};
 use tcslog::{Format, LogWrite, SEGMENT_FILE_HEADER_LEN};
+use tcsprotocol::graph::Node;
+use tcsprotocol::node::vehicle::log::{params_of, LogFormat, LogParams};
 
 use crate::segsend::{Handoff, SegSend};
 
@@ -85,7 +85,7 @@ impl LogNode {
         let what = node.name.as_str();
 
         // What the file says, by the rules the ground tool checks it against:
-        // see tcslib_protocol::node::vehicle::log.
+        // see tcsprotocol::node::vehicle::log.
         let LogParams {
             directory,
             format,
@@ -201,7 +201,7 @@ impl std::fmt::Debug for LogNode {
 /// Gives the `tcslog` format these records are written in.
 ///
 /// The one place the two spellings meet. A configuration states a format by the
-/// rules in `tcslib_protocol::node::vehicle::log`, which the ground tool checks
+/// rules in `tcsprotocol::node::vehicle::log`, which the ground tool checks
 /// without `tcslog` in it at all; this is where what it settled becomes what
 /// the library takes.
 ///
@@ -224,14 +224,14 @@ fn tcslog_format(format: LogFormat) -> Format {
 mod tests {
     use super::*;
     use std::path::Path;
-    use tcslib_protocol::graph::Graph;
-    use tcslib_protocol::Scalar;
+    use tcsprotocol::graph::Graph;
+    use tcsprotocol::Scalar;
 
     /// Builds a log node here rather than reading one, so a test can make
     /// one wrong.
     ///
     /// What a log node may say is checked in
-    /// `tcslib_protocol::node::vehicle::log`, where the ground tool checks it
+    /// `tcsprotocol::node::vehicle::log`, where the ground tool checks it
     /// too. What is tested here is the other half: that a log opens where the
     /// node said, writes what arrives, and reports what it could not write.
     ///

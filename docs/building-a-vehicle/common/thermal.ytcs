@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # The deck's thermal subsystem, which the stages of "Building a Vehicle" from
 # stage 7 on include: the hull's three temperature sensors, their conversions

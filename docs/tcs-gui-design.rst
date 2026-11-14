@@ -620,7 +620,7 @@ resting on one is told the terminal it is joined to in a tip, which is what
 tells a line into a thermal mass's ``heat`` from one into its ``heater_1``
 when both enter its one input box. tcspecial's visual window draws the same
 pane from the simulator file tcs-sim would read for the configuration, and only
-draws it. See ``tcslib_diagram::physics``.
+draws it. See ``tcs_diagram::physics``.
 
 The physics list is at the top of the selection column, its pane being the
 leftmost, with a line under it that is dragged as the others are. Its entries
@@ -642,9 +642,9 @@ component: its ``connects`` is set to the terminal, or, for a GPIO payload
 watching lines, given the terminal after those it names already, one decision a
 line. The line says only which two things, the component being drawn with one
 output and one input whatever its type has, so the terminals come from the rules
-a file is held to -- ``tcslib_protocol::node::physics::connectable`` for a
+a file is held to -- ``tcsprotocol::node::physics::connectable`` for a
 connection, an output to an input of one kind, and
-``tcslib_protocol::sim_config::may_join`` for a simulated payload -- and each is
+``tcsprotocol::sim_config::may_join`` for a simulated payload -- and each is
 offered where the line was clicked, with Cancel, one join or several -- a
 heater's heat, current and heating to a sensor -- rather than one guessed at: a
 line to the wrong terminal is a simulator that reads something other than was
@@ -746,11 +746,11 @@ colour are the type's, and a page of computations each written "compute" is a
 page whose reader has to open every node to find the thermostat. The function
 stands alone rather than after "compute, ", the shape already saying that, and
 one with no function yet says ``compute``
-(``tcslib_diagram::view::type_line``). There is less room
+(``tcs_diagram::view::type_line``). There is less room
 between two terminals than across the middle, so the type is set in the
 diagram's own small size, nine pixels, rather than the window's: the one label
 on the canvas that is, and the longest type, ``subdiagram`` between four
-terminals, fits at it as drawn (``tcslib_diagram::style::TYPE_SIZE`` and
+terminals, fits at it as drawn (``tcs_diagram::style::TYPE_SIZE`` and
 ``type_band``). A closed subdiagram is taller than the other nodes, 80 pixels
 to their 64, so that what it holds -- how many nodes, and how many lines cross
 its edge -- has room under its name, and the mark that opens it the middle of
@@ -906,10 +906,10 @@ either direction, and what is inside a page may have any of them, which nothing
 outside it knows. A drawing that showed four on every node would say nothing
 about what may be linked to what, which is the one thing about a graph that the
 shapes cannot say. The table is the schema's own,
-``tcslib_protocol::graph::terminals``, read rather than copied wherever it has
+``tcsprotocol::graph::terminals``, read rather than copied wherever it has
 an answer, so a terminal added there appears on the canvas without the editor
 being touched; the computation, the log and the page, whose terminals that table
-leaves to them, are answered in ``tcslib_diagram::style``.
+leaves to them, are answered in ``tcs_diagram::style``.
 
 The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
@@ -927,7 +927,7 @@ marks drawn on its body stay white, so the one thing that changed is the thing
 that is wrong. A node of a type this build does not know is drawn differently
 as well: as a small plain rectangle, 104 by 40 where every other node is 152
 by 64, with a thin single edge and no terminals, in the same red
-(``tcslib_diagram::view::node_look``). Showing it beats refusing the file: a
+(``tcs_diagram::view::node_look``). Showing it beats refusing the file: a
 configuration written for a later build is readable, and what cannot be
 placed is visibly what cannot be placed.
 
@@ -950,7 +950,7 @@ and the payload pane a pale teal: all three light and neutral -- no chroma
 above 14 -- so that a pane reads as tinted paper rather than as a coloured
 panel. The nodes drawn on one are darker members of its family: a payload is
 a dark teal, a vehicle node a green or an olive, the ground link a blue. The
-colours are written down in ``tcslib_diagram::look``, which tcspecial's visual
+colours are written down in ``tcs_diagram::look``, which tcspecial's visual
 window paints with too.
 
 So a node's colour says two things at once. The hue says which family it is in,
@@ -1141,7 +1141,7 @@ node body of its family -- at least eight CIE units above the lightest, as the
 tiers above say. Lighter so that a line is not taken for a node's outline, and
 of the family so that the colour says the stream. A line whose stream cannot be
 told, which is a line this build does not understand, is grey, and drawn all
-the same (``tcslib_diagram::look::line_ink``).
+the same (``tcs_diagram::look::line_ink``).
 ``the_palette_runs_from_the_pane_through_the_line_to_the_bodies`` holds both
 lines to the panels themselves, so a palette change that made a node lighter
 than its lines fails there, and ``no_two_colours_of_the_scheme_look_alike``
@@ -1280,7 +1280,7 @@ button anywhere else on the page selects nothing, and closes whatever menu was
 open. A line is a ``Path``, and a press on a path is not reported, so the press
 goes to the page underneath, which asks which line runs within a few pixels of
 the point, by the line's points rather than its drawing: see
-``tcslib_diagram::route::distance_to``. Only the document's lines are found, not
+``tcs_diagram::route::distance_to``. Only the document's lines are found, not
 the ones an edge draws to a node nothing joins outside yet, there being no line
 to take out. A selected line is kept by what it joins rather than where it is in
 the page's list, so an edit elsewhere that redraws the page keeps it selected,
@@ -1393,7 +1393,7 @@ so a line carrying what the ground sends has nothing to reach on a gateway
 node -- offers no menu, and the line stays in hand with the box on the sheet
 saying so, which is a kinder answer to a near miss than throwing away a line
 that took a click to pick up. The rule is still
-``tcslib_protocol::graph::terminals``; the menu only says it.
+``tcsprotocol::graph::terminals``; the menu only says it.
 
 A link that is already there can be picked up by either of its ends. Click the
 terminal it is attached to and the line comes off the drawing and into the
@@ -2132,7 +2132,7 @@ Which terminals a type has is declared there, and so is what a node of it may
 be told. Both were written in Rust where nobody adding a node type could see
 them, and both are still *read* from Rust by the parts that cannot afford to
 read a file -- the checking and the flight software have
-``tcslib_protocol::graph::terminals``, and a window has
+``tcsprotocol::graph::terminals``, and a window has
 ``style::NodeType::attributes`` for a type the tree does not describe. So the
 tree is held against those: ``the_trees_terminals_are_the_schemas`` and
 ``a_description_of_a_whole_type_says_what_the_type_says``. A description of one
@@ -2178,7 +2178,7 @@ That is ``vehicle/compute/vote.yaml`` shortened. An attribute may also say its
 ``kind``, which is what its field is offered as: ``boolean`` is a control with
 two states, and ``text``, ``path``, ``whole``, ``interval``, ``timeout`` and
 ``bytes`` are a box to write in, a kind with a rule of its own naming the
-``tcslib-protocol`` rule a value of it is read by (``nodes::KINDS``). Unstated
+``tcsprotocol`` rule a value of it is read by (``nodes::KINDS``). Unstated
 is ``text``; ``process.xml`` states a ``path``, an ``interval`` and a
 ``boolean``.
 
@@ -2207,7 +2207,7 @@ cannot find the tree at all offers every type as itself, which is exactly what
 it offered before there was a tree.
 
 What a computation is told is the flight software's own list, and the tree is
-held to it: ``tcslib_protocol::node::vehicle::compute::attributes_of`` says what
+held to it: ``tcsprotocol::node::vehicle::compute::attributes_of`` says what
 each computation takes, ``params_of`` refuses anything else, and a test says
 each description asks for exactly that list. A description that asked for
 something else would be a panel filling in a field the checking then refuses, or
@@ -2223,10 +2223,10 @@ the same way -- a name picks out one node here as it does in a configuration.
 Schemas Beside the Tree
 =======================
 
-``tcslib-protocol/schema`` holds a schema for each file tcs-gui edits, in each
+``tcsprotocol/schema`` holds a schema for each file tcs-gui edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
-tcslib-protocol's rather than this editor's, because every program that reads a
+tcsprotocol's rather than this editor's, because every program that reads a
 configuration reads those formats; they are installed under
 ``$(PREFIX)/share/tcspecial/schema``. The schemas of the editor's own node
 descriptions stay with it, in ``tcs-gui/share/schema``.
@@ -2269,11 +2269,11 @@ that is the two attributes every XML tool reads::
 
     <configuration
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="tcslib-protocol/schema/tcspecial.xsd">
+        xsi:noNamespaceSchemaLocation="tcsprotocol/schema/tcspecial.xsd">
 
 and in YAML it is a comment, there being no other way to say it in YAML::
 
-    # yaml-language-server: $schema=tcslib-protocol/schema/tcspecial.schema.json
+    # yaml-language-server: $schema=tcsprotocol/schema/tcspecial.schema.json
 
 Both are written by ``nodes::schema_reference``, which gives the path relative
 to the file where the schemas are above it -- which is a checkout, where these

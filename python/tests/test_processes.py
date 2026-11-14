@@ -14,7 +14,7 @@ from pathlib import Path
 PYTHON = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PYTHON))
 
-from tcslib_moc import processes  # noqa: E402
+from tcsmoc import processes  # noqa: E402
 
 
 def alive(pid):
@@ -59,7 +59,7 @@ class VehicleTest(unittest.TestCase):
         parent = subprocess.Popen(
             [sys.executable, "-c",
              "import sys, time; sys.path[:0] = sys.argv[1:2]; "
-             "from tcslib_moc import processes; "
+             "from tcsmoc import processes; "
              "v = processes.Vehicle('sleep', ['1000']); v.start(); "
              "print(v.process.pid, flush=True); time.sleep(1000)",
              str(PYTHON)],

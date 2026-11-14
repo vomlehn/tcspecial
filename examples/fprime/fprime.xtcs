@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
     <description>Answering to an F´ flight computer: a reading, the temperature made of it and what a thermostat would decide of that, to its bridge component, and a command from it to a heater</description>
     <tcspecial>
         <!-- Every port is in the nine thousands, which no other example
@@ -11,7 +11,7 @@
              The vehicle answers to an F´ flight computer rather than to the
              ground. Its links are the radio's - UDP, in the radio's protocol
              - because the far end of each is the F´ deployment's TcsBridge
-             component, which is a ground station built on tcslib-moc-c as far
+             component, which is a ground station built on tcsmoc-c as far
              as tcspecial can tell. -->
         <beacon>
             <default_interval>5 s</default_interval>

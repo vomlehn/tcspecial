@@ -60,9 +60,9 @@ include $(CURDIR)/beside.mk
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
 TCS_HELPERS_REQUIRED := 0.8.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
-# runtime python/tcslib_protocol/_xtce links to: a checkout of
+# runtime python/tcsprotocol/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
-# cannot follow a variable. See the tcs-xtce target in tcslib-protocol/Makefile.
+# cannot follow a variable. See the tcs-xtce target in tcsprotocol/Makefile.
 TCS_XTCE := $(BESIDE)/tcs-xtce
 BINDIR = $(PREFIX)/bin
 SBINDIR = $(PREFIX)/sbin
@@ -74,7 +74,7 @@ DOCDIR = $(DATADIR)/doc
 EXAMPLEDIR = $(DATADIR)/examples/$(PROJECT_NAME)
 PYTHONDIR = $(LIBDIR)/python3/site-packages
 TCS_GUI_DATA = $(DESTDIR)$(DATADIR)/$(GUI_NAME)
-# The XTCS, YTCS and simulator schemas, tcslib-protocol/schema: tcspecial's and
+# The XTCS, YTCS and simulator schemas, tcsprotocol/schema: tcspecial's and
 # not tcs-gui's, since they define the formats every program reads.
 SCHEMADIR = $(DATADIR)/tcspecial/schema
 
@@ -303,12 +303,12 @@ doc-headers: tcs-xtce
 	python3 -I $(TCS_XTCE)/tests/doc_headers.py
 
 # Stop, saying what to do, unless the tcs-xtce checkout beside this one is
-# there, at the version tcslib-protocol pins the tcs-xtce crate to, and ready to
-# run: the tests reach its Python runtime through python/tcslib_protocol/_xtce,
+# there, at the version tcsprotocol pins the tcs-xtce crate to, and ready to
+# run: the tests reach its Python runtime through python/tcsprotocol/_xtce,
 # and installing the ground package copies it from there.
 .PHONY: tcs-xtce
 tcs-xtce:
-	@$(MAKE) --no-print-directory -C tcslib-protocol tcs-xtce
+	@$(MAKE) --no-print-directory -C tcsprotocol tcs-xtce
 
 # Stop, saying what to do, unless the tcs-helpers checkout is there and
 # at least TCS_HELPERS_REQUIRED.
@@ -465,7 +465,7 @@ VEHICLE_GUIDE_CONFIGURATIONS = \
 		$(stage)/deck.xtcs)
 
 # Write this build's interface digest into every shipped configuration, in
-# place and changing nothing else, after tcslib-protocol/xtce/link.xtce changes:
+# place and changing nothing else, after tcsprotocol/xtce/link.xtce changes:
 # tcs-verify --set-interface, which says what it changed. A test in
 # tcs-verify/tests/examples.rs fails while one is stale.
 .PHONY: set-interfaces
@@ -482,7 +482,7 @@ OWN_XTCE_CONFIGURATIONS = $(filter %.ytcs, \
 	$(filter-out $(VEHICLE_GUIDE_CONFIGURATIONS),$(SHIPPED_CONFIGURATIONS)))
 
 # Write each one's own XTCE again, after a configuration or
-# tcslib-protocol/xtce/types.xtce changes: tcs-verify --xtce, which says what it
+# tcsprotocol/xtce/types.xtce changes: tcs-verify --xtce, which says what it
 # wrote.
 .PHONY: xtce
 xtce:
@@ -802,7 +802,7 @@ PACKAGES := tcspecial tcspecial-moc tcspecial-test
 RELEASE_ATTRIBUTION := slint
 
 # The crates those come from, built together by install-build.
-INSTALL_CRATES := tcspecial tcs-verify tcs-gui tcslib-moc-c tcs-moc tcs-sim \
+INSTALL_CRATES := tcspecial tcs-verify tcs-gui tcsmoc-c tcs-moc tcs-sim \
 		  $(FLIGHT_LIBEXEC)
 
 # The crates each package's programs and libraries are built from, whose
@@ -811,26 +811,26 @@ INSTALL_CRATES := tcspecial tcs-verify tcs-gui tcslib-moc-c tcs-moc tcs-sim \
 # third-party-notices.py gathers. segsend is a program of the tcspecial
 # crate's.
 FLIGHT_CRATES := tcspecial tcs-verify $(FLIGHT_LIBEXEC)
-GROUND_CRATES := tcs-gui tcslib-moc-c
+GROUND_CRATES := tcs-gui tcsmoc-c
 TEST_CRATES := tcs-moc tcs-sim tcspecial
 
 # Where cargo puts a release build.
 RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
 
 # The versions, read from where each is stated so that it is stated once: the
-# workspace's Cargo.toml for the packages, tcslib-moc-c's for libtcsmoc-c's
-# own, which tcsmoc-c.pc says, and tcslib-moc-c/abi-version for
+# workspace's Cargo.toml for the packages, tcsmoc-c's for libtcsmoc-c's
+# own, which tcsmoc-c.pc says, and tcsmoc-c/abi-version for
 # libtcsmoc-c's ABI version, which is its soname -- libtcsmoc-c.so.<ABI>
 # -- and the name its file is installed under. The ABI version goes up only when
 # a program built against the old tcsmoc-c.h would not work with the new
-# library: see tcslib-moc-c/build.rs, which reads the same file to set the
+# library: see tcsmoc-c/build.rs, which reads the same file to set the
 # soname, for exactly when.
 VERSION := $(shell sed -n \
 	   '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' \
 	   Cargo.toml)
 LIBTCS_VERSION := $(shell sed -n 's/^version *= *"\(.*\)"/\1/p' \
-		    tcslib-moc-c/Cargo.toml)
-LIBTCS_ABI := $(shell cat tcslib-moc-c/abi-version)
+		    tcsmoc-c/Cargo.toml)
+LIBTCS_ABI := $(shell cat tcsmoc-c/abi-version)
 LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 
 # The example configurations, in both spellings, with their simulator files
@@ -1001,7 +1001,7 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 		$(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PYTHONDIR)
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(GROUND_BIN)) \
 		$(DESTDIR)$(BINDIR)
-	install -m 644 tcslib-moc-c/include/tcsmoc-c.h \
+	install -m 644 tcsmoc-c/include/tcsmoc-c.h \
 		$(DESTDIR)$(INCLUDEDIR)
 	install -m 644 $(RELEASE_DIR)/libtcsmoc_c.so \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
@@ -1015,9 +1015,9 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 	$(SUBST) packaging/tcsmoc-c.pc.in \
 		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
-# The schemas the Python reads are tcslib-protocol/schema, which install-data
+# The schemas the Python reads are tcsprotocol/schema, which install-data
 # puts under $(SCHEMADIR): the installed package reaches them through a link, as
-# python/tcslib_protocol/schema does in the source tree, rather than carrying a
+# python/tcsprotocol/schema does in the source tree, rather than carrying a
 # second copy that could differ from the first.
 	set -e; \
 	tmp=$$(mktemp -d -t tcspecial-py.XXXXXXXXXX); \
@@ -1032,20 +1032,20 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 	rm -f "$$dist/direct_url.json"; \
 	sed -i '/^tcspecial_moc-[^/]*\.dist-info\/direct_url\.json,/d' \
 		"$$dist/RECORD"; \
-	schema=$(DESTDIR)$(PYTHONDIR)/tcslib_protocol/schema; \
+	schema=$(DESTDIR)$(PYTHONDIR)/tcsprotocol/schema; \
 	rm -rf "$$schema"; \
-	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcslib_protocol \
+	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcsprotocol \
 		$(SCHEMADIR)) "$$schema"; \
-	sed -i '/^tcslib_protocol\/schema\//d' "$$dist/RECORD"
-	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-moc/tcslib-moc-c \
+	sed -i '/^tcsprotocol\/schema\//d' "$$dist/RECORD"
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-moc/tcsmoc-c \
 		$(DESTDIR)$(DOCDIR)/tcspecial-moc/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/tcspecial-moc
 	$(THIRD_PARTY_NOTICES) . \
 		$(DESTDIR)$(DOCDIR)/tcspecial-moc/THIRD-PARTY-NOTICES \
 		tcspecial-moc $(GROUND_CRATES)
-	install -m 644 tcslib-moc-c/README.html \
-		$(DESTDIR)$(DOCDIR)/tcspecial-moc/tcslib-moc-c
+	install -m 644 tcsmoc-c/README.html \
+		$(DESTDIR)$(DOCDIR)/tcspecial-moc/tcsmoc-c
 	install -m 644 python/README.md \
 		$(DESTDIR)$(DOCDIR)/tcspecial-moc/python
 	if [ "$(HOOKS)" = 1 ]; then \
@@ -1096,7 +1096,7 @@ install-tcspecial-test: tcs-helpers
 	fi
 
 # Install tcs-gui's data -- the description tree and its schemas -- and the
-# XTCS, YTCS and simulator schemas of tcslib-protocol/schema, under
+# XTCS, YTCS and simulator schemas of tcsprotocol/schema, under
 # $(SCHEMADIR).
 #
 # The whole of tcs-gui/share, with its structure: the description tree's shape
@@ -1120,8 +1120,8 @@ install-data:
 	@cd $(GUI_NAME)/share && find . -type f \
 		-exec install -m 644 {} $(TCS_GUI_DATA)/{} \;
 	@install -d -m 755 $(DESTDIR)$(SCHEMADIR)
-	@install -m 644 tcslib-protocol/schema/README \
-		tcslib-protocol/schema/*.xsd tcslib-protocol/schema/*.json \
+	@install -m 644 tcsprotocol/schema/README \
+		tcsprotocol/schema/*.xsd tcsprotocol/schema/*.json \
 		$(DESTDIR)$(SCHEMADIR)
 	@echo "✓ $(GUI_NAME) data installed"
 
@@ -1151,8 +1151,8 @@ uninstall-files:
 		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a \
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
-	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslib_protocol tcslib_moc \
-		tcslib_ui tcspecial_moc-*.dist-info)
+	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcsprotocol tcsmoc \
+		tcsui tcspecial_moc-*.dist-info)
 	rm -rf $(TCS_GUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
 		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))
@@ -1385,7 +1385,7 @@ screenshots: screenshots-tcs-gui screenshots-tcs-moc screenshots-tcs-sim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
-HTML_DIRS = $(DOCS_DIR) examples tcslib-moc tcslib-moc-c tcslib-protocol
+HTML_DIRS = $(DOCS_DIR) examples tcsmoc tcsmoc-c tcsprotocol
 
 # Fail where a committed page has fallen behind its source, naming it, having
 # made every page again in place: tcs-helpers' html-pages check, which also

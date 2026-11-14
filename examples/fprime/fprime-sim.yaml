@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../tcslib-protocol/schema/tcspecial-sim.schema.json
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial-sim.schema.json
 
 # How tcs-sim simulates the payloads of fprime.ytcs.
 #

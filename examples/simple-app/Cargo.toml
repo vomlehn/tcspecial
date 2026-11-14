@@ -9,14 +9,14 @@ sends; the payload itself is lorem_pl.py"""
 
 [dependencies]
 # How the ground gets the payload's words from the gateway node.
-tcslib-moc = { path = "../../tcslib-moc" }
+tcsmoc = { path = "../../tcsmoc" }
 
 # The payload's tests run lorem_pl.py the way tcspecial does.
 [dev-dependencies]
 tcsapp = { path = "../../tcsapp" }
 tempfile = "3"
 # The ground test sends each word as tcspecial does, after its count.
-tcslib-protocol = { path = "../../tcslib-protocol" }
+tcsprotocol = { path = "../../tcsprotocol" }
 
 [lints]
 workspace = true

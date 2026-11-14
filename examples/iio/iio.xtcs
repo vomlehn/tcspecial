@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
     <description>A sensor's sample buffer, read through the IIO subsystem, its samples going to the ground</description>
     <tcspecial>
         <!-- Every port is in the thirty-two hundreds to thirty-seven

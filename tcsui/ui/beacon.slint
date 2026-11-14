@@ -1,0 +1,185 @@
+// The beacon panel: an indicator, when the last beacon arrived, and what it
+// said.
+//
+// Shared markup rather than a copy in each window. Two programs show it --
+// tcs-moc, beside its command link, and the `beacon` example, which shows this
+// and nothing else -- and an operator who has read one has read the other:
+// an indicator in a different place or a label in different words would be
+// two things to learn about one spacecraft.
+//
+// Imported by path, which is what Slint resolves relative to the importing
+// file:
+//
+//     import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
+//
+// Nothing is computed here. What colour the indicator is and what the two
+// lines say are worked out in Rust, from what `tcsmoc::beacon` reports, and
+// set as properties: see the crate's `shown`.
+
+import { Fonts } from "fonts.slint";
+import { TitledBox } from "titled.slint";
+
+export component BeaconPanel inherits TitledBox {
+    // The indicator's colour, which says how stale the last beacon is. Grey
+    // before any has arrived and never after: once one has, the dark half of
+    // a blink is white. See `tcsui::indicator`.
+    in property <color> indicator-color: #c0c0c0;
+    // When the last beacon arrived, as a time of day, and the placeholder
+    // until one has.
+    in property <string> last-received: "--:--:--";
+    // What that beacon said: the build flying, the version of the
+    // configuration it is serving, and the digest of the files it read.
+    in property <string> last-message: "<none>";
+    // Which stage the indicator is at, in a word --
+    // tcsmoc::beacon::Stage::label -- shown after the indicator, which says
+    // the same thing in colour: the eye goes to the colour first, and the
+    // word says what it means. Empty is a window that does not show it, and
+    // the row is then the label and the indicator alone.
+    in property <string> stage: "";
+    // Every word the stage can be, a line each, so that its line is as wide
+    // as the widest of them and the row does not change width as the stage
+    // changes. Stage::label's words: the beacon example's window test sets
+    // each of them and checks that nothing moves.
+    in property <string> stages: "Unheard\nHeard\nAging\nWaiting";
+    // Every shape a beacon's message can take at its widest, a line each, so
+    // that its line is as wide as the widest and the panel does not grow when
+    // a beacon arrives. Empty is a panel that does not hold the line to a
+    // width, and wraps the message where the panel is narrower than it, as
+    // tcs-moc's is.
+    in property <string> messages: "";
+    // What the field to the right of the indicator says of a restart --
+    // tcsui::RESTARTED_CONNECT while the last beacon carried the restart
+    // flag, empty while it did not -- and whether the
+    // window shows the field at all. Read-only: it is the beacon's to say.
+    in property <string> restart: "";
+    in property <bool> shows-restart: false;
+
+    // Titled and boxed, because this is not part of whatever sits beside it:
+    // the beacon has a socket of its own and keeps arriving after a
+    // disconnect, which is a window worth being able to read rather than one
+    // to be puzzled by. The title says what the box is, so the rows need not.
+    title: "Beacon";
+
+    // Labels on the left at their own width, and each value starting at the
+    // same place after them, all of it left justified: the label column does
+    // not stretch, so a wider panel puts its room after the values rather
+    // than between them and their labels.
+    GridLayout {
+        spacing-horizontal: 12px;
+        spacing-vertical: 4px;
+
+        Row {
+            Text {
+                text: "Status:";
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+            // Sized from the type rather than in pixels, so that the
+            // indicator stands as tall as the line beside it at any type
+            // size.
+            HorizontalLayout {
+                alignment: start;
+                spacing: 8px;
+                horizontal-stretch: 1;
+                Rectangle {
+                    width: Fonts.window * 1.5;
+                    height: self.width;
+                    border-radius: self.width / 2;
+                    background: indicator-color;
+                    border-color: #808080;
+                    border-width: 1px;
+                }
+                if root.stage != "": Text {
+                    text: root.stage;
+                    min-width: widest-stage.preferred-width;
+                    vertical-alignment: center;
+                }
+                // A field that can be read and not typed in, drawn rather
+                // than a LineEdit, which would take focus and a cursor. As
+                // wide as what it can say, so the row does not change width
+                // as it fills and empties.
+                if root.shows-restart: Rectangle {
+                    min-width: widest-restart.preferred-width + 12px;
+                    horizontal-stretch: 0;
+                    border-color: #808080;
+                    border-width: 1px;
+                    border-radius: 2px;
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        padding-top: 2px;
+                        padding-bottom: 2px;
+                        Text {
+                            text: root.restart;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                // What the values are held to: the widest each will be,
+                // measured rather than stated in pixels, the text being
+                // whatever size Fonts.window makes it. Each is one Text
+                // holding every shape on a line of its own, so as wide as its
+                // widest line, and never drawn. They are in a box of no size
+                // at the end of this row, where they take up no room: a
+                // layout holds a box to the size it is given, where one
+                // outside a layout would be as tall as the column of lines.
+                // The time is in the window's own face, whose digits are all
+                // one width.
+                Rectangle {
+                    width: 0;
+                    height: 0;
+                    widest-stage := Text {
+                        visible: false;
+                        text: root.stages;
+                    }
+                    widest-received := Text {
+                        visible: false;
+                        text: "--:--:--\n00:00:00";
+                    }
+                    widest-message := Text {
+                        visible: false;
+                        text: root.messages;
+                    }
+                    widest-restart := Text {
+                        visible: false;
+                        text: "Restarted\u{2014}connect";
+                    }
+                }
+            }
+        }
+
+        Row {
+            Text {
+                text: "Last rcvd:";
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+            Text {
+                text: last-received;
+                min-width: widest-received.preferred-width;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+        }
+
+        // What that beacon said, under when it arrived: the two read as one
+        // message, received then and saying this.
+        Row {
+            Text {
+                text: "Last msg:";
+                vertical-alignment: center;
+                horizontal-stretch: 0;
+            }
+            // Wrapped at its spaces where the box is narrower than the line,
+            // as it is beside tcs-moc's command link: the digest goes to a
+            // line of its own rather than off the edge of the window.
+            Text {
+                text: last-message;
+                min-width: widest-message.preferred-width;
+                vertical-alignment: center;
+                wrap: word-wrap;
+                horizontal-stretch: 1;
+            }
+        }
+    }
+}

@@ -53,8 +53,8 @@
 
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::node::vehicle::compute::{Algorithm, VoteParams};
-use tcslib_protocol::unit::Unit;
+use tcsprotocol::node::vehicle::compute::{Algorithm, VoteParams};
+use tcsprotocol::unit::Unit;
 
 use super::{from_value, Function, Out};
 
@@ -97,7 +97,7 @@ impl Vote {
     /// that a configuration fault rather than a vote over two. Nothing to
     /// refuse here -- that a vote is over at least three inputs, each named
     /// once, and names an algorithm it knows, is
-    /// `tcslib_protocol::node::vehicle::compute`'s rule.
+    /// `tcsprotocol::node::vehicle::compute`'s rule.
     ///
     /// # Arguments
     ///
@@ -328,7 +328,7 @@ mod tests {
     /// The refusal is `as_value`'s range, which these temperatures are all
     /// well inside; a test that meant to try the range says so.
     fn kelvin(number: f64) -> Vec<u8> {
-        as_value(number, tcslib_protocol::unit::Unit::Kelvin)
+        as_value(number, tcsprotocol::unit::Unit::Kelvin)
             .expect("a temperature a value carries")
     }
 
@@ -367,7 +367,7 @@ mod tests {
                 algorithm,
                 age,
             },
-            tcslib_protocol::unit::Unit::Kelvin,
+            tcsprotocol::unit::Unit::Kelvin,
         )
     }
 
@@ -383,7 +383,7 @@ mod tests {
     fn said(out: Option<Out>) -> f64 {
         from_value(
             &out.expect("a value"),
-            tcslib_protocol::unit::Unit::Kelvin,
+            tcsprotocol::unit::Unit::Kelvin,
             "a vote",
         )
         .expect("a value")

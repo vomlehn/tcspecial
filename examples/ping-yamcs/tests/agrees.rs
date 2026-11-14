@@ -1,7 +1,7 @@
 //! What the Python reads out of the configuration is what the Rust reads.
 //!
 //! The ground station is Python and reads the XML spelling; the vehicle reads
-//! the configuration through `tcslib-protocol`. `ping_yamcs.py` writes Yamcs's
+//! the configuration through `tcsprotocol`. `ping_yamcs.py` writes Yamcs's
 //! configuration from what it reads -- where Yamcs sends commands and pings,
 //! where it listens for the answers and the beacon, and the APIDs that tell
 //! them apart -- so a port or an APID the two sides work out differently is a
@@ -15,8 +15,8 @@ use std::process::Command;
 
 use std::collections::BTreeSet;
 
-use tcslib_protocol::graph::telemetry::{self, ApidCarries, Via};
-use tcslib_protocol::graph::{Destination, Graph};
+use tcsprotocol::graph::telemetry::{self, ApidCarries, Via};
+use tcsprotocol::graph::{Destination, Graph};
 
 mod common;
 
@@ -102,7 +102,7 @@ fn python_payload_telemetry(path: &Path) -> Vec<String> {
     let python = here().join("../../python");
     let script = "import sys\n\
         sys.path.insert(0, sys.argv[1])\n\
-        from tcslib_protocol import configuration\n\
+        from tcsprotocol import configuration\n\
         said = configuration.load(sys.argv[2])\n\
         for name in said.untouched_payloads():\n\
         \x20   vehicle, ground = said.payload_telemetry_link(name)\n\
@@ -247,7 +247,7 @@ fn mdb_apids(xtce: &Element) -> BTreeSet<(String, u16)> {
 }
 
 /// The command the ping node's interface document,
-/// `tcslib-protocol/xtce/ping.xtce`, states: what a gateway node whose data
+/// `tcsprotocol/xtce/ping.xtce`, states: what a gateway node whose data
 /// goes only to ping nodes takes.
 ///
 /// # Returns
@@ -258,7 +258,7 @@ fn mdb_apids(xtce: &Element) -> BTreeSet<(String, u16)> {
 ///
 /// The document does not read, or states no one command.
 fn ping_command() -> String {
-    let path = here().join("../../tcslib-protocol/xtce/ping.xtce");
+    let path = here().join("../../tcsprotocol/xtce/ping.xtce");
     let document = read_xml(&std::fs::read_to_string(path).expect("it reads"));
     let mut commands = Vec::new();
     document.within("MetaCommand", &mut commands);
@@ -345,7 +345,7 @@ fn rust_apids(path: &Path) -> BTreeSet<(String, u16)> {
     expected
 }
 
-/// The wrapper `tcslib_protocol/yamcs.py` generates holds exactly the APIDs the
+/// The wrapper `tcsprotocol/yamcs.py` generates holds exactly the APIDs the
 /// Rust counts, each in the container or command named for it: for the
 /// example, and for a copy with a payload more drawn into the gateway node
 /// and two payloads nothing touches, whose containers no hand wrote.

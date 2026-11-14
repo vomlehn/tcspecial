@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1020" height="470" viewBox="0 0 1020 470" role="img" aria-labelledby="title desc">
   <title id="title">The simple-app example</title>
-  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. tcspecial sends each word it produces as a UDP datagram to the gateway node on the ground, gateway-1, at its ground_base, 127.0.0.1:5100, plus lorem's device id, 1: port 5101. The ground program lorem_gateway gets the words from gateway-1 with a function call, tcslib-moc's GatewayReceiver::receive, and prints the line.</desc>
+  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. tcspecial sends each word it produces as a UDP datagram to the gateway node on the ground, gateway-1, at its ground_base, 127.0.0.1:5100, plus lorem's device id, 1: port 5101. The ground program lorem_gateway gets the words from gateway-1 with a function call, tcsmoc's GatewayReceiver::receive, and prints the line.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -82,7 +82,7 @@
   <path class="groundward" d="M45,422 L95,422" marker-end="url(#arrow-blue)"/>
   <text class="label" x="105" y="426">data toward the MOC</text>
   <path class="call" d="M300,422 L350,422" marker-end="url(#arrow-call)"/>
-  <text class="label" x="360" y="426">function call, from tcslib_moc::gateway</text>
+  <text class="label" x="360" y="426">function call, from tcsmoc::gateway</text>
   <rect class="payload" x="45" y="444" width="22" height="16" rx="4"/>
   <text class="label" x="75" y="457">payload</text>
   <rect class="socket" x="160" y="444" width="22" height="16" rx="4"/>

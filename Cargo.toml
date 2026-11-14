@@ -2,25 +2,25 @@
 resolver = "2"
 
 members = [
-    "tcslib-protocol",
-    "tcslib-moc",
+    "tcsprotocol",
+    "tcsmoc",
     "tcspecial",
     "tcs-moc",
     "tcs-sim",
     # The checks every program asks of a configuration, and the program that
-    # prints them. See tcslib-verify.
-    "tcslib-verify",
+    # prints them. See tcsverify.
+    "tcsverify",
     "tcs-verify",
     "tcs-gui",
     # The window pieces the ground programs share: the panels, and what to
-    # show on them. See tcslib-ui.
-    "tcslib-ui",
+    # show on them. See tcsui.
+    "tcsui",
     # How a configuration is drawn -- the panes, the nodes, the links -- for
-    # the editor and for tcspecial's visual window alike. See tcslib-diagram.
-    "tcslib-diagram",
-    # tcslib-moc for C and C++: the ground station's library behind one header.
-    # See tcslib-moc-c.
-    "tcslib-moc-c",
+    # the editor and for tcspecial's visual window alike. See tcs-diagram.
+    "tcs-diagram",
+    # tcsmoc for C and C++: the ground station's library behind one header.
+    # See tcsmoc-c.
+    "tcsmoc-c",
     # The file interfaces an app node's program is run with, and the five
     # apps that are run over them: see tcsapp. Three are nodes of the
     # vehicle's own and two are payloads.
@@ -41,7 +41,7 @@ members = [
     # And for the thermostat example through Yamcs.
     "examples/thermostat-yamcs",
     # What the tests of the examples through Yamcs share: an interpreter of
-    # the mission database tcslib_protocol/yamcs.py generates. Not an example.
+    # the mission database tcsprotocol/yamcs.py generates. Not an example.
     "examples/yamcs-common",
 ]
 

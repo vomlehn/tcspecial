@@ -16,9 +16,9 @@
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::ccsds::{read_header, PacketType, Sender};
-use tcslib_protocol::link_type::{uncounted, Count};
-use tcslib_protocol::{Beacon, Command, ConnectCommand, Telemetry};
+use tcsprotocol::ccsds::{read_header, PacketType, Sender};
+use tcsprotocol::link_type::{uncounted, Count};
+use tcsprotocol::{Beacon, Command, ConnectCommand, Telemetry};
 
 mod common;
 
@@ -63,7 +63,7 @@ fn send_framed(
     to: SocketAddr,
     data: &[u8],
 ) {
-    let mut room = vec![0u8; tcslib_protocol::ccsds::HEADER_BYTES + data.len()];
+    let mut room = vec![0u8; tcsprotocol::ccsds::HEADER_BYTES + data.len()];
     let packet = sender.frame(&mut room, data).expect("framed");
     from.send_to(packet, to).expect("sent");
 }
@@ -111,7 +111,7 @@ vehicle:
         world-out: [ground.pinger]
         moc-in: [ground]
 ",
-            tcslib_protocol::InterfaceDigest::of_this_build(),
+            tcsprotocol::InterfaceDigest::of_this_build(),
             port(&beacons),
             at(),
             at(),
@@ -163,7 +163,7 @@ vehicle:
     // taken, as Yamcs sends each from whatever port the system gives it,
     // and answered back to that port.
     let another = bound();
-    let ping = Command::Ping(tcslib_protocol::PingCommand::new(2)).to_bytes();
+    let ping = Command::Ping(tcsprotocol::PingCommand::new(2)).to_bytes();
     send_framed(&mut tc, &another, to, &ping);
     let answer = heard(&another, Duration::from_secs(5))
         .expect("an answer, to the port it came from");
@@ -212,7 +212,7 @@ fn connect_framed(
     from: &UdpSocket,
     to: SocketAddr,
     apid: u16,
-    digest: tcslib_protocol::config_digest::ConfigDigest,
+    digest: tcsprotocol::config_digest::ConfigDigest,
 ) {
     let connect = Command::Connect(ConnectCommand::new(1, digest)).to_bytes();
     let mut tc = Sender::new(PacketType::Telecommand, apid).unwrap();
@@ -280,7 +280,7 @@ payloads:
         port: \"{second_at}\"
         protocol: \"udp\"
 ",
-            tcslib_protocol::InterfaceDigest::of_this_build(),
+            tcsprotocol::InterfaceDigest::of_this_build(),
             port(&beacons),
             at(),
             at(),

@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every ordinary command the MOC sends tcspecial and every answer
+     tcspecial sends back, as they go on the link: the whole of each
+     datagram. CONNECT, RESTART_ARM and RESTART are not here: they are the
+     fixed commands, whose layouts never change, and are in xtce/fixed.xtce.
+
+     A command is
+
+       opcode           1 byte: which command
+       sequence         4 bytes: the command's number, which its answer
+                        carries back; a command older than one this start
+                        of tcspecial has taken, PING aside, is answered
+                        Stale and not acted on
+       ...              what that command carries
+
+     and an answer is
+
+       opcode           1 byte: the opcode of the command it answers
+       sequence         4 bytes: that command's sequence
+       status           1 byte: how the command went
+       timestamp        8 bytes: microseconds since the UNIX epoch when the
+                        answer was made, all ones where the vehicle could
+                        not tell the time
+       ...              what that answer carries
+
+     There is no header, no packet type and no generation: which way a
+     packet goes is said by who sends it and who receives it, and which
+     layout it has by the configuration, whose `interface` names the digest
+     of this document. Every number is most significant byte first, as the
+     beacon has it. A packet carries no CRC of its own: the transport under
+     it, UDP's checksum on this link, refuses a damaged datagram before it
+     is read. A datagram whose length is not exactly what its opcode's
+     layout gives is refused, not answered and not acted on.
+
+     The Rust in tcsprotocol/src/link_packet.rs is generated from this file
+     by `make link-packet` in tcsprotocol/: change this, and regenerate it,
+     and the interface digest with `make interface-digest`. See
+     tcsprotocol/src/link.rs, and "The link without a header" in
+     docs/tcspecial-design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="TcsLink">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <IntegerParameterType name="U8Type" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U32Type" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerParameterType>
+      <IntegerParameterType name="U64Type" signed="false">
+        <IntegerDataEncoding sizeInBits="64" encoding="unsigned"/>
+      </IntegerParameterType>
+      <BooleanParameterType name="FlagType">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </BooleanParameterType>
+      <BinaryParameterType name="SampleBytesType">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <FixedValue>64</FixedValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+      <!-- Why a SET_NODE was refused, in the vehicle's words: up to 160
+           bytes of UTF-8, after a byte saying how many. -->
+      <StringParameterType name="ReasonType">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="1288">
+            <LeadingSize sizeInBitsOfSizeTag="8"/>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
+      <EnumeratedParameterType name="StatusType">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <EnumerationList>
+          <Enumeration value="0" label="Success"/>
+          <Enumeration value="1" label="Failure"/>
+          <Enumeration value="2" label="InvalidCommand"/>
+          <Enumeration value="3" label="InvalidParameter"/>
+          <Enumeration value="4" label="NotArmed"/>
+          <Enumeration value="5" label="NotFound"/>
+          <Enumeration value="6" label="AlreadyExists"/>
+          <Enumeration value="7" label="Timeout"/>
+          <!-- 8 is not used: it was WrongGeneration, when a command
+               carried a generation. -->
+          <!-- Older than a command this start has already taken, and
+               not acted on. -->
+          <Enumeration value="9" label="Stale"/>
+          <!-- Not acted on, because this start of tcspecial has not taken
+               a CONNECT whose configuration checksum is its own since it
+               started, or has taken a RESTART: only CONNECT, RESTART_ARM
+               and RESTART are taken until it does. -->
+          <Enumeration value="10" label="Unmatched"/>
+        </EnumerationList>
+      </EnumeratedParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="Opcode" parameterTypeRef="U8Type"/>
+      <Parameter name="Sequence" parameterTypeRef="U32Type"/>
+      <Parameter name="Status" parameterTypeRef="StatusType"/>
+      <Parameter name="Timestamp" parameterTypeRef="U64Type"/>
+      <Parameter name="Node" parameterTypeRef="U32Type"/>
+      <Parameter name="Reason" parameterTypeRef="ReasonType"/>
+      <Parameter name="Enabled" parameterTypeRef="FlagType"/>
+      <Parameter name="TakenBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="Reads" parameterTypeRef="U64Type"/>
+      <Parameter name="ReadsFailed" parameterTypeRef="U64Type"/>
+      <Parameter name="GivenBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="Writes" parameterTypeRef="U64Type"/>
+      <Parameter name="WritesFailed" parameterTypeRef="U64Type"/>
+      <Parameter name="Dropped" parameterTypeRef="U64Type"/>
+      <Parameter name="Asks" parameterTypeRef="U64Type"/>
+      <Parameter name="AsksFailed" parameterTypeRef="U64Type"/>
+      <Parameter name="Strangers" parameterTypeRef="U64Type"/>
+      <!-- Whether the node has moved anything, and when it last did: the
+           time is nought where it has not, and is read only where the flag
+           says it has. -->
+      <Parameter name="MovedKnown" parameterTypeRef="FlagType"/>
+      <Parameter name="LastMoved" parameterTypeRef="U64Type"/>
+      <!-- The last datum a node moved each way: whether one has, when, how
+           many bytes of it are shown, how many it had, and the first eight
+           of them. -->
+      <Parameter name="TakenKnown" parameterTypeRef="FlagType"/>
+      <Parameter name="TakenTime" parameterTypeRef="U64Type"/>
+      <Parameter name="TakenLength" parameterTypeRef="U8Type"/>
+      <Parameter name="TakenTotal" parameterTypeRef="U32Type"/>
+      <Parameter name="TakenBytesShown" parameterTypeRef="SampleBytesType"/>
+      <Parameter name="GivenKnown" parameterTypeRef="FlagType"/>
+      <Parameter name="GivenTime" parameterTypeRef="U64Type"/>
+      <Parameter name="GivenLength" parameterTypeRef="U8Type"/>
+      <Parameter name="GivenTotal" parameterTypeRef="U32Type"/>
+      <Parameter name="GivenBytesShown" parameterTypeRef="SampleBytesType"/>
+    </ParameterSet>
+    <ContainerSet>
+      <!-- What every answer holds first. -->
+      <SequenceContainer name="AnswerLayout" abstract="true">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Opcode"/>
+          <ParameterRefEntry parameterRef="Sequence"/>
+          <ParameterRefEntry parameterRef="Status"/>
+          <ParameterRefEntry parameterRef="Timestamp"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="PingAnswer">
+        <EntryList/>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="1"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="StartNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="48"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="StopNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="49"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="SetNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="Reason"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="50"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="QueryNodeAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="Enabled"/>
+          <ParameterRefEntry parameterRef="TakenBytes"/>
+          <ParameterRefEntry parameterRef="Reads"/>
+          <ParameterRefEntry parameterRef="ReadsFailed"/>
+          <ParameterRefEntry parameterRef="GivenBytes"/>
+          <ParameterRefEntry parameterRef="Writes"/>
+          <ParameterRefEntry parameterRef="WritesFailed"/>
+          <ParameterRefEntry parameterRef="Dropped"/>
+          <ParameterRefEntry parameterRef="Asks"/>
+          <ParameterRefEntry parameterRef="AsksFailed"/>
+          <ParameterRefEntry parameterRef="Strangers"/>
+          <ParameterRefEntry parameterRef="MovedKnown"/>
+          <ParameterRefEntry parameterRef="LastMoved"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="51"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="QueryNodeSampleAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="TakenKnown"/>
+          <ParameterRefEntry parameterRef="TakenTime"/>
+          <ParameterRefEntry parameterRef="TakenLength"/>
+          <ParameterRefEntry parameterRef="TakenTotal"/>
+          <ParameterRefEntry parameterRef="TakenBytesShown"/>
+          <ParameterRefEntry parameterRef="GivenKnown"/>
+          <ParameterRefEntry parameterRef="GivenTime"/>
+          <ParameterRefEntry parameterRef="GivenLength"/>
+          <ParameterRefEntry parameterRef="GivenTotal"/>
+          <ParameterRefEntry parameterRef="GivenBytesShown"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="52"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+  <CommandMetaData>
+    <ArgumentTypeSet>
+      <IntegerArgumentType name="U8Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <IntegerArgumentType name="U32Arg" signed="false">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+      </IntegerArgumentType>
+      <!-- The attribute a SET_NODE sets: up to 64 bytes of UTF-8, after a
+           byte saying how many. -->
+      <StringArgumentType name="AttributeArg">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="520">
+            <LeadingSize sizeInBitsOfSizeTag="8"/>
+          </Variable>
+        </StringDataEncoding>
+      </StringArgumentType>
+      <!-- How many bytes the value is: up to 256. -->
+      <IntegerArgumentType name="ValueLengthArg" signed="false">
+        <IntegerDataEncoding sizeInBits="16" encoding="unsigned"/>
+        <ValidRangeSet>
+          <ValidRange minInclusive="0" maxInclusive="256"/>
+        </ValidRangeSet>
+      </IntegerArgumentType>
+      <!-- And the value: a datum of the attribute's type, in that type's
+           own encoding as types.xtce states it, and not text. A thermostat's
+           setpoint is the value type its type-in is: four bytes of a count of
+           the unit's steps. Which type is the configuration's to say:
+           tcsprotocol/src/graph/settings.rs, and each binding's command in
+           the configuration's own XTCE. -->
+      <BinaryArgumentType name="ValueArg"
+          shortDescription="An attribute's value, in its type's encoding.">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ArgumentInstanceRef argumentRef="ValueLength"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryArgumentType>
+    </ArgumentTypeSet>
+    <MetaCommandSet>
+      <!-- What every command holds first. -->
+      <MetaCommand name="TcsCommand" abstract="true">
+        <ArgumentList>
+          <Argument name="Opcode" argumentTypeRef="U8Arg"/>
+          <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="TcsCommandContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Opcode"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+          </EntryList>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="Ping">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="1"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <CommandContainer name="PingContainer">
+          <EntryList/>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- Opcodes 0x00 to 0x0F belong to the fixed commands, in
+           fixed.xtce, and no command here takes another of them. PING keeps
+           0x01, which it had before there were fixed commands, and is an
+           ordinary command all the same. -->
+      <!-- Opcode 32, and answer kind 160, are not used: they were CONFIG,
+           which set the beacon interval while tcspecial ran. The interval
+           is the configuration's alone, so that every station with the same
+           configuration knows it. -->
+      <MetaCommand name="StartNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="48"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="StartNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="StopNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="49"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="StopNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="SetNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="50"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+          <Argument name="Attribute" argumentTypeRef="AttributeArg"/>
+          <Argument name="ValueLength" argumentTypeRef="ValueLengthArg"/>
+          <Argument name="Value" argumentTypeRef="ValueArg"/>
+        </ArgumentList>
+        <CommandContainer name="SetNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+            <ArgumentRefEntry argumentRef="Attribute"/>
+            <ArgumentRefEntry argumentRef="ValueLength"/>
+            <ArgumentRefEntry argumentRef="Value"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="QueryNode">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="51"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryNodeContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <MetaCommand name="QueryNodeSample">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="52"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryNodeSampleContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+    </MetaCommandSet>
+  </CommandMetaData>
+</SpaceSystem>

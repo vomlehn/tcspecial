@@ -70,7 +70,7 @@
   <!-- The F´ deployment's bridge component -->
   <rect class="ground" x="640" y="110" width="235" height="235" rx="10"/>
   <text class="name" x="656" y="137">TcsBridge</text>
-  <text class="kind" x="656" y="158">F´ component, on tcslib-moc-c</text>
+  <text class="kind" x="656" y="158">F´ component, on tcsmoc-c</text>
   <text class="detail" x="656" y="182">channel 0x3003:</text>
   <text class="detail" x="656" y="198">  thermometer, bytes</text>
   <text class="detail" x="656" y="218">channel 0x3004:</text>

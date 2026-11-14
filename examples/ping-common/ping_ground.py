@@ -1,10 +1,10 @@
 """The ground's half of a ping, with no window.
 
-The Python spelling of ``tcslib-moc/src/ping.rs``, which is what tcs-moc pings a
+The Python spelling of ``tcsmoc/src/ping.rs``, which is what tcs-moc pings a
 ``ping`` node with: the same rules for what is kept and the same three times,
 shown the same way. Here between the two halves it borrows: the ping format
-(``python/tcslib_protocol/ping.py``, after ``tcslib_protocol``) and the
-configuration (``python/tcslib_protocol/configuration.py``). A :class:`Pinger`
+(``python/tcsprotocol/ping.py``, after ``tcsprotocol``) and the
+configuration (``python/tcsprotocol/configuration.py``). A :class:`Pinger`
 sends each ping up to the ``gateway`` node, takes each answer the ``ping`` node
 sends back down, and keeps what a window shows: the last ping sent and when, the
 last answer received and when, and the three times between them.
@@ -28,7 +28,7 @@ Whether anything at all has arrived since the last ping is kept too, so that
 a ground station with no window (:func:`report`) prints what came that did
 not answer it -- an earlier ping's answer, or what is no answer at all --
 rather than saying nothing came. It is the one thing kept here that
-``tcslib_moc::ping`` does not keep: tcs-moc always shows its pings in a window,
+``tcsmoc::ping`` does not keep: tcs-moc always shows its pings in a window,
 which shows the last thing received whatever it was, and has no use for it.
 
 The three times
@@ -50,13 +50,13 @@ import socket
 import time
 from dataclasses import dataclass
 
-from tcslib_moc.beacon import NO_BEACON_MESSAGE
-from tcslib_protocol import count, ping
+from tcsmoc.beacon import NO_BEACON_MESSAGE
+from tcsprotocol import count, ping
 
 NANOS = 1_000_000_000
 
 #: What a panel shows for a ping or an answer before there is one:
-#: ``tcslib_moc::ping::NO_MESSAGE``, the beacon panel's placeholder.
+#: ``tcsmoc::ping::NO_MESSAGE``, the beacon panel's placeholder.
 NO_MESSAGE = NO_BEACON_MESSAGE
 #: What :func:`precise_time` shows for no time: ``NO_PRECISE_TIME``.
 NO_PRECISE_TIME = "--:--:--.---------"

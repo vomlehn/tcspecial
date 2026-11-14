@@ -19,7 +19,7 @@
 //!
 //! # What it is told on its command line
 //!
-//! A short, fixed list, built by `tcslib_protocol::node::app`: the name of the
+//! A short, fixed list, built by `tcsprotocol::node::app`: the name of the
 //! node it is, and then the argument the configuration states for each stream
 //! its kind handles, payload before gateway. See [`start`].
 //!
@@ -519,7 +519,7 @@ pub struct Running {
 /// short, fixed list and are the one thing an app is told other than over its
 /// interfaces: the name of the node it is, and then what the configuration says
 /// about each stream its kind handles -- payload before gateway.
-/// `tcslib_protocol::node::app::AppParams::arguments` is what builds the list,
+/// `tcsprotocol::node::app::AppParams::arguments` is what builds the list,
 /// and the order is fixed by the kind rather than by what a file happened to
 /// state, so a program reads argument two without counting.
 ///

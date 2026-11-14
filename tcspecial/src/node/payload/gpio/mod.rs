@@ -12,7 +12,7 @@
 //! significant byte first: see "Typed links" in the design.
 //!
 //! Whether the lines are watched or driven is the node's type -- see
-//! `tcslib_protocol::node::payload::gpio::Kind`. Watched lines report: what
+//! `tcsprotocol::node::payload::gpio::Kind`. Watched lines report: what
 //! they are goes out groundward, by `world-out`, every `state_interval`, and a
 //! datum arriving at `world-in` asks for it now. Driven lines are set: what
 //! arrives at `moc-in` is the value they are driven to, and a value that
@@ -48,7 +48,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use nix::poll::PollFlags;
-use tcslib_protocol::{
+use tcsprotocol::{
     graph::terminals::Stream,
     link_type::Basic,
     node::payload::gpio::{state_read, state_said},
@@ -1103,7 +1103,7 @@ mod tests {
     /// The lines' configuration, on `/dev/gpiochip0`, reported every minute.
     fn watched(lines: Vec<u32>) -> GpioConfig {
         GpioConfig {
-            kind: tcslib_protocol::node::payload::gpio::Kind::In,
+            kind: tcsprotocol::node::payload::gpio::Kind::In,
             path: "/dev/gpiochip0".to_string(),
             inputs: lines,
             outputs: Vec::new(),
@@ -1285,7 +1285,7 @@ mod tests {
     #[test]
     fn driven_lines_ask_only_to_be_driven() {
         let config = GpioConfig {
-            kind: tcslib_protocol::node::payload::gpio::Kind::Out,
+            kind: tcsprotocol::node::payload::gpio::Kind::Out,
             path: "/dev/gpiochip0".to_string(),
             inputs: Vec::new(),
             outputs: vec![17, 18, 19],
@@ -1541,7 +1541,7 @@ mod tests {
     #[test]
     fn simulated_driven_lines_send_what_they_are_driven_to() {
         let config = GpioConfig {
-            kind: tcslib_protocol::node::payload::gpio::Kind::Inout,
+            kind: tcsprotocol::node::payload::gpio::Kind::Inout,
             path: "/dev/gpiochip1".to_string(),
             inputs: Vec::new(),
             outputs: vec![4, 5],

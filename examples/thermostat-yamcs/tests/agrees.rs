@@ -1,29 +1,29 @@
 //! What the Python reads out of the configuration is what the Rust reads.
 //!
 //! The ground station is Python and reads the XML spelling; the vehicle reads
-//! the configuration through `tcslib-protocol`. `thermostat_yamcs.py` writes
+//! the configuration through `tcsprotocol`. `thermostat_yamcs.py` writes
 //! Yamcs's configuration from what it reads -- where Yamcs sends commands,
 //! where it listens for each source's data and the beacon, the APIDs that tell
 //! them apart -- and its mission database gives each source's parameter the
 //! type the configuration's own XTCE says its data are, by
-//! `tcslib_protocol/form.py`. A port, an APID or a form the two sides work out
+//! `tcsprotocol/form.py`. A port, an APID or a form the two sides work out
 //! differently is a Yamcs that listens where nothing arrives, or reads a
 //! temperature as something else. So this holds the Python's answers for
 //! `thermostat-yamcs.xtcs` to the Rust's for `thermostat-yamcs.ytcs`, and the
 //! Python's form of every node of every example, read from its own XTCE, to
-//! `tcslib_protocol::graph::fprime::Form::of`, which tcs-moc's plot window and
+//! `tcsprotocol::graph::fprime::Form::of`, which tcs-moc's plot window and
 //! the F´ bridge go by, so that the two cannot drift.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use tcslib_protocol::config_digest::digest_of_file;
-use tcslib_protocol::graph::fprime::Form;
-use tcslib_protocol::graph::parameters::{beacon_of, ci_config_of, flatten};
-use tcslib_protocol::graph::reach::apid_base_of;
-use tcslib_protocol::graph::telemetry::{self, Via};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::unit::Unit;
+use tcsprotocol::config_digest::digest_of_file;
+use tcsprotocol::graph::fprime::Form;
+use tcsprotocol::graph::parameters::{beacon_of, ci_config_of, flatten};
+use tcsprotocol::graph::reach::apid_base_of;
+use tcsprotocol::graph::telemetry::{self, Via};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::unit::Unit;
 
 /// Where the example is.
 ///
@@ -68,7 +68,7 @@ fn described() -> Vec<(String, String)> {
 }
 
 /// The address to reach a socket at from this host, as the Python's
-/// `tcslib_protocol.yamcs.local` gives it.
+/// `tcsprotocol.yamcs.local` gives it.
 ///
 /// # Arguments
 ///
@@ -235,11 +235,11 @@ fn every_example() -> Vec<(PathBuf, PathBuf)> {
 ///
 /// # Returns
 ///
-/// One line per node: its name and its form, as `tcslib_protocol/form.py`
+/// One line per node: its name and its form, as `tcsprotocol/form.py`
 /// writes it, sorted.
 fn python_forms(path: &Path) -> Vec<String> {
     let said = yamcs_common::python(
-        "from tcslib_protocol import configuration, form\n\
+        "from tcsprotocol import configuration, form\n\
          said = configuration.load(sys.argv[1])\n\
          for node in said.nodes:\n\
          \x20   print(node.name, form.form_of(said, node.name))\n",
@@ -281,7 +281,7 @@ fn every_nodes_form_is_the_rusts() {
     }
     assert!(values > 10, "too few values to say anything: {values}");
     let said = yamcs_common::python(
-        "from tcslib_protocol import configuration, form\n\
+        "from tcsprotocol import configuration, form\n\
          said = configuration.load(sys.argv[1])\n\
          print(form.form_of(said, 'nobody'))\n",
         &[],
@@ -290,12 +290,12 @@ fn every_nodes_form_is_the_rusts() {
     assert_eq!(said.trim(), format!("{:?}", Form::Datum));
 }
 
-/// The Python's table of units is `tcslib_protocol::unit`'s: each unit, in
+/// The Python's table of units is `tcsprotocol::unit`'s: each unit, in
 /// order, with the same name, symbol, words and steps.
 #[test]
 fn the_units_are_the_rusts() {
     let said = yamcs_common::python(
-        "from tcslib_protocol import form\n\
+        "from tcsprotocol import form\n\
          for unit in form.UNITS:\n\
          \x20   print(unit.variant, unit.symbol, unit.per_unit, unit.name,\n\
          \x20         sep='|')\n",

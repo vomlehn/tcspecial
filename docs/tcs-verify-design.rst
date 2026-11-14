@@ -13,10 +13,10 @@ beside it when one is given -- and prints what is wrong with it. It opens no soc
 person editing a file or by a recipe: it is given the files to read and says
 nothing when they are good.
 
-The checking is the library **tcslib-verify**'s, and the program is the
+The checking is the library **tcsverify**'s, and the program is the
 crate **tcs-verify**. They are apart because tcspecial asks the same
 checks of the configuration it is to fly, and what flies is built from
-libraries, never from a tool: tcspecial is built with tcslib-verify and
+libraries, never from a tool: tcspecial is built with tcsverify and
 without tcs-verify. tcs-verify keeps what only the tool does -- the summary,
 the interface digest, a configuration's own XTCE and F´ model -- and the
 start-up window tcs-moc and tcs-sim share.
@@ -42,14 +42,14 @@ Requirement
     on one port, message ID, APID or F´ ID, or one counted past its range -- and
     a **warning** where it has not finished saying it: a node whose attributes
     are not all in yet, a node nothing is linked to. One statement of which is
-    which, ``tcslib_protocol::graph::check::Problem::severity``, so that the
+    which, ``tcsprotocol::graph::check::Problem::severity``, so that the
     verifier, the editor and the flight software agree about what a half-built
     graph is.
 
     A type that does not exist is an error and not an unfinished attribute,
     because no amount of finishing makes it work: it is most likely a
     misspelling, and the flight software would have nothing to open it as. The
-    types are ``tcslib_protocol::graph::types_in``, one list per section, which
+    types are ``tcsprotocol::graph::types_in``, one list per section, which
     the configuration schemas beside tcs-gui are tested against.
 
     The split changes no rule. The flight software refuses a configuration
@@ -128,7 +128,7 @@ Requirement
     and how many data and bytes a second each link to the ground carries, with
     the beacon's and the total. Plain text in aligned columns under a heading
     each, in orders no file can change, so that two summaries can be compared
-    with ``diff``. Every list is ``tcslib-protocol``'s --
+    with ``diff``. Every list is ``tcsprotocol``'s --
     ``graph::sockets::of``, ``graph::telemetry::ids``, ``msgids`` and ``apids``,
     ``graph::rates::of`` -- and tcs-verify lays them out and states none of
     them. A configuration that does not read has no summary, which fails the
@@ -138,7 +138,7 @@ Requirement
     No two sockets a configuration states or implies are one socket:
     one port of one protocol on one host, the names of this host being one
     host, or a port on every interface and the same port on this host.
-    ``tcslib_protocol::graph::sockets::clashes`` is the rule, asked by
+    ``tcsprotocol::graph::sockets::clashes`` is the rule, asked by
     ``Graph::check``, and an error naming both: whichever binds second
     would fail as it starts, aboard or on a desk. It leaves to their own
     rules the pairs those hold apart already -- two nodes that want one
@@ -148,7 +148,7 @@ Requirement
     refusing it would refuse a vehicle whose payload is a box at that
     address.
 
-    The rates are an estimate, ``tcslib_protocol::graph::rates``: a node read on
+    The rates are an estimate, ``tcsprotocol::graph::rates``: a node read on
     a schedule sends as its schedule says, any other at most one datum for
     each that arrives at it, and one with no schedule and nothing linked
     into it at a rate no file says. What it is for is a sum that shows
@@ -197,20 +197,20 @@ Requirement
 
 Requirement
     Tcs-verify states no rule of its own. Every problem it reports comes from
-    the same rules in ``tcslib-protocol`` that the programs reading these files
+    the same rules in ``tcsprotocol`` that the programs reading these files
     use, so a set it accepts is a set they accept. A verifier with rules of its
     own would eventually disagree with them, and then a passing check would mean
     nothing.
 
 Requirement
-    Every program that reads these files asks tcslib-verify about them as it
+    Every program that reads these files asks tcsverify about them as it
     starts, before anything else is read from them, and says what it says in its
     words: tcspecial, tcs-moc, tcs-sim and tcs-gui report the same problems,
     each with its file and line, as ``tcs-verify`` does for the same files. What
     a program then refuses for its own reasons -- tcs-sim a payload it has it
     cannot simulate, tcs-moc a configuration it does not control -- is said
     beside them. Where a rule is the simulator's rather than the file's, it is
-    in ``tcslib-protocol`` all the same (``simulable``), so that tcslib-verify
+    in ``tcsprotocol`` all the same (``simulable``), so that tcsverify
     asks it too.
 
     Which of them stops a program is the program's business. tcspecial

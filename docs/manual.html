@@ -401,7 +401,7 @@ program on a socket -- are each read and driven by a device node.
 Compute nodes work on what they read, a gateway node sends it to
 the ground, and tcslog keeps a record aboard of what was sent.
 Telemetry and beacons go down the space link to the mission
-operations center, where Yamcs uses tcslib-moc for its end of the link,
+operations center, where Yamcs uses tcsmoc for its end of the link,
 and commands come back up.</object>
 <p class="caption">A vehicle running tcspecial, and the ground station that commands it.</p>
 </div>
@@ -416,9 +416,9 @@ record aboard of what it sent down, in a log written by the TCS Onboard
 Log, <strong>tcslog</strong>, a library of its own.</p>
 <p>On the ground, a mission control system such as Yamcs (<a class="reference external" href="https://yamcs.org">https://yamcs.org</a>)
 holds the other end of the link through the TCSpecial MOC Correspondent,
-<strong>tcslib-moc</strong>. Both ends share TCS Link Support, <strong>tcslib-protocol</strong>, which
+<strong>tcsmoc</strong>. Both ends share TCS Link Support, <strong>tcsprotocol</strong>, which
 says what goes on the link.
-tcslib-moc sends the vehicle its commands, receives its telemetry and beacons,
+tcsmoc sends the vehicle its commands, receives its telemetry and beacons,
 and knows from the vehicle's configuration where each datum arrives and
 what it is; Yamcs's mission database is generated from the same
 configuration, so the two ends cannot disagree about the link. The link's
@@ -448,7 +448,7 @@ developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.</p>
 <p>A configuration is written with <strong>tcs-gui</strong>, which draws it as a diagram of
 nodes and links, and checked with <strong>tcs-verify</strong>, which says what is wrong
-with it without running any of it. Both read it through <strong>tcslib-protocol</strong>, the
+with it without running any of it. Both read it through <strong>tcsprotocol</strong>, the
 library the vehicle and the ground share, so the error a person sees on the
 desktop is the one the vehicle would refuse the file with.</p>
 <p>The link's XTCE can be read and edited with <strong>tcs-xtcee</strong>, the XTCE editor
@@ -501,9 +501,9 @@ System (cFS) and JPL's F´ (F Prime). Work in progress.</dd>
 <dt><a class="reference external" href="../examples/README.html">Examples</a></dt>
 <dd>The shipped example configurations, and what each one shows.</dd>
 <dt>The libraries</dt>
-<dd><a class="reference external" href="../tcslib-moc/README.html">tcslib-moc</a> in the MOC, in Rust, and
-<a class="reference external" href="../tcslib-moc-c/README.html">tcslib-moc-c</a>, its C interface;
-<a class="reference external" href="../tcslib-protocol/README.html">tcslib-protocol</a>, used aboard and in the MOC.</dd>
+<dd><a class="reference external" href="../tcsmoc/README.html">tcsmoc</a> in the MOC, in Rust, and
+<a class="reference external" href="../tcsmoc-c/README.html">tcsmoc-c</a>, its C interface;
+<a class="reference external" href="../tcsprotocol/README.html">tcsprotocol</a>, used aboard and in the MOC.</dd>
 </dl>
 </div>
 <div class="section" id="the-rest-of-the-tcs-software">

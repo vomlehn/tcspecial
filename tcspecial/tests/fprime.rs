@@ -13,8 +13,8 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::graph::telemetry;
-use tcslib_protocol::graph::Graph;
+use tcsprotocol::graph::telemetry;
+use tcsprotocol::graph::Graph;
 
 mod common;
 
@@ -235,9 +235,9 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         .expect("an address");
     let reading = 320i16.to_be_bytes();
     assert_eq!(until_heard(&sensor, to, &reading, &bridge), reading);
-    let kelvin = tcslib_protocol::node::vehicle::compute::from_value(
+    let kelvin = tcsprotocol::node::vehicle::compute::from_value(
         &until_heard(&sensor, to, &reading, &temperatures),
-        tcslib_protocol::unit::Unit::Kelvin,
+        tcsprotocol::unit::Unit::Kelvin,
         "zone_temp",
     )
     .expect("a value");

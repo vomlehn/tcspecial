@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
     <description>A payload that is a program, sending a line of text a word at a time</description>
     <tcspecial>
         <beacon>
@@ -42,7 +42,7 @@
             <!-- that node's device id: lorem is id 1, so its words go -->
             <!-- to 127.0.0.1:5101. Ground software gets them from this node -->
             <!-- with a function call, -->
-            <!-- tcslib_moc::gateway::GatewayReceiver::receive: run -->
+            <!-- tcsmoc::gateway::GatewayReceiver::receive: run -->
             <!-- `lorem_gateway` to be that ground. It states no address or -->
             <!-- port of its own, because nothing comes back up. -->
             <gateway name="gateway-1">

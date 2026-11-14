@@ -25,9 +25,9 @@ use crate::journal::{Edit, Link};
 use crate::pane::{is_payload, size_of};
 use crate::style::NodeType;
 use crate::subdiagram::{file_for, Home, Qualified};
-use tcslib_protocol::endpoint_config::Scalar;
-use tcslib_protocol::graph::{section_of, Section};
-use tcslib_protocol::ConfigFormat;
+use tcsprotocol::endpoint_config::Scalar;
+use tcsprotocol::graph::{section_of, Section};
+use tcsprotocol::ConfigFormat;
 
 /// One node as the editor holds it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -97,7 +97,7 @@ pub struct Command {
 ///
 /// The section is named as the file names it, `payloads`; the type as it is
 /// written on its group's line, `network`. A type belongs to one section -- see
-/// `tcslib_protocol::graph::section_of` -- so the type alone says which group.
+/// `tcsprotocol::graph::section_of` -- so the type alone says which group.
 #[derive(
     Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
 )]
@@ -245,7 +245,7 @@ impl Concern {
 /// type the document holds: the document holds links, and this is one of them
 /// on its way into a file.
 ///
-/// See `tcslib_protocol::graph::Destinations` for how a reader takes it.
+/// See `tcsprotocol::graph::Destinations` for how a reader takes it.
 struct Bound {
     /// The node the line goes to, written as the file names it: a node on
     /// another page is named from the page this one is written on.
@@ -339,7 +339,7 @@ pub struct Document {
     /// Required of every configuration, and the one part of a configuration
     /// that is not on the canvas: it is about the whole of it rather than about
     /// any node in it, so it is edited in a window of its own and not by
-    /// pressing something. See `tcslib_protocol::graph::parameters`, which
+    /// pressing something. See `tcsprotocol::graph::parameters`, which
     /// holds the list of what it may say and the rules about it.
     ///
     /// Text, as a node's attributes are, because the editor has to be able to
@@ -369,13 +369,13 @@ pub struct Document {
     /// What each subdiagram's file exports, by the subdiagram's name: for
     /// each terminal, the nodes of that file, by their own names, a line
     /// from another file may reach there. See
-    /// `tcslib_protocol::graph::exports`.
+    /// `tcsprotocol::graph::exports`.
     ///
     /// Left alone when a node is removed, so that undoing the removal finds
     /// the node exported as it was; a name with no node behind it is not
     /// written. See [`Document::exports_written`].
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub exports: BTreeMap<String, tcslib_protocol::graph::exports::Exports>,
+    pub exports: BTreeMap<String, tcsprotocol::graph::exports::Exports>,
     /// What the ground may set in flight.
     ///
     /// Not editable on the canvas yet, and written out whatever else happens:
@@ -430,7 +430,7 @@ pub struct GroupField {
 /// The rules' own words for what is wrong: what an app node lacks, or why a
 /// payload's or the gateway link's way of being reached is refused.
 fn reach_of_node(node: &Node) -> Result<(), String> {
-    let theirs = tcslib_protocol::graph::Node {
+    let theirs = tcsprotocol::graph::Node {
         name: node.name.clone(),
         node_type: node.node_type.clone(),
         group: node
@@ -458,8 +458,8 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
     // must say: its executable and the arguments its kind is run with. The
     // same rule tcspecial reads it by, so what this says is what is missing
     // rather than that an app has no address, which no app has.
-    if tcslib_protocol::node::app::Kind::of(&theirs.node_type).is_some() {
-        return tcslib_protocol::node::app::params_of(
+    if tcsprotocol::node::app::Kind::of(&theirs.node_type).is_some() {
+        return tcsprotocol::node::app::params_of(
             &theirs.name,
             &theirs.node_type,
             &theirs.attributes,
@@ -477,7 +477,7 @@ fn reach_of_node(node: &Node) -> Result<(), String> {
     {
         return Ok(());
     }
-    tcslib_protocol::graph::reach::reach_of(&theirs).map(|_| ())
+    tcsprotocol::graph::reach::reach_of(&theirs).map(|_| ())
 }
 
 /// Whether a node names this group.
@@ -519,7 +519,7 @@ pub enum Fault {
     /// wrong whatever else is missing, and an attribute belonging to another
     /// type is wrong on this one. Absence is checked on the ground and aboard,
     /// where the complaint can name the file and the line -- see
-    /// `tcslib_protocol::graph::check::Problem::BadNode`.
+    /// `tcsprotocol::graph::check::Problem::BadNode`.
     ///
     /// `why` is the reason in the words of the rules that have been tested
     /// against real buses, so the editor says what `tcs-verify` will say.
@@ -793,7 +793,7 @@ impl Document {
     pub fn exports_written(
         &self,
         home: &Home,
-    ) -> Option<tcslib_protocol::graph::exports::Exports> {
+    ) -> Option<tcsprotocol::graph::exports::Exports> {
         let said = self.exports.get(home.as_ref()?)?;
         let kept = |nodes: &Vec<String>| {
             let mut kept: Vec<String> = nodes
@@ -812,7 +812,7 @@ impl Document {
             kept.dedup();
             kept
         };
-        let written = tcslib_protocol::graph::exports::Exports {
+        let written = tcsprotocol::graph::exports::Exports {
             world_in: kept(&said.world_in),
             world_out: kept(&said.world_out),
             moc_in: kept(&said.moc_in),
@@ -1071,7 +1071,7 @@ impl Document {
     ///
     /// How many nodes were moved, which is what a caller would log.
     pub fn settle(&mut self, dividers: crate::pane::Dividers) -> usize {
-        // The rule is tcslib-diagram's, which tcspecial's visual window draws
+        // The rule is tcs-diagram's, which tcspecial's visual window draws
         // by as well: see pane::settle. Walked in the order of the names, which
         // is the one order a configuration has, so that a file saved and
         // read again is laid out as it was whatever order the session added
@@ -2440,7 +2440,7 @@ impl Document {
                     let mine = format!("{name}.");
                     for (payload, was) in joins {
                         let kept: Vec<&str> =
-                            tcslib_protocol::sim_config::terminals_of(was)
+                            tcsprotocol::sim_config::terminals_of(was)
                                 .filter(|said| !said.starts_with(&mine))
                                 .collect();
                         let said = simulator
@@ -2759,10 +2759,9 @@ impl Document {
         };
         // Which are required depends on what the vehicle answers to, which
         // decides how its links are written.
-        let kind = answered("gateway").and_then(|said| {
-            tcslib_protocol::gateway::GatewayKind::of(said).ok()
-        });
-        let filled = tcslib_protocol::graph::parameters::ATTRIBUTES
+        let kind = answered("gateway")
+            .and_then(|said| tcsprotocol::gateway::GatewayKind::of(said).ok());
+        let filled = tcsprotocol::graph::parameters::ATTRIBUTES
             .iter()
             .filter(|(_, needed)| needed.required(kind))
             .all(|(attribute, _)| answered(attribute).is_some());
@@ -2775,9 +2774,8 @@ impl Document {
                     (attribute.clone(), Scalar::of(value.as_str()))
                 })
                 .collect();
-            let outcome =
-                tcslib_protocol::graph::parameters::ci_config_of(&said)
-                    .and_then(|section| section.to_ci_config().map(|_| ()));
+            let outcome = tcsprotocol::graph::parameters::ci_config_of(&said)
+                .and_then(|section| section.to_ci_config().map(|_| ()));
             if let Err(why) = outcome {
                 faults.push(Fault::BadTcspecial { why });
             }
@@ -2789,20 +2787,20 @@ impl Document {
         // ask are its trigger -- so a link delivering into a payload that is
         // read and states no trigger has nowhere to go. The same rule
         // tcs-verify applies on the ground and tcspecial applies again aboard;
-        // see tcslib_protocol::graph::check, which is where the reasoning is.
+        // see tcsprotocol::graph::check, which is where the reasoning is.
         //
         // Only a payload that is read. One that is written and never read -- a
         // heater, a valve, a latch -- is driven rather than asked, and a
         // trigger on one would be bytes written before a read that never
         // happens. And only one asked by a trigger at all, which a program
         // and a set of discrete lines are not: see
-        // tcslib_protocol::graph::check::asked_by_a_trigger.
+        // tcsprotocol::graph::check::asked_by_a_trigger.
         for node in &self.nodes {
             let payload = NodeType::ALL
                 .iter()
                 .find(|t| t.spelling() == node.node_type)
                 .is_some_and(|t| t.is_payload())
-                && tcslib_protocol::graph::check::asked_by_a_trigger(
+                && tcsprotocol::graph::check::asked_by_a_trigger(
                     &node.node_type,
                 );
             if !payload || node.attributes.contains_key("trigger") {
@@ -3066,8 +3064,7 @@ impl Document {
             .iter()
             .filter(|node| crate::pane::is_payload(&node.node_type))
             .filter(|node| {
-                tcslib_protocol::DHType::from_spelling(&node.node_type)
-                    .is_some()
+                tcsprotocol::DHType::from_spelling(&node.node_type).is_some()
             })
             .map(|node| (node.name.clone(), node.node_type.clone()))
             .collect()
@@ -3094,7 +3091,7 @@ impl Document {
         path: &std::path::Path,
     ) -> Result<String, String> {
         // The extension decides, by the rule every program here follows: see
-        // tcslib_protocol::ConfigFormat, which refuses anything but .ytcs and
+        // tcsprotocol::ConfigFormat, which refuses anything but .ytcs and
         // .xtcs rather than guess at it.
         match ConfigFormat::of_file(path).map_err(|e| e.to_string())? {
             ConfigFormat::Yaml => Ok(self.to_yaml_for(home, path)),
@@ -3303,8 +3300,8 @@ impl Document {
                         }
                         // A list is the element once for each entry, which is
                         // how XML writes one: see
-                        // tcslib_protocol::graph::LISTED.
-                        if tcslib_protocol::graph::LISTED
+                        // tcsprotocol::graph::LISTED.
+                        if tcsprotocol::graph::LISTED
                             .contains(&attribute.as_str())
                         {
                             for one in listed(value) {
@@ -3549,7 +3546,7 @@ impl Document {
 
         // What of a subdiagram's file the files around it may join, near the
         // top, because it is what a reader of the file from outside wants
-        // first: see tcslib_protocol::graph::exports.
+        // first: see tcsprotocol::graph::exports.
         if let Some(exports) = self.exports_written(home) {
             out.push('\n');
             yaml_comment(
@@ -3586,7 +3583,7 @@ impl Document {
         // The nodes, in three sections: the ground links, what the vehicle
         // itself runs, and what it carries. The same three working panes the
         // canvas is divided into, and which section a node belongs in is its
-        // type's own answer -- see tcslib_protocol::graph::section_of -- so the
+        // type's own answer -- see tcsprotocol::graph::section_of -- so the
         // file and the drawing cannot come to disagree about what a node is.
         //
         // Within a section the nodes are grouped by type, each group an entry
@@ -3658,8 +3655,8 @@ impl Document {
                         // the two formats would read differently, and the
                         // digest of one would not match the other. Quoting
                         // keeps the spelling the person wrote. A list is a
-                        // sequence: see tcslib_protocol::graph::LISTED.
-                        if tcslib_protocol::graph::LISTED
+                        // sequence: see tcsprotocol::graph::LISTED.
+                        if tcsprotocol::graph::LISTED
                             .contains(&attribute.as_str())
                         {
                             out.push_str(&format!("        {attribute}:\n"));
@@ -3961,7 +3958,7 @@ impl Document {
             link.origin.as_deref(),
             false,
         );
-        left_by.and_then(tcslib_protocol::graph::terminals::answers)
+        left_by.and_then(tcsprotocol::graph::terminals::answers)
     }
 }
 
@@ -4030,7 +4027,7 @@ fn spelled_like(
 
 /// The entries of a listed attribute, as a file writes them: in the order of
 /// their text, a list of this kind being a set whose order means nothing. See
-/// tcslib_protocol::graph::LISTED.
+/// tcsprotocol::graph::LISTED.
 ///
 /// # Arguments
 ///
@@ -4040,7 +4037,7 @@ fn spelled_like(
 ///
 /// The entries, sorted.
 fn listed(value: &str) -> Vec<&str> {
-    let mut entries = tcslib_protocol::graph::entries(value);
+    let mut entries = tcsprotocol::graph::entries(value);
     entries.sort_unstable();
     entries
 }
@@ -4594,7 +4591,7 @@ mod tests {
     /// A set of discrete lines driven and read -- a heater's switch that
     /// reports what it was told -- is not marked for wanting a trigger, as
     /// the ground check does not refuse it: see
-    /// `tcslib_protocol::graph::check::asked_by_a_trigger`.
+    /// `tcsprotocol::graph::check::asked_by_a_trigger`.
     #[test]
     fn driven_lines_that_report_are_not_marked_for_a_trigger() {
         let mut document = Document::new();
@@ -4712,7 +4709,7 @@ mod tests {
     /// The editor and the checker mean the same thing by "payload".
     ///
     /// Two statements of one fact -- `style.rs` has the editor's, so that a
-    /// type can be put in the right selection pane, and `tcslib-protocol` has
+    /// type can be put in the right selection pane, and `tcsprotocol` has
     /// the one the ground check and the flight software use -- and two
     /// statements of one fact drift. What that would look like is a node the
     /// editor drew in the payload pane and the checker did not hold to a
@@ -4726,7 +4723,7 @@ mod tests {
                 assert!(!t.is_payload());
                 continue;
             }
-            let theirs = tcslib_protocol::graph::Node {
+            let theirs = tcsprotocol::graph::Node {
                 name: "x".to_string(),
                 node_type: t.spelling().to_string(),
                 group: None,
@@ -6268,7 +6265,7 @@ mod tests {
             let path = where_.path().join(name);
             std::fs::write(&path, text).expect("written");
             let graph =
-                tcslib_protocol::graph::Graph::load(&path).expect("read back");
+                tcsprotocol::graph::Graph::load(&path).expect("read back");
             let console = graph.node("console").expect("the node");
             assert_eq!(
                 console.attributes["terminators"].as_str(),

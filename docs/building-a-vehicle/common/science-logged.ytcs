@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # The deck's science subsystem with a log aboard, which the stages of "Building
 # a Vehicle" from stage 8 on include in place of science.ytcs: the same nodes,

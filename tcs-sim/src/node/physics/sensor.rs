@@ -5,7 +5,7 @@
 //! error that stays put; that error drifts, slowly; and its electronics add
 //! noise to every reading. Each is a datasheet figure, stated in the
 //! simulator file in the unit of what the sensor reports, and off unless it
-//! is (see `tcslib_protocol::sim_config::SensorErrors`):
+//! is (see `tcsprotocol::sim_config::SensorErrors`):
 //!
 //! * **Lag.** The sensor is a small mass of its own, warmed by the body
 //!   through its mounting, so it follows the body's temperature through a
@@ -35,7 +35,7 @@ use std::sync::Mutex;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use rand_distr::StandardNormal;
-use tcslib_protocol::sim_config::SensorErrors;
+use tcsprotocol::sim_config::SensorErrors;
 
 use super::random::{seed_for, wandered};
 
@@ -151,7 +151,7 @@ impl Sensor {
 mod tests {
     use super::*;
     use std::time::Duration;
-    use tcslib_protocol::node::physics::Wander;
+    use tcsprotocol::node::physics::Wander;
 
     /// A sensor with no errors reports the body exactly.
     #[test]

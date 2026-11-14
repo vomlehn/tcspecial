@@ -180,7 +180,7 @@ What Has to Change
 ---------------------------------
 This is the change everything else depends on, and it is made: tcspecial's
 commands and the answers to them are CCSDS Space Packets stated in XTCE, in
-``tcslib-protocol/xtce/link.xtce``, as cFS's Software Bus carries and ground
+``tcsprotocol/xtce/link.xtce``, as cFS's Software Bus carries and ground
 systems read from a dictionary, and the beacon carries the interface's digest
 beside the configuration's.
 
@@ -245,7 +245,7 @@ b. **A library.** tcspecial split in three:
        file access, each supplied by whoever hosts the core.
 
    ``tcspecial-c``
-       A C ABI whose header compiles as C and as C++, as ``tcslib-moc-c``'s
+       A C ABI whose header compiles as C and as C++, as ``tcsmoc-c``'s
        does.
 
    A cFS application then drives a pass on each wakeup from SCH and maps the

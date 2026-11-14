@@ -1,11 +1,11 @@
 """A configuration that answers to Yamcs, as a ground station reads it, its
 APIDs, and the port-0 rule for where the ground sends commands from.
 
-The Python mirrors of ``tcslib_protocol::gateway::GatewayKind::Yamcs``'s base
-attribute, of ``tcslib_protocol::graph::telemetry::apids``, and of
-``tcslib_protocol::types::came_from`` and ``sender_of``: the two languages must
+The Python mirrors of ``tcsprotocol::gateway::GatewayKind::Yamcs``'s base
+attribute, of ``tcsprotocol::graph::telemetry::apids``, and of
+``tcsprotocol::types::came_from`` and ``sender_of``: the two languages must
 agree about which datagrams are the ground's, and what each carries. And
-the Yamcs mission database ``tcslib_protocol.yamcs`` generates from those APIDs.
+the Yamcs mission database ``tcsprotocol.yamcs`` generates from those APIDs.
 """
 
 import os
@@ -19,10 +19,10 @@ from xml.etree import ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_protocol import configuration, interface  # noqa: E402
+from tcsprotocol import configuration, interface  # noqa: E402
 from tests import loaded  # noqa: E402
-from tcslib_protocol import yamcs as generated  # noqa: E402
-from tcslib_protocol.configuration import HostPort, came_from  # noqa: E402
+from tcsprotocol import yamcs as generated  # noqa: E402
+from tcsprotocol.configuration import HostPort, came_from  # noqa: E402
 
 
 class SenderAtAnyPortTest(unittest.TestCase):
@@ -149,7 +149,7 @@ def yamcs(directory, base="0x300", gateway="yamcs", renamed=None,
 
 
 class ApidTest(unittest.TestCase):
-    """The APIDs, as ``tcslib_protocol::graph::telemetry::apids`` counts
+    """The APIDs, as ``tcsprotocol::graph::telemetry::apids`` counts
     them."""
 
     def test_each_link_says_or_counts_its_apid(self):

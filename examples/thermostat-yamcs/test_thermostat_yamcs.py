@@ -20,10 +20,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import thermostat_yamcs  # noqa: E402
-from tcslib_moc.beacon import Arrived  # noqa: E402
-from tcslib_protocol import configuration  # noqa: E402
-from tcslib_protocol import yamcs as generated  # noqa: E402
-from tcslib_protocol.form import DATUM, DECISION, UNITS, Form  # noqa: E402
+from tcsmoc.beacon import Arrived  # noqa: E402
+from tcsprotocol import configuration  # noqa: E402
+from tcsprotocol import yamcs as generated  # noqa: E402
+from tcsprotocol.form import DATUM, DECISION, UNITS, Form  # noqa: E402
 
 #: The XTCE namespace the wrapper is in, for ElementTree's paths.
 X = {"x": generated.NAMESPACE}

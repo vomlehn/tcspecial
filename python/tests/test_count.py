@@ -1,5 +1,5 @@
 """The count a string or bytes is sent the ground after, as
-``tcslib_protocol::link_type``'s tests hold the Rust to: the same bytes, both
+``tcsprotocol::link_type``'s tests hold the Rust to: the same bytes, both
 ways."""
 
 import sys
@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_protocol.count import counted, uncounted  # noqa: E402
+from tcsprotocol.count import counted, uncounted  # noqa: E402
 
 
 class CountTest(unittest.TestCase):

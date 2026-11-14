@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command as Process, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::config_digest::{digest_of_graph, ConfigDigest};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::{Command, ConnectCommand, Telemetry};
+use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::{Command, ConnectCommand, Telemetry};
 
 /// The checksum of the configuration in `path`, as tcspecial computes it.
 ///

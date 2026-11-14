@@ -1,0 +1,26 @@
+[package]
+name = "tcsmoc-c"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+The TCSpecial MOC Correspondent (tcsmoc) for C and C++: a ground \
+station's beacons, the vehicle's data from a gateway node, and commands to \
+the vehicle, behind one header"""
+
+[lib]
+# libtcsmoc_c.a and libtcsmoc_c.so, which a C or C++ program links with
+# include/tcsmoc-c.h; and the rlib, for this crate's own tests. A crate's
+# name has no hyphen, so the Makefile installs them as libtcsmoc-c.
+name = "tcsmoc_c"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+tcsmoc = { path = "../tcsmoc" }
+tcsprotocol = { path = "../tcsprotocol" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

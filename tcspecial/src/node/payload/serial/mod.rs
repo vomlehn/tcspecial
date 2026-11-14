@@ -25,7 +25,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::poll::PollFlags;
-use tcslib_protocol::{Parity, SerialConfig, StopBits, TcsError, TcsResult};
+use tcsprotocol::{Parity, SerialConfig, StopBits, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::{
@@ -309,7 +309,7 @@ fn apply_line_terms(
     // setting none is allowed to start, so a pseudo-terminal here is a run
     // against tcs-sim, which carries the bus's bytes and has no turnaround.
     if let Some(terms) = &config.rs485 {
-        if tcslib_protocol::node::payload::serial::judged(&config.path)
+        if tcsprotocol::node::payload::serial::judged(&config.path)
             .is_simulated()
         {
             log::info!(
@@ -764,7 +764,7 @@ mod tests {
             parity: Parity::None,
             stop_bits: StopBits::One,
             byte_length: 8,
-            rs485: Some(tcslib_protocol::Rs485Params {
+            rs485: Some(tcsprotocol::Rs485Params {
                 rts_on_send: true,
                 delay_before_send: Duration::from_millis(2),
                 delay_after_send: Duration::from_millis(2),

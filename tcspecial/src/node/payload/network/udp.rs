@@ -16,7 +16,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Arc, Mutex};
 
 use nix::poll::PollFlags;
-use tcslib_protocol::{NetworkConfig, SendsFrom, TcsError, TcsResult};
+use tcsprotocol::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
 use crate::endpoint::bind_failed;
@@ -365,7 +365,7 @@ mod tests {
     fn an_endpoint_told_where_the_ground_is_sends_there() {
         use std::net::UdpSocket;
         use std::time::Duration;
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         // The ground's end, bound and listening, and the vehicle's, which is
         // a port the system chooses.
@@ -434,7 +434,7 @@ mod tests {
     fn a_driven_payload_is_sent_to_where_the_node_says_it_is() {
         use std::net::UdpSocket;
         use std::time::Duration;
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         // The heater, waiting where the configuration says it is.
         let heater = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -499,7 +499,7 @@ mod tests {
     fn an_asked_payload_is_sent_its_trigger_where_the_node_says_it_is() {
         use std::net::UdpSocket;
         use std::time::{Duration, Instant};
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         // The sensor, waiting to be asked where the configuration says.
         let sensor = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn a_stranger_is_turned_away_and_counted() {
         use std::net::UdpSocket;
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         let sensor = UdpSocket::bind("127.0.0.1:0").unwrap();
         let at = sensor.local_addr().unwrap();
@@ -616,7 +616,7 @@ mod tests {
     #[test]
     fn a_udp_endpoint_learns_where_to_answer() {
         use std::net::UdpSocket;
-        use tcslib_protocol::NetworkProtocol;
+        use tcsprotocol::NetworkProtocol;
 
         // Port 0, bound by the endpoint itself, so the test takes whatever is
         // free and cannot collide with another test or a running tcspecial.

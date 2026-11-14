@@ -6,7 +6,7 @@
 //! `src/bin/beacon.rs`.
 
 use slint::ComponentHandle;
-use tcslib_ui::Shown;
+use tcsui::Shown;
 
 slint::include_modules!();
 
@@ -18,7 +18,7 @@ slint::include_modules!();
 /// widest of these, so that the window opens at the width a beacon will want
 /// and keeps it.
 ///
-/// Written by [`tcslib_moc::beacon::what_it_read`], which writes every beacon's
+/// Written by [`tcsmoc::beacon::what_it_read`], which writes every beacon's
 /// message, so a change to the format changes the width with it.
 ///
 /// # Returns
@@ -30,19 +30,19 @@ slint::include_modules!();
 ///
 /// Never in practice: only if `255.255.255` were not a version.
 pub fn widest_messages() -> Vec<String> {
-    use tcslib_protocol::config_digest::{ConfigDigest, ConfigVersion};
+    use tcsprotocol::config_digest::{ConfigDigest, ConfigVersion};
 
     let version = ConfigVersion::of_text("255.255.255")
         .expect("255.255.255 is a version");
     let mut messages: Vec<String> = (0..16u8)
         .map(|digit| {
-            tcslib_moc::beacon::what_it_read(
+            tcsmoc::beacon::what_it_read(
                 version,
                 ConfigDigest([digit * 0x11; 16]),
             )
         })
         .collect();
-    messages.push(tcslib_moc::beacon::NO_BEACON_MESSAGE.to_string());
+    messages.push(tcsmoc::beacon::NO_BEACON_MESSAGE.to_string());
     messages
 }
 
@@ -56,7 +56,7 @@ pub fn prepare(window: &WatchWindow) {
 ///
 /// All four at once, from the one reading: an indicator that said beacons
 /// were arriving beside a time that said none had would be two answers to one
-/// question. The window passes them down to the panel, which is `tcslib-ui`'s.
+/// question. The window passes them down to the panel, which is `tcsui`'s.
 ///
 /// # Arguments
 ///

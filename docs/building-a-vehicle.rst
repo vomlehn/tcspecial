@@ -148,7 +148,7 @@ Node                      Device id  Port, stage 1  Port, stage 2
 
 A ground station written for stage 1 now listens to the thermometer on the
 seismometer's old port. This is why a ground station should take its ports from
-the configuration -- tcslib-moc's and tcs-moc's do -- rather than from a list
+the configuration -- tcsmoc's and tcs-moc's do -- rather than from a list
 written beside it, and why ``tcs-verify --summary`` (`Checking the whole
 vehicle`_) lists every port a configuration uses.
 

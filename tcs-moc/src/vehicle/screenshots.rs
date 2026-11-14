@@ -37,12 +37,12 @@ use slint::platform::software_renderer::{
 use slint::platform::{EventLoopProxy, Platform, WindowAdapter};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-use tcslib_moc::beacon::{Contact, Link};
-use tcslib_moc::gateway::GatewayReceiver;
-use tcslib_moc::matched::Matched;
-use tcslib_protocol::graph::telemetry::{self, Reaches};
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::{
+use tcsmoc::beacon::{Contact, Link};
+use tcsmoc::gateway::GatewayReceiver;
+use tcsmoc::matched::Matched;
+use tcsprotocol::graph::telemetry::{self, Reaches};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::{
     Beacon, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, HostPort, NodeCounts, NodeTelemetry, QueryNodeTelemetry,
     Scalar, Telemetry, Timestamp,
@@ -616,7 +616,7 @@ fn answer(command: &Command, aboard: &mut Aboard) -> Telemetry {
             };
             Telemetry::StartNode(NodeTelemetry::started(seq, status, cmd.node))
         }
-        other => tcslib_protocol::answer_to(other, CommandStatus::Success),
+        other => tcsprotocol::answer_to(other, CommandStatus::Success),
     }
 }
 
@@ -738,7 +738,7 @@ impl Station {
         let sim = root.join(format!("examples/{name}/{name}-sim.yaml"));
         let graph = Graph::load(&path).expect("the example reads");
         let links = telemetry::of(&graph).expect("its links");
-        let digest = tcslib_protocol::config_digest::digest_of_graph(&graph)
+        let digest = tcsprotocol::config_digest::digest_of_graph(&graph)
             .expect("its checksum");
 
         let ui = MainWindow::new().expect("a window");
@@ -756,7 +756,7 @@ impl Station {
                 .nodes
                 .iter()
                 .filter_map(|node| {
-                    tcslib_protocol::graph::units::unit_of(&graph, &node.name)
+                    tcsprotocol::graph::units::unit_of(&graph, &node.name)
                         .map(|unit| (node.name.clone(), unit))
                 })
                 .collect(),
@@ -816,10 +816,10 @@ impl Station {
         let beacon_to = socket.local_addr().expect("where");
         let beacon_from = UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let interval =
-            tcslib_protocol::graph::parameters::beacon_interval_of(&graph)
+            tcsprotocol::graph::parameters::beacon_interval_of(&graph)
                 .expect("its interval")
-                .unwrap_or(tcslib_moc::beacon::STANDARD_INTERVAL);
-        let beacons = tcslib_moc::beacon::Beacons::on(
+                .unwrap_or(tcsmoc::beacon::STANDARD_INTERVAL);
+        let beacons = tcsmoc::beacon::Beacons::on(
             socket,
             Link {
                 send: here(&beacon_from.local_addr().unwrap().to_string()),
@@ -857,11 +857,11 @@ impl Station {
         let gateway = graph
             .nodes
             .iter()
-            .find(|n| tcslib_protocol::gateway::is_gateway(&n.node_type))
+            .find(|n| tcsprotocol::gateway::is_gateway(&n.node_type))
             .map(|n| n.name.clone())
             .expect("a gateway node");
         let (receiver, moved) = receiver_on_free_ports(&graph, &gateway);
-        let pings = tcslib_moc::ping::route_of(&graph).map(|route| {
+        let pings = tcsmoc::ping::route_of(&graph).map(|route| {
             let vehicle_ping =
                 UdpSocket::bind("127.0.0.1:0").expect("a ping socket");
             let port = vehicle_ping.local_addr().unwrap().port();
@@ -987,7 +987,7 @@ impl Station {
             let mut out = Vec::new();
             match link.count() {
                 Some(count) => {
-                    tcslib_protocol::link_type::counted(data, count, &mut out)
+                    tcsprotocol::link_type::counted(data, count, &mut out)
                         .expect("counted");
                 }
                 None => out.extend_from_slice(data),
@@ -1050,7 +1050,7 @@ fn ping_node_answers(
     node: &str,
     done: &Arc<AtomicBool>,
 ) {
-    use tcslib_protocol::node::vehicle::ping;
+    use tcsprotocol::node::vehicle::ping;
 
     let link = telemetry::of(moved)
         .expect("its links")
@@ -1081,7 +1081,7 @@ fn ping_node_answers(
             let mut out = Vec::new();
             match count {
                 Some(count) => {
-                    tcslib_protocol::link_type::counted(
+                    tcsprotocol::link_type::counted(
                         reply.as_bytes(),
                         count,
                         &mut out,
@@ -1143,7 +1143,7 @@ impl Zone {
             self.heating = false;
         }
         let value = |kelvin: f64| {
-            tcslib_protocol::node::vehicle::compute::value_bytes(
+            tcsprotocol::node::vehicle::compute::value_bytes(
                 kelvin,
                 Unit::Kelvin,
             )
@@ -1337,13 +1337,13 @@ fn thermostat() {
                 && ui.get_indicator_color() == colour
         });
     };
-    late(10_500, tcslib_ui::palette::well());
+    late(10_500, tcsui::palette::well());
     station.refresh();
     shoot(ui.window(), Some(down_to_panel(ui, 0)), "late");
-    late(20_500, tcslib_ui::palette::watch());
+    late(20_500, tcsui::palette::watch());
     station.refresh();
     shoot(ui.window(), Some(down_to_panel(ui, 0)), "aging");
-    late(40_500, tcslib_ui::palette::wrong());
+    late(40_500, tcsui::palette::wrong());
     ui.invoke_menu_action(MenuAction::Ping);
     station.refresh();
     let notice = ElementQuery::from_root(ui)

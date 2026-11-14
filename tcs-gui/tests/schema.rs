@@ -1,6 +1,6 @@
 //! The schemas say what the software says.
 //!
-//! `tcslib-protocol/schema` holds a schema for each file tcs-gui edits, in each
+//! `tcsprotocol/schema` holds a schema for each file tcs-gui edits, in each
 //! spelling: a JSON Schema for the YAML, YTCS, and an XSD for the XML, XTCS;
 //! `tcs-gui/share/schema` holds those of tcs-gui's own node descriptions. They are data,
 //! installed on a workstation so that somebody's own editor can tell them that
@@ -15,14 +15,14 @@
 //!
 //! What they do not check is whether a configuration can be flown. The schemas
 //! are about shape, `tcs-verify` is about meaning, and
-//! `tcslib-protocol/schema/README` says so to whoever installs them.
+//! `tcsprotocol/schema/README` says so to whoever installs them.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Where one of the schemas this repository ships is: the XTCS, YTCS and
-/// simulator schemas in `tcslib-protocol/schema`, which every program reads,
+/// simulator schemas in `tcsprotocol/schema`, which every program reads,
 /// and the node descriptions' own in this editor's `share/schema`.
 ///
 /// # Arguments
@@ -37,7 +37,7 @@ fn schema_of(name: &str) -> PathBuf {
     if name.starts_with("node.") {
         here.join("share/schema").join(name)
     } else {
-        here.join("../tcslib-protocol/schema").join(name)
+        here.join("../tcsprotocol/schema").join(name)
     }
 }
 
@@ -245,12 +245,12 @@ fn text_of(name: &str) -> String {
 /// Each section of a configuration takes the node types the software knows
 /// for it, in both schemas, and no others.
 ///
-/// Held against `tcslib_protocol::graph::types_in`, which is what the checker
+/// Held against `tcsprotocol::graph::types_in`, which is what the checker
 /// refuses an unknown type by: a type the schemas offer and the checker
 /// refuses, or the other way round, is a schema arguing with the software.
 #[test]
 fn each_section_takes_the_node_types_the_software_knows() {
-    use tcslib_protocol::graph::{types_in, Section};
+    use tcsprotocol::graph::{types_in, Section};
 
     let json = read("tcspecial.schema.json");
     let xsd = text_of("tcspecial.xsd");
@@ -336,7 +336,7 @@ fn each_section_takes_the_node_types_the_software_knows() {
 /// model.
 #[test]
 fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
-    let kinds: Vec<String> = tcslib_protocol::DHType::ALL
+    let kinds: Vec<String> = tcsprotocol::DHType::ALL
         .iter()
         .map(|kind| kind.spelling().to_string())
         .collect();
@@ -374,10 +374,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
 
     let xsd = text_of("tcspecial-sim.xsd");
     assert_eq!(enumerated(&xsd, "kind"), kinds, "in the XSD");
-    for word in tcslib_protocol::sim_config::SETTINGS
-        .iter()
-        .chain(&["group"])
-    {
+    for word in tcsprotocol::sim_config::SETTINGS.iter().chain(&["group"]) {
         assert!(
             xsd.contains(&format!("<xs:element name=\"{word}\"")),
             "the simulator XSD has no {word}"
@@ -420,7 +417,7 @@ fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
     .expect("written");
     // Read as far as a file is without its world: the payloads are joined
     // to terminals only a YAML simulator file's world can have.
-    tcslib_protocol::sim_config::SimConfigFile::load(&file)
+    tcsprotocol::sim_config::SimConfigFile::load(&file)
         .unwrap_or_else(|e| panic!("the simulator does not read it: {e}"));
 
     if Command::new("xmllint").arg("--version").output().is_err() {
@@ -463,7 +460,7 @@ fn the_tcspecial_section_is_what_the_parameters_say() {
     let schema = read("tcspecial.schema.json");
 
     let mut wanted: BTreeSet<String> = BTreeSet::new();
-    for (attribute, _) in tcslib_protocol::graph::parameters::ATTRIBUTES {
+    for (attribute, _) in tcsprotocol::graph::parameters::ATTRIBUTES {
         // Dotted in the rules, nested in the file: `beacon.send` is `send`
         // under `beacon`. One with no dot in it would be an attribute at the
         // top of the section, which the schema would hold as its own property.
@@ -509,7 +506,7 @@ fn the_simulator_schema_is_what_the_settings_say() {
             words(&schema["properties"]["simulated_payload_groups"]["items"]),
         ),
     ] {
-        for setting in tcslib_protocol::sim_config::SETTINGS {
+        for setting in tcsprotocol::sim_config::SETTINGS {
             assert!(
                 said.contains(*setting),
                 "{section} has no {setting}: {said:?}"
@@ -524,7 +521,7 @@ fn the_simulator_schema_is_what_the_settings_say() {
         let extra = if payload { 2 } else { 1 };
         assert_eq!(
             said.len(),
-            tcslib_protocol::sim_config::SETTINGS.len() + extra,
+            tcsprotocol::sim_config::SETTINGS.len() + extra,
             "{section}: {said:?}"
         );
     }
@@ -677,9 +674,9 @@ fn a_section_written_twice_is_refused_by_the_xsd_and_the_reader() {
     let file = dir.path().join("once-sim.xml");
     let check = |text: &str| {
         std::fs::write(&file, text).expect("written");
-        let read = tcslib_protocol::sim_config::SimConfigFile::parse(
+        let read = tcsprotocol::sim_config::SimConfigFile::parse(
             text,
-            tcslib_protocol::ConfigFormat::Xml,
+            tcsprotocol::ConfigFormat::Xml,
         );
         (xsd_check("tcspecial-sim.xsd", &file), read.map(|_| ()))
     };
@@ -710,7 +707,7 @@ fn a_section_written_twice_is_refused_by_the_xsd_and_the_reader() {
         "the XSD takes <description> twice"
     );
     assert!(
-        tcslib_protocol::graph::Graph::load(&file).is_err(),
+        tcsprotocol::graph::Graph::load(&file).is_err(),
         "the reader takes <description> twice"
     );
 }
@@ -781,32 +778,29 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
     let mut shipped: Vec<(String, &str)> = [
         (
             "tests/manual/thermostat.xtcs",
-            "../../tcslib-protocol/schema/tcspecial.xsd",
+            "../../tcsprotocol/schema/tcspecial.xsd",
         ),
         (
             "tests/manual/thermostat.ytcs",
-            "../../tcslib-protocol/schema/tcspecial.schema.json",
+            "../../tcsprotocol/schema/tcspecial.schema.json",
         ),
         (
             "example-sim.yaml",
-            "tcslib-protocol/schema/tcspecial-sim.schema.json",
+            "tcsprotocol/schema/tcspecial-sim.schema.json",
         ),
     ]
     .map(|(file, said)| (file.to_string(), said))
     .to_vec();
     // Each example is two directories below the root.
     for file in examples(".xtcs") {
-        shipped.push((file, "../../tcslib-protocol/schema/tcspecial.xsd"));
+        shipped.push((file, "../../tcsprotocol/schema/tcspecial.xsd"));
     }
     for file in example_configurations() {
-        shipped
-            .push((file, "../../tcslib-protocol/schema/tcspecial.schema.json"));
+        shipped.push((file, "../../tcsprotocol/schema/tcspecial.schema.json"));
     }
     for file in examples("-sim.yaml") {
-        shipped.push((
-            file,
-            "../../tcslib-protocol/schema/tcspecial-sim.schema.json",
-        ));
+        shipped
+            .push((file, "../../tcsprotocol/schema/tcspecial-sim.schema.json"));
     }
     for (file, said) in &shipped {
         let (file, said) = (file.as_str(), *said);
@@ -861,7 +855,7 @@ fn every_key_of_a_shipped_configuration_is_in_the_schema() {
             // The node sections, whose entries are what a schema has most to
             // say about: each an entry of one key, the word type and the
             // type, holding the nodes of that type.
-            let Some(section) = tcslib_protocol::graph::Section::ALL
+            let Some(section) = tcsprotocol::graph::Section::ALL
                 .into_iter()
                 .find(|section| section.name() == key)
             else {
@@ -1360,10 +1354,8 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
         .keys()
         .map(|key| key.strip_prefix("type ").expect("the word type and a type"))
         .collect();
-    let wanted: BTreeSet<&str> = tcslib_protocol::node::physics::TYPES
-        .iter()
-        .copied()
-        .collect();
+    let wanted: BTreeSet<&str> =
+        tcsprotocol::node::physics::TYPES.iter().copied().collect();
     assert_eq!(types, wanted);
     for name in types {
         let component = &json["$defs"][name];
@@ -1380,7 +1372,7 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
             .filter(|key| *key != "component")
             .collect();
         said.sort_unstable();
-        let mut wanted = tcslib_protocol::node::physics::settings_of(name)
+        let mut wanted = tcsprotocol::node::physics::settings_of(name)
             .expect("a type the model reads")
             .to_vec();
         wanted.sort_unstable();

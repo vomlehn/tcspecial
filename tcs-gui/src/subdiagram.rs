@@ -22,7 +22,7 @@
 //! to anything without restructuring the diagram first.
 //!
 //! **A name is the node's own in every file.** The configuration reader,
-//! `tcslib_protocol::graph::Graph::load`, knows a node by its bare name across
+//! `tcsprotocol::graph::Graph::load`, knows a node by its bare name across
 //! every file of a configuration -- no two nodes share one, whichever files
 //! they are in -- so a link in one file names a node in another just as it
 //! names one beside it, and that is how every file is written. The editor holds

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:noNamespaceSchemaLocation="../../../tcslib-protocol/schema/tcspecial.xsd">
+    xsi:noNamespaceSchemaLocation="../../../tcsprotocol/schema/tcspecial.xsd">
     <!-- Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst),
          with Yamcs as the ground: the deck of stage 9, its every packet to
          and from the ground carrying a CCSDS primary header. The tcspecial

@@ -5,7 +5,7 @@
 #
 # Like the other gateway nodes it has no Rust of its own under node/: what
 # the bus sends it and what it publishes go through the vehicle's one SBN
-# peer, tcspecial/src/runtime/bus.rs. See tcslib_protocol::gateway, and "cFS:
+# peer, tcspecial/src/runtime/bus.rs. See tcsprotocol::gateway, and "cFS:
 # gateway_cfs" in docs/tcs-gui-design.rst.
 node: gateway_cfs
 type: gateway_cfs

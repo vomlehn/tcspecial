@@ -7,7 +7,7 @@
 
 use std::process::Command;
 
-use tcslib_protocol::graph::built::{types_from, OPTIONAL_TYPES};
+use tcsprotocol::graph::built::{types_from, OPTIONAL_TYPES};
 
 #[test]
 fn types_prints_what_was_built_in_the_words_tcs_verify_takes() {

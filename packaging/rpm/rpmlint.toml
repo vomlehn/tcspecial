@@ -26,7 +26,7 @@ Filters = [
 	# default, and not the old SysV one as well.
 	' missing-hash-section /opt/tcs/lib/libtcsmoc-c\.so\.',
 	# Words of the trade that rpmlint's dictionary does not have.
-	" spelling-error \\('(libtcs|tcslib|config|pc|schemas)',",
+	" spelling-error \\('(libtcsmoc|gui|moc|config|pc|schemas)',",
 	# tcspecial-moc was tcspecial-ground, and obsoletes it so that an
 	# upgrade takes the old package out. Nothing requires the old name, so
 	# it is not provided: providing it at this version would have the

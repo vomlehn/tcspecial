@@ -81,7 +81,7 @@ list in the tests to update:
   XML read as the same configuration.
 - `tcs-gui/tests/schema.rs` validates each XML file against `tcspecial.xsd`,
   checks each YAML key against `tcspecial.schema.json`, and checks that every
-  file names its schema (`../../tcslib-protocol/schema/...`).
+  file names its schema (`../../tcsprotocol/schema/...`).
 
 `make` in this directory builds `README.html` from this file, with
 `style.html` in its head -- which is where the tables' cells are told to sit
@@ -97,12 +97,12 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | Directory | Description |
 |---|---|
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
-| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib_moc::beacon` to listen and `tcslib_ui`'s panel to show it. |
+| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcsmoc::beacon` to listen and `tcsui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 | `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
 | `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
 | `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `thermostat` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
-| `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcs-moc on it, tcs-sim simulating the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcslib_moc. |
+| `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcs-moc on it, tcs-sim simulating the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcsmoc. |
 
 ### minimal
 
@@ -139,11 +139,11 @@ ground read.
 It is also the example of how a ground program is put together, because almost
 nothing in it is its own:
 
-- `tcslib_moc::beacon` binds the socket, reads each datagram, counts the beacons
+- `tcsmoc::beacon` binds the socket, reads each datagram, counts the beacons
   that did not arrive, compares the digest in each one with the ground's own
   and says how stale the last one is. No window, no toolkit: a ground station
   with no screen -- a logger, a test -- uses exactly this.
-- `tcslib-ui` holds the panel, as markup other windows import, and works out
+- `tcsui` holds the panel, as markup other windows import, and works out
   what to show on it: which colour the indicator is, and the two lines beside
   it.
 - `beacon`, the program here, reads the configuration to find where the
@@ -161,8 +161,8 @@ tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
 ```
 
 It is text so that it can be read as it is, in a packet capture or with any UDP
-listener. tcspecial writes every beacon and `tcslib_moc::beacon` reads it with
-`tcslib_protocol::Beacon`, and this example's test writes the beacon it sends
+listener. tcspecial writes every beacon and `tcsmoc::beacon` reads it with
+`tcsprotocol::Beacon`, and this example's test writes the beacon it sends
 the same way. The window shows it differently, as `tcspecial v0.1.0 md5
 <digest>`.
 
@@ -208,7 +208,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs
 
 Languages:
 
-- MOC: Rust -- the `beacon` program, on `tcslib_moc::beacon` and `tcslib_ui`.
+- MOC: Rust -- the `beacon` program, on `tcsmoc::beacon` and `tcsui`.
 - Vehicle: Rust -- tcspecial.
 - Payload: Rust -- tcs-sim simulates `sensor`, a network payload.
 
@@ -217,7 +217,7 @@ Languages:
 The ground sends a ping up to the gateway node, which hands it to the `ping`
 node; the `ping` node answers with the vehicle's time on the end, and the
 answer comes back down. What a ping and its answer say is
-`tcslib_protocol::node::vehicle::ping`:
+`tcsprotocol::node::vehicle::ping`:
 
 ```
 ping #<count> <seconds>.<nanoseconds>                    up
@@ -235,9 +235,9 @@ trip. Press `Send ping` to send one: it clears the time received until its own
 answer, matched by count, arrives.
 
 It is built the way the `beacon` program is, from the same two halves written
-again in Python: `python/tcslib_moc/beacon.py` after `tcslib_moc::beacon`,
-`python/tcslib_ui/beacon_panel.py` after `tcslib_ui`, and
-`python/tcslib_protocol` for the ping format, the beacon and the configuration.
+again in Python: `python/tcsmoc/beacon.py` after `tcsmoc::beacon`,
+`python/tcsui/beacon_panel.py` after `tcsui`, and
+`python/tcsprotocol` for the ping format, the beacon and the configuration.
 The interface digest beacons are checked against is worked out with tcs-xtce's
 Python runtime, from the tcs-xtce checkout beside this tree.
 `ping-common/ping_ground.py` is the ping's own part, with no window, and
@@ -252,7 +252,7 @@ python3 examples/ping/ping_gateway.py --yaml    # ping.ytcs, not ping.xtcs
 ```
 
 It sends a CONNECT of its own as soon as the vehicle is started, carrying the
-configuration's checksum, with `python/tcslib_moc/listening.py`, and again each
+configuration's checksum, with `python/tcsmoc/listening.py`, and again each
 second until the vehicle answers with that checksum: a vehicle sends nothing
 down, the ping node's answers included, until it has taken one. `--pings`
 waits for it before the first ping; `-v` says when it is matched. It is sent
@@ -275,7 +275,7 @@ Its ports are all in the seven thousands, which no other example uses.
 
 tcs-moc pings it too: `make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping`,
 then the `Ping node` button beside `Command`. It is the same panel, kept by
-`tcslib_moc::ping`, which `ping_ground.py` is written after.
+`tcsmoc::ping`, which `ping_ground.py` is written after.
 
 Languages:
 
@@ -307,10 +307,10 @@ configuration, when it is.
 `ping_yamcs.py` writes a Yamcs configuration from the tcspecial one -- the ports
 and the APIDs, stated once -- with a mission database of tcspecial's own XTCE
 and a wrapper that puts the header around it. The wrapper and Yamcs's links are
-generated by `python/tcslib_protocol/yamcs.py`: a container named after each
+generated by `python/tcsprotocol/yamcs.py`: a container named after each
 node whose data reaches the ground, `pingPacket` here; a command for each
 gateway node; and a link on every port. The ping node has an interface document
-of its own, `tcslib-protocol/xtce/ping.xtce`, which states a ping and its answer
+of its own, `tcsprotocol/xtce/ping.xtce`, which states a ping and its answer
 field by field -- the prefix `ping #`, the count, the seconds and the nine
 digits of nanoseconds, and for the answer the space and the vehicle's time -- so
 `pingPacket` holds the answer as those fields, `ReplyCount`, `ReplySentSeconds`
@@ -328,12 +328,12 @@ thermostat's decision -- is given a parameter of that type instead: see
 thermostat-yamcs. It starts Yamcs and tcspecial, has Yamcs send CONNECT until
 the vehicle answers with the configuration's checksum, then pings through Yamcs
 -- the ping split into the document's fields by the code tcs-xtce generates from
-it, `python/tcslib_protocol/ping_packet.py` -- and reads the answers back over
+it, `python/tcsprotocol/ping_packet.py` -- and reads the answers back over
 Yamcs's REST API, putting each together again from its fields.
 
 Its window is the ping example's, from `ping-common`: the beacon panel, and
 the ping panel with its `Send ping` button. Starting Yamcs, its REST API,
-CONNECT and the beacon through Yamcs are `python/tcslib_moc/yamcs_ground.py`'s,
+CONNECT and the beacon through Yamcs are `python/tcsmoc/yamcs_ground.py`'s,
 which thermostat-yamcs shares. The beacon panel is fed the beacon's own bytes,
 which the Yamcs wrapper keeps whole as the `BeaconBody` parameter, so it
 checks the configuration's checksum and the beacon's number and ages the
@@ -356,13 +356,13 @@ a fraction of a millisecond negative.
 
 The Rust crate beside it is its tests, which `cargo test` runs: `agrees.rs`
 holds the ports, APIDs and checksum `ping_yamcs.py --describe` reads from
-`ping-yamcs.xtcs` to what `tcslib-protocol` reads from `ping-yamcs.ytcs`, and
+`ping-yamcs.xtcs` to what `tcsprotocol` reads from `ping-yamcs.ytcs`, and
 the generated wrapper's APIDs, for the example and for a copy with more nodes,
-to the ones `tcslib-protocol` counts; `wrapper.rs` works the generated wrapper
+to the ones `tcsprotocol` counts; `wrapper.rs` works the generated wrapper
 as Yamcs would, decoding the beacon, the answers -- a ping's field by field,
 every byte of it read -- and each added node's data as the vehicle frames them,
 and encoding CONNECT and a ping, its fields as text, for the vehicle to unframe
-and read as the ping `tcslib-protocol` writes, with the interpreter of
+and read as the ping `tcsprotocol` writes, with the interpreter of
 `examples/yamcs-common`; and `python.rs` runs `test_ping_yamcs.py`, which also
 holds every line of the written wrapper to 80 columns. None needs Yamcs or opens
 a window.
@@ -381,8 +381,8 @@ Its ports are all in the sixteen thousands, which no other example uses.
 Languages:
 
 * tcspecial configuration: YAML (`ping-yamcs.ytcs`) or XML (`ping-yamcs.xtcs`)
-* Yamcs configuration: YAML templates (`python/tcslib_moc/yamcs-templates`)
-  and an XTCE template (`python/tcslib_protocol/yamcs.xtce`)
+* Yamcs configuration: YAML templates (`python/tcsmoc/yamcs-templates`)
+  and an XTCE template (`python/tcsprotocol/yamcs.xtce`)
 * ground program: Python 3 (`ping_yamcs.py`), with Yamcs (Java)
 
 ## Payloads on the kernel's dummy devices
@@ -572,8 +572,8 @@ ground carries a CCSDS primary header:
 | `to_k1`, `to_k2`, `to_k3` | down | 0x408 to 0x40a |
 
 `thermostat_yamcs.py` writes Yamcs's configuration with
-`python/tcslib_moc/yamcs_ground.py`, as `ping_yamcs.py` does, its mission
-database generated by `python/tcslib_protocol/yamcs.py`. That gives each node
+`python/tcsmoc/yamcs_ground.py`, as `ping_yamcs.py` does, its mission
+database generated by `python/tcsprotocol/yamcs.py`. That gives each node
 drawn into the gateway node a parameter of the type the example's own
 XTCE, `thermostat-yamcs.xtce`, says its data are, copied from there:
 tcs-verify writes that file from the configuration (`make xtce`), so the
@@ -616,9 +616,9 @@ it is killed or crashes.
 
 The Rust crate beside it is its tests: `agrees.rs` holds the ports, APIDs,
 forms and checksum `thermostat_yamcs.py --describe` reads from
-`thermostat-yamcs.xtcs` to what `tcslib-protocol` reads from
+`thermostat-yamcs.xtcs` to what `tcsprotocol` reads from
 `thermostat-yamcs.ytcs`, the Python's form of every node of every example
-to `Form::of`, and its table of units to `tcslib_protocol::unit`; `wrapper.rs`
+to `Form::of`, and its table of units to `tcsprotocol::unit`; `wrapper.rs`
 works the generated mission database as Yamcs would, with
 `examples/yamcs-common`'s interpreter, on what the vehicle sends -- each
 value as `value_bytes` makes it, in every unit there is, and each decision;
@@ -730,12 +730,12 @@ see what an app node is. Two programs, both in `examples/simple-app`:
 - `lorem_gateway` is the ground station, a Rust program in the crate beside the
   configuration. It gets `lorem`'s words from the configuration's gateway node,
   `gateway-1`, with one function call,
-  `tcslib_moc::gateway::GatewayReceiver::receive_into`, which works out from the
+  `tcsmoc::gateway::GatewayReceiver::receive_into`, which works out from the
   configuration which port they arrive at and puts each
   word in a buffer made before the loop, so that the loop allocates nothing; it writes out each word
   with one space between them, and stops when the terminator arrives. Before
   its first word it sends a CONNECT of its own, carrying the configuration's
-  checksum, with `tcslib_moc::listening`, and sends it again each second until
+  checksum, with `tcsmoc::listening`, and sends it again each second until
   the vehicle answers with that checksum: a vehicle sends nothing down until
   it has taken one, and nothing else in this example sends one. It sends it
   from the configuration's `tcs_cmd.send`, so tcs-moc cannot be run on the
@@ -769,6 +769,6 @@ what stands for it on the wire is the one constant both programs read.
 
 Languages:
 
-- MOC: Rust -- `lorem_gateway`, on `tcslib_moc::gateway`.
+- MOC: Rust -- `lorem_gateway`, on `tcsmoc::gateway`.
 - Vehicle: Rust -- tcspecial, which runs the payload as its `app_pl` node.
 - Payload: Python 3 -- `lorem_pl.py`.

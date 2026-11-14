@@ -12,8 +12,8 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use tcslib_protocol::graph::telemetry;
-use tcslib_protocol::graph::Graph;
+use tcsprotocol::graph::telemetry;
+use tcsprotocol::graph::Graph;
 
 mod common;
 

@@ -37,8 +37,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tcslib_protocol::graph::Graph;
-use tcslib_protocol::{DHSample, NodeCounts, NodeId, Timestamp};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::{DHSample, NodeCounts, NodeId, Timestamp};
 
 /// A descriptor a wait can be woken through.
 ///
@@ -295,7 +295,7 @@ pub enum Outcome {
 /// addition gives on its own.
 ///
 /// They survive a disable, because what they say is what this node has done
-/// since the vehicle started: see [`tcslib_protocol::NodeCounts`].
+/// since the vehicle started: see [`tcsprotocol::NodeCounts`].
 #[derive(Debug, Default)]
 pub struct Counters {
     taken_bytes: AtomicU64,
@@ -386,7 +386,7 @@ pub struct NodeState {
     /// The last datum each way.
     samples: Mutex<Samples>,
     /// Whether the ground may start and stop it: see
-    /// [`tcslib_protocol::graph::starts_and_stops`]. Fixed when the state is
+    /// [`tcsprotocol::graph::starts_and_stops`]. Fixed when the state is
     /// made, because a node's type is.
     switchable: bool,
 }
@@ -602,7 +602,7 @@ impl NodeState {
 pub struct NodeStates {
     by_name: BTreeMap<String, Arc<NodeState>>,
     /// Indexed by node id, which is a node's position: see
-    /// [`tcslib_protocol::graph::telemetry::ids`].
+    /// [`tcsprotocol::graph::telemetry::ids`].
     by_id: Vec<Arc<NodeState>>,
 }
 
@@ -625,7 +625,7 @@ impl NodeStates {
     ///
     /// The error making a node's [`Wakeup`] failed with.
     pub fn of(graph: &Graph) -> std::io::Result<NodeStates> {
-        let ids = tcslib_protocol::graph::telemetry::ids(graph);
+        let ids = tcsprotocol::graph::telemetry::ids(graph);
         let mut states = NodeStates::default();
         // In id order, so that `by_id` can be indexed by the id itself.
         let mut in_order: Vec<(usize, &str)> =
@@ -638,7 +638,7 @@ impl NodeStates {
                 .iter()
                 .find(|node| node.name == name)
                 .is_none_or(|node| {
-                    tcslib_protocol::graph::starts_and_stops(&node.node_type)
+                    tcsprotocol::graph::starts_and_stops(&node.node_type)
                 });
             let state = Arc::new(state);
             states.by_name.insert(name.to_string(), state.clone());
@@ -858,7 +858,7 @@ vehicle:
         let states = NodeStates::of(&graph).expect("states");
         assert_eq!(states.len(), 2);
 
-        let ids = tcslib_protocol::graph::telemetry::ids(&graph);
+        let ids = tcsprotocol::graph::telemetry::ids(&graph);
         for (name, &id) in &ids {
             let by_id = states.at(NodeId::of(id)).expect("that id");
             assert_eq!(by_id.name(), name, "id {id} is {name}");

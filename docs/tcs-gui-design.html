@@ -988,7 +988,7 @@ resting on one is told the terminal it is joined to in a tip, which is what
 tells a line into a thermal mass's <tt class="docutils literal">heat</tt> from one into its <tt class="docutils literal">heater_1</tt>
 when both enter its one input box. tcspecial's visual window draws the same
 pane from the simulator file tcs-sim would read for the configuration, and only
-draws it. See <tt class="docutils literal"><span class="pre">tcslib_diagram::physics</span></tt>.</p>
+draws it. See <tt class="docutils literal"><span class="pre">tcs_diagram::physics</span></tt>.</p>
 <p>The physics list is at the top of the selection column, its pane being the
 leftmost, with a line under it that is dragged as the others are. Its entries
 are the component types, under <tt class="docutils literal">Thermal</tt>, <tt class="docutils literal">Power</tt> and <tt class="docutils literal">Motion</tt>.
@@ -1008,9 +1008,9 @@ component: its <tt class="docutils literal">connects</tt> is set to the terminal
 watching lines, given the terminal after those it names already, one decision a
 line. The line says only which two things, the component being drawn with one
 output and one input whatever its type has, so the terminals come from the rules
-a file is held to -- <tt class="docutils literal"><span class="pre">tcslib_protocol::node::physics::connectable</span></tt> for a
+a file is held to -- <tt class="docutils literal"><span class="pre">tcsprotocol::node::physics::connectable</span></tt> for a
 connection, an output to an input of one kind, and
-<tt class="docutils literal"><span class="pre">tcslib_protocol::sim_config::may_join</span></tt> for a simulated payload -- and each is
+<tt class="docutils literal"><span class="pre">tcsprotocol::sim_config::may_join</span></tt> for a simulated payload -- and each is
 offered where the line was clicked, with Cancel, one join or several -- a
 heater's heat, current and heating to a sensor -- rather than one guessed at: a
 line to the wrong terminal is a simulator that reads something other than was
@@ -1104,11 +1104,11 @@ colour are the type's, and a page of computations each written &quot;compute&quo
 page whose reader has to open every node to find the thermostat. The function
 stands alone rather than after &quot;compute, &quot;, the shape already saying that, and
 one with no function yet says <tt class="docutils literal">compute</tt>
-(<tt class="docutils literal"><span class="pre">tcslib_diagram::view::type_line</span></tt>). There is less room
+(<tt class="docutils literal"><span class="pre">tcs_diagram::view::type_line</span></tt>). There is less room
 between two terminals than across the middle, so the type is set in the
 diagram's own small size, nine pixels, rather than the window's: the one label
 on the canvas that is, and the longest type, <tt class="docutils literal">subdiagram</tt> between four
-terminals, fits at it as drawn (<tt class="docutils literal"><span class="pre">tcslib_diagram::style::TYPE_SIZE</span></tt> and
+terminals, fits at it as drawn (<tt class="docutils literal"><span class="pre">tcs_diagram::style::TYPE_SIZE</span></tt> and
 <tt class="docutils literal">type_band</tt>). A closed subdiagram is taller than the other nodes, 80 pixels
 to their 64, so that what it holds -- how many nodes, and how many lines cross
 its edge -- has room under its name, and the mark that opens it the middle of
@@ -1247,10 +1247,10 @@ either direction, and what is inside a page may have any of them, which nothing
 outside it knows. A drawing that showed four on every node would say nothing
 about what may be linked to what, which is the one thing about a graph that the
 shapes cannot say. The table is the schema's own,
-<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::terminals</span></tt>, read rather than copied wherever it has
+<tt class="docutils literal"><span class="pre">tcsprotocol::graph::terminals</span></tt>, read rather than copied wherever it has
 an answer, so a terminal added there appears on the canvas without the editor
 being touched; the computation, the log and the page, whose terminals that table
-leaves to them, are answered in <tt class="docutils literal"><span class="pre">tcslib_diagram::style</span></tt>.</p>
+leaves to them, are answered in <tt class="docutils literal"><span class="pre">tcs_diagram::style</span></tt>.</p>
 <p>The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
 the node and stops short of the corner boxes, where reserving rows would leave
@@ -1266,7 +1266,7 @@ marks drawn on its body stay white, so the one thing that changed is the thing
 that is wrong. A node of a type this build does not know is drawn differently
 as well: as a small plain rectangle, 104 by 40 where every other node is 152
 by 64, with a thin single edge and no terminals, in the same red
-(<tt class="docutils literal"><span class="pre">tcslib_diagram::view::node_look</span></tt>). Showing it beats refusing the file: a
+(<tt class="docutils literal"><span class="pre">tcs_diagram::view::node_look</span></tt>). Showing it beats refusing the file: a
 configuration written for a later build is readable, and what cannot be
 placed is visibly what cannot be placed.</p>
 <p>So on the canvas the red is the whole of what marks a faulty node of a known
@@ -1288,7 +1288,7 @@ and the payload pane a pale teal: all three light and neutral -- no chroma
 above 14 -- so that a pane reads as tinted paper rather than as a coloured
 panel. The nodes drawn on one are darker members of its family: a payload is
 a dark teal, a vehicle node a green or an olive, the ground link a blue. The
-colours are written down in <tt class="docutils literal"><span class="pre">tcslib_diagram::look</span></tt>, which tcspecial's visual
+colours are written down in <tt class="docutils literal"><span class="pre">tcs_diagram::look</span></tt>, which tcspecial's visual
 window paints with too.</p>
 <p>So a node's colour says two things at once. The hue says which family it is in,
 which makes a node drawn in the wrong pane visible as one; the step within the
@@ -1457,7 +1457,7 @@ node body of its family -- at least eight CIE units above the lightest, as the
 tiers above say. Lighter so that a line is not taken for a node's outline, and
 of the family so that the colour says the stream. A line whose stream cannot be
 told, which is a line this build does not understand, is grey, and drawn all
-the same (<tt class="docutils literal"><span class="pre">tcslib_diagram::look::line_ink</span></tt>).
+the same (<tt class="docutils literal"><span class="pre">tcs_diagram::look::line_ink</span></tt>).
 <tt class="docutils literal">the_palette_runs_from_the_pane_through_the_line_to_the_bodies</tt> holds both
 lines to the panels themselves, so a palette change that made a node lighter
 than its lines fails there, and <tt class="docutils literal">no_two_colours_of_the_scheme_look_alike</tt>
@@ -1585,7 +1585,7 @@ button anywhere else on the page selects nothing, and closes whatever menu was
 open. A line is a <tt class="docutils literal">Path</tt>, and a press on a path is not reported, so the press
 goes to the page underneath, which asks which line runs within a few pixels of
 the point, by the line's points rather than its drawing: see
-<tt class="docutils literal"><span class="pre">tcslib_diagram::route::distance_to</span></tt>. Only the document's lines are found, not
+<tt class="docutils literal"><span class="pre">tcs_diagram::route::distance_to</span></tt>. Only the document's lines are found, not
 the ones an edge draws to a node nothing joins outside yet, there being no line
 to take out. A selected line is kept by what it joins rather than where it is in
 the page's list, so an edit elsewhere that redraws the page keeps it selected,
@@ -1688,7 +1688,7 @@ so a line carrying what the ground sends has nothing to reach on a gateway
 node -- offers no menu, and the line stays in hand with the box on the sheet
 saying so, which is a kinder answer to a near miss than throwing away a line
 that took a click to pick up. The rule is still
-<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::terminals</span></tt>; the menu only says it.</p>
+<tt class="docutils literal"><span class="pre">tcsprotocol::graph::terminals</span></tt>; the menu only says it.</p>
 <p>A link that is already there can be picked up by either of its ends. Click the
 terminal it is attached to and the line comes off the drawing and into the
 hand; the node clicked next offers the pressed end moved there, to its terminal
@@ -2355,7 +2355,7 @@ family from being half described.</p>
 be told. Both were written in Rust where nobody adding a node type could see
 them, and both are still <em>read</em> from Rust by the parts that cannot afford to
 read a file -- the checking and the flight software have
-<tt class="docutils literal"><span class="pre">tcslib_protocol::graph::terminals</span></tt>, and a window has
+<tt class="docutils literal"><span class="pre">tcsprotocol::graph::terminals</span></tt>, and a window has
 <tt class="docutils literal"><span class="pre">style::NodeType::attributes</span></tt> for a type the tree does not describe. So the
 tree is held against those: <tt class="docutils literal">the_trees_terminals_are_the_schemas</tt> and
 <tt class="docutils literal">a_description_of_a_whole_type_says_what_the_type_says</tt>. A description of one
@@ -2397,7 +2397,7 @@ twice is two statements of what its terminals are. What it says:</p>
 <tt class="docutils literal">kind</tt>, which is what its field is offered as: <tt class="docutils literal">boolean</tt> is a control with
 two states, and <tt class="docutils literal">text</tt>, <tt class="docutils literal">path</tt>, <tt class="docutils literal">whole</tt>, <tt class="docutils literal">interval</tt>, <tt class="docutils literal">timeout</tt> and
 <tt class="docutils literal">bytes</tt> are a box to write in, a kind with a rule of its own naming the
-<tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt> rule a value of it is read by (<tt class="docutils literal"><span class="pre">nodes::KINDS</span></tt>). Unstated
+<tt class="docutils literal">tcsprotocol</tt> rule a value of it is read by (<tt class="docutils literal"><span class="pre">nodes::KINDS</span></tt>). Unstated
 is <tt class="docutils literal">text</tt>; <tt class="docutils literal">process.xml</tt> states a <tt class="docutils literal">path</tt>, an <tt class="docutils literal">interval</tt> and a
 <tt class="docutils literal">boolean</tt>.</p>
 <p>The shape of one of those files has two schemas of its own, <tt class="docutils literal">node.xsd</tt> and
@@ -2422,7 +2422,7 @@ type's name, so each is offered under that name as before. An editor that
 cannot find the tree at all offers every type as itself, which is exactly what
 it offered before there was a tree.</p>
 <p>What a computation is told is the flight software's own list, and the tree is
-held to it: <tt class="docutils literal"><span class="pre">tcslib_protocol::node::vehicle::compute::attributes_of</span></tt> says what
+held to it: <tt class="docutils literal"><span class="pre">tcsprotocol::node::vehicle::compute::attributes_of</span></tt> says what
 each computation takes, <tt class="docutils literal">params_of</tt> refuses anything else, and a test says
 each description asks for exactly that list. A description that asked for
 something else would be a panel filling in a field the checking then refuses, or
@@ -2436,10 +2436,10 @@ the same way -- a name picks out one node here as it does in a configuration.</p
 </div>
 <div class="section" id="schemas-beside-the-tree">
 <h1><a class="toc-backref" href="#toc-entry-45">Schemas Beside the Tree</a></h1>
-<p><tt class="docutils literal"><span class="pre">tcslib-protocol/schema</span></tt> holds a schema for each file tcs-gui edits, in each
+<p><tt class="docutils literal">tcsprotocol/schema</tt> holds a schema for each file tcs-gui edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
-tcslib-protocol's rather than this editor's, because every program that reads a
+tcsprotocol's rather than this editor's, because every program that reads a
 configuration reads those formats; they are installed under
 <tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcspecial/schema</span></tt>. The schemas of the editor's own node
 descriptions stay with it, in <tt class="docutils literal"><span class="pre">tcs-gui/share/schema</span></tt>.</p>
@@ -2478,11 +2478,11 @@ that is the two attributes every XML tool reads:</p>
 <pre class="literal-block">
 &lt;configuration
     xmlns:xsi=&quot;http://www.w3.org/2001/XMLSchema-instance&quot;
-    xsi:noNamespaceSchemaLocation=&quot;tcslib-protocol/schema/tcspecial.xsd&quot;&gt;
+    xsi:noNamespaceSchemaLocation=&quot;tcsprotocol/schema/tcspecial.xsd&quot;&gt;
 </pre>
 <p>and in YAML it is a comment, there being no other way to say it in YAML:</p>
 <pre class="literal-block">
-# yaml-language-server: $schema=tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=tcsprotocol/schema/tcspecial.schema.json
 </pre>
 <p>Both are written by <tt class="docutils literal"><span class="pre">nodes::schema_reference</span></tt>, which gives the path relative
 to the file where the schemas are above it -- which is a checkout, where these

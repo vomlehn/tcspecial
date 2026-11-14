@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../../../tcslib-protocol/schema/tcspecial.schema.json
+# yaml-language-server: $schema=../../../tcsprotocol/schema/tcspecial.schema.json
 
 # Stage 10 of "Building a Vehicle" (docs/building-a-vehicle.rst), with Yamcs
 # as the ground: the deck of stage 9, its every packet to and from the ground

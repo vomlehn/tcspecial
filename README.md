@@ -62,7 +62,7 @@ Everything installs under `/opt/tcs`, as three packages:
 * `tcspecial-moc`, what a ground station is built on: `libtcsmoc-c` for C
   and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
   `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python
-  packages `tcslib_protocol`, `tcslib_moc` and `tcslib_ui`, and `bin/tcs-gui`
+  packages `tcsprotocol`, `tcsmoc` and `tcsui`, and `bin/tcs-gui`
   with its data.
 * `tcspecial-test`, the test ground station and simulator: `bin/tcs-moc` and
   `bin/tcs-sim`, and `bin/segsend`, the test one, which deletes each
@@ -175,14 +175,14 @@ Key TCSpecial features are:
 
 * Operations Center
 
-  * The TCSpecial MOC Correspondent (tcslib-moc) is used to send commands and
+  * The TCSpecial MOC Correspondent (tcsmoc) is used to send commands and
     receive telemetry from the spacecraft. This can be integrated with mission
     control software such Yamcs.
 
 * Test Software
 
   * The TCSpecial test interface (tcstest) provides simulated payload devices and
-    uses tcslib-moc to verify the behavior of TCSpecial.
+    uses tcsmoc to verify the behavior of TCSpecial.
 
 
 To Do
@@ -212,8 +212,8 @@ manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
 * [The examples](https://vomlehn.github.io/tcspecial/examples/README.html): working configurations, each
   with a diagram.
 
-* [tcslib-moc](https://vomlehn.github.io/tcspecial/tcslib-moc/README.html), [tcslib-protocol](https://vomlehn.github.io/tcspecial/tcslib-protocol/README.html) and
-  [tcslib-moc-c](https://vomlehn.github.io/tcspecial/tcslib-moc-c/README.html): the libraries a ground station is
+* [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/README.html), [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/README.html) and
+  [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/README.html): the libraries a ground station is
   built on, and what the ground and the vehicle share: the TCSpecial MOC
   Correspondent, TCS Link Support, and the Correspondent for C and C++.
 

@@ -1,4 +1,4 @@
-# pkg-config's account of libtcsmoc-c, tcslib-moc for C and C++, written by
+# pkg-config's account of libtcsmoc-c, tcsmoc for C and C++, written by
 # `make install-files` with the prefix it installs under.
 prefix=@PREFIX@
 exec_prefix=${prefix}
@@ -6,7 +6,7 @@ libdir=${exec_prefix}/lib
 includedir=${prefix}/include
 
 Name: tcsmoc-c
-Description: tcslib-moc for C and C++: ground station beacons, data and commands
+Description: tcsmoc for C and C++: ground station beacons, data and commands
 URL: https://github.com/vomlehn/tcspecial
 Version: @LIBTCS_VERSION@
 Libs: -L${libdir} -ltcsmoc-c

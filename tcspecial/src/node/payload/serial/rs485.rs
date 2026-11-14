@@ -28,7 +28,7 @@
 
 use std::os::unix::io::RawFd;
 
-use tcslib_protocol::{Rs485Params, TcsError, TcsResult};
+use tcsprotocol::{Rs485Params, TcsError, TcsResult};
 
 /// The kernel's `struct serial_rs485`, from `linux/serial.h`.
 ///

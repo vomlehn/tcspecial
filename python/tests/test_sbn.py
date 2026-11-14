@@ -1,7 +1,7 @@
 """SBN's wire format and the cFS packet, held to the Rust by its examples.
 
-The same figures as the tests of ``tcslib-protocol/src/sbn.rs`` and
-``tcslib-protocol/src/cfs.rs``, so that the two spellings cannot drift apart
+The same figures as the tests of ``tcsprotocol/src/sbn.rs`` and
+``tcsprotocol/src/cfs.rs``, so that the two spellings cannot drift apart
 unnoticed.
 """
 
@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcslib_protocol import cfs, sbn  # noqa: E402
+from tcsprotocol import cfs, sbn  # noqa: E402
 
 HASH = "3b339a5e0f686cef822a5d6ea95004222ab7af33"
 

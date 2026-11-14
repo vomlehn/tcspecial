@@ -42,7 +42,7 @@
 //! Payload data is what travels groundward, from what the vehicle carries
 //! towards the ground; gateway data is what travels vehicleward, from the
 //! ground towards what it carries. The names are the graph's own: see
-//! `tcslib_protocol::graph::terminals`.
+//! `tcsprotocol::graph::terminals`.
 //!
 //! # What an app supports, and what it does not
 //!

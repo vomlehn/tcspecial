@@ -218,6 +218,20 @@ pub enum Problem {
     /// entered belongs here, where the complaint can name the file, the line
     /// and the attribute.
     BadNode { node: String, why: String },
+    /// A string or bytes that states no most: `bytes` where `bytes(256)`
+    /// would say how large a datum of it may be.
+    ///
+    /// Not wrong, as the configuration still says what it carries, but
+    /// unfinished, as what carries it cannot then be sized by it, and is
+    /// held to the most any datum may be. So it is a warning, as an
+    /// unfinished node is, and unlike an unfinished node it does not stop
+    /// tcspecial: see [`Problem::refused_aboard`]. `attribute` is where it
+    /// is said and `said` what is said there.
+    Unbounded {
+        node: String,
+        attribute: String,
+        said: String,
+    },
     /// A port, message ID, APID or F´ ID that two of the configuration's
     /// links share, or that counting from its base takes past where such a
     /// thing can go.
@@ -389,6 +403,7 @@ impl Problem {
                 About::Section("tcspecial")
             }
             Problem::BadNode { node, .. } => About::Node(node.clone()),
+            Problem::Unbounded { node, .. } => About::Node(node.clone()),
             Problem::Clash { node, .. } => About::Node(node.clone()),
             Problem::BadLog { node, .. } => About::Node(node.clone()),
             Problem::BadCompute { node, .. } => About::Node(node.clone()),
@@ -423,9 +438,26 @@ impl Problem {
             // And a node with nothing joined to it, which is a line somebody
             // has not drawn yet.
             | Problem::NodeOnNoLink { .. }
-            | Problem::Unconnected { .. } => Severity::Warning,
+            | Problem::Unconnected { .. }
+            // And a string or bytes whose most is not yet written.
+            | Problem::Unbounded { .. } => Severity::Warning,
             _ => Severity::Error,
         }
+    }
+
+    /// Whether tcspecial refuses to run a configuration with this problem.
+    ///
+    /// Every problem but one stops it: a configuration that is wrong, or
+    /// that has not finished saying what a node needs, is one the vehicle
+    /// cannot run as it stands. A string or bytes with no most is the
+    /// exception, which tcspecial says in its log and runs: it still says
+    /// what it carries, and is held to the most any datum may be.
+    ///
+    /// # Returns
+    ///
+    /// False for [`Problem::Unbounded`], and true for everything else.
+    pub fn refused_aboard(&self) -> bool {
+        !matches!(self, Problem::Unbounded { .. })
     }
 
     /// What to print, one problem per line.
@@ -635,6 +667,17 @@ impl Problem {
                  readings",
                 said(declared),
                 said(bound)
+            ),
+            Problem::Unbounded {
+                node,
+                attribute,
+                said,
+            } => format!(
+                "\"{node}\": {attribute} is {said}, which states no most: \
+                 write it as {said}(<most>), the most bytes one may hold, \
+                 so that what carries it is sized by it rather than held to \
+                 the most any datum may be, {} bytes",
+                crate::types::DATUM_BYTES
             ),
             Problem::LogSourceMismatch {
                 log,
@@ -1633,6 +1676,13 @@ impl Graph {
         for (node, why) in super::link_types::problems(self) {
             problems.push(Problem::BadNode { node, why });
         }
+        for (node, attribute, said) in super::link_types::unbounded(self) {
+            problems.push(Problem::Unbounded {
+                node,
+                attribute,
+                said,
+            });
+        }
 
         // What each command binding sets, which the node it names must take
         // from the ground, as a type: see `settings`.
@@ -2272,6 +2322,40 @@ mod tests {
             exports: Default::default(),
             includes: Vec::new(),
         }
+    }
+
+    /// A string or bytes stated with no most is warned of, by node and
+    /// attribute, and does not stop tcspecial; one stated with a most is
+    /// not warned of.
+    #[test]
+    fn an_unbounded_string_or_bytes_is_a_warning_aboard_too() {
+        let mut serial = node("modem", "serial");
+        serial
+            .attributes
+            .insert("world-out-type".into(), Scalar::of("bytes"));
+        serial
+            .attributes
+            .insert("moc-in-type".into(), Scalar::of("string(64)"));
+        let g = graph(vec![serial], Vec::new());
+        let problems = g.check();
+        let unbounded: Vec<&Problem> = problems
+            .iter()
+            .filter(|p| matches!(p, Problem::Unbounded { .. }))
+            .collect();
+        assert_eq!(unbounded.len(), 1, "{problems:?}");
+        let problem = unbounded[0];
+        assert_eq!(
+            problem,
+            &Problem::Unbounded {
+                node: "modem".into(),
+                attribute: "world-out-type".into(),
+                said: "bytes".into(),
+            }
+        );
+        assert_eq!(problem.severity(), Severity::Warning);
+        assert!(!problem.refused_aboard());
+        assert!(problem.describe().contains("bytes(<most>)"));
+        assert!(Problem::NamelessNode.refused_aboard());
     }
 
     /// Two raw nodes reading one protocol from one host claim one thing; a

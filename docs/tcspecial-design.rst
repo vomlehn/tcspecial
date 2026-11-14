@@ -1024,10 +1024,19 @@ Requirement
 
 Requirement
     A string or bytes type states the most it may hold, as ``string(64)``
-    or ``bytes(256)``, from 1 to that most; ``string`` or ``bytes``
-    alone is refused, naming the terminal and asking for its most. The
+    or ``bytes(256)``, from 1 to that most. ``string`` or ``bytes`` alone is
+    a warning, naming the node and the attribute and asking for its most,
+    and a terminal that is held to it by nothing else is held to the most a
+    datum may be. tcspecial says the warning in its log and runs, as it does
+    for nothing else a check finds (``Problem::refused_aboard``); tcs-verify
+    prints it, and fails on it under ``--fatal-warnings``. The
     configuration then says the size of every datum any node produces, and
     a node's buffers can be sized from it.
+
+    **Built** (2026-11-14): ``string(<most>)`` and ``bytes(<most>)``, held
+    to for now by ``DATUM_BYTES``; the warning, aboard and in tcs-verify;
+    and ``--fatal-warnings``. tcs-xtce takes the same flag for its own
+    warning, an XTCE string or binary type with no most.
 
 Requirement
     Every node that produces data says the **largest datum** it can

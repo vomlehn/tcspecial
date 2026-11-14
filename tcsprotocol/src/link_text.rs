@@ -24,7 +24,7 @@ use crate::node::vehicle::compute::{from_text, from_value, value_bytes};
 /// True but for a string, bytes, and a structure, whose fields are of fixed
 /// width and so never either.
 pub fn has_text(kind: &LinkType) -> bool {
-    !matches!(kind, LinkType::Basic(Basic::String | Basic::Bytes))
+    !matches!(kind, LinkType::Basic(Basic::String(_) | Basic::Bytes(_)))
 }
 
 /// Writes a datum as a program reads it, on the end of a line.
@@ -156,7 +156,7 @@ fn write_basic(
         Basic::Boolean => {
             let _ = write!(out, "{}", data.first().copied().unwrap_or(0));
         }
-        Basic::String | Basic::Bytes => {
+        Basic::String(_) | Basic::Bytes(_) => {
             return Err(format!("a {} has no text form", basic.name()))
         }
         whole => {
@@ -213,7 +213,7 @@ fn read_basic(
             };
             Ok(1)
         }
-        Basic::String | Basic::Bytes => {
+        Basic::String(_) | Basic::Bytes(_) => {
             Err(format!("{what}: a {} has no text form", basic.name()))
         }
         whole => {

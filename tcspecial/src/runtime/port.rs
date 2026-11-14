@@ -1536,7 +1536,7 @@ impl AppPort {
         let sends = |terminal: &str| match link_types::carries(node, terminal) {
             Ok(link_types::Carries::Only(kind)) => Ok(kind),
             Ok(link_types::Carries::Any) => {
-                Ok(LinkType::Basic(tcsprotocol::link_type::Basic::Bytes))
+                Ok(LinkType::Basic(tcsprotocol::link_type::Basic::Bytes(None)))
             }
             Err(why) => Err(why),
         };

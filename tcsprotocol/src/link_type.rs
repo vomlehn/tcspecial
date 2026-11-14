@@ -31,10 +31,13 @@ pub enum Basic {
     Boolean,
     /// A value in a unit: a 32-bit count of the unit's step.
     Value(Unit),
-    /// Text, at most 4096 bytes of it.
-    String,
-    /// Opaque data, at most 4096 bytes of it.
-    Bytes,
+    /// UTF-8 text, at most the bytes its most says: `string(64)`. `None` is
+    /// a string that states no most, which is warned of, and held to the
+    /// most any datum may be.
+    String(Option<u32>),
+    /// Opaque data, at most the bytes its most says: `bytes(256)`, `None`
+    /// as for a string.
+    Bytes(Option<u32>),
 }
 
 /// The whole numbers, with their names, in the order they are listed.
@@ -54,16 +57,29 @@ impl Basic {
     ///
     /// # Arguments
     ///
-    /// * `said` - The name: `u8`, `boolean`, `kelvin`, `string`.
+    /// * `said` - The name: `u8`, `boolean`, `kelvin`, `string(64)`.
     ///
     /// # Returns
     ///
     /// The type, or `None` for a name that is no type's.
     pub fn of(said: &str) -> Option<Basic> {
+        if let Some((name, most)) = said.split_once('(') {
+            let most = most
+                .strip_suffix(')')?
+                .trim()
+                .parse::<u32>()
+                .ok()
+                .filter(|most| *most > 0)?;
+            return match name.trim() {
+                "string" => Some(Basic::String(Some(most))),
+                "bytes" => Some(Basic::Bytes(Some(most))),
+                _ => None,
+            };
+        }
         match said {
             "boolean" => Some(Basic::Boolean),
-            "string" => Some(Basic::String),
-            "bytes" => Some(Basic::Bytes),
+            "string" => Some(Basic::String(None)),
+            "bytes" => Some(Basic::Bytes(None)),
             _ => WHOLE
                 .iter()
                 .find(|(_, name)| *name == said)
@@ -72,16 +88,17 @@ impl Basic {
         }
     }
 
-    /// Names this type as a configuration writes it.
+    /// Names this type's kind as a configuration writes it, without a
+    /// string's or bytes' most, which its [`fmt::Display`] adds.
     ///
     /// # Returns
     ///
-    /// The name: `u8`, `boolean`, `kelvin`.
+    /// The name: `u8`, `boolean`, `kelvin`, `string`.
     pub fn name(self) -> &'static str {
         match self {
             Basic::Boolean => "boolean",
-            Basic::String => "string",
-            Basic::Bytes => "bytes",
+            Basic::String(_) => "string",
+            Basic::Bytes(_) => "bytes",
             Basic::Value(unit) => unit.type_name(),
             whole => {
                 WHOLE
@@ -132,6 +149,31 @@ impl Basic {
         }
     }
 
+    /// Says the most a string or bytes may hold, where it states one.
+    ///
+    /// # Returns
+    ///
+    /// The bytes, or `None` for any other type, and for a string or bytes
+    /// that states no most.
+    pub fn most(self) -> Option<usize> {
+        match self {
+            Basic::String(most) | Basic::Bytes(most) => {
+                most.map(|most| most as usize)
+            }
+            _ => None,
+        }
+    }
+
+    /// Says whether this is a string or bytes that states no most: one that
+    /// is warned of, as nothing then says how large a datum of it may be.
+    ///
+    /// # Returns
+    ///
+    /// True for `string` or `bytes` alone.
+    pub fn is_unbounded(self) -> bool {
+        matches!(self, Basic::String(None) | Basic::Bytes(None))
+    }
+
     /// Says how many bytes a datum of this type is, where every datum of it
     /// is as long as every other.
     ///
@@ -143,7 +185,7 @@ impl Basic {
         match self {
             Basic::Boolean => Some(1),
             Basic::Value(_) => Some(4),
-            Basic::String | Basic::Bytes => None,
+            Basic::String(_) | Basic::Bytes(_) => None,
             whole => whole.bits().map(|bits| bits as usize / 8),
         }
     }
@@ -158,8 +200,8 @@ impl Basic {
             WHOLE.iter().map(|(_, name)| *name).collect();
         names.push("boolean");
         names.extend(Unit::ALL.iter().map(|unit| unit.type_name()));
-        names.push("string");
-        names.push("bytes");
+        names.push("string(<most>)");
+        names.push("bytes(<most>)");
         names.join(", ")
     }
 }
@@ -331,7 +373,8 @@ impl LinkType {
     }
 }
 
-/// The most a string or bytes may hold: `tcsprotocol::types::DATUM_BYTES`.
+/// The most a string or bytes may hold, whatever its own most says:
+/// `tcsprotocol::types::DATUM_BYTES`.
 const MOST_BYTES: usize = crate::types::DATUM_BYTES;
 
 /// How many bytes the count is that a string or bytes is sent after where
@@ -349,7 +392,17 @@ impl LinkType {
     ///
     /// True for a string and bytes.
     pub fn is_counted(&self) -> bool {
-        matches!(self, LinkType::Basic(Basic::String | Basic::Bytes))
+        matches!(self, LinkType::Basic(Basic::String(_) | Basic::Bytes(_)))
+    }
+
+    /// Says whether this is a string or bytes that states no most: see
+    /// [`Basic::is_unbounded`].
+    ///
+    /// # Returns
+    ///
+    /// True for `string` or `bytes` alone.
+    pub fn is_unbounded(&self) -> bool {
+        matches!(self, LinkType::Basic(basic) if basic.is_unbounded())
     }
 }
 
@@ -481,12 +534,14 @@ fn basic_accepts(basic: Basic, data: &[u8]) -> Result<(), String> {
             Err(format!("a boolean is 1 or 0 and {} arrived", data[0]))
         }
         Some(_) => Ok(()),
-        None if data.len() > MOST_BYTES => Err(format!(
-            "{} hold at most {MOST_BYTES} bytes and {} arrived",
-            basic.name(),
-            data.len()
-        )),
-        None if basic == Basic::String
+        None if data.len() > basic.most().unwrap_or(MOST_BYTES) => {
+            Err(format!(
+                "a {basic} holds at most {} bytes and {} arrived",
+                basic.most().unwrap_or(MOST_BYTES),
+                data.len()
+            ))
+        }
+        None if matches!(basic, Basic::String(_))
             && std::str::from_utf8(data).is_err() =>
         {
             Err("a string is UTF-8 text, and what arrived is not".to_string())
@@ -495,14 +550,23 @@ fn basic_accepts(basic: Basic, data: &[u8]) -> Result<(), String> {
     }
 }
 
+impl fmt::Display for Basic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.most() {
+            Some(most) => write!(f, "{}({most})", self.name()),
+            None => f.write_str(self.name()),
+        }
+    }
+}
+
 impl fmt::Display for LinkType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LinkType::Basic(basic) => f.write_str(basic.name()),
+            LinkType::Basic(basic) => write!(f, "{basic}"),
             LinkType::Structure(fields) => {
                 let said: Vec<String> = fields
                     .iter()
-                    .map(|(name, basic)| format!("{name}: {}", basic.name()))
+                    .map(|(name, basic)| format!("{name}: {basic}"))
                     .collect();
                 f.write_str(&said.join(", "))
             }
@@ -549,8 +613,9 @@ mod tests {
     #[test]
     fn every_name_reads_back() {
         for name in Basic::every_name().split(", ") {
-            let basic = Basic::of(name).expect(name);
-            assert_eq!(basic.name(), name);
+            let name = name.replace("<most>", "64");
+            let basic = Basic::of(&name).expect(&name);
+            assert_eq!(basic.to_string(), name);
         }
         assert_eq!(Basic::of("kelvin"), Some(Basic::Value(Unit::Kelvin)));
         assert_eq!(Basic::of("K"), None);
@@ -583,10 +648,30 @@ mod tests {
         assert!(of("string").accepts(&[0xff]).is_err());
         assert!(of("bytes").accepts(&[0xff; 4096]).is_ok());
         assert!(of("bytes").accepts(&[0xff; 4097]).is_err());
+        assert!(of("bytes(4)").accepts(&[0xff; 4]).is_ok());
+        assert!(of("bytes(4)").accepts(&[0xff; 5]).is_err());
+        assert!(of("string(3)").accepts(b"abcd").is_err());
         let imu = of("x: i16, y: i16, on: boolean");
         assert!(imu.accepts(&[0, 1, 0, 2, 1]).is_ok());
         assert!(imu.accepts(&[0, 1, 0, 2, 7]).is_err());
         LinkType::of("x: i16, name: string").expect_err("no strings");
+    }
+
+    /// A string or bytes states its most in brackets, a whole number more
+    /// than nought, and one that states none is unbounded.
+    #[test]
+    fn a_string_or_bytes_states_its_most() {
+        assert_eq!(Basic::of("string(64)"), Some(Basic::String(Some(64))));
+        assert_eq!(Basic::of("bytes( 256 )"), Some(Basic::Bytes(Some(256))));
+        assert_eq!(Basic::of("bytes"), Some(Basic::Bytes(None)));
+        for bad in ["string(0)", "string(-1)", "bytes(x)", "u8(4)", "bytes(4"] {
+            assert_eq!(Basic::of(bad), None, "{bad}");
+        }
+        assert!(Basic::Bytes(None).is_unbounded());
+        assert!(!Basic::Bytes(Some(8)).is_unbounded());
+        assert!(!Basic::U8.is_unbounded());
+        assert_eq!(Basic::String(Some(64)).most(), Some(64));
+        assert_eq!(LinkType::of("bytes(8)").unwrap().to_string(), "bytes(8)");
     }
 
     /// A set of lines is the narrowest whole number with room for them.

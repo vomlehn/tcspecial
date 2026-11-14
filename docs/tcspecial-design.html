@@ -1540,11 +1540,20 @@ less the packet's headers. That answer replaces <tt class="docutils literal">DAT
 most anything may be: a line's <tt class="docutils literal">max_length</tt>, a read's, a string's or
 bytes'.</dd>
 <dt>Requirement</dt>
-<dd>A string or bytes type states the most it may hold, as <tt class="docutils literal">string(64)</tt>
-or <tt class="docutils literal">bytes(256)</tt>, from 1 to that most; <tt class="docutils literal">string</tt> or <tt class="docutils literal">bytes</tt>
-alone is refused, naming the terminal and asking for its most. The
+<dd><p class="first">A string or bytes type states the most it may hold, as <tt class="docutils literal">string(64)</tt>
+or <tt class="docutils literal">bytes(256)</tt>, from 1 to that most. <tt class="docutils literal">string</tt> or <tt class="docutils literal">bytes</tt> alone is
+a warning, naming the node and the attribute and asking for its most,
+and a terminal that is held to it by nothing else is held to the most a
+datum may be. tcspecial says the warning in its log and runs, as it does
+for nothing else a check finds (<tt class="docutils literal"><span class="pre">Problem::refused_aboard</span></tt>); tcs-verify
+prints it, and fails on it under <tt class="docutils literal"><span class="pre">--fatal-warnings</span></tt>. The
 configuration then says the size of every datum any node produces, and
-a node's buffers can be sized from it.</dd>
+a node's buffers can be sized from it.</p>
+<p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">string(&lt;most&gt;)</span></tt> and <tt class="docutils literal"><span class="pre">bytes(&lt;most&gt;)</span></tt>, held
+to for now by <tt class="docutils literal">DATUM_BYTES</tt>; the warning, aboard and in tcs-verify;
+and <tt class="docutils literal"><span class="pre">--fatal-warnings</span></tt>. tcs-xtce takes the same flag for its own
+warning, an XTCE string or binary type with no most.</p>
+</dd>
 <dt>Requirement</dt>
 <dd><p class="first">Every node that produces data says the <strong>largest datum</strong> it can
 produce, in bytes, worked out from what the configuration says of it

@@ -65,14 +65,20 @@ pub enum Warnings {
     Errors,
 }
 
-/// How much a run looks for: tcs-verify's `--error-limit` and `--warnings`.
+/// How much a run looks for, and what fails it: tcs-verify's
+/// `--error-limit`, `--warnings` and `--fatal-warnings`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// How many counted findings are recorded before the run stops, or
     /// `None` to look at everything. Errors are counted, and warnings too
     /// under [`Warnings::Errors`].
     pub error_limit: Option<usize>,
+    /// What is done with warnings.
     pub warnings: Warnings,
+    /// Whether a warning fails the run as an error does: for a build that
+    /// wants nothing left unfinished, a string or bytes with no most among
+    /// it. The warnings are printed as warnings still.
+    pub fatal_warnings: bool,
 }
 
 impl Limits {
@@ -82,6 +88,7 @@ impl Limits {
     pub const EVERYTHING: Limits = Limits {
         error_limit: None,
         warnings: Warnings::On,
+        fatal_warnings: false,
     };
 }
 
@@ -167,6 +174,13 @@ impl Report {
             .any(|finding| finding.severity == Severity::Error)
     }
 
+    /// Whether the run fails: an error was found, or a warning under
+    /// [`Limits::fatal_warnings`].
+    pub fn fails(&self) -> bool {
+        self.found_errors()
+            || (self.limits.fatal_warnings && self.found_anything())
+    }
+
     /// Whether anything at all was found, wrong or unfinished.
     pub fn found_anything(&self) -> bool {
         !self.findings.is_empty()
@@ -176,10 +190,10 @@ impl Report {
     ///
     /// # Returns
     ///
-    /// Nought when no error was found, so that `make` and a shell `&&` can
-    /// be told by it, and 1 when one was.
+    /// Nought when the run does not [`Report::fails`], so that `make` and a
+    /// shell `&&` can be told by it, and 1 when it does.
     pub fn status(&self) -> i32 {
-        if self.found_errors() {
+        if self.fails() {
             1
         } else {
             0
@@ -2501,6 +2515,7 @@ payloads:
         Limits {
             error_limit,
             warnings,
+            fatal_warnings: false,
         }
     }
 
@@ -2592,7 +2607,8 @@ payloads:
     }
 
     /// Warnings are printed and not counted, dropped, or counted as errors
-    /// are -- and in none of the three do they fail a run.
+    /// are -- and in none of the three do they fail a run, which only
+    /// `fatal_warnings` makes them do.
     #[test]
     fn warnings_are_printed_dropped_or_counted() {
         let (_dir, path) = with_warnings(4);
@@ -2630,6 +2646,19 @@ payloads:
         assert_eq!(counted.findings.len(), 2, "{:?}", counted.findings);
         assert!(counted.halted);
         assert_eq!(counted.status(), 0);
+
+        // Fatal: the same warnings, all of them printed, fail the run.
+        let fatal = verify(
+            &path,
+            None,
+            Limits {
+                fatal_warnings: true,
+                ..Limits::EVERYTHING
+            },
+        );
+        assert_eq!(fatal.findings.len(), warned);
+        assert!(fatal.fails());
+        assert_eq!(fatal.status(), 1);
 
         // And errors are not touched by what is done with warnings.
         let set = with_errors(3);

@@ -424,7 +424,11 @@ for a limit -- any whole number, nought included -- and then stops as soon
 as it has printed that many. <tt class="docutils literal"><span class="pre">--error-limit=unlimited</span></tt> is the default
 said aloud. Nothing is looked for after the last one the limit allows. <tt class="docutils literal"><span class="pre">--warnings=on</span></tt>, the default, prints warnings without
 counting them; <tt class="docutils literal"><span class="pre">--warnings=off</span></tt> prints none; <tt class="docutils literal"><span class="pre">--warnings=errors</span></tt>
-prints them and counts them against the limit as errors are. What is found
+prints them and counts them against the limit as errors are.
+<tt class="docutils literal"><span class="pre">--fatal-warnings</span></tt> fails the run on a warning as on an error, printing
+the warnings as warnings still, for a build that wants nothing left
+unfinished; with <tt class="docutils literal"><span class="pre">--warnings=off</span></tt> it is refused, as it would fail a run
+on something it did not print. What is found
 is printed in the order it was found, so that a run stopped by its limit
 ends on the finding that stopped it. Every one by default, because a
 report cut short by a limit nobody asked for hides errors from somebody
@@ -522,10 +526,11 @@ silent success, which it otherwise would under <tt class="docutils literal"><spa
 <dt>Requirement</dt>
 <dd>The exit status is about what was printed: failure if an error was, and
 success if none was -- a run stopped before it reached one included, and a
-run whose only findings are warnings, whatever <tt class="docutils literal"><span class="pre">--warnings</span></tt> says. A
+run whose only findings are warnings, whatever <tt class="docutils literal"><span class="pre">--warnings</span></tt> says, unless
+<tt class="docutils literal"><span class="pre">--fatal-warnings</span></tt> is given, when a warning printed fails it too. A
 digest asked for and not given fails as well, being the one failure that
 is not about a file's contents. The library's <tt class="docutils literal">verify</tt> takes the same
-two settings and its report passes and fails as tcs-verify does.</dd>
+three settings and its report passes and fails as tcs-verify does.</dd>
 <dt>Requirement</dt>
 <dd>The programs that check a file before running it -- tcspecial, tcs-moc,
 tcs-sim and tcs-gui -- set no limit and keep warnings on, so they look at

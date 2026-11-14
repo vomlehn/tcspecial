@@ -96,11 +96,13 @@ pub struct Chosen {
 ///
 /// # Returns
 ///
-/// Every problem, each a line beginning with `path`; none where it may run.
+/// Every problem that stops it, each a line beginning with `path`; none
+/// where it may run. One that does not stop it is [`warnings_of`]'s.
 pub fn problems_of(path: &Path, graph: &Graph) -> Vec<String> {
     graph
         .check()
         .iter()
+        .filter(|problem| problem.refused_aboard())
         .chain(
             tcsprotocol::graph::built::not_built(
                 &graph.nodes,
@@ -108,6 +110,27 @@ pub fn problems_of(path: &Path, graph: &Graph) -> Vec<String> {
             )
             .iter(),
         )
+        .map(|problem| format!("{}: {}", path.display(), problem.describe()))
+        .collect()
+}
+
+/// Says what is unfinished in a configuration that a start runs all the
+/// same: a string or bytes with no most (see
+/// [`tcsprotocol::graph::check::Problem::refused_aboard`]).
+///
+/// # Arguments
+///
+/// * `path`  - The file it was read from, which each warning is said of.
+/// * `graph` - What it says.
+///
+/// # Returns
+///
+/// Each, a line beginning with `path`, for the log.
+pub fn warnings_of(path: &Path, graph: &Graph) -> Vec<String> {
+    graph
+        .check()
+        .iter()
+        .filter(|problem| !problem.refused_aboard())
         .map(|problem| format!("{}: {}", path.display(), problem.describe()))
         .collect()
 }
@@ -266,6 +289,7 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
         if !problems.is_empty() {
             return Err(problems);
         }
+        let notes = warnings_of(path, &command_line);
         return Ok(Chosen {
             loaded: Loaded {
                 path: path.to_path_buf(),
@@ -277,7 +301,7 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
                 .to_string(),
             commanded: false,
             boot,
-            notes: Vec::new(),
+            notes,
         });
     };
 
@@ -398,6 +422,7 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
     )
     .map_err(|why| vec![format!("{}: {why}", path.display())])?;
 
+    notes.extend(warnings_of(&loaded.path, &loaded.graph));
     Ok(Chosen {
         loaded,
         why,

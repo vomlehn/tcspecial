@@ -66,7 +66,11 @@ Requirement
     as it has printed that many. ``--error-limit=unlimited`` is the default
     said aloud. Nothing is looked for after the last one the limit allows. ``--warnings=on``, the default, prints warnings without
     counting them; ``--warnings=off`` prints none; ``--warnings=errors``
-    prints them and counts them against the limit as errors are. What is found
+    prints them and counts them against the limit as errors are.
+    ``--fatal-warnings`` fails the run on a warning as on an error, printing
+    the warnings as warnings still, for a build that wants nothing left
+    unfinished; with ``--warnings=off`` it is refused, as it would fail a run
+    on something it did not print. What is found
     is printed in the order it was found, so that a run stopped by its limit
     ends on the finding that stopped it. Every one by default, because a
     report cut short by a limit nobody asked for hides errors from somebody
@@ -175,10 +179,11 @@ Requirement
 Requirement
     The exit status is about what was printed: failure if an error was, and
     success if none was -- a run stopped before it reached one included, and a
-    run whose only findings are warnings, whatever ``--warnings`` says. A
+    run whose only findings are warnings, whatever ``--warnings`` says, unless
+    ``--fatal-warnings`` is given, when a warning printed fails it too. A
     digest asked for and not given fails as well, being the one failure that
     is not about a file's contents. The library's ``verify`` takes the same
-    two settings and its report passes and fails as tcs-verify does.
+    three settings and its report passes and fails as tcs-verify does.
 
 Requirement
     The programs that check a file before running it -- tcspecial, tcs-moc,

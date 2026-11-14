@@ -182,7 +182,7 @@ fn device_sends(node: &Node) -> Result<LinkType, String> {
         }
         (Some(stated), _) => Ok(stated),
         (None, Some(format)) => Ok(LinkType::Basic(format.basic())),
-        (None, None) => Ok(LinkType::Basic(Basic::Bytes)),
+        (None, None) => Ok(LinkType::Basic(Basic::Bytes(None))),
     }
 }
 
@@ -231,11 +231,12 @@ pub fn carries(node: &Node, terminal: &str) -> Result<Carries, String> {
     }
     if kind == "tee-gateway" || kind == "tee-payload" {
         return only(
-            optional(node, "carries")?.unwrap_or(LinkType::Basic(Basic::Bytes)),
+            optional(node, "carries")?
+                .unwrap_or(LinkType::Basic(Basic::Bytes(None))),
         );
     }
     if kind == "ping" {
-        return only(LinkType::Basic(Basic::String));
+        return only(LinkType::Basic(Basic::String(None)));
     }
     if let Some(gpio) = crate::node::payload::gpio::Kind::of(kind) {
         // A watched set takes anything at its world-in, as a request for a
@@ -248,14 +249,15 @@ pub fn carries(node: &Node, terminal: &str) -> Result<Carries, String> {
     if crate::node::app::Kind::of(kind).is_some() {
         let name = format!("{terminal}-type");
         return only(
-            optional(node, &name)?.unwrap_or(LinkType::Basic(Basic::Bytes)),
+            optional(node, &name)?
+                .unwrap_or(LinkType::Basic(Basic::Bytes(None))),
         );
     }
     // A device of any other kind: what it reads, and what it is driven with.
     if sink {
         only(
             optional(node, "moc-in-type")?
-                .unwrap_or(LinkType::Basic(Basic::Bytes)),
+                .unwrap_or(LinkType::Basic(Basic::Bytes(None))),
         )
     } else {
         only(device_sends(node)?)
@@ -295,6 +297,50 @@ pub fn takes_unit(node: &Node) -> Option<Unit> {
             _ => None,
         }
     })
+}
+
+/// The attributes any node may state a type in: a device's or an app's
+/// four, a vote's or a tee's `carries`, and a computation's `type-in` and
+/// `type-out`.
+const STATED_TYPES: [&str; 7] = [
+    "world-in-type",
+    "world-out-type",
+    "moc-in-type",
+    "moc-out-type",
+    "carries",
+    "type-in",
+    "type-out",
+];
+
+/// Lists each string or bytes a node states with no most.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The node, the attribute and what it says, for each attribute that states
+/// `string` or `bytes` alone. One that does not read is not listed here:
+/// [`problems`] says what is wrong with it.
+pub fn unbounded(graph: &Graph) -> Vec<(String, String, String)> {
+    let mut found = Vec::new();
+    for node in &graph.nodes {
+        for attribute in STATED_TYPES {
+            let Some(said) = node.attributes.get(attribute) else {
+                continue;
+            };
+            if LinkType::of(said.as_str()).is_ok_and(|kind| kind.is_unbounded())
+            {
+                found.push((
+                    node.name.clone(),
+                    attribute.to_string(),
+                    said.as_str().trim().to_string(),
+                ));
+            }
+        }
+    }
+    found
 }
 
 /// Checks every node's stated types and every link's two ends.

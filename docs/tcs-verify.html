@@ -493,7 +493,13 @@ prints them and does not count them against the limit, so they are printed for
 as far as the run got. <tt class="docutils literal">off</tt> prints none. <tt class="docutils literal">errors</tt> prints them and counts
 them against the limit as errors are -- for the limit only: they still do not
 fail the run.</p>
-<p>The exit status is about what was printed: 1 if an error was, 0 if none was.
+<p><tt class="docutils literal"><span class="pre">--fatal-warnings</span></tt> makes a warning fail the run as an error does, the
+warnings still printed as warnings: for a build that wants nothing left
+unfinished, a <tt class="docutils literal">string</tt> or <tt class="docutils literal">bytes</tt> that states no most among it. It is not
+given with <tt class="docutils literal"><span class="pre">--warnings=off</span></tt>, which would hide what failed the run; the two
+together exit 2.</p>
+<p>The exit status is about what was printed: 1 if an error was, or a warning
+under <tt class="docutils literal"><span class="pre">--fatal-warnings</span></tt>, 0 if none was.
 So a run that stopped before it reached an error passes, as
 <tt class="docutils literal"><span class="pre">--error-limit=0</span></tt> always does, having been asked for none of the reasons. A
 value either option does not take is a command line of none of the shapes, and

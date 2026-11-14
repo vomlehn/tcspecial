@@ -147,7 +147,14 @@ as far as the run got. ``off`` prints none. ``errors`` prints them and counts
 them against the limit as errors are -- for the limit only: they still do not
 fail the run.
 
-The exit status is about what was printed: 1 if an error was, 0 if none was.
+``--fatal-warnings`` makes a warning fail the run as an error does, the
+warnings still printed as warnings: for a build that wants nothing left
+unfinished, a ``string`` or ``bytes`` that states no most among it. It is not
+given with ``--warnings=off``, which would hide what failed the run; the two
+together exit 2.
+
+The exit status is about what was printed: 1 if an error was, or a warning
+under ``--fatal-warnings``, 0 if none was.
 So a run that stopped before it reached an error passes, as
 ``--error-limit=0`` always does, having been asked for none of the reasons. A
 value either option does not take is a command line of none of the shapes, and

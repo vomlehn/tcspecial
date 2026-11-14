@@ -76,6 +76,11 @@ configuration.
   --warnings=<what>  on: print warnings, not counting them (the default);
                      off: print none; errors: print them and count them
                      against the limit as errors are
+  --fatal-warnings   fail the run on a warning as on an error, the
+                     warnings still printed as warnings: for a build that
+                     wants nothing left unfinished, a string or bytes
+                     that states no most among it. Not with
+                     --warnings=off, which would hide what failed it
   --types=<types>    check the configuration for a tcspecial built with
                      only these payload types, separated by commas --
                      what `tcspecial --types` prints -- reporting each
@@ -156,8 +161,9 @@ configuration.
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
-one included, as --error-limit=0 always does, and warnings never fail a
-run -- 1 an error was printed, or a digest or a summary was asked for and
+one included, as --error-limit=0 always does, and warnings fail a run only
+under --fatal-warnings -- 1 an error was printed, or a warning under
+--fatal-warnings, or a digest or a summary was asked for and
 the file could not be read to give it, 2 the command line was not one of
 these.";
 
@@ -172,6 +178,9 @@ const ERROR_LIMIT_FLAG: &str = "--error-limit=";
 
 /// What is done with warnings: printed and not counted unless asked.
 const WARNINGS_FLAG: &str = "--warnings=";
+
+/// Whether a warning fails the run, as an error does.
+const FATAL_WARNINGS_FLAG: &str = "--fatal-warnings";
 
 /// Which payload types the tcspecial being checked for contains: every one
 /// unless asked.
@@ -305,6 +314,10 @@ fn main() -> ExitCode {
             fprime_model = Some(PathBuf::from(value));
             continue;
         }
+        if said == FATAL_WARNINGS_FLAG {
+            limits.fatal_warnings = true;
+            continue;
+        }
         let asked = if let Some(value) = said.strip_prefix(ERROR_LIMIT_FLAG) {
             error_limit(value).map(|limit| limits.error_limit = limit)
         } else if let Some(value) = said.strip_prefix(WARNINGS_FLAG) {
@@ -321,6 +334,17 @@ fn main() -> ExitCode {
             eprintln!("tcs-verify: {why}\n\n{USAGE}");
             return ExitCode::from(2);
         }
+    }
+
+    // A warning that fails the run and is not printed would be a failure
+    // nothing explains.
+    if limits.fatal_warnings && limits.warnings == tcsverify::Warnings::Off {
+        eprintln!(
+            "tcs-verify: {FATAL_WARNINGS_FLAG} fails the run on a warning, \
+             and {WARNINGS_FLAG}off prints none: give one or the other\n\n\
+             {USAGE}"
+        );
+        return ExitCode::from(2);
     }
 
     // One configuration is kept, not a pair of spellings: the two would be
@@ -467,7 +491,7 @@ fn main() -> ExitCode {
     // may restart onto is one the ground has checked, and the vehicle
     // checks it again as it loads it.
     if let Some(dir) = keep {
-        if report.found_errors() {
+        if report.fails() {
             eprintln!(
                 "tcs-verify: {} has errors, so it is not kept in {}",
                 payload.display(),
@@ -501,7 +525,7 @@ fn main() -> ExitCode {
     // Written only once nothing is wrong with it, as a configuration is
     // kept: a bridge is built from a configuration the vehicle would load.
     if let Some(dir) = fprime_model {
-        if report.found_errors() {
+        if report.fails() {
             eprintln!(
                 "tcs-verify: {} has errors, so no F´ model is written from it",
                 payload.display()

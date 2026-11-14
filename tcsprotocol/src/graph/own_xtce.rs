@@ -72,7 +72,7 @@ pub fn written(graph: &Graph, name: &str) -> Result<String, String> {
             .ok_or_else(|| format!("\"{source}\" is no node"))?;
         let kind = match carries(node, "world-out")? {
             Carries::Only(kind) => kind,
-            Carries::Any => LinkType::Basic(Basic::Bytes),
+            Carries::Any => LinkType::Basic(Basic::Bytes(None)),
         };
         sources.insert(source, kind);
     }
@@ -331,7 +331,8 @@ fn parameter_types(
     let _ = writeln!(out, "{level}<ParameterTypeSet>");
     for (element, copied) in copied_types()? {
         if used.iter().any(|basic| basic.name() == element)
-            || (element == BYTES_LENGTH && used.contains(&Basic::Bytes))
+            || (element == BYTES_LENGTH
+                && used.iter().any(|basic| matches!(basic, Basic::Bytes(_))))
         {
             out.push_str(&copied);
         }
@@ -374,7 +375,7 @@ fn parameters(out: &mut String, sources: &BTreeMap<String, LinkType>) {
     let _ = writeln!(out, "{level}<ParameterSet>");
     if sources
         .values()
-        .any(|k| *k == LinkType::Basic(Basic::Bytes))
+        .any(|k| matches!(k, LinkType::Basic(Basic::Bytes(_))))
     {
         let _ = writeln!(
             out,
@@ -423,7 +424,7 @@ fn containers(out: &mut String, sources: &BTreeMap<String, LinkType>) {
             container_name(source)
         );
         let _ = writeln!(out, "{inner}{INDENT}<EntryList>");
-        if *kind == LinkType::Basic(Basic::Bytes) {
+        if matches!(kind, LinkType::Basic(Basic::Bytes(_))) {
             let _ = writeln!(
                 out,
                 "{inner}{INDENT}{INDENT}<ParameterRefEntry \

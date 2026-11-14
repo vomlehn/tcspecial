@@ -290,7 +290,7 @@ pub fn payload_link_name(payload: &str) -> String {
 fn sent_by(node: Option<&Node>) -> LinkType {
     match node.map(|node| carries(node, "world-out")) {
         Some(Ok(link_types::Carries::Only(kind))) => kind,
-        _ => LinkType::Basic(Basic::Bytes),
+        _ => LinkType::Basic(Basic::Bytes(None)),
     }
 }
 

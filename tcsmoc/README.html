@@ -231,7 +231,7 @@ sends its commands through a <code>UdpConnection</code> – on a bus, to
 the station’s peer of it, which publishes each one.</p>
 <h2 id="what-tcsmoc-is-not">What tcsmoc is not</h2>
 <p>tcsmoc has no windows. Showing what it receives is the job of the
-programs built on it: <code>tcsui</code> holds the panels the ground
+programs built on it: <code>tcs-ui</code> holds the panels the ground
 programs share, and <code>tcs-moc</code> is the test ground station that
 puts them on the screen.</p>
 <p>tcsmoc does not define the link either. The commands, the telemetry,
@@ -243,7 +243,7 @@ all of it, so a ground program needs only tcsmoc.</p>
 <li><code>tcs-moc</code>, the test ground station.</li>
 <li><code>tcs-sim</code>, whose <code>--wait</code> waits through
 <code>simulator</code>.</li>
-<li><code>tcsui</code>, the window pieces shared by the ground
+<li><code>tcs-ui</code>, the window pieces shared by the ground
 programs.</li>
 <li><code>examples/simple-app</code>, whose ground station
 <code>lorem_gateway</code> gets its data with one call to

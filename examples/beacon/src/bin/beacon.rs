@@ -14,7 +14,7 @@
 //! * [`tcsmoc::beacon`] binds the socket, reads each datagram, counts the
 //!   beacons that did not arrive, compares the digest with this end's own and
 //!   says how stale the last one is.
-//! * `tcsui` holds the panel and works out what to show on it.
+//! * `tcs-ui` holds the panel and works out what to show on it.
 //!
 //! What is left is this program: read the configuration, start the loop, put
 //! each pass in the window. And a button that starts tcspecial on the same
@@ -50,7 +50,7 @@ use tcsprotocol::config_digest::digest_of_file;
 use tcsprotocol::graph::parameters::{beacon_interval_of, beacon_of};
 use tcsprotocol::graph::Graph;
 use tcsprotocol::{ConfigFormat, Spelling};
-use tcsui::Shown;
+use tcs_ui::Shown;
 
 /// The example's configuration, without its extension: `.yaml` or `.xml`,
 /// the two saying the same thing.

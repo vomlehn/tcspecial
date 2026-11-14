@@ -12621,12 +12621,12 @@ mod tests {
         let (top, height) = pane::NAMES;
         assert_eq!(top, 0, "a band is drawn, so it starts at the pane's top");
         // And Fonts.window is twelve points, which is sixteen pixels: see
-        // tcsui/ui/fonts.slint.
+        // tcs-ui/ui/fonts.slint.
         let fonts = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../tcsui/ui/fonts.slint"),
+                .join("../tcs-ui/ui/fonts.slint"),
         )
-        .expect("tcsui's fonts read");
+        .expect("tcs-ui's fonts read");
         assert!(
             fonts.contains("out property <length> window: 12pt;"),
             "Fonts.window is no longer twelve points, so pane::NAMES is out of \

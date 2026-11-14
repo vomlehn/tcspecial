@@ -67,9 +67,9 @@ fn every_window_is_set_in_the_one_default_size() {
 
 #[test]
 fn the_python_windows_use_the_same_size() {
-    let slint = std::fs::read_to_string(root().join("tcsui/ui/fonts.slint"))
+    let slint = std::fs::read_to_string(root().join("tcs-ui/ui/fonts.slint"))
         .expect("it reads");
-    let python = std::fs::read_to_string(root().join("python/tcsui/fonts.py"))
+    let python = std::fs::read_to_string(root().join("python/tcs_ui/fonts.py"))
         .expect("it reads");
 
     let points = slint
@@ -84,7 +84,7 @@ fn the_python_windows_use_the_same_size() {
         python
             .lines()
             .any(|line| line == format!("POINTS = {points}")),
-        "python/tcsui/fonts.py does not say POINTS = {points}"
+        "python/tcs_ui/fonts.py does not say POINTS = {points}"
     );
 }
 
@@ -178,7 +178,7 @@ fn points(size: &str) -> Option<f32> {
 /// apart, and its type, written between two terminals where there is less
 /// room than the window's size needs (see `tcs-diagram/src/style.rs`,
 /// `TYPE_SIZE`). And the Python windows are held to it too:
-/// a font they name with a size names the size from `tcsui.fonts`.
+/// a font they name with a size names the size from `tcs_ui.fonts`.
 #[test]
 fn no_text_is_set_smaller_than_the_one_size() {
     let mut files = Vec::new();
@@ -222,7 +222,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
     }
 
     for python in [
-        "python/tcsui/beacon_panel.py",
+        "python/tcs_ui/beacon_panel.py",
         "examples/ping/ping_gateway.py",
     ] {
         let text =

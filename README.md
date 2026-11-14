@@ -62,7 +62,7 @@ Everything installs under `/opt/tcs`, as three packages:
 * `tcspecial-moc`, what a ground station is built on: `libtcsmoc-c` for C
   and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
   `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python
-  packages `tcsprotocol`, `tcsmoc` and `tcsui`, and `bin/tcs-gui`
+  packages `tcsprotocol`, `tcsmoc` and `tcs_ui`, and `bin/tcs-gui`
   with its data.
 * `tcspecial-test`, the test ground station and simulator: `bin/tcs-moc` and
   `bin/tcs-sim`, and `bin/segsend`, the test one, which deletes each
@@ -135,11 +135,10 @@ Production code, which a mission depends on while it operates:
   C++.
 * [`tcsverify/`](tcsverify/): the configuration checker as a library, which
   tcspecial and every program that reads a configuration asks.
-* [`tcsui/`](tcsui/): the window pieces a ground station shows a vehicle
-  with.
 * [`tcsapp/`](tcsapp/): the file interfaces an app node's program runs with.
-* [`python/`](python/): the Python spellings of tcsprotocol, tcsmoc and
-  tcsui, for ground stations written in Python.
+* [`python/`](python/): the Python spellings of tcsprotocol and tcsmoc,
+  for ground stations written in Python, and of tcs-ui, `tcs_ui`, which
+  is not production code.
 
 Non-production code:
 
@@ -149,6 +148,8 @@ Non-production code:
 * [`tcs-verify/`](tcs-verify/): the configuration checker as a program.
 * [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-gui
   and tcspecial's visual window, which never flies.
+* [`tcs-ui/`](tcs-ui/): the window pieces tcs-moc and the desk tools
+  share: the beacon and ping panels, fonts and colours.
 * [`app_pl/`](app_pl/), [`app_all_pl/`](app_all_pl/),
   [`app_payload_veh/`](app_payload_veh/),
   [`app_gateway_veh/`](app_gateway_veh/) and

@@ -1,5 +1,5 @@
 # The Python a ground station is built on -- tcsprotocol, tcsmoc and
-# tcsui -- as one distribution, so that `pip install ./python` installs all
+# tcs_ui -- as one distribution, so that `pip install ./python` installs all
 # three.
 #
 # Named tcspecial-moc, as the system package that carries them is, and
@@ -25,7 +25,7 @@ authors = [{ name = "David VomLehn", email = "dvomlehn@gmail.com" }]
 requires-python = ">=3.9"
 # Nothing outside the standard library is needed to import any of them. A
 # YAML configuration is read with PyYAML, imported only when one is read, so
-# it is an extra rather than a requirement; tcsui needs tkinter, which is
+# it is an extra rather than a requirement; tcs_ui needs tkinter, which is
 # part of the standard library but packaged on its own by most
 # distributions, and is not something pip can install.
 dependencies = []
@@ -37,7 +37,7 @@ yaml = ["PyYAML"]
 # Named rather than found: tcsprotocol._xtce is a directory of links, which
 # package discovery does not follow, and tests/ is not to be installed.
 packages = ["tcsprotocol", "tcsprotocol._xtce", "tcsmoc",
-            "tcsui"]
+            "tcs_ui"]
 
 [tool.setuptools.package-data]
 # The XTCE documents the interface digest is taken over: see

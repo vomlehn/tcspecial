@@ -1,6 +1,6 @@
 """The beacon's facts and its panel, held to the Rust's own examples.
 
-The tests of ``tcsmoc/src/beacon.rs`` and ``tcsui/src/lib.rs`` said
+The tests of ``tcsmoc/src/beacon.rs`` and ``tcs-ui/src/lib.rs`` said
 again, with the same figures. The beacons are written here as text, field by
 field, rather than by the code under test; ``examples/ping/tests/pings.rs``
 sends this program beacons the Rust writes, so a change to the layout is caught
@@ -414,10 +414,10 @@ def beacon_link():
 
 
 class PanelTest(unittest.TestCase):
-    """What the panel shows for each stage: tcsui's palette."""
+    """What the panel shows for each stage: tcs-ui's palette."""
 
     def test_the_indicator_ages_through_the_palette(self):
-        from tcsui.beacon_panel import indicator, palette
+        from tcs_ui.beacon_panel import indicator, palette
 
         s = Schedule.standard()
         self.assertEqual(indicator(s.after(None, AT), False), palette.UNKNOWN)
@@ -435,7 +435,7 @@ class PanelTest(unittest.TestCase):
         self.assertEqual(indicator(s.at(11_500 * MS), True), palette.OFF)
 
     def test_once_heard_the_indicator_is_never_grey_again(self):
-        from tcsui.beacon_panel import indicator, palette
+        from tcs_ui.beacon_panel import indicator, palette
 
         s = Schedule.standard()
         for ms in range(0, 60_000, 100):
@@ -448,7 +448,7 @@ class PanelTest(unittest.TestCase):
 
     def test_the_panel_shows_what_it_was_given(self):
         import tkinter
-        from tcsui.beacon_panel import NOTHING_YET, BeaconPanel, Shown
+        from tcs_ui.beacon_panel import NOTHING_YET, BeaconPanel, Shown
 
         try:
             window = tkinter.Tk()
@@ -472,10 +472,10 @@ class PanelTest(unittest.TestCase):
         finally:
             window.destroy()
 
-    def test_the_palette_is_tcsuis(self):
-        from tcsui.beacon_panel import palette
+    def test_the_palette_is_tcs_uis(self):
+        from tcs_ui.beacon_panel import palette
 
-        # tcsui::palette, byte for byte.
+        # tcs_ui::palette, byte for byte.
         self.assertEqual(palette.UNKNOWN, "#c4c4c4")
         self.assertEqual(palette.OFF, "#ffffff")
         self.assertEqual(palette.WELL, "#22c55e")

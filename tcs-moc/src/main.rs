@@ -2037,11 +2037,11 @@ mod tests {
         );
 
         // And after one, the time it arrived and what it said. What to show
-        // is tcsui's to work out, from what the beacon loop reports; what
+        // is tcs-ui's to work out, from what the beacon loop reports; what
         // is checked here is that this window shows it.
         beacon_receive::show_beacon(
             &ui,
-            &tcsui::Shown::at(
+            &tcs_ui::Shown::at(
                 &tcsmoc::beacon::Schedule::standard().at(Duration::ZERO),
                 Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
                 "tcspecial v0.1.0 md5 0123456789abcdef",
@@ -2059,15 +2059,15 @@ mod tests {
             "what the beacon said is not on screen: {shown:?}"
         );
         assert!(
-            !shown.iter().any(|line| line == tcsui::RESTARTED_CONNECT),
+            !shown.iter().any(|line| line == tcs_ui::RESTARTED_CONNECT),
             "no restart said of a beacon without the flag: {shown:?}"
         );
 
         // A beacon carrying the restart flag says, beside the
         // indicator, to connect; the next without it clears that.
-        let restarted = tcsui::Shown {
-            restart: tcsui::restart_of(true),
-            ..tcsui::Shown::at(
+        let restarted = tcs_ui::Shown {
+            restart: tcs_ui::restart_of(true),
+            ..tcs_ui::Shown::at(
                 &tcsmoc::beacon::Schedule::standard().at(Duration::ZERO),
                 None,
                 "",
@@ -2077,20 +2077,20 @@ mod tests {
         assert!(
             on_screen(&ui)
                 .iter()
-                .any(|line| line == tcsui::RESTARTED_CONNECT),
+                .any(|line| line == tcs_ui::RESTARTED_CONNECT),
             "the restart field does not say to connect"
         );
         beacon_receive::show_beacon(
             &ui,
-            &tcsui::Shown {
-                restart: tcsui::restart_of(false),
+            &tcs_ui::Shown {
+                restart: tcs_ui::restart_of(false),
                 ..restarted
             },
         );
         assert!(
             !on_screen(&ui)
                 .iter()
-                .any(|line| line == tcsui::RESTARTED_CONNECT),
+                .any(|line| line == tcs_ui::RESTARTED_CONNECT),
             "the restart field was not cleared"
         );
     }

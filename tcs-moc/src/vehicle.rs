@@ -59,7 +59,7 @@ use tcsprotocol::sim_config::SimConfigFile;
 use tcsprotocol::simulate::Mode;
 use tcsprotocol::unit::Unit;
 use tcsprotocol::{DHSample, Timestamp};
-use tcsui::PingShown;
+use tcs_ui::PingShown;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
@@ -540,7 +540,7 @@ fn refused_unmatched(
             theirs: &theirs,
             ours,
             listening,
-            flagged: ui.get_beacon_restart() == tcsui::RESTARTED_CONNECT,
+            flagged: ui.get_beacon_restart() == tcs_ui::RESTARTED_CONNECT,
         },
     );
     eprintln!("{}: {}", refusal.heading, refusal.message);

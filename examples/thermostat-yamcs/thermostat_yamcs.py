@@ -496,8 +496,8 @@ def run_the_window(readings, beacons):
     import tkinter as tk
     from tkinter import ttk
 
-    from tcsui import fonts, theme
-    from tcsui.beacon_panel import BeaconPanel, Shown
+    from tcs_ui import fonts, theme
+    from tcs_ui.beacon_panel import BeaconPanel, Shown
 
     reports = queue.Queue()
 

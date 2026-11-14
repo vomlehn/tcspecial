@@ -13,8 +13,8 @@ members = [
     "tcs-verify",
     "tcs-gui",
     # The window pieces the ground programs share: the panels, and what to
-    # show on them. See tcsui.
-    "tcsui",
+    # show on them. See tcs-ui.
+    "tcs-ui",
     # How a configuration is drawn -- the panes, the nodes, the links -- for
     # the editor and for tcspecial's visual window alike. See tcs-diagram.
     "tcs-diagram",

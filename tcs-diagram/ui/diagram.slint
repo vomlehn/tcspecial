@@ -7,7 +7,7 @@
 // path -- and fills these structs from tcs-diagram's NodeLook and LinkLook,
 // which hold every path, size and colour drawn here: arithmetic in a layout
 // language is hard to read and impossible to test.
-import { Fonts } from "../../tcsui/ui/fonts.slint";
+import { Fonts } from "../../tcs-ui/ui/fonts.slint";
 
 // Whether this session may change the configuration: false for one started
 // with `--read-only`, which shows everything and changes nothing. Set from
@@ -46,7 +46,7 @@ export global Type {
     // everything the window says in its own voice is.
     //
     // Small, body and strong are all the one size every window is set in,
-    // tcsui's Fonts.window: nothing a window says is smaller than that.
+    // tcs-ui's Fonts.window: nothing a window says is smaller than that.
     // They are kept as three names because they still say three things --
     // strong is set bold -- and a title is larger, which is how it is a title.
     out property <length> small: Fonts.window;

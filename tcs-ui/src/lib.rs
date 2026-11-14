@@ -20,7 +20,7 @@
 //! Slint resolves relative to the importing file:
 //!
 //! ```text
-//! import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
+//! import { BeaconPanel } from "../../tcs-ui/ui/beacon.slint";
 //! ```
 //!
 //! The Rust side sets its three properties from [`Shown::of`].

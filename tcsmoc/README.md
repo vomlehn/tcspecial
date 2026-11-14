@@ -55,7 +55,7 @@ publishes each one.
 ## What tcsmoc is not
 
 tcsmoc has no windows. Showing what it receives is the job of the programs
-built on it: `tcsui` holds the panels the ground programs share, and
+built on it: `tcs-ui` holds the panels the ground programs share, and
 `tcs-moc` is the test ground station that puts them on the screen.
 
 tcsmoc does not define the link either. The commands, the telemetry, and the
@@ -67,7 +67,7 @@ only tcsmoc.
 
 - `tcs-moc`, the test ground station.
 - `tcs-sim`, whose `--wait` waits through `simulator`.
-- `tcsui`, the window pieces shared by the ground programs.
+- `tcs-ui`, the window pieces shared by the ground programs.
 - `examples/simple-app`, whose ground station `lorem_gateway` gets its data with
   one call to `GatewayReceiver::receive_into`, into a buffer it made beforehand.
 - `examples/beacon`, whose window watches the beacon through `beacon`.

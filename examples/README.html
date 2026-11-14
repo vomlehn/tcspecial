@@ -311,7 +311,7 @@ goes straight to the ground (MOC).</td>
 <td>The one thing a ground station knows without asking: a window
 showing the spacecraft’s beacon, built from the two halves any ground
 station would use – <code>tcsmoc::beacon</code> to listen and
-<code>tcsui</code>’s panel to show it.</td>
+<code>tcs-ui</code>’s panel to show it.</td>
 </tr>
 <tr>
 <td><code>ping</code></td>
@@ -401,7 +401,7 @@ counts the beacons that did not arrive, compares the digest in each one
 with the ground’s own and says how stale the last one is. No window, no
 toolkit: a ground station with no screen – a logger, a test – uses
 exactly this.</li>
-<li><code>tcsui</code> holds the panel, as markup other windows import,
+<li><code>tcs-ui</code> holds the panel, as markup other windows import,
 and works out what to show on it: which colour the indicator is, and the
 two lines beside it.</li>
 <li><code>beacon</code>, the program here, reads the configuration to
@@ -457,7 +457,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – the <code>beacon</code> program, on
-<code>tcsmoc::beacon</code> and <code>tcsui</code>.</li>
+<code>tcsmoc::beacon</code> and <code>tcs-ui</code>.</li>
 <li>Vehicle: Rust – tcspecial.</li>
 <li>Payload: Rust – tcs-sim simulates <code>sensor</code>, a network
 payload.</li>
@@ -482,9 +482,9 @@ until its own answer, matched by count, arrives.</p>
 <p>It is built the way the <code>beacon</code> program is, from the same
 two halves written again in Python: <code>python/tcsmoc/beacon.py</code>
 after <code>tcsmoc::beacon</code>,
-<code>python/tcsui/beacon_panel.py</code> after <code>tcsui</code>, and
-<code>python/tcsprotocol</code> for the ping format, the beacon and the
-configuration. The interface digest beacons are checked against is
+<code>python/tcs_ui/beacon_panel.py</code> after <code>tcs-ui</code>,
+and <code>python/tcsprotocol</code> for the ping format, the beacon and
+the configuration. The interface digest beacons are checked against is
 worked out with tcsxtce, tcs-xtce’s runtime, from the tcs-xtce checkout
 beside this tree. <code>ping-common/ping_ground.py</code> is the ping’s
 own part, with no window, and <code>ping-common/ping_window.py</code>

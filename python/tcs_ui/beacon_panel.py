@@ -1,8 +1,8 @@
 """The beacon panel, and what to show on it.
 
-The Python spelling of ``tcsui``: ``tcsui/src/lib.rs``, which says what
+The Python spelling of ``tcs-ui``: ``tcs-ui/src/lib.rs``, which says what
 colour the indicator is and what the two lines say, and
-``tcsui/ui/beacon.slint``, which is the panel itself. The panel is drawn
+``tcs-ui/ui/beacon.slint``, which is the panel itself. The panel is drawn
 with tkinter, which is the toolkit the Python standard library has.
 
 The other half of ``python/tcsmoc/beacon.py``. That one listens and says
@@ -28,13 +28,13 @@ from tcsmoc.beacon import (
     Stage,
     received_at,
 )
-from tcsui import theme
+from tcs_ui import theme
 
 
 class palette:
     """The colours an indicator is drawn in.
 
-    ``tcsui::palette``, complete.
+    ``tcs_ui::palette``, complete.
     """
 
     #: Nothing is known: no beacon has arrived, or the station has stopped
@@ -134,7 +134,7 @@ class BeaconPanel(ttk.LabelFrame):
     disconnect, and three rows -- the indicator, then the time, then what that
     beacon said under it, the two reading as one message received then and
     saying this. Drawn in ttk, so that it takes the window's theme: see
-    :mod:`tcsui.theme`.
+    :mod:`tcs_ui.theme`.
 
     Args:
         parent:    The widget the panel goes in.

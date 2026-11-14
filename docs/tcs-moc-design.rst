@@ -80,7 +80,7 @@ Requirement
     half of a blink, a last beacon a moved clock puts in the future -- it is
     white. Grey says nothing has been heard; an indicator that went from green
     back to grey would say the spacecraft had never been heard from, and look
-    like a window that had just opened. ``tcsui::indicator`` is the rule,
+    like a window that had just opened. ``tcs_ui::indicator`` is the rule,
     and the Python panel says it again with the same tests.
 
 **Where the beacon's code lives**
@@ -106,7 +106,7 @@ Requirement
 
 Requirement
     The panel is shared markup, imported by every window that shows it, with
-    what to show on it worked out beside it: ``tcsui``. Two windows show it
+    what to show on it worked out beside it: ``tcs-ui``. Two windows show it
     -- this one, beside its command link, and the ``beacon`` example, which
     shows it and nothing else -- and an operator who has read one has read the
     other, where an indicator in a different place or a label in different

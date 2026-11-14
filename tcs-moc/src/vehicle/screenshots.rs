@@ -1337,13 +1337,13 @@ fn thermostat() {
                 && ui.get_indicator_color() == colour
         });
     };
-    late(10_500, tcsui::palette::well());
+    late(10_500, tcs_ui::palette::well());
     station.refresh();
     shoot(ui.window(), Some(down_to_panel(ui, 0)), "late");
-    late(20_500, tcsui::palette::watch());
+    late(20_500, tcs_ui::palette::watch());
     station.refresh();
     shoot(ui.window(), Some(down_to_panel(ui, 0)), "aging");
-    late(40_500, tcsui::palette::wrong());
+    late(40_500, tcs_ui::palette::wrong());
     ui.invoke_menu_action(MenuAction::Ping);
     station.refresh();
     let notice = ElementQuery::from_root(ui)

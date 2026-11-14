@@ -2,7 +2,7 @@
 
 The Python spelling of ``tcsmoc/src/beacon.rs``: the half of a ground
 station's beacon that is not a window. The other half, the panel, is
-``python/tcsui/beacon_panel.py``, as it is ``tcsui`` in Rust. Everything
+``python/tcs_ui/beacon_panel.py``, as it is ``tcs-ui`` in Rust. Everything
 here is said there first, in the same words, and ``python/tests/test_beacon.py``
 holds the two to one another with the same examples the Rust tests use.
 

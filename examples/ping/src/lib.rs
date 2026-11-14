@@ -4,7 +4,7 @@
 //! beside this crate, its ping link and window in `examples/ping-common`, which
 //! it shares with ping-yamcs. The libraries it is built on are Python spellings
 //! of Rust ones: `python/tcsmoc/beacon.py` of `tcsmoc::beacon`,
-//! `python/tcsui` of `tcsui`, and `python/tcsprotocol` of the parts
+//! `python/tcs_ui` of `tcs-ui`, and `python/tcsprotocol` of the parts
 //! of `tcsprotocol` a ground station reads. A rule written twice is two
 //! rules on the day one of them changes, so the tests here hold each Python
 //! spelling to its Rust one:

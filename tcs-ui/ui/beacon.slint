@@ -10,7 +10,7 @@
 // Imported by path, which is what Slint resolves relative to the importing
 // file:
 //
-//     import { BeaconPanel } from "../../tcsui/ui/beacon.slint";
+//     import { BeaconPanel } from "../../tcs-ui/ui/beacon.slint";
 //
 // Nothing is computed here. What colour the indicator is and what the two
 // lines say are worked out in Rust, from what `tcsmoc::beacon` reports, and
@@ -22,7 +22,7 @@ import { TitledBox } from "titled.slint";
 export component BeaconPanel inherits TitledBox {
     // The indicator's colour, which says how stale the last beacon is. Grey
     // before any has arrived and never after: once one has, the dark half of
-    // a blink is white. See `tcsui::indicator`.
+    // a blink is white. See `tcs_ui::indicator`.
     in property <color> indicator-color: #c0c0c0;
     // When the last beacon arrived, as a time of day, and the placeholder
     // until one has.
@@ -48,7 +48,7 @@ export component BeaconPanel inherits TitledBox {
     // tcs-moc's is.
     in property <string> messages: "";
     // What the field to the right of the indicator says of a restart --
-    // tcsui::RESTARTED_CONNECT while the last beacon carried the restart
+    // tcs_ui::RESTARTED_CONNECT while the last beacon carried the restart
     // flag, empty while it did not -- and whether the
     // window shows the field at all. Read-only: it is the beacon's to say.
     in property <string> restart: "";

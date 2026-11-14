@@ -12,7 +12,7 @@ Obsoletes:      tcspecial-ground < 0.1.1
 What a ground station for tcspecial is built on: libtcsmoc-c, the TCSpecial
 MOC Correspondent (tcsmoc) for C and C++, with its header tcsmoc-c.h
 and pkg-config file tcsmoc-c.pc; the Python packages tcsprotocol (TCS
-Link Support), tcsmoc (the Correspondent) and tcsui; and tcs-gui, the
+Link Support), tcsmoc (the Correspondent) and tcs_ui; and tcs-gui, the
 graphical configuration editor, with its node descriptions and schemas.
 
 %install

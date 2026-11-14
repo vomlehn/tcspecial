@@ -1,7 +1,7 @@
 //! The Python's own tests, run where the Rust's are.
 //!
 //! Three suites: the libraries' in `python/tests`, which say each Rust test of
-//! `tcsmoc::beacon`, `tcsui` and the ping format again, with the same
+//! `tcsmoc::beacon`, `tcs-ui` and the ping format again, with the same
 //! figures; this example's, beside `ping_gateway.py`; and what it shares with
 //! ping-yamcs, the ping link and the window, in `examples/ping-common`. Run
 //! under `cargo test` so that a change to the Rust that the Python has not

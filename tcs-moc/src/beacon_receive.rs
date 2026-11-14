@@ -3,7 +3,7 @@
 //! What a beacon is, how stale the last one is and what its number says about
 //! the ones before it are not this program's business: they are the same for
 //! any ground station, and they live in [`tcslib_moc::beacon`]. What a panel
-//! showing them looks like is `tcs-ui`, whose markup this window imports.
+//! showing them looks like is `tcslib-ui`, whose markup this window imports.
 //!
 //! What is left here is this window's own: a thread to run the loop on, the
 //! window to put the answers in, the question to ask the operator when the
@@ -23,9 +23,9 @@ use std::thread;
 
 use slint::{SharedString, Weak};
 
-use tcs_ui::Shown;
 use tcslib_moc::beacon::{Arrived, Beacons, Contact};
 use tcslib_moc::matched::Matched;
+use tcslib_ui::Shown;
 
 use crate::MainWindow;
 

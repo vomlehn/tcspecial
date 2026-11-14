@@ -12,7 +12,7 @@ learn.
 import tkinter.font
 from tkinter import ttk
 
-from tcs_ui import fonts
+from tcslib_ui import fonts
 
 #: The theme every window is drawn in.
 THEME = "clam"
@@ -20,11 +20,11 @@ THEME = "clam"
 #: The window's background, and every box's: white rather than the theme's
 #: grey, which is the one colour the beacon indicator keeps for "nothing heard
 #: yet" and would leave an unheard indicator nearly the colour of its window.
-#: The Slint windows read the same white from tcs-ui/ui/colors.slint.
+#: The Slint windows read the same white from tcslib-ui/ui/colors.slint.
 BACKGROUND = "#ffffff"
 
-#: A box's edge: one flat pixel, the colour tcs_ui's TitledBox draws in, rather
-#: than the theme's raised bevel.
+#: A box's edge: one flat pixel, the colour tcslib_ui's TitledBox draws in,
+#: rather than the theme's raised bevel.
 BORDER = "#808080"
 
 #: A button's face, a light grey that stands off the white so the button reads
@@ -46,7 +46,7 @@ def use_in(window):
     :data:`THEME`.
 
     Called once, on the root window, before anything is put in it, as
-    :func:`tcs_ui.fonts.use_in` is.
+    :func:`tcslib_ui.fonts.use_in` is.
 
     Args:
         window: The root window.
@@ -93,7 +93,7 @@ def use_in(window):
     text = tkinter.font.nametofont("TkDefaultFont", root=window).actual(
         "family"
     )
-    # A box's title, bold, as tcs_ui's TitledBox sets it.
+    # A box's title, bold, as tcslib_ui's TitledBox sets it.
     style.configure("TLabelframe.Label", font=(text, points, "bold"))
     style.configure("Value.TLabel", font=(text, points))
     style.configure("TButton", font=(text, points))

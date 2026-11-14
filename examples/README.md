@@ -97,7 +97,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | Directory | Description |
 |---|---|
 | `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
-| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib_moc::beacon` to listen and `tcs_ui`'s panel to show it. |
+| `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcslib_moc::beacon` to listen and `tcslib_ui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 | `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
 | `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
@@ -143,8 +143,9 @@ nothing in it is its own:
   that did not arrive, compares the digest in each one with the ground's own
   and says how stale the last one is. No window, no toolkit: a ground station
   with no screen -- a logger, a test -- uses exactly this.
-- `tcs-ui` holds the panel, as markup other windows import, and works out what
-  to show on it: which colour the indicator is, and the two lines beside it.
+- `tcslib-ui` holds the panel, as markup other windows import, and works out
+  what to show on it: which colour the indicator is, and the two lines beside
+  it.
 - `beacon`, the program here, reads the configuration to find where the
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
@@ -207,7 +208,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs
 
 Languages:
 
-- MOC: Rust -- the `beacon` program, on `tcslib_moc::beacon` and `tcs_ui`.
+- MOC: Rust -- the `beacon` program, on `tcslib_moc::beacon` and `tcslib_ui`.
 - Vehicle: Rust -- tcspecial.
 - Payload: Rust -- tcs-sim simulates `sensor`, a network payload.
 
@@ -235,13 +236,14 @@ answer, matched by count, arrives.
 
 It is built the way the `beacon` program is, from the same two halves written
 again in Python: `python/tcslib_moc/beacon.py` after `tcslib_moc::beacon`,
-`python/tcs_ui/beacon_panel.py` after `tcs_ui`, and `python/tcslib_protocol` for
-the ping format, the beacon and the configuration. The interface digest beacons
-are checked against is worked out with tcs-xtce's Python runtime, from the
-tcs-xtce checkout beside this tree. `ping-common/ping_ground.py` is the ping's
-own part, with no window, and `ping-common/ping_window.py` the window, both
-shared with `ping-yamcs`. The Rust crate beside them is the tests that hold the
-Python to the Rust; `cargo test` runs them.
+`python/tcslib_ui/beacon_panel.py` after `tcslib_ui`, and
+`python/tcslib_protocol` for the ping format, the beacon and the configuration.
+The interface digest beacons are checked against is worked out with tcs-xtce's
+Python runtime, from the tcs-xtce checkout beside this tree.
+`ping-common/ping_ground.py` is the ping's own part, with no window, and
+`ping-common/ping_window.py` the window, both shared with `ping-yamcs`. The Rust
+crate beside them is the tests that hold the Python to the Rust; `cargo test`
+runs them.
 
 ```
 make run-ping                                   # the vehicle and the window

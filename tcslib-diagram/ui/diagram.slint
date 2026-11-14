@@ -4,10 +4,10 @@
 // Shared by the editor, tcs-gui, and tcspecial's visual window, which draws a
 // running vehicle's graph as the editor draws the configuration. Each program
 // compiles this into its own build -- a Slint file is markup, imported by
-// path -- and fills these structs from tcs-diagram's NodeLook and LinkLook,
+// path -- and fills these structs from tcslib-diagram's NodeLook and LinkLook,
 // which hold every path, size and colour drawn here: arithmetic in a layout
 // language is hard to read and impossible to test.
-import { Fonts } from "../../tcs-ui/ui/fonts.slint";
+import { Fonts } from "../../tcslib-ui/ui/fonts.slint";
 
 // Whether this session may change the configuration: false for one started
 // with `--read-only`, which shows everything and changes nothing. Set from
@@ -46,9 +46,9 @@ export global Type {
     // everything the window says in its own voice is.
     //
     // Small, body and strong are all the one size every window is set in,
-    // tcs-ui's Fonts.window: nothing a window says is smaller than that. They
-    // are kept as three names because they still say three things -- strong
-    // is set bold -- and a title is larger, which is how it is a title.
+    // tcslib-ui's Fonts.window: nothing a window says is smaller than that.
+    // They are kept as three names because they still say three things --
+    // strong is set bold -- and a title is larger, which is how it is a title.
     out property <length> small: Fonts.window;
     out property <length> body: Fonts.window;
     out property <length> strong: Fonts.window;
@@ -94,7 +94,7 @@ export struct NodeView {
     // The type's spelling, which is the configuration's word for it.
     node-type: string,
     // What the line along the top says the node is: the type, or a compute
-    // node's function. See tcs_diagram::view::type_line.
+    // node's function. See tcslib_diagram::view::type_line.
     type-line: string,
     x: length,
     y: length,
@@ -135,8 +135,8 @@ export struct NodeView {
     // is darker, and the bodies are darker still -- so what is drawn on a body
     // has to be legible on the lightest and the darkest of them alike. One
     // colour does that, and it is the one at the end of the scale. See
-    // tcs_diagram::look::MARK, tcs_diagram::look::tint_of and
-    // tcs_diagram::look::line_ink.
+    // tcslib_diagram::look::MARK, tcslib_diagram::look::tint_of and
+    // tcslib_diagram::look::line_ink.
     mark: color,
     // Something is wrong with this node, which is what paints it red: the
     // outline, the label and the terminals, so colour is never the only thing
@@ -194,7 +194,7 @@ export struct LinkView {
     // What it is drawn in, which says which stream it carries: the payload's
     // own data in the payloads' family, what the ground sends in the ground's.
     // One shade lighter than the lightest node of that panel, so a line reads
-    // as a line. See tcs_diagram::look::line_ink.
+    // as a line. See tcslib_diagram::look::line_ink.
     ink: color,
     // The route, the arrowhead at its end, and the marker in the middle of its
     // longest run, as SVG path data in canvas coordinates.
@@ -217,7 +217,7 @@ export struct LinkView {
     // What somebody wrote about this connection.
     comment: string,
     // What a pointer resting on the line is told: both ends, the input it
-    // arrives at, and the comment, whole. See tcs_diagram::view::tip_of.
+    // arrives at, and the comment, whole. See tcslib_diagram::view::tip_of.
     tip: string,
     // Whether data has just crossed it: tcspecial's visual window lights a
     // line while what was sent over it is less than LINE_BLINK old, and the
@@ -227,7 +227,7 @@ export struct LinkView {
     // A shade lighter than `ink`, which is what a lit line's wide line is
     // drawn in: the same family, so it still says which stream it is, and
     // lighter, so the ordinary line on top of it is still the one a reader
-    // follows. See tcs_diagram::look::lighter.
+    // follows. See tcslib_diagram::look::lighter.
     glow: color,
 }
 
@@ -925,7 +925,7 @@ export component SheetGround inherits Rectangle {
     in property <length> working-width;
     in property <length> payload-divider;
     in property <length> vehicle-divider;
-    // What each pane's band is painted. See tcs_diagram::look::ground_of.
+    // What each pane's band is painted. See tcslib_diagram::look::ground_of.
     in property <color> payload-ground;
     in property <color> vehicle-ground;
     in property <color> gateway-ground;
@@ -953,7 +953,7 @@ export component SheetGround inherits Rectangle {
     // nearly. Coarse on purpose: a line at every millimetre would
     // be thousands of elements and a texture rather than a guide.
     // A millimetre is 96/25.4 of the canvas's pixels, as it is in
-    // tcs_diagram::pane::PX_PER_MM; the sheet is 254 mm across and 635
+    // tcslib_diagram::pane::PX_PER_MM; the sheet is 254 mm across and 635
     // down, so 51 lines across and 127 down.
     for n in 51: Rectangle {
         x: round(n * 5 * 96 / 25.4) * 1px;
@@ -1053,12 +1053,12 @@ export component SheetGround inherits Rectangle {
 // The Physics pane's heading: a band across the top of the pane with its
 // name in it, painted in its own tint, as SheetGround heads the other three.
 // The Physics pane is the simulator file's and is drawn left of the sheet
-// the configuration is on -- see tcs_diagram::pane -- so it is a piece of its
-// own, put in the window's canvas beside the sheet.
+// the configuration is on -- see tcslib_diagram::pane -- so it is a piece of
+// its own, put in the window's canvas beside the sheet.
 export component PhysicsGround inherits Rectangle {
     // How wide the pane is, in sheet pixels.
     in property <length> physics-width;
-    // What its band is painted. See tcs_diagram::look::ground_of.
+    // What its band is painted. See tcslib_diagram::look::ground_of.
     in property <color> physics-ground;
     // How deep the band is: the other three panes', so that the four line
     // up. SheetGround works it out from its labels; this one is told.

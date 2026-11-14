@@ -367,7 +367,7 @@ The Python ground reads its type lists from the JSON schema, so it follows.
 
 Drawing It
 ==========
-How a type is drawn is in ``tcs-diagram/src/style.rs``: a ``NodeType``
+How a type is drawn is in ``tcslib-diagram/src/style.rs``: a ``NodeType``
 variant, in ``ALL`` with its length, ``spelling``, ``family``,
 ``is_payload``, ``attributes`` (which must be the description's, in the
 same order and with the same ``required``), and ``appearance``, its edge,
@@ -410,7 +410,7 @@ should fail without the fix: check that it does.
 Many tests enumerate every type, and a new type that was missed somewhere
 fails one of them: the schema tests in ``tcs-gui/tests/schema.rs``, which
 hold the schemas to ``types_in`` and ``DHType::ALL``; the description tests
-in ``tcs-gui/src/nodes.rs``; the drawing tests in ``tcs-diagram``;
+in ``tcs-gui/src/nodes.rs``; the drawing tests in ``tcslib-diagram``;
 ``the_features_are_the_optional_types`` and ``tcspecial/tests/types.rs``;
 and ``tcs-verify/tests/examples.rs``. No test holds ``NodeType::ALL`` to
 ``types_in``, so a type missing from the drawing is caught only through the
@@ -448,7 +448,7 @@ For a payload type ``foo``:
    ``endpoint.rs``.
 7. tcs-gui: the description, its place in the list of descriptions, both
    configuration schemas and both simulator schemas.
-8. tcs-diagram: ``NodeType`` and its ``appearance``, two ways unlike every
+8. tcslib-diagram: ``NodeType`` and its ``appearance``, two ways unlike every
    other type that are not colour.
 9. The design, the manual, ``CLAUDE.md`` and the examples, and their HTML.
 10. The checks above.

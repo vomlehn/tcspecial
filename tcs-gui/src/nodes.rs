@@ -1381,8 +1381,8 @@ mod tests {
 
     /// The compute fields are every computation's own terms.
     ///
-    /// Here rather than beside the table in tcs-diagram's style.rs, because the
-    /// computations are read from this editor's description tree.
+    /// Here rather than beside the table in tcslib-diagram's style.rs, because
+    /// the computations are read from this editor's description tree.
     ///
     /// The window asks a node of a described kind for what its description
     /// lists -- a mean for a mean's attributes -- and falls back to this table
@@ -1400,7 +1400,7 @@ mod tests {
         let (described, trouble) = read_tree(&tree);
         assert!(trouble.is_empty(), "{trouble:?}");
 
-        let offered = tcs_diagram::style::NodeType::Compute.attributes();
+        let offered = tcslib_diagram::style::NodeType::Compute.attributes();
         let mut asked = 0;
         for one in described.iter().filter(|one| one.node_type == "compute") {
             let function = one.sets.get("function").unwrap_or_else(|| {

@@ -2907,7 +2907,7 @@ beacons that did not arrive, compares the digest each one carries with the
 ground's own, and says how stale the last one is as a stage: Unheard, Heard,
 Aging or Waiting. There is no toolkit in it, so a ground station with no
 screen -- a logger, a test -- uses exactly this.</li>
-<li><tt class="docutils literal"><span class="pre">tcs-ui</span></tt> holds the panel, as markup other windows import, and works out
+<li><tt class="docutils literal"><span class="pre">tcslib-ui</span></tt> holds the panel, as markup other windows import, and works out
 what to show on it: which colour the indicator is, and the two lines beside
 it.</li>
 <li><tt class="docutils literal">beacon</tt>, the program in the example, reads the configuration to
@@ -3012,7 +3012,7 @@ received, and changes none of the times.</p>
 <p>The ground station is built the way the <tt class="docutils literal">beacon</tt> program is, from two halves
 and a little of its own, and the halves are the same ones in Python:
 <tt class="docutils literal">python/tcslib_moc/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcslib_moc::beacon</span></tt>,
-<tt class="docutils literal">python/tcs_ui/beacon_panel.py</tt> is <tt class="docutils literal">tcs_ui</tt>'s panel, and
+<tt class="docutils literal">python/tcslib_ui/beacon_panel.py</tt> is <tt class="docutils literal">tcslib_ui</tt>'s panel, and
 <tt class="docutils literal">python/tcslib_protocol</tt> holds the ping format and what a ground station reads
 out of a configuration. It reads the XML spelling, the standard library having
 no YAML, and asks <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--digest</span></tt> for the digest it compares each
@@ -3636,7 +3636,7 @@ go</a>).</dd>
 <dd>What a ground station is built on. <tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.so.4</span></tt> and
 <tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.a</span></tt> with <tt class="docutils literal"><span class="pre">include/tcsmoc-c.h</span></tt> and
 <tt class="docutils literal"><span class="pre">lib/pkgconfig/tcsmoc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcslib_protocol</tt>,
-<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
+<tt class="docutils literal">tcslib_moc</tt> and <tt class="docutils literal">tcslib_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
 <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS,
 YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
@@ -3773,13 +3773,13 @@ another directory.</p>
 <div class="section" id="the-python-alone">
 <h2><a class="toc-backref" href="#toc-entry-55">The Python alone</a></h2>
 <p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcslib_protocol</tt>, <tt class="docutils literal">tcslib_moc</tt> and
-<tt class="docutils literal"><span class="pre">tcs-ui</span></tt> one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>:</p>
+<tt class="docutils literal"><span class="pre">tcslib-ui</span></tt> one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./python<span class="whitespace">
 </span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span>
 </pre>
 <p>The extra brings PyYAML, which a station reading a YAML configuration
-needs. <tt class="docutils literal">tcs_ui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
+needs. <tt class="docutils literal">tcslib_ui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
 Debian, <tt class="docutils literal"><span class="pre">python3-tkinter</span></tt> on Fedora. The XTCE documents the interface
 digest is taken over, and the part of tcs-xtce that takes it, are inside
 <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt>, so an installed station needs nothing from the source tree.</p>
@@ -4827,8 +4827,8 @@ history, which it keeps on disk.</td>
 <tr><td><a class="reference external" href="https://crates.io/crates/slint">slint</a></td>
 <td>1.3, 1.18</td>
 <td><a class="reference external" href="https://docs.rs/slint/1.18.1">1.18.1</a></td>
-<td>tcs-gui, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial built
-with <tt class="docutils literal">visual</tt></td>
+<td>tcs-gui, tcs-moc, tcs-sim, tcslib-ui, examples/beacon, and tcspecial
+built with <tt class="docutils literal">visual</tt></td>
 <td>The toolkit every window is drawn with.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
 </tr>

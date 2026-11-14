@@ -55,8 +55,8 @@ publishes each one.
 ## What tcslib-moc is not
 
 tcslib-moc has no windows. Showing what it receives is the job of the programs
-built on it: `tcs-ui` holds the panels the ground programs share, and `tcs-moc`
-is the test ground station that puts them on the screen.
+built on it: `tcslib-ui` holds the panels the ground programs share, and
+`tcs-moc` is the test ground station that puts them on the screen.
 
 tcslib-moc does not define the link either. The commands, the telemetry, and the
 configuration files both ends read belong to `tcslib-protocol`, which the
@@ -67,7 +67,7 @@ only tcslib-moc.
 
 - `tcs-moc`, the test ground station.
 - `tcs-sim`, whose `--wait` waits through `simulator`.
-- `tcs-ui`, the window pieces shared by the ground programs.
+- `tcslib-ui`, the window pieces shared by the ground programs.
 - `examples/simple-app`, whose ground station `lorem_gateway` gets its data with
   one call to `GatewayReceiver::receive_into`, into a buffer it made beforehand.
 - `examples/beacon`, whose window watches the beacon through `beacon`.

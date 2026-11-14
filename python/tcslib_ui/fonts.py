@@ -1,6 +1,6 @@
 """The type every window is set in, where its text names no size of its own.
 
-The Python spelling of ``tcs-ui/ui/fonts.slint``: the same figure, in points,
+The Python spelling of ``tcslib-ui/ui/fonts.slint``: the same figure, in points,
 for the Tk windows. Text that states a size keeps it; this is the size of
 everything that does not -- Tk's named fonts, which a label, a button and a
 field are drawn in unless told otherwise.

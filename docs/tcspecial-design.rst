@@ -7733,10 +7733,10 @@ Requirement
 Requirement
     The drawing is one drawing. What a node, a link and the sheet look like --
     the shapes, the routes, the colours, the panes -- is the crate
-    ``tcs-diagram``, Rust that produces paths, sizes and colours and the markup
-    ``tcs-diagram/ui/diagram.slint`` that paints them, and both tcs-gui and
-    tcspecial draw with it. Two copies of the drawing would be two answers to
-    where a node is.
+    ``tcslib-diagram``, Rust that produces paths, sizes and colours and the
+    markup ``tcslib-diagram/ui/diagram.slint`` that paints them, and both
+    tcs-gui and tcspecial draw with it. Two copies of the drawing would be two
+    answers to where a node is.
 
 Requirement
     A link is lit while data crosses it. Each datum sent over a link draws,

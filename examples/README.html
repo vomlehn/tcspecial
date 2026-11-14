@@ -311,7 +311,7 @@ goes straight to the ground (MOC).</td>
 <td>The one thing a ground station knows without asking: a window
 showing the spacecraft’s beacon, built from the two halves any ground
 station would use – <code>tcslib_moc::beacon</code> to listen and
-<code>tcs_ui</code>’s panel to show it.</td>
+<code>tcslib_ui</code>’s panel to show it.</td>
 </tr>
 <tr>
 <td><code>ping</code></td>
@@ -401,9 +401,9 @@ datagram, counts the beacons that did not arrive, compares the digest in
 each one with the ground’s own and says how stale the last one is. No
 window, no toolkit: a ground station with no screen – a logger, a test –
 uses exactly this.</li>
-<li><code>tcs-ui</code> holds the panel, as markup other windows import,
-and works out what to show on it: which colour the indicator is, and the
-two lines beside it.</li>
+<li><code>tcslib-ui</code> holds the panel, as markup other windows
+import, and works out what to show on it: which colour the indicator is,
+and the two lines beside it.</li>
 <li><code>beacon</code>, the program here, reads the configuration to
 find where the beacons are, starts the loop on a thread, and puts each
 pass in the window. That is all of it, but for a button.</li>
@@ -457,7 +457,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <p>Languages:</p>
 <ul>
 <li>MOC: Rust – the <code>beacon</code> program, on
-<code>tcslib_moc::beacon</code> and <code>tcs_ui</code>.</li>
+<code>tcslib_moc::beacon</code> and <code>tcslib_ui</code>.</li>
 <li>Vehicle: Rust – tcspecial.</li>
 <li>Payload: Rust – tcs-sim simulates <code>sensor</code>, a network
 payload.</li>
@@ -484,15 +484,16 @@ until its own answer, matched by count, arrives.</p>
 two halves written again in Python:
 <code>python/tcslib_moc/beacon.py</code> after
 <code>tcslib_moc::beacon</code>,
-<code>python/tcs_ui/beacon_panel.py</code> after <code>tcs_ui</code>,
-and <code>python/tcslib_protocol</code> for the ping format, the beacon
-and the configuration. The interface digest beacons are checked against
-is worked out with tcs-xtce’s Python runtime, from the tcs-xtce checkout
-beside this tree. <code>ping-common/ping_ground.py</code> is the ping’s
-own part, with no window, and <code>ping-common/ping_window.py</code>
-the window, both shared with <code>ping-yamcs</code>. The Rust crate
-beside them is the tests that hold the Python to the Rust;
-<code>cargo test</code> runs them.</p>
+<code>python/tcslib_ui/beacon_panel.py</code> after
+<code>tcslib_ui</code>, and <code>python/tcslib_protocol</code> for the
+ping format, the beacon and the configuration. The interface digest
+beacons are checked against is worked out with tcs-xtce’s Python
+runtime, from the tcs-xtce checkout beside this tree.
+<code>ping-common/ping_ground.py</code> is the ping’s own part, with no
+window, and <code>ping-common/ping_window.py</code> the window, both
+shared with <code>ping-yamcs</code>. The Rust crate beside them is the
+tests that hold the Python to the Rust; <code>cargo test</code> runs
+them.</p>
 <pre><code>make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
 python3 examples/ping/ping_gateway.py --yaml    # ping.ytcs, not ping.xtcs</code></pre>

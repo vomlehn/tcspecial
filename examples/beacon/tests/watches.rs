@@ -1,10 +1,10 @@
 //! The example's own configuration, watched the way the example watches it.
 //!
-//! No window: what the window shows is `tcs-ui`'s and is tested there, and what
-//! a beacon means is `tcslib_moc::beacon`'s and is tested there. What is left
-//! to check is the join -- that this example's configuration says where the
-//! beacons are, that a station reading it listens where tcspecial would send,
-//! and that a beacon sent from that address is reported as one.
+//! No window: what the window shows is `tcslib-ui`'s and is tested there, and
+//! what a beacon means is `tcslib_moc::beacon`'s and is tested there. What is
+//! left to check is the join -- that this example's configuration says where
+//! the beacons are, that a station reading it listens where tcspecial would
+//! send, and that a beacon sent from that address is reported as one.
 //!
 //! The beacon is sent by this test rather than by tcspecial. What tcspecial
 //! does with the same two addresses is its own tests' business; the datagram

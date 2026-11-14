@@ -63,8 +63,8 @@ use slint::{Model, ModelRc, VecModel};
 // panes, the node shapes, the routes, the colours and the settings that say
 // where the panes are divided. Named here so that `crate::pane` and the rest
 // read as they did while these were this program's own.
-use tcs_diagram::look::ground_of;
-use tcs_diagram::{look, pane, physics, route, style};
+use tcslib_diagram::look::ground_of;
+use tcslib_diagram::{look, pane, physics, route, style};
 
 use document::{Concern, Document, Fault};
 use editor::Editor;
@@ -2015,7 +2015,7 @@ fn put(
     ui.set_physics_links(ModelRc::from(Rc::new(VecModel::from(physics_links))));
     // A subdiagram's page has an edge, in its margins, where what comes
     // from outside it arrives and what leaves it goes: see
-    // tcs_diagram::style::edge_box. The top page has nothing outside it.
+    // tcslib_diagram::style::edge_box. The top page has nothing outside it.
     match home {
         Some(_) => {
             ui.set_edge_width(style::EDGE as f32);
@@ -2095,7 +2095,7 @@ fn sheet_left(dividers: Dividers, home: &Home) -> i32 {
 }
 
 /// Where what is inside a page begins and ends: see
-/// `tcs_diagram::pane::inside_of`, which tcspecial's visual window draws by
+/// `tcslib_diagram::pane::inside_of`, which tcspecial's visual window draws by
 /// too.
 fn inside_of(dividers: Dividers) -> (i32, i32) {
     pane::inside_of(dividers)
@@ -2116,7 +2116,7 @@ fn inside_f(dividers: Dividers) -> (f32, f32) {
 ///
 /// # Returns
 ///
-/// Each terminal, where `tcs_diagram::style::edge_box` puts it.
+/// Each terminal, where `tcslib_diagram::style::edge_box` puts it.
 fn edge_views(dividers: Dividers) -> Vec<EdgeView> {
     style::edge_terminals(inside_f(dividers))
         .into_iter()
@@ -5338,9 +5338,9 @@ fn views_of(
                 .map(|f| f.describe());
 
             // A subdiagram that is not open shows what is in it: see
-            // tcs_diagram::view::box_summary.
+            // tcslib_diagram::view::box_summary.
             let summary = (node.node_type == "subdiagram").then(|| {
-                tcs_diagram::view::box_summary(
+                tcslib_diagram::view::box_summary(
                     document.nodes_in(&Some(node.name.clone())).len(),
                     document.crossings(&node.name),
                 )
@@ -5360,8 +5360,9 @@ fn views_of(
 
     // Every node, whichever page it is on, because a line to one on another
     // page is drawn to a stub whose height is taken from it; and the lines
-    // with an end on this one. The drawing is tcs-diagram's, which tcspecial's
-    // visual window draws by too: see tcs_diagram::view::link_looks.
+    // with an end on this one. The drawing is tcslib-diagram's, which
+    // tcspecial's visual window draws by too: see
+    // tcslib_diagram::view::link_looks.
     let mut sheet = on_sheet(document, home, dividers);
     // And on a subdiagram's page, each node it exports that no line joins
     // outside yet is drawn joined to the edge all the same: what the edge
@@ -5369,14 +5370,14 @@ fn views_of(
     // nothing drawn would look like one that is not.
     let unjoined = unjoined_exports(document, home);
     if !unjoined.is_empty() {
-        sheet.push(tcs_diagram::view::OnSheet {
+        sheet.push(tcslib_diagram::view::OnSheet {
             name: NOT_JOINED_OUTSIDE.to_string(),
             node_type: "subdiagram",
             at: (0, 0),
             here: false,
             drawn: {
                 let (left, right) = inside_of(dividers);
-                tcs_diagram::view::Drawn::AtTheEdge(left, right)
+                tcslib_diagram::view::Drawn::AtTheEdge(left, right)
             },
         });
     }
@@ -5384,12 +5385,12 @@ fn views_of(
         .into_iter()
         .chain(&unjoined)
         .collect();
-    let lines: Vec<tcs_diagram::view::LineOnSheet> =
+    let lines: Vec<tcslib_diagram::view::LineOnSheet> =
         drawn.iter().map(|link| line_on_sheet(link)).collect();
     // The line chosen from the errors button is lit, as tcspecial's visual
     // window lights a line data crosses: a wide pale line under it, which
     // says which one it is by its width as well as its colour.
-    let links: Vec<LinkView> = tcs_diagram::view::link_looks(&sheet, &lines)
+    let links: Vec<LinkView> = tcslib_diagram::view::link_looks(&sheet, &lines)
         .into_iter()
         .zip(&drawn)
         .map(|(look, link)| LinkView {
@@ -5440,11 +5441,11 @@ fn physics_views_of(
     // This page's components only: each is drawn on the page it was placed
     // on, and a connection or join to one on another page is drawn nowhere,
     // as one to a component the world has not.
-    let components: Vec<tcs_diagram::physics::Component> = world
+    let components: Vec<tcslib_diagram::physics::Component> = world
         .components
         .iter()
         .filter(|(name, _)| world.on_page(name, home.as_deref()))
-        .map(|(name, component)| tcs_diagram::physics::Component {
+        .map(|(name, component)| tcslib_diagram::physics::Component {
             name,
             kind: &component.kind,
             faulty: faulty(name),
@@ -5485,9 +5486,9 @@ fn physics_views_of(
             }
         }
     }
-    let joins: Vec<tcs_diagram::physics::Join> = said
+    let joins: Vec<tcslib_diagram::physics::Join> = said
         .iter()
-        .map(|(payload, terminal)| tcs_diagram::physics::Join {
+        .map(|(payload, terminal)| tcslib_diagram::physics::Join {
             payload,
             terminal,
         })
@@ -5496,7 +5497,7 @@ fn physics_views_of(
     // Physics pane being just left of them, inside a subdiagram's edge as on
     // the top page.
     let sheet = on_sheet(document, home, dividers);
-    let (nodes, links) = tcs_diagram::physics::looks(
+    let (nodes, links) = tcslib_diagram::physics::looks(
         &components,
         &connections,
         &joins,
@@ -5651,7 +5652,7 @@ fn wire_physics(
         let home = home.clone();
         window.on_drop_physics(move |kind, x, y| {
             let dividers = views.borrow().divider.get();
-            let at = tcs_diagram::physics::confine(
+            let at = tcslib_diagram::physics::confine(
                 snap((
                     x.round() as i32 - sheet_left(dividers, &home),
                     y.round() as i32,
@@ -5720,7 +5721,7 @@ fn wire_physics(
                 else {
                     return;
                 };
-                let now = tcs_diagram::physics::confine(
+                let now = tcslib_diagram::physics::confine(
                     snap((
                         drawn.0 + dx.round() as i32,
                         drawn.1 + dy.round() as i32,
@@ -5791,7 +5792,7 @@ fn wire_physics(
                         (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT,
                         (place.at.1 + ty) as f32 + physics::TERMINAL_MIDDLE,
                     );
-                    Some(tcs_diagram::route::drawing(anchor, (x - shift, y)))
+                    Some(tcslib_diagram::route::drawing(anchor, (x - shift, y)))
                 })
                 .unwrap_or_default();
             window.set_drawing_route(route.into());
@@ -5954,7 +5955,7 @@ fn physics_places(
     editor: &Editor,
     dividers: Dividers,
     home: &Home,
-) -> Vec<(String, String, tcs_diagram::physics::Place)> {
+) -> Vec<(String, String, tcslib_diagram::physics::Place)> {
     let Some(simulator) = &editor.document().simulator else {
         return Vec::new();
     };
@@ -6514,15 +6515,15 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
         let mut kinds: Vec<&str> = kinds.to_vec();
         kinds.sort_unstable();
         for kind in kinds {
-            let look = tcs_diagram::physics::node_look(
-                &tcs_diagram::physics::Component {
+            let look = tcslib_diagram::physics::node_look(
+                &tcslib_diagram::physics::Component {
                     name: kind,
                     kind,
                     faulty: false,
                     placed: None,
                 },
                 (8, 2),
-                tcs_diagram::physics::SIZE,
+                tcslib_diagram::physics::SIZE,
             );
             entries.push(PaletteEntry {
                 heading: "".into(),
@@ -6577,13 +6578,13 @@ fn ends_of(
     home: &Home,
     dividers: Dividers,
 ) -> route::Ends {
-    tcs_diagram::view::ends(
+    tcslib_diagram::view::ends(
         &on_sheet(document, home, dividers),
         &line_on_sheet(link),
     )
 }
 
-/// Lists every node of the document as tcs-diagram draws it, each saying
+/// Lists every node of the document as tcslib-diagram draws it, each saying
 /// whether it is on `home`'s page.
 ///
 /// # Arguments
@@ -6600,8 +6601,8 @@ fn on_sheet<'a>(
     document: &'a Document,
     home: &Home,
     dividers: Dividers,
-) -> Vec<tcs_diagram::view::OnSheet<'a>> {
-    use tcs_diagram::view::{Drawn, OnSheet};
+) -> Vec<tcslib_diagram::view::OnSheet<'a>> {
+    use tcslib_diagram::view::{Drawn, OnSheet};
     document
         .nodes
         .iter()
@@ -6713,7 +6714,7 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
     lines
 }
 
-/// Gives one of the document's links as tcs-diagram draws it.
+/// Gives one of the document's links as tcslib-diagram draws it.
 ///
 /// # Arguments
 ///
@@ -6722,8 +6723,8 @@ fn unjoined_exports(document: &Document, home: &Home) -> Vec<Link> {
 /// # Returns
 ///
 /// The link's ends, origin, input and comment, borrowed from it.
-fn line_on_sheet(link: &Link) -> tcs_diagram::view::LineOnSheet<'_> {
-    tcs_diagram::view::LineOnSheet {
+fn line_on_sheet(link: &Link) -> tcslib_diagram::view::LineOnSheet<'_> {
+    tcslib_diagram::view::LineOnSheet {
         from: &link.from,
         origin: link.origin.as_deref(),
         to: &link.to,
@@ -7315,7 +7316,7 @@ fn anchored(
     }
 
     // Taken from the page's own edge, which is the subdiagram's box seen
-    // from inside: see `tcs_diagram::style::edge_box`.
+    // from inside: see `tcslib_diagram::style::edge_box`.
     if home.as_deref() == Some(from.node.as_str()) {
         let (at, _) =
             style::edge_attachment(&from.terminal, inside_f(dividers))?;
@@ -8246,15 +8247,15 @@ fn stated(sets: &str) -> Vec<(String, String)> {
 
 /// Draws a node of this type as the window wants it.
 ///
-/// The look is tcs-diagram's, which tcspecial's visual window draws from too;
-/// this adds what only the editor has, which is whether it is selected.
+/// The look is tcslib-diagram's, which tcspecial's visual window draws from
+/// too; this adds what only the editor has, which is whether it is selected.
 ///
 /// # Arguments
 ///
 /// * `name`      - The node's name, as drawn.
 /// * `node_type` - Its type, as spelled in a file.
 /// * `function`  - Its `function`, where it states one: a compute node's
-///                 type line names it. See tcs_diagram::view::type_line.
+///                 type line names it. See tcslib_diagram::view::type_line.
 /// * `at`        - Its upper left corner.
 /// * `fault`     - What is wrong with it, if anything; only whether there is
 ///                 something is drawn.
@@ -8277,7 +8278,7 @@ fn view_of(
     summary: Option<&str>,
 ) -> NodeView {
     node_view(
-        tcs_diagram::view::node_look(
+        tcslib_diagram::view::node_look(
             name,
             node_type,
             function,
@@ -8293,14 +8294,14 @@ fn view_of(
 ///
 /// # Arguments
 ///
-/// * `look`     - The look tcs-diagram gives the node.
+/// * `look`     - The look tcslib-diagram gives the node.
 /// * `selected` - Whether it is drawn as chosen.
 ///
 /// # Returns
 ///
 /// The look, as the markup's `NodeView`.
-fn node_view(look: tcs_diagram::view::NodeLook, selected: bool) -> NodeView {
-    let terminal = |look: tcs_diagram::view::TerminalLook| TerminalView {
+fn node_view(look: tcslib_diagram::view::NodeLook, selected: bool) -> NodeView {
+    let terminal = |look: tcslib_diagram::view::TerminalLook| TerminalView {
         shown: look.shown,
         x: look.x,
         y: look.y,
@@ -8338,7 +8339,7 @@ fn node_view(look: tcs_diagram::view::NodeLook, selected: bool) -> NodeView {
         terminal_row: look.terminal_row,
         type_left: look.type_band.0,
         type_right: look.type_band.1,
-        type_size: tcs_diagram::style::TYPE_SIZE as f32,
+        type_size: tcslib_diagram::style::TYPE_SIZE as f32,
     }
 }
 
@@ -8350,12 +8351,12 @@ fn node_view(look: tcs_diagram::view::NodeLook, selected: bool) -> NodeView {
 ///
 /// # Arguments
 ///
-/// * `look` - The look tcs-diagram gives the line.
+/// * `look` - The look tcslib-diagram gives the line.
 ///
 /// # Returns
 ///
 /// The look, as the markup's `LinkView`.
-fn link_view(look: tcs_diagram::view::LinkLook) -> LinkView {
+fn link_view(look: tcslib_diagram::view::LinkLook) -> LinkView {
     LinkView {
         glow: colour(&look::lighter(&look.ink)),
         ink: colour(&look.ink),
@@ -8397,7 +8398,8 @@ fn line_under(
         .filter_map(|row| {
             let line = links.row_data(row)?;
             let away = route::distance_to(&line.route, at)?;
-            let reach = tcs_diagram::view::line_width(line.wide) / 2.0 + SLACK;
+            let reach =
+                tcslib_diagram::view::line_width(line.wide) / 2.0 + SLACK;
             (away <= reach).then_some((row, away))
         })
         .min_by(|a, b| a.1.total_cmp(&b.1))
@@ -8541,7 +8543,7 @@ fn the_physics_list_offers_every_type_once() {
     assert_eq!(offered, known);
 }
 
-/// A hex string as a Slint colour. See tcs_diagram::look::rgb.
+/// A hex string as a Slint colour. See tcslib_diagram::look::rgb.
 fn colour(hex: &str) -> slint::Color {
     let (red, green, blue) = look::rgb(hex);
     slint::Color::from_argb_u8(0xff, red, green, blue)
@@ -8568,16 +8570,16 @@ mod tests {
                 .unwrap_or_else(|why| panic!("{}: {why}", path.display()))
         };
         read(root.join("ui/main.slint"))
-            + &read(root.join("../tcs-diagram/ui/diagram.slint"))
+            + &read(root.join("../tcslib-diagram/ui/diagram.slint"))
     }
 
-    // The palette, which moved to tcs-diagram with the drawing and is held to
-    // its rules here, where sight.rs is.
+    // The palette, which moved to tcslib-diagram with the drawing and is held
+    // to its rules here, where sight.rs is.
     use super::*;
     use document::Document;
     use slint::Model;
     use style::ERROR_TINT;
-    use tcs_diagram::look::{
+    use tcslib_diagram::look::{
         came_later, ramp_order, tint_of, GATEWAY_LINE, GATEWAY_RUNGS, MARK,
         PAYLOAD_LINE, PAYLOAD_RUNGS, VEHICLE_RUNGS,
     };
@@ -8866,7 +8868,7 @@ mod tests {
         let shrink = 0.75;
         assert!(markup.contains("property <float> shrink: 0.75;"));
         let wanted =
-            ABOVE_THE_FIRST + tcs_diagram::physics::SIZE.1 as f32 * shrink;
+            ABOVE_THE_FIRST + tcslib_diagram::physics::SIZE.1 as f32 * shrink;
         let got = tall * settings::DEFAULT_LIST_PHYSICS as f32 / 100.0;
         assert!(
             got >= wanted,
@@ -12556,11 +12558,11 @@ mod tests {
     /// one the editor put there would be the editor covering a name nobody
     /// asked it to cover.
     ///
-    /// The bands are written down in `pane::NAMES` and drawn in tcs-diagram's
-    /// `diagram.slint`, so this reads the markup and holds the two against
-    /// each other: a band made deeper in the window without this would leave
-    /// the row reserved shallower than the row that is drawn, and a node would
-    /// be placed over a name.
+    /// The bands are written down in `pane::NAMES` and drawn in
+    /// tcslib-diagram's `diagram.slint`, so this reads the markup and holds the
+    /// two against each other: a band made deeper in the window without this
+    /// would leave the row reserved shallower than the row that is drawn, and a
+    /// node would be placed over a name.
     #[test]
     fn nothing_placed_by_the_editor_covers_a_panes_name() {
         let markup = markup();
@@ -12635,12 +12637,12 @@ mod tests {
         let (top, height) = pane::NAMES;
         assert_eq!(top, 0, "a band is drawn, so it starts at the pane's top");
         // And Fonts.window is twelve points, which is sixteen pixels: see
-        // tcs-ui/ui/fonts.slint.
+        // tcslib-ui/ui/fonts.slint.
         let fonts = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../tcs-ui/ui/fonts.slint"),
+                .join("../tcslib-ui/ui/fonts.slint"),
         )
-        .expect("tcs-ui's fonts read");
+        .expect("tcslib-ui's fonts read");
         assert!(
             fonts.contains("out property <length> window: 12pt;"),
             "Fonts.window is no longer twelve points, so pane::NAMES is out of \
@@ -13962,7 +13964,7 @@ mod tests {
             world.placed.get(&name).copied(),
             // Kept from where the working panes begin, which the Physics
             // pane is left of: the sheet's point less its width.
-            Some(tcs_diagram::physics::confine(
+            Some(tcslib_diagram::physics::confine(
                 snap((into.0 - dividers().physics, into.1)),
                 dividers()
             )),

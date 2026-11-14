@@ -8,6 +8,10 @@
 //! drawings of one configuration that differed would be two answers to where a
 //! node is, so there is one.
 //!
+//! It is named as a library, `tcslib-`, because it is built into tcspecial
+//! (with the `visual` feature), and everything tcspecial is built from is
+//! production code, to be written and reviewed as such.
+//!
 //! Everything here is arithmetic and text: paths as SVG path data, colours as
 //! hex strings, sizes in sheet pixels. Nothing here uses Slint, because each
 //! program compiles the markup that paints these, `ui/diagram.slint`, into

@@ -252,9 +252,10 @@ pub struct Appearance {
 ///
 /// The nodes drawn on one are a ramp of darker colours in its own family's
 /// hue, starting below the line that carries its data and darkening down the
-/// panel -- `tcs_diagram::look::tint_of` is the rule and
-/// `tcs_diagram::look::ground_of` the grounds themselves. A node's colour then
-/// says both which pane it belongs in and where in that pane's list it sits.
+/// panel -- `tcslib_diagram::look::tint_of` is the rule and
+/// `tcslib_diagram::look::ground_of` the grounds themselves. A node's colour
+/// then says both which pane it belongs in and where in that pane's list it
+/// sits.
 ///
 /// Here as a meaning and painted in `main.rs`: this file says which pane has
 /// which ground, and the window says what that ground is.

@@ -1,12 +1,12 @@
 //! What tcs-gui remembers between sessions, and writing it down.
 //!
-//! What the settings are and how the file is read are tcs-diagram's, which
+//! What the settings are and how the file is read are tcslib-diagram's, which
 //! tcspecial's visual window reads the same file with -- see
-//! `tcs_diagram::settings` -- and they are all here under the names they had.
-//! What is the editor's alone is the writing: making the directory, and the
-//! file, the first time and every time something is moved.
+//! `tcslib_diagram::settings` -- and they are all here under the names they
+//! had. What is the editor's alone is the writing: making the directory, and
+//! the file, the first time and every time something is moved.
 
-pub use tcs_diagram::settings::*;
+pub use tcslib_diagram::settings::*;
 
 /// The directory the editor keeps its own files in, made if it is not there.
 ///

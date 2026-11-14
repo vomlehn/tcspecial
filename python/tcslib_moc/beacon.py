@@ -2,8 +2,8 @@
 
 The Python spelling of ``tcslib-moc/src/beacon.rs``: the half of a ground
 station's beacon that is not a window. The other half, the panel, is
-``python/tcs_ui/beacon_panel.py``, as it is ``tcs_ui`` in Rust. Everything here
-is said there first, in the same words, and ``python/tests/test_beacon.py``
+``python/tcslib_ui/beacon_panel.py``, as it is ``tcslib_ui`` in Rust. Everything
+here is said there first, in the same words, and ``python/tests/test_beacon.py``
 holds the two to one another with the same examples the Rust tests use.
 
 A beacon says that tcspecial is running, which build it is, which version of

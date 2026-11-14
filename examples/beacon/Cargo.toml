@@ -14,7 +14,7 @@ tcslib-moc = { path = "../../tcslib-moc" }
 # Reading the configuration to find where the beacons are.
 tcslib-protocol = { path = "../../tcslib-protocol" }
 # The panel, and what to show on it.
-tcs-ui = { path = "../../tcs-ui" }
+tcslib-ui = { path = "../../tcslib-ui" }
 slint = "1.3"
 # The vehicle the window starts is told to die with it, which is a prctl.
 libc = "0.2"

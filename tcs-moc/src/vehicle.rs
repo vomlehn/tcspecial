@@ -44,7 +44,6 @@ use std::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
-use tcs_ui::PingShown;
 use tcs_verify::startup::Startup;
 use tcslib_moc::gateway::GatewayReceiver;
 use tcslib_moc::gateway::DATUM_BYTES;
@@ -60,6 +59,7 @@ use tcslib_protocol::sim_config::SimConfigFile;
 use tcslib_protocol::simulate::Mode;
 use tcslib_protocol::unit::Unit;
 use tcslib_protocol::{DHSample, Timestamp};
+use tcslib_ui::PingShown;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};
@@ -541,7 +541,7 @@ fn refused_unmatched(
             theirs: &theirs,
             ours,
             listening,
-            flagged: ui.get_beacon_restart() == tcs_ui::RESTARTED_CONNECT,
+            flagged: ui.get_beacon_restart() == tcslib_ui::RESTARTED_CONNECT,
         },
     );
     eprintln!("{}: {}", refusal.heading, refusal.message);

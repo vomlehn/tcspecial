@@ -2,7 +2,7 @@
 //!
 //! The graph is drawn as tcs-gui draws the configuration -- the three working
 //! panes, every node where the editor would put it, every link along the
-//! route the editor gives it, all of it from `tcs-diagram` -- with the
+//! route the editor gives it, all of it from `tcslib-diagram` -- with the
 //! simulator file's physics in the Physics pane to their left, as the editor
 //! draws it too. One window a page, as the editor has: the top file's, and
 //! one for each subdiagram it includes, with its edge. A link is lit
@@ -32,10 +32,10 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
-use tcs_diagram::look::{self, ground_of};
-use tcs_diagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
-use tcs_diagram::style;
-use tcs_diagram::view::{
+use tcslib_diagram::look::{self, ground_of};
+use tcslib_diagram::pane::{self, Placing, WORKING_HEIGHT, WORKING_WIDTH};
+use tcslib_diagram::style;
+use tcslib_diagram::view::{
     self, Drawn, LineOnSheet, LinkLook, NodeLook, OnSheet,
 };
 use tcslib_protocol::graph::{Destination, Graph};
@@ -202,7 +202,7 @@ pub fn run(path: &str, mode: tcslib_protocol::simulate::Mode) -> i32 {
     let lines = lines_of(&graph);
     watch(lines.len());
 
-    let settings = tcs_diagram::settings::read().settings;
+    let settings = tcslib_diagram::settings::read().settings;
     let mut dividers =
         pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
     dividers.physics = pane::physics_width(settings.physics_percent);
@@ -641,7 +641,7 @@ fn draw_physics(
             return;
         }
     };
-    let drawn = tcs_diagram::physics::of_simulator(&file, page);
+    let drawn = tcslib_diagram::physics::of_simulator(&file, page);
     // Drawn from where the working panes begin, past the edge and the
     // Physics pane.
     let (nodes, links) = drawn.looks(sheet, dividers, dividers.physics + edge);
@@ -653,7 +653,7 @@ fn draw_physics(
     )));
 }
 
-/// A hex colour as Slint's. See tcs_diagram::look::rgb.
+/// A hex colour as Slint's. See tcslib_diagram::look::rgb.
 fn colour(hex: &str) -> slint::Color {
     let (red, green, blue) = look::rgb(hex);
     slint::Color::from_rgb_u8(red, green, blue)
@@ -667,7 +667,7 @@ fn colour(hex: &str) -> slint::Color {
 ///
 /// # Arguments
 ///
-/// * `look` - How tcs-diagram draws the node.
+/// * `look` - How tcslib-diagram draws the node.
 ///
 /// # Returns
 ///
@@ -711,7 +711,7 @@ fn node_view(look: NodeLook) -> ui::NodeView {
         terminal_row: look.terminal_row,
         type_left: look.type_band.0,
         type_right: look.type_band.1,
-        type_size: tcs_diagram::style::TYPE_SIZE as f32,
+        type_size: tcslib_diagram::style::TYPE_SIZE as f32,
     }
 }
 
@@ -720,7 +720,7 @@ fn node_view(look: NodeLook) -> ui::NodeView {
 ///
 /// # Arguments
 ///
-/// * `look` - How tcs-diagram draws the line.
+/// * `look` - How tcslib-diagram draws the line.
 ///
 /// # Returns
 ///

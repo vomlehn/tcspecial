@@ -9,8 +9,8 @@ build = "build.rs"
 [dependencies]
 tcslib-protocol = { path = "../tcslib-protocol" }
 # How a configuration is drawn: the panes, the node shapes, the routes and
-# the colours, shared with tcspecial's visual window. See tcs-diagram.
-tcs-diagram = { path = "../tcs-diagram" }
+# the colours, shared with tcspecial's visual window. See tcslib-diagram.
+tcslib-diagram = { path = "../tcslib-diagram" }
 # Asked about the files as the editor starts and after every edit, so that
 # what it says about them is what tcs-verify, tcspecial, tcs-moc and tcs-sim
 # say: see `errors_of`.

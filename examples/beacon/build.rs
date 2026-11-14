@@ -4,7 +4,7 @@
 ///
 /// The markup does not compile.
 fn main() {
-    // The window is one panel, and the panel is tcs-ui's: the markup imports
+    // The window is one panel, and the panel is tcslib-ui's: the markup imports
     // it by path, which is what Slint resolves relative to the importing
     // file. Rebuilt when either changes, which Slint's own build glue
     // arranges by telling cargo about the files it read.

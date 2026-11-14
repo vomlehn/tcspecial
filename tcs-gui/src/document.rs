@@ -1071,8 +1071,8 @@ impl Document {
     ///
     /// How many nodes were moved, which is what a caller would log.
     pub fn settle(&mut self, dividers: crate::pane::Dividers) -> usize {
-        // The rule is tcs-diagram's, which tcspecial's visual window draws by
-        // as well: see pane::settle. Walked in the order of the names, which
+        // The rule is tcslib-diagram's, which tcspecial's visual window draws
+        // by as well: see pane::settle. Walked in the order of the names, which
         // is the one order a configuration has, so that a file saved and
         // read again is laid out as it was whatever order the session added
         // its nodes in.

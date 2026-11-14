@@ -6,7 +6,7 @@
 //! `src/bin/beacon.rs`.
 
 use slint::ComponentHandle;
-use tcs_ui::Shown;
+use tcslib_ui::Shown;
 
 slint::include_modules!();
 
@@ -56,7 +56,7 @@ pub fn prepare(window: &WatchWindow) {
 ///
 /// All four at once, from the one reading: an indicator that said beacons
 /// were arriving beside a time that said none had would be two answers to one
-/// question. The window passes them down to the panel, which is `tcs-ui`'s.
+/// question. The window passes them down to the panel, which is `tcslib-ui`'s.
 ///
 /// # Arguments
 ///

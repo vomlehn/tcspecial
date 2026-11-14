@@ -1,9 +1,9 @@
 """The beacon panel, and what to show on it.
 
-The Python spelling of ``tcs_ui``: ``tcs-ui/src/lib.rs``, which says what colour
-the indicator is and what the two lines say, and ``tcs-ui/ui/beacon.slint``,
-which is the panel itself. The panel is drawn with tkinter, which is the
-toolkit the Python standard library has.
+The Python spelling of ``tcslib_ui``: ``tcslib-ui/src/lib.rs``, which says what
+colour the indicator is and what the two lines say, and
+``tcslib-ui/ui/beacon.slint``, which is the panel itself. The panel is drawn
+with tkinter, which is the toolkit the Python standard library has.
 
 The other half of ``python/tcslib_moc/beacon.py``. That one listens and says
 what is true of the spacecraft; this one says what that looks like. They are
@@ -28,11 +28,14 @@ from tcslib_moc.beacon import (
     Stage,
     received_at,
 )
-from tcs_ui import theme
+from tcslib_ui import theme
 
 
 class palette:
-    """The colours an indicator is drawn in: ``tcs_ui::palette``, complete."""
+    """The colours an indicator is drawn in.
+
+    ``tcslib_ui::palette``, complete.
+    """
 
     #: Nothing is known: no beacon has arrived, or the station has stopped
     #: listening.
@@ -131,7 +134,7 @@ class BeaconPanel(ttk.LabelFrame):
     disconnect, and three rows -- the indicator, then the time, then what that
     beacon said under it, the two reading as one message received then and
     saying this. Drawn in ttk, so that it takes the window's theme: see
-    :mod:`tcs_ui.theme`.
+    :mod:`tcslib_ui.theme`.
 
     Args:
         parent:    The widget the panel goes in.

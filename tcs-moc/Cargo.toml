@@ -9,7 +9,7 @@ build = "build.rs"
 [dependencies]
 tcslib-moc = { path = "../tcslib-moc" }
 # The panels this window is made of, and what to show on them.
-tcs-ui = { path = "../tcs-ui" }
+tcslib-ui = { path = "../tcslib-ui" }
 tcslib-protocol = { path = "../tcslib-protocol" }
 # No payload types: nothing here reaches a payload through tcspecial's code.
 # With its defaults this would turn every type back on in any build that

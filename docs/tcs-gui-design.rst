@@ -620,7 +620,7 @@ resting on one is told the terminal it is joined to in a tip, which is what
 tells a line into a thermal mass's ``heat`` from one into its ``heater_1``
 when both enter its one input box. tcspecial's visual window draws the same
 pane from the simulator file tcs-sim would read for the configuration, and only
-draws it. See ``tcs_diagram::physics``.
+draws it. See ``tcslib_diagram::physics``.
 
 The physics list is at the top of the selection column, its pane being the
 leftmost, with a line under it that is dragged as the others are. Its entries
@@ -746,11 +746,11 @@ colour are the type's, and a page of computations each written "compute" is a
 page whose reader has to open every node to find the thermostat. The function
 stands alone rather than after "compute, ", the shape already saying that, and
 one with no function yet says ``compute``
-(``tcs_diagram::view::type_line``). There is less room
+(``tcslib_diagram::view::type_line``). There is less room
 between two terminals than across the middle, so the type is set in the
 diagram's own small size, nine pixels, rather than the window's: the one label
 on the canvas that is, and the longest type, ``subdiagram`` between four
-terminals, fits at it as drawn (``tcs_diagram::style::TYPE_SIZE`` and
+terminals, fits at it as drawn (``tcslib_diagram::style::TYPE_SIZE`` and
 ``type_band``). A closed subdiagram is taller than the other nodes, 80 pixels
 to their 64, so that what it holds -- how many nodes, and how many lines cross
 its edge -- has room under its name, and the mark that opens it the middle of
@@ -909,7 +909,7 @@ shapes cannot say. The table is the schema's own,
 ``tcslib_protocol::graph::terminals``, read rather than copied wherever it has
 an answer, so a terminal added there appears on the canvas without the editor
 being touched; the computation, the log and the page, whose terminals that table
-leaves to them, are answered in ``tcs_diagram::style``.
+leaves to them, are answered in ``tcslib_diagram::style``.
 
 The label is padded away from whichever side carries terminals rather than a
 row being reserved at the top and the bottom: the name stays in the middle of
@@ -927,7 +927,7 @@ marks drawn on its body stay white, so the one thing that changed is the thing
 that is wrong. A node of a type this build does not know is drawn differently
 as well: as a small plain rectangle, 104 by 40 where every other node is 152
 by 64, with a thin single edge and no terminals, in the same red
-(``tcs_diagram::view::node_look``). Showing it beats refusing the file: a
+(``tcslib_diagram::view::node_look``). Showing it beats refusing the file: a
 configuration written for a later build is readable, and what cannot be
 placed is visibly what cannot be placed.
 
@@ -950,7 +950,7 @@ and the payload pane a pale teal: all three light and neutral -- no chroma
 above 14 -- so that a pane reads as tinted paper rather than as a coloured
 panel. The nodes drawn on one are darker members of its family: a payload is
 a dark teal, a vehicle node a green or an olive, the ground link a blue. The
-colours are written down in ``tcs_diagram::look``, which tcspecial's visual
+colours are written down in ``tcslib_diagram::look``, which tcspecial's visual
 window paints with too.
 
 So a node's colour says two things at once. The hue says which family it is in,
@@ -1141,7 +1141,7 @@ node body of its family -- at least eight CIE units above the lightest, as the
 tiers above say. Lighter so that a line is not taken for a node's outline, and
 of the family so that the colour says the stream. A line whose stream cannot be
 told, which is a line this build does not understand, is grey, and drawn all
-the same (``tcs_diagram::look::line_ink``).
+the same (``tcslib_diagram::look::line_ink``).
 ``the_palette_runs_from_the_pane_through_the_line_to_the_bodies`` holds both
 lines to the panels themselves, so a palette change that made a node lighter
 than its lines fails there, and ``no_two_colours_of_the_scheme_look_alike``
@@ -1280,7 +1280,7 @@ button anywhere else on the page selects nothing, and closes whatever menu was
 open. A line is a ``Path``, and a press on a path is not reported, so the press
 goes to the page underneath, which asks which line runs within a few pixels of
 the point, by the line's points rather than its drawing: see
-``tcs_diagram::route::distance_to``. Only the document's lines are found, not
+``tcslib_diagram::route::distance_to``. Only the document's lines are found, not
 the ones an edge draws to a node nothing joins outside yet, there being no line
 to take out. A selected line is kept by what it joins rather than where it is in
 the page's list, so an edit elsewhere that redraws the page keeps it selected,

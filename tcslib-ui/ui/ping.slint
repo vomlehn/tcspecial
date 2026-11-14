@@ -8,7 +8,7 @@
 // Imported by path, which is what Slint resolves relative to the importing
 // file:
 //
-//     import { PingPanel } from "../../tcs-ui/ui/ping.slint";
+//     import { PingPanel } from "../../tcslib-ui/ui/ping.slint";
 //
 // Nothing is computed here. What each row says is worked out in Rust, from
 // what `tcslib_moc::ping` keeps, and set as properties: see the crate's
@@ -115,7 +115,7 @@ export component PingPanel inherits TitledBox {
                 // Half as large again as Fonts.window, the one size every
                 // window is set in, and stated as a size of its own because
                 // a size is stated in points or by name: see
-                // tcs-ui/tests/fonts.rs.
+                // tcslib-ui/tests/fonts.rs.
                 Value {
                     text: root.round-trip;
                     font-size: 18pt;

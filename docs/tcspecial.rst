@@ -2637,7 +2637,7 @@ none of it is the program's own:
   ground's own, and says how stale the last one is as a stage: Unheard, Heard,
   Aging or Waiting. There is no toolkit in it, so a ground station with no
   screen -- a logger, a test -- uses exactly this.
-* ``tcs-ui`` holds the panel, as markup other windows import, and works out
+* ``tcslib-ui`` holds the panel, as markup other windows import, and works out
   what to show on it: which colour the indicator is, and the two lines beside
   it.
 * ``beacon``, the program in the example, reads the configuration to
@@ -2754,7 +2754,7 @@ received, and changes none of the times.
 The ground station is built the way the ``beacon`` program is, from two halves
 and a little of its own, and the halves are the same ones in Python:
 ``python/tcslib_moc/beacon.py`` is ``tcslib_moc::beacon``,
-``python/tcs_ui/beacon_panel.py`` is ``tcs_ui``'s panel, and
+``python/tcslib_ui/beacon_panel.py`` is ``tcslib_ui``'s panel, and
 ``python/tcslib_protocol`` holds the ping format and what a ground station reads
 out of a configuration. It reads the XML spelling, the standard library having
 no YAML, and asks ``tcs-verify --digest`` for the digest it compares each
@@ -3442,7 +3442,7 @@ There are three, because three kinds of machine take them:
    What a ground station is built on. ``lib/libtcsmoc-c.so.4`` and
    ``lib/libtcsmoc-c.a`` with ``include/tcsmoc-c.h`` and
    ``lib/pkgconfig/tcsmoc-c.pc``; the Python packages ``tcslib_protocol``,
-   ``tcslib_moc`` and ``tcs_ui`` in ``lib/python3/site-packages``;
+   ``tcslib_moc`` and ``tcslib_ui`` in ``lib/python3/site-packages``;
    ``bin/tcs-gui`` with its descriptions in ``share/tcs-gui``; and the XTCS,
    YTCS and simulator schemas in ``share/tcspecial/schema``.
 ``tcspecial-test``
@@ -3596,7 +3596,7 @@ The Python alone
 ----------------
 
 ``python/pyproject.toml`` makes ``tcslib_protocol``, ``tcslib_moc`` and
-``tcs-ui`` one distribution, ``tcspecial-moc``:
+``tcslib-ui`` one distribution, ``tcspecial-moc``:
 
 .. code-block:: console
 
@@ -3604,7 +3604,7 @@ The Python alone
    $ pip install './python[yaml]'
 
 The extra brings PyYAML, which a station reading a YAML configuration
-needs. ``tcs_ui`` needs tkinter, which pip cannot install: ``python3-tk`` on
+needs. ``tcslib_ui`` needs tkinter, which pip cannot install: ``python3-tk`` on
 Debian, ``python3-tkinter`` on Fedora. The XTCE documents the interface
 digest is taken over, and the part of tcs-xtce that takes it, are inside
 ``tcslib-protocol``, so an installed station needs nothing from the source tree.
@@ -4774,8 +4774,8 @@ that satisfies both.
    * - `slint <https://crates.io/crates/slint>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint/1.18.1>`__
-     - tcs-gui, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial built
-       with ``visual``
+     - tcs-gui, tcs-moc, tcs-sim, tcslib-ui, examples/beacon, and tcspecial
+       built with ``visual``
      - The toolkit every window is drawn with.
      - `repository <https://github.com/slint-ui/slint>`__
    * - `slint-build <https://crates.io/crates/slint-build>`__

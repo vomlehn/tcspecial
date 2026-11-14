@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn reading_the_settings_leaves_nothing_behind() {
         let where_ = std::env::temp_dir()
-            .join(format!("tcs-diagram-settings-{}", std::process::id()));
+            .join(format!("tcslib-diagram-settings-{}", std::process::id()));
         std::fs::create_dir_all(&where_).expect("a directory");
         let was = std::env::var_os("HOME");
         std::env::set_var("HOME", &where_);

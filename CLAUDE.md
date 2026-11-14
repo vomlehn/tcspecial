@@ -40,8 +40,8 @@ argue from this order and say so.
 - `tcs-verify` -- the program that prints those problems, and what only the
   tool does: `--summary`, `--set-interface`, `--xtce`, `--fprime-model`, and
   the start-up window tcs-moc and tcs-sim share.
-- `tcs-ui` -- window pieces the ground programs share.
-- `tcs-diagram` -- how a configuration is drawn: the working panes, node
+- `tcslib-ui` -- window pieces the ground programs share.
+- `tcslib-diagram` -- how a configuration is drawn: the working panes, node
   shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcs-gui
   draws with it, and so does tcspecial's visual window (`--visual`, in a
   build with the `visual` feature, which never flies).

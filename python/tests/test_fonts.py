@@ -1,4 +1,4 @@
-"""Tk's named fonts are set in tcs_ui's one default size."""
+"""Tk's named fonts are set in tcslib_ui's one default size."""
 
 import sys
 import unittest
@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tcs_ui import fonts  # noqa: E402
+from tcslib_ui import fonts  # noqa: E402
 
 
 class FontsTest(unittest.TestCase):

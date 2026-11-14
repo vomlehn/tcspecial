@@ -1,5 +1,9 @@
 //! Window pieces shared by the ground programs, and what to show on them.
 //!
+//! It is named as a library, `tcslib-`, because it is production code: a
+//! ground station's window shows a vehicle's beacon with it, and tcspecial's
+//! visual window draws in its colours and fonts.
+//!
 //! The other half of [`tcslib_moc::beacon`]. That one listens and says what is
 //! true of the spacecraft -- how stale the last beacon is, what it said, and
 //! whether anything is being heard from; this one says what that looks like:
@@ -16,7 +20,7 @@
 //! Slint resolves relative to the importing file:
 //!
 //! ```text
-//! import { BeaconPanel } from "../../tcs-ui/ui/beacon.slint";
+//! import { BeaconPanel } from "../../tcslib-ui/ui/beacon.slint";
 //! ```
 //!
 //! The Rust side sets its three properties from [`Shown::of`].

@@ -62,8 +62,8 @@ Everything installs under `/opt/tcs`, as three packages:
 * `tcspecial-moc`, what a ground station is built on: `libtcsmoc-c` for C
   and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
   `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python
-  packages `tcslib_protocol`, `tcslib_moc` and `tcs_ui`, and `bin/tcs-gui` with
-  its data.
+  packages `tcslib_protocol`, `tcslib_moc` and `tcslib_ui`, and `bin/tcs-gui`
+  with its data.
 * `tcspecial-test`, the test ground station and simulator: `bin/tcs-moc` and
   `bin/tcs-sim`, and `bin/segsend`, the test one, which deletes each
   telemetry log segment. A vehicle that keeps a log puts its own segsend in

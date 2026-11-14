@@ -67,10 +67,12 @@ fn every_window_is_set_in_the_one_default_size() {
 
 #[test]
 fn the_python_windows_use_the_same_size() {
-    let slint = std::fs::read_to_string(root().join("tcs-ui/ui/fonts.slint"))
-        .expect("it reads");
-    let python = std::fs::read_to_string(root().join("python/tcs_ui/fonts.py"))
-        .expect("it reads");
+    let slint =
+        std::fs::read_to_string(root().join("tcslib-ui/ui/fonts.slint"))
+            .expect("it reads");
+    let python =
+        std::fs::read_to_string(root().join("python/tcslib_ui/fonts.py"))
+            .expect("it reads");
 
     let points = slint
         .lines()
@@ -84,7 +86,7 @@ fn the_python_windows_use_the_same_size() {
         python
             .lines()
             .any(|line| line == format!("POINTS = {points}")),
-        "python/tcs_ui/fonts.py does not say POINTS = {points}"
+        "python/tcslib_ui/fonts.py does not say POINTS = {points}"
     );
 }
 
@@ -176,9 +178,9 @@ fn points(size: &str) -> Option<f32> {
 /// held to the same rule here. The exceptions are a node's two labels on
 /// the canvas: its name, whose size is one of the ways node types are told
 /// apart, and its type, written between two terminals where there is less
-/// room than the window's size needs (see `tcs-diagram/src/style.rs`,
+/// room than the window's size needs (see `tcslib-diagram/src/style.rs`,
 /// `TYPE_SIZE`). And the Python windows are held to it too:
-/// a font they name with a size names the size from `tcs-ui.fonts`.
+/// a font they name with a size names the size from `tcslib-ui.fonts`.
 #[test]
 fn no_text_is_set_smaller_than_the_one_size() {
     let mut files = Vec::new();
@@ -222,7 +224,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
     }
 
     for python in [
-        "python/tcs_ui/beacon_panel.py",
+        "python/tcslib_ui/beacon_panel.py",
         "examples/ping/ping_gateway.py",
     ] {
         let text =

@@ -67,8 +67,10 @@ XTCE_DIGEST := cd $(TCS_XTCE)/python && python3 -m tcs_xtce.digest_cli
 PY_RUNTIME := \
 	's/^from tcsxtce import packet as pk$$/from ._xtce import packet as pk/'
 
-# Stop, saying what to do, unless the tcs-xtce checkout is there, at the
-# version Cargo.toml pins the crate to, and has its XML binding,
+# Stop, saying what to do, unless the tcs-xtce checkout is there, its
+# runtime, rust/tcsxtce, at the version Cargo.toml pins the crate to -- the
+# runtime's own version, which tcs-xtce's may pass when only the compiler
+# changes -- and has its XML binding,
 # python/tcs_xtce/generated.py, which git does not keep and the generator
 # reads XTCE with.
 .PHONY: tcs-xtce
@@ -80,9 +82,9 @@ tcs-xtce:
 		exit 1; \
 	fi
 	@version=$$(sed -n 's/^version = "\(.*\)"$$/\1/p' \
-		"$(TCS_XTCE)/pyproject.toml"); \
+		"$(TCS_XTCE)/rust/tcsxtce/Cargo.toml"); \
 	if [ "$$version" != "$(XTCE_PIN)" ]; then \
-		echo "The tcs-xtce checkout at $(TCS_XTCE) is version" \
+		echo "The tcs-xtce checkout at $(TCS_XTCE) has tcsxtce" \
 			"$$version, and tcsprotocol/Cargo.toml pins" \
 			"tcsxtce to $(XTCE_PIN): check out v$(XTCE_PIN)" \
 			"there, or change the pin and regenerate." >&2; \

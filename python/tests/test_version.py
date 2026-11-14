@@ -1,7 +1,8 @@
-"""The distribution's version is the workspace's.
+"""The distributions' versions are the workspace's.
 
-python/pyproject.toml states the version pip installs, and the workspace's
-Cargo.toml the one every crate and system package carries. A version is
+python/pyproject.toml and tcs-ui/python/pyproject.toml state the versions
+pip installs, and the workspace's Cargo.toml the one every crate and
+system package carries. A version is
 stated once wherever it can be, but pyproject.toml has to state its own, so
 this holds the two together instead.
 """
@@ -38,11 +39,12 @@ def stated(path, section):
 
 
 class VersionTest(unittest.TestCase):
-    def test_the_distribution_is_the_workspaces_version(self):
+    def test_the_distributions_are_the_workspaces_version(self):
         workspace = stated(ROOT / "Cargo.toml", "[workspace.package]")
-        distribution = stated(ROOT / "python" / "pyproject.toml", "[project]")
         self.assertIsNotNone(workspace)
-        self.assertEqual(distribution, workspace)
+        for project in (ROOT / "python", ROOT / "tcs-ui" / "python"):
+            distribution = stated(project / "pyproject.toml", "[project]")
+            self.assertEqual(distribution, workspace, project)
 
 
 if __name__ == "__main__":

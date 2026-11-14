@@ -5,11 +5,12 @@ Group:          Applications/System
 
 %description
 tcspecial, the TCSpecial Flight Executive, runs a spacecraft's payloads as
-nodes in a configured graph and relays their data and commands to and from the
-mission operations center over UDP. This package is what flies: tcspecial
-itself, tcs-verify, the five test app programs under /opt/tcs/libexec, the
-manual, and the example configurations. A systemd unit, tcspecial.service, is
-installed but not enabled.
+nodes in a configured graph and relays their data and commands to and from
+the mission operations center over UDP. This package is what flies,
+operational code alone: tcspecial itself, with its README, licences and
+notices. The configuration checker and the test apps are the tcs-tools and
+tcspecial-test packages, and the manuals and examples tcspecial-doc. A
+systemd unit, tcspecial.service, is installed but not enabled.
 
 %install
 cp -a %{tcs_stage}/. %{buildroot}/
@@ -34,21 +35,12 @@ fi
 %dir /opt/tcs
 %dir /opt/tcs/bin
 %dir /opt/tcs/sbin
-%dir /opt/tcs/libexec
 %dir /opt/tcs/share
 %dir /opt/tcs/share/doc
-%dir /opt/tcs/share/examples
 %dir /etc/opt/tcs
 %dir /var/opt/tcs
 /opt/tcs/bin/tcspecial
-/opt/tcs/bin/tcs-verify
-/opt/tcs/libexec/app_pl
-/opt/tcs/libexec/app_all_pl
-/opt/tcs/libexec/app_gateway_veh
-/opt/tcs/libexec/app_payload_veh
-/opt/tcs/libexec/app_all_veh
 %doc /opt/tcs/share/doc/tcspecial
-/opt/tcs/share/examples/tcspecial
 %dir /etc/opt/tcs/tcspecial
 %dir /var/opt/tcs/tcspecial
 %config(noreplace) /etc/profile.d/tcspecial.sh

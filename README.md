@@ -53,21 +53,26 @@ each for viewing.
 
 # Installing
 
-Everything installs under `/opt/tcs`, as three packages:
+Everything installs under `/opt/tcs`, as five packages, each built as a
+.deb and as an RPM. A package with operational code holds nothing else:
 
-* `tcspecial`, what flies: `bin/tcspecial`, `bin/tcs-verify`,
-  the five test app programs in `libexec/`, the documents and the example
-  configurations, and a systemd unit, `tcspecial.service`, installed but not
-  enabled.
-* `tcspecial-moc`, what a ground station is built on: `libtcsmoc-c` for C
-  and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
-  `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python
-  packages `tcsprotocol`, `tcsmoc` and `tcs_ui`, and `bin/tcs-gui`
-  with its data.
-* `tcspecial-test`, the test ground station and simulator: `bin/tcs-moc` and
-  `bin/tcs-sim`, and `bin/segsend`, the test one, which deletes each
-  telemetry log segment. A vehicle that keeps a log puts its own segsend in
+* `tcspecial`, operational code, what flies: `bin/tcspecial`, with its
+  README, licences and notices, and a systemd unit, `tcspecial.service`,
+  installed but not enabled.
+* `tcsmoc`, operational code, what a ground station is built on:
+  `libtcsmoc-c` for C and C++ (`lib/libtcsmoc-c.so.4`, `lib/libtcsmoc-c.a`,
+  `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python packages
+  `tcsprotocol` and `tcsmoc`, and the configuration schemas. It was
+  `tcspecial-moc`, which it replaces.
+* `tcs-tools`, software tools: `bin/tcs-gui` with its data,
+  `bin/tcs-verify`, and the Python `tcs_ui`.
+* `tcspecial-test`, verification tools: the test ground station and
+  simulator, `bin/tcs-moc` and `bin/tcs-sim`; `bin/segsend`, the test one,
+  which deletes each telemetry log segment; and the five test app programs
+  in `libexec/`. A vehicle that keeps a log puts its own segsend in
   `/opt/tcs/bin` instead.
+* `tcspecial-doc`, the manuals and designs, and the example
+  configurations, which the manuals' figures come from.
 
 Building them needs checkouts of
 [tcs-helpers](https://github.com/vomlehn/tcs-helpers) and
@@ -84,12 +89,13 @@ without them:
      make install-build && sudo make install-files HOOKS=1
      make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix
      pip install ./python                    # the Python alone
+     pip install ./tcs-ui/python             # and tcs_ui, which needs it
      cargo install --path tcs-verify --root /opt/tcs
      cc station.c $(pkg-config --cflags --libs tcsmoc-c)
 
 `HOOKS=1`, which the packages have, also installs what puts `/opt/tcs` on
 the search paths: `/etc/profile.d/<package>.sh`,
-`/etc/ld.so.conf.d/tcspecial-moc.conf` and a `.pth` file for python3.
+`/etc/ld.so.conf.d/tcsmoc.conf` and a `.pth` file for python3.
 Each .deb also carries what Debian expects of every package:
 `/usr/share/doc/<package>/copyright` and `changelog.Debian.gz`, made as it
 is built, and lintian's overrides in `/usr/share/lintian/overrides`.
@@ -139,8 +145,7 @@ Operational code, which a mission depends on while it operates:
   tcspecial and every program that reads a configuration asks.
 * [`tcsapp/`](tcsapp/): the file interfaces an app node's program runs with.
 * [`python/`](python/): the Python spellings of tcsprotocol and tcsmoc,
-  for ground stations written in Python, and of tcs-ui, `tcs_ui`, a
-  software tool.
+  for ground stations written in Python.
 
 Software tools, which make or check what operational code is built from or
 loads:
@@ -150,7 +155,8 @@ loads:
 * [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-gui
   and tcspecial's visual window, which never flies.
 * [`tcs-ui/`](tcs-ui/): the window pieces tcs-moc and the desk tools
-  share: the beacon and ping panels, fonts and colours.
+  share: the beacon and ping panels, fonts and colours, in Rust and Slint,
+  and in Python, `tcs-ui/python`, a distribution of its own.
 * [`tools/`](tools/): `tools/convert-format.py`, which rewrites a
   configuration from the old shape into the new.
 

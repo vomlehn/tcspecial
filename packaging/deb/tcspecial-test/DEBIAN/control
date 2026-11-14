@@ -4,6 +4,8 @@ Architecture: @ARCH@
 Maintainer: David VomLehn <dvomlehn@gmail.com>
 Installed-Size: @SIZE@
 Depends: @SHLIBS@, tcspecial (= @VERSION@)
+Replaces: tcspecial (<< 0.1.1)
+Breaks: tcspecial (<< 0.1.1)
 Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
@@ -12,7 +14,9 @@ Description: tcspecial's test ground station and payload simulator
  tcs-sim, which simulates the payloads a configuration describes. tcs-moc
  starts the tcspecial installed beside it and tcs-sim, both with the
  simulation mode it was given. Also the test segsend, which deletes each
- filled telemetry log segment it is given. Test software, never flown.
+ filled telemetry log segment it is given, and the five test app programs,
+ under /opt/tcs/libexec, that the app node types are tested with.
+ Verification tools, never flown.
  Everything is under /opt/tcs. /etc/profile.d/tcspecial-test.sh puts
  /opt/tcs/bin on a login shell's search path, and
  /opt/tcs/sbin/tcspecial-test-links links the programs into /usr/local/bin

@@ -80,7 +80,7 @@ SCHEMADIR = $(DATADIR)/tcspecial/schema
 
 # Where the hooks go. Debian's places; the RPM writes its .pth file when
 # it is installed, in Fedora's place, which names python3's minor version:
-# see packaging/rpm/tcspecial-moc.spec.
+# see packaging/rpm/tcsmoc.spec.
 PROFILEDIR ?= /etc/profile.d
 LDCONFDIR ?= /etc/ld.so.conf.d
 SYSTEMDDIR ?= /usr/lib/systemd/system
@@ -227,12 +227,12 @@ help:
 	@echo "  make install-build - The release build install-files copies"
 	@echo "  make install-files - Copy a build already made under PREFIX" \
 		"(/opt/tcs)"
-	@echo "  make install-tcspecial, install-tcspecial-moc," \
-		"install-tcspecial-test"
+	@echo "  make install-tcspecial, install-tcsmoc, install-tcs-tools," \
+		"install-tcspecial-test, install-tcspecial-doc"
 	@echo "                   - Copy one package's files from a build" \
 		"already made"
-	@echo "  make install-data - Install tcs-gui's descriptions and the" \
-		"configuration schemas"
+	@echo "  make install-data - Install tcs-gui's descriptions"
+	@echo "  make install-schemas - Install the configuration schemas"
 	@echo "  make uninstall-files - Take away what install-files put in" \
 		"place"
 	@echo "  make links       - Link the installed programs into" \
@@ -523,7 +523,8 @@ operational-names: tcs-helpers
 	$(TCS_HELPERS)/bin/operational-names \
 		$(addprefix --install ,$(INSTALL_CRATES)) \
 		--desk-feature tcspecial/visual=tcs-diagram \
-		--pyproject python/pyproject.toml
+		--pyproject python/pyproject.toml \
+		--pyproject tcs-ui/python/pyproject.toml
 
 # Compare the two spellings of every one of them.
 #
@@ -798,16 +799,25 @@ distclean: clean
 
 # What is installed, by package.
 #
-# Three packages, because three kinds of machine take them. tcspecial is
-# what flies, and nothing a vehicle does not need is in it; tcspecial-moc
-# is what a ground station is built on; tcspecial-test is the test ground
-# station and the payload simulator, which never fly. Each install-<package>
-# target below installs one, so the lists here are the whole account of
-# which file is in which package, for `make install`, the .debs and the RPMs
-# alike.
+# Four packages, since a package with operational code holds nothing else
+# (see "The categories of TCS software" in docs/manual.rst):
 #
-# The five app programs are what the five app node types are tested with,
-# and are run by tcspecial rather than by a person, so they go in libexec: a
+#   tcspecial       operational code: what flies, the flight executive
+#   tcsmoc          operational code: what a ground station is built on,
+#                   libtcsmoc-c and the Python tcsprotocol and tcsmoc
+#   tcs-tools       software tools: tcs-gui and tcs-verify, which write and
+#                   check configurations, and tcs_ui
+#   tcspecial-test  verification tools: tcs-moc, tcs-sim, the test segsend
+#                   and the five test apps
+#   tcspecial-doc   the manuals and designs, and the example configurations
+#                   their figures come from
+#
+# Each install-<package> target below installs one, so the lists here are
+# the whole account of which file is in which package, for `make install`,
+# the .debs and the RPMs alike.
+#
+# The five test apps are what the five app node types are tested with, and
+# are run by tcspecial rather than by a person, so they go in libexec: a
 # configuration names one as `executable: /opt/tcs/libexec/app_pl`. A
 # mission's own app is its own program, installed wherever its node's
 # `executable` says. tcsapp's stray_app and the examples' programs are tests
@@ -819,11 +829,11 @@ distclean: clean
 # its own segsend beside tcspecial instead, and no package of ours then owns
 # the file or overwrites it on an upgrade. The test one goes in the same
 # bin, beside tcspecial, which is where tcspecial looks for it.
-FLIGHT_BIN := tcspecial tcs-verify
-FLIGHT_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
-GROUND_BIN := tcs-gui
+FLIGHT_BIN := tcspecial
+TOOLS_BIN := tcs-gui tcs-verify
 TEST_BIN := tcs-moc tcs-sim segsend
-PACKAGES := tcspecial tcspecial-moc tcspecial-test
+TEST_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
+PACKAGES := tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-doc
 # Its programs with windows are built with Slint, whose royalty-free
 # licence asks for its badge where they are downloaded: make
 # publish-release adds it to the notes of every release (see tcs-helpers'
@@ -832,16 +842,17 @@ RELEASE_ATTRIBUTION := slint
 
 # The crates those come from, built together by install-build.
 INSTALL_CRATES := tcspecial tcs-verify tcs-gui tcsmoc-c tcs-moc tcs-sim \
-		  $(FLIGHT_LIBEXEC)
+		  $(TEST_LIBEXEC)
 
 # The crates each package's programs and libraries are built from, whose
 # dependencies its THIRD-PARTY-NOTICES lists: every crate compiled into a
 # program has licence notices that must go with it, which tcs-helpers'
 # third-party-notices.py gathers. segsend is a program of the tcspecial
 # crate's.
-FLIGHT_CRATES := tcspecial tcs-verify $(FLIGHT_LIBEXEC)
-GROUND_CRATES := tcs-gui tcsmoc-c
-TEST_CRATES := tcs-moc tcs-sim tcspecial
+FLIGHT_CRATES := tcspecial
+MOC_CRATES := tcsmoc-c
+TOOLS_CRATES := tcs-gui tcs-verify
+TEST_CRATES := tcs-moc tcs-sim tcspecial $(TEST_LIBEXEC)
 
 # Where cargo puts a release build.
 RELEASE_DIR = $(or $(CARGO_TARGET_DIR),target)/release
@@ -951,7 +962,7 @@ install-tools:
 	bin/install-tools $(if $(filter 1,$(DRY_RUN)),--dry-run) \
 		$(if $(filter 0,$(PACKAGING)),--no-packaging)
 
-# Copy all three packages' files into place from a build already made,
+# Copy all five packages' files into place from a build already made,
 # under PREFIX and DESTDIR: what `make install` once did, kept for
 # development and for `make stage`, which cuts the packages from it; `make
 # install` installs the packages. The build is cargo's release build of the
@@ -971,46 +982,22 @@ install-files: $(addprefix install-,$(PACKAGES))
 # wrong payloads. The second is for the state file and the telemetry log,
 # which a configuration names.
 #
-# The manual finds its figures at ../examples, as it does in the source
-# tree, so share/doc/tcspecial/examples links to the installed examples,
-# which have the diagrams beside the configurations. An example that starts
-# with "#!" is a script to run, so it would be installed executable and the
-# rest are not; none of today's does.
+# Its README, licences and notices go with it; the manuals are
+# tcspecial-doc's.
 .PHONY: install-tcspecial
 install-tcspecial: tcs-helpers
 	@echo "Installing $(PROJECT_NAME) under $(DESTDIR)$(PREFIX)..."
-	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(LIBEXECDIR)
+	install -d -m 755 $(DESTDIR)$(BINDIR)
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(FLIGHT_BIN)) \
 		$(DESTDIR)$(BINDIR)
-	install -m 755 $(addprefix $(RELEASE_DIR)/,$(FLIGHT_LIBEXEC)) \
-		$(DESTDIR)$(LIBEXECDIR)
-	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(FLIGHT_BIN)) \
-		$(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(FLIGHT_LIBEXEC)),)
+	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(FLIGHT_BIN)),)
 	$(call install_links,tcspecial,$(FLIGHT_BIN))
-	install -d -m 755 $(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)
 	$(THIRD_PARTY_NOTICES) . \
 		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/THIRD-PARTY-NOTICES \
 		tcspecial $(FLIGHT_CRATES)
-	install -m 644 $(DOCS_DIR)/*.html $(DOCS_DIR)/*.svg \
-		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs
-	install -d -m 755 $(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs/shots
-	install -m 644 $(DOCS_DIR)/shots/*.png \
-		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/docs/shots
-	for file in $(EXAMPLE_FILES); do \
-		to=$(DESTDIR)$(EXAMPLEDIR)/$${file#examples/}; \
-		if [ -L $$file ]; then \
-			install -d -m 755 $$(dirname $$to) && \
-				ln -sfn $$(readlink $$file) $$to || exit 1; \
-			continue; \
-		fi; \
-		mode=644; \
-		[ "$$(head -c 2 $$file)" != '#!' ] || mode=755; \
-		install -D -m $$mode $$file $$to || exit 1; \
-	done
-	ln -sfn ../../examples/$(PROJECT_NAME) \
-		$(DESTDIR)$(DOCDIR)/$(PROJECT_NAME)/examples
 	install -d -m 755 $(DESTDIR)$(SYSCONFDIR)/$(PROJECT_NAME) \
 		$(DESTDIR)$(LOCALSTATEDIR)/$(PROJECT_NAME)
 	if [ "$(HOOKS)" = 1 ]; then \
@@ -1026,8 +1013,8 @@ install-tcspecial: tcs-helpers
 			$(DESTDIR)$(SYSTEMDDIR)/tcspecial.service; \
 	fi
 
-# What a ground station is built on: libtcsmoc-c for C and C++, the Python
-# packages, and the configuration editor with its data.
+# What a ground station is built on: libtcsmoc-c for C and C++, and the
+# Python tcsprotocol and tcsmoc, with the schemas they read.
 #
 # Cargo builds it as libtcsmoc_c, a crate's name having no hyphen, and it is
 # installed as libtcsmoc-c. libtcsmoc-c.so is installed under its soname,
@@ -1047,13 +1034,11 @@ install-tcspecial: tcs-helpers
 # `sudo make install-files` would be root's. The direct_url.json pip
 # writes names that copy, which is gone by then, so it is removed, with its
 # line in RECORD.
-.PHONY: install-tcspecial-moc
-install-tcspecial-moc: install-data tcs-helpers tcs-xtce
-	@echo "Installing tcspecial-moc under $(DESTDIR)$(PREFIX)..."
-	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(INCLUDEDIR) \
+.PHONY: install-tcsmoc
+install-tcsmoc: install-schemas tcs-helpers tcs-xtce
+	@echo "Installing tcsmoc under $(DESTDIR)$(PREFIX)..."
+	install -d -m 755 $(DESTDIR)$(INCLUDEDIR) \
 		$(DESTDIR)$(LIBDIR)/pkgconfig $(DESTDIR)$(PYTHONDIR)
-	install -m 755 $(addprefix $(RELEASE_DIR)/,$(GROUND_BIN)) \
-		$(DESTDIR)$(BINDIR)
 	install -m 644 tcsmoc-c/include/tcsmoc-c.h \
 		$(DESTDIR)$(INCLUDEDIR)
 	install -m 644 $(RELEASE_DIR)/libtcsmoc_c.so \
@@ -1061,14 +1046,12 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 	ln -sf $(LIBTCS_SONAME) $(DESTDIR)$(LIBDIR)/libtcsmoc-c.so
 	install -m 644 $(RELEASE_DIR)/libtcsmoc_c.a \
 		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a
-	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(GROUND_BIN)) \
-		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME), \
+	$(call strip_installed,$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME), \
 		$(DESTDIR)$(LIBDIR)/libtcsmoc-c.a)
-	$(call install_links,tcspecial-moc,$(GROUND_BIN))
 	$(SUBST) packaging/tcsmoc-c.pc.in \
 		> $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 	chmod 644 $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
-# The schemas the Python reads are tcsprotocol/schema, which install-data
+# The schemas the Python reads are tcsprotocol/schema, which install-schemas
 # puts under $(SCHEMADIR): the installed package reaches them through a link, as
 # python/tcsprotocol/schema does in the source tree, rather than carrying a
 # second copy that could differ from the first.
@@ -1090,49 +1073,126 @@ install-tcspecial-moc: install-data tcs-helpers tcs-xtce
 	ln -s $$(realpath -m --relative-to=$(PYTHONDIR)/tcsprotocol \
 		$(SCHEMADIR)) "$$schema"; \
 	sed -i '/^tcsprotocol\/schema\//d' "$$dist/RECORD"
-	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-moc/tcsmoc-c \
-		$(DESTDIR)$(DOCDIR)/tcspecial-moc/python
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcsmoc/tcsmoc-c \
+		$(DESTDIR)$(DOCDIR)/tcsmoc/python
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
-		$(DESTDIR)$(DOCDIR)/tcspecial-moc
+		$(DESTDIR)$(DOCDIR)/tcsmoc
 	$(THIRD_PARTY_NOTICES) . \
-		$(DESTDIR)$(DOCDIR)/tcspecial-moc/THIRD-PARTY-NOTICES \
-		tcspecial-moc $(GROUND_CRATES)
+		$(DESTDIR)$(DOCDIR)/tcsmoc/THIRD-PARTY-NOTICES \
+		tcsmoc $(MOC_CRATES)
 	install -m 644 tcsmoc-c/README.html \
-		$(DESTDIR)$(DOCDIR)/tcspecial-moc/tcsmoc-c
+		$(DESTDIR)$(DOCDIR)/tcsmoc/tcsmoc-c
 	install -m 644 python/README.md \
-		$(DESTDIR)$(DOCDIR)/tcspecial-moc/python
+		$(DESTDIR)$(DOCDIR)/tcsmoc/python
 	if [ "$(HOOKS)" = 1 ]; then \
 		set -e; \
 		install -d -m 755 $(DESTDIR)$(PROFILEDIR) \
 			$(DESTDIR)$(LDCONFDIR) $(DESTDIR)$(PTHDIR); \
-		$(SUBST) -e 's|@PACKAGE@|tcspecial-moc|g' \
+		$(SUBST) -e 's|@PACKAGE@|tcsmoc|g' \
 			packaging/hooks/profile-moc.sh.in \
-			> $(DESTDIR)$(PROFILEDIR)/tcspecial-moc.sh; \
+			> $(DESTDIR)$(PROFILEDIR)/tcsmoc.sh; \
 		echo $(LIBDIR) \
-			> $(DESTDIR)$(LDCONFDIR)/tcspecial-moc.conf; \
+			> $(DESTDIR)$(LDCONFDIR)/tcsmoc.conf; \
 		echo $(PYTHONDIR) \
-			> $(DESTDIR)$(PTHDIR)/tcspecial-moc.pth; \
-		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-moc.sh \
-			$(DESTDIR)$(LDCONFDIR)/tcspecial-moc.conf \
-			$(DESTDIR)$(PTHDIR)/tcspecial-moc.pth; \
+			> $(DESTDIR)$(PTHDIR)/tcsmoc.pth; \
+		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcsmoc.sh \
+			$(DESTDIR)$(LDCONFDIR)/tcsmoc.conf \
+			$(DESTDIR)$(PTHDIR)/tcsmoc.pth; \
 	fi
 	@if [ "$(HOOKS)" = 1 ] && [ -z "$(DESTDIR)" ]; then \
 		echo "Run ldconfig as root so the loader finds" \
 			"$(LIBTCS_SONAME)."; \
 	fi
 
-# The test ground station and the payload simulator, and the test segsend.
+# The software tools: tcs-gui, the configuration editor, with its data;
+# tcs-verify, the configuration checker; and tcs_ui, the Python window
+# pieces, whose distribution, tcs-ui, is pip's to install from a copy of
+# tcs-ui/python, as tcsmoc's is, and which has a .pth file of its own.
+.PHONY: install-tcs-tools
+install-tcs-tools: install-data tcs-helpers
+	@echo "Installing tcs-tools under $(DESTDIR)$(PREFIX)..."
+	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(PYTHONDIR) \
+		$(DESTDIR)$(DOCDIR)/tcs-tools
+	install -m 755 $(addprefix $(RELEASE_DIR)/,$(TOOLS_BIN)) \
+		$(DESTDIR)$(BINDIR)
+	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(TOOLS_BIN)),)
+	$(call install_links,tcs-tools,$(TOOLS_BIN))
+	set -e; \
+	tmp=$$(mktemp -d -t tcs-ui-py.XXXXXXXXXX); \
+	trap 'rm -rf "$$tmp"' EXIT; \
+	cp -RL tcs-ui/python "$$tmp/"; \
+	rm -rf "$$tmp/python/build" "$$tmp/python/tests" \
+		"$$tmp"/python/*.egg-info; \
+	find "$$tmp" -name __pycache__ -type d -prune -exec rm -rf {} +; \
+	python3 -m pip install --quiet --upgrade --no-deps \
+		--no-build-isolation --no-compile \
+		--target $(DESTDIR)$(PYTHONDIR) "$$tmp/python"; \
+	dist=$$(echo $(DESTDIR)$(PYTHONDIR)/tcs_ui-*.dist-info); \
+	rm -f "$$dist/direct_url.json"; \
+	sed -i '/^tcs_ui-[^/]*\.dist-info\/direct_url\.json,/d' \
+		"$$dist/RECORD"
+	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
+		$(DESTDIR)$(DOCDIR)/tcs-tools
+	$(THIRD_PARTY_NOTICES) . \
+		$(DESTDIR)$(DOCDIR)/tcs-tools/THIRD-PARTY-NOTICES \
+		tcs-tools $(TOOLS_CRATES)
+	if [ "$(HOOKS)" = 1 ]; then \
+		set -e; \
+		install -d -m 755 $(DESTDIR)$(PROFILEDIR) $(DESTDIR)$(PTHDIR); \
+		$(SUBST) -e 's|@PACKAGE@|tcs-tools|g' \
+			packaging/hooks/profile.sh.in \
+			> $(DESTDIR)$(PROFILEDIR)/tcs-tools.sh; \
+		echo $(PYTHONDIR) > $(DESTDIR)$(PTHDIR)/tcs-tools.pth; \
+		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcs-tools.sh \
+			$(DESTDIR)$(PTHDIR)/tcs-tools.pth; \
+	fi
+
+# The documents: the manuals and designs, and the example configurations,
+# which the manuals' figures come from. The manuals find them at ../examples,
+# as they do in the source tree, so share/doc/tcspecial-doc/examples links
+# to the installed examples, which have the diagrams beside the
+# configurations. An example that starts with "#!" is a script to run, so it
+# would be installed executable and the rest are not; none of today's does.
+.PHONY: install-tcspecial-doc
+install-tcspecial-doc: tcs-helpers
+	@echo "Installing tcspecial-doc under $(DESTDIR)$(PREFIX)..."
+	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-doc/docs/shots
+	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
+		$(DESTDIR)$(DOCDIR)/tcspecial-doc
+	install -m 644 $(DOCS_DIR)/*.html $(DOCS_DIR)/*.svg \
+		$(DESTDIR)$(DOCDIR)/tcspecial-doc/docs
+	install -m 644 $(DOCS_DIR)/shots/*.png \
+		$(DESTDIR)$(DOCDIR)/tcspecial-doc/docs/shots
+	ln -sfn ../../examples/$(PROJECT_NAME) \
+		$(DESTDIR)$(DOCDIR)/tcspecial-doc/examples
+	for file in $(EXAMPLE_FILES); do \
+		to=$(DESTDIR)$(EXAMPLEDIR)/$${file#examples/}; \
+		if [ -L $$file ]; then \
+			install -d -m 755 $$(dirname $$to) && \
+				ln -sfn $$(readlink $$file) $$to || exit 1; \
+			continue; \
+		fi; \
+		mode=644; \
+		[ "$$(head -c 2 $$file)" != '#!' ] || mode=755; \
+		install -D -m $$mode $$file $$to || exit 1; \
+	done
+
+# The verification tools: the test ground station, the payload simulator,
+# the test segsend and the five test apps.
 #
 # tcs-moc starts the tcspecial and the tcs-sim beside it, so these go in the
 # same bin as tcspecial does: see child_command in tcs-moc/src/main.rs.
 .PHONY: install-tcspecial-test
 install-tcspecial-test: tcs-helpers
 	@echo "Installing tcspecial-test under $(DESTDIR)$(PREFIX)..."
-	install -d -m 755 $(DESTDIR)$(BINDIR) \
+	install -d -m 755 $(DESTDIR)$(BINDIR) $(DESTDIR)$(LIBEXECDIR) \
 		$(DESTDIR)$(DOCDIR)/tcspecial-test
 	install -m 755 $(addprefix $(RELEASE_DIR)/,$(TEST_BIN)) \
 		$(DESTDIR)$(BINDIR)
-	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(TEST_BIN)),)
+	install -m 755 $(addprefix $(RELEASE_DIR)/,$(TEST_LIBEXEC)) \
+		$(DESTDIR)$(LIBEXECDIR)
+	$(call strip_installed,$(addprefix $(DESTDIR)$(BINDIR)/,$(TEST_BIN)) \
+		$(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(TEST_LIBEXEC)),)
 	$(call install_links,tcspecial-test,$(TEST_BIN))
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/tcspecial-test
@@ -1148,9 +1208,8 @@ install-tcspecial-test: tcs-helpers
 		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-test.sh; \
 	fi
 
-# Install tcs-gui's data -- the description tree and its schemas -- and the
-# XTCS, YTCS and simulator schemas of tcsprotocol/schema, under
-# $(SCHEMADIR).
+# Install tcs-gui's data -- the description tree and its schemas -- for
+# tcs-tools.
 #
 # The whole of tcs-gui/share, with its structure: the description tree's shape
 # is part of what it means -- a description at vehicle/compute/vote.yaml is
@@ -1172,11 +1231,18 @@ install-data:
 		-exec install -d -m 755 $(TCS_GUI_DATA)/{} \;
 	@cd $(GUI_NAME)/share && find . -type f \
 		-exec install -m 644 {} $(TCS_GUI_DATA)/{} \;
+	@echo "✓ $(GUI_NAME) data installed"
+
+# Install the XTCS, YTCS and simulator schemas of tcsprotocol/schema under
+# $(SCHEMADIR), for tcsmoc: they define the formats every program reads,
+# and tcsprotocol's Python reads them.
+.PHONY: install-schemas
+install-schemas:
 	@install -d -m 755 $(DESTDIR)$(SCHEMADIR)
 	@install -m 644 tcsprotocol/schema/README \
 		tcsprotocol/schema/*.xsd tcsprotocol/schema/*.json \
 		$(DESTDIR)$(SCHEMADIR)
-	@echo "✓ $(GUI_NAME) data installed"
+	@echo "✓ schemas installed"
 
 # Take away what `make install-files` put in place, with the same PREFIX,
 # DESTDIR and HOOKS it was given; `make uninstall` removes the packages.
@@ -1195,9 +1261,9 @@ uninstall-files:
 		script=$(DESTDIR)$(SBINDIR)/$$package-links; \
 		[ -x $$script ] && $$script --remove --dir $(LINKDIR); \
 	done; true
-	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(FLIGHT_BIN) $(GROUND_BIN) \
+	rm -f $(addprefix $(DESTDIR)$(BINDIR)/,$(FLIGHT_BIN) $(TOOLS_BIN) \
 		$(TEST_BIN))
-	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(FLIGHT_LIBEXEC))
+	rm -f $(addprefix $(DESTDIR)$(LIBEXECDIR)/,$(TEST_LIBEXEC))
 	rm -f $(addprefix $(DESTDIR)$(SBINDIR)/,$(addsuffix -links,$(PACKAGES)))
 	rm -f $(DESTDIR)$(INCLUDEDIR)/tcsmoc-c.h
 	rm -f $(DESTDIR)$(LIBDIR)/libtcsmoc-c.so \
@@ -1205,15 +1271,16 @@ uninstall-files:
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcsprotocol tcsmoc \
-		tcs_ui tcspecial_moc-*.dist-info)
+		tcs_ui tcspecial_moc-*.dist-info tcs_ui-*.dist-info)
 	rm -rf $(TCS_GUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
 		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))
 	if [ "$(HOOKS)" = 1 ]; then \
 		rm -f $(addprefix $(DESTDIR)$(PROFILEDIR)/,$(addsuffix .sh, \
 			$(PACKAGES))) \
-			$(DESTDIR)$(LDCONFDIR)/tcspecial-moc.conf \
-			$(DESTDIR)$(PTHDIR)/tcspecial-moc.pth \
+			$(DESTDIR)$(LDCONFDIR)/tcsmoc.conf \
+			$(DESTDIR)$(PTHDIR)/tcsmoc.pth \
+			$(DESTDIR)$(PTHDIR)/tcs-tools.pth \
 			$(DESTDIR)$(SYSTEMDDIR)/tcspecial.service; \
 	fi
 	-for dir in $(DESTDIR)$(INCLUDEDIR) \

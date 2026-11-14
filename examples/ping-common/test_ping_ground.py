@@ -15,6 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parents[1] / "python"))
+sys.path.insert(0, str(HERE.parents[1] / "tcs-ui" / "python"))
 sys.path.insert(0, str(HERE))
 
 from ping_ground import Pinger, interval, precise_time, report  # noqa: E402

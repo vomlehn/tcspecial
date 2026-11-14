@@ -703,9 +703,9 @@ nothing of either. Nor does it cover the <tt class="docutils literal">.deb</tt> 
 a project installs with, which are named for the project and for what
 they install. tcspecial's are split so that none holds both --
 <tt class="docutils literal">tcspecial</tt>, the flight executive, and <tt class="docutils literal">tcsmoc</tt>, what a station is
-built on, hold operational code and nothing else; <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> and
-<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> hold the rest -- but the names are not held to the
-rule: <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> is no operational code. Nor pkg-config files, which
+built on, hold operational code and nothing else; <tt class="docutils literal"><span class="pre">tcs-tools</span></tt>,
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> and <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt> hold the rest -- but the names
+are not held to the rule: <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> is no operational code. Nor pkg-config files, which
 tell a compiler how to build with a library: managing the compiler is
 outside how TCS manages its versions. Nor any other kind of name:
 installed directories, configuration keys, environment variables,
@@ -11010,14 +11010,15 @@ files, should TCS install any, would raise the same question.</p>
 <blockquote>
 <p>The packages TCS installs with are left out of the rule too: the
 <tt class="docutils literal">.deb</tt> and <tt class="docutils literal">.rpm</tt> packages (<tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal">tcsmoc</tt>,
-<tt class="docutils literal"><span class="pre">tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal">tcslog</tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>,
-<tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>) and the Python distributions pip builds (<tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>
-among them). tcspecial's are split already, so that a vehicle or a
-station can be given its operational code and nothing else:
-<tt class="docutils literal">tcspecial</tt> holds the flight executive and its manuals, <tt class="docutils literal">tcsmoc</tt>
-what a station is built on, <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> the editor, the checker and
-the examples, and <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> the test station, the simulator
-and the test apps.</p>
+<tt class="docutils literal"><span class="pre">tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt>, <tt class="docutils literal">tcslog</tt>,
+<tt class="docutils literal"><span class="pre">tcslog-gen</span></tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>, <tt class="docutils literal">tcsxtce</tt>, <tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>) and the
+Python distributions pip builds (<tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>, <tt class="docutils literal"><span class="pre">tcs-ui</span></tt> and
+<tt class="docutils literal"><span class="pre">tcs-xtce</span></tt> among them). Every project's are split, so that a vehicle
+or a station can be given its operational code and nothing else:
+<tt class="docutils literal">tcspecial</tt> holds the flight executive, <tt class="docutils literal">tcsmoc</tt> what a station is
+built on, <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> the editor and the checker, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>
+the test station, the simulator and the test apps, and
+<tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt> the manuals and the examples.</p>
 <p>Bringing the names in would mean naming each package by the rule, so
 that a package's name alone says what it is being given --
 <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> reads as operational code and holds none -- and

@@ -1,7 +1,7 @@
-# What rpmlint is to accept in the tcspecial, tcspecial-moc and
-# tcspecial-test RPMs, read by `make lint-packages` and never shipped. Each
-# filter is a finding that is intended, with why; anything else rpmlint
-# reports is to be fixed.
+# What rpmlint is to accept in the tcspecial, tcsmoc, tcs-tools,
+# tcspecial-test and tcspecial-doc RPMs, read by `make lint-packages` and
+# never shipped. Each filter is a finding that is intended, with why;
+# anything else rpmlint reports is to be fixed.
 
 # Debian's rpmlint, unlike Fedora's, comes with no list of licences it
 # knows, and so calls every one invalid. rpmlint splits the SPDX expression
@@ -12,13 +12,12 @@ Filters = [
 	# An add-on package lives under /opt/<package>, as FHS 3.0 section
 	# 3.13 lays it out, and /opt/tcs is the tree every TCS package shares.
 	' dir-or-file-in-opt ',
-	# tcspecial-moc holds libtcsmoc-c and what is built against
-	# it, tcsmoc-c.h, tcsmoc-c.pc and the static library, by
-	# design: there is no -devel package for them to go in. The Python
-	# packages and the editor's data beside the library are not named for
-	# its version either.
-	'^tcspecial-moc\.[^:]+: [EW]: non-versioned-file-in-library-package ',
-	'^tcspecial-moc\.[^:]+: [EW]: devel-file-in-non-devel-package ',
+	# tcsmoc holds libtcsmoc-c and what is built against it, tcsmoc-c.h,
+	# tcsmoc-c.pc and the static library, by design: there is no -devel
+	# package for them to go in. The Python packages and the schemas
+	# beside the library are not named for its version either.
+	'^tcsmoc\.[^:]+: [EW]: non-versioned-file-in-library-package ',
+	'^tcsmoc\.[^:]+: [EW]: devel-file-in-non-devel-package ',
 	# With STRIP=1, the default, the static library is stripped of its
 	# debugging information on purpose, keeping the symbols a link needs.
 	' static-library-without-debuginfo /opt/tcs/lib/libtcsmoc-c\.a$',
@@ -26,19 +25,23 @@ Filters = [
 	# default, and not the old SysV one as well.
 	' missing-hash-section /opt/tcs/lib/libtcsmoc-c\.so\.',
 	# Words of the trade that rpmlint's dictionary does not have.
-	" spelling-error \\('(libtcsmoc|gui|moc|config|pc|schemas)',",
-	# tcspecial-moc was tcspecial-ground, and obsoletes it so that an
-	# upgrade takes the old package out. Nothing requires the old name, so
-	# it is not provided: providing it at this version would have the
-	# package obsolete itself.
-	'^tcspecial-moc\.[^:]+: [EW]: obsolete-not-provided tcspecial-ground$',
+	" spelling-error \\('(libtcsmoc|gui|moc|config|pc|schemas|ui)',",
+	" spelling-error \\(\"tcspecial's\",",
+	" spelling-error \\('(tcspecial|licences)',",
+	# tcsmoc was tcspecial-moc, and before that tcspecial-ground, and
+	# obsoletes both so that an upgrade takes the old package out. Nothing
+	# requires the old names, so they are not provided: providing one at
+	# this version would have the package obsolete itself.
+	'^tcsmoc\.[^:]+: [EW]: obsolete-not-provided tcspecial-(ground|moc)$',
+	# tcs-tools takes tcs-gui from tcspecial-moc, which it obsoletes too.
+	'^tcs-tools\.[^:]+: [EW]: obsolete-not-provided tcspecial-moc$',
 	# "moc" is the mission operations center, not the ISO 639 code of
-	# Mocovi, so tcspecial-moc has no locales package to depend on.
-	'^tcspecial-moc\.[^:]+: [EW]: no-dependency-on locales-moc$',
+	# Mocovi, so tcsmoc has no locales package to depend on.
+	'^tcsmoc\.[^:]+: [EW]: no-dependency-on locales-moc$',
 	# The packages are not signed.
 	' no-signature',
 	# python-base is openSUSE's name; Fedora's python3 is depended on
-	# through the python3 tcspecial-moc requires.
+	# through the python3 tcsmoc requires.
 	' no-dependency-on python-base ',
 	# tcs-moc starts the tcspecial installed beside it, so tcspecial-test
 	# needs exactly the tcspecial built with it.
@@ -46,5 +49,16 @@ Filters = [
 	# The rm the triggers and %preun run takes away only the package's own
 	# .pth file, which the python3 installed says where to write, so it
 	# cannot be a file the package lists.
-	'^tcspecial-moc\.[^:]+: E: dangerous-command-in-%(trigger|preun) rm$',
+	'^(tcsmoc|tcs-tools)\.[^:]+: E: dangerous-command-in-%(trigger|preun) rm$',
+	# tcs-tools' tcs_ui imports tcsmoc and shows what its beacon code works
+	# out, so it needs exactly the tcsmoc built with it.
+	'^tcs-tools\.[^:]+: [EW]: requires-on-release tcsmoc = ',
+	# tcspecial-doc is documentation and examples, and nothing else.
+	'^tcspecial-doc\.[^:]+: E: (no-binary|package-with-huge-docs)',
+	# tcs_ui's distribution requires tcspecial-moc's, the Python
+	# distribution the tcsmoc package installs, which tcs-tools requires.
+	'^tcs-tools\.[^:]+: E: python-missing-require tcspecial-moc$',
+	# "doc" in tcspecial-doc is documentation, not a language code, so it
+	# has no locales package to depend on.
+	'^tcspecial-doc\.[^:]+: E: no-dependency-on locales-doc$',
 ]

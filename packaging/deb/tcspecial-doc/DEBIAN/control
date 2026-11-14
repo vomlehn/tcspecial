@@ -1,0 +1,18 @@
+Package: tcspecial-doc
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: David VomLehn <dvomlehn@gmail.com>
+Installed-Size: @SIZE@
+Replaces: tcspecial (<< 0.1.1)
+Breaks: tcspecial (<< 0.1.1)
+Section: doc
+Priority: optional
+Homepage: https://github.com/vomlehn/tcspecial
+Description: manuals, designs and example configurations for tcspecial
+ The TCS manuals and design documents, TCS Design and Documentation at their
+ head, as HTML with their figures and screenshots, under
+ /opt/tcs/share/doc/tcspecial-doc, and the example configurations, in both
+ spellings with their simulator files and diagrams, which the manuals'
+ figures come from, under /opt/tcs/share/examples/tcspecial.
+ Documentation alone: no program, and nothing a vehicle or a ground station
+ needs to run.

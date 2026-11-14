@@ -60,6 +60,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "python"))
+sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 # What this example shares with the ping example: the ping link's
 # bookkeeping and the window.
 sys.path.insert(0, str(HERE.parent / "ping-common"))

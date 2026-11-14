@@ -1,11 +1,12 @@
-# The Python a ground station is built on -- tcsprotocol, tcsmoc and
-# tcs_ui -- as one distribution, so that `pip install ./python` installs all
-# three.
+# The Python a ground station is built on -- tcsprotocol and tcsmoc, both
+# operational code -- as one distribution, so that `pip install ./python`
+# installs both. tcs_ui, the window pieces, is a software tool and a
+# distribution of its own, tcs-ui, in ../tcs-ui/python.
 #
-# Named tcspecial-moc, as the system package that carries them is, and
-# not after any one of the three: the import names are the crates' own and
+# Named tcspecial-moc, as the system package that carried them was, and
+# not after either of the two: the import names are the crates' own and
 # stay so, but a distribution called tcsmoc would be one name on PyPI away
-# from somebody else's.
+# from somebody else's. The system package is tcsmoc now.
 
 [build-system]
 requires = ["setuptools>=64"]
@@ -15,19 +16,17 @@ build-backend = "setuptools.build_meta"
 name = "tcspecial-moc"
 # The workspace's version, [workspace.package] in ../Cargo.toml.
 # tests/test_version.py fails when the two differ.
-version = "0.1.0"
+version = "0.1.1"
 description = """\
-The Python spelling of tcspecial's ground libraries: beacons, \
-configurations and the beacon panel"""
+The Python spelling of tcspecial's ground libraries: beacons and \
+configurations"""
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }
 authors = [{ name = "David VomLehn", email = "dvomlehn@gmail.com" }]
 requires-python = ">=3.9"
-# Nothing outside the standard library is needed to import any of them. A
-# YAML configuration is read with PyYAML, imported only when one is read, so
-# it is an extra rather than a requirement; tcs_ui needs tkinter, which is
-# part of the standard library but packaged on its own by most
-# distributions, and is not something pip can install.
+# Nothing outside the standard library is needed to import either of them.
+# A YAML configuration is read with PyYAML, imported only when one is read,
+# so it is an extra rather than a requirement.
 dependencies = []
 
 [project.optional-dependencies]
@@ -36,8 +35,7 @@ yaml = ["PyYAML"]
 [tool.setuptools]
 # Named rather than found: tcsprotocol._xtce is a directory of links, which
 # package discovery does not follow, and tests/ is not to be installed.
-packages = ["tcsprotocol", "tcsprotocol._xtce", "tcsmoc",
-            "tcs_ui"]
+packages = ["tcsprotocol", "tcsprotocol._xtce", "tcsmoc"]
 
 [tool.setuptools.package-data]
 # The XTCE documents the interface digest is taken over: see

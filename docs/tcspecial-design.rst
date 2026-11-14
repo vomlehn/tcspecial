@@ -128,9 +128,9 @@ Requirement
     a project installs with, which are named for the project and for what
     they install. tcspecial's are split so that none holds both --
     ``tcspecial``, the flight executive, and ``tcsmoc``, what a station is
-    built on, hold operational code and nothing else; ``tcs-tools`` and
-    ``tcspecial-test`` hold the rest -- but the names are not held to the
-    rule: ``tcspecial-test`` is no operational code. Nor pkg-config files, which
+    built on, hold operational code and nothing else; ``tcs-tools``,
+    ``tcspecial-test`` and ``tcspecial-doc`` hold the rest -- but the names
+    are not held to the rule: ``tcspecial-test`` is no operational code. Nor pkg-config files, which
     tell a compiler how to build with a library: managing the compiler is
     outside how TCS manages its versions. Nor any other kind of name:
     installed directories, configuration keys, environment variables,
@@ -10753,14 +10753,15 @@ Package names and the naming rule
 
     The packages TCS installs with are left out of the rule too: the
     ``.deb`` and ``.rpm`` packages (``tcspecial``, ``tcsmoc``,
-    ``tcs-tools``, ``tcspecial-test``, ``tcslog``, ``tcslog-tools``,
-    ``tcs-xtce``) and the Python distributions pip builds (``tcs-xtce``
-    among them). tcspecial's are split already, so that a vehicle or a
-    station can be given its operational code and nothing else:
-    ``tcspecial`` holds the flight executive and its manuals, ``tcsmoc``
-    what a station is built on, ``tcs-tools`` the editor, the checker and
-    the examples, and ``tcspecial-test`` the test station, the simulator
-    and the test apps.
+    ``tcs-tools``, ``tcspecial-test``, ``tcspecial-doc``, ``tcslog``,
+    ``tcslog-gen``, ``tcslog-tools``, ``tcsxtce``, ``tcs-xtce``) and the
+    Python distributions pip builds (``tcspecial-moc``, ``tcs-ui`` and
+    ``tcs-xtce`` among them). Every project's are split, so that a vehicle
+    or a station can be given its operational code and nothing else:
+    ``tcspecial`` holds the flight executive, ``tcsmoc`` what a station is
+    built on, ``tcs-tools`` the editor and the checker, ``tcspecial-test``
+    the test station, the simulator and the test apps, and
+    ``tcspecial-doc`` the manuals and the examples.
 
     Bringing the names in would mean naming each package by the rule, so
     that a package's name alone says what it is being given --

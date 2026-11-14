@@ -44,6 +44,7 @@ use std::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
+use tcs_ui::PingShown;
 use tcs_verify::startup::Startup;
 use tcsmoc::gateway::GatewayReceiver;
 use tcsmoc::gateway::DATUM_BYTES;
@@ -59,7 +60,6 @@ use tcsprotocol::sim_config::SimConfigFile;
 use tcsprotocol::simulate::Mode;
 use tcsprotocol::unit::Unit;
 use tcsprotocol::{DHSample, Timestamp};
-use tcs_ui::PingShown;
 
 use crate::beacon_receive::BeaconReceive;
 use crate::ci_link::{CiLink, Commanded};

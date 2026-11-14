@@ -236,7 +236,7 @@ answer, matched by count, arrives.
 
 It is built the way the `beacon` program is, from the same two halves written
 again in Python: `python/tcsmoc/beacon.py` after `tcsmoc::beacon`,
-`python/tcs_ui/beacon_panel.py` after `tcs-ui`, and
+`tcs-ui/python/tcs_ui/beacon_panel.py` after `tcs-ui`, and
 `python/tcsprotocol` for the ping format, the beacon and the configuration.
 The interface digest beacons are checked against is worked out with tcsxtce,
 tcs-xtce's runtime, from the tcs-xtce checkout beside this tree.

@@ -5,7 +5,7 @@ Two halves borrowed and one of its own, as the beacon example is put together
 in Rust:
 
 * the beacon, from ``python/tcsmoc/beacon.py`` and
-  ``python/tcs_ui/beacon_panel.py`` -- the Python spellings of
+  ``tcs-ui/python/tcs_ui/beacon_panel.py`` -- the Python spellings of
   ``tcsmoc::beacon`` and ``tcs-ui`` -- so the window says whether the
   vehicle is alive before anybody presses anything;
 * the ping, from ``examples/ping-common/ping_ground.py``, which sends each
@@ -66,6 +66,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "python"))
+sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 # What this example shares with ping-yamcs, its version through Yamcs: the
 # ping link and the window.
 sys.path.insert(0, str(HERE.parent / "ping-common"))

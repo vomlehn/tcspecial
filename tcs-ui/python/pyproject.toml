@@ -1,0 +1,25 @@
+# tcs_ui, the Python spelling of the tcs-ui crate: the window pieces the
+# examples' ground stations show, a software tool. A distribution of its
+# own, so that `pip install ./tcs-ui/python` installs it and nothing of the
+# operational code beside it; it imports tcsmoc, which is ../../python's
+# distribution, tcspecial-moc.
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tcs-ui"
+# The workspace's version, [workspace.package] in ../../Cargo.toml.
+# python/tests/test_version.py fails when the two differ.
+version = "0.1.1"
+description = "The beacon panel and the Tk theme of tcspecial's windows"
+license = { text = "MIT OR Apache-2.0" }
+authors = [{ name = "David VomLehn", email = "dvomlehn@gmail.com" }]
+requires-python = ">=3.9"
+# tkinter is part of the standard library, but packaged on its own by most
+# distributions, and is not something pip can install.
+dependencies = ["tcspecial-moc"]
+
+[tool.setuptools]
+packages = ["tcs_ui"]

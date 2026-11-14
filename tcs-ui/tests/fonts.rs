@@ -69,8 +69,9 @@ fn every_window_is_set_in_the_one_default_size() {
 fn the_python_windows_use_the_same_size() {
     let slint = std::fs::read_to_string(root().join("tcs-ui/ui/fonts.slint"))
         .expect("it reads");
-    let python = std::fs::read_to_string(root().join("python/tcs_ui/fonts.py"))
-        .expect("it reads");
+    let python =
+        std::fs::read_to_string(root().join("tcs-ui/python/tcs_ui/fonts.py"))
+            .expect("it reads");
 
     let points = slint
         .lines()
@@ -84,7 +85,7 @@ fn the_python_windows_use_the_same_size() {
         python
             .lines()
             .any(|line| line == format!("POINTS = {points}")),
-        "python/tcs_ui/fonts.py does not say POINTS = {points}"
+        "tcs-ui/python/tcs_ui/fonts.py does not say POINTS = {points}"
     );
 }
 
@@ -222,7 +223,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
     }
 
     for python in [
-        "python/tcs_ui/beacon_panel.py",
+        "tcs-ui/python/tcs_ui/beacon_panel.py",
         "examples/ping/ping_gateway.py",
     ] {
         let text =

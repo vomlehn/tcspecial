@@ -482,15 +482,16 @@ until its own answer, matched by count, arrives.</p>
 <p>It is built the way the <code>beacon</code> program is, from the same
 two halves written again in Python: <code>python/tcsmoc/beacon.py</code>
 after <code>tcsmoc::beacon</code>,
-<code>python/tcs_ui/beacon_panel.py</code> after <code>tcs-ui</code>,
-and <code>python/tcsprotocol</code> for the ping format, the beacon and
-the configuration. The interface digest beacons are checked against is
-worked out with tcsxtce, tcs-xtce’s runtime, from the tcs-xtce checkout
-beside this tree. <code>ping-common/ping_ground.py</code> is the ping’s
-own part, with no window, and <code>ping-common/ping_window.py</code>
-the window, both shared with <code>ping-yamcs</code>. The Rust crate
-beside them is the tests that hold the Python to the Rust;
-<code>cargo test</code> runs them.</p>
+<code>tcs-ui/python/tcs_ui/beacon_panel.py</code> after
+<code>tcs-ui</code>, and <code>python/tcsprotocol</code> for the ping
+format, the beacon and the configuration. The interface digest beacons
+are checked against is worked out with tcsxtce, tcs-xtce’s runtime, from
+the tcs-xtce checkout beside this tree.
+<code>ping-common/ping_ground.py</code> is the ping’s own part, with no
+window, and <code>ping-common/ping_window.py</code> the window, both
+shared with <code>ping-yamcs</code>. The Rust crate beside them is the
+tests that hold the Python to the Rust; <code>cargo test</code> runs
+them.</p>
 <pre><code>make run-ping                                   # the vehicle and the window
 python3 examples/ping/ping_gateway.py --pings 3 # no window: three pings
 python3 examples/ping/ping_gateway.py --yaml    # ping.ytcs, not ping.xtcs</code></pre>

@@ -1001,8 +1001,8 @@ where it is read.</p>
 section per type of payload for the attributes only that type has. A payload's
 type is the <tt class="docutils literal">type</tt> it is written under -- <tt class="docutils literal">- type i2c:</tt> in YAML, <tt class="docutils literal">&lt;type
 <span class="pre">name=&quot;i2c&quot;&gt;</span></tt> in XML -- and the payload is then held to that type's attributes
-and no others: a device file stating a <tt class="docutils literal">port</tt>, or a network payload stating a
-<tt class="docutils literal">path</tt>, is refused.</p>
+and no others: a device file stating a <tt class="docutils literal">protocol</tt>, or a network payload
+stating a <tt class="docutils literal">path</tt>, is refused.</p>
 <div class="section" id="supported-and-experimental-interfaces">
 <h2><a class="toc-backref" href="#toc-entry-9">Supported and experimental interfaces</a></h2>
 <p>Nine types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
@@ -1548,8 +1548,7 @@ attribute, in the node description tree, as its <tt class="docutils literal">kin
       </span><span class="comment single"># stream, so it says where a packet ends: twelve bytes at a time.</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">auto-send</span><span class="whitespace">
         </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
-        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">
-        </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">5000</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:5000</span><span class="whitespace">
         </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12</span><span class="whitespace">
         </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">none</span><span class="whitespace">
 
@@ -1557,8 +1556,7 @@ attribute, in the node description tree, as its <tt class="docutils literal">kin
       </span><span class="comment single"># is in is how often the question is asked.</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">triggered-send</span><span class="whitespace">
         </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
-        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1</span><span class="whitespace">
-        </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">5001</span><span class="whitespace">
+        </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:5001</span><span class="whitespace">
         </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12</span><span class="whitespace">
         </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">none</span><span class="whitespace">
         </span><span class="name tag">group</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">every_half_second</span><span class="whitespace">
@@ -1593,8 +1591,7 @@ alone, strangers counted as above:</p>
 <span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">sounder_feed</span><span class="whitespace">
       </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">udp</span><span class="whitespace">
-      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0</span><span class="whitespace">
-      </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">
+      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:7000</span><span class="whitespace">
       </span><span class="name tag">sends_from</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.7:7001</span>
 </pre>
 <p><tt class="docutils literal">sends_from</tt> is a host and a port over <tt class="docutils literal">udp</tt> -- an IP address, not a name
@@ -1605,18 +1602,18 @@ is asked or only driven, which is reached at its address and read only from
 there. Without it, a payload that restarts from a new port is heard again at
 once; with it, the payload must send from the address it names. tcs-sim sends
 from there when it simulates the payload, and a simulator file that names a
-<tt class="docutils literal">payload_address</tt> or <tt class="docutils literal">payload_port</tt> for it as well is refused.</p>
+<tt class="docutils literal">payload_address</tt> for it as well is refused.</p>
 </div>
 <div class="section" id="a-network-payload">
 <h2><a class="toc-backref" href="#toc-entry-16">A Network Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type network</tt>. A socket, which the transport decides the shape of.</p>
 <pre class="code text literal-block">
 protocol       tcp | udp | unix_stream | unix_dgram | raw
-address        where this payload is reached: a host, as 127.0.0.1 -- or,
-               over unix_stream or unix_dgram, the path of the socket
-port           the port that goes with the address. Every protocol but
-               raw states one; a Unix-domain socket is named by its path
-               and does nothing with it
+address        where this payload is reached: the host and the port
+               together, as 127.0.0.1:5000 ([::1]:5000 for an IPv6
+               address), as every address in a configuration is written;
+               over unix_stream or unix_dgram, the path of the socket,
+               which has no port; over raw, the host alone
 ip_protocol    with raw, and only then: the IP protocol number the
                payload's datagrams carry, 1 to 254
 sends_from     with udp or unix_dgram, on a payload that speaks first:
@@ -1642,8 +1639,7 @@ record split across two segments is not sent as two halves:</p>
 <span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type network</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">logger</span><span class="whitespace">
       </span><span class="name tag">protocol</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">tcp</span><span class="whitespace">
-      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.9</span><span class="whitespace">
-      </span><span class="name tag">port</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">7000</span><span class="whitespace">
+      </span><span class="name tag">address</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">10.0.0.9:7000</span><span class="whitespace">
       </span><span class="name tag">max_length</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">512</span><span class="whitespace">
       </span><span class="name tag">terminators</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">'&quot;\r\n&quot;'</span><span class="whitespace">
       </span><span class="name tag">read_timeout</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1 s</span>
@@ -1652,7 +1648,7 @@ record split across two segments is not sent as two halves:</p>
 that gives these attributes is refused.</p>
 <p><tt class="docutils literal">raw</tt> is for a payload that speaks IP and nothing above it: no UDP header
 and no ports, the <tt class="docutils literal">ip_protocol</tt> number being what says which datagrams are
-its. It takes an <tt class="docutils literal">address</tt> and an <tt class="docutils literal">ip_protocol</tt> and refuses a <tt class="docutils literal">port</tt>.
+its. It takes an <tt class="docutils literal">address</tt>, a host with no port, and an <tt class="docutils literal">ip_protocol</tt>.
 253 and 254 are the numbers set aside for experiments; the rest are IANA's.
 tcspecial opens a raw socket of that protocol, connected to the address, so it
 hears only that payload and sends only to it, and a datagram read is handed
@@ -2300,10 +2296,16 @@ two payloads from one entry. The rule reaches no further than the file --
 two sets may name their payloads and their groups alike, and the shipped
 examples do.</li>
 <li>An <strong>attribute of another type</strong> -- a device file payload stating
-<tt class="docutils literal">address</tt>, <tt class="docutils literal">port</tt> or <tt class="docutils literal">protocol</tt>, or a network payload stating
-<tt class="docutils literal">path</tt>. Each type is located by its own attributes, and the refusal says
-which: <tt class="docutils literal"><span class="pre">&quot;random-device&quot;</span> is a <span class="pre">device-file</span> node, so port does not locate it:
+<tt class="docutils literal">address</tt> or <tt class="docutils literal">protocol</tt>, or a network payload stating <tt class="docutils literal">path</tt>. Each
+type is located by its own attributes, and the refusal says which:
+<tt class="docutils literal"><span class="pre">&quot;random-device&quot;</span> is a <span class="pre">device-file</span> node, so protocol does not locate it:
 it is located by path</tt>.</li>
+<li>A <strong>host and a port written apart</strong> -- <tt class="docutils literal">address: 127.0.0.1</tt> and
+<tt class="docutils literal">port: 5000</tt> on a network payload or a gateway node, as a file did
+before the two were one attribute. The <tt class="docutils literal">port</tt> is refused, by line, and
+told to write <tt class="docutils literal">address: &quot;127.0.0.1:5000&quot;</tt>; <tt class="docutils literal"><span class="pre">tools/convert-format.py</span></tt>
+rewrites a file so. A simulator file's <tt class="docutils literal">payload_port</tt> is refused the same
+way, folded into <tt class="docutils literal">payload_address</tt>.</li>
 <li>A <strong>term of a link on a type that is not on one</strong>: a <tt class="docutils literal">datarate</tt> or a
 <tt class="docutils literal">spi_mode</tt> or a set of <tt class="docutils literal">lines</tt> on a network or device file payload. Each
 type
@@ -2541,8 +2543,8 @@ that does not keep each datum takes it with <tt class="docutils literal"><span c
 into a buffer of <tt class="docutils literal"><span class="pre">tcsmoc::gateway::DATUM_BYTES</span></tt> it made before it started,
 and allocates nothing. What it does with the data then -- process it, display
 it, log it -- is its own business. A gateway node that the ground sends commands
-or other data through also states the <tt class="docutils literal">address</tt> and <tt class="docutils literal">port</tt> tcspecial binds
-to receive them.</p>
+or other data through also states the <tt class="docutils literal">address</tt> tcspecial binds to receive
+them, its host and port together, as <tt class="docutils literal">127.0.0.1:5000</tt>.</p>
 <p>tcs-moc runs a configuration as a ground station for that data: one panel per
 source, filled through <tt class="docutils literal"><span class="pre">tcsmoc::gateway</span></tt>, with tcspecial started on the
 same file and tcs-sim where the simulator file simulates anything. Both it and
@@ -2867,7 +2869,7 @@ the words from <tt class="docutils literal"><span class="pre">gateway-1</span></
 <tt class="docutils literal"><span class="pre">tcsmoc::gateway::GatewayReceiver::receive_into</span></tt>, into a buffer it made
 before it started listening, prints each with one space
 between them, and stops at the end of the line. <tt class="docutils literal"><span class="pre">gateway-1</span></tt> states no
-<tt class="docutils literal">address</tt> or <tt class="docutils literal">port</tt>, because nothing goes back up to the vehicle.</p>
+<tt class="docutils literal">address</tt>, because nothing goes back up to the vehicle.</p>
 <p>Before its first word, <tt class="docutils literal">lorem_gateway</tt> sends a <tt class="docutils literal">CONNECT</tt> of its own,
 carrying the configuration's checksum, and sends it again each second until
 the vehicle answers with that checksum: a vehicle sends nothing down until it
@@ -3020,7 +3022,7 @@ received, and changes none of the times.</p>
 <p>The ground station is built the way the <tt class="docutils literal">beacon</tt> program is, from two halves
 and a little of its own, and the halves are the same ones in Python:
 <tt class="docutils literal">python/tcsmoc/beacon.py</tt> is <tt class="docutils literal"><span class="pre">tcsmoc::beacon</span></tt>,
-<tt class="docutils literal">python/tcs_ui/beacon_panel.py</tt> is <tt class="docutils literal"><span class="pre">tcs-ui</span></tt>'s panel, and
+<tt class="docutils literal"><span class="pre">tcs-ui/python/tcs_ui/beacon_panel.py</span></tt> is <tt class="docutils literal"><span class="pre">tcs-ui</span></tt>'s panel, and
 <tt class="docutils literal">python/tcsprotocol</tt> holds the ping format and what a ground station reads
 out of a configuration. It reads the XML spelling, the standard library having
 no YAML, and asks <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--digest</span></tt> for the digest it compares each
@@ -3050,8 +3052,8 @@ prints each answer and its times, and stops both. Every port the example uses is
 the seven thousands, which no other example uses.</p>
 <p>tcs-moc pings it too. <tt class="docutils literal">make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping</tt>
 runs the MOC on the example, and a configuration with a <tt class="docutils literal">ping</tt> node the
-ground can reach both ways -- a gateway node binding an address and port with a
-link to it, and its link back down -- gives the MOC a <tt class="docutils literal">Ping node</tt> button
+ground can reach both ways -- a gateway node binding an address with a link to
+it, and its link back down -- gives the MOC a <tt class="docutils literal">Ping node</tt> button
 beside <tt class="docutils literal">Command</tt>. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
 keep them by the same rules, <tt class="docutils literal"><span class="pre">tcsmoc::ping</span></tt> in Rust and
@@ -3473,8 +3475,8 @@ either changes.</p>
 </div>
 <p>The gateway node says where what is drawn into it is published, <tt class="docutils literal">tlm_base</tt>,
 counted on by each source's device id: the <tt class="docutils literal">thermometer</tt>, device id 2, is
-published as <tt class="docutils literal">0x4242</tt>. It has no address and no port, and one written on it
-is refused: it is reached through the peer. A command the bus publishes as its
+published as <tt class="docutils literal">0x4242</tt>. It has no address, and one written on it is refused:
+it is reached through the peer. A command the bus publishes as its
 <tt class="docutils literal">cmd_msgid</tt>, <tt class="docutils literal">0x4281</tt>, is taken by <tt class="docutils literal">fsw</tt> and leaves it by its
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> for the <tt class="docutils literal">heater</tt>; <tt class="docutils literal">cmd_msgid</tt> is required where a line or
 a command binding leaves the node.</p>
@@ -3627,59 +3629,76 @@ machine with all of them has one <tt class="docutils literal">bin</tt>, one <tt 
 be told of.</p>
 <div class="section" id="the-packages">
 <h2><a class="toc-backref" href="#toc-entry-52">The packages</a></h2>
-<p>There are three, because three kinds of machine take them:</p>
+<p>There are five, each built as a <tt class="docutils literal">.deb</tt> and as an RPM, because a package
+with operational code holds nothing else (see <a class="reference external" href="manual.html#the-categories-of-tcs-software">The categories of TCS
+software</a>):</p>
 <dl class="docutils">
 <dt><tt class="docutils literal">tcspecial</tt></dt>
-<dd>What flies. <tt class="docutils literal">bin/tcspecial</tt> and <tt class="docutils literal"><span class="pre">bin/tcs-verify</span></tt>; the
-five test app programs, in <tt class="docutils literal">libexec</tt> because tcspecial runs them rather
-than a person -- a configuration names one as <tt class="docutils literal">executable:
-/opt/tcs/libexec/app_pl</tt>; the manual and design in
-<tt class="docutils literal">share/doc/tcspecial</tt>; the example configurations in
-<tt class="docutils literal">share/examples/tcspecial</tt>; and empty <tt class="docutils literal">/etc/opt/tcs/tcspecial</tt> and
-<tt class="docutils literal">/var/opt/tcs/tcspecial</tt> for a vehicle's configuration and its state
-and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keeps a log puts its own
+<dd>Operational code: what flies. <tt class="docutils literal">bin/tcspecial</tt>, with its README,
+licences and notices in <tt class="docutils literal">share/doc/tcspecial</tt>; and empty
+<tt class="docutils literal">/etc/opt/tcs/tcspecial</tt> and <tt class="docutils literal">/var/opt/tcs/tcspecial</tt> for a
+vehicle's configuration and its state and telemetry. No <tt class="docutils literal">segsend</tt>: a vehicle that keeps a log puts its own
 in <tt class="docutils literal">/opt/tcs/bin</tt>, beside tcspecial (see <a class="reference internal" href="#where-the-logs-segments-go">Where the logs' segments
 go</a>).</dd>
-<dt><tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt></dt>
-<dd>What a ground station is built on. <tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.so.4</span></tt> and
-<tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.a</span></tt> with <tt class="docutils literal"><span class="pre">include/tcsmoc-c.h</span></tt> and
-<tt class="docutils literal"><span class="pre">lib/pkgconfig/tcsmoc-c.pc</span></tt>; the Python packages <tt class="docutils literal">tcsprotocol</tt>,
-<tt class="docutils literal">tcsmoc</tt> and <tt class="docutils literal">tcs_ui</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
-<tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; and the XTCS,
-YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.</dd>
+<dt><tt class="docutils literal">tcsmoc</tt></dt>
+<dd>Operational code: what a ground station is built on.
+<tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.so.4</span></tt> and <tt class="docutils literal"><span class="pre">lib/libtcsmoc-c.a</span></tt> with
+<tt class="docutils literal"><span class="pre">include/tcsmoc-c.h</span></tt> and <tt class="docutils literal"><span class="pre">lib/pkgconfig/tcsmoc-c.pc</span></tt>; the Python
+packages <tt class="docutils literal">tcsprotocol</tt> and <tt class="docutils literal">tcsmoc</tt> in <tt class="docutils literal"><span class="pre">lib/python3/site-packages</span></tt>;
+and the XTCS, YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.
+It was <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>, which it replaces.</dd>
+<dt><tt class="docutils literal"><span class="pre">tcs-tools</span></tt></dt>
+<dd>Software tools, which never fly. <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in
+<tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; <tt class="docutils literal"><span class="pre">bin/tcs-verify</span></tt>; and the Python <tt class="docutils literal">tcs_ui</tt>, the
+<tt class="docutils literal"><span class="pre">tcs-ui</span></tt> distribution, with a <tt class="docutils literal">.pth</tt> file of its own. It depends on
+<tt class="docutils literal">tcsmoc</tt>, since <tt class="docutils literal">tcs_ui</tt> imports <tt class="docutils literal">tcsmoc</tt>.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
-<dd><tt class="docutils literal"><span class="pre">bin/tcs-moc</span></tt> and <tt class="docutils literal"><span class="pre">bin/tcs-sim</span></tt>, which never fly, and <tt class="docutils literal">bin/segsend</tt>,
-the test one, which deletes each segment it is given. It depends on
-<tt class="docutils literal">tcspecial</tt>, because an installed tcs-moc starts the tcspecial and the
-tcs-sim installed beside it. The test <tt class="docutils literal">segsend</tt> is here rather than in
+<dd>Verification tools, which never fly. <tt class="docutils literal"><span class="pre">bin/tcs-moc</span></tt> and <tt class="docutils literal"><span class="pre">bin/tcs-sim</span></tt>;
+<tt class="docutils literal">bin/segsend</tt>, the test one, which deletes each segment it is given;
+and the five test app programs, in <tt class="docutils literal">libexec</tt> because tcspecial runs
+them rather than a person -- a configuration names one as
+<tt class="docutils literal">executable: /opt/tcs/libexec/app_pl</tt>. It depends on <tt class="docutils literal">tcspecial</tt>,
+because an installed tcs-moc starts the tcspecial and the tcs-sim
+installed beside it. The test <tt class="docutils literal">segsend</tt> is here rather than in
 <tt class="docutils literal">tcspecial</tt> because a vehicle that flew it would throw its telemetry
 away, and because a package that owned <tt class="docutils literal">/opt/tcs/bin/segsend</tt> would
 overwrite a mission's own on every upgrade.</dd>
+<dt><tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt></dt>
+<dd>The manuals and designs, as HTML with their figures and screenshots, in
+<tt class="docutils literal"><span class="pre">share/doc/tcspecial-doc/docs</span></tt>, and the example configurations, in
+both spellings with their simulator files and diagrams, in
+<tt class="docutils literal">share/examples/tcspecial</tt>, which the manuals' figures come from.
+Documentation alone, for whoever writes or reads configurations: no
+vehicle or station needs it to run.</dd>
 </dl>
+<p>Each takes the place of what was in an earlier package, so an upgrade
+from 0.1.0, when there were three -- <tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt> and
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> -- moves each file to its new package.</p>
 <p><tt class="docutils literal">make deb</tt> builds them as <tt class="docutils literal">.deb</tt> files and <tt class="docutils literal">make rpm</tt> as RPMs, both
 into <tt class="docutils literal">build/packages</tt>; <tt class="docutils literal">make packages</tt> builds both. Each is cut from
 <tt class="docutils literal">make stage</tt>, which installs each package into a directory of its own
 under <tt class="docutils literal">build/stage</tt>. Then, as root:</p>
 <pre class="code console literal-block">
-<span class="generic prompt"># </span>apt<span class="whitespace"> </span>install<span class="whitespace"> </span>./build/packages/tcspecial_0.1.0-1_amd64.deb<span class="whitespace">
-</span><span class="generic prompt"># </span>dnf<span class="whitespace"> </span>install<span class="whitespace"> </span>./build/packages/tcspecial-0.1.0-1.x86_64.rpm
+<span class="generic prompt"># </span>apt<span class="whitespace"> </span>install<span class="whitespace"> </span>./build/packages/tcspecial_0.1.1-1_amd64.deb<span class="whitespace">
+</span><span class="generic prompt"># </span>dnf<span class="whitespace"> </span>install<span class="whitespace"> </span>./build/packages/tcspecial-0.1.1-1.x86_64.rpm
 </pre>
 <p>A package also installs what makes <tt class="docutils literal">/opt/tcs</tt> usable without being told
 of it, each file named after the package so that no two own one:
 <tt class="docutils literal"><span class="pre">/etc/profile.d/&lt;package&gt;.sh</span></tt>, which puts <tt class="docutils literal">/opt/tcs/bin</tt> on <tt class="docutils literal">PATH</tt> --
-and, for the ground package, <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on
-<tt class="docutils literal">PKG_CONFIG_PATH</tt>; <tt class="docutils literal"><span class="pre">/etc/ld.so.conf.d/tcspecial-moc.conf</span></tt>, which puts
-<tt class="docutils literal">/opt/tcs/lib</tt> on the loader's path; a <tt class="docutils literal"><span class="pre">tcspecial-moc.pth</span></tt> in the
-system python3's own directory -- <tt class="docutils literal"><span class="pre">/usr/lib/python3/dist-packages</span></tt> on
-Debian, <tt class="docutils literal"><span class="pre">/usr/lib/python3.&lt;minor&gt;/site-packages</span></tt> on Fedora, which has no
-directory every python3 reads -- which puts the Python on python3's path;
+or, for <tt class="docutils literal">tcsmoc</tt>, which has no programs, <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on
+<tt class="docutils literal">PKG_CONFIG_PATH</tt>; <tt class="docutils literal">/etc/ld.so.conf.d/tcsmoc.conf</tt>, which puts
+<tt class="docutils literal">/opt/tcs/lib</tt> on the loader's path; a <tt class="docutils literal">tcsmoc.pth</tt> in the system
+python3's own directory -- <tt class="docutils literal"><span class="pre">/usr/lib/python3/dist-packages</span></tt> on Debian,
+<tt class="docutils literal"><span class="pre">/usr/lib/python3.&lt;minor&gt;/site-packages</span></tt> on Fedora, which has no
+directory every python3 reads, where the RPM writes it for the python3
+installed -- which puts the Python on python3's path;
 and <tt class="docutils literal">/usr/lib/systemd/system/tcspecial.service</tt> (see <a class="reference internal" href="#running-tcspecial-under-a-supervisor">Running tcspecial
 under a supervisor</a>).</p>
 <p>Each .deb also carries what Debian expects of every package, outside
 <tt class="docutils literal">/opt/tcs</tt> as the files above are: <tt class="docutils literal"><span class="pre">/usr/share/doc/&lt;package&gt;/copyright</span></tt>, in
 Debian's machine-readable format, and <tt class="docutils literal">changelog.Debian.gz</tt>, both made as the
 package is built, from <tt class="docutils literal"><span class="pre">LICENSE-MIT</span></tt> and the version; and lintian's overrides,
-in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. The ground package also has a
+in <tt class="docutils literal"><span class="pre">/usr/share/lintian/overrides/&lt;package&gt;</span></tt>. <tt class="docutils literal">tcsmoc</tt> also has a
 trigger that has dpkg run <tt class="docutils literal">ldconfig</tt> once <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt> is
 installed or removed. The RPMs say the same in their own <tt class="docutils literal">License</tt>,
 <tt class="docutils literal">%changelog</tt>, <tt class="docutils literal">%post</tt> and <tt class="docutils literal">%postun</tt>. <tt class="docutils literal"><span class="pre">libtcsmoc-c.so.4</span></tt> is not
@@ -3744,8 +3763,8 @@ same way, leaving the configuration and the state, which are the mission's.</p>
 in front of every path, for staging, and is not part of any path a program
 looks in. <tt class="docutils literal">HOOKS=1</tt> installs the files outside the prefix as well, which
 a developer's copy leaves alone unless asked. <tt class="docutils literal">make <span class="pre">install-tcspecial</span></tt>,
-<tt class="docutils literal"><span class="pre">install-tcspecial-moc</span></tt> and <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt> copy one
-package. <tt class="docutils literal">make <span class="pre">uninstall-files</span></tt>, with the same variables, takes away what
+<tt class="docutils literal"><span class="pre">install-tcsmoc</span></tt>, <tt class="docutils literal"><span class="pre">install-tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt> and
+<tt class="docutils literal"><span class="pre">install-tcspecial-doc</span></tt> copy one package. <tt class="docutils literal">make <span class="pre">uninstall-files</span></tt>, with the same variables, takes away what
 was copied.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">DRY_RUN</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
@@ -3772,7 +3791,8 @@ debugged:</p>
 <p>The packages' <tt class="docutils literal">/etc/profile.d</tt> scripts put <tt class="docutils literal">/opt/tcs/bin</tt> on <tt class="docutils literal">PATH</tt>,
 but only a login shell reads them: <tt class="docutils literal">sudo</tt>, <tt class="docutils literal">cron</tt>, a systemd unit and
 other minimal environments do not see it, and find the programs only by
-their full path. So each package ships <tt class="docutils literal"><span class="pre">/opt/tcs/sbin/&lt;package&gt;-links</span></tt>,
+their full path. So each package with programs ships
+<tt class="docutils literal"><span class="pre">/opt/tcs/sbin/&lt;package&gt;-links</span></tt>,
 which links that package's programs into <tt class="docutils literal">/usr/local/bin</tt> -- on every
 path, <tt class="docutils literal">sudo</tt>'s <tt class="docutils literal">secure_path</tt> included, and the administrator's own,
 which is where the filesystem hierarchy standard lets an administrator link
@@ -3780,7 +3800,7 @@ an <tt class="docutils literal">/opt</tt> package's programs. Installing a packa
 the administrator's choice:</p>
 <pre class="code console literal-block">
 <span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-links<span class="whitespace">
-</span><span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-moc-links<span class="whitespace">
+</span><span class="generic prompt"># </span>/opt/tcs/sbin/tcs-tools-links<span class="whitespace">
 </span><span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-test-links<span class="whitespace">
 </span><span class="generic prompt"># </span>/opt/tcs/sbin/tcspecial-links<span class="whitespace"> </span>--dir<span class="whitespace"> </span>/opt/bin
 </pre>
@@ -3800,11 +3820,14 @@ another directory.</p>
 </div>
 <div class="section" id="the-python-alone">
 <h2><a class="toc-backref" href="#toc-entry-56">The Python alone</a></h2>
-<p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcsprotocol</tt>, <tt class="docutils literal">tcsmoc</tt> and
-<tt class="docutils literal">tcs_ui</tt> one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>:</p>
+<p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcsprotocol</tt> and <tt class="docutils literal">tcsmoc</tt>, the
+operational code, one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>, and
+<tt class="docutils literal"><span class="pre">tcs-ui/python/pyproject.toml</span></tt> makes <tt class="docutils literal">tcs_ui</tt>, a software tool, one of
+its own, <tt class="docutils literal"><span class="pre">tcs-ui</span></tt>, which needs the first:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./python<span class="whitespace">
-</span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span>
+</span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./tcs-ui/python
 </pre>
 <p>The extra brings PyYAML, which a station reading a YAML configuration
 needs. <tt class="docutils literal">tcs_ui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on

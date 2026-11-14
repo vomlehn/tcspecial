@@ -1,0 +1,22 @@
+Package: tcsmoc
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: David VomLehn <dvomlehn@gmail.com>
+Installed-Size: @SIZE@
+Depends: @SHLIBS@, python3
+Recommends: python3-yaml, pkgconf
+Replaces: tcspecial-ground, tcspecial-moc
+Conflicts: tcspecial-ground, tcspecial-moc
+Section: misc
+Priority: optional
+Homepage: https://github.com/vomlehn/tcspecial
+Description: TCSpecial MOC Correspondent: what a ground station is built on
+ What a ground station for tcspecial is built on: libtcsmoc-c, the TCSpecial
+ MOC Correspondent (tcsmoc) for C and C++, with its header tcsmoc-c.h
+ and pkg-config file tcsmoc-c.pc; the Python packages tcsprotocol (TCS
+ Link Support) and tcsmoc (the Correspondent); and the schemas of the
+ configuration files they read. Operational code alone: the configuration
+ editor and checker are the tcs-tools package. Everything is under /opt/tcs.
+ /etc/ld.so.conf.d/tcsmoc.conf puts /opt/tcs/lib on the loader's path, a .pth
+ file puts the Python packages on python3's, and /etc/profile.d/tcsmoc.sh
+ puts /opt/tcs/lib/pkgconfig on pkg-config's.

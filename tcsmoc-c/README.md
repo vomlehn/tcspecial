@@ -112,7 +112,7 @@ c++ my_station.cpp -I tcsmoc-c/include \
     target/debug/libtcsmoc_c.a -lpthread -ldl -lm
 ```
 
-Installed -- by the `tcspecial-moc` package, or `make install` at the
+Installed -- by the `tcsmoc` package, or `make install` at the
 repository's root -- it is `/opt/tcs/lib/libtcsmoc-c.so.<ABI>`, with the
 link `libtcsmoc-c.so` to it, `libtcsmoc-c.a`, the header as
 `/opt/tcs/include/tcsmoc-c.h`, and `/opt/tcs/lib/pkgconfig/tcsmoc-c.pc`.

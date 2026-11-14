@@ -598,8 +598,8 @@ What follows is the attributes every payload has, whatever it is, and then one
 section per type of payload for the attributes only that type has. A payload's
 type is the ``type`` it is written under -- ``- type i2c:`` in YAML, ``<type
 name="i2c">`` in XML -- and the payload is then held to that type's attributes
-and no others: a device file stating a ``port``, or a network payload stating a
-``path``, is refused.
+and no others: a device file stating a ``protocol``, or a network payload
+stating a ``path``, is refused.
 
 Supported and experimental interfaces
 -------------------------------------
@@ -1111,8 +1111,7 @@ attribute, in the node description tree, as its ``kind``: ``interval`` or
          # stream, so it says where a packet ends: twelve bytes at a time.
          - payload: auto-send
            protocol: tcp
-           address: 127.0.0.1
-           port: 5000
+           address: 127.0.0.1:5000
            max_length: 12
            read_timeout: none
 
@@ -1120,8 +1119,7 @@ attribute, in the node description tree, as its ``kind``: ``interval`` or
          # is in is how often the question is asked.
          - payload: triggered-send
            protocol: tcp
-           address: 127.0.0.1
-           port: 5001
+           address: 127.0.0.1:5001
            max_length: 12
            read_timeout: none
            group: every_half_second
@@ -1162,8 +1160,7 @@ alone, strangers counted as above:
    - type network:
        - payload: sounder_feed
          protocol: udp
-         address: 0.0.0.0
-         port: 7000
+         address: 0.0.0.0:7000
          sends_from: 10.0.0.7:7001
 
 ``sends_from`` is a host and a port over ``udp`` -- an IP address, not a name
@@ -1174,7 +1171,7 @@ is asked or only driven, which is reached at its address and read only from
 there. Without it, a payload that restarts from a new port is heard again at
 once; with it, the payload must send from the address it names. tcs-sim sends
 from there when it simulates the payload, and a simulator file that names a
-``payload_address`` or ``payload_port`` for it as well is refused.
+``payload_address`` for it as well is refused.
 
 A Network Payload
 -----------------
@@ -1183,11 +1180,11 @@ Keyword ``type network``. A socket, which the transport decides the shape of.
 .. code-block:: text
 
    protocol       tcp | udp | unix_stream | unix_dgram | raw
-   address        where this payload is reached: a host, as 127.0.0.1 -- or,
-                  over unix_stream or unix_dgram, the path of the socket
-   port           the port that goes with the address. Every protocol but
-                  raw states one; a Unix-domain socket is named by its path
-                  and does nothing with it
+   address        where this payload is reached: the host and the port
+                  together, as 127.0.0.1:5000 ([::1]:5000 for an IPv6
+                  address), as every address in a configuration is written;
+                  over unix_stream or unix_dgram, the path of the socket,
+                  which has no port; over raw, the host alone
    ip_protocol    with raw, and only then: the IP protocol number the
                   payload's datagrams carry, 1 to 254
    sends_from     with udp or unix_dgram, on a payload that speaks first:
@@ -1216,8 +1213,7 @@ record split across two segments is not sent as two halves:
    - type network:
        - payload: logger
          protocol: tcp
-         address: 10.0.0.9
-         port: 7000
+         address: 10.0.0.9:7000
          max_length: 512
          terminators: '"\r\n"'
          read_timeout: 1 s
@@ -1227,7 +1223,7 @@ that gives these attributes is refused.
 
 ``raw`` is for a payload that speaks IP and nothing above it: no UDP header
 and no ports, the ``ip_protocol`` number being what says which datagrams are
-its. It takes an ``address`` and an ``ip_protocol`` and refuses a ``port``.
+its. It takes an ``address``, a host with no port, and an ``ip_protocol``.
 253 and 254 are the numbers set aside for experiments; the rest are IANA's.
 tcspecial opens a raw socket of that protocol, connected to the address, so it
 hears only that payload and sends only to it, and a datagram read is handed
@@ -1972,10 +1968,16 @@ otherwise produces a payload that looks configured and is not:
   two sets may name their payloads and their groups alike, and the shipped
   examples do.
 * An **attribute of another type** -- a device file payload stating
-  ``address``, ``port`` or ``protocol``, or a network payload stating
-  ``path``. Each type is located by its own attributes, and the refusal says
-  which: ``"random-device" is a device-file node, so port does not locate it:
+  ``address`` or ``protocol``, or a network payload stating ``path``. Each
+  type is located by its own attributes, and the refusal says which:
+  ``"random-device" is a device-file node, so protocol does not locate it:
   it is located by path``.
+* A **host and a port written apart** -- ``address: 127.0.0.1`` and
+  ``port: 5000`` on a network payload or a gateway node, as a file did
+  before the two were one attribute. The ``port`` is refused, by line, and
+  told to write ``address: "127.0.0.1:5000"``; ``tools/convert-format.py``
+  rewrites a file so. A simulator file's ``payload_port`` is refused the same
+  way, folded into ``payload_address``.
 * A **term of a link on a type that is not on one**: a ``datarate`` or a
   ``spi_mode`` or a set of ``lines`` on a network or device file payload. Each
   type
@@ -2224,8 +2226,8 @@ that does not keep each datum takes it with ``GatewayReceiver::receive_into``,
 into a buffer of ``tcsmoc::gateway::DATUM_BYTES`` it made before it started,
 and allocates nothing. What it does with the data then -- process it, display
 it, log it -- is its own business. A gateway node that the ground sends commands
-or other data through also states the ``address`` and ``port`` tcspecial binds
-to receive them.
+or other data through also states the ``address`` tcspecial binds to receive
+them, its host and port together, as ``127.0.0.1:5000``.
 
 tcs-moc runs a configuration as a ground station for that data: one panel per
 source, filled through ``tcsmoc::gateway``, with tcspecial started on the
@@ -2593,7 +2595,7 @@ the words from ``gateway-1`` with
 ``tcsmoc::gateway::GatewayReceiver::receive_into``, into a buffer it made
 before it started listening, prints each with one space
 between them, and stops at the end of the line. ``gateway-1`` states no
-``address`` or ``port``, because nothing goes back up to the vehicle.
+``address``, because nothing goes back up to the vehicle.
 
 Before its first word, ``lorem_gateway`` sends a ``CONNECT`` of its own,
 carrying the configuration's checksum, and sends it again each second until
@@ -2764,7 +2766,7 @@ received, and changes none of the times.
 The ground station is built the way the ``beacon`` program is, from two halves
 and a little of its own, and the halves are the same ones in Python:
 ``python/tcsmoc/beacon.py`` is ``tcsmoc::beacon``,
-``python/tcs_ui/beacon_panel.py`` is ``tcs-ui``'s panel, and
+``tcs-ui/python/tcs_ui/beacon_panel.py`` is ``tcs-ui``'s panel, and
 ``python/tcsprotocol`` holds the ping format and what a ground station reads
 out of a configuration. It reads the XML spelling, the standard library having
 no YAML, and asks ``tcs-verify --digest`` for the digest it compares each
@@ -2798,8 +2800,8 @@ the seven thousands, which no other example uses.
 
 tcs-moc pings it too. ``make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping``
 runs the MOC on the example, and a configuration with a ``ping`` node the
-ground can reach both ways -- a gateway node binding an address and port with a
-link to it, and its link back down -- gives the MOC a ``Ping node`` button
+ground can reach both ways -- a gateway node binding an address with a link to
+it, and its link back down -- gives the MOC a ``Ping node`` button
 beside ``Command``. It opens the same panel, in a window of its own: the
 button, the ping sent and the answer, and the three times. Both ground stations
 keep them by the same rules, ``tcsmoc::ping`` in Rust and
@@ -3264,8 +3266,8 @@ message ID or a base where a radio's configuration has a socket:
 
 The gateway node says where what is drawn into it is published, ``tlm_base``,
 counted on by each source's device id: the ``thermometer``, device id 2, is
-published as ``0x4242``. It has no address and no port, and one written on it
-is refused: it is reached through the peer. A command the bus publishes as its
+published as ``0x4242``. It has no address, and one written on it is refused:
+it is reached through the peer. A command the bus publishes as its
 ``cmd_msgid``, ``0x4281``, is taken by ``fsw`` and leaves it by its
 ``moc-out`` for the ``heater``; ``cmd_msgid`` is required where a line or
 a command binding leaves the node.
@@ -3435,34 +3437,51 @@ be told of.
 The packages
 ------------
 
-There are three, because three kinds of machine take them:
+There are five, each built as a ``.deb`` and as an RPM, because a package
+with operational code holds nothing else (see `The categories of TCS
+software <manual.html#the-categories-of-tcs-software>`__):
 
 ``tcspecial``
-   What flies. ``bin/tcspecial`` and ``bin/tcs-verify``; the
-   five test app programs, in ``libexec`` because tcspecial runs them rather
-   than a person -- a configuration names one as ``executable:
-   /opt/tcs/libexec/app_pl``; the manual and design in
-   ``share/doc/tcspecial``; the example configurations in
-   ``share/examples/tcspecial``; and empty ``/etc/opt/tcs/tcspecial`` and
-   ``/var/opt/tcs/tcspecial`` for a vehicle's configuration and its state
-   and telemetry. No ``segsend``: a vehicle that keeps a log puts its own
+   Operational code: what flies. ``bin/tcspecial``, with its README,
+   licences and notices in ``share/doc/tcspecial``; and empty
+   ``/etc/opt/tcs/tcspecial`` and ``/var/opt/tcs/tcspecial`` for a
+   vehicle's configuration and its state and telemetry. No ``segsend``: a vehicle that keeps a log puts its own
    in ``/opt/tcs/bin``, beside tcspecial (see `Where the logs' segments
    go`_).
-``tcspecial-moc``
-   What a ground station is built on. ``lib/libtcsmoc-c.so.4`` and
-   ``lib/libtcsmoc-c.a`` with ``include/tcsmoc-c.h`` and
-   ``lib/pkgconfig/tcsmoc-c.pc``; the Python packages ``tcsprotocol``,
-   ``tcsmoc`` and ``tcs_ui`` in ``lib/python3/site-packages``;
-   ``bin/tcs-gui`` with its descriptions in ``share/tcs-gui``; and the XTCS,
-   YTCS and simulator schemas in ``share/tcspecial/schema``.
+``tcsmoc``
+   Operational code: what a ground station is built on.
+   ``lib/libtcsmoc-c.so.4`` and ``lib/libtcsmoc-c.a`` with
+   ``include/tcsmoc-c.h`` and ``lib/pkgconfig/tcsmoc-c.pc``; the Python
+   packages ``tcsprotocol`` and ``tcsmoc`` in ``lib/python3/site-packages``;
+   and the XTCS, YTCS and simulator schemas in ``share/tcspecial/schema``.
+   It was ``tcspecial-moc``, which it replaces.
+``tcs-tools``
+   Software tools, which never fly. ``bin/tcs-gui`` with its descriptions in
+   ``share/tcs-gui``; ``bin/tcs-verify``; and the Python ``tcs_ui``, the
+   ``tcs-ui`` distribution, with a ``.pth`` file of its own. It depends on
+   ``tcsmoc``, since ``tcs_ui`` imports ``tcsmoc``.
 ``tcspecial-test``
-   ``bin/tcs-moc`` and ``bin/tcs-sim``, which never fly, and ``bin/segsend``,
-   the test one, which deletes each segment it is given. It depends on
-   ``tcspecial``, because an installed tcs-moc starts the tcspecial and the
-   tcs-sim installed beside it. The test ``segsend`` is here rather than in
+   Verification tools, which never fly. ``bin/tcs-moc`` and ``bin/tcs-sim``;
+   ``bin/segsend``, the test one, which deletes each segment it is given;
+   and the five test app programs, in ``libexec`` because tcspecial runs
+   them rather than a person -- a configuration names one as
+   ``executable: /opt/tcs/libexec/app_pl``. It depends on ``tcspecial``,
+   because an installed tcs-moc starts the tcspecial and the tcs-sim
+   installed beside it. The test ``segsend`` is here rather than in
    ``tcspecial`` because a vehicle that flew it would throw its telemetry
    away, and because a package that owned ``/opt/tcs/bin/segsend`` would
    overwrite a mission's own on every upgrade.
+``tcspecial-doc``
+   The manuals and designs, as HTML with their figures and screenshots, in
+   ``share/doc/tcspecial-doc/docs``, and the example configurations, in
+   both spellings with their simulator files and diagrams, in
+   ``share/examples/tcspecial``, which the manuals' figures come from.
+   Documentation alone, for whoever writes or reads configurations: no
+   vehicle or station needs it to run.
+
+Each takes the place of what was in an earlier package, so an upgrade
+from 0.1.0, when there were three -- ``tcspecial``, ``tcspecial-moc`` and
+``tcspecial-test`` -- moves each file to its new package.
 
 ``make deb`` builds them as ``.deb`` files and ``make rpm`` as RPMs, both
 into ``build/packages``; ``make packages`` builds both. Each is cut from
@@ -3471,18 +3490,19 @@ under ``build/stage``. Then, as root:
 
 .. code-block:: console
 
-   # apt install ./build/packages/tcspecial_0.1.0-1_amd64.deb
-   # dnf install ./build/packages/tcspecial-0.1.0-1.x86_64.rpm
+   # apt install ./build/packages/tcspecial_0.1.1-1_amd64.deb
+   # dnf install ./build/packages/tcspecial-0.1.1-1.x86_64.rpm
 
 A package also installs what makes ``/opt/tcs`` usable without being told
 of it, each file named after the package so that no two own one:
 ``/etc/profile.d/<package>.sh``, which puts ``/opt/tcs/bin`` on ``PATH`` --
-and, for the ground package, ``/opt/tcs/lib/pkgconfig`` on
-``PKG_CONFIG_PATH``; ``/etc/ld.so.conf.d/tcspecial-moc.conf``, which puts
-``/opt/tcs/lib`` on the loader's path; a ``tcspecial-moc.pth`` in the
-system python3's own directory -- ``/usr/lib/python3/dist-packages`` on
-Debian, ``/usr/lib/python3.<minor>/site-packages`` on Fedora, which has no
-directory every python3 reads -- which puts the Python on python3's path;
+or, for ``tcsmoc``, which has no programs, ``/opt/tcs/lib/pkgconfig`` on
+``PKG_CONFIG_PATH``; ``/etc/ld.so.conf.d/tcsmoc.conf``, which puts
+``/opt/tcs/lib`` on the loader's path; a ``tcsmoc.pth`` in the system
+python3's own directory -- ``/usr/lib/python3/dist-packages`` on Debian,
+``/usr/lib/python3.<minor>/site-packages`` on Fedora, which has no
+directory every python3 reads, where the RPM writes it for the python3
+installed -- which puts the Python on python3's path;
 and ``/usr/lib/systemd/system/tcspecial.service`` (see `Running tcspecial
 under a supervisor`_).
 
@@ -3490,7 +3510,7 @@ Each .deb also carries what Debian expects of every package, outside
 ``/opt/tcs`` as the files above are: ``/usr/share/doc/<package>/copyright``, in
 Debian's machine-readable format, and ``changelog.Debian.gz``, both made as the
 package is built, from ``LICENSE-MIT`` and the version; and lintian's overrides,
-in ``/usr/share/lintian/overrides/<package>``. The ground package also has a
+in ``/usr/share/lintian/overrides/<package>``. ``tcsmoc`` also has a
 trigger that has dpkg run ``ldconfig`` once ``libtcsmoc-c.so.4`` is
 installed or removed. The RPMs say the same in their own ``License``,
 ``%changelog``, ``%post`` and ``%postun``. ``libtcsmoc-c.so.4`` is not
@@ -3563,8 +3583,8 @@ install-build`` made, so that nothing is built as root. ``DESTDIR`` is put
 in front of every path, for staging, and is not part of any path a program
 looks in. ``HOOKS=1`` installs the files outside the prefix as well, which
 a developer's copy leaves alone unless asked. ``make install-tcspecial``,
-``install-tcspecial-moc`` and ``install-tcspecial-test`` copy one
-package. ``make uninstall-files``, with the same variables, takes away what
+``install-tcsmoc``, ``install-tcs-tools``, ``install-tcspecial-test`` and
+``install-tcspecial-doc`` copy one package. ``make uninstall-files``, with the same variables, takes away what
 was copied.
 
 .. code-block:: console
@@ -3595,7 +3615,8 @@ Programs everywhere, not only in a login shell
 The packages' ``/etc/profile.d`` scripts put ``/opt/tcs/bin`` on ``PATH``,
 but only a login shell reads them: ``sudo``, ``cron``, a systemd unit and
 other minimal environments do not see it, and find the programs only by
-their full path. So each package ships ``/opt/tcs/sbin/<package>-links``,
+their full path. So each package with programs ships
+``/opt/tcs/sbin/<package>-links``,
 which links that package's programs into ``/usr/local/bin`` -- on every
 path, ``sudo``'s ``secure_path`` included, and the administrator's own,
 which is where the filesystem hierarchy standard lets an administrator link
@@ -3605,7 +3626,7 @@ the administrator's choice:
 .. code-block:: console
 
    # /opt/tcs/sbin/tcspecial-links
-   # /opt/tcs/sbin/tcspecial-moc-links
+   # /opt/tcs/sbin/tcs-tools-links
    # /opt/tcs/sbin/tcspecial-test-links
    # /opt/tcs/sbin/tcspecial-links --dir /opt/bin
 
@@ -3628,13 +3649,16 @@ another directory.
 The Python alone
 ----------------
 
-``python/pyproject.toml`` makes ``tcsprotocol``, ``tcsmoc`` and
-``tcs_ui`` one distribution, ``tcspecial-moc``:
+``python/pyproject.toml`` makes ``tcsprotocol`` and ``tcsmoc``, the
+operational code, one distribution, ``tcspecial-moc``, and
+``tcs-ui/python/pyproject.toml`` makes ``tcs_ui``, a software tool, one of
+its own, ``tcs-ui``, which needs the first:
 
 .. code-block:: console
 
    $ pip install ./python
    $ pip install './python[yaml]'
+   $ pip install ./tcs-ui/python
 
 The extra brings PyYAML, which a station reading a YAML configuration
 needs. ``tcs_ui`` needs tkinter, which pip cannot install: ``python3-tk`` on

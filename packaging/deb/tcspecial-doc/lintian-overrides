@@ -1,0 +1,12 @@
+# This is an add-on package, not one of the distribution's, so it lives
+# under /opt/tcs, as FHS 3.0 section 3.13 lays out /opt/<package>; every
+# TCS package shares the one tree.
+tcspecial-doc: dir-or-file-in-opt
+
+# The package is not uploaded to Debian, so its first changelog entry has
+# no bug asking for it to close.
+tcspecial-doc: initial-upload-closes-no-bugs
+
+# Every TCS package is built for the machine's architecture, so that its
+# file is named as the others are, documentation too.
+tcspecial-doc: documentation-package-not-architecture-independent

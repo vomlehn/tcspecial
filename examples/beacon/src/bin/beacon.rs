@@ -45,12 +45,12 @@ use slint::ComponentHandle;
 use beacon_example::{
     notice_exit, prepare, show_on, wire, Vehicle, WatchWindow,
 };
+use tcs_ui::Shown;
 use tcsmoc::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
 use tcsprotocol::config_digest::digest_of_file;
 use tcsprotocol::graph::parameters::{beacon_interval_of, beacon_of};
 use tcsprotocol::graph::Graph;
 use tcsprotocol::{ConfigFormat, Spelling};
-use tcs_ui::Shown;
 
 /// The example's configuration, without its extension: `.yaml` or `.xml`,
 /// the two saying the same thing.

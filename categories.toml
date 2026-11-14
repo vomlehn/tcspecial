@@ -23,7 +23,6 @@ software-tools = [
 	"tcs-verify",
 	"tcs-diagram",
 	"tcs-ui",
-	"python/tcs_ui",
 	"tools/convert-format.py",
 ]
 

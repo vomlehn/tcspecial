@@ -1,0 +1,22 @@
+Package: tcs-tools
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: David VomLehn <dvomlehn@gmail.com>
+Installed-Size: @SIZE@
+Depends: @SHLIBS@, tcsmoc (= @VERSION@), python3
+Recommends: python3-tk
+Replaces: tcspecial (<< 0.1.1), tcspecial-moc
+Breaks: tcspecial (<< 0.1.1), tcspecial-moc
+Section: misc
+Priority: optional
+Homepage: https://github.com/vomlehn/tcspecial
+Description: tcspecial's configuration editor and checker
+ The software tools that write and check tcspecial's configurations: tcs-gui,
+ the graphical configuration editor, with its node descriptions; tcs-verify,
+ which says what is wrong with a configuration without running any of it;
+ and tcs_ui, the Python window pieces the examples' ground stations show.
+ Never flown; the manuals and examples are tcspecial-doc. Everything is
+ under /opt/tcs, and a .pth file puts tcs_ui on python3's path.
+ /etc/profile.d/tcs-tools.sh puts /opt/tcs/bin on a login shell's search
+ path, and /opt/tcs/sbin/tcs-tools-links links the programs into
+ /usr/local/bin for everything else.

@@ -64,6 +64,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "python"))
+sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 
 from tcsmoc.beacon import Schedule  # noqa: E402
 from tcsmoc.processes import Child, Vehicle, built  # noqa: E402

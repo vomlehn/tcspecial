@@ -46,6 +46,11 @@ fn the_python_libraries_pass_their_tests() {
 }
 
 #[test]
+fn tcs_uis_python_passes_its_tests() {
+    suite("tcs-ui/python/tests", "test_*.py", "tcs-ui/python");
+}
+
+#[test]
 fn the_ping_examples_python_passes_its_tests() {
     suite("examples/ping", "test_*.py", "examples/ping");
 }

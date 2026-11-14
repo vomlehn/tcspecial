@@ -14,7 +14,7 @@ tcs-diagram = { path = "../tcs-diagram" }
 # Asked about the files as the editor starts and after every edit, so that
 # what it says about them is what tcs-verify, tcspecial, tcs-moc and tcs-sim
 # say: see `errors_of`.
-tcs-verify = { path = "../tcs-verify" }
+tcslib-verify = { path = "../tcslib-verify" }
 # 1.18 rather than 1.3: the menu bar is a builtin element and the earlier
 # versions have none. What the editor would otherwise need is a control of its
 # own in place of a menu, which is a menu that behaves like nothing else on

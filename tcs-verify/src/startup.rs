@@ -1,6 +1,6 @@
 //! What a program found as it started, gathered to be said before its window.
 //!
-//! Every program that reads a configuration asks [`crate::verify`] about it
+//! Every program that reads a configuration asks [`tcslib_verify::verify`] about it
 //! first, so that each says what `tcs-verify` says about the same files, in the
 //! same words. What a program then finds for itself -- a socket it cannot
 //! make, a file it can read but not run -- is added beside those, so that a
@@ -9,12 +9,14 @@
 //!
 //! Gathered here and shown by the program, because showing is the program's
 //! own: tcs-moc and tcs-sim put it in a window that has to be closed before
-//! their main window opens, and tcspecial, which has no window, logs it. See
-//! `ui/startup.slint` beside this crate, which is that window.
+//! their main window opens. tcspecial, which has no window, logs what the
+//! verifier found itself. See `ui/startup.slint` beside this crate, which is
+//! that window.
 
 use std::path::Path;
 
-use crate::Report;
+use tcslib_protocol::graph::check::Severity;
+use tcslib_verify::Report;
 
 /// Everything a program has to say about how it is starting.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -53,7 +55,7 @@ impl Startup {
     pub fn report_loosely(&mut self, report: &Report, loose: &Path) {
         self.lines.extend(report.lines());
         if report.findings.iter().any(|finding| {
-            finding.severity == crate::Severity::Error && finding.file != loose
+            finding.severity == Severity::Error && finding.file != loose
         }) {
             self.fatal = true;
         }
@@ -107,9 +109,9 @@ impl Startup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Finding;
     use std::path::PathBuf;
     use tcslib_protocol::graph::check::Severity;
+    use tcslib_verify::Finding;
 
     /// Makes a finding of "wrong" at line 1 of a file.
     ///

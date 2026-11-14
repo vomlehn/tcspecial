@@ -227,7 +227,7 @@ const INTERFACE_DIGEST_FLAG: &str = "--interface-digest";
 /// line is not one of its shapes or the output cannot be written.
 fn main() -> ExitCode {
     let mut files: Vec<PathBuf> = Vec::new();
-    let mut limits = tcs_verify::Limits::EVERYTHING;
+    let mut limits = tcslib_verify::Limits::EVERYTHING;
     let mut digest = false;
     let mut summary = false;
     let mut keep: Option<PathBuf> = None;
@@ -354,16 +354,16 @@ fn main() -> ExitCode {
     }
 
     let report = match files.as_slice() {
-        [payload] => tcs_verify::verify_built(payload, None, limits, &built),
+        [payload] => tcslib_verify::verify_built(payload, None, limits, &built),
         [payload, sim] => {
-            tcs_verify::verify_built(payload, Some(sim), limits, &built)
+            tcslib_verify::verify_built(payload, Some(sim), limits, &built)
         }
         [first, second, sim] => {
             if let Err(why) = one_of_each(first, second) {
                 eprintln!("tcs-verify: {why}\n\n{USAGE}");
                 return ExitCode::from(2);
             }
-            tcs_verify::verify_pair(first, second, sim, limits, &built)
+            tcslib_verify::verify_pair(first, second, sim, limits, &built)
         }
         _ => {
             eprintln!("{USAGE}");
@@ -792,8 +792,8 @@ fn error_limit(value: &str) -> Result<Option<usize>, String> {
 /// # Errors
 ///
 /// A sentence saying what it may be, if it is anything else.
-fn warnings(value: &str) -> Result<tcs_verify::Warnings, String> {
-    use tcs_verify::Warnings;
+fn warnings(value: &str) -> Result<tcslib_verify::Warnings, String> {
+    use tcslib_verify::Warnings;
 
     match value {
         "on" => Ok(Warnings::On),
@@ -860,7 +860,7 @@ mod tests {
     /// On, off or errors, spelled so; anything else is told so.
     #[test]
     fn warnings_are_on_off_or_errors() {
-        use tcs_verify::Warnings;
+        use tcslib_verify::Warnings;
 
         assert_eq!(warnings("on"), Ok(Warnings::On));
         assert_eq!(warnings("off"), Ok(Warnings::Off));

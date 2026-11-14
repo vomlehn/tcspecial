@@ -7827,7 +7827,7 @@ i2c: build tcspecial with --features i2c, or take the node out of the
 configuration
 </pre>
 <p>The rule and its sentence are <tt class="docutils literal"><span class="pre">tcslib_protocol::graph::built</span></tt>, which
-tcspecial asks through <tt class="docutils literal"><span class="pre">tcs_verify::verify_built</span></tt> with the types it
+tcspecial asks through <tt class="docutils literal"><span class="pre">tcslib_verify::verify_built</span></tt> with the types it
 contains. An open of a type the build lacks says the same, though the load
 means none is ever reached.</p>
 <p class="last">A configuration refused on the ground costs a rebuild, where one that

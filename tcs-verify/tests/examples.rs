@@ -10,8 +10,8 @@
 
 use std::path::{Path, PathBuf};
 
-use tcs_verify::verify;
 use tcslib_protocol::graph::Graph;
+use tcslib_verify::verify;
 
 const SIM_SUFFIX: &str = "-sim.yaml";
 
@@ -227,7 +227,7 @@ fn every_example_verifies() {
         );
 
         let report =
-            verify(&config, Some(&sim), tcs_verify::Limits::EVERYTHING);
+            verify(&config, Some(&sim), tcslib_verify::Limits::EVERYTHING);
         let findings: Vec<String> =
             report.findings.iter().map(|f| f.to_string()).collect();
         assert!(
@@ -452,7 +452,7 @@ fn every_node_in_the_manual_verifies() {
 
             let path = dir.path().join(format!("{name}-{line}.ytcs"));
             std::fs::write(&path, &file).unwrap();
-            let report = verify(&path, None, tcs_verify::Limits::EVERYTHING);
+            let report = verify(&path, None, tcslib_verify::Limits::EVERYTHING);
             assert!(
                 !report.found_anything(),
                 "the example at {name}:{line} does not verify: {:?}\n{file}",

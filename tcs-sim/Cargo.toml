@@ -9,6 +9,8 @@ build = "build.rs"
 [dependencies]
 tcslib-protocol = { path = "../tcslib-protocol" }
 # Asked about the pair before anything opens: see main.
+tcslib-verify = { path = "../tcslib-verify" }
+# What it found, said in the window that opens before the main one.
 tcs-verify = { path = "../tcs-verify" }
 # How a harness waits for a simulator to be ready, which --wait is.
 tcslib-moc = { path = "../tcslib-moc" }

@@ -375,6 +375,13 @@ ul.auto-toc {
 beside it when one is given -- and prints what is wrong with it. It opens no socket and no device node, so it can be run anywhere, by a
 person editing a file or by a recipe: it is given the files to read and says
 nothing when they are good.</p>
+<p>The checking is the library <strong>tcslib-verify</strong>'s, and the program is the
+crate <strong>tcs-verify</strong>. They are apart because tcspecial asks the same
+checks of the configuration it is to fly, and what flies is built from
+libraries, never from a tool: tcspecial is built with tcslib-verify and
+without tcs-verify. tcs-verify keeps what only the tool does -- the summary,
+the interface digest, a configuration's own XTCE and F´ model -- and the
+start-up window tcs-moc and tcs-sim share.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Tcs-verify takes one file or two. The first is the tcspecial configuration
@@ -539,15 +546,15 @@ use, so a set it accepts is a set they accept. A verifier with rules of its
 own would eventually disagree with them, and then a passing check would mean
 nothing.</dd>
 <dt>Requirement</dt>
-<dd><p class="first">Every program that reads these files asks tcs-verify about them as it
+<dd><p class="first">Every program that reads these files asks tcslib-verify about them as it
 starts, before anything else is read from them, and says what it says in its
 words: tcspecial, tcs-moc, tcs-sim and tcs-gui report the same problems,
 each with its file and line, as <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> does for the same files. What
 a program then refuses for its own reasons -- tcs-sim a payload it has it
 cannot simulate, tcs-moc a configuration it does not control -- is said
 beside them. Where a rule is the simulator's rather than the file's, it is
-in <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt> all the same (<tt class="docutils literal">simulable</tt>), so that tcs-verify asks
-it too.</p>
+in <tt class="docutils literal"><span class="pre">tcslib-protocol</span></tt> all the same (<tt class="docutils literal">simulable</tt>), so that tcslib-verify
+asks it too.</p>
 <p class="last">Which of them stops a program is the program's business. tcspecial
 refuses a configuration with a warning in it, as above; tcs-moc
 reads the simulator file only to show it, so a problem there is said and

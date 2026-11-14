@@ -162,7 +162,8 @@ pub(crate) fn restart_target_of(
              lower-case hex digits"
         ));
     }
-    let report = tcs_verify::verify(path, None, tcs_verify::Limits::EVERYTHING);
+    let report =
+        tcslib_verify::verify(path, None, tcslib_verify::Limits::EVERYTHING);
     if report.found_errors() {
         let problems: Vec<String> = report
             .lines()

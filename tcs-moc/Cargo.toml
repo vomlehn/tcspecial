@@ -17,6 +17,8 @@ tcslib-protocol = { path = "../tcslib-protocol" }
 # come to contain types it was built without.
 tcspecial = { path = "../tcspecial", default-features = false }
 # Asked about the payload set before anything opens: see main.
+tcslib-verify = { path = "../tcslib-verify" }
+# What it found, said in the window that opens before the main one.
 tcs-verify = { path = "../tcs-verify" }
 slint = "1.3"
 serde = { version = "1.0", features = ["derive"] }

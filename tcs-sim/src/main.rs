@@ -1246,10 +1246,10 @@ fn main() {
     // all where any of it is an error.
     let mut startup = Startup::default();
     startup.report(
-        &tcs_verify::verify(
+        &tcslib_verify::verify(
             Path::new(&payload_path),
             Some(Path::new(&sim_path)),
-            tcs_verify::Limits::EVERYTHING,
+            tcslib_verify::Limits::EVERYTHING,
         ),
         true,
     );

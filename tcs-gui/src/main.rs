@@ -3461,8 +3461,11 @@ fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
         return (Vec::new(), Vec::new());
     }
     let simulator = simulator.filter(|path| path.exists());
-    let report =
-        tcs_verify::verify(config, simulator, tcs_verify::Limits::EVERYTHING);
+    let report = tcslib_verify::verify(
+        config,
+        simulator,
+        tcslib_verify::Limits::EVERYTHING,
+    );
 
     let document = editor.document();
     let faults = document.faults();
@@ -3538,7 +3541,7 @@ fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
 /// # Returns
 ///
 /// The menu's words for it.
-fn said_where(finding: &tcs_verify::Finding, on_node: bool) -> String {
+fn said_where(finding: &tcslib_verify::Finding, on_node: bool) -> String {
     if on_node {
         return finding.message.clone();
     }
@@ -9623,8 +9626,11 @@ mod tests {
 
         // The unfinished node is the rules' alone, and it is a concern about
         // the node, said as tcs-verify says it, and not an error.
-        let report =
-            tcs_verify::verify(&path, None, tcs_verify::Limits::EVERYTHING);
+        let report = tcslib_verify::verify(
+            &path,
+            None,
+            tcslib_verify::Limits::EVERYTHING,
+        );
         let warning = report
             .findings
             .iter()
@@ -9710,7 +9716,7 @@ mod tests {
     /// given, which would fill the menu's line before it said anything.
     #[test]
     fn an_error_in_a_file_is_said_by_the_file_name() {
-        let finding = tcs_verify::Finding {
+        let finding = tcslib_verify::Finding {
             file: std::path::PathBuf::from(
                 "/home/someone/battery/battery-sim.yaml",
             ),

@@ -17,7 +17,7 @@ tcslib-protocol = { path = "../tcslib-protocol" }
 tcsapp = { path = "../tcsapp" }
 # The checks tcs-verify makes, asked of the configuration before anything is
 # opened, so that what this refuses to start on is what tcs-verify reports.
-tcs-verify = { path = "../tcs-verify" }
+tcslib-verify = { path = "../tcslib-verify" }
 serde = { version = "1.0", features = ["derive"] }
 libc = "0.2"
 thiserror = "1.0"

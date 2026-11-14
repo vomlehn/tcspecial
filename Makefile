@@ -1152,7 +1152,7 @@ uninstall-files:
 		$(DESTDIR)$(LIBDIR)/$(LIBTCS_SONAME)
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcslib_protocol tcslib_moc \
-		tcs-ui tcspecial_moc-*.dist-info)
+		tcs_ui tcspecial_moc-*.dist-info)
 	rm -rf $(TCS_GUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
 		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))

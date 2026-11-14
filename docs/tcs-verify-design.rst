@@ -13,6 +13,14 @@ beside it when one is given -- and prints what is wrong with it. It opens no soc
 person editing a file or by a recipe: it is given the files to read and says
 nothing when they are good.
 
+The checking is the library **tcslib-verify**'s, and the program is the
+crate **tcs-verify**. They are apart because tcspecial asks the same
+checks of the configuration it is to fly, and what flies is built from
+libraries, never from a tool: tcspecial is built with tcslib-verify and
+without tcs-verify. tcs-verify keeps what only the tool does -- the summary,
+the interface digest, a configuration's own XTCE and F´ model -- and the
+start-up window tcs-moc and tcs-sim share.
+
 Requirement
     Tcs-verify takes one file or two. The first is the tcspecial configuration
     file and the second, if there is one, the simulator configuration. Which
@@ -195,15 +203,15 @@ Requirement
     nothing.
 
 Requirement
-    Every program that reads these files asks tcs-verify about them as it
+    Every program that reads these files asks tcslib-verify about them as it
     starts, before anything else is read from them, and says what it says in its
     words: tcspecial, tcs-moc, tcs-sim and tcs-gui report the same problems,
     each with its file and line, as ``tcs-verify`` does for the same files. What
     a program then refuses for its own reasons -- tcs-sim a payload it has it
     cannot simulate, tcs-moc a configuration it does not control -- is said
     beside them. Where a rule is the simulator's rather than the file's, it is
-    in ``tcslib-protocol`` all the same (``simulable``), so that tcs-verify asks
-    it too.
+    in ``tcslib-protocol`` all the same (``simulable``), so that tcslib-verify
+    asks it too.
 
     Which of them stops a program is the program's business. tcspecial
     refuses a configuration with a warning in it, as above; tcs-moc

@@ -7,6 +7,9 @@ members = [
     "tcspecial",
     "tcs-moc",
     "tcs-sim",
+    # The checks every program asks of a configuration, and the program that
+    # prints them. See tcslib-verify.
+    "tcslib-verify",
     "tcs-verify",
     "tcs-gui",
     # The window pieces the ground programs share: the panels, and what to

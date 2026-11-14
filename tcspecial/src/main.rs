@@ -176,10 +176,10 @@ fn main() {
     // Against the types this build contains, so that a configuration with a
     // node of another type is refused here, before anything is opened, in
     // the words tcs-verify's `--types` uses on the ground.
-    let report = tcs_verify::verify_built(
+    let report = tcslib_verify::verify_built(
         std::path::Path::new(&payload_path),
         None,
-        tcs_verify::Limits::EVERYTHING,
+        tcslib_verify::Limits::EVERYTHING,
         built,
     );
     for (_, line) in report.lines() {

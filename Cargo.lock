@@ -4855,8 +4855,8 @@ dependencies = [
  "slint",
  "slint-build",
  "tcs-diagram",
- "tcs-verify",
  "tcslib-protocol",
+ "tcslib-verify",
  "tempfile",
 ]
 
@@ -4874,6 +4874,7 @@ dependencies = [
  "tcs-verify",
  "tcslib-moc",
  "tcslib-protocol",
+ "tcslib-verify",
  "tcspecial",
  "tempfile",
 ]
@@ -4894,6 +4895,7 @@ dependencies = [
  "tcs-verify",
  "tcslib-moc",
  "tcslib-protocol",
+ "tcslib-verify",
  "tempfile",
 ]
 
@@ -4909,8 +4911,8 @@ dependencies = [
 name = "tcs-verify"
 version = "0.1.0"
 dependencies = [
- "serde_json",
  "tcslib-protocol",
+ "tcslib-verify",
  "tempfile",
 ]
 
@@ -4968,6 +4970,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcslib-verify"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "tcslib-protocol",
+ "tempfile",
+]
+
+[[package]]
 name = "tcslog"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4989,10 +5000,10 @@ dependencies = [
  "slint-build",
  "socket2",
  "tcs-diagram",
- "tcs-verify",
  "tcsapp",
  "tcslib-moc",
  "tcslib-protocol",
+ "tcslib-verify",
  "tcslog",
  "tempfile",
  "thiserror 1.0.69",

@@ -7486,7 +7486,7 @@ Requirement
        configuration
 
     The rule and its sentence are ``tcslib_protocol::graph::built``, which
-    tcspecial asks through ``tcs_verify::verify_built`` with the types it
+    tcspecial asks through ``tcslib_verify::verify_built`` with the types it
     contains. An open of a type the build lacks says the same, though the load
     means none is ever reached.
 

@@ -881,10 +881,10 @@ fn main() {
     let sim_path = sim_path_for(&payload_path);
     let mut startup = Startup::default();
     startup.report_loosely(
-        &tcs_verify::verify(
+        &tcslib_verify::verify(
             Path::new(&payload_path),
             sim_path.as_deref().map(Path::new),
-            tcs_verify::Limits::EVERYTHING,
+            tcslib_verify::Limits::EVERYTHING,
         ),
         // Where a set has no simulator file, the configuration itself is what
         // every problem is reported against: there is no second file for one

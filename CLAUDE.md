@@ -34,9 +34,12 @@ argue from this order and say so.
 - `tcs-moc` -- the test ground station (GUI).
 - `tcs-sim` -- the payload simulator (GUI).
 - `tcs-gui` -- the graphical configuration editor.
-- `tcs-verify` -- checks a configuration and prints every problem with its file
-  and line. tcspecial, tcs-moc, tcs-sim and tcs-gui all check through its
-  `verify`, so they agree about what is wrong.
+- `tcslib-verify` -- checks a configuration and gives every problem with its
+  file and line. tcspecial, tcs-verify, tcs-moc, tcs-sim and tcs-gui all
+  check through its `verify`, so they agree about what is wrong.
+- `tcs-verify` -- the program that prints those problems, and what only the
+  tool does: `--summary`, `--set-interface`, `--xtce`, `--fprime-model`, and
+  the start-up window tcs-moc and tcs-sim share.
 - `tcs-ui` -- window pieces the ground programs share.
 - `tcs-diagram` -- how a configuration is drawn: the working panes, node
   shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcs-gui

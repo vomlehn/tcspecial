@@ -172,7 +172,8 @@ Non-production code:
   `tools/convert-format.py`, which rewrites a configuration from the old
   shape into the new, and `tools/ntss.py`, which `make ntss` runs: it counts
   the non-test source statements of every tcs project checked out beside
-  this one, by subproject and language.
+  this one, by subproject and language, production code apart from the
+  rest, as tables or, with `CSV=1`, comma-separated values.
 
 # Stuff
 

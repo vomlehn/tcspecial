@@ -32,13 +32,31 @@ Cargo.toml holding [package], a pyproject.toml, a setup.py or a
 CMakeLists.txt; a file in none of them goes under the first directory of
 its path, or "(top)" for one at the top.
 
-Run as `python3 tools/ntss.py`, which is what `make ntss` does.
+Each subproject is production code or not as its name says, by the rule
+tcs-helpers' production-names states: a crate's, a Python project's or a
+CMake project's name with a letter, or nothing, after `tcs` or `tcslog`
+is production code's (tcslog, tcsmoc, tcsxtce), and any other name is
+not (tcs-gui, tcs_xtce). A file in no subproject -- a project's top-level
+scripts, makefiles, tools and packaging -- is not production code. The
+counts are printed in two parts, production code and non-production code,
+each by project and subproject with its totals, and then the totals of
+both.
+
+Run as `python3 tools/ntss.py`, which is what `make ntss` does. With
+--csv, it prints instead one comma-separated row per subproject, with a
+header row, for a spreadsheet: `make ntss CSV=1`. --tcs-helpers names the
+tcs-helpers checkout, ../tcs-helpers by default.
 """
 
+import argparse
+import csv
+import importlib.machinery
+import importlib.util
 import re
 import subprocess
 import sys
 import tokenize
+import tomllib
 from io import StringIO
 from pathlib import Path
 
@@ -74,6 +92,14 @@ TEST_FILE = re.compile(r"^(test_.*\.py|.*_tests?\..*|test-.*|conftest\.py)$")
 
 # What a subproject's directory holds.
 MANIFESTS = ["Cargo.toml", "pyproject.toml", "setup.py", "CMakeLists.txt"]
+
+# A CMake project's name, in its project() command.
+CMAKE_PROJECT = re.compile(r"^\s*project\s*\(\s*([A-Za-z0-9_.+-]+)",
+                           re.IGNORECASE | re.MULTILINE)
+
+# The two parts of the counts, in the order they are printed: whether
+# production code's, and the heading.
+KINDS = [(True, "Production code"), (False, "Non-production code")]
 
 # A character literal, which a ' that does not begin one, a Rust lifetime
 # or label such as 'a, is told from.
@@ -387,10 +413,52 @@ def subprojects(project, files):
             continue
         if f.name == "Cargo.toml":
             text = (project / f).read_text(errors="replace")
-            if not re.search(r"^\[package\]", text, re.M):
+            if not re.search(r"^\[package\]", text, re.MULTILINE):
                 continue
         found.add(f.parent)
     return sorted(found, key=lambda d: -len(d.parts))
+
+
+def name_of(project, directory):
+    """Gives a subproject's name, as its manifest states it.
+
+    Args:
+        project:   The project's directory.
+        directory: The subproject's, relative to the project.
+
+    Returns:
+        The name of the crate, Python project or CMake project the
+        directory holds, or the directory's own name where its manifest
+        gives none.
+    """
+    where = project / directory
+    try:
+        cargo = where / "Cargo.toml"
+        if cargo.is_file():
+            name = tomllib.loads(cargo.read_text()).get(
+                "package", {}).get("name")
+            if isinstance(name, str):
+                return name
+        pyproject = where / "pyproject.toml"
+        if pyproject.is_file():
+            name = tomllib.loads(pyproject.read_text()).get(
+                "project", {}).get("name")
+            if isinstance(name, str):
+                return name
+    except (OSError, tomllib.TOMLDecodeError):
+        pass
+    setup = where / "setup.py"
+    if setup.is_file():
+        m = re.search(r"\bname\s*=\s*[\"']([^\"']+)[\"']",
+                      setup.read_text(errors="replace"))
+        if m is not None:
+            return m.group(1)
+    cmake = where / "CMakeLists.txt"
+    if cmake.is_file():
+        m = CMAKE_PROJECT.search(cmake.read_text(errors="replace"))
+        if m is not None:
+            return m.group(1)
+    return directory.name
 
 
 def subproject_of(relative, dirs):
@@ -401,24 +469,39 @@ def subproject_of(relative, dirs):
         dirs: The project's subprojects, deepest first.
 
     Returns:
-        The subproject's name.
+        The subproject's directory, or None for a file in none.
     """
     for d in dirs:
         if d in relative.parents:
-            return str(d)
+            return d
+    return None
+
+
+def group_of(relative):
+    """Names the group a file in no subproject is counted under.
+
+    Args:
+        relative: The file's path within its project.
+
+    Returns:
+        Its first directory, or "(top)" for a file at the top.
+    """
     if len(relative.parts) == 1:
         return "(top)"
     return relative.parts[0]
 
 
-def count(project):
+def count(project, is_production):
     """Counts a project.
 
     Args:
-        project: The project's directory.
+        project:       The project's directory.
+        is_production: production-names' test of whether a name is
+                       production code's.
 
     Returns:
-        {subproject: {language: statements}}.
+        {(production, subproject): {language: statements}}, where
+        production says whether the subproject is production code.
     """
     listed = subprocess.run(
         ["git", "-C", str(project), "ls-files", "-z"],
@@ -439,7 +522,13 @@ def count(project):
         n = statements(path, kind)
         if n == 0:
             continue
-        row = counts.setdefault(subproject_of(relative, dirs), {})
+        directory = subproject_of(relative, dirs)
+        if directory is None:
+            key = (False, group_of(relative))
+        else:
+            key = (is_production(name_of(project, directory)),
+                   str(directory))
+        row = counts.setdefault(key, {})
         row[kind] = row.get(kind, 0) + n
     return counts
 
@@ -463,33 +552,128 @@ def table(rows, width):
     return lines
 
 
-def main():
-    """Prints the counts, project by project, with their totals."""
-    results = [(p.name, count(p)) for p in projects()]
-    names = [s for _, c in results for s in c] + ["total"]
+def add(total, row):
+    """Adds one row of counts to another.
+
+    Args:
+        total: {language: statements}, added to.
+        row:   {language: statements}.
+    """
+    for k, v in row.items():
+        total[k] = total.get(k, 0) + v
+
+
+def load_is_production(helpers):
+    """Loads the naming rule from tcs-helpers' production-names.
+
+    Args:
+        helpers: The tcs-helpers checkout.
+
+    Returns:
+        Its is_production function.
+
+    Raises:
+        SystemExit: The checkout has no production-names.
+    """
+    path = helpers / "bin" / "production-names"
+    if not path.is_file():
+        sys.exit(f"ntss: no {path}: ntss needs a tcs-helpers checkout, "
+                 "0.9.0 or later, for the rule that names production code")
+    loader = importlib.machinery.SourceFileLoader("production_names",
+                                                  str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module.is_production
+
+
+def print_csv(results):
+    """Prints the counts as comma-separated values.
+
+    Args:
+        results: (project, its counts from count()) for each project.
+    """
+    out = csv.writer(sys.stdout, lineterminator="\n")
+    out.writerow(["code", "project", "subproject"] + LANGUAGES
+                 + ["Total"])
+    for production, _ in KINDS:
+        kind = "production" if production else "non-production"
+        for name, counts in results:
+            for (p, sub), row in sorted(counts.items()):
+                if p != production:
+                    continue
+                cells = [row.get(k, 0) for k in LANGUAGES]
+                out.writerow([kind, name, sub] + cells + [sum(cells)])
+
+
+def print_text(results):
+    """Prints the counts as tables: production code's, non-production
+    code's, and the totals of both.
+
+    Args:
+        results: (project, its counts from count()) for each project.
+    """
+    names = [s for _, c in results for _, s in c] + ["total"]
     width = max(len(n) for n in names)
-    header = (f"  {'':<{width}}" + "".join(f"{k:>7}" for k in LANGUAGES)
-          + f"{'Total':>8}")
+    header = (f"    {'':<{width}}"
+              + "".join(f"{k:>7}" for k in LANGUAGES) + f"{'Total':>8}")
     grand = {}
     print("Non-test source statements: lines of code, less tests and "
           "generated code")
-    for name, counts in results:
+    for production, heading in KINDS:
         print()
-        print(name)
+        print(heading)
+        part = {}
+        for name, counts in results:
+            rows = {s: r for (p, s), r in counts.items()
+                    if p == production}
+            if not rows:
+                continue
+            total = {}
+            for row in rows.values():
+                add(total, row)
+            add(part, total)
+            print()
+            print(f"  {name}")
+            print(header)
+            for line in table(sorted(rows.items())
+                              + [("total", total)], width):
+                print("  " + line)
+        add(grand, part)
+        print()
+        print(f"  All {heading[0].lower()}{heading[1:]}")
         print(header)
-        total = {}
-        for row in counts.values():
-            for k, v in row.items():
-                total[k] = total.get(k, 0) + v
-                grand[k] = grand.get(k, 0) + v
-        for line in table(sorted(counts.items()) + [("total", total)],
-                  width):
-            print(line)
+        for line in table([("total", part)], width):
+            print("  " + line)
     print()
-    print("All projects")
+    print("All code")
     print(header)
     for line in table([("total", grand)], width):
-        print(line)
+        print("  " + line)
+
+
+def main():
+    """Prints the counts, production code's first, as tables or CSV.
+
+    Returns:
+        0.
+    """
+    parser = argparse.ArgumentParser(
+        description="Count the tcs projects' non-test source statements.")
+    parser.add_argument("--csv", action="store_true",
+                        help="print comma-separated values, a row per "
+                             "subproject")
+    parser.add_argument("--tcs-helpers", type=Path,
+                        default=TOP / "tcs-helpers",
+                        help="the tcs-helpers checkout "
+                             "(default: ../tcs-helpers)")
+    args = parser.parse_args()
+    is_production = load_is_production(args.tcs_helpers)
+    results = [(p.name, count(p, is_production)) for p in projects()]
+    if args.csv:
+        print_csv(results)
+    else:
+        print_text(results)
     return 0
 
 

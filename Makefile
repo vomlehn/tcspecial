@@ -214,7 +214,7 @@ help:
 	@echo "  make clean       - Remove build artifacts"
 	@echo "  make distclean   - Remove everything that can be rebuilt"
 	@echo "  make ntss        - Count each tcs project's non-test source" \
-		"statements"
+		"statements (CSV=1: as CSV)"
 	@echo "  make install-tools - Install the tools building, testing and" \
 		"packaging need"
 	@echo "                     (DRY_RUN=1: show what it would do;"
@@ -925,12 +925,14 @@ install-build:
 	cargo build --release $(addprefix -p ,$(INSTALL_CRATES))
 
 # Count each tcs project's and subproject's non-test source statements, of
-# every ../tcs* checkout beside this one: see tools/ntss.py for what is
-# counted. Printed, not kept: the counts are of other repositories too, as
-# they stand when it is run.
+# every ../tcs* checkout beside this one, production code's apart from the
+# rest: see tools/ntss.py for what is counted. Printed, not kept: the counts
+# are of other repositories too, as they stand when it is run. CSV=1 prints
+# them as comma-separated values, for a spreadsheet.
 .PHONY: ntss
 ntss:
-	python3 tools/ntss.py
+	python3 tools/ntss.py --tcs-helpers $(TCS_HELPERS) \
+		$(if $(filter 1,$(CSV)),--csv)
 
 # Install the tools building, testing, checking, documenting and packaging
 # this project need, with the system's own package manager, under sudo:

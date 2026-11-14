@@ -43,4 +43,8 @@ Filters = [
 	# tcs-moc starts the tcspecial installed beside it, so tcspecial-test
 	# needs exactly the tcspecial built with it.
 	'^tcspecial-test\.[^:]+: [EW]: requires-on-release tcspecial = ',
+	# The rm the triggers and %preun run takes away only the package's own
+	# .pth file, which the python3 installed says where to write, so it
+	# cannot be a file the package lists.
+	'^tcspecial-moc\.[^:]+: E: dangerous-command-in-%(trigger|preun) rm$',
 ]

@@ -8,15 +8,6 @@ Recommends:     python3-pyyaml, python3-tkinter, pkgconf-pkg-config
 # takes the old one out. Every tcspecial-ground built was 0.1.0.
 Obsoletes:      tcspecial-ground < 0.1.1
 
-# Where the .pth file that puts /opt/tcs/lib/python3/site-packages on
-# python3's path goes: the system python3's own site-packages, which on
-# Fedora names its minor version (/usr/lib/python3.13/site-packages) because
-# Fedora has no directory every python3 reads. Fedora's macro, where there is
-# one; elsewhere the same path, asked of python3.
-%{!?python3_sitelib: %global python3_sitelib %(python3 -c '
-import sysconfig
-print(sysconfig.get_path("purelib", "posix_prefix", {"base": "/usr"}))')}
-
 %description
 What a ground station for tcspecial is built on: libtcsmoc-c, the TCSpecial
 MOC Correspondent (tcsmoc) for C and C++, with its header tcsmoc-c.h
@@ -26,15 +17,32 @@ graphical configuration editor, with its node descriptions and schemas.
 
 %install
 cp -a %{tcs_stage}/. %{buildroot}/
-# The stage puts the .pth where Debian's python3 reads it; this is the
-# place Fedora's does.
+# The stage puts the .pth where Debian's python3 reads it; this one's is
+# written when it is installed, by the trigger below.
 rm -rf %{buildroot}/usr/lib/python3
-install -d %{buildroot}%{python3_sitelib}
-echo /opt/tcs/lib/python3/site-packages \
-	> %{buildroot}%{python3_sitelib}/tcspecial-moc.pth
 # RPM finds what a shared library provides only in an executable file,
 # where Debian wants one that is not.
 chmod 755 %{buildroot}/opt/tcs/lib/libtcsmoc-c.so.[0-9]*
+
+# The .pth file that puts /opt/tcs/lib/python3/site-packages on python3's
+# path. It goes in python3's own site-packages, which on Fedora names its
+# minor version (/usr/lib/python3.15/site-packages), so the python3 that is
+# installed says where, rather than the one that built the package. This
+# runs when the package is installed with a python3 there, and again when
+# python3 is installed or upgraded, moving the file to the new version's
+# directory; it never fails the transaction.
+%triggerin -- python3
+rm -f /usr/lib/python3*/site-packages/tcspecial-moc.pth
+site=$(python3 -c 'import sysconfig
+print(sysconfig.get_path("purelib", "posix_prefix", {"base": "/usr"}))') \
+	&& mkdir -p "$site" \
+	&& echo /opt/tcs/lib/python3/site-packages > "$site/tcspecial-moc.pth" || :
+
+# python3 removed ($2 is 0) takes the .pth with it.
+%triggerun -- python3
+if [ "$2" = 0 ]; then
+	rm -f /usr/lib/python3*/site-packages/tcspecial-moc.pth
+fi
 
 %post -p /sbin/ldconfig
 %postun -p /sbin/ldconfig
@@ -43,6 +51,7 @@ chmod 755 %{buildroot}/opt/tcs/lib/libtcsmoc-c.so.[0-9]*
 # The links this package's links script made, taken away while the script
 # is still here, and only when the package is going ($1 = 0), not upgraded.
 if [ "$1" = 0 ]; then
+	rm -f /usr/lib/python3*/site-packages/tcspecial-moc.pth
 	for dir in /usr/local/bin /opt/bin; do
 		/opt/tcs/sbin/tcspecial-moc-links --remove --dir "$dir" \
 			>/dev/null 2>&1 || :
@@ -70,7 +79,6 @@ fi
 %doc /opt/tcs/share/doc/tcspecial-moc
 %config(noreplace) /etc/ld.so.conf.d/tcspecial-moc.conf
 %config(noreplace) /etc/profile.d/tcspecial-moc.sh
-%{python3_sitelib}/tcspecial-moc.pth
 /opt/tcs/sbin/tcspecial-moc-links
 
 %include %{_sourcedir}/changelog.inc

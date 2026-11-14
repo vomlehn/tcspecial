@@ -78,9 +78,9 @@ TCS_GUI_DATA = $(DESTDIR)$(DATADIR)/$(GUI_NAME)
 # not tcs-gui's, since they define the formats every program reads.
 SCHEMADIR = $(DATADIR)/tcspecial/schema
 
-# Where the hooks go. Debian's places; the RPM spec moves the .pth file to
-# Fedora's, which names python3's minor version: see
-# packaging/rpm/tcspecial-moc.spec.
+# Where the hooks go. Debian's places; the RPM writes its .pth file when
+# it is installed, in Fedora's place, which names python3's minor version:
+# see packaging/rpm/tcspecial-moc.spec.
 PROFILEDIR ?= /etc/profile.d
 LDCONFDIR ?= /etc/ld.so.conf.d
 SYSTEMDDIR ?= /usr/lib/systemd/system

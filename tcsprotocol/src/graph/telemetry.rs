@@ -51,6 +51,16 @@
 //! payload's device id. [`apids`] is every APID such a configuration uses,
 //! and holds each to being one, at most 0x7FF, and used once.
 //!
+//! # Consolidators' inputs
+//!
+//! A consolidator packs its inputs into one datum for the link from the
+//! vehicle, and the ground takes it apart. Each input whose source is not
+//! drawn into the gateway node itself is given the link it would have were
+//! it drawn in -- its port and APID counted from the node's bases by its
+//! own device id -- and the ground hands each new reading on there:
+//! [`relayed`]. tcspecial sends nothing on these, but they are held to the
+//! same rules, so none lands where another link does.
+//!
 //! This is the one place that says all of it. The flight software routes by
 //! it, the checking judges a configuration by it, and a ground station or
 //! simulator working from the same file finds the same ports by it.
@@ -60,6 +70,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::link_types::{self, carries};
 use super::parameters::{ci_config_of, flatten};
 use super::{Destination, Graph, Node};
+use crate::consolidation::Layout;
 use crate::link_type::{Basic, Count, LinkType};
 use crate::types::{
     host_port_of, msgid_of, Links, MsgIdRange, NetworkConfig, NetworkProtocol,
@@ -115,6 +126,11 @@ pub struct Telemetered {
     /// The largest datum its source can produce, which the buffer it is
     /// sent from is sized by: see [`crate::graph::largest::largest_datum`].
     pub largest: usize,
+    /// The consolidator whose datum carries the source's readings to the
+    /// gateway node, where the source is not drawn into it itself: see
+    /// [`relayed`]. tcspecial sends nothing on such a link; the ground's
+    /// relay sends each reading on it as tcspecial would have.
+    pub relayed_by: Option<String>,
 }
 
 impl Telemetered {
@@ -297,9 +313,106 @@ fn sent_by(node: Option<&Node>) -> LinkType {
     }
 }
 
-/// Names every node whose data reaches the ground, as [`of`] counts them,
-/// without asking where it arrives: each drawn into a gateway node, and,
-/// where the configuration has a `tcspecial` section, each payload nothing
+/// A source's link into a gateway node, where the node is one and states
+/// the base the link is counted from.
+///
+/// # Arguments
+///
+/// * `graph`      - The configuration.
+/// * `ids`        - Every node's device id.
+/// * `source`     - The node whose data it carries.
+/// * `to`         - The node it is drawn into.
+/// * `relayed_by` - The consolidator whose datum carries it, where the
+///                  source is not drawn in itself.
+///
+/// # Returns
+///
+/// The link, or `None` where `to` is not a gateway node, or its base or
+/// `apid_base` does not read: what is wrong with them is `reach_of`'s to
+/// say, and once.
+///
+/// # Errors
+///
+/// [`Refused`] where the port, message ID or APID cannot be counted on to
+/// from its base.
+fn through(
+    graph: &Graph,
+    ids: &BTreeMap<String, usize>,
+    source: &str,
+    to: &str,
+    relayed_by: Option<&str>,
+) -> Result<Option<Telemetered>, Refused> {
+    let Some(gateway) = graph
+        .node(to)
+        .filter(|n| crate::gateway::is_gateway(&n.node_type))
+    else {
+        return Ok(None);
+    };
+    // Each kind names its far end by what is there: a radio's ground_base,
+    // an F´ gateway's bridge_base, cFS's tlm_base. One rule counts on from
+    // each.
+    let kind = crate::gateway::GatewayKind::of_node_type(&gateway.node_type)
+        .expect("a gateway node");
+    let attribute = kind.base_attribute();
+    let Some(said) = gateway.attributes.get(attribute) else {
+        return Ok(None);
+    };
+    let Some(&id) = ids.get(source) else {
+        return Ok(None);
+    };
+    let refused = |why: String| Refused {
+        node: Some(to.to_string()),
+        why: format!("\"{to}\": {attribute} {why}"),
+    };
+    // Under Yamcs, the node's apid_base counted on by the source's id, as
+    // the port is.
+    let apid = match crate::graph::reach::apid_base_of(gateway) {
+        Err(_) => return Ok(None),
+        Ok(None) => None,
+        Ok(Some(base)) => {
+            Some(counted_apid(base, id).map_err(|why| Refused {
+                node: Some(to.to_string()),
+                why: format!("\"{to}\": apid_base {why}"),
+            })?)
+        }
+    };
+    let reaches = if kind.on_bus() {
+        let Ok(base) = msgid_of(attribute, said.as_str()) else {
+            return Ok(None);
+        };
+        Reaches::Bus(counted(base, id).map_err(refused)?)
+    } else {
+        let Ok(base) = host_port_of(attribute, said.as_str()) else {
+            return Ok(None);
+        };
+        Reaches::Socket {
+            vehicle: NetworkConfig {
+                protocol: NetworkProtocol::Udp,
+                address: "0.0.0.0".to_string(),
+                port: 0,
+            },
+            ground: base.at(id).map_err(refused)?,
+        }
+    };
+    Ok(Some(Telemetered {
+        name: gateway_link_name(source, to),
+        source: source.to_string(),
+        id,
+        via: Via::Gateway(to.to_string()),
+        reaches,
+        apid,
+        carries: sent_by(graph.node(source)),
+        largest: graph
+            .node(source)
+            .map_or(0, |node| super::largest::largest_datum(graph, node).bytes),
+        relayed_by: relayed_by.map(str::to_string),
+    }))
+}
+
+/// Names every node whose data reaches the ground, as [`of`] and
+/// [`relayed`] count them, without asking where it arrives: each drawn into
+/// a gateway node, each input of a consolidator drawn into one, and, where
+/// the configuration has a `tcspecial` section, each payload nothing
 /// touches.
 ///
 /// # Arguments
@@ -317,9 +430,19 @@ pub fn sources(graph: &Graph) -> BTreeSet<String> {
                 .node(&Destination::parse(destination).node)
                 .is_some_and(|n| crate::gateway::is_gateway(&n.node_type))
         });
-        if reaches_a_gateway {
-            found.insert(link.origin().node);
+        if !reaches_a_gateway {
+            continue;
         }
+        let source = link.origin().node;
+        // A consolidator's inputs reach the ground in its datum, and are
+        // handed on as their sources' own.
+        if let Some(Ok((_, layout))) = graph
+            .node(&source)
+            .and_then(|node| Layout::of_node(graph, node))
+        {
+            found.extend(layout.inputs.into_iter().map(|input| input.source));
+        }
+        found.insert(source);
     }
     if graph.tcspecial.is_some() {
         let drawn = touched(graph);
@@ -353,6 +476,59 @@ pub fn sources(graph: &Graph) -> BTreeSet<String> {
 /// its base, the `tcspecial` section does not read, or two links land on one
 /// port of one host or on one message ID.
 pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
+    Ok(every(graph)?
+        .into_iter()
+        .filter(|link| link.relayed_by.is_none())
+        .collect())
+}
+
+/// Every link a consolidator's input would reach the ground on, were its
+/// source drawn into the gateway node the consolidator is: one for each
+/// source and gateway node, where the source is not drawn into it itself.
+///
+/// A consolidator packs its inputs into one datum only for the link from
+/// the vehicle, where bandwidth is short. The ground takes the datum apart
+/// as it arrives, and a ground station that reads its own ports, as Yamcs
+/// does, is handed each new reading on the source's own link, as though
+/// the source were drawn into the gateway node: the same port and APID
+/// [`of`] would give it, counted from the node's base by the source's id.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The links, each with [`Telemetered::relayed_by`] naming the
+/// consolidator, by consolidator and then by the input's device id.
+///
+/// # Errors
+///
+/// As [`of`], which checks these with its own, so that none lands on a
+/// port or APID another link has.
+pub fn relayed(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
+    Ok(every(graph)?
+        .into_iter()
+        .filter(|link| link.relayed_by.is_some())
+        .collect())
+}
+
+/// What [`of`] and [`relayed`] are each a part of: every link to the
+/// ground, sent and relayed, checked together.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// The links drawn into a gateway node, then those relayed, then the
+/// untouched payloads'.
+///
+/// # Errors
+///
+/// As [`of`].
+fn every(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     let ids = ids(graph);
     let mut links = Vec::new();
 
@@ -363,78 +539,44 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
         let source = link.origin().node;
         for destination in link.to.each() {
             let to = Destination::parse(destination).node;
-            let Some(gateway) = graph
-                .node(&to)
-                .filter(|n| crate::gateway::is_gateway(&n.node_type))
-            else {
-                continue;
-            };
-            // Each kind names its far end by what is there: a radio's
-            // ground_base, an F´ gateway's bridge_base, cFS's tlm_base. One
-            // rule counts on from each.
-            let kind =
-                crate::gateway::GatewayKind::of_node_type(&gateway.node_type)
-                    .expect("a gateway node");
-            let attribute = kind.base_attribute();
-            let Some(said) = gateway.attributes.get(attribute) else {
-                continue;
-            };
             if !seen.insert((source.clone(), to.clone())) {
                 continue;
             }
-            let Some(&id) = ids.get(&source) else {
-                continue;
-            };
-            let refused = |why: String| Refused {
-                node: Some(to.clone()),
-                why: format!("\"{to}\": {attribute} {why}"),
-            };
-            // Under Yamcs, the node's apid_base counted on by the source's
-            // id, as the port is. A node whose apid_base does not read
-            // contributes nothing, as one whose base does not: reach_of
-            // says what is wrong with it.
-            let apid = match crate::graph::reach::apid_base_of(gateway) {
-                Err(_) => continue,
-                Ok(None) => None,
-                Ok(Some(base)) => {
-                    Some(counted_apid(base, id).map_err(|why| Refused {
-                        node: Some(to.clone()),
-                        why: format!("\"{to}\": apid_base {why}"),
-                    })?)
-                }
-            };
-            let reaches = if kind.on_bus() {
-                let Ok(base) = msgid_of(attribute, said.as_str()) else {
-                    continue;
-                };
-                Reaches::Bus(counted(base, id).map_err(refused)?)
-            } else {
-                let Ok(base) = host_port_of(attribute, said.as_str()) else {
-                    continue;
-                };
-                Reaches::Socket {
-                    vehicle: NetworkConfig {
-                        protocol: NetworkProtocol::Udp,
-                        address: "0.0.0.0".to_string(),
-                        port: 0,
-                    },
-                    ground: base.at(id).map_err(refused)?,
-                }
-            };
-            links.push(Telemetered {
-                name: gateway_link_name(&source, &to),
-                source: source.clone(),
-                id,
-                via: Via::Gateway(to.clone()),
-                reaches,
-                apid,
-                carries: sent_by(graph.node(&source)),
-                largest: graph.node(&source).map_or(0, |node| {
-                    super::largest::largest_datum(graph, node).bytes
-                }),
-            });
+            if let Some(link) = through(graph, &ids, &source, &to, None)? {
+                links.push(link);
+            }
         }
     }
+
+    // Each consolidator's inputs, through the gateway nodes it is drawn
+    // into, where their sources are not drawn in themselves.
+    let mut relayed = Vec::new();
+    for drawn in &links {
+        let Via::Gateway(to) = &drawn.via else {
+            continue;
+        };
+        let Some(Ok((_, layout))) = graph
+            .node(&drawn.source)
+            .and_then(|node| Layout::of_node(graph, node))
+        else {
+            continue;
+        };
+        // By device id, which is by name: the order the Python spelling of
+        // this finds them in too.
+        let mut inputs: Vec<&str> =
+            layout.inputs.iter().map(|i| i.source.as_str()).collect();
+        inputs.sort_by_key(|source| ids.get(*source));
+        for source in inputs {
+            if !seen.insert((source.to_string(), to.clone())) {
+                continue;
+            }
+            let by = Some(drawn.source.as_str());
+            if let Some(link) = through(graph, &ids, source, to, by)? {
+                relayed.push(link);
+            }
+        }
+    }
+    links.extend(relayed);
 
     // Payloads nothing touches, over the section's payload_telemetry.
     if let Some(section) = graph.tcspecial.as_ref() {
@@ -494,6 +636,7 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
                 apid,
                 carries: sent_by(Some(node)),
                 largest: super::largest::largest_datum(graph, node).bytes,
+                relayed_by: None,
             });
         }
     }
@@ -870,7 +1013,8 @@ pub fn apids(graph: &Graph) -> Result<Vec<ApidUse>, Refused> {
             carries: ApidCarries::Uplink(node.name.clone()),
         });
     }
-    for link in of(graph)? {
+    // Those relayed too: the ground hands each reading on under its own.
+    for link in every(graph)? {
         let Some(apid) = link.apid else {
             continue;
         };
@@ -1060,6 +1204,51 @@ mod tests {
 
         let links = of(&example("simple-app")).expect("it reads");
         assert_eq!(summary(&links), vec![("lorem", 1, "127.0.0.1", 5101)]);
+    }
+
+    /// A consolidator's inputs whose sources are not drawn into its gateway
+    /// node are each given the link they would have were they drawn in: the
+    /// port and APID counted on by their own ids. tcspecial sends on none of
+    /// them, so they are not among the links it opens, but their APIDs are
+    /// among those used. An input drawn in itself keeps the one link.
+    #[test]
+    fn a_consolidators_inputs_are_relayed_on_links_of_their_own() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/consolidator/yamcs.ytcs"))
+            .expect("the file reads");
+        let sent = of(&graph).expect("it reads");
+        assert_eq!(
+            summary(&sent),
+            vec![
+                ("label", 1, "127.0.0.1", 26701),
+                ("pack", 2, "127.0.0.1", 26702),
+            ]
+        );
+        assert!(sent.iter().all(|link| link.relayed_by.is_none()));
+
+        let relayed = relayed(&graph).expect("it reads");
+        assert_eq!(
+            summary(&relayed),
+            vec![
+                ("temp", 3, "127.0.0.1", 26703),
+                ("valve", 4, "127.0.0.1", 26704),
+            ]
+        );
+        assert!(relayed
+            .iter()
+            .all(|link| link.relayed_by.as_deref() == Some("pack")));
+        assert_eq!(
+            relayed.iter().map(|link| link.apid).collect::<Vec<_>>(),
+            vec![Some(0x203), Some(0x204)]
+        );
+        assert_eq!(relayed[0].count(), None);
+
+        let used: Vec<u16> = apids(&graph)
+            .expect("it reads")
+            .iter()
+            .map(|u| u.apid)
+            .collect();
+        assert!(used.contains(&0x203) && used.contains(&0x204), "{used:x?}");
     }
 
     /// A payload nothing touches reports over the section's payload_telemetry.

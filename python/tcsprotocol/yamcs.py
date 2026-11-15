@@ -255,7 +255,9 @@ def telemetry(config):
 
     Returns:
         A :class:`Telemetry` for each source drawn into a ``gateway_yamcs``
-        node and each payload nothing touches, in the order of
+        node but a consolidator, each source relayed to one (see
+        :meth:`~tcsprotocol.configuration.Configuration.relayed`) and each
+        payload nothing touches, in the order of
         :meth:`~tcsprotocol.configuration.Configuration.apids`.
 
     Raises:
@@ -272,6 +274,11 @@ def telemetry(config):
         framed[use.node] = framed.get(use.node, 0) + 1
     links = []
     for use in uses:
+        # A consolidator's datum is the relay's to take apart, which binds
+        # its port and hands each input on under the input's own APID, on
+        # the input's own link: Yamcs never sees the datum.
+        if use.carries == "downlink" and config.is_consolidator(use.node):
+            continue
         if use.carries == "downlink":
             ground = config.downlink(use.gateway, use.node)
             name = (use.node if framed[use.node] == 1

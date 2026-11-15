@@ -1,0 +1,67 @@
+# A consolidator drawn into a gateway_yamcs node, for the tests of how its
+# inputs reach Yamcs: temp and valve reach the gateway only in its datum,
+# and label is drawn in itself as well. The device ids, by name: gateway 0,
+# label 1, pack 2, temp 3, valve 4; so temp's and valve's relayed links are
+# on ground_base plus 3 and 4, under apid_base plus 3 and 4.
+
+description: "A consolidator to Yamcs, for the tests"
+
+tcspecial:
+  beacon:
+    apid: "0x100"
+    default_interval: "5 s"
+    recv: "127.0.0.1:26510"
+    reset_interval: "1 s"
+    send: "0.0.0.0:26500"
+  gateway: "yamcs"
+  interface: "5684f9b97e87a4e3294258ba473c2e79"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  max_consolidator_inputs: "32"
+  payload_command:
+    dest_base: "0.0.0.0:26300"
+    source_base: "127.0.0.1:0"
+  payload_telemetry:
+    apid_base: "0x300"
+    dest_base: "127.0.0.1:26410"
+    source_base: "0.0.0.0:26400"
+  state_file: "/tmp/tcspecial-consolidator-yamcs.state"
+  tcs_cmd:
+    apid: "0x101"
+    recv: "0.0.0.0:26200"
+    send: "127.0.0.1:0"
+
+gateways:
+  - type gateway_yamcs:
+      - gateway: gateway
+        address: "127.0.0.1:26600"
+        apid_base: "0x200"
+        ground_base: "127.0.0.1:26700"
+        world-in: [pack, label]
+
+payloads:
+  - type network:
+      - payload: temp
+        address: "127.0.0.1:27001"
+        protocol: udp
+        world-out-type: "u16"
+        world-out: [pack.temp]
+      - payload: valve
+        address: "127.0.0.1:27002"
+        protocol: udp
+        world-out-type: "boolean"
+        world-out: [pack.valve]
+      - payload: label
+        address: "127.0.0.1:27003"
+        protocol: udp
+        world-out-type: "string(8)"
+        world-out: [pack.name, gateway.label]
+
+vehicle:
+  - type compute:
+      - compute: pack
+        function: consolidator
+        send: [all_new, moc]
+        world-in: [temp, valve, name]
+        world-out: [gateway.pack]

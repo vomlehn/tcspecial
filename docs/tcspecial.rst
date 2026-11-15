@@ -4207,6 +4207,20 @@ soon as it is regenerated:
   node's ``address`` and ``port``, and on each port a source's data arrives
   at.
 
+Yamcs never sees a consolidator's datum. The ground station binds the
+consolidator's port in Yamcs's place with a *relay*, a thread of its own
+process -- ``tcsmoc::relay``, started from Python by
+``python/tcsmoc/relay.py`` through libtcsmoc-c -- which takes each datum
+apart and sends each new input on to Yamcs as though its source were drawn
+into the gateway node: on the port and under the APID it would then have,
+the node's ``ground_base`` and ``apid_base`` counted on by the source's
+device id. So each such source has its container and its link as above,
+and the consolidator has neither. A held input is not sent on, being a
+reading Yamcs already has. A source drawn into the gateway node itself is
+not relayed, Yamcs having its readings already. The relay ends when the
+station does; libtcsmoc-c is needed only by a station whose configuration
+has something to relay, and the Yamcs examples start one where it does.
+
 What does not depend on the configuration -- the header, the beacon's and the
 answers' layouts, which it takes from ``tcsprotocol/xtce``, and CONNECT --
 is ``python/tcsprotocol/yamcs.xtce``, to which the generated parts are

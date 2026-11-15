@@ -58,6 +58,13 @@ peer (see "A vehicle on a cFS software bus" in
   `tcs_configuration_sends_decisions` says whether they are *decisions* --
   the text `1` or `0`, which a thermostat makes -- and `tcs_decision_on`
   reads one as on or off.
+- **Relaying a consolidator's inputs.** `tcs_relay_open` starts a thread
+  that binds the ports of the consolidators drawn into a gateway node and
+  sends each new input on as though its source were drawn into the node, on
+  its own port and under its own APID, for a station that reads the node's
+  other ports itself, as Yamcs does; `tcs_relay_close` stops it, and it
+  ends with the process too. A station built on `tcs_gateway_receive` needs
+  none: it is handed the inputs already.
 - **Data up.** `tcs_uplink_open` opens the way up to a gateway node that
   binds an address and port aboard, and each `tcs_uplink_send` sends one
   datum there, which leaves the node by its `moc-out` links for the

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
+    <!-- A consolidator drawn into a gateway_yamcs node, for the tests of
+         how its inputs reach Yamcs: temp and valve reach the gateway only
+         in its datum, and label is drawn in itself as well. The device
+         ids, by name: gateway 0, label 1, pack 2, temp 3, valve 4; so
+         temp's and valve's relayed links are on ground_base plus 3 and 4,
+         under apid_base plus 3 and 4. -->
+    <description>A consolidator to Yamcs, for the tests</description>
+    <tcspecial>
+        <beacon>
+            <apid>0x100</apid>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:26510</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:26500</send>
+        </beacon>
+        <gateway>yamcs</gateway>
+        <interface>5684f9b97e87a4e3294258ba473c2e79</interface>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <max_consolidator_inputs>32</max_consolidator_inputs>
+        <payload_command>
+            <dest_base>0.0.0.0:26300</dest_base>
+            <source_base>127.0.0.1:0</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <apid_base>0x300</apid_base>
+            <dest_base>127.0.0.1:26410</dest_base>
+            <source_base>0.0.0.0:26400</source_base>
+        </payload_telemetry>
+        <state_file>/tmp/tcspecial-consolidator-yamcs.state</state_file>
+        <tcs_cmd>
+            <apid>0x101</apid>
+            <recv>0.0.0.0:26200</recv>
+            <send>127.0.0.1:0</send>
+        </tcs_cmd>
+    </tcspecial>
+    <gateways>
+        <type name="gateway_yamcs">
+            <gateway name="gateway">
+                <address>127.0.0.1:26600</address>
+                <apid_base>0x200</apid_base>
+                <ground_base>127.0.0.1:26700</ground_base>
+                <world-in>pack</world-in>
+                <world-in>label</world-in>
+            </gateway>
+        </type>
+    </gateways>
+    <payloads>
+        <type name="network">
+            <payload name="temp">
+                <address>127.0.0.1:27001</address>
+                <protocol>udp</protocol>
+                <world-out-type>u16</world-out-type>
+                <world-out>pack.temp</world-out>
+            </payload>
+            <payload name="valve">
+                <address>127.0.0.1:27002</address>
+                <protocol>udp</protocol>
+                <world-out-type>boolean</world-out-type>
+                <world-out>pack.valve</world-out>
+            </payload>
+            <payload name="label">
+                <address>127.0.0.1:27003</address>
+                <protocol>udp</protocol>
+                <world-out-type>string(8)</world-out-type>
+                <world-out>pack.name</world-out>
+                <world-out>gateway.label</world-out>
+            </payload>
+        </type>
+    </payloads>
+    <vehicle>
+        <type name="compute">
+            <compute name="pack">
+                <function>consolidator</function>
+                <send>all_new</send>
+                <send>moc</send>
+                <world-out>gateway.pack</world-out>
+                <world-in>temp</world-in>
+                <world-in>valve</world-in>
+                <world-in>name</world-in>
+            </compute>
+        </type>
+    </vehicle>
+</configuration>

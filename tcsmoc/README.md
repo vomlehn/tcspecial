@@ -23,6 +23,12 @@ part for each:
   A consolidator's datum is taken apart as it arrives, and each receive after
   hands out one of its new inputs, named by the node whose reading it is, as
   though that node had sent it; held inputs, sent before, are left out.
+- **Relaying a consolidator's inputs.** `relay::Relay` is for a station that
+  reads a gateway node's ports itself, as Yamcs does. It binds the
+  consolidators' ports in the station's place, on a thread that ends when
+  the relay is dropped or the process ends, and sends each new input on to
+  the station as though its source were drawn into the gateway node: on the
+  port and under the APID that would give it.
 - **Sending it data.** `ping::Uplink` sends a datum up to a gateway node, to
   the address and port it binds aboard, from which it leaves by the node's
   `moc-out` links: a ping to a ping node, or a command to a heater. Gated

@@ -317,6 +317,33 @@ int tcs_gateway_receive(tcs_gateway *gateway, int64_t wait_ms,
  * @param gateway  The gateway node, or NULL to do nothing. */
 void tcs_gateway_close(tcs_gateway *gateway);
 
+/* ---- Relaying a consolidator's inputs ---------------------------------- */
+
+/* A relay: a thread that takes apart the datum of each consolidator drawn
+ * into a gateway node and sends each new input on as its source would have
+ * been sent, were it drawn into the node: on its own port, under its own
+ * APID. For a station that reads the node's other ports itself, as Yamcs
+ * does; one built on tcs_gateway_receive() is handed the inputs already. */
+typedef struct tcs_relay tcs_relay;
+
+/** Starts relaying the inputs of every consolidator drawn into a gateway
+ * node. The configuration may be closed while the relay runs.
+ *
+ * @param configuration  The configuration.
+ * @param gateway        The gateway node's name.
+ * @param relay          Where the relay is put: NULL where there is nothing
+ *                       to relay.
+ * @return               1 for a relay started, 0 for nothing to relay, -1
+ *                       on an error. */
+int tcs_relay_open(const tcs_configuration *configuration,
+		   const char *gateway, tcs_relay **relay);
+
+/** Stops a relay, waiting for its thread to end; it ends with the process,
+ * too.
+ *
+ * @param relay  The relay, or NULL to do nothing. */
+void tcs_relay_close(tcs_relay *relay);
+
 /* A value is what a computation that makes one sends: four bytes of a signed
  * count of its unit's steps, most significant first -- micro-kelvin for a
  * temperature, micro-volts for a voltage, millimetres for a length. Only the

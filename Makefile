@@ -458,7 +458,7 @@ runcomparexy:
 VEHICLE_GUIDE_STAGES = $(wildcard docs/building-a-vehicle/stage-*)
 
 # Every configuration shipped in both spellings, with the simulator file each
-# is checked beside: the thermostat fixture and the examples. A list of stems
+# is checked beside: the fixtures and the examples. A list of stems
 # and simulator files rather than a pattern, so that a configuration may be
 # checked beside a simulator file not named for it. THERMOSTAT_YAMCS is a
 # stem too long to write twice on one line.
@@ -466,6 +466,7 @@ VEHICLE_GUIDE_STAGES = $(wildcard docs/building-a-vehicle/stage-*)
 THERMOSTAT_YAMCS = examples/thermostat-yamcs/thermostat-yamcs
 SPELLINGS = \
 	tests/manual/thermostat:tests/manual/thermostat-sim.yaml \
+	tests/consolidator/yamcs:tests/consolidator/yamcs-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
 	$(THERMOSTAT_YAMCS):$(THERMOSTAT_YAMCS)-sim.yaml \
@@ -478,12 +479,14 @@ SPELLINGS = \
 		$(stage)/deck:$(stage)/deck-sim.yaml)
 
 # Every shipped configuration, both spellings: the examples, the thermostat
-# fixture, the top-level example and the stages of "Building a Vehicle", but
+# fixture, the consolidator-to-Yamcs fixture, the top-level example and the
+# stages of "Building a Vehicle", but
 # not the simulator files, which name no interface, nor the files in
 # examples/*-common and docs/building-a-vehicle/common that others include,
 # which have no tcspecial section to name one in.
 SHIPPED_CONFIGURATIONS = example.ytcs example.xtcs \
 	tests/manual/thermostat.ytcs tests/manual/thermostat.xtcs \
+	tests/consolidator/yamcs.ytcs tests/consolidator/yamcs.xtcs \
 	$(filter-out $(wildcard examples/*-common/*), \
 		$(wildcard examples/*/*.ytcs) \
 		$(wildcard examples/*/*.xtcs)) \

@@ -3277,11 +3277,30 @@ Requirement
     reach it, and a held one is left out as a none is. That is what lets
     the bit strings go unpadded: Yamcs decodes a number at any bit, but not
     a string or bytes that starts partway through a byte, and with the
-    unpacking TCS's own, nothing on the ground has to. How Yamcs, which
-    reads the gateway's ports itself, is given the inputs is not settled.
+    unpacking TCS's own, nothing on the ground has to.
+
+Requirement
+    Yamcs, which reads a gateway node's ports itself, is given a
+    consolidator's inputs and never its datum. A relay binds the
+    consolidator's port in its place, takes each datum apart with tcsmoc's
+    unpacking, and sends each new input on as though its source were drawn
+    into the gateway node: on the port and under the APID it would then
+    have (``graph::telemetry::relayed``), which are held to the same rules
+    as every other link's, so none lands where another does. Yamcs decodes
+    each as it decodes any source, by the configuration's own XTCE, which
+    describes every input's source. The relay is a thread of the ground
+    station's process, not a program of its own, so it ends when the
+    station does, however it ends; a Python station starts it through
+    libtcsmoc-c. The datum is packed only where bandwidth is short, on the
+    link from the vehicle; past the gateway, on the ground, nothing needs
+    it packed, and the one unpacking is tcsmoc's.
 
     **Built** (2026-11-15): the queue, in tcsmoc's ``GatewayReceiver``,
-    which tcsmoc-c's ``tcs_gateway_receive`` hands on as it stands.
+    which tcsmoc-c's ``tcs_gateway_receive`` hands on as it stands; the
+    relay, ``tcsmoc::relay``, ``tcs_relay_open`` in tcsmoc-c and
+    ``python/tcsmoc/relay.py``, which the Yamcs examples start; the
+    relayed links and their APIDs in both spellings of the rule; and every
+    input's source in the configuration's own XTCE.
 
 Requirement
     A log that takes a consolidation keeps it packed, as it was sent, the

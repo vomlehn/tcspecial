@@ -67,6 +67,7 @@ sys.path.insert(0, str(HERE.parent / "ping-common"))
 
 from tcsmoc.beacon import Schedule  # noqa: E402
 from tcsmoc.processes import Vehicle  # noqa: E402
+from tcsmoc.relay import Relays  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
     Yamcs, YamcsBeacons, command_settings, connect, first_beacon,
     write_yamcs, yamcs_home)
@@ -392,6 +393,7 @@ def main(argv):
         return 2
     yamcs = Yamcs(options.yamcs, run_dir, options.http_port, INSTANCE)
     vehicle = None
+    relays = None
     try:
         if not options.no_yamcs:
             try:
@@ -403,6 +405,10 @@ def main(argv):
                         INSTANCE, "ping_yamcs.py")
             status(f"starting Yamcs on {run_dir}")
             yamcs.start()
+            # Each consolidator's inputs handed on to Yamcs as their
+            # sources' own, by a thread of this process; nothing where the
+            # configuration has no consolidator.
+            relays = Relays(setup.path, setup.config)
             status(f"Yamcs is at http://localhost:{options.http_port}")
         if not options.no_vehicle:
             vehicle = Vehicle.for_configuration(
@@ -433,6 +439,8 @@ def main(argv):
     finally:
         if vehicle is not None:
             vehicle.stop()
+        if relays is not None:
+            relays.close()
         if not options.no_yamcs:
             yamcs.stop()
 

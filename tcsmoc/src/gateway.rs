@@ -32,6 +32,7 @@ use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use tcsprotocol::ccsds::{self, PacketType};
 use tcsprotocol::consolidation::{Layout, State};
 use tcsprotocol::graph::telemetry::{self, Telemetered, Via};
 use tcsprotocol::graph::Graph;
@@ -108,6 +109,10 @@ pub struct GatewayReceiver {
     /// How each source's datum is counted, in the same order: `None` for
     /// one of a type with a width of its own, which is sent with no count.
     counts: Vec<Option<Count>>,
+    /// The APID each source's packets carry, in the same order, where they
+    /// are CCSDS Space Packets, as they are through a `gateway_yamcs` node:
+    /// the header is checked and taken off before the count is read.
+    apids: Vec<Option<u16>>,
     /// Each source's consolidation, in the same order: how its datum is
     /// laid out where it is a consolidator, and `None` where it is not.
     consolidations: Vec<Option<Consolidation>>,
@@ -209,6 +214,44 @@ impl GatewayReceiver {
         GatewayReceiver::binding(graph, gateway, ours)
     }
 
+    /// Opens only the consolidators drawn into a gateway node: binds the port
+    /// each one's datum arrives at, and no other, for a ground station that
+    /// reads the node's other ports itself, as Yamcs does, and is handed
+    /// the consolidators' inputs by [`crate::relay::Relay`].
+    ///
+    /// # Arguments
+    ///
+    /// * `graph`   - The configuration's graph.
+    /// * `gateway` - The gateway node's name.
+    ///
+    /// # Returns
+    ///
+    /// The open node, or `None` where no consolidator is drawn into it.
+    ///
+    /// # Errors
+    ///
+    /// As [`GatewayReceiver::open`].
+    pub fn open_consolidators(
+        graph: &Graph,
+        gateway: &str,
+    ) -> Result<Option<GatewayReceiver>, String> {
+        let links = telemetry::of(graph).map_err(|refused| refused.why)?;
+        let ours: Vec<Telemetered> = links
+            .into_iter()
+            .filter(|l| l.via == Via::Gateway(gateway.to_string()))
+            .filter(|l| {
+                graph
+                    .node(&l.source)
+                    .and_then(|node| Layout::of_node(graph, node))
+                    .is_some()
+            })
+            .collect();
+        if ours.is_empty() {
+            return Ok(None);
+        }
+        GatewayReceiver::binding(graph, gateway, ours).map(Some)
+    }
+
     /// Open the ground's end of every payload that reports over the
     /// `tcspecial` section's `payload_telemetry`: the payloads nothing in the
     /// drawing touches, each at `dest_base` plus its device id.
@@ -267,10 +310,12 @@ impl GatewayReceiver {
     ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
         let mut counts = Vec::new();
+        let mut apids = Vec::new();
         let mut layouts = Vec::new();
         let mut datum_bytes = 0;
         for link in links {
             counts.push(link.count());
+            apids.push(link.apid);
             let layout = graph
                 .node(&link.source)
                 .and_then(|node| Layout::of_node(graph, node))
@@ -286,7 +331,11 @@ impl GatewayReceiver {
                 Some(_) => tcsprotocol::link_type::COUNT_BYTES,
                 None => 0,
             };
-            datum_bytes = datum_bytes.max(link.largest + count);
+            let header = match link.apid {
+                Some(_) => ccsds::HEADER_BYTES,
+                None => 0,
+            };
+            datum_bytes = datum_bytes.max(link.largest + count + header);
             // A link on a software bus has no ground socket of its own: the
             // bus's peer sends what is published under its message ID to a
             // socket it makes for it, as tcspecial would over UDP.
@@ -368,6 +417,7 @@ impl GatewayReceiver {
             name: name.to_string(),
             ports,
             counts,
+            apids,
             consolidations,
             relayed,
             queue,
@@ -651,8 +701,9 @@ impl GatewayReceiver {
     }
 
     /// Takes a datagram as its source sent it to the datum it carries: the
-    /// whole of it, or for a string or bytes what follows its count, moved
-    /// to the start of `out`.
+    /// whole of it, or what follows its CCSDS header where it has one, and
+    /// for a string or bytes what follows its count, moved to the start of
+    /// `out`.
     ///
     /// # Arguments
     ///
@@ -665,8 +716,9 @@ impl GatewayReceiver {
     ///
     /// # Errors
     ///
-    /// A message naming the source where the datagram was cut short, or a
-    /// count does not say how long the datum is.
+    /// A message naming the source where the datagram was cut short, its
+    /// header is not one its link's packets carry, or a count does not say
+    /// how long the datum is.
     fn read_out(
         &self,
         arrival: Arrival,
@@ -683,11 +735,29 @@ impl GatewayReceiver {
                 out.len()
             ));
         }
-        let Some(count) = self.counts[arrival.source] else {
-            return Ok(arrival);
+        let header = match self.apids[arrival.source] {
+            None => 0,
+            Some(apid) => {
+                ccsds::read_header(
+                    &out[..arrival.length],
+                    PacketType::Telemetry,
+                    apid,
+                )
+                .map_err(|why| {
+                    format!("\"{}\": \"{source}\": {why}", self.name)
+                })?;
+                ccsds::HEADER_BYTES
+            }
         };
-        let start = uncounted(&out[..arrival.length], count)
-            .map_err(|why| format!("\"{}\": \"{source}\": {why}", self.name))?;
+        let start = match self.counts[arrival.source] {
+            None => header,
+            Some(count) => {
+                header
+                    + uncounted(&out[header..arrival.length], count).map_err(
+                        |why| format!("\"{}\": \"{source}\": {why}", self.name),
+                    )?
+            }
+        };
         out.copy_within(start..arrival.length, 0);
         Ok(Arrival {
             source: arrival.source,

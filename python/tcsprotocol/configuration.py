@@ -310,6 +310,10 @@ class ApidUse:
     node: str = None
     #: The gateway node a downlink goes through, or ``None``.
     gateway: str = None
+    #: The consolidator whose datum carries a relayed downlink's readings
+    #: to the gateway node, or ``None``: see
+    #: :meth:`Configuration.relayed`.
+    relayed_by: str = None
 
     def may_share(self, other):
         """Whether two uses may be one APID: only a gateway node's commands
@@ -734,13 +738,15 @@ class Configuration:
 
         The beacon's and the command links', each ``gateway_yamcs`` node's
         ``apid_base``, every source drawn into one at that base plus its
-        device id, and every payload nothing touches at
+        device id, every source :meth:`relayed` to one at the same, and
+        every payload nothing touches at
         ``payload_telemetry.apid_base`` plus its device id. Two uses may
         share an APID only as :meth:`ApidUse.may_share` allows.
 
         Returns:
-            The :class:`ApidUse` of each, in that order: the gateway nodes
-            and their sources, and the payloads, by name.
+            The :class:`ApidUse` of each, in that order: the gateway nodes,
+            their sources, the sources relayed to them, and the payloads,
+            by name.
 
         Raises:
             ValueError: The configuration does not answer to Yamcs, an APID
@@ -765,6 +771,15 @@ class Configuration:
                     f'"{gateway.name}", its apid_base plus the device id '
                     f"{self.device_id(node.name)}",
                     node=node.name, gateway=gateway.name))
+        for gateway in gateways:
+            for source, consolidator in self.relayed(gateway.name):
+                used.append(ApidUse(
+                    self.downlink_apid(gateway.name, source), "downlink",
+                    f'the APID "{source}"\'s readings are relayed under '
+                    f'from "{consolidator}" to "{gateway.name}", its '
+                    f"apid_base plus the device id {self.device_id(source)}",
+                    node=source, gateway=gateway.name,
+                    relayed_by=consolidator))
         for name in self.untouched_payloads():
             used.append(ApidUse(
                 self.payload_telemetry_apid(name), "payload_telemetry",
@@ -1017,8 +1032,58 @@ class Configuration:
             )
         return HostPort(base.address, port)
 
+    def is_consolidator(self, name):
+        """Whether the node called ``name`` is a consolidator: a compute
+        node whose ``function`` is ``consolidator``.
+
+        Args:
+            name: The node's name.
+
+        Returns:
+            Whether it is one.
+
+        Raises:
+            ValueError: There is no such node.
+        """
+        node = self.node(name)
+        return (node.node_type == "compute"
+                and node.attributes.get("function") == "consolidator")
+
+    def relayed(self, gateway):
+        """The sources whose readings reach ``gateway`` only in a
+        consolidator's datum, which the ground relays to a station that
+        reads the node's ports itself as though each were drawn in, on its
+        own port and under its own APID: ``graph::telemetry::relayed``.
+
+        Args:
+            gateway: The gateway node's name.
+
+        Returns:
+            Each source and the consolidator that carries it, by
+            consolidator in the order the file writes them, then by the
+            source's device id; a source drawn into ``gateway`` itself is
+            not among them.
+        """
+        drawn = {node.name for node in self.nodes
+                 if gateway in node.links.get("world-out", [])}
+        found = []
+        for consolidator in self.nodes:
+            if (consolidator.name not in drawn
+                    or not self.is_consolidator(consolidator.name)):
+                continue
+            inputs = sorted(
+                (node.name for node in self.nodes
+                 if consolidator.name in node.links.get("world-out", [])),
+                key=self.device_id)
+            for source in inputs:
+                if source in drawn or any(source == s for s, _ in found):
+                    continue
+                found.append((source, consolidator.name))
+        return found
+
     def _sends_to(self, gateway, source):
-        """Refuses a source that sends nothing to ``gateway``.
+        """Refuses a source that sends nothing to ``gateway``, drawn in or
+        :meth:`relayed`.
 
         Args:
             gateway: The gateway node's name.
@@ -1026,8 +1091,10 @@ class Configuration:
 
         Raises:
             ValueError: ``source`` is missing, or has no ``world-out`` link
-                        to ``gateway``.
+                        to ``gateway`` and is not relayed to it.
         """
+        if any(source == s for s, _ in self.relayed(gateway)):
+            return
         if gateway not in self.node(source).links.get("world-out", []):
             raise ValueError(
                 f'{self.path}: "{source}" sends nothing to "{gateway}": it has '

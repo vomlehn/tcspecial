@@ -233,6 +233,14 @@ are in, <code>tcs_value_in</code> reads one as a number in it, and
 <em>decisions</em> – the text <code>1</code> or <code>0</code>, which a
 thermostat makes – and <code>tcs_decision_on</code> reads one as on or
 off.</li>
+<li><strong>Relaying a consolidator’s inputs.</strong>
+<code>tcs_relay_open</code> starts a thread that binds the ports of the
+consolidators drawn into a gateway node and sends each new input on as
+though its source were drawn into the node, on its own port and under
+its own APID, for a station that reads the node’s other ports itself, as
+Yamcs does; <code>tcs_relay_close</code> stops it, and it ends with the
+process too. A station built on <code>tcs_gateway_receive</code> needs
+none: it is handed the inputs already.</li>
 <li><strong>Data up.</strong> <code>tcs_uplink_open</code> opens the way
 up to a gateway node that binds an address and port aboard, and each
 <code>tcs_uplink_send</code> sends one datum there, which leaves the

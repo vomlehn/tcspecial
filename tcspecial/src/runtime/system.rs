@@ -3432,23 +3432,27 @@ vehicle:
         // Stopped after the first pause, which is the shape of a vehicle
         // commanded to stop: the pass it was making finishes.
         let passes = std::cell::Cell::new(0);
+        let pauses = std::cell::Cell::new(0);
         let waits = std::cell::Cell::new(Duration::ZERO);
         vehicle.system.run(
             &|| passes.get() > 0,
             |_moved| passes.set(passes.get() + 1),
-            |waiting| waits.set(waits.get() + waiting),
+            |waiting| {
+                pauses.set(pauses.get() + 1);
+                waits.set(waits.get() + waiting)
+            },
         );
 
         assert_eq!(passes.get(), 1, "one pass, then the stop");
-        // It waited, and for no longer than the group's own interval. Not a
-        // tighter bound than that: what is left of the interval depends on
-        // how long the pass took, and a machine running the rest of this
-        // suite beside it takes longer -- which is a loaded machine and not a
-        // loop that failed to wait.
+        // It paused after the pass, for no longer than the group's own
+        // interval. How long is left of the interval depends on how long the
+        // pass took: on a loaded machine the pass can take the whole of it,
+        // and the pause is then rightly nothing. What the wait comes to at a
+        // given moment is until_next_pass's, tested with moments of its own.
+        assert_eq!(pauses.get(), 1, "one pause, after the pass");
         assert!(
-            waits.get() > Duration::ZERO
-                && waits.get() <= Duration::from_millis(100),
-            "the loop should have waited for the next group: {:?}",
+            waits.get() <= Duration::from_millis(100),
+            "the loop waited longer than the group's interval: {:?}",
             waits.get()
         );
         assert_eq!(

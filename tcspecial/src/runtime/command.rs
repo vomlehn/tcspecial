@@ -398,24 +398,26 @@ impl Drop for Commands {
     }
 }
 
-/// Drops every command already queued on `link`, unread, without waiting.
+/// Drops every command already queued on a link, unread, without waiting.
 ///
-/// Read into `buffer`, which the thread already holds, so that dropping
-/// allocates nothing. The count is logged once, for the record of what the
-/// match threw away.
+/// Each is read into one byte on the stack, which takes the whole datagram
+/// off the queue and throws away the rest of it, so that dropping allocates
+/// nothing and needs none of the thread's room. The count is logged once,
+/// for the record of what the match threw away.
 ///
 /// # Arguments
 ///
-/// * `link`   - The link to empty.
-/// * `buffer` - Room for a datagram.
-fn drop_queued(link: &Link, buffer: &mut [u8]) {
-    if let Err(e) = link.socket.set_nonblocking(true) {
-        error!("{}: cannot be emptied: {e}", spelling(link.which));
+/// * `socket` - The link's socket.
+/// * `which`  - Which link it is, for the log.
+fn drop_queued(socket: &UdpSocket, which: CommandLink) {
+    if let Err(e) = socket.set_nonblocking(true) {
+        error!("{}: cannot be emptied: {e}", spelling(which));
         return;
     }
     let mut dropped = 0u32;
+    let mut byte = [0u8; 1];
     loop {
-        match link.socket.recv_from(buffer) {
+        match socket.recv_from(&mut byte) {
             Ok(_) => dropped = dropped.saturating_add(1),
             Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
             // WouldBlock is the queue empty; anything else is a socket that
@@ -423,15 +425,15 @@ fn drop_queued(link: &Link, buffer: &mut [u8]) {
             Err(_) => break,
         }
     }
-    if let Err(e) = link.socket.set_nonblocking(false) {
-        error!("{}: cannot wait on it again: {e}", spelling(link.which));
+    if let Err(e) = socket.set_nonblocking(false) {
+        error!("{}: cannot wait on it again: {e}", spelling(which));
     }
     if dropped > 0 {
         // Allocates, where the log formats the line: once a start, at the
         // match, and worth it for the record of what was thrown away.
         warn!(
             "{}: {dropped} command(s) queued before the match dropped unread",
-            spelling(link.which)
+            spelling(which)
         );
     }
 }
@@ -565,19 +567,20 @@ impl Serving {
 
             // By index, because taking a command counts its answer on the
             // link it arrived on.
-            for which in 0..links.len() {
-                let ready = set[which]
+            for (which, polled) in set.iter().take(links.len()).enumerate() {
+                let ready = polled
                     .revents()
                     .is_some_and(|events| events.contains(PollFlags::POLLIN));
-                if ready && self.take_one(&mut links[which], &mut buffer) {
-                    // A CONNECT has just matched this start. Everything
-                    // already queued on the node link was sent before the
-                    // ground knew it was matched -- it sends nothing but the
-                    // three commands until it is -- so none of it is read.
-                    // Then the poll again, rather than the rest of this
-                    // one's answers: the node link it said was readable may
-                    // be empty now.
-                    drop_queued(&links[1], &mut buffer);
+                let (first, second) = links.split_at_mut(1);
+                let (link, other) = match which {
+                    0 => (&mut first[0], &second[0]),
+                    _ => (&mut second[0], &first[0]),
+                };
+                if ready && self.take_one(link, other, &mut buffer) {
+                    // A CONNECT has just matched this start, and the node
+                    // link was emptied before its answer went. Then the poll
+                    // again, rather than the rest of this one's answers: the
+                    // node link it said was readable may be empty now.
                     break;
                 }
             }
@@ -635,9 +638,9 @@ impl Serving {
                 continue;
             }
             if let Took::Command(arrival) = reader.take(Instant::now()) {
-                if self.take_from_bus(&reader, &arrival, &mut answers) {
-                    self.drop_queued_on_bus(&mut reader, &mut answers);
-                }
+                // A CONNECT that matches empties what was queued before it,
+                // in take_from_bus, before its answer is published.
+                let _ = self.take_from_bus(&mut reader, &arrival, &mut answers);
             }
         }
     }
@@ -650,7 +653,8 @@ impl Serving {
     /// counted as malformed, as a datagram on the UDP links is. One about a
     /// node published under another node's message ID is answered
     /// `InvalidCommand`, as a command on the wrong UDP link is: one end is
-    /// not reading the configuration the other is.
+    /// not reading the configuration the other is. A CONNECT that matches
+    /// this start empties the bus before its answer is published.
     ///
     /// # Arguments
     ///
@@ -664,7 +668,7 @@ impl Serving {
     /// had not been before.
     fn take_from_bus(
         &mut self,
-        reader: &BusReader,
+        reader: &mut BusReader,
         arrival: &Arrival,
         answers: &mut Publisher,
     ) -> bool {
@@ -722,16 +726,26 @@ impl Serving {
                 return false;
             }
         }
-        self.serve(arrival.link, &command, |data| publish(answers, data))
+        let (answer, matched_now) = self.serve(arrival.link, &command);
+        if matched_now {
+            // Before the answer, so that a command the ground sends on
+            // hearing it is not among what is emptied.
+            self.drop_queued_on_bus(reader, answers);
+        }
+        self.send_answer(&answer, |data| publish(answers, data));
+        matched_now
     }
 
-    /// Takes everything already queued on the bus once a CONNECT has
-    /// matched this start, dropping the node commands among it unread.
+    /// Takes everything already queued on the bus when a CONNECT has
+    /// matched this start, before its answer is published, dropping the
+    /// node commands among it unread.
     ///
     /// Everything queued was sent before the ground knew it was matched, and
     /// it sends nothing but the three fixed commands until it is, as over
     /// the UDP links; on the bus the two links share one socket, so what is
-    /// not a node command is still taken.
+    /// not a node command is still taken, and answered ahead of the
+    /// CONNECT. A node command the ground sends on hearing the CONNECT's
+    /// answer comes after the emptying, and is taken.
     ///
     /// # Arguments
     ///
@@ -778,9 +792,17 @@ impl Serving {
     /// is, and put on its answer. An armed RESTART is carried out once its
     /// answer has gone.
     ///
+    /// A CONNECT that matches this start empties the node link before its
+    /// answer goes: everything queued there was sent before the ground knew
+    /// it was matched -- it sends nothing but the three commands until it
+    /// is -- so none of it is read, while a node command sent on hearing
+    /// the answer arrives after the emptying and is taken.
+    ///
     /// # Arguments
     ///
     /// * `link`   - The link the poll said is readable.
+    /// * `other`  - The other link, which is the node link when `link` is
+    ///              the spacecraft one.
     /// * `buffer` - Room for the datagram, as long as the longest one, and
     ///              where a framed answer is made once the command is
     ///              read.
@@ -789,7 +811,12 @@ impl Serving {
     ///
     /// Whether the command was a CONNECT that matched this start, which it
     /// had not been before.
-    fn take_one(&mut self, link: &mut Link, buffer: &mut [u8]) -> bool {
+    fn take_one(
+        &mut self,
+        link: &mut Link,
+        other: &Link,
+        buffer: &mut [u8],
+    ) -> bool {
         let (size, from) = match link.socket.recv_from(buffer) {
             Ok(got) => got,
             // Nothing there after all, which a poll can say: another reader
@@ -881,7 +908,15 @@ impl Serving {
         let which = link.which;
         let socket = &link.socket;
         let framing = &mut link.framing;
-        self.serve(which, &command, |data| match framing {
+        let nodes = match which {
+            CommandLink::Payload => &link.socket,
+            CommandLink::Spacecraft => &other.socket,
+        };
+        let (answer, matched_now) = self.serve(which, &command);
+        if matched_now {
+            drop_queued(nodes, CommandLink::Payload);
+        }
+        self.send_answer(&answer, |data| match framing {
             None => {
                 let _ = socket.send_to(data, from);
             }
@@ -893,37 +928,48 @@ impl Serving {
                     error!("{}: an answer not sent: {fault}", spelling(which))
                 }
             },
-        })
+        });
+        matched_now
     }
 
-    /// Answers a command that has been taken, hands the answer to `send`,
-    /// and carries out an armed RESTART once it has gone.
+    /// Answers a command that has been taken, saying whether it was a
+    /// CONNECT that has just matched this start.
     ///
     /// What either transport does once it has a command: the UDP links and
     /// the software bus differ in how a command arrives and where its answer
-    /// goes, and in nothing about what it is answered.
+    /// goes, and in nothing about what it is answered. The answer is not
+    /// sent here: on a match the caller first empties what was queued before
+    /// it, and then sends it with [`Serving::send_answer`].
     ///
     /// # Arguments
     ///
     /// * `which`   - The link the command arrived on.
     /// * `command` - The command.
-    /// * `send`    - What sends the packed answer.
     ///
     /// # Returns
     ///
-    /// Whether the command was a CONNECT that matched this start, which it
-    /// had not been before.
+    /// The answer, and whether the command was a CONNECT that matched this
+    /// start, which it had not been before.
     fn serve(
         &mut self,
         which: CommandLink,
         command: &Command,
-        send: impl FnOnce(&[u8]),
-    ) -> bool {
+    ) -> (Telemetry, bool) {
         let was_matched = self.matched.is_matched();
         let answer = self.answer(which, command);
+        (answer, !was_matched && self.matched.is_matched())
+    }
 
+    /// Records an answer, hands it to `send`, and carries out an armed
+    /// RESTART once it has gone.
+    ///
+    /// # Arguments
+    ///
+    /// * `answer` - The answer [`Serving::serve`] gave.
+    /// * `send`   - What sends the packed answer.
+    fn send_answer(&mut self, answer: &Telemetry, send: impl FnOnce(&[u8])) {
         // Into the thread's own packer, which keeps its buffer.
-        let data = self.answer.pack(&answer);
+        let data = self.answer.pack(answer);
         // Recorded before it is sent, as a beacon is, so that an answer the
         // send fails on is still known to have been produced.
         self.log.record(data);
@@ -941,7 +987,6 @@ impl Serving {
             }
             (self.restart)();
         }
-        !was_matched && self.matched.is_matched()
     }
 
     /// Acts on a command and says what this vehicle answers it with.
@@ -1911,17 +1956,8 @@ vehicle:
     /// waiting there and leaves the link waiting for the next as before.
     #[test]
     fn what_is_queued_at_a_match_is_dropped_and_the_link_still_waits() {
-        let socket = UdpSocket::bind("127.0.0.1:0").expect("a link");
-        let at = socket.local_addr().expect("where it is");
-        let link = Link {
-            framing: None,
-            socket,
-            which: CommandLink::Payload,
-            from: HostPort {
-                address: "127.0.0.1".to_string(),
-                port: 0,
-            },
-        };
+        let link = UdpSocket::bind("127.0.0.1:0").expect("a link");
+        let at = link.local_addr().expect("where it is");
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
         for queued in [&b"one"[..], b"two", b"three"] {
             ground.send_to(queued, at).expect("sent");
@@ -1929,22 +1965,22 @@ vehicle:
         // On loopback a datagram is queued at the receiver by the time its
         // send returns, so all three are waiting now.
 
-        let mut buffer = [0u8; 64];
-        drop_queued(&link, &mut buffer);
+        drop_queued(&link, CommandLink::Payload);
 
         // Nothing left of what was queued, and the link blocks again: a read
         // with a short timeout times out rather than failing at once.
-        link.socket
-            .set_read_timeout(Some(Duration::from_millis(100)))
+        link.set_read_timeout(Some(Duration::from_millis(100)))
             .expect("a timeout");
-        let left = link.socket.recv_from(&mut buffer);
+        let mut buffer = [0u8; 64];
+        let left = link.recv_from(&mut buffer);
         assert!(
             matches!(&left, Err(e) if e.kind() == std::io::ErrorKind::WouldBlock
                 || e.kind() == std::io::ErrorKind::TimedOut),
             "{left:?}"
         );
+        // Whole, though each dropped one was read a byte at a time.
         ground.send_to(b"after", at).expect("sent");
-        let (size, _) = link.socket.recv_from(&mut buffer).expect("the next");
+        let (size, _) = link.recv_from(&mut buffer).expect("the next");
         assert_eq!(&buffer[..size], b"after");
     }
 

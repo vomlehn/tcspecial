@@ -910,10 +910,16 @@ mod tests {
     /// release on it never changes.
     const FIXED_DIGEST: &str = "87aa3a5da4546803bba49afe56c66ba8";
 
-    /// The tcs-xtce digest of `xtce/beacon.xtce`, which must never change,
-    /// for the reason [`FIXED_DIGEST`] must not: every ground station reads
-    /// the beacon of every vehicle.
-    const BEACON_DIGEST: &str = "36c964e123aa9e8ace3fde97576aa441";
+    /// The tcs-xtce digest of `xtce/beacon.xtce`, which changes only
+    /// deliberately, for the reason [`FIXED_DIGEST`] must not change at all:
+    /// every ground station reads the beacon of every vehicle.
+    ///
+    /// It changed once, deliberately, on 2026-11-15, from `36c964e1...`,
+    /// when the link digest was added before the interface's: no other
+    /// field could carry to a station that only listens whether the vehicle
+    /// worked its configuration out as the station did. A test that fails
+    /// here is a change to undo unless it is as deliberate, and says so here.
+    const BEACON_DIGEST: &str = "6d8f5990e6fa621fd8df2e47a0058148";
 
     /// Makes one command of every kind, and a SET_NODE as long as one can be.
     ///
@@ -1199,13 +1205,14 @@ mod tests {
     /// The beacon's document is the one its layout is pinned by: see
     /// [`BEACON_DIGEST`].
     #[test]
-    fn the_beacon_document_never_changes() {
+    fn the_beacon_document_changes_only_deliberately() {
         assert_eq!(
             digest_of_document("beacon.xtce"),
             BEACON_DIGEST,
-            "tcsprotocol/xtce/beacon.xtce has changed, and it must never \
-             change: the beacon's layout is what every ground station reads \
-             of every vehicle, whatever else either runs. Undo the change"
+            "tcsprotocol/xtce/beacon.xtce has changed: the beacon's layout is \
+             what every ground station reads of every vehicle, whatever else \
+             either runs. Undo the change, or, where it is meant, pin the new \
+             digest in BEACON_DIGEST and say there why"
         );
     }
 

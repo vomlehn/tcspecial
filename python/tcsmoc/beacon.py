@@ -40,6 +40,7 @@ import socket
 import time
 from dataclasses import dataclass, field
 
+from tcsprotocol import interface as _interface
 from tcsprotocol.beacon import Beacon, BeaconError
 from tcsprotocol.configuration import BeaconLink, HostPort, came_from
 
@@ -391,7 +392,8 @@ class Heard:
     #: Whether its restart flag was set: the vehicle has started, or taken a
     #: RESTART, and has not been matched since.
     restart_flag: bool = False
-    #: What is wrong with the configuration it announces, if anything.
+    #: What is wrong with the configuration it announces, what it worked out
+    #: of it or the interface it speaks, if anything: see :func:`mismatch`.
     differs: str = None
 
 
@@ -402,9 +404,10 @@ def _beacon_of(datagram):
         datagram: The bytes that arrived on the beacon link.
 
     Returns:
-        A dict of the beacon's ``sequence``, ``version`` and ``digest`` (as
-        text) and ``restart_flag``, or ``None`` if the datagram is not a
-        beacon this can read.
+        A dict of the beacon's ``sequence``, ``version``, ``digest``,
+        ``links`` and ``interface`` (each digest as text) and
+        ``restart_flag``, or ``None`` if the datagram is not a beacon this
+        can read.
     """
     try:
         beacon = Beacon.read(datagram)
@@ -415,10 +418,12 @@ def _beacon_of(datagram):
         "version": version_text(beacon.version),
         "digest": digest_text(beacon.digest),
         "restart_flag": beacon.restart_flag,
+        "links": digest_text(beacon.links),
+        "interface": digest_text(beacon.interface),
     }
 
 
-def hear(datagram, expected):
+def hear(datagram, expected, links=None):
     """Read a datagram from the beacon link.
 
     Args:
@@ -426,15 +431,15 @@ def hear(datagram, expected):
         expected: This station's own configuration digest, as thirty-two hex
                   digits, which the beacon's is compared with; ``None`` to
                   compare nothing.
+        links:    This station's own link digest, as hex, which the beacon's
+                  is compared with; ``None`` to compare none.
 
     Returns:
         A :class:`Heard`: what to show, the beacon's numbers if it could be
-        read, and what differs about its configuration, if anything.
+        read, and what differs, if anything.
     """
     beacon = _beacon_of(datagram)
-    why = None
-    if beacon is not None and expected is not None:
-        why = differs(beacon["digest"], expected)
+    why = None if beacon is None else mismatch(beacon, expected, links)
     message = message_of(datagram)
     return Heard(
         message=f"{why} -- {message}" if why else message,
@@ -458,6 +463,55 @@ def restarted(now):
         The sentence to say.
     """
     return f"the beacons start again at #{now}, so tcspecial has restarted"
+
+
+#: What is remarked when the beacons agree with this station again: the
+#: configuration it read, what it worked out of it and its interface.
+AGREES_AGAIN = ("tcspecial is serving the configuration this MOC read again, "
+                "worked out alike, in the same interface")
+
+
+def mismatch(beacon, expected, links):
+    """What a beacon says that this station does not agree with: the first
+    of them, in the order a person would look into them --
+    ``tcsmoc::beacon::Mismatch``. The interface is compared whatever else the
+    station has: it is this tree's.
+
+    Args:
+        beacon:   The beacon, as :func:`_beacon_of` gives it.
+        expected: This station's configuration digest, as hex, or ``None``.
+        links:    This station's link digest, as hex, or ``None``.
+
+    Returns:
+        What to say of it, or ``None`` where nothing differs.
+    """
+    if expected is not None and beacon["digest"] != expected:
+        return differs(beacon["digest"], expected)
+    ours = digest_text(_interface.of_this_tree())
+    if beacon["interface"] != ours:
+        return (f"INTERFACE DIFFERS: tcspecial speaks interface "
+                f"{beacon['interface']}, and this MOC {ours}")
+    if links is not None and beacon["links"] != links:
+        return (f"LINKS DIFFER: tcspecial worked links {beacon['links']} out "
+                f"of the configuration, and this MOC {links}")
+    return None
+
+
+def heading(why):
+    """What a window that asks whether to go on says above what differs:
+    ``tcsmoc::beacon::Mismatch::heading``.
+
+    Args:
+        why: What :func:`mismatch` said.
+
+    Returns:
+        The heading.
+    """
+    if why.startswith("INTERFACE DIFFERS"):
+        return "tcspecial speaks a different interface"
+    if why.startswith("LINKS DIFFER"):
+        return "tcspecial worked the configuration out differently"
+    return "tcspecial is serving a different configuration"
 
 
 def differs(theirs, ours):
@@ -589,6 +643,9 @@ class Beacons:
         self._link = link
         self._schedule = schedule
         self._expected = expected
+        # This station's link digest, compared with every beacon's: see
+        # with_links. None compares none.
+        self._links = None
         self._clock = clock
         self._socket = None
         self._at = None
@@ -643,6 +700,20 @@ class Beacons:
         beacons = Beacons(link, schedule, expected)
         beacons._socket = held
         return beacons
+
+    def with_links(self, links):
+        """Compares every beacon's link digest with this station's own, the
+        digest of what it worked out of the configuration it read --
+        ``Beacons::with_links``. :func:`open` does, from its configuration.
+
+        Args:
+            links: This station's link digest, as hex.
+
+        Returns:
+            These beacons, comparing it.
+        """
+        self._links = links
+        return self
 
     def link(self):
         """Where this is listening and where it expects beacons from."""
@@ -707,17 +778,12 @@ class Beacons:
                 self._stranger = sender
             return self.after(Arrived.NOTHING, remarks, warnings=warnings)
 
-        heard = hear(datagram, self._expected)
-        # A configuration that differs is remarked on when it starts and when
-        # it stops, and not on every beacon in between.
+        heard = hear(datagram, self._expected, self._links)
+        # A beacon that disagrees is remarked on when it starts and when it
+        # stops, and not on every beacon in between.
         if (heard.differs is not None) != self._differed:
             remarks.append(
-                heard.differs
-                if heard.differs is not None
-                else (
-                    "tcspecial is serving the configuration this MOC read "
-                    "again"
-                )
+                heard.differs if heard.differs is not None else AGREES_AGAIN
             )
             self._differed = heard.differs is not None
 
@@ -797,12 +863,32 @@ def open(config, schedule, expected):
         ValueError: The configuration does not say where beacons are.
         OSError:    A socket cannot be bound.
     """
+    links = links_of(config)
     if not config.answers_over_bus():
-        return Beacons.listening(config.beacon_link(), schedule, expected)
+        beacons = Beacons.listening(config.beacon_link(), schedule, expected)
+        return beacons if links is None else beacons.with_links(links)
     from tcsmoc import bus
 
     ground = bus.ground_of(config)
     held = ground.receiving(config.bus().beacon_msgid)
     link = BeaconLink(send=HostPort(*ground.delivering()),
                       recv=HostPort(*held.getsockname()))
-    return Beacons.on(held, link, schedule, expected)
+    beacons = Beacons.on(held, link, schedule, expected)
+    return beacons if links is None else beacons.with_links(links)
+
+
+def links_of(config):
+    """This station's link digest, compared with every beacon's, or ``None``
+    where it cannot be had: as the Rust's ``open``, a configuration whose
+    links do not work out compares none, its check saying why.
+
+    Args:
+        config: The :class:`tcsprotocol.configuration.Configuration`.
+
+    Returns:
+        The digest, as hex, or ``None``.
+    """
+    try:
+        return config.link_digest()
+    except ValueError:
+        return None

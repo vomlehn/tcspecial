@@ -65,7 +65,7 @@ sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 # bookkeeping and the window.
 sys.path.insert(0, str(HERE.parent / "ping-common"))
 
-from tcsmoc.beacon import Schedule  # noqa: E402
+from tcsmoc.beacon import Schedule, links_of  # noqa: E402
 from tcsmoc.processes import Vehicle  # noqa: E402
 from tcsmoc.relay import Relays  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
@@ -420,7 +420,8 @@ def main(argv):
               flush=True)
         beacons = YamcsBeacons(yamcs, setup.beacon,
                                Schedule.for_interval(setup.beacon_interval),
-                               setup.digest, setup.beacon_interval)
+                               setup.digest, setup.beacon_interval,
+                               links=links_of(setup.config))
         pinger = YamcsPinger(yamcs, setup.ping_command, setup.ping_reply)
         if options.pings is None:
             return run_the_window(setup, beacons, pinger,

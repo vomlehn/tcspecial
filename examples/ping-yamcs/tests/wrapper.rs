@@ -73,6 +73,7 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
         5,
         ConfigVersion::of_this_build(),
         ConfigDigest([0x5a; 16]),
+        tcsprotocol::graph::link_table::LinkDigest([0x6b; 16]),
     )
     .to_bytes();
     let packet = framed(apid("beacon_apid"), &body);

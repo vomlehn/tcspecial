@@ -738,8 +738,16 @@ start that comes back.
 
 On the ground, tcs-moc -- and any station built on tcsmoc or the C/C++
 library -- is *matched for listening* while the last beacon it has heard is
-recent (the indicator says the vehicle is heard from), has the flag clear and
-carries the checksum of the configuration this station read. A clear flag
+recent (the indicator says the vehicle is heard from), has the flag clear,
+carries the checksum of the configuration this station read, and carries
+the link digest and the interface digest the station has: the digest of what
+it worked out of that configuration -- its ports, APIDs and consolidations --
+and of the interface its build speaks. A beacon whose checksum, link digest or
+interface digest is not the station's brings a pop-up in front of the panels
+asking whether to go on, headed by what differs -- *tcspecial is serving a
+different configuration*, *tcspecial worked the configuration out
+differently* or *tcspecial speaks a different interface* -- and naming both
+digests; Quit stops what tcs-moc started. A clear flag
 says some station's ``CONNECT`` matched the vehicle, so a station that only
 listens is matched as surely as one that commands. It reads the vehicle's
 data only while matched for listening: everything else is dropped and

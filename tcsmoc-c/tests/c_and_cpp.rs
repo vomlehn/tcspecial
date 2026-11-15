@@ -252,6 +252,12 @@ vehicle:
     )
     .expect("written");
     let digest = digest_of_file(&configuration).expect("it digests");
+    // What the vehicle worked out of it, which the station compares with
+    // what it worked out itself.
+    let links = tcsprotocol::graph::link_table::digest_of(
+        &tcsprotocol::graph::Graph::load(&configuration).expect("it reads"),
+    )
+    .expect("its links work out");
     let version = ConfigVersion::of_this_build();
 
     let stop = Arc::new(AtomicBool::new(false));
@@ -265,7 +271,7 @@ vehicle:
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
                 let datagram =
-                    Beacon::new(sequence, version, digest).to_bytes();
+                    Beacon::new(sequence, version, digest, links).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
 
                 // A ping, answered as the ping node answers it, down to where

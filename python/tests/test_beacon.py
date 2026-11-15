@@ -31,12 +31,16 @@ SECOND = 1_000_000_000
 AT = 1_000_000 * SECOND
 
 
+#: The link digest the tests' beacons carry: the Rust's tests' too.
+LINKS = bytes([0x5A] * 16)
+
+
 def a_beacon(sequence=2, digest=None, version=(0, 1, 0), flagged=False,
-             interface_digest=None):
+             interface_digest=None, links=LINKS):
     """A beacon, as tcspecial sends one.
 
-    The name, the version, the digest, the number, the restart flag
-    and the interface's digest, as text, a colon between each.
+    The name, the version, the digest, the number, the restart flag, the
+    link digest and the interface's digest, as text, a colon between each.
 
     Args:
         sequence:         The beacon's number.
@@ -46,6 +50,7 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0), flagged=False,
         flagged:          Whether the restart flag is set.
         interface_digest: The interface's digest, sixteen bytes; ``None`` for
                           this tree's.
+        links:            The link digest, sixteen bytes.
 
     Returns:
         The beacon's bytes.
@@ -56,7 +61,7 @@ def a_beacon(sequence=2, digest=None, version=(0, 1, 0), flagged=False,
     major, minor, patch = version
     flag = "restart" if flagged else "normal"
     return (f"tcspecial:{major}.{minor}.{patch}:{bytes(digest).hex()}:"
-            f"{sequence}:{flag}:{bytes(interface_digest).hex()}"
+            f"{sequence}:{flag}:{links.hex()}:{bytes(interface_digest).hex()}"
             ).encode("ascii")
 
 
@@ -202,7 +207,8 @@ class LayoutTest(unittest.TestCase):
         digest = bytes([0xD4, 0x1D, 0x8C, 0xD9, 0x8F, 0x00, 0xB2, 0x04,
                         0xE9, 0x80, 0x09, 0x98, 0xEC, 0xF8, 0x42, 0x7E])
         packed = Beacon(sequence=0x01020304, version=(1, 2, 3),
-                        digest=digest, restart_flag=True).to_bytes()
+                        digest=digest, restart_flag=True,
+                        links=LINKS).to_bytes()
         self.assertEqual(packed, a_beacon(sequence=0x01020304,
                                           digest=list(digest),
                                           version=(1, 2, 3),
@@ -210,11 +216,12 @@ class LayoutTest(unittest.TestCase):
         self.assertEqual(
             packed,
             b"tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:"
-            b"restart:" + interface.of_this_tree().hex().encode())
+            b"restart:5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:"
+            + interface.of_this_tree().hex().encode())
         longest = Beacon(sequence=2 ** 32 - 1, version=(255, 255, 255),
                          digest=digest, restart_flag=True).to_bytes()
         self.assertEqual(len(longest), BEACON_BYTES)
-        self.assertEqual(BEACON_BYTES, 106)
+        self.assertEqual(BEACON_BYTES, 139)
 
     def test_this_trees_interface_is_the_one_the_rust_was_built_with(self):
         # The constant `make interface-digest` wrote for the Rust, read from
@@ -228,20 +235,25 @@ class LayoutTest(unittest.TestCase):
 
     def test_the_beacon_is_what_the_hand_written_packer_wrote(self):
         # What the hand-written packer that came before the generated code
-        # wrote for these beacons, which tcsprotocol/src/beacon.rs holds the
-        # Rust to as well.
+        # wrote for these beacons, with the link digest the beacon has
+        # carried since 2026-11-15 before the interface's, which
+        # tcsprotocol/src/beacon.rs holds the Rust to as well.
         digest = bytes.fromhex("d41d8cd98f00b204e9800998ecf8427e")
         face = bytes([0xAB] * 16)
         for beacon, written in [
-            (Beacon(0x01020304, (1, 2, 3), digest, True, face),
+            (Beacon(0x01020304, (1, 2, 3), digest, True, face, LINKS),
              b"tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:"
-             b"restart:abababababababababababababababab"),
-            (Beacon(1, (0, 1, 0), digest, False, face),
-             b"tcspecial:0.1.0:d41d8cd98f00b204e9800998ecf8427e:1:normal:"
+             b"restart:5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:"
              b"abababababababababababababababab"),
-            (Beacon(2 ** 32 - 1, (255, 255, 255), bytes(16), True, face),
+            (Beacon(1, (0, 1, 0), digest, False, face, LINKS),
+             b"tcspecial:0.1.0:d41d8cd98f00b204e9800998ecf8427e:1:normal:"
+             b"5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:"
+             b"abababababababababababababababab"),
+            (Beacon(2 ** 32 - 1, (255, 255, 255), bytes(16), True, face,
+                    bytes([0xFF] * 16)),
              b"tcspecial:255.255.255:00000000000000000000000000000000:"
-             b"4294967295:restart:abababababababababababababababab"),
+             b"4294967295:restart:ffffffffffffffffffffffffffffffff:"
+             b"abababababababababababababababab"),
         ]:
             self.assertEqual(beacon.to_bytes(), written)
             self.assertEqual(Beacon.read(written), beacon)
@@ -311,17 +323,43 @@ class HearingTest(unittest.TestCase):
             beacon.hear(b"T" + good[1:], None).sequence)
         # Each of the Rust's refusals, said again.
         md5, face = "d4" * 16, interface.of_this_tree().hex()
+        links = LINKS.hex()
         for bad in (
-            f"tcspecial:1.2:{md5}:1:normal:{face}",
-            f"tcspecial:1.2.256:{md5}:1:normal:{face}",
-            f"tcspecial:1.2.3:{md5.upper()}:1:normal:{face}",
-            f"tcspecial:1.2.3:{md5}:+1:normal:{face}",
-            f"tcspecial:1.2.3:{md5}:4294967296:normal:{face}",
-            f"tcspecial:1.2.3:{md5}:1:yes:{face}",
-            f"tcspecial:1.2.3:{md5}:1:normal",
-            f"tcspecial:1.2.3:{md5}:1:normal:{face}:",
+            f"tcspecial:1.2:{md5}:1:normal:{links}:{face}",
+            f"tcspecial:1.2.256:{md5}:1:normal:{links}:{face}",
+            f"tcspecial:1.2.3:{md5.upper()}:1:normal:{links}:{face}",
+            f"tcspecial:1.2.3:{md5}:+1:normal:{links}:{face}",
+            f"tcspecial:1.2.3:{md5}:4294967296:normal:{links}:{face}",
+            f"tcspecial:1.2.3:{md5}:1:yes:{links}:{face}",
+            f"tcspecial:1.2.3:{md5}:1:normal:{links[1:]}:{face}",
+            f"tcspecial:1.2.3:{md5}:1:normal:{links.upper()}:{face}",
+            # A beacon of the six fields before the link digest.
+            f"tcspecial:1.2.3:{md5}:1:normal:{face}",
+            f"tcspecial:1.2.3:{md5}:1:normal:{links}",
+            f"tcspecial:1.2.3:{md5}:1:normal:{links}:{face}:",
         ):
             self.assertIsNone(beacon.hear(bad.encode(), None).sequence, bad)
+
+    def test_a_beacon_that_worked_its_links_out_otherwise_says_so(self):
+        # As tcsmoc::beacon's test of the same says it.
+        ours = "6b" * 16
+        datagram = a_beacon(links=bytes([0x7C] * 16))
+        heard = beacon.hear(datagram, None, ours)
+        self.assertTrue(heard.differs.startswith("LINKS DIFFER"),
+                        heard.differs)
+        self.assertIn("7c" * 16, heard.differs)
+        self.assertIn(ours, heard.differs)
+        self.assertEqual(beacon.heading(heard.differs),
+                         "tcspecial worked the configuration out differently")
+        self.assertIsNone(beacon.hear(datagram, None, "7c" * 16).differs)
+        self.assertIsNone(beacon.hear(datagram, None).differs)
+
+        # Another interface is said whatever the station has to compare.
+        other = a_beacon(interface_digest=bytes([0x11] * 16))
+        heard = beacon.hear(other, None)
+        self.assertTrue(heard.differs.startswith("INTERFACE DIFFERS"),
+                        heard.differs)
+        self.assertIn("11" * 16, heard.differs)
 
     def test_a_beacons_number_says_what_happened_before_it(self):
         self.assertEqual(beacon.counted(None, 7), (Counted.FIRST, 0))

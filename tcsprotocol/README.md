@@ -37,8 +37,10 @@ the editor is the one the vehicle would have refused the file with.
   link-packet` here after changing `link.xtce`, and `make interface-digest`.
   A test pins `fixed.xtce`'s digest, and fails, saying it must never change,
   if it does.
-- `beacon`: the beacon, a line of text with six fields between colons,
-  `tcspecial:1.2.3:<md5>:42:normal:<interface>`, at most 106 bytes, so that a
+- `beacon`: the beacon, a line of text with seven fields between colons,
+  `tcspecial:1.2.3:<md5>:42:normal:<links>:<interface>`, at most 139 bytes,
+  the link digest being of what was worked out of the configuration
+  (`graph::link_table`), so that a
   person can read it in a capture or a log with no decoder. Its layout is in
   `xtce/beacon.xtce`, as text fields, packed and unpacked by the code generated
   from it, `src/beacon_packet.rs` and

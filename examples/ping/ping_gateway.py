@@ -71,7 +71,7 @@ sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 # ping link and the window.
 sys.path.insert(0, str(HERE.parent / "ping-common"))
 
-from tcsmoc.beacon import Beacons, Schedule  # noqa: E402
+from tcsmoc.beacon import Beacons, Schedule, links_of  # noqa: E402
 from tcsmoc.listening import Listening  # noqa: E402
 from tcsmoc.processes import Vehicle  # noqa: E402
 from tcsprotocol import configuration  # noqa: E402
@@ -379,6 +379,11 @@ def main(argv):
             Schedule.for_interval(setup.beacon_interval),
             setup.digest,
         )
+        # And what the vehicle worked out of the configuration, compared
+        # with what this end worked out of it.
+        links = links_of(setup.config)
+        if links is not None:
+            beacons.with_links(links)
         pinger = Pinger(setup.uplink, setup.downlink)
     except OSError as why:
         print(f"cannot listen: {why}", file=sys.stderr)

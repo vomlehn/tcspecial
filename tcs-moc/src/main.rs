@@ -1040,8 +1040,9 @@ fn handle_close(
     });
 }
 
-/// What to do when tcspecial's beacons announce a configuration other than
-/// the one this MOC read: ask the operator whether to continue anyway.
+/// What to do when tcspecial's beacons disagree with this MOC -- another
+/// configuration than the one it read, the same one worked out otherwise,
+/// or another interface: ask the operator whether to continue anyway.
 ///
 /// Continue closes the question and leaves everything running; Quit stops
 /// tcspecial and tcs-sim, where this MOC started them, and exits, as the Quit
@@ -1062,13 +1063,14 @@ fn ask_whether_to_continue(
     pm_tcs_sim: Arc<ProcessManager>,
     pm_tcspecial: Option<Arc<ProcessManager>>,
 ) -> beacon_receive::Ask {
-    Arc::new(move |why: String| {
+    Arc::new(move |heading: &'static str, why: String| {
         let pm_tcs_sim = pm_tcs_sim.clone();
         let pm_tcspecial = pm_tcspecial.clone();
         let _ = slint::invoke_from_event_loop(move || {
             let Some(ui) = main_window() else {
                 return;
             };
+            ui.set_differs_heading(SharedString::from(heading));
             ui.set_differs_message(SharedString::from(why));
             // The panels take no presses until it is answered: nothing is
             // commanded behind a question about whether to go on at all.
@@ -1881,6 +1883,9 @@ mod tests {
 
         // As `ask_whether_to_continue` asks it, without the processes it
         // would stop on Quit.
+        ui.set_differs_heading(
+            "tcspecial is serving a different configuration".into(),
+        );
         ui.set_differs_message("tcspecial md5 aaaa, this MOC md5 bbbb".into());
         ui.set_inert(true);
         ui.on_differs_continue_anyway(|| {

@@ -5995,7 +5995,7 @@ tcspecial and <tt class="docutils literal">tcsmoc</tt> use, and <tt class="docut
 the two are held to each other by the same examples in their tests, and to what
 the hand-written packer that came before wrote, byte for byte. For example:</p>
 <pre class="code text literal-block">
-tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
+tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
 </pre>
 <table border="1" class="docutils">
 <colgroup>
@@ -6031,6 +6031,12 @@ taking a RESTART, until the start takes a CONNECT carrying
 its configuration's checksum, and <tt class="docutils literal">normal</tt> otherwise: the
 <em>restart flag</em>, <tt class="docutils literal">restart_flag</tt> in code</td>
 </tr>
+<tr><td>links</td>
+<td>The <em>link digest</em>: MD5 of what this tcspecial worked out of
+its configuration -- ports, APIDs, message IDs, the layout
+of each consolidation -- as 32 lower-case hex digits: see
+<tt class="docutils literal"><span class="pre">tcsprotocol::graph::link_table</span></tt></td>
+</tr>
 <tr><td>interface</td>
 <td>The digest of the interface this tcspecial speaks, as 32
 lower-case hex digits</td>
@@ -6048,10 +6054,10 @@ of text fields and nothing else.</dd>
 <dt>Requirement</dt>
 <dd>A beacon is read strictly, by <tt class="docutils literal"><span class="pre">tcsprotocol::Beacon::read</span></tt> in Rust and
 <tt class="docutils literal">tcsprotocol.beacon.Beacon.read</tt> in Python, and by nothing else:
-exactly six fields, each in the form the table gives. A datagram longer than
-the longest beacon, 106 bytes (<tt class="docutils literal">BEACON_BYTES</tt>), that is not UTF-8, or that
-has a field out of its form, a seventh field, a trailing colon or a trailing
-newline, is not a beacon, and the ground shows what arrived rather than a
+exactly seven fields, each in the form the table gives. A datagram longer
+than the longest beacon, 139 bytes (<tt class="docutils literal">BEACON_BYTES</tt>), that is not UTF-8,
+or that has a field out of its form, an eighth field, a trailing colon or a
+trailing newline, is not a beacon, and the ground shows what arrived rather than a
 beacon (<tt class="docutils literal"><span class="pre">BeaconError::Length</span></tt> or <tt class="docutils literal"><span class="pre">BeaconError::Field</span></tt>, naming the
 field). Something else sending to the beacon port is then seen for what it
 is.</dd>
@@ -6363,17 +6369,23 @@ patch), newest sequence taken 4</td>
 reads a value it does not know as a refusal for a reason it cannot name,
 and says so with the number.</dd>
 <dt>Requirement</dt>
-<dd>The beacon's layout is fixed for ever too: its text fields, in their
+<dd>The beacon's layout changes only deliberately: its text fields, in their
 order, as <a class="reference internal" href="#asynchronous-telemetry">Asynchronous Telemetry</a> gives them. It is stated in a
 document of its own, <tt class="docutils literal">beacon.xtce</tt>, because it goes on a link of its
-own, apart from the commands and their answers.</dd>
+own, apart from the commands and their answers. It changed once, on
+2026-11-15, to add the link digest before the interface's: nothing else
+reaches a station that only listens, and no other field could say that
+the vehicle worked its configuration out as the station did. A station
+built before then reads every later beacon as not a beacon, which is
+what it is to that station.</dd>
 <dt>Requirement</dt>
 <dd>The digests of <tt class="docutils literal">fixed.xtce</tt> and of <tt class="docutils literal">beacon.xtce</tt> are pinned by a
 test, which fails at any change to either. <tt class="docutils literal">fixed.xtce</tt>'s changed,
 deliberately, before the first release that is not a release
 candidate, when the beacon was moved into it, and changed back when the
-beacon was moved out again, into <tt class="docutils literal">beacon.xtce</tt>. From that release on
-neither changes.</dd>
+beacon was moved out again, into <tt class="docutils literal">beacon.xtce</tt>; from that release on
+it never changes. <tt class="docutils literal">beacon.xtce</tt>'s changed once, for the link digest,
+and the test says so beside the digest it pins now.</dd>
 </dl>
 <p>PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
 before a match like any other, and moves out of the fixed range when the
@@ -6554,12 +6566,18 @@ interval or changes what any payload does: what they can do to the
 vehicle is match it, and restart it onto a configuration already
 there.</dd>
 <dt>Requirement</dt>
-<dd>The ground compares interface digests before it sends a command of the
+<dd><p class="first">The ground compares interface digests before it sends a command of the
 interface: <tt class="docutils literal">tcsmoc</tt> refuses to send one while the last beacon's
 interface digest differs from the digest of the documents the ground
 read, and says which documents and which two digests. The fixed
 commands are never refused for this, because they are how a mismatch is
-fixed.</dd>
+fixed.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): every beacon's interface digest is compared
+with this build's, and a station that hears another is not matched --
+so <tt class="docutils literal">tcsmoc</tt> sends it nothing a match gates -- and says <tt class="docutils literal">INTERFACE
+DIFFERS</tt>, naming both digests. Before then the beacon's interface
+digest was read and ignored.</p>
+</dd>
 </dl>
 </div>
 <div class="section" id="what-goes-on-the-vehicle">
@@ -7062,7 +7080,9 @@ reads.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A ground station is <em>matched</em> while the last beacon it heard, since it
-began using its configuration, has its restart flag clear and carries
+began using its configuration, has its restart flag clear, carries the
+link digest the station worked out of that configuration and the
+interface digest of the station's build, and carries
 that configuration's checksum, and while that beacon is recent: its
 beacon watch says the vehicle is heard from
 (<tt class="docutils literal"><span class="pre">tcsmoc::beacon::Stage::Heard</span></tt>). A beacon gone overdue -- four times

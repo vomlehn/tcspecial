@@ -164,9 +164,13 @@ fn a_beacon_decodes_as_the_vehicle_framed_it() {
     .framing
     .expect("framed")
     .beacon_apid;
-    let body =
-        Beacon::new(3, ConfigVersion::of_this_build(), ConfigDigest([7; 16]))
-            .to_bytes();
+    let body = Beacon::new(
+        3,
+        ConfigVersion::of_this_build(),
+        ConfigDigest([7; 16]),
+        tcsprotocol::graph::link_table::LinkDigest([8; 16]),
+    )
+    .to_bytes();
     let decoded = decode(&generated_mdb(&path), &framed(apid, &body));
     assert_eq!(decoded.container, "BeaconPacket");
     assert_eq!(decoded.bytes["BeaconBody"], body);

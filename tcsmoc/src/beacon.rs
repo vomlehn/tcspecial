@@ -42,9 +42,10 @@ use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::{Duration, SystemTime};
 
+use tcsprotocol::graph::link_table::LinkDigest;
 use tcsprotocol::{
-    came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion, Timestamp,
-    NO_TRANSFER_TIME,
+    came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion,
+    InterfaceDigest, Timestamp, NO_TRANSFER_TIME,
 };
 
 /// Where beacons come from and where they are received.
@@ -578,6 +579,12 @@ const SAID_BYTES: usize = 256;
 /// warning.
 const REMARKS_AT_ONCE: usize = 4;
 
+/// What is remarked when the beacons agree with this station again: the
+/// configuration it read, what it worked out of it and its interface.
+pub const AGREES_AGAIN: &str =
+    "tcspecial is serving the configuration this MOC read again, worked out \
+     alike, in the same interface";
+
 /// What a datagram on the beacon link turned out to be.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Heard {
@@ -588,9 +595,114 @@ pub struct Heard {
     /// Whether its restart flag was set: the vehicle has started, or taken a
     /// RESTART, and has not been matched since.
     pub restart_flag: bool,
-    /// What is wrong with the configuration it announces, if anything: see
-    /// [`differs`].
+    /// What is wrong with the configuration it announces, what it worked
+    /// out of it or the interface it speaks, if anything: see [`Mismatch`].
     pub differs: Option<String>,
+}
+
+/// What a beacon says that this station does not agree with: the first of
+/// them, in the order a person would look into them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Mismatch {
+    /// The configuration tcspecial is serving is not the one this station
+    /// read: tcspecial's digest and this station's.
+    Configuration(ConfigDigest, ConfigDigest),
+    /// tcspecial speaks another interface than this station's build: its
+    /// interface digest and this build's.
+    Interface(InterfaceDigest, InterfaceDigest),
+    /// tcspecial worked the same configuration out otherwise than this
+    /// station did -- its ports, APIDs, message IDs or consolidations: its
+    /// link digest and this station's. The two were built from versions of
+    /// tcsprotocol that work them out differently.
+    Links(LinkDigest, LinkDigest),
+}
+
+impl Mismatch {
+    /// Finds what a beacon says that this station does not agree with.
+    ///
+    /// # Arguments
+    ///
+    /// * `beacon`   - The beacon.
+    /// * `expected` - This station's configuration digest, or `None` where
+    ///                it has none to compare with.
+    /// * `links`    - This station's link digest, or `None` where it has
+    ///                none.
+    ///
+    /// # Returns
+    ///
+    /// The first thing that differs, or `None` where nothing does. The
+    /// interface is compared whatever else the station has: it is this
+    /// build's.
+    pub fn of(
+        beacon: &Beacon,
+        expected: Option<ConfigDigest>,
+        links: Option<LinkDigest>,
+    ) -> Option<Mismatch> {
+        let interface = InterfaceDigest::of_this_build();
+        if let Some(ours) = expected.filter(|ours| *ours != beacon.digest) {
+            return Some(Mismatch::Configuration(beacon.digest, ours));
+        }
+        if beacon.interface != interface {
+            return Some(Mismatch::Interface(beacon.interface, interface));
+        }
+        if let Some(ours) = links.filter(|ours| *ours != beacon.links) {
+            return Some(Mismatch::Links(beacon.links, ours));
+        }
+        None
+    }
+
+    /// What is said of it, written onto the end of `out`: what differs,
+    /// naming both, in capitals, so that it is seen.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where it is written.
+    fn write(&self, out: &mut String) {
+        match self {
+            Mismatch::Configuration(theirs, ours) => {
+                write_differs(*theirs, *ours, out)
+            }
+            Mismatch::Interface(theirs, ours) => {
+                let _ = write!(
+                    out,
+                    "INTERFACE DIFFERS: tcspecial speaks interface {theirs}, \
+                     and this MOC {ours}"
+                );
+            }
+            Mismatch::Links(theirs, ours) => {
+                let _ = write!(
+                    out,
+                    "LINKS DIFFER: tcspecial worked links {theirs} out of \
+                     the configuration, and this MOC {ours}"
+                );
+            }
+        }
+    }
+
+    /// What a window that asks whether to go on says above what differs:
+    /// what it means, in a few words.
+    ///
+    /// # Returns
+    ///
+    /// The heading.
+    pub fn heading(&self) -> &'static str {
+        match self {
+            Mismatch::Configuration(..) => {
+                "tcspecial is serving a different configuration"
+            }
+            Mismatch::Interface(..) => "tcspecial speaks a different interface",
+            Mismatch::Links(..) => {
+                "tcspecial worked the configuration out differently"
+            }
+        }
+    }
+
+    /// What is said of it, as a string of its own.
+    pub fn said(&self) -> String {
+        let mut out = String::new();
+        self.write(&mut out);
+        out
+    }
 }
 
 /// Reads a datagram from the beacon link, comparing the digest it carries
@@ -607,14 +719,12 @@ pub struct Heard {
 /// What the datagram turned out to be, and what a window shows for it.
 pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
     let mut message = String::new();
-    let reading = read_into(datagram, expected, &mut message);
+    let reading = read_into(datagram, expected, None, &mut message);
     Heard {
         message,
         sequence: reading.sequence,
         restart_flag: reading.beacon.is_some_and(|beacon| beacon.restart_flag),
-        differs: reading
-            .digests
-            .and_then(|(theirs, ours)| differs(theirs, ours)),
+        differs: reading.mismatch.map(|mismatch| mismatch.said()),
     }
 }
 
@@ -624,8 +734,8 @@ struct Reading {
     sequence: Option<u32>,
     /// The beacon, if it was one this build can read.
     beacon: Option<Beacon>,
-    /// The digest it announced and this station's, where the two differ.
-    digests: Option<(ConfigDigest, ConfigDigest)>,
+    /// What it says that this station does not agree with.
+    mismatch: Option<Mismatch>,
 }
 
 /// [`hear`], with the message written into `message` in place of what it
@@ -637,6 +747,8 @@ struct Reading {
 /// * `datagram` - What arrived on the beacon link.
 /// * `expected` - This station's own configuration digest, or `None`
 ///                where it has none to compare with.
+/// * `links`    - This station's own link digest, or `None` where it has
+///                none to compare with.
 /// * `message`  - Where what a window shows for it is written, cleared
 ///                first.
 ///
@@ -646,26 +758,23 @@ struct Reading {
 fn read_into(
     datagram: &[u8],
     expected: Option<ConfigDigest>,
+    links: Option<LinkDigest>,
     message: &mut String,
 ) -> Reading {
     message.clear();
     let read = Beacon::read(datagram);
     let beacon = read.as_ref().ok();
-    let digests = match (beacon, expected) {
-        (Some(beacon), Some(ours)) if beacon.digest != ours => {
-            Some((beacon.digest, ours))
-        }
-        _ => None,
-    };
-    if let Some((theirs, ours)) = digests {
-        write_differs(theirs, ours, message);
+    let mismatch =
+        beacon.and_then(|beacon| Mismatch::of(beacon, expected, links));
+    if let Some(mismatch) = mismatch {
+        mismatch.write(message);
         message.push_str(" -- ");
     }
     write_message(datagram, &read, message);
     Reading {
         sequence: beacon.map(|beacon| beacon.sequence),
         beacon: beacon.copied(),
-        digests,
+        mismatch,
     }
 }
 
@@ -850,6 +959,10 @@ pub struct Pass {
     /// arrived. Kept as `at` is: with the flag and the stage it is what says
     /// whether a station is matched -- see [`crate::matched`].
     pub digest: Option<ConfigDigest>,
+    /// What the last beacon says that this station does not agree with, if
+    /// anything. Kept as `at` is: a station that disagrees is not matched,
+    /// whatever the checksum says -- see [`crate::matched`].
+    pub mismatch: Option<Mismatch>,
     /// Whether the spacecraft is being heard from, which is the same reading
     /// as the stage in the form a program acts on.
     pub contact: Contact,
@@ -886,6 +999,10 @@ pub struct Beacons {
     /// every beacon's digest is compared with. `None` where it could not
     /// digest its own, and then nothing is compared.
     expected: Option<ConfigDigest>,
+    /// The link digest this station worked out of the configuration it
+    /// read, which every beacon's is compared with: see
+    /// [`Beacons::with_links`]. `None` where it has none.
+    links: Option<LinkDigest>,
     /// When the last beacon arrived.
     at: Option<SystemTime>,
     /// The last pass, which the next is made in: its message, remarks and
@@ -961,9 +1078,17 @@ pub fn open(
     expected: Option<ConfigDigest>,
 ) -> Result<Option<Beacons>, String> {
     let cannot = |e: io::Error| format!("beacons cannot be received: {e}");
+    // This station's own link digest, compared with every beacon's where it
+    // can be worked out: where it cannot, the configuration's links do not
+    // work out, which its check says, and nothing is compared.
+    let links = tcsprotocol::graph::link_table::digest_of(graph).ok();
+    let compared = |beacons: Beacons| match links {
+        Some(links) => beacons.with_links(links),
+        None => beacons,
+    };
     if let Some(link) = tcsprotocol::graph::parameters::beacon_of(graph)? {
         return Beacons::listening(link, schedule, expected)
-            .map(Some)
+            .map(|beacons| Some(compared(beacons)))
             .map_err(cannot);
     }
     let Some(bus) = crate::bus::bus_of(graph)? else {
@@ -982,7 +1107,7 @@ pub fn open(
         recv: at(socket.local_addr().map_err(cannot)?),
     };
     Beacons::on(socket, link, schedule, expected)
-        .map(Some)
+        .map(|beacons| Some(compared(beacons)))
         .map_err(cannot)
 }
 
@@ -1067,6 +1192,7 @@ impl Beacons {
             restarted: false,
             restart_flag: false,
             digest: None,
+            mismatch: None,
             contact: Contact::Lost,
             remarks: Vec::with_capacity(REMARKS_AT_ONCE),
             warnings: Vec::with_capacity(REMARKS_AT_ONCE),
@@ -1076,6 +1202,7 @@ impl Beacons {
             link,
             schedule,
             expected,
+            links: None,
             at: None,
             last,
             count: None,
@@ -1084,6 +1211,23 @@ impl Beacons {
             wake,
             wake_from,
         })
+    }
+
+    /// Compares every beacon's link digest with this station's own, the
+    /// digest of what it worked out of the configuration it read: see
+    /// `tcsprotocol::graph::link_table`. [`open`] does, from the
+    /// configuration it opens by.
+    ///
+    /// # Arguments
+    ///
+    /// * `links` - This station's link digest.
+    ///
+    /// # Returns
+    ///
+    /// This watch, comparing it.
+    pub fn with_links(mut self, links: LinkDigest) -> Beacons {
+        self.links = Some(links);
+        self
     }
 
     /// What wakes this watch from another thread: see [`Waker`].
@@ -1156,6 +1300,7 @@ impl Beacons {
                 let heard = read_into(
                     &buffer[..size],
                     self.expected,
+                    self.links,
                     &mut self.last.said,
                 );
                 let remarks = &mut self.last.remarks;
@@ -1165,19 +1310,12 @@ impl Beacons {
                 // when it starts and when it stops -- and not on every beacon
                 // in between, which would bury it. Each remark allocates, on
                 // the pass where it is made.
-                if heard.digests.is_some() != self.differed {
-                    match heard
-                        .digests
-                        .and_then(|(theirs, ours)| differs(theirs, ours))
-                    {
-                        Some(why) => remarks.push(why),
-                        None => remarks.push(
-                            "tcspecial is serving the configuration this MOC \
-                             read again"
-                                .to_string(),
-                        ),
+                if heard.mismatch.is_some() != self.differed {
+                    match heard.mismatch {
+                        Some(mismatch) => remarks.push(mismatch.said()),
+                        None => remarks.push(AGREES_AGAIN.to_string()),
                     }
-                    self.differed = heard.digests.is_some();
+                    self.differed = heard.mismatch.is_some();
                 }
 
                 if let Some(beacon) = heard.beacon {
@@ -1204,6 +1342,7 @@ impl Beacons {
                     self.last.restarted = kind == Counted::Restarted;
                     self.last.restart_flag = beacon.restart_flag;
                     self.last.digest = Some(beacon.digest);
+                    self.last.mismatch = heard.mismatch;
                 }
 
                 Arrived::Beacon
@@ -1596,6 +1735,59 @@ mod tests {
         assert_eq!(missed(Duration::from_secs(10), Duration::ZERO), 0);
     }
 
+    /// The link digest the tests' beacons carry.
+    fn links() -> LinkDigest {
+        LinkDigest([0x6b; 16])
+    }
+
+    /// A beacon whose link digest is not the station's says so, naming
+    /// both, as one whose interface is not this build's does; and a station
+    /// that hears either is not matched, whatever the checksum says.
+    #[test]
+    fn a_beacon_that_worked_its_links_out_otherwise_says_so() {
+        let digest = ConfigDigest([0xab; 16]);
+        let ours = links();
+        let theirs = LinkDigest([0x7c; 16]);
+        let version = ConfigVersion::of_this_build();
+        let beacon = Beacon::new(1, version, digest, theirs);
+
+        let mismatch = Mismatch::of(&beacon, Some(digest), Some(ours));
+        assert_eq!(mismatch, Some(Mismatch::Links(theirs, ours)));
+        let said = mismatch.expect("they differ").said();
+        assert!(said.starts_with("LINKS DIFFER"), "{said}");
+        assert!(said.contains(&theirs.to_string()), "{said}");
+        assert!(said.contains(&ours.to_string()), "{said}");
+        assert_eq!(Mismatch::of(&beacon, Some(digest), Some(theirs)), None);
+        // With no link digest of its own, a station compares none.
+        assert_eq!(Mismatch::of(&beacon, Some(digest), None), None);
+
+        let other = InterfaceDigest([0x11; 16]);
+        let speaks = Beacon {
+            interface: other,
+            ..beacon
+        };
+        let said = Mismatch::of(&speaks, Some(digest), Some(theirs))
+            .expect("the interface differs")
+            .said();
+        assert!(said.starts_with("INTERFACE DIFFERS"), "{said}");
+        assert!(said.contains(&other.to_string()), "{said}");
+        // And it is compared by a station that has nothing else to compare.
+        assert!(hear(&speaks.to_bytes(), None)
+            .message
+            .starts_with("INTERFACE DIFFERS"));
+
+        // A configuration that differs is said first: it is the likelier
+        // reason for the rest.
+        let elsewhere = Beacon {
+            digest: ConfigDigest([0xcd; 16]),
+            ..speaks
+        };
+        assert!(matches!(
+            Mismatch::of(&elsewhere, Some(digest), Some(ours)),
+            Some(Mismatch::Configuration(..))
+        ));
+    }
+
     /// The digest tcspecial sent is compared with the one this station
     /// computed: the same says nothing, and a different one says both.
     #[test]
@@ -1608,7 +1800,7 @@ mod tests {
         assert!(said.contains(&ours.to_string()), "{said}");
 
         let version = ConfigVersion::of_this_build();
-        let datagram = Beacon::new(1, version, theirs).to_bytes();
+        let datagram = Beacon::new(1, version, theirs, links()).to_bytes();
 
         let heard = hear(&datagram, Some(ours));
         assert!(heard.differs.is_some());
@@ -1636,7 +1828,7 @@ mod tests {
             patch: 3,
         };
         let digest = ConfigDigest([0xab; 16]);
-        let datagram = Beacon::new(3, version, digest).to_bytes();
+        let datagram = Beacon::new(3, version, digest, links()).to_bytes();
 
         // Each labelled, the version three decimal parts, and the digest hex
         // with nothing between the bytes. No configuration version: a
@@ -1649,7 +1841,7 @@ mod tests {
         assert_eq!(what_it_read(version, digest), read);
 
         // A beacon sent with the restart flag set says so.
-        let flagged = Beacon::new(4, version, digest)
+        let flagged = Beacon::new(4, version, digest, links())
             .restart_flag(true)
             .to_bytes();
         assert_eq!(
@@ -1876,6 +2068,61 @@ mod tests {
         }
     }
 
+    /// A station that hears a beacon whose link digest is not its own is
+    /// not matched, though the checksum is its own, and says so once; when
+    /// the beacons agree again, it is matched, and says that.
+    #[test]
+    fn a_station_that_worked_its_links_out_otherwise_is_not_matched() {
+        let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a vehicle");
+        let from = vehicle.local_addr().expect("where it sends from");
+        let listening =
+            UdpSocket::bind("127.0.0.1:0").expect("a port for the station");
+        let recv = listening.local_addr().expect("its address");
+        drop(listening);
+        let link = Link {
+            send: HostPort {
+                address: from.ip().to_string(),
+                port: from.port(),
+            },
+            recv: HostPort {
+                address: recv.ip().to_string(),
+                port: recv.port(),
+            },
+        };
+        let digest = ConfigDigest([0xab; 16]);
+        let Ok(beacons) =
+            Beacons::listening(link, Schedule::standard(), Some(digest))
+        else {
+            // The port was taken between being chosen and being bound.
+            return;
+        };
+        let mut beacons = beacons.with_links(links());
+        let matched = crate::matched::Matched::for_configuration(digest);
+        let version = ConfigVersion::of_this_build();
+
+        let otherwise = LinkDigest([0x7c; 16]);
+        vehicle
+            .send_to(
+                &Beacon::new(1, version, digest, otherwise).to_bytes(),
+                recv,
+            )
+            .expect("sent");
+        let pass = beacons.pass().clone();
+        assert_eq!(pass.mismatch, Some(Mismatch::Links(otherwise, links())));
+        assert!(pass.remarks[0].starts_with("LINKS DIFFER"), "{pass:?}");
+        matched.heard(&pass);
+        assert!(!matched.for_listening(), "its links are not ours");
+
+        vehicle
+            .send_to(&Beacon::new(2, version, digest, links()).to_bytes(), recv)
+            .expect("sent");
+        let pass = beacons.pass().clone();
+        assert_eq!(pass.mismatch, None);
+        assert_eq!(pass.remarks, vec![AGREES_AGAIN.to_string()]);
+        matched.heard(&pass);
+        assert!(matched.for_listening(), "they agree");
+    }
+
     /// A beacon from somewhere else is not a beacon.
     ///
     /// The address it comes from is in the configuration, so a datagram from
@@ -1913,7 +2160,7 @@ mod tests {
             UdpSocket::bind("127.0.0.1:0").expect("a socket for the stranger");
         let version = ConfigVersion::of_this_build();
         let datagram =
-            Beacon::new(1, version, ConfigDigest([0; 16])).to_bytes();
+            Beacon::new(1, version, ConfigDigest([0; 16]), links()).to_bytes();
         stranger
             .send_to(&datagram, recv)
             .expect("the stranger sends");

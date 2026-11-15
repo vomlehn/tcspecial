@@ -573,8 +573,9 @@ fn open_bus(graph: &Graph) -> Result<Option<(Bus, BusReader)>, String> {
 /// says.
 ///
 /// From `beacon.send` to `beacon.recv`, carrying this build's version, the
-/// configuration's digest and the restart flag, which every start begins
-/// with. The state file has been read and written by then, as the
+/// configuration's digest, the link digest of what was worked out of it
+/// (`tcsprotocol::graph::link_table`) and the restart flag, which every
+/// start begins with. The state file has been read and written by then, as the
 /// configuration was chosen. Every
 /// `beacon.reset_interval` until the MOC connects, as every start is, and
 /// every `beacon.default_interval` after that: see
@@ -621,6 +622,10 @@ fn beacons(
         &tcsprotocol::graph::parameters::flatten(section),
     )?
     .to_ci_config()?;
+    // Worked out once, here, from the configuration the vehicle flies, as
+    // the configuration's digest is: what the ground compares with its own.
+    let links = tcsprotocol::graph::link_table::digest_of(graph)
+        .map_err(|refused| refused.why)?;
     let timing = crate::beacon_send::BeaconTiming {
         default_interval: ci.beacon_interval,
         reset_interval: ci.reset_interval,
@@ -636,6 +641,7 @@ fn beacons(
                 telemetry_log,
                 ConfigVersion::of_this_build(),
                 digest,
+                links,
                 matched,
             )
             .map_err(|e| e.to_string())?,
@@ -662,6 +668,7 @@ fn beacons(
                 telemetry_log,
                 ConfigVersion::of_this_build(),
                 digest,
+                links,
                 matched,
             ),
             format!(
@@ -677,7 +684,7 @@ fn beacons(
     };
     if sending.is_some() {
         summary(format!(
-            "{} ms beacon: {way}",
+            "{} ms beacon: {way}, link digest {links}",
             ci.beacon_interval.as_millis()
         ));
     }

@@ -5737,7 +5737,7 @@ the hand-written packer that came before wrote, byte for byte. For example:
 
 .. code-block:: text
 
-   tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
+   tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
 
 +-----------+--------------------------------------------------------------+
 | Field     | What it says, and how it is written                          |
@@ -5760,6 +5760,11 @@ the hand-written packer that came before wrote, byte for byte. For example:
 |           | its configuration's checksum, and ``normal`` otherwise: the  |
 |           | *restart flag*, ``restart_flag`` in code                     |
 +-----------+--------------------------------------------------------------+
+| links     | The *link digest*: MD5 of what this tcspecial worked out of  |
+|           | its configuration -- ports, APIDs, message IDs, the layout   |
+|           | of each consolidation -- as 32 lower-case hex digits: see    |
+|           | ``tcsprotocol::graph::link_table``                           |
++-----------+--------------------------------------------------------------+
 | interface | The digest of the interface this tcspecial speaks, as 32     |
 |           | lower-case hex digits                                        |
 +-----------+--------------------------------------------------------------+
@@ -5775,10 +5780,10 @@ Requirement
 Requirement
     A beacon is read strictly, by ``tcsprotocol::Beacon::read`` in Rust and
     ``tcsprotocol.beacon.Beacon.read`` in Python, and by nothing else:
-    exactly six fields, each in the form the table gives. A datagram longer than
-    the longest beacon, 106 bytes (``BEACON_BYTES``), that is not UTF-8, or that
-    has a field out of its form, a seventh field, a trailing colon or a trailing
-    newline, is not a beacon, and the ground shows what arrived rather than a
+    exactly seven fields, each in the form the table gives. A datagram longer
+    than the longest beacon, 139 bytes (``BEACON_BYTES``), that is not UTF-8,
+    or that has a field out of its form, an eighth field, a trailing colon or a
+    trailing newline, is not a beacon, and the ground shows what arrived rather than a
     beacon (``BeaconError::Length`` or ``BeaconError::Field``, naming the
     field). Something else sending to the beacon port is then seen for what it
     is.
@@ -6076,18 +6081,24 @@ Requirement
     and says so with the number.
 
 Requirement
-    The beacon's layout is fixed for ever too: its text fields, in their
+    The beacon's layout changes only deliberately: its text fields, in their
     order, as `Asynchronous Telemetry`_ gives them. It is stated in a
     document of its own, ``beacon.xtce``, because it goes on a link of its
-    own, apart from the commands and their answers.
+    own, apart from the commands and their answers. It changed once, on
+    2026-11-15, to add the link digest before the interface's: nothing else
+    reaches a station that only listens, and no other field could say that
+    the vehicle worked its configuration out as the station did. A station
+    built before then reads every later beacon as not a beacon, which is
+    what it is to that station.
 
 Requirement
     The digests of ``fixed.xtce`` and of ``beacon.xtce`` are pinned by a
     test, which fails at any change to either. ``fixed.xtce``'s changed,
     deliberately, before the first release that is not a release
     candidate, when the beacon was moved into it, and changed back when the
-    beacon was moved out again, into ``beacon.xtce``. From that release on
-    neither changes.
+    beacon was moved out again, into ``beacon.xtce``; from that release on
+    it never changes. ``beacon.xtce``'s changed once, for the link digest,
+    and the test says so beside the digest it pins now.
 
 PING keeps opcode 0x01 for now, but is an ordinary command: it is refused
 before a match like any other, and moves out of the fixed range when the
@@ -6280,6 +6291,12 @@ Requirement
     read, and says which documents and which two digests. The fixed
     commands are never refused for this, because they are how a mismatch is
     fixed.
+
+    **Built** (2026-11-15): every beacon's interface digest is compared
+    with this build's, and a station that hears another is not matched --
+    so ``tcsmoc`` sends it nothing a match gates -- and says ``INTERFACE
+    DIFFERS``, naming both digests. Before then the beacon's interface
+    digest was read and ignored.
 
 What goes on the vehicle
 ------------------------
@@ -6816,7 +6833,9 @@ On the ground
 
 Requirement
     A ground station is *matched* while the last beacon it heard, since it
-    began using its configuration, has its restart flag clear and carries
+    began using its configuration, has its restart flag clear, carries the
+    link digest the station worked out of that configuration and the
+    interface digest of the station's build, and carries
     that configuration's checksum, and while that beacon is recent: its
     beacon watch says the vehicle is heard from
     (``tcsmoc::beacon::Stage::Heard``). A beacon gone overdue -- four times

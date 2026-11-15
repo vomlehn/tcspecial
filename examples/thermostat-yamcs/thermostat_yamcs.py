@@ -66,7 +66,7 @@ ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT / "python"))
 sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 
-from tcsmoc.beacon import Schedule  # noqa: E402
+from tcsmoc.beacon import Schedule, links_of  # noqa: E402
 from tcsmoc.processes import Child, Vehicle, built  # noqa: E402
 from tcsmoc.relay import Relays  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
@@ -656,7 +656,8 @@ def main(argv):
               flush=True)
         beacons = YamcsBeacons(yamcs, setup.beacon,
                                Schedule.for_interval(setup.beacon_interval),
-                               setup.digest, setup.beacon_interval)
+                               setup.digest, setup.beacon_interval,
+                               links=links_of(setup.config))
         sources = setup.sources + [setup.world] * (setup.world is not None)
         if setup.world is None:
             status("no simulated world's temperature: "

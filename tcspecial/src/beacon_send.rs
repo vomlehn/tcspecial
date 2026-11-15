@@ -19,6 +19,8 @@ use tcsprotocol::{
     Beacon, BeaconPacker, ConfigDigest, ConfigVersion, TcsResult,
 };
 
+use tcsprotocol::graph::link_table::LinkDigest;
+
 use crate::runtime::bus::Publisher;
 use crate::runtime::matched::Matched;
 use crate::telemetry_log::TelemetryLog;
@@ -81,8 +83,8 @@ pub struct BeaconSend {
     /// sends them holds one: two counters would both say "the third beacon"
     /// about different beacons.
     sent: Arc<AtomicU32>,
-    /// What this build is and the digest of the configuration it read,
-    /// carried in every beacon.
+    /// What this build is, the digest of the configuration it read and the
+    /// link digest of what it worked out of it, carried in every beacon.
     ///
     /// Settled once, here, rather than read when a beacon goes out: the
     /// digest is of the file this process read, and a file edited since would
@@ -90,6 +92,7 @@ pub struct BeaconSend {
     /// serving.
     version: ConfigVersion,
     digest: ConfigDigest,
+    links: LinkDigest,
 }
 
 impl BeaconSend {
@@ -122,6 +125,8 @@ impl BeaconSend {
     /// * `version`   - What this build is, carried in every beacon.
     /// * `digest`    - The digest of the configuration read, carried in every
     ///                 beacon.
+    /// * `links`     - The link digest of what was worked out of it,
+    ///                 carried in every beacon.
     /// * `matched`   - Whether the ground has matched this start, which the
     ///                 restart flag in every beacon says the opposite of.
     ///
@@ -136,7 +141,7 @@ impl BeaconSend {
     /// cannot be bound, `dest_addr` does not resolve to an address or `apid`
     /// is not an APID.
     //
-    // Eight, each a different thing the sender is made of, as `sending`
+    // Nine, each a different thing the sender is made of, as `sending`
     // has: a structure holding them would only be these arguments again.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -147,6 +152,7 @@ impl BeaconSend {
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
+        links: LinkDigest,
         matched: Matched,
     ) -> TcsResult<Option<BeaconSend>> {
         if timing.default_interval == Duration::from_secs(0) {
@@ -219,6 +225,7 @@ impl BeaconSend {
             log,
             version,
             digest,
+            links,
             matched,
         )))
     }
@@ -234,12 +241,17 @@ impl BeaconSend {
     /// * `log`       - The telemetry log every beacon is recorded in.
     /// * `version`   - What this build is, carried in every beacon.
     /// * `digest`    - The digest of the configuration read.
+    /// * `links`     - The link digest of what was worked out of it.
     /// * `matched`   - Whether the ground has matched this start.
     ///
     /// # Returns
     ///
     /// The sender, whose thread is already sending; `None` where
     /// `timing.default_interval` is nought.
+    //
+    // Eight, each a different thing the sender is made of, as `new` has: a
+    // structure holding them would only be these arguments again.
+    #[allow(clippy::too_many_arguments)]
     pub fn on_bus(
         timing: BeaconTiming,
         publisher: Publisher,
@@ -247,6 +259,7 @@ impl BeaconSend {
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
+        links: LinkDigest,
         matched: Matched,
     ) -> Option<BeaconSend> {
         if timing.default_interval == Duration::from_secs(0) {
@@ -260,6 +273,7 @@ impl BeaconSend {
             log,
             version,
             digest,
+            links,
             matched,
         ))
     }
@@ -275,6 +289,7 @@ impl BeaconSend {
     /// * `log`       - The telemetry log every beacon is recorded in.
     /// * `version`   - What this build is, carried in every beacon.
     /// * `digest`    - The digest of the configuration read.
+    /// * `links`     - The link digest of what was worked out of it.
     /// * `matched`   - Whether the ground has matched this start.
     ///
     /// # Returns
@@ -282,7 +297,7 @@ impl BeaconSend {
     /// The sender, whose thread is already sending, at the restart
     /// interval until a matching CONNECT is taken.
     //
-    // Eight, each a different thing the sender is made of: a structure
+    // Nine, each a different thing the sender is made of: a structure
     // holding them would only be these arguments again.
     #[allow(clippy::too_many_arguments)]
     fn sending(
@@ -293,6 +308,7 @@ impl BeaconSend {
         log: TelemetryLog,
         version: ConfigVersion,
         digest: ConfigDigest,
+        links: LinkDigest,
         matched: Matched,
     ) -> BeaconSend {
         let interval = timing.reset_interval;
@@ -314,6 +330,7 @@ impl BeaconSend {
             log,
             version,
             digest,
+            links,
         };
 
         let b_clone = b.clone();
@@ -400,8 +417,9 @@ impl BeaconSend {
         // every beacon used to carry.
         let sequence =
             self.sent.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
-        let beacon = Beacon::new(sequence, self.version, self.digest)
-            .restart_flag(!self.matched.is_matched());
+        let beacon =
+            Beacon::new(sequence, self.version, self.digest, self.links)
+                .restart_flag(!self.matched.is_matched());
         let data = packer.pack(&beacon);
         trace!("send_beacon: sending to {}", self.dest_addr);
         // Recorded before it is sent, as a command response is, so that a
@@ -659,6 +677,7 @@ mod tests {
             log,
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            LinkDigest([0u8; 16]),
             Matched::at_a_start(),
         )
         .expect("a sender")
@@ -726,6 +745,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            LinkDigest([0u8; 16]),
             matched.clone(),
         )
         .expect("a sender")
@@ -849,6 +869,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            LinkDigest([0u8; 16]),
             Matched::at_a_start(),
         );
         let said = match refused {
@@ -876,6 +897,7 @@ mod tests {
             TelemetryLog::disabled(),
             ConfigVersion::of_this_build(),
             ConfigDigest([0u8; 16]),
+            LinkDigest([0u8; 16]),
             Matched::at_a_start(),
         );
         let said = match refused {

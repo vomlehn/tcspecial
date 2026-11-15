@@ -984,9 +984,15 @@ impl Station {
     /// * `number`  - The beacon's number.
     /// * `restart` - Whether its restart flag is set.
     fn beacon(&self, number: u32, restart: bool) {
-        let beacon =
-            Beacon::new(number, ConfigVersion::of_this_build(), self.digest)
-                .restart_flag(restart);
+        // The watch these go to compares no link digest, being made with
+        // no configuration's links: any will do.
+        let beacon = Beacon::new(
+            number,
+            ConfigVersion::of_this_build(),
+            self.digest,
+            tcsprotocol::graph::link_table::LinkDigest([0; 16]),
+        )
+        .restart_flag(restart);
         self.beacon_from
             .send_to(&beacon.to_bytes(), self.beacon_to)
             .expect("a beacon sent");

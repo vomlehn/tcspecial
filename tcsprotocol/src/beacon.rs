@@ -3,7 +3,8 @@
 //! What tcspecial sends every `beacon.default_interval`, whether or not
 //! anything has connected to it: the build it is, the digest of the
 //! configuration it read, the beacon's own number, whether this start has
-//! yet been matched by the ground, and which interface it speaks. A ground
+//! yet been matched by the ground, the digest of what it worked out of its
+//! configuration, and which interface it speaks. A ground
 //! station that is only listening can then see which software is flying,
 //! which payload set it is serving and whether it has just come back, rather
 //! than having to ask before it can know.
@@ -13,19 +14,19 @@
 //! as it is, with no decoder. Numbers are decimal and digests hexadecimal:
 //!
 //! ```text
-//! tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
+//! tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
 //! ```
 //!
 //! which is the name, the version, the configuration's digest, the beacon's
-//! number, `restart` or `normal` for the restart flag, and the
-//! interface's digest. It is read strictly: anything else at the beacon
+//! number, `restart` or `normal` for the restart flag, the link digest (see
+//! [`crate::graph::link_table`]) and the interface's digest. It is read strictly: anything else at the beacon
 //! port, or a field out of its form, is not a beacon. A beacon carries no
 //! check of its own: the transport under it checks it, as UDP's checksum
 //! does here.
 //!
-//! Its layout -- six text fields, each but the last ended by a colon, the last
-//! 32 characters that end the datagram -- is stated in XTCE in
-//! `xtce/beacon.xtce`, which never changes, and packed and unpacked by the code
+//! Its layout -- seven text fields, each but the last ended by a colon, the
+//! last 32 characters that end the datagram -- is stated in XTCE in
+//! `xtce/beacon.xtce`, which changes only deliberately, and packed and unpacked by the code
 //! tcs-xtce generates from it, which allocates nothing. What the text must say
 //! -- the name, digits only, lower-case hex -- and turning it into numbers and
 //! digests and back, is here, and in `python/tcsprotocol/beacon.py` over
@@ -40,6 +41,7 @@ use tcsxtce::packet::{Codec, FixedString, Packet, PacketError};
 use crate::beacon_packet as packet;
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::graph::link_table::LinkDigest;
 use crate::interface::InterfaceDigest;
 
 /// The name every beacon starts with.
@@ -52,9 +54,9 @@ pub const RESTART_FLAG: &str = "restart";
 pub const NORMAL_FLAG: &str = "normal";
 
 /// The longest a beacon is: the name, a version of three parts of up to
-/// three digits, two digests of thirty-two hex digits, a number of up to ten
-/// digits and the longer flag, with the five colons between them.
-pub const BEACON_BYTES: usize = 9 + 11 + 32 + 10 + 7 + 32 + 5;
+/// three digits, three digests of thirty-two hex digits, a number of up to
+/// ten digits and the longer flag, with the six colons between them.
+pub const BEACON_BYTES: usize = 9 + 11 + 32 + 10 + 7 + 32 + 32 + 6;
 
 /// What a beacon says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +85,11 @@ pub struct Beacon {
     /// See "Configurations named by their checksum" in
     /// `docs/tcspecial-design.rst`.
     pub restart_flag: bool,
+    /// The digest of what the sender worked out of its configuration: its
+    /// ports, APIDs and message IDs, and how it lays out consolidations. See
+    /// [`crate::graph::link_table`]. A ground station that worked out
+    /// another reads the same file otherwise than the vehicle.
+    pub links: LinkDigest,
     /// The interface the sender speaks: the digest of the XTCE documents it
     /// was built from. See [`crate::interface`].
     pub interface: InterfaceDigest,
@@ -97,6 +104,7 @@ impl Beacon {
     /// * `sequence` - Which beacon this is, counted from one.
     /// * `version`  - The version of the build that sends it.
     /// * `digest`   - The digest of the configuration the sender read.
+    /// * `links`    - The digest of what it worked out of it.
     ///
     /// # Returns
     ///
@@ -105,12 +113,14 @@ impl Beacon {
         sequence: u32,
         version: ConfigVersion,
         digest: ConfigDigest,
+        links: LinkDigest,
     ) -> Self {
         Self {
             sequence,
             version,
             digest,
             restart_flag: false,
+            links,
             interface: InterfaceDigest::of_this_build(),
         }
     }
@@ -166,7 +176,7 @@ impl Beacon {
         let (fields, used) = packet::Beacon::decode_prefix(datagram)
             .map_err(|why| BeaconError::Field(missing(&why)))?;
         if used != datagram.len() {
-            return Err(BeaconError::Field("it has more than six fields"));
+            return Err(BeaconError::Field("it has more than seven fields"));
         }
 
         if fields.beacon_name.as_str() != BEACON_NAME {
@@ -187,6 +197,9 @@ impl Beacon {
                     "the restart flag is neither \"restart\" nor \"normal\"",
                 )),
             };
+        let links = hex_of(&fields.beacon_links).ok_or(BeaconError::Field(
+            "the link digest is not 32 hex digits",
+        ))?;
         let interface = hex_of(&fields.beacon_interface).ok_or(
             BeaconError::Field("the interface digest is not 32 hex digits"),
         )?;
@@ -195,6 +208,7 @@ impl Beacon {
             version,
             digest: ConfigDigest(digest),
             restart_flag,
+            links: LinkDigest(links),
             interface: InterfaceDigest(interface),
         })
     }
@@ -241,7 +255,9 @@ fn missing(why: &PacketError) -> &'static str {
         ("BeaconFlag", true) => {
             "the restart flag is neither \"restart\" nor \"normal\""
         }
-        ("BeaconFlag", false) => "it has no interface digest",
+        ("BeaconFlag", false) => "it has no link digest",
+        ("BeaconLinks", true) => "the link digest is not 32 hex digits",
+        ("BeaconLinks", false) => "it has no interface digest",
         _ => "the interface digest is not 32 hex digits",
     }
 }
@@ -364,6 +380,7 @@ impl BeaconPacker {
             } else {
                 NORMAL_FLAG
             }),
+            beacon_links: text(beacon.links),
             beacon_interface: text(beacon.interface),
         };
         self.codec
@@ -428,18 +445,30 @@ mod tests {
         ])
     }
 
+    /// Gives the link digest the tests' beacons carry.
+    ///
+    /// # Returns
+    ///
+    /// A fixed, recognizable digest, unlike the configuration's.
+    fn links() -> LinkDigest {
+        LinkDigest([0x5a; 16])
+    }
+
+    /// The link digest's text.
+    const LINKS: &str = "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a";
+
     /// The fields in order, as text, a colon between each.
     #[test]
     fn a_beacon_is_its_fields_in_order_as_text() {
-        let beacon =
-            Beacon::new(0x01020304, version(), digest()).restart_flag(true);
+        let beacon = Beacon::new(0x01020304, version(), digest(), links())
+            .restart_flag(true);
         let want = format!(
             "tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:\
-             restart:{}",
+             restart:{LINKS}:{}",
             InterfaceDigest::of_this_build()
         );
         assert_eq!(beacon.to_bytes(), want.as_bytes());
-        let normal = Beacon::new(7, version(), digest()).to_bytes();
+        let normal = Beacon::new(7, version(), digest(), links()).to_bytes();
         assert!(
             String::from_utf8(normal).unwrap().contains(":7:normal:"),
             "the flag in words"
@@ -457,6 +486,7 @@ mod tests {
                 patch: 255,
             },
             digest(),
+            links(),
         )
         .restart_flag(true);
         let packed = longest.to_bytes();
@@ -470,24 +500,29 @@ mod tests {
     }
 
     /// The beacon the generated code packs is byte for byte the one the
-    /// hand-written packer that came before it wrote, for the same beacons:
-    /// these are what it wrote.
+    /// hand-written packer that came before it wrote, for the same beacons,
+    /// with the link digest the beacon has carried since 2026-11-15 before
+    /// the interface's: these are what it wrote, with that.
     #[test]
     fn the_beacon_is_what_the_hand_written_packer_wrote() {
         let interface = InterfaceDigest([0xab; 16]);
         for (beacon, written) in [
             (
-                Beacon::new(0x01020304, version(), digest()).restart_flag(true),
+                Beacon::new(0x01020304, version(), digest(), links())
+                    .restart_flag(true),
                 "tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:\
-                 restart:abababababababababababababababab",
+                 restart:5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:\
+                 abababababababababababababababab",
             ),
             (
                 Beacon::new(
                     1,
                     ConfigVersion::of_text("0.1.0").unwrap(),
                     digest(),
+                    links(),
                 ),
                 "tcspecial:0.1.0:d41d8cd98f00b204e9800998ecf8427e:1:normal:\
+                 5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:\
                  abababababababababababababababab",
             ),
             (
@@ -499,10 +534,12 @@ mod tests {
                         patch: 255,
                     },
                     ConfigDigest([0; 16]),
+                    LinkDigest([0xff; 16]),
                 )
                 .restart_flag(true),
                 "tcspecial:255.255.255:00000000000000000000000000000000:\
-                 4294967295:restart:abababababababababababababababab",
+                 4294967295:restart:ffffffffffffffffffffffffffffffff:\
+                 abababababababababababababababab",
             ),
         ] {
             let beacon = Beacon {
@@ -520,7 +557,7 @@ mod tests {
 
     #[test]
     fn a_beacon_reads_back_as_itself() {
-        let beacon = Beacon::new(7, version(), digest());
+        let beacon = Beacon::new(7, version(), digest(), links());
         assert_eq!(Beacon::read(&beacon.to_bytes()), Ok(beacon));
         let flagged = beacon.restart_flag(true);
         assert_eq!(Beacon::read(&flagged.to_bytes()), Ok(flagged));
@@ -529,11 +566,14 @@ mod tests {
     #[test]
     fn one_packer_packs_beacon_after_beacon_in_the_one_buffer() {
         let mut packer = BeaconPacker::new();
-        let first = packer.pack(&Beacon::new(1, version(), digest())).as_ptr();
+        let first = packer
+            .pack(&Beacon::new(1, version(), digest(), links()))
+            .as_ptr();
         let other = Beacon::new(
             2,
             ConfigVersion::of_this_build(),
             ConfigDigest([9; 16]),
+            LinkDigest([8; 16]),
         );
         let second = packer.pack(&other);
         assert_eq!(second.as_ptr(), first);
@@ -544,25 +584,31 @@ mod tests {
     /// is read is what was written, and nothing is guessed at.
     #[test]
     fn a_field_out_of_its_form_is_not_a_beacon() {
-        let good =
-            String::from_utf8(Beacon::new(1, version(), digest()).to_bytes())
-                .unwrap();
+        let good = String::from_utf8(
+            Beacon::new(1, version(), digest(), links()).to_bytes(),
+        )
+        .unwrap();
         assert!(Beacon::read(good.as_bytes()).is_ok());
         let interface = InterfaceDigest::of_this_build().to_string();
         let md5 = digest().to_string();
         let upper = md5.to_uppercase();
+        let l = LINKS;
         for bad in [
-            format!("Tcspecial:1.2.3:{md5}:1:normal:{interface}"),
-            format!("tcspecial:1.2:{md5}:1:normal:{interface}"),
-            format!("tcspecial:1.2.256:{md5}:1:normal:{interface}"),
-            format!("tcspecial:1.2.3:{}:1:normal:{interface}", &md5[1..]),
-            format!("tcspecial:1.2.3:{upper}:1:normal:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:+1:normal:{interface}"),
-            format!("tcspecial:1.2.3:{md5}: 1:normal:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:4294967296:normal:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:1:yes:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:1:normal"),
-            format!("tcspecial:1.2.3:{md5}:1:normal:{interface}:"),
+            format!("Tcspecial:1.2.3:{md5}:1:normal:{l}:{interface}"),
+            format!("tcspecial:1.2:{md5}:1:normal:{l}:{interface}"),
+            format!("tcspecial:1.2.256:{md5}:1:normal:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{}:1:normal:{l}:{interface}", &md5[1..]),
+            format!("tcspecial:1.2.3:{upper}:1:normal:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:+1:normal:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}: 1:normal:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:4294967296:normal:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:1:yes:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{}:{interface}", &l[1..]),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{upper}:{interface}"),
+            // A beacon of the six fields before the link digest.
+            format!("tcspecial:1.2.3:{md5}:1:normal:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{l}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{l}:{interface}:"),
             format!("{good}\n"),
         ] {
             assert!(

@@ -124,6 +124,12 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     // ground, which digests it too, finds they agree -- and says so by saying
     // nothing about it.
     let digest = digest_of_file(&configuration).expect("it digests");
+    // And what it works out of the configuration, which the ground works
+    // out too and compares.
+    let links = tcsprotocol::graph::link_table::digest_of(
+        &tcsprotocol::graph::Graph::load(&configuration).expect("it reads"),
+    )
+    .expect("its links work out");
 
     let mut ground = Command::new("python3")
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/ping_gateway.py"))
@@ -176,7 +182,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             while !stop.load(Ordering::Relaxed) {
                 sequence += 1;
                 let datagram =
-                    Beacon::new(sequence, version, digest).to_bytes();
+                    Beacon::new(sequence, version, digest, links).to_bytes();
                 let _ = beacon.send_to(&datagram, ("127.0.0.1", beacons));
                 std::thread::sleep(Duration::from_millis(100));
             }

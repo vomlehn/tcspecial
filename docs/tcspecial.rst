@@ -2671,22 +2671,24 @@ none of it is the program's own:
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
-A beacon is a line of text, at most 106 bytes and with no newline at the
-end: six fields with a colon between each -- the name ``tcspecial``, the
+A beacon is a line of text, at most 139 bytes and with no newline at the
+end: seven fields with a colon between each -- the name ``tcspecial``, the
 version as ``major.minor.patch``, the configuration's MD5 digest as 32
 lower-case hex digits, the beacon's number in decimal, the restart flag,
 written ``restart`` from every start of tcspecial -- the first included --
 and from its taking a restart, until it takes a ``CONNECT`` carrying its
-configuration's checksum, and ``normal`` otherwise, and the interface's
-digest, also as 32 hex digits:
+configuration's checksum, and ``normal`` otherwise, the link digest -- the
+MD5 of what tcspecial worked out of its configuration, its ports, APIDs and
+consolidations, as ``tcs-verify --links`` prints them -- and the interface's
+digest, each also as 32 hex digits:
 
 .. code-block:: text
 
-   tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:0123...cdef
+   tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:89ab...4567:0123...cdef
 
 It is text so that it can be read as it is, in a packet capture, a log or with
 any UDP listener, with nothing to decode it. Its layout is stated in XTCE, in
-``tcsprotocol/xtce/beacon.xtce``, as six text fields -- each but the last
+``tcsprotocol/xtce/beacon.xtce``, as seven text fields -- each but the last
 ended by its colon -- and nothing else, so a ground system that reads XTCE can
 read it too. That is what goes on the wire; what the window shows on its ``Last
 msg:`` line is written for the window, as ``tcspecial v0.1.0 md5`` and the
@@ -2694,8 +2696,12 @@ digest. tcspecial writes each beacon, and ``tcsmoc::beacon`` reads it, with
 ``tcsprotocol::Beacon``, which the Python in
 ``python/tcsprotocol/beacon.py`` says again, held to it by the same examples
 in their tests. The example's test writes the beacon it sends the same way. A
-beacon is read strictly: anything with a field out of its form, a seventh field,
-a trailing colon or newline, or more than 106 bytes, is not a beacon.
+beacon is read strictly: anything with a field out of its form, an eighth
+field, a trailing colon or newline, or more than 139 bytes, is not a beacon.
+A beacon whose configuration digest, link digest or interface digest is not
+the station's says so first on that line -- ``CONFIGURATION DIFFERS``,
+``LINKS DIFFER`` or ``INTERFACE DIFFERS``, naming both -- and the station is
+not matched while it does.
 
 tcs-moc shows that same panel from that same library, in a row beside its
 command link. That is the point of their being apart: what a beacon means is
@@ -3512,6 +3518,71 @@ its own; write the number the script printed. ``make -C examples run-iio``
 runs tcs-moc on the example, and ``tcspecial/tests/kernel-dummies.rs`` is
 written to fly it, checking that what arrives is whole sample sets. Every port
 is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.
+
+Where to Get It
+===============
+
+TCSpecial is published in three places, each for a different way of using
+it.
+
+GitHub
+------
+
+The source, its history, its issues and its releases are at
+https://github.com/vomlehn/tcspecial. A release carries the packages
+`Installing`_ describes, as ``.deb`` and RPM files, beside the source; the
+manuals and design documents, this one among them, are read on the web at
+https://vomlehn.github.io/tcspecial/. TCSpecial is built with two projects
+of its own beside it, each on GitHub too: `tcslog
+<https://github.com/vomlehn/tcslog>`__, the onboard log, and `tcs-xtce
+<https://github.com/vomlehn/tcs-xtce>`__, the packet compiler.
+
+crates.io
+---------
+
+The Rust crates are published on `crates.io <https://crates.io>`__, the
+Rust package registry, under their own names, so a program built on one
+names it in its ``Cargo.toml`` as it would any crate, and its documentation
+is on `docs.rs <https://docs.rs>`__ under the same name:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Crate
+     - What it is
+   * - `tcspecial <https://crates.io/crates/tcspecial>`__
+     - The flight software.
+   * - `tcsprotocol <https://crates.io/crates/tcsprotocol>`__
+     - What the ground and the vehicle share: the command and telemetry
+       protocol, and how every configuration file is read and checked.
+   * - `tcsmoc <https://crates.io/crates/tcsmoc>`__
+     - What a ground station is built on: commands, the vehicle's data and
+       its beacons.
+   * - `tcsmoc-c <https://crates.io/crates/tcsmoc-c>`__
+     - tcsmoc for C and C++, behind one header, ``tcsmoc-c.h``.
+   * - `tcsapp <https://crates.io/crates/tcsapp>`__
+     - The file interfaces an app node's program is run with.
+   * - `tcsverify <https://crates.io/crates/tcsverify>`__
+     - The checking of a configuration and its simulator file, which every
+       TCS program checks through.
+   * - `tcs-verify <https://crates.io/crates/tcs-verify>`__
+     - The program that prints what is wrong with a configuration.
+
+The crates TCSpecial is built from, its own projects' among them --
+`tcslog <https://crates.io/crates/tcslog>`__ and `tcsxtce
+<https://crates.io/crates/tcsxtce>`__ -- are fetched from crates.io too
+(see `Crates Used`_).
+
+PyPI
+----
+
+The Python a ground station is built on -- the ``tcsprotocol`` and
+``tcsmoc`` packages, one distribution, ``tcspecial-moc`` -- and ``tcs_ui``,
+the ``tcs-ui`` distribution, are to be published on `PyPI
+<https://pypi.org>`__, the Python package index, under those names. They
+are not there yet. Until they are, they are installed from the source, as
+`Installing`_ says, or with the ``tcsmoc`` and ``tcs-tools`` packages.
 
 Installing
 ==========

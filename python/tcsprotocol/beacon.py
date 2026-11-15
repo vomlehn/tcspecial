@@ -4,16 +4,17 @@ The Python spelling of ``tcsprotocol/src/beacon.rs``. A beacon is text, and
 nothing but text: its fields in order, a colon between each, so that a person
 reading a packet capture or a log reads it as it is, with no decoder::
 
-    tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:0123...cdef
+    tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
 
 which is the name, the version, the configuration's digest, the beacon's
-number, ``restart`` or ``normal`` for the restart flag, and the
-interface's digest, numbers in decimal and digests in lower-case hex. It is
+number, ``restart`` or ``normal`` for the restart flag, the link digest of
+what the sender worked out of its configuration (``graph::link_table``) and
+the interface's digest, numbers in decimal and digests in lower-case hex. It is
 read strictly, as the Rust reads it. A beacon carries no check of its own:
 the transport under it checks it, as UDP's checksum does here.
 
-Its layout -- six text fields, each but the last ended by a colon, the last 32
-characters that end the datagram -- is in ``tcsprotocol/xtce/beacon.xtce``,
+Its layout -- seven text fields, each but the last ended by a colon, the last
+32 characters that end the datagram -- is in ``tcsprotocol/xtce/beacon.xtce``,
 and is packed and unpacked here by the code tcs-xtce generates from it,
 :class:`tcsprotocol.beacon_packet.Beacon`. What the
 text must say, and turning it into numbers and digests and back, is here.
@@ -32,10 +33,10 @@ BEACON_NAME = "tcspecial"
 RESTART_FLAG = "restart"
 NORMAL_FLAG = "normal"
 #: The longest a beacon is: the name, a version of three parts of up to three
-#: digits, two digests of thirty-two hex digits, a number of up to ten digits
-#: and the longer flag, with the five colons between them -- the longest the
+#: digits, three digests of thirty-two hex digits, a number of up to ten digits
+#: and the longer flag, with the six colons between them -- the longest the
 #: XTCE's layout allows.
-BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 32 + 5
+BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 32 + 32 + 6
 assert BEACON_BYTES == _packet.Beacon.MAX_BYTES
 
 #: What each field's being longer than its room says, by the field's name in
@@ -46,6 +47,7 @@ _TOO_LONG = {
     "BeaconDigest": "the configuration digest is not 32 hex digits",
     "BeaconNumber": "the number is not a number",
     "BeaconFlag": 'the restart flag is neither "restart" nor "normal"',
+    "BeaconLinks": "the link digest is not 32 hex digits",
 }
 
 _HEX = set("0123456789abcdef")
@@ -136,10 +138,17 @@ class Beacon:
     #: The interface the sender speaks: the digest of the XTCE documents it
     #: was built from, sixteen bytes. This tree's, where none is given.
     interface: bytes = None
+    #: The digest of what the sender worked out of its configuration -- its
+    #: ports, APIDs, message IDs and consolidations -- sixteen bytes: see
+    #: ``tcsprotocol::graph::link_table``. Sixteen zero bytes where none is
+    #: given, which no configuration's is likely to be.
+    links: bytes = None
 
     def __post_init__(self):
         if self.interface is None:
             object.__setattr__(self, "interface", _interface.of_this_tree())
+        if self.links is None:
+            object.__setattr__(self, "links", bytes(16))
 
     @staticmethod
     def read(datagram):
@@ -176,17 +185,18 @@ class Beacon:
                 raise _refused(_TOO_LONG[field]) from None
             if field == "BeaconName":
                 raise _refused('it does not start "tcspecial:"') from None
-            if field == "BeaconInterface" and count == 6:
+            if field == "BeaconInterface" and count == 7:
                 raise _refused(
                     "the interface digest is not 32 hex digits") from None
-            raise _refused(f"it has {count} fields, not six") from None
+            raise _refused(f"it has {count} fields, not seven") from None
         if used != len(datagram):
-            raise _refused(f"it has {count} fields, not six")
+            raise _refused(f"it has {count} fields, not seven")
         name = fields.beacon_name
         version = fields.beacon_version
         digest = fields.beacon_digest
         sequence = fields.beacon_number
         flag = fields.beacon_flag
+        links = fields.beacon_links
         interface = fields.beacon_interface
         if name != BEACON_NAME:
             raise _refused('it does not start "tcspecial:"')
@@ -202,6 +212,9 @@ class Beacon:
         if flag not in (RESTART_FLAG, NORMAL_FLAG):
             raise _refused(
                 'the restart flag is neither "restart" nor "normal"')
+        links = _hex(links)
+        if links is None:
+            raise _refused("the link digest is not 32 hex digits")
         interface = _hex(interface)
         if interface is None:
             raise _refused("the interface digest is not 32 hex digits")
@@ -211,6 +224,7 @@ class Beacon:
             digest=digest,
             restart_flag=flag == RESTART_FLAG,
             interface=interface,
+            links=links,
         )
 
     def to_bytes(self):
@@ -226,5 +240,6 @@ class Beacon:
             beacon_digest=self.digest.hex(),
             beacon_number=str(self.sequence),
             beacon_flag=RESTART_FLAG if self.restart_flag else NORMAL_FLAG,
+            beacon_links=self.links.hex(),
             beacon_interface=self.interface.hex(),
         ).to_bytes()

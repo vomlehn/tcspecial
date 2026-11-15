@@ -43,7 +43,7 @@ class Beacon(pk.Packet):
     """
 
     NAME: ClassVar[str] = "/TcsBeacon/Beacon"
-    MAX_BYTES: ClassVar[int] = 106
+    MAX_BYTES: ClassVar[int] = 139
 
     beacon_name: str = ""
     """``/TcsBeacon/BeaconName`` (/TcsBeacon/BeaconNameType)"""
@@ -55,6 +55,8 @@ class Beacon(pk.Packet):
     """``/TcsBeacon/BeaconNumber`` (/TcsBeacon/BeaconNumberType)"""
     beacon_flag: str = ""
     """``/TcsBeacon/BeaconFlag`` (/TcsBeacon/BeaconFlagType)"""
+    beacon_links: str = ""
+    """``/TcsBeacon/BeaconLinks`` (/TcsBeacon/BeaconLinksType)"""
     beacon_interface: str = ""
     """``/TcsBeacon/BeaconInterface`` (/TcsBeacon/BeaconInterfaceType)"""
 
@@ -79,11 +81,12 @@ class Beacon(pk.Packet):
         v3 = pk.read_string(r, (None, 264, b':', 0, 'UTF-8'), "BeaconDigest")
         v4 = pk.read_string(r, (None, 88, b':', 0, 'UTF-8'), "BeaconNumber")
         v5 = pk.read_string(r, (None, 64, b':', 0, 'UTF-8'), "BeaconFlag")
-        v6 = pk.read_string(r, (256, 256, b"\x00", 0, "UTF-8"),
+        v6 = pk.read_string(r, (None, 264, b':', 0, 'UTF-8'), "BeaconLinks")
+        v7 = pk.read_string(r, (256, 256, b"\x00", 0, "UTF-8"),
                             "BeaconInterface")
         return (Beacon(beacon_name=v1, beacon_version=v2, beacon_digest=v3,
-                       beacon_number=v4, beacon_flag=v5, beacon_interface=v6),
-                r.used())
+                       beacon_number=v4, beacon_flag=v5, beacon_links=v6,
+                       beacon_interface=v7), r.used())
 
     def encode_into(self, w: pk.BitWriter) -> None:
         """Encodes this ``/TcsBeacon/Beacon`` packet with a writer, after what
@@ -106,6 +109,8 @@ class Beacon(pk.Packet):
                         "BeaconNumber")
         pk.write_string(w, (None, 64, b":", 0, "UTF-8"), self.beacon_flag,
                         "BeaconFlag")
+        pk.write_string(w, (None, 264, b":", 0, "UTF-8"), self.beacon_links,
+                        "BeaconLinks")
         pk.write_string(w, (256, 256, b"\x00", 0, "UTF-8"),
                         self.beacon_interface, "BeaconInterface")
 
@@ -158,5 +163,6 @@ class Beacon(pk.Packet):
              "beacon_digest=" + pk.describe_str(self.beacon_digest),
              "beacon_number=" + pk.describe_str(self.beacon_number),
              "beacon_flag=" + pk.describe_str(self.beacon_flag),
+             "beacon_links=" + pk.describe_str(self.beacon_links),
              "beacon_interface="
              + pk.describe_str(self.beacon_interface))) + "}"

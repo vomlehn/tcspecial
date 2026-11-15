@@ -29,8 +29,9 @@ use tcsmoc::matched::Matched;
 
 use crate::MainWindow;
 
-/// Asks the operator, with what differs, whether to continue anyway.
-pub type Ask = Arc<dyn Fn(String) + Send + Sync>;
+/// Asks the operator, with a heading saying what differs and the remark
+/// that names both sides, whether to continue anyway.
+pub type Ask = Arc<dyn Fn(&'static str, String) + Send + Sync>;
 
 /// What to do when contact with the spacecraft changes.
 ///
@@ -164,13 +165,15 @@ impl BeaconReceive {
                 eprintln!("{remark}");
             }
             // The one remark an operator must not be left to find in a
-            // terminal. It is asked from this thread, so it takes the
-            // question to the window itself.
-            if let Some(ask) = &ask {
-                for remark in &pass.remarks {
-                    if remark.starts_with("CONFIGURATION DIFFERS") {
-                        ask(remark.clone());
-                    }
+            // terminal: tcspecial disagreeing with this station, about the
+            // configuration, what it worked out of it or the interface.
+            // Asked as it begins, which is the pass whose remarks say it. It
+            // is asked from this thread, so it takes the question to the
+            // window itself.
+            if let (Some(ask), Some(mismatch)) = (&ask, pass.mismatch) {
+                let said = mismatch.said();
+                if pass.remarks.contains(&said) {
+                    ask(mismatch.heading(), said);
                 }
             }
 

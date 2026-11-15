@@ -114,7 +114,12 @@ fn a_free_port() -> u16 {
 fn packing_and_reading_a_beacon_allocate_nothing() {
     let mut packer = tcsprotocol::BeaconPacker::new();
     let digest = ConfigDigest([7; 16]);
-    let beacon = Beacon::new(1, ConfigVersion::of_this_build(), digest);
+    let beacon = Beacon::new(
+        1,
+        ConfigVersion::of_this_build(),
+        digest,
+        tcsprotocol::graph::link_table::LinkDigest([8; 16]),
+    );
     let mut read = None;
     let made = allocations_in(|| {
         for sequence in 1..=50u32 {
@@ -160,7 +165,13 @@ fn a_beacon_pass_allocates_nothing() {
         return;
     };
     let beacon = |sequence: u32| {
-        Beacon::new(sequence, ConfigVersion::of_this_build(), digest).to_bytes()
+        Beacon::new(
+            sequence,
+            ConfigVersion::of_this_build(),
+            digest,
+            tcsprotocol::graph::link_table::LinkDigest([8; 16]),
+        )
+        .to_bytes()
     };
     let datagrams: Vec<Vec<u8>> = (1..=23).map(beacon).collect();
 

@@ -390,6 +390,9 @@ component DiffersPanel inherits Rectangle {
     min-width: 420px;
     preferred-width: 560px;
 
+    // What differs, in a few words: the configuration, what was worked out
+    // of it, or the interface.
+    in property <string> heading: "";
     // Both digests, and which file this MOC read.
     in property <string> message: "";
 
@@ -401,7 +404,7 @@ component DiffersPanel inherits Rectangle {
         spacing: 10px;
 
         Copyable {
-            text: "tcspecial is serving a different configuration";
+            text: root.heading;
             font-size: Fonts.window;
             font-weight: 700;
             color: #c0392b;
@@ -411,16 +414,15 @@ component DiffersPanel inherits Rectangle {
             font-size: Fonts.window;
         }
         Copyable {
-            text: "The panels may show sources where the vehicle "
-                + "does not send them. Continue anyway?";
+            text: "The panels may show what the vehicle does not send, "
+                + "or not as it sends it. Continue anyway?";
             font-size: Fonts.window;
             color: #6b7280;
         }
         HorizontalLayout {
             spacing: 8px;
             CopyButton {
-                said: "tcspecial is serving a different configuration\n"
-                    + root.message;
+                said: root.heading + "\n" + root.message;
             }
             Rectangle { }
             Button {
@@ -544,6 +546,7 @@ export component MainWindow inherits Window {
     // The question about a configuration other than the one this MOC read,
     // asked in front of the panels inside this window: see DiffersPanel.
     in property <bool> differs-up: false;
+    in property <string> differs-heading: "";
     in property <string> differs-message: "";
     callback differs-continue-anyway();
     callback differs-quit();
@@ -1143,6 +1146,7 @@ export component MainWindow inherits Window {
         height: self.preferred-height;
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
+        heading: root.differs-heading;
         message: root.differs-message;
         continue-anyway => { root.differs-continue-anyway(); }
         quit => { root.differs-quit(); }

@@ -658,12 +658,16 @@ class YamcsBeacons:
                   nothing.
         interval: How often the vehicle beacons, in nanoseconds.
         clock:    What gives the time now, in nanoseconds since the epoch.
+        links:    The configuration's link digest, as hex, which each
+                  beacon's is compared with; ``None`` to compare none.
     """
 
     def __init__(self, yamcs, link, schedule, expected, interval,
-                 clock=time.time_ns):
+                 clock=time.time_ns, links=None):
         self._yamcs = yamcs
         self._beacons = Beacons(link, schedule, expected)
+        if links is not None:
+            self._beacons.with_links(links)
         # Yamcs says nothing of where a beacon came from, and the beacon
         # link to it is its own, so each is taken as from where the
         # configuration says beacons are sent from.

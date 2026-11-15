@@ -209,6 +209,17 @@ fn main() -> Result<(), slint::PlatformError> {
             std::process::exit(1);
         }
     };
+    // And the digest of what this end worked out of the configuration --
+    // ports, APIDs, consolidations -- which every beacon's link digest is
+    // compared with: the same file worked out otherwise is read otherwise.
+    match tcsprotocol::graph::link_table::digest_of(&graph) {
+        Ok(links) => beacons = beacons.with_links(links),
+        Err(refused) => eprintln!(
+            "{path}: its links do not work out, so no beacon's link digest \
+             is checked: {}",
+            refused.why
+        ),
+    }
     if verbose {
         eprintln!(
             "Listening for beacons at {}, which {} sends from",

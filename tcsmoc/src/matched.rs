@@ -3,7 +3,10 @@
 //!
 //! A station is *matched for listening* while the last beacon it has heard,
 //! since it began using its configuration, has its restart flag clear,
-//! carries that configuration's checksum, and is recent: the beacon watch
+//! carries that configuration's checksum, carries the link digest and the
+//! interface digest the station has -- one that does not is from a vehicle
+//! the station would misread, which [`crate::beacon::Mismatch`] names --
+//! and is recent: the beacon watch
 //! says the vehicle is heard from ([`Stage::Heard`]). A clear flag says the
 //! vehicle has taken a CONNECT carrying the checksum in that beacon, from
 //! this station or another, so a station that only listens is matched as
@@ -11,8 +14,8 @@
 //! matched for listening and a CONNECT of its own has been answered with its
 //! checksum since the match last ended.
 //!
-//! A beacon with the flag set, one carrying another checksum, or the beacon
-//! going overdue ends both; one whose number goes back -- a start of
+//! A beacon with the flag set, one carrying another checksum, link digest
+//! or interface digest, or the beacon going overdue ends both; one whose number goes back -- a start of
 //! tcspecial -- ends the commanding half whatever else it says, since the
 //! CONNECT it rested on was answered by a start that has gone. A station
 //! that changes the configuration it uses makes a new [`Matched`] for it,
@@ -170,9 +173,16 @@ impl Matched {
     ///
     /// * `pass` - The pass, as [`crate::beacon::Beacons::pass`] gave it.
     pub fn heard(&self, pass: &Pass) {
+        // A beacon whose link digest or interface is not this station's is
+        // from a vehicle this station would misread, whatever its checksum
+        // says: matched by no checksum, as one that has none.
+        let digest = match pass.mismatch {
+            None => pass.digest,
+            Some(_) => None,
+        };
         self.beacon(
             pass.restart_flag,
-            pass.digest,
+            digest,
             pass.showing.stage,
             pass.restarted,
         );

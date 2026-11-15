@@ -86,6 +86,8 @@ pub mod simulate;
 /// Configurations kept on board, named by their checksum.
 pub mod store;
 pub mod telemetry;
+/// What the ground is told of tcspecial's threads and their stacks.
+pub mod threads;
 pub mod trigger;
 pub mod types;
 /// The codec of each type a link between nodes can carry, which tcs-xtce
@@ -127,6 +129,7 @@ pub use parameters::*;
 pub use protocol::*;
 pub use sim_config::*;
 pub use telemetry::*;
+pub use threads::*;
 pub use trigger::*;
 pub use types::*;
 pub use verify::*;

@@ -43,6 +43,9 @@ fn main() {
     // says so first, before anything is made.
     let child = runtime::supervisor::is_child();
     if child {
+        // First, so that as little of the main thread's stack is in use as
+        // can be when its depth starts to be measured.
+        runtime::thread::watch_main();
         runtime::supervisor::child_follows_supervisor();
 
         // Before any thread is made, so that each allocates from the main

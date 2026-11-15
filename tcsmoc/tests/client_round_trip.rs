@@ -20,8 +20,9 @@ use tcsmoc::{TcsClient, UdpConnection};
 use tcsprotocol::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
-    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
-    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
+    QueryThreadsTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
+    SetNodeTelemetry, Telemetry, ThreadRole, ThreadStack, THREADS_PER_ANSWER,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -141,6 +142,25 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                         stub_sample(0x40),
                     ))
                 }
+                // A vehicle with more threads than one answer holds, so
+                // that reading them all takes more than one question.
+                Command::QueryThreads(cmd) => {
+                    let mut answer = QueryThreadsTelemetry::new(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.first,
+                    );
+                    let first = cmd.first as usize;
+                    let told = STUB_THREADS
+                        .saturating_sub(first)
+                        .min(THREADS_PER_ANSWER);
+                    for (at, slot) in
+                        answer.threads[..told].iter_mut().enumerate()
+                    {
+                        *slot = stub_thread(first + at);
+                    }
+                    Telemetry::QueryThreads(answer.tell(STUB_THREADS, told))
+                }
             };
 
             let data = answer.to_bytes();
@@ -224,6 +244,45 @@ fn stub_counts() -> NodeCounts {
             micros: 1_700_000_000_000_000,
         }),
     }
+}
+
+/// How many threads the simulated vehicle has: more than one answer to
+/// QUERY_THREADS tells of.
+const STUB_THREADS: usize = THREADS_PER_ANSWER + 8;
+
+/// The thread a simulated vehicle has at a position.
+///
+/// # Arguments
+///
+/// * `at` - The thread's position, in the order they started.
+///
+/// # Returns
+///
+/// The thread: a node's, unlike every other.
+fn stub_thread(at: usize) -> ThreadStack {
+    ThreadStack {
+        role: ThreadRole::Node,
+        node: NodeId::of(at),
+        stack: 65_536,
+        deepest: 4_096 + at as u32,
+    }
+}
+
+/// Every thread comes back, though the vehicle has more than one answer
+/// tells of, in the order the vehicle has them.
+#[test]
+fn every_thread_comes_back_across_answers() {
+    // The CONNECT that matches the client, and two questions.
+    let (addr, stub) = stub_spacecraft(3);
+    let mut client = client_to(&addr);
+
+    let threads = client.threads().expect("the threads");
+    let expected: Vec<ThreadStack> =
+        (0..STUB_THREADS).map(stub_thread).collect();
+    assert_eq!(threads, expected);
+
+    stub.join()
+        .expect("the simulated spacecraft answered all three");
 }
 
 /// What a node has moved comes back whole, and so does what it last moved.

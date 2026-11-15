@@ -286,6 +286,27 @@ int main(int argc, char **argv)
 		       node_name, (int)taken.length,
 		       (const char *)taken.bytes, (unsigned)taken.total,
 		       given.moved ? "gave something" : "gave nothing");
+
+		/* How deep each thread has been into its stack, which is what
+		 * a configuration's thread_stack is set from. */
+		tcs_thread threads[TCS_THREADS_PER_ANSWER];
+		uint32_t total = 0;
+		size_t told = 0;
+		if (tcs_client_query_threads(client, 0, &status, &total,
+					     threads, &told) != 0) {
+			return fail("threads");
+		}
+		printf("threads: %s, %u of %u\n", tcs_status_name(status),
+		       (unsigned)told, (unsigned)total);
+		for (size_t at = 0; at < told; at++) {
+			const tcs_thread *thread = &threads[at];
+			printf("thread %s", tcs_thread_role_name(thread->role));
+			if (thread->node != TCS_NO_NODE) {
+				printf(" (node %u)", (unsigned)thread->node);
+			}
+			printf(": %u of %u bytes\n", (unsigned)thread->deepest,
+			       (unsigned)thread->stack);
+		}
 	}
 
 	if (restart) {

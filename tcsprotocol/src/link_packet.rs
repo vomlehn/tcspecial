@@ -74,6 +74,61 @@ impl fmt::Display for StatusType {
     }
 }
 
+/// Enumeration `/TcsLink/ThreadRoleType`; holds the raw value so unlisted
+/// values survive decoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ThreadRoleType(pub i64);
+
+impl ThreadRoleType {
+    pub const MAIN: Self = Self(0);
+    pub const SIGNALS: Self = Self(1);
+    pub const COMMANDS: Self = Self(2);
+    pub const BEACONS: Self = Self(3);
+    pub const SEGSEND: Self = Self(4);
+    pub const NODE: Self = Self(5);
+    pub const GROUND_LINK: Self = Self(6);
+
+    /// Names this value of enumeration `/TcsLink/ThreadRoleType`.
+    ///
+    /// # Returns
+    ///
+    /// The value's label, or `None` if the enumeration doesn't list it.
+    pub fn label(self) -> Option<&'static str> {
+        match self.0 {
+            0 => Some("Main"),
+            1 => Some("Signals"),
+            2 => Some("Commands"),
+            3 => Some("Beacons"),
+            4 => Some("Segsend"),
+            5 => Some("Node"),
+            6 => Some("GroundLink"),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ThreadRoleType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.label() {
+            Some(l) => f.write_str(l),
+            None => write!(f, "{}", self.0),
+        }
+    }
+}
+
+/// Aggregate `/TcsLink/ThreadType`; its members are encoded in this order.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ThreadType {
+    /// `Role` (/TcsLink/ThreadRoleType)
+    pub role: ThreadRoleType,
+    /// `Node` (/TcsLink/U32Type)
+    pub node: u32,
+    /// `StackBytes` (/TcsLink/U32Type)
+    pub stack_bytes: u32,
+    /// `DeepestBytes` (/TcsLink/U32Type)
+    pub deepest_bytes: u32,
+}
+
 /// The functions the application supplies for the document's custom
 /// algorithms: set them before decoding or encoding a packet that needs
 /// them, or it fails with `NoAlgorithm`.
@@ -1146,6 +1201,256 @@ impl fmt::Display for QueryNodeSampleAnswer {
     }
 }
 
+/// Sequence container `/TcsLink/QueryThreadsAnswer`.
+///
+/// Fixed by its inheritance: `Opcode` = 53.
+///
+/// `ThreadsTold` gives the size of `Threads`: computed from its length when
+/// encoding.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct QueryThreadsAnswer {
+    /// `/TcsLink/Sequence` (/TcsLink/U32Type)
+    pub sequence: u32,
+    /// `/TcsLink/Status` (/TcsLink/StatusType)
+    pub status: StatusType,
+    /// `/TcsLink/Timestamp` (/TcsLink/U64Type)
+    pub timestamp: u64,
+    /// `/TcsLink/FirstThread` (/TcsLink/U32Type)
+    pub first_thread: u32,
+    /// `/TcsLink/ThreadTotal` (/TcsLink/U32Type)
+    pub thread_total: u32,
+    /// `/TcsLink/Threads` (/TcsLink/ThreadsType)
+    pub threads: pk::FixedVec<ThreadType, 32>,
+}
+
+impl QueryThreadsAnswer {
+    /// The number of fields with an alarm.
+    pub const ALARMS: usize = 0;
+
+    /// Evaluates the alarms of this `/TcsLink/QueryThreadsAnswer` packet's
+    /// fields. Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn alarms(&self) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// Evaluates the alarms of this `/TcsLink/QueryThreadsAnswer` packet's
+    /// fields like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// The number of MathAlgorithms this packet triggers.
+    pub const ALGORITHMS: usize = 0;
+
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryThreadsAnswer` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
+    pub fn algorithms(&self) -> pk::Outputs<0> {
+        let mut o = pk::Outputs::new();
+        o
+    }
+}
+
+impl Packet for QueryThreadsAnswer {
+    const NAME: &'static str = "/TcsLink/QueryThreadsAnswer";
+    const MAX_BYTES: usize = 439;
+
+    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        let mut r = BitReader::new(data);
+        let v1 = r.uint_order(8, false, "Opcode")? as u8;
+        let v2 = r.uint_order(32, false, "Sequence")? as u32;
+        let v3 = StatusType(r.uint_order(8, false, "Status")? as i64);
+        let v4 = r.uint_order(64, false, "Timestamp")? as u64;
+        if !((v1 as i128) == 53) {
+            return Err(PacketError::Mismatch {
+                container: "/TcsLink/QueryThreadsAnswer",
+                criterion: "/TcsLink/Opcode == 53",
+            });
+        }
+        let v34 = r.uint_order(32, false, "FirstThread")? as u32;
+        let v35 = r.uint_order(32, false, "ThreadTotal")? as u32;
+        let v36 = r.uint_order(8, false, "ThreadsTold")? as u8;
+        let v37 = {
+            let n = pk::dynamic_size(v36 as f64, 1.0, 0.0, 1, 32, "Threads")?;
+            let mut a = pk::FixedVec::<ThreadType, 32>::new();
+            for i in 0..n {
+                if a.push(ThreadType {
+                    role: ThreadRoleType(
+                        r.uint_order(8, false, "Threads")? as i64
+                    ),
+                    node: r.uint_order(32, false, "Threads")? as u32,
+                    stack_bytes: r.uint_order(32, false, "Threads")? as u32,
+                    deepest_bytes: r.uint_order(32, false, "Threads")? as u32,
+                })
+                .is_err()
+                {
+                    return Err(PacketError::BadSize { field: "Threads" });
+                }
+            }
+            a
+        };
+        Ok((
+            QueryThreadsAnswer {
+                sequence: v2,
+                status: v3,
+                timestamp: v4,
+                first_thread: v34,
+                thread_total: v35,
+                threads: v37,
+            },
+            r.used(),
+        ))
+    }
+
+    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
+        let d36 = u8::try_from(pk::size_source(
+            self.threads.len(),
+            1.0,
+            0.0,
+            1,
+            1,
+            "Threads",
+        )?)
+        .map_err(|_| PacketError::OutOfRange {
+            field: "ThreadsTold",
+        })?;
+        w.uint_order(8, false, pk::from_unsigned(53 as u64, 8, "Opcode")?);
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
+        );
+        w.uint_order(
+            8,
+            false,
+            pk::from_signed(self.status.0, 8, IntEncoding::Unsigned, "Status")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.timestamp as u64, 64, "Timestamp")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.first_thread as u64, 32, "FirstThread")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.thread_total as u64, 32, "ThreadTotal")?,
+        );
+        w.uint_order(
+            8,
+            false,
+            pk::from_unsigned(d36 as u64, 8, "ThreadsTold")?,
+        );
+        {
+            let n = pk::dynamic_size(d36 as f64, 1.0, 0.0, 1, 32, "Threads")?;
+            if self.threads.len() != n {
+                return Err(PacketError::BadSize { field: "Threads" });
+            }
+            for (i, e) in self.threads.iter().enumerate() {
+                {
+                    w.uint_order(
+                        8,
+                        false,
+                        pk::from_signed(
+                            e.role.0,
+                            8,
+                            IntEncoding::Unsigned,
+                            "Threads",
+                        )?,
+                    );
+                    w.uint_order(
+                        32,
+                        false,
+                        pk::from_unsigned(e.node as u64, 32, "Threads")?,
+                    );
+                    w.uint_order(
+                        32,
+                        false,
+                        pk::from_unsigned(e.stack_bytes as u64, 32, "Threads")?,
+                    );
+                    w.uint_order(
+                        32,
+                        false,
+                        pk::from_unsigned(
+                            e.deepest_bytes as u64,
+                            32,
+                            "Threads",
+                        )?,
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for QueryThreadsAnswer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("QueryThreadsAnswer{")?;
+        f.write_str("sequence=")?;
+        write!(f, "{}", self.sequence)?;
+        f.write_str(", status=")?;
+        write!(f, "{}", self.status)?;
+        f.write_str(", timestamp=")?;
+        write!(f, "{}", self.timestamp)?;
+        f.write_str(", first_thread=")?;
+        write!(f, "{}", self.first_thread)?;
+        f.write_str(", thread_total=")?;
+        write!(f, "{}", self.thread_total)?;
+        f.write_str(", threads=")?;
+        {
+            f.write_char('[')?;
+            for (i, e) in (self.threads).iter().enumerate() {
+                if i > 0 {
+                    f.write_str(", ")?;
+                }
+                {
+                    f.write_char('{')?;
+                    f.write_str("role=")?;
+                    write!(f, "{}", (e).role)?;
+                    f.write_str(", node=")?;
+                    write!(f, "{}", (e).node)?;
+                    f.write_str(", stack_bytes=")?;
+                    write!(f, "{}", (e).stack_bytes)?;
+                    f.write_str(", deepest_bytes=")?;
+                    write!(f, "{}", (e).deepest_bytes)?;
+                    f.write_char('}')?
+                };
+            }
+            f.write_char(']')?
+        };
+        f.write_char('}')
+    }
+}
+
 /// Meta-command `/TcsLink/Ping`.
 ///
 /// Fixed by its inheritance: `Opcode` = 1.
@@ -1212,15 +1517,15 @@ impl Packet for Ping {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v34 as i128) == 1) {
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 1) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/Ping",
                 criterion: "Opcode = 1",
             });
         }
-        Ok((Ping { sequence: v35 }, r.used()))
+        Ok((Ping { sequence: v39 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1312,19 +1617,19 @@ impl Packet for StartNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v34 as i128) == 48) {
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 48) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/StartNode",
                 criterion: "Opcode = 48",
             });
         }
-        let v36 = r.uint_order(32, false, "Node")? as u32;
+        let v40 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             StartNode {
-                sequence: v35,
-                node: v36,
+                sequence: v39,
+                node: v40,
             },
             r.used(),
         ))
@@ -1425,19 +1730,19 @@ impl Packet for StopNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v34 as i128) == 49) {
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 49) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/StopNode",
                 criterion: "Opcode = 49",
             });
         }
-        let v37 = r.uint_order(32, false, "Node")? as u32;
+        let v41 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             StopNode {
-                sequence: v35,
-                node: v37,
+                sequence: v39,
+                node: v41,
             },
             r.used(),
         ))
@@ -1545,16 +1850,16 @@ impl Packet for SetNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v34 as i128) == 50) {
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 50) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/SetNode",
                 criterion: "Opcode = 50",
             });
         }
-        let v38 = r.uint_order(32, false, "Node")? as u32;
-        let v39 = pk::read_fixed_string::<64, 65>(
+        let v42 = r.uint_order(32, false, "Node")? as u32;
+        let v43 = pk::read_fixed_string::<64, 65>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -1565,24 +1870,24 @@ impl Packet for SetNode {
             },
             "Attribute",
         )?;
-        let v40 = r.uint_order(16, false, "ValueLength")? as u16;
-        let v41 = r.fixed_bytes::<256>(
-            pk::dynamic_size(v40 as f64, 8.0, 0.0, 8, 256, "Value")?,
+        let v44 = r.uint_order(16, false, "ValueLength")? as u16;
+        let v45 = r.fixed_bytes::<256>(
+            pk::dynamic_size(v44 as f64, 8.0, 0.0, 8, 256, "Value")?,
             "Value",
         )?;
         Ok((
             SetNode {
-                sequence: v35,
-                node: v38,
-                attribute: v39,
-                value_: v41,
+                sequence: v39,
+                node: v42,
+                attribute: v43,
+                value_: v45,
             },
             r.used(),
         ))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d40 = u16::try_from(pk::size_source(
+        let d44 = u16::try_from(pk::size_source(
             self.value_.len(),
             8.0,
             0.0,
@@ -1619,10 +1924,10 @@ impl Packet for SetNode {
         w.uint_order(
             16,
             false,
-            pk::from_unsigned(d40 as u64, 16, "ValueLength")?,
+            pk::from_unsigned(d44 as u64, 16, "ValueLength")?,
         );
         {
-            let n = pk::dynamic_size(d40 as f64, 8.0, 0.0, 8, 256, "Value")?;
+            let n = pk::dynamic_size(d44 as f64, 8.0, 0.0, 8, 256, "Value")?;
             if self.value_.len() != n {
                 return Err(PacketError::BadSize { field: "Value" });
             }
@@ -1716,19 +2021,19 @@ impl Packet for QueryNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v34 as i128) == 51) {
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 51) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryNode",
                 criterion: "Opcode = 51",
             });
         }
-        let v42 = r.uint_order(32, false, "Node")? as u32;
+        let v46 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             QueryNode {
-                sequence: v35,
-                node: v42,
+                sequence: v39,
+                node: v46,
             },
             r.used(),
         ))
@@ -1830,19 +2135,19 @@ impl Packet for QueryNodeSample {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v34 as i128) == 52) {
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 52) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryNodeSample",
                 criterion: "Opcode = 52",
             });
         }
-        let v43 = r.uint_order(32, false, "Node")? as u32;
+        let v47 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             QueryNodeSample {
-                sequence: v35,
-                node: v43,
+                sequence: v39,
+                node: v47,
             },
             r.used(),
         ))
@@ -1875,6 +2180,120 @@ impl fmt::Display for QueryNodeSample {
     }
 }
 
+/// Meta-command `/TcsLink/QueryThreads`.
+///
+/// Fixed by its inheritance: `Opcode` = 53.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct QueryThreads {
+    /// `/TcsLink/TcsCommand#Sequence` (/TcsLink/U32Arg)
+    pub sequence: u32,
+    /// `/TcsLink/QueryThreads#First` (/TcsLink/U32Arg)
+    pub first: u32,
+}
+
+impl QueryThreads {
+    /// The number of fields with an alarm.
+    pub const ALARMS: usize = 0;
+
+    /// Evaluates the alarms of this `/TcsLink/QueryThreads` packet's fields.
+    /// Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn alarms(&self) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// Evaluates the alarms of this `/TcsLink/QueryThreads` packet's fields
+    /// like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// The number of MathAlgorithms this packet triggers.
+    pub const ALGORITHMS: usize = 0;
+
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryThreads` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
+    pub fn algorithms(&self) -> pk::Outputs<0> {
+        let mut o = pk::Outputs::new();
+        o
+    }
+}
+
+impl Packet for QueryThreads {
+    const NAME: &'static str = "/TcsLink/QueryThreads";
+    const MAX_BYTES: usize = 9;
+
+    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        let mut r = BitReader::new(data);
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v38 as i128) == 53) {
+            return Err(PacketError::Mismatch {
+                container: "/TcsLink/QueryThreads",
+                criterion: "Opcode = 53",
+            });
+        }
+        let v48 = r.uint_order(32, false, "First")? as u32;
+        Ok((
+            QueryThreads {
+                sequence: v39,
+                first: v48,
+            },
+            r.used(),
+        ))
+    }
+
+    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
+        w.uint_order(8, false, pk::from_unsigned(53 as u64, 8, "Opcode")?);
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.first as u64, 32, "First")?,
+        );
+        Ok(())
+    }
+}
+
+impl fmt::Display for QueryThreads {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("QueryThreads{")?;
+        f.write_str("sequence=")?;
+        write!(f, "{}", self.sequence)?;
+        f.write_str(", first=")?;
+        write!(f, "{}", self.first)?;
+        f.write_char('}')
+    }
+}
+
 /// Every concrete packet derived from `/TcsLink/AnswerLayout`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnswerLayoutKind {
@@ -1884,11 +2303,12 @@ pub enum AnswerLayoutKind {
     SetNodeAnswer(SetNodeAnswer),
     QueryNodeAnswer(QueryNodeAnswer),
     QueryNodeSampleAnswer(QueryNodeSampleAnswer),
+    QueryThreadsAnswer(QueryThreadsAnswer),
 }
 
 impl Packet for AnswerLayoutKind {
     const NAME: &'static str = "/TcsLink/AnswerLayout";
-    const MAX_BYTES: usize = 179;
+    const MAX_BYTES: usize = 439;
 
     /// Decodes the root's entries, then picks the first child (in
     /// document order) whose criteria match, recursively.
@@ -2026,6 +2446,43 @@ impl Packet for AnswerLayoutKind {
                 r.used(),
             ));
         }
+        if (v1 as i128) == 53 {
+            let v34 = r.uint_order(32, false, "FirstThread")? as u32;
+            let v35 = r.uint_order(32, false, "ThreadTotal")? as u32;
+            let v36 = r.uint_order(8, false, "ThreadsTold")? as u8;
+            let v37 = {
+                let n =
+                    pk::dynamic_size(v36 as f64, 1.0, 0.0, 1, 32, "Threads")?;
+                let mut a = pk::FixedVec::<ThreadType, 32>::new();
+                for i in 0..n {
+                    if a.push(ThreadType {
+                        role: ThreadRoleType(
+                            r.uint_order(8, false, "Threads")? as i64,
+                        ),
+                        node: r.uint_order(32, false, "Threads")? as u32,
+                        stack_bytes: r.uint_order(32, false, "Threads")? as u32,
+                        deepest_bytes: r.uint_order(32, false, "Threads")?
+                            as u32,
+                    })
+                    .is_err()
+                    {
+                        return Err(PacketError::BadSize { field: "Threads" });
+                    }
+                }
+                a
+            };
+            return Ok((
+                Self::QueryThreadsAnswer(QueryThreadsAnswer {
+                    sequence: v2,
+                    status: v3,
+                    timestamp: v4,
+                    first_thread: v34,
+                    thread_total: v35,
+                    threads: v37,
+                }),
+                r.used(),
+            ));
+        }
         return Err(PacketError::NoMatch {
             container: "/TcsLink/AnswerLayout",
         });
@@ -2039,6 +2496,7 @@ impl Packet for AnswerLayoutKind {
             Self::SetNodeAnswer(p) => p.encode_into(w),
             Self::QueryNodeAnswer(p) => p.encode_into(w),
             Self::QueryNodeSampleAnswer(p) => p.encode_into(w),
+            Self::QueryThreadsAnswer(p) => p.encode_into(w),
         }
     }
 }
@@ -2052,6 +2510,7 @@ impl fmt::Display for AnswerLayoutKind {
             Self::SetNodeAnswer(p) => p.fmt(f),
             Self::QueryNodeAnswer(p) => p.fmt(f),
             Self::QueryNodeSampleAnswer(p) => p.fmt(f),
+            Self::QueryThreadsAnswer(p) => p.fmt(f),
         }
     }
 }
@@ -2100,6 +2559,11 @@ impl AnswerLayoutKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryThreadsAnswer(p) => {
+                for a in p.alarms().as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -2142,6 +2606,11 @@ impl AnswerLayoutKind {
                 }
             }
             Self::QueryNodeSampleAnswer(p) => {
+                for o in p.algorithms().as_slice() {
+                    out.push(o.name, o.value);
+                }
+            }
+            Self::QueryThreadsAnswer(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -2196,6 +2665,11 @@ impl AnswerLayoutKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryThreadsAnswer(p) => {
+                for a in p.monitor(m, t).as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -2237,6 +2711,12 @@ impl From<QueryNodeSampleAnswer> for AnswerLayoutKind {
     }
 }
 
+impl From<QueryThreadsAnswer> for AnswerLayoutKind {
+    fn from(p: QueryThreadsAnswer) -> Self {
+        Self::QueryThreadsAnswer(p)
+    }
+}
+
 /// Every concrete packet derived from `/TcsLink/TcsCommand`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TcsCommandKind {
@@ -2246,6 +2726,7 @@ pub enum TcsCommandKind {
     SetNode(SetNode),
     QueryNode(QueryNode),
     QueryNodeSample(QueryNodeSample),
+    QueryThreads(QueryThreads),
 }
 
 impl Packet for TcsCommandKind {
@@ -2256,34 +2737,34 @@ impl Packet for TcsCommandKind {
     /// document order) whose criteria match, recursively.
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v34 = r.uint_order(8, false, "Opcode")? as u8;
-        let v35 = r.uint_order(32, false, "Sequence")? as u32;
-        if (v34 as i128) == 1 {
-            return Ok((Self::Ping(Ping { sequence: v35 }), r.used()));
+        let v38 = r.uint_order(8, false, "Opcode")? as u8;
+        let v39 = r.uint_order(32, false, "Sequence")? as u32;
+        if (v38 as i128) == 1 {
+            return Ok((Self::Ping(Ping { sequence: v39 }), r.used()));
         }
-        if (v34 as i128) == 48 {
-            let v36 = r.uint_order(32, false, "Node")? as u32;
+        if (v38 as i128) == 48 {
+            let v40 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::StartNode(StartNode {
-                    sequence: v35,
-                    node: v36,
+                    sequence: v39,
+                    node: v40,
                 }),
                 r.used(),
             ));
         }
-        if (v34 as i128) == 49 {
-            let v37 = r.uint_order(32, false, "Node")? as u32;
+        if (v38 as i128) == 49 {
+            let v41 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::StopNode(StopNode {
-                    sequence: v35,
-                    node: v37,
+                    sequence: v39,
+                    node: v41,
                 }),
                 r.used(),
             ));
         }
-        if (v34 as i128) == 50 {
-            let v38 = r.uint_order(32, false, "Node")? as u32;
-            let v39 = pk::read_fixed_string::<64, 65>(
+        if (v38 as i128) == 50 {
+            let v42 = r.uint_order(32, false, "Node")? as u32;
+            let v43 = pk::read_fixed_string::<64, 65>(
                 &mut r,
                 &StringSpec {
                     fixed_bits: None,
@@ -2294,37 +2775,47 @@ impl Packet for TcsCommandKind {
                 },
                 "Attribute",
             )?;
-            let v40 = r.uint_order(16, false, "ValueLength")? as u16;
-            let v41 = r.fixed_bytes::<256>(
-                pk::dynamic_size(v40 as f64, 8.0, 0.0, 8, 256, "Value")?,
+            let v44 = r.uint_order(16, false, "ValueLength")? as u16;
+            let v45 = r.fixed_bytes::<256>(
+                pk::dynamic_size(v44 as f64, 8.0, 0.0, 8, 256, "Value")?,
                 "Value",
             )?;
             return Ok((
                 Self::SetNode(SetNode {
-                    sequence: v35,
-                    node: v38,
-                    attribute: v39,
-                    value_: v41,
+                    sequence: v39,
+                    node: v42,
+                    attribute: v43,
+                    value_: v45,
                 }),
                 r.used(),
             ));
         }
-        if (v34 as i128) == 51 {
-            let v42 = r.uint_order(32, false, "Node")? as u32;
+        if (v38 as i128) == 51 {
+            let v46 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::QueryNode(QueryNode {
-                    sequence: v35,
-                    node: v42,
+                    sequence: v39,
+                    node: v46,
                 }),
                 r.used(),
             ));
         }
-        if (v34 as i128) == 52 {
-            let v43 = r.uint_order(32, false, "Node")? as u32;
+        if (v38 as i128) == 52 {
+            let v47 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::QueryNodeSample(QueryNodeSample {
-                    sequence: v35,
-                    node: v43,
+                    sequence: v39,
+                    node: v47,
+                }),
+                r.used(),
+            ));
+        }
+        if (v38 as i128) == 53 {
+            let v48 = r.uint_order(32, false, "First")? as u32;
+            return Ok((
+                Self::QueryThreads(QueryThreads {
+                    sequence: v39,
+                    first: v48,
                 }),
                 r.used(),
             ));
@@ -2342,6 +2833,7 @@ impl Packet for TcsCommandKind {
             Self::SetNode(p) => p.encode_into(w),
             Self::QueryNode(p) => p.encode_into(w),
             Self::QueryNodeSample(p) => p.encode_into(w),
+            Self::QueryThreads(p) => p.encode_into(w),
         }
     }
 }
@@ -2355,6 +2847,7 @@ impl fmt::Display for TcsCommandKind {
             Self::SetNode(p) => p.fmt(f),
             Self::QueryNode(p) => p.fmt(f),
             Self::QueryNodeSample(p) => p.fmt(f),
+            Self::QueryThreads(p) => p.fmt(f),
         }
     }
 }
@@ -2403,6 +2896,11 @@ impl TcsCommandKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryThreads(p) => {
+                for a in p.alarms().as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -2445,6 +2943,11 @@ impl TcsCommandKind {
                 }
             }
             Self::QueryNodeSample(p) => {
+                for o in p.algorithms().as_slice() {
+                    out.push(o.name, o.value);
+                }
+            }
+            Self::QueryThreads(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -2499,6 +3002,11 @@ impl TcsCommandKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryThreads(p) => {
+                for a in p.monitor(m, t).as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -2537,5 +3045,11 @@ impl From<QueryNode> for TcsCommandKind {
 impl From<QueryNodeSample> for TcsCommandKind {
     fn from(p: QueryNodeSample) -> Self {
         Self::QueryNodeSample(p)
+    }
+}
+
+impl From<QueryThreads> for TcsCommandKind {
+    fn from(p: QueryThreads) -> Self {
+        Self::QueryThreads(p)
     }
 }

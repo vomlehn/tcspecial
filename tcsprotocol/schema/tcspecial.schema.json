@@ -2448,7 +2448,7 @@
           ]
         },
         "thread_stack": {
-          "description": "The stack each of tcspecial's threads is given, in bytes: a whole number, 131072 (128 KiB) or more, 262144 (256 KiB) where it is not stated. The main thread's is the kernel's, set by ulimit -s or a systemd unit's LimitSTACK.",
+          "description": "The stack each node's thread is given, in bytes: a whole number, 32768 (32 KiB) or more, 65536 (64 KiB) where it is not stated. tcspecial's own threads have a fixed 262144 (256 KiB), and the main thread's is the kernel's, set by ulimit -s or a systemd unit's LimitSTACK.",
           "type": [
             "string",
             "integer"

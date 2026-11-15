@@ -59,6 +59,7 @@ use std::thread::JoinHandle;
 
 use tcsprotocol::graph::terminals::Stream;
 use tcsprotocol::link_type::LinkType;
+use tcsprotocol::{NodeId, ThreadRole, NO_NODE};
 
 use super::node_state::Outcome;
 use super::route::{Delivery, Routes};
@@ -578,6 +579,23 @@ pub trait Watch: Send + Sync {
     fn sample_given(&self, node: &str, data: &[u8]) {
         let _ = (node, data);
     }
+
+    /// The node id the ground knows this node by, which its thread is told
+    /// of under: see [`crate::runtime::thread`].
+    ///
+    /// None by default, and for a name that is not a node.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// The node's id, where it has one.
+    fn id_of(&self, node: &str) -> Option<tcsprotocol::NodeId> {
+        let _ = node;
+        None
+    }
 }
 
 /// What a fabric nobody is watching has: everything enabled, nothing counted.
@@ -887,11 +905,29 @@ impl Fabric {
             mail.produced.reserve(into);
         }
 
+        // What the thread is told of to the ground as: a payload's link to
+        // the ground under its payload's id, every other node under its own.
+        let (role, node) = match self
+            .shared
+            .routes
+            .ground_links()
+            .iter()
+            .find(|link| link.name == name)
+        {
+            Some(link) => (ThreadRole::GroundLink, NodeId::of(link.id)),
+            None => (
+                ThreadRole::Node,
+                read(&self.shared.watch).id_of(name).unwrap_or(NO_NODE),
+            ),
+        };
         let (shared, handed) = (self.shared.clone(), Arc::new(worker));
         let theirs = handed.clone();
-        match crate::runtime::thread::named(format!("node {name}"))
-            .spawn(move || serve(&theirs, &shared))
-        {
+        match crate::runtime::thread::spawn(
+            role,
+            node,
+            format!("node {name}"),
+            move || serve(&theirs, &shared),
+        ) {
             Ok(thread) => {
                 self.threads.push(thread);
                 handed

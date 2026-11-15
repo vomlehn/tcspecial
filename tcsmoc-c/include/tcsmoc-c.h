@@ -678,6 +678,59 @@ int tcs_client_query_node_sample(tcs_client *client, uint32_t node,
 				 tcs_status *status, tcs_sample *taken,
 				 tcs_sample *given);
 
+/* How many threads one answer to QUERY_THREADS tells of. */
+#define TCS_THREADS_PER_ANSWER 32
+
+/* The node a thread that belongs to no node is given. */
+#define TCS_NO_NODE 0xFFFFFFFFu
+
+/* What one of tcspecial's threads is for. A vehicle of a later build may
+ * give a role this library does not know, by its number. */
+typedef enum tcs_thread_role {
+	TCS_THREAD_MAIN = 0,         /* starts the vehicle and waits */
+	TCS_THREAD_SIGNALS = 1,      /* takes SIGINT and SIGTERM */
+	TCS_THREAD_COMMANDS = 2,     /* takes and answers commands */
+	TCS_THREAD_BEACONS = 3,      /* sends the beacons */
+	TCS_THREAD_SEGSEND = 4,      /* hands logs' segments to segsend */
+	TCS_THREAD_NODE = 5,         /* a node's: node names it */
+	TCS_THREAD_GROUND_LINK = 6   /* a payload's link to the ground:
+	                                node names the payload */
+} tcs_thread_role;
+
+/* One of tcspecial's threads, and how deep it has been into its stack. */
+typedef struct tcs_thread {
+	int role;          /* a tcs_thread_role, or a later build's number */
+	uint32_t node;     /* the node it belongs to, or TCS_NO_NODE */
+	uint32_t stack;    /* the bytes of stack it was given */
+	uint32_t deepest;  /* the most of them it has used since it started:
+	                      a little more than it used, never less */
+} tcs_thread;
+
+/** Names a thread's role.
+ *
+ * @param role  The role.
+ * @return      "main", "node", "ground link" and so on, or "" for a number
+ *              that is no role this library knows; static, never freed. */
+const char *tcs_thread_role_name(int role);
+
+/** Sends QUERY_THREADS, to ask what tcspecial's threads are for and how deep
+ * each has been into its stack, from the thread at position first, in the
+ * order they started. One answer tells of up to TCS_THREADS_PER_ANSWER;
+ * ask again from first plus told until first reaches total for the rest.
+ * Asking changes nothing aboard.
+ *
+ * @param client   The client.
+ * @param first    The position of the first thread to tell of.
+ * @param status   Where what the vehicle answered is written.
+ * @param total    Where how many threads the vehicle has is written.
+ * @param threads  Where the threads are written: room for
+ *                 TCS_THREADS_PER_ANSWER.
+ * @param told     Where how many of threads were written is written.
+ * @return         0, or -1 on an error. */
+int tcs_client_query_threads(tcs_client *client, uint32_t first,
+			     tcs_status *status, uint32_t *total,
+			     tcs_thread *threads, size_t *told);
+
 /** Closes the command links and frees the client.
  *
  * @param client  The client, or NULL to do nothing. */

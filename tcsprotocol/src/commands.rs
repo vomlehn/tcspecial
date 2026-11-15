@@ -45,6 +45,9 @@ pub enum CommandType {
     /// A graph's `commands` section says which attribute of which node the
     /// ground may set, so this is the command that section was written for.
     SetNode,
+    /// What tcspecial's threads are for and how deep each has been into
+    /// its stack: see [`crate::threads`].
+    QueryThreads,
 }
 
 /// Which of the command interpreter's two links a command belongs on.
@@ -110,7 +113,10 @@ impl CommandType {
             | CommandType::StopNode
             | CommandType::SetNode
             | CommandType::QueryNode
-            | CommandType::QueryNodeSample => CommandLink::Payload,
+            | CommandType::QueryNodeSample
+            // About the vehicle, not a payload, but asked at leisure, and
+            // nothing that cannot wait should wait behind it.
+            | CommandType::QueryThreads => CommandLink::Payload,
         }
     }
 
@@ -149,7 +155,8 @@ impl CommandType {
             | CommandType::StopNode
             | CommandType::SetNode
             | CommandType::QueryNode
-            | CommandType::QueryNodeSample => false,
+            | CommandType::QueryNodeSample
+            | CommandType::QueryThreads => false,
         }
     }
 
@@ -192,7 +199,8 @@ impl CommandType {
             | CommandType::StopNode
             | CommandType::SetNode
             | CommandType::QueryNode
-            | CommandType::QueryNodeSample => false,
+            | CommandType::QueryNodeSample
+            | CommandType::QueryThreads => false,
         }
     }
 
@@ -218,6 +226,7 @@ impl CommandType {
             CommandType::SetNode => 0x32,
             CommandType::QueryNode => 0x33,
             CommandType::QueryNodeSample => 0x34,
+            CommandType::QueryThreads => 0x35,
         }
     }
 
@@ -242,6 +251,7 @@ impl CommandType {
             0x32 => Some(CommandType::SetNode),
             0x33 => Some(CommandType::QueryNode),
             0x34 => Some(CommandType::QueryNodeSample),
+            0x35 => Some(CommandType::QueryThreads),
             _ => None,
         }
     }
@@ -406,6 +416,41 @@ impl ConnectCommand {
                 cmd_type: CommandType::Connect,
             },
             digest,
+        }
+    }
+}
+
+/// QUERY_THREADS: what tcspecial's threads are for and how deep each has
+/// been into its stack, from the `first`, in the order they started.
+///
+/// One answer tells of up to [`crate::THREADS_PER_ANSWER`] threads and says
+/// how many there are in all, so a vehicle with more is read by asking again
+/// from where the last answer stopped. Asking changes nothing aboard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ThreadsCommand {
+    pub header: CommandHeader,
+    /// The position of the first thread to tell of.
+    pub first: u32,
+}
+
+impl ThreadsCommand {
+    /// Asks of the threads from the `first`.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `first`    - The position of the first thread to tell of.
+    ///
+    /// # Returns
+    ///
+    /// The command.
+    pub fn new(sequence: u32, first: u32) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::QueryThreads,
+            },
+            first,
         }
     }
 }
@@ -723,6 +768,7 @@ pub enum Command {
     SetNode(SetNodeCommand),
     QueryNode(NodeCommand),
     QueryNodeSample(NodeCommand),
+    QueryThreads(ThreadsCommand),
 }
 
 impl Command {
@@ -742,6 +788,7 @@ impl Command {
             | Command::QueryNode(cmd)
             | Command::QueryNodeSample(cmd) => cmd.header.sequence,
             Command::SetNode(cmd) => cmd.header.sequence,
+            Command::QueryThreads(cmd) => cmd.header.sequence,
         }
     }
 
@@ -762,7 +809,8 @@ impl Command {
             Command::Ping(_)
             | Command::Connect(_)
             | Command::RestartArm(_)
-            | Command::Restart(_) => None,
+            | Command::Restart(_)
+            | Command::QueryThreads(_) => None,
         }
     }
 
@@ -787,6 +835,7 @@ impl Command {
             | Command::QueryNode(cmd)
             | Command::QueryNodeSample(cmd) => cmd.header.cmd_type,
             Command::SetNode(cmd) => cmd.header.cmd_type,
+            Command::QueryThreads(cmd) => cmd.header.cmd_type,
         }
     }
 }
@@ -911,6 +960,8 @@ mod tests {
             CommandType::SetNode,
             CommandType::QueryNode,
             CommandType::QueryNodeSample,
+            // And the vehicle's threads, asked at leisure too.
+            CommandType::QueryThreads,
         ];
 
         for kind in spacecraft {

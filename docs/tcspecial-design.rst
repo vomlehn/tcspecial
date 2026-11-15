@@ -1153,22 +1153,46 @@ Requirement
     shipped with tcspecial sets it.
 
 Requirement
-    Each of tcspecial's threads is given a small stack, the running
-    configuration's ``thread_stack``, 256 KiB where it says nothing, rather
-    than the 2 MiB a Rust thread has, so that what is locked is mostly what
-    tcspecial uses. Less than 128 KiB is refused when the configuration is
-    checked (``tcsprotocol::THREAD_STACK_LEAST``): the least the tests pass
-    with in a debug build, which uses more than a release build, the
-    default being twice that. Every thread the flight software runs on is
-    made by ``runtime::thread::named``, so none takes the standard
-    library's default by being made elsewhere. The signal thread, made
-    before any configuration is read, has the default. One setting for
-    every thread: a node's own may be added later without changing what
-    this one means.
+    Each of tcspecial's threads is given a small stack rather than the 2
+    MiB a Rust thread has, so that what is locked is mostly what tcspecial
+    uses. A node's thread, and a payload's link to the ground, are given the
+    running configuration's ``thread_stack``, 64 KiB where it says nothing;
+    less than 32 KiB is refused when the configuration is checked
+    (``tcsprotocol::THREAD_STACK_LEAST``), a little more than the 26 KiB
+    the deepest node thread the tests run reaches in a debug build, which
+    uses more than a release build. tcspecial's own threads -- signals,
+    commands, beacons and segsend -- are given a fixed 256 KiB
+    (``runtime::thread::SERVICE_STACK``), two and a half times the 96 KiB
+    the commands thread, the deepest of them, reaches. Every thread the
+    flight software runs on is made by ``runtime::thread::spawn``, so none
+    takes the standard library's default by being made elsewhere. One
+    setting for every node: a node's own may be added later without
+    changing what this one means.
 
-    **Built** (2026-11-14): ``thread_stack``, for the nodes', the
-    commands', the beacons' and segsend's threads, said in the startup
-    summary. The lock itself is not built yet.
+    **Built** (2026-11-15): ``thread_stack`` for nodes' threads, said in
+    the startup summary, and the fixed stack for tcspecial's own. The lock
+    itself is not built yet.
+
+Requirement
+    How deep each thread has been into its stack is measured aboard and
+    told to the ground on request, so that a vehicle's ``thread_stack`` is
+    set from what that vehicle does: the paths a vehicle runs -- its
+    devices, its errors -- are not all the paths a desk runs. Each thread,
+    as it starts, fills the part of its stack it has not used with a
+    pattern; how much of the pattern is gone is how deep it has been. The
+    figure is a little more than the thread used and never less. A page
+    counted as touched would not do: once the process's memory is locked,
+    every page is. QUERY_THREADS, on the node command link, is answered
+    with each thread's role, the node it belongs to, its stack and its
+    deepest, up to ``tcsprotocol::THREADS_PER_ANSWER`` threads an answer,
+    from the one the command names, and how many there are in all, so the
+    ground reads a vehicle with more by asking again. Reading the figures
+    allocates nothing, since it is done in the loop.
+
+    **Built** (2026-11-15): ``runtime::thread``, ``tcsprotocol::threads``,
+    QUERY_THREADS, ``tcsmoc::TcsClient::query_threads`` and
+    ``threads``, and the C library's ``tcs_client_query_threads``. Not yet
+    in tcs-moc's window or the F´ bridge.
 
 Requirement
     Every thread of the child allocates from one malloc arena, the main
@@ -1180,8 +1204,10 @@ Requirement
     not in its loop, so its threads have little to contend for in one.
 
     **Built** (2026-11-14): ``runtime::thread::one_arena``. With no nodes,
-    a release build maps about 8.7 MiB, where it mapped 200 MiB; each ping
-    node, two threads, adds about 0.7 MiB, where it added 128 MiB.
+    a release build maps about 8.9 MiB, where it mapped 200 MiB; each ping
+    node, two threads of 64 KiB, adds about 0.3 MiB, where it added 128
+    MiB. Filling the stacks to measure them makes all of each stack
+    resident, which locking does anyway.
 
 Requirement
     Whether there is memory enough is not tcspecial's to judge. A total of
@@ -1336,7 +1362,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "c7820f9bfe585feab72247ece0a2261d"
+     interface: "2f452fd334eb3cc535b5b1f01bb64c2f"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -4054,6 +4080,13 @@ both ends read; what follows is what a vehicle made of nodes does with each.
 ``QUERY_NODE_SAMPLE``
     The last datum that node moved each way, for an operator who wants to see
     the bytes rather than a count of them.
+
+``QUERY_THREADS``
+    What tcspecial's threads are for -- each node's, each payload's link to
+    the ground, and its own -- the stack each was given and how deep each
+    has been into it, measured as ``runtime::thread`` says, from the thread
+    the command names. About the vehicle rather than a node, but asked at
+    leisure, so on the node link.
 
 ``SET_NODE``
     Sets an attribute of a node. A graph's ``commands`` section says which
@@ -8614,7 +8647,8 @@ drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
 are PING, CONNECT, RESTART_ARM and RESTART; the per-node ones are
-START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE.
+START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE; and
+QUERY_THREADS asks of the vehicle's threads, on the node link.
 
 Requirement
     An operation that is not answered within the client's timeout is an error.

@@ -8,6 +8,7 @@
 //! `xtce/beacon.xtce`, is in [`crate::beacon`].
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::threads::{ThreadStack, THREADS_PER_ANSWER};
 use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 
 /// Telemetry message header
@@ -80,6 +81,8 @@ pub enum TelemetryType {
     QueryNode,
     /// And to a QUERY_NODE_SAMPLE: see [`QueryNodeSampleTelemetry`].
     QueryNodeSample,
+    /// And to a QUERY_THREADS: see [`QueryThreadsTelemetry`].
+    QueryThreads,
 }
 
 impl TelemetryType {
@@ -100,6 +103,7 @@ impl TelemetryType {
             TelemetryType::SetNode => CommandType::SetNode,
             TelemetryType::QueryNode => CommandType::QueryNode,
             TelemetryType::QueryNodeSample => CommandType::QueryNodeSample,
+            TelemetryType::QueryThreads => CommandType::QueryThreads,
         }
     }
 
@@ -137,6 +141,7 @@ impl TelemetryType {
             CommandType::SetNode => TelemetryType::SetNode,
             CommandType::QueryNode => TelemetryType::QueryNode,
             CommandType::QueryNodeSample => TelemetryType::QueryNodeSample,
+            CommandType::QueryThreads => TelemetryType::QueryThreads,
         })
     }
 }
@@ -604,6 +609,78 @@ impl QueryNodeSampleTelemetry {
     }
 }
 
+/// The answer to a QUERY_THREADS: what tcspecial's threads are for and how
+/// deep each has been into its stack, from the one the command asked for.
+///
+/// Up to [`THREADS_PER_ANSWER`] of them, and how many there are in all: a
+/// ground station that wants every thread asks again from `first` plus
+/// however many this told of, until it has `total`. A `first` at or past
+/// the last is answered with none, which is not a refusal: the threads a
+/// vehicle has can change between two questions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QueryThreadsTelemetry {
+    pub header: TelemetryHeader,
+    /// The position of the first thread told of, in the order they
+    /// started.
+    pub first: u32,
+    /// How many threads there are in all.
+    pub total: u32,
+    /// How many of `threads` are told of, from its start.
+    pub told: u8,
+    /// The threads, of which the first `told` mean anything.
+    pub threads: [ThreadStack; THREADS_PER_ANSWER],
+}
+
+impl QueryThreadsTelemetry {
+    /// Makes the answer to a QUERY_THREADS, made now, telling of no thread
+    /// yet: see [`QueryThreadsTelemetry::tell`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    /// * `first`    - The position of the first thread it tells of.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    pub fn new(sequence: u32, status: CommandStatus, first: u32) -> Self {
+        Self {
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::QueryThreads,
+                status,
+            ),
+            first,
+            total: 0,
+            told: 0,
+            threads: [ThreadStack::default(); THREADS_PER_ANSWER],
+        }
+    }
+
+    /// Has it tell of `told` threads of `total`, which are already in
+    /// [`QueryThreadsTelemetry::threads`].
+    ///
+    /// # Arguments
+    ///
+    /// * `total` - How many threads there are in all.
+    /// * `told`  - How many it tells of: at most [`THREADS_PER_ANSWER`].
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    pub fn tell(mut self, total: usize, told: usize) -> Self {
+        self.total = u32::try_from(total).unwrap_or(u32::MAX);
+        self.told = told.min(THREADS_PER_ANSWER) as u8;
+        self
+    }
+
+    /// The threads it tells of.
+    pub fn told(&self) -> &[ThreadStack] {
+        &self.threads[..usize::from(self.told)]
+    }
+}
+
 /// Makes an answer of this status to a command of that kind.
 ///
 /// The telemetry type has to match the command, because that is how the ground
@@ -679,10 +756,18 @@ pub fn answer_to(
                 DHSample::new(),
             ))
         }
+        Command::QueryThreads(cmd) => Telemetry::QueryThreads(
+            QueryThreadsTelemetry::new(sequence, status, cmd.first),
+        ),
     }
 }
 
 /// Union of all telemetry types
+///
+/// Unboxed though an answer to QUERY_THREADS is far larger than the rest:
+/// tcspecial makes an answer in its main loop, where boxing one would be an
+/// allocation for every command answered.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Telemetry {
     Ping(PingTelemetry),
@@ -694,6 +779,7 @@ pub enum Telemetry {
     SetNode(SetNodeTelemetry),
     QueryNode(QueryNodeTelemetry),
     QueryNodeSample(QueryNodeSampleTelemetry),
+    QueryThreads(QueryThreadsTelemetry),
 }
 
 impl Telemetry {
@@ -712,6 +798,7 @@ impl Telemetry {
             Telemetry::SetNode(tm) => &tm.header,
             Telemetry::QueryNode(tm) => &tm.header,
             Telemetry::QueryNodeSample(tm) => &tm.header,
+            Telemetry::QueryThreads(tm) => &tm.header,
         }
     }
 
@@ -732,6 +819,7 @@ impl Telemetry {
             Telemetry::SetNode(tm) => &mut tm.header,
             Telemetry::QueryNode(tm) => &mut tm.header,
             Telemetry::QueryNodeSample(tm) => &mut tm.header,
+            Telemetry::QueryThreads(tm) => &mut tm.header,
         }
     }
 
@@ -909,6 +997,11 @@ mod tests {
                 NodeId::of(1),
                 DHSample::new(),
                 DHSample::new(),
+            )),
+            Telemetry::QueryThreads(QueryThreadsTelemetry::new(
+                16,
+                CommandStatus::Success,
+                0,
             )),
         ];
 

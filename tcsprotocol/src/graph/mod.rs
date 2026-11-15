@@ -2385,7 +2385,7 @@ mod tests {
     path: zone
 tcspecial:
   gateway: radio
-  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  interface: \"2f452fd334eb3cc535b5b1f01bb64c2f\"
   tcs_cmd:
     \
              recv: 0.0.0.0:4000

@@ -274,7 +274,7 @@ Requirement
     ``tcs_cmd.recv``; a command about a node -- ``START_NODE``, ``STOP_NODE``,
     ``SET_NODE``, ``QUERY_NODE``, ``QUERY_NODE_SAMPLE`` -- arrives on
     ``payload_command.dest_base``, with nothing added to it, and is answered
-    there. ``CONNECT`` is the spacecraft's: it asks whether there is a
+    there, as ``QUERY_THREADS``, about the vehicle's threads, does. ``CONNECT`` is the spacecraft's: it asks whether there is a
     connection to the vehicle, which is what that link is, and a ground
     station without one has nothing to ask a node. A ``CONNECT`` that arrives
     on the node link is refused like any other command on the wrong one.

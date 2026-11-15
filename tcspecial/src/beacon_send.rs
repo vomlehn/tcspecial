@@ -317,9 +317,13 @@ impl BeaconSend {
         };
 
         let b_clone = b.clone();
-        crate::runtime::thread::named("beacons")
-            .spawn(move || b_clone.beacon_send(out))
-            .expect("the beacon thread starts");
+        crate::runtime::thread::spawn(
+            tcsprotocol::ThreadRole::Beacons,
+            tcsprotocol::NO_NODE,
+            "beacons",
+            move || b_clone.beacon_send(out),
+        )
+        .expect("the beacon thread starts");
         b
     }
 

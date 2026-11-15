@@ -3927,7 +3927,9 @@ statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
 ``RESTART_ARM``, ``RESTART`` and ``CONFIGURE`` go to ``tcs_cmd.recv``;
 ``START_NODE``, ``STOP_NODE``, ``SET_NODE``, ``QUERY_NODE`` and
 ``QUERY_NODE_SAMPLE`` go to ``payload_command.dest_base``, one socket for
-every node, the node's id being in the command.
+every node, the node's id being in the command, and so does
+``QUERY_THREADS``, which is about the vehicle's threads but asked at
+leisure.
 ``CONNECT`` goes to ``tcs_cmd.recv`` with the rest of the spacecraft's own:
 it asks whether there is a connection to the vehicle at all, and a ground
 station without one has nothing to ask a payload. One table in the library
@@ -4246,20 +4248,40 @@ Thread stacks
 
 tcspecial runs a thread for each node, one for each payload's link to the
 ground, and one each for its commands, its beacons, its signals and, where
-it keeps a log, segsend. Each is given ``thread_stack`` bytes of stack, the
-running configuration's:
+it keeps a log, segsend. Each node's thread, and each link's, is given
+``thread_stack`` bytes of stack, the running configuration's:
 
 .. code-block:: yaml
 
    tcspecial:
-     thread_stack: "262144"
+     thread_stack: "65536"
 
-Left out, it is 262144, 256 KiB. Less than 131072, 128 KiB, is refused:
-a thread that overflows its stack aborts tcspecial, and that is the least
-its tests pass with. The startup summary says what each thread was given.
-The signal thread is started before any configuration is read and has the
-default; the main thread's stack is set as the process starts, by
-``ulimit -s`` or a systemd unit's ``LimitSTACK``.
+Left out, it is 65536, 64 KiB. Less than 32768, 32 KiB, is refused: a
+thread that overflows its stack aborts tcspecial, and the deepest node
+thread its tests run reaches 26 KiB. The startup summary says what each
+node's thread was given. tcspecial's own threads are given 262144 bytes,
+256 KiB, whatever the configuration says: the commands thread reads
+configurations, which takes far more than a node does. The main thread's
+stack is set as the process starts, by ``ulimit -s`` or a systemd unit's
+``LimitSTACK``.
+
+How deep each thread has been
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+What a vehicle's nodes need is best learned from the vehicle. tcspecial
+measures how deep each of its threads has been into its stack since it
+started, and ``QUERY_THREADS`` asks it, on the node command link: the
+answer gives each thread's role -- ``main``, ``signals``, ``commands``,
+``beacons``, ``segsend``, ``node`` or ``ground link`` -- the id of the node
+it belongs to, the stack it was given and the most of it it has used, a
+little more than it used and never less. One answer tells of up to 32
+threads and says how many there are in all; ask again from where it
+stopped for the rest. ``TcsClient::threads`` in tcsmoc reads them all, and
+``tcs_client_query_threads`` in the C/C++ library reads one answer.
+
+Set ``thread_stack`` from the deepest node thread a vehicle has reported
+after it has run through what it does in flight, with room to spare: twice
+is what the default leaves over what the tests reach.
 
 Which interface it is written for
 ---------------------------------
@@ -4270,7 +4292,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "c7820f9bfe585feab72247ece0a2261d"
+     interface: "2f452fd334eb3cc535b5b1f01bb64c2f"
 
 It is the digest of the ``tcsprotocol/xtce/link.xtce`` a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4285,7 +4307,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --interface-digest
-   c7820f9bfe585feab72247ece0a2261d
+   2f452fd334eb3cc535b5b1f01bb64c2f
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -4296,8 +4318,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to c7820f9bfe585feab72247ece0a2261d, from 0123...
-   vehicle.xtcs: interface is c7820f9bfe585feab72247ece0a2261d already
+   vehicle.ytcs: interface set to 2f452fd334eb3cc535b5b1f01bb64c2f, from 0123...
+   vehicle.xtcs: interface is 2f452fd334eb3cc535b5b1f01bb64c2f already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

@@ -58,7 +58,9 @@ use tcsprotocol::node::vehicle::compute::{
     from_decision, from_value, node_sends_a_decision, node_sends_a_value,
 };
 use tcsprotocol::unit::Unit;
-use tcsprotocol::{ArmKey, DHSample, NodeId, DH_SAMPLE_BYTES};
+use tcsprotocol::{
+    ArmKey, DHSample, NodeId, ThreadRole, DH_SAMPLE_BYTES, THREADS_PER_ANSWER,
+};
 
 /// The size of the buffer `tcs_last_error` returns, its NUL included:
 /// `TCS_ERROR_BYTES` in the header.
@@ -2174,6 +2176,100 @@ pub unsafe extern "C" fn tcs_client_query_node_sample(
     })
 }
 
+/// What the header's `tcs_thread` is.
+#[repr(C)]
+pub struct tcs_thread {
+    role: c_int,
+    node: u32,
+    stack: u32,
+    deepest: u32,
+}
+
+/// Names a thread's role, as the header's `tcs_thread_role_name` says.
+///
+/// # Arguments
+///
+/// * `role` - The role's number.
+///
+/// # Returns
+///
+/// Its name, or "" for a number this library does not know: static.
+#[no_mangle]
+pub extern "C" fn tcs_thread_role_name(role: c_int) -> *const c_char {
+    let name: &'static CStr = match u8::try_from(role).map(ThreadRole::from_u8)
+    {
+        Ok(ThreadRole::Main) => c"main",
+        Ok(ThreadRole::Signals) => c"signals",
+        Ok(ThreadRole::Commands) => c"commands",
+        Ok(ThreadRole::Beacons) => c"beacons",
+        Ok(ThreadRole::Segsend) => c"segsend",
+        Ok(ThreadRole::Node) => c"node",
+        Ok(ThreadRole::GroundLink) => c"ground link",
+        Ok(ThreadRole::Unknown(_)) | Err(_) => c"",
+    };
+    name.as_ptr()
+}
+
+/// Sends QUERY_THREADS, to ask what tcspecial's threads are for and how deep
+/// each has been into its stack.
+///
+/// # Arguments
+///
+/// * `client`  - The client.
+/// * `first`   - The position of the first thread to tell of.
+/// * `status`  - Where what the vehicle answered is written.
+/// * `total`   - Where how many threads the vehicle has is written.
+/// * `threads` - Where the threads are written: room for
+///               `TCS_THREADS_PER_ANSWER`.
+/// * `told`    - Where how many of `threads` were written is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
+///
+/// # Safety
+///
+/// As [`tcs_client_connect`]; `status`, `total` and `told` NULL or
+/// writable, and `threads` NULL or room for `TCS_THREADS_PER_ANSWER`.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_query_threads(
+    client: *mut tcs_client,
+    first: u32,
+    status: *mut c_int,
+    total: *mut u32,
+    threads: *mut tcs_thread,
+    told: *mut usize,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let status_out = out_of(status, "the status")?;
+        let total_out = out_of(total, "the total")?;
+        let told_out = out_of(told, "told")?;
+        if threads.is_null() {
+            return Err(fail("the threads is NULL"));
+        }
+        let (answered, all, them) = link
+            .client
+            .query_threads(first)
+            .map_err(|e| fail(format_args!("QUERY_THREADS {first}: {e}")))?;
+        // SAFETY: the caller gives room for TCS_THREADS_PER_ANSWER, and an
+        // answer tells of no more.
+        let room = std::slice::from_raw_parts_mut(threads, THREADS_PER_ANSWER);
+        for (slot, thread) in room.iter_mut().zip(them.iter()) {
+            *slot = tcs_thread {
+                role: c_int::from(thread.role.to_u8()),
+                node: thread.node.0,
+                stack: thread.stack,
+                deepest: thread.deepest,
+            };
+        }
+        *status_out = status_number(answered);
+        *total_out = all;
+        *told_out = them.len().min(THREADS_PER_ANSWER);
+        Ok(0)
+    })
+}
+
 // ---- Pinging a ping node ----------------------------------------------------
 
 /// What the header's `tcs_exchange` is.
@@ -2906,9 +3002,45 @@ mod tests {
             ("TCS_SAMPLE_BYTES", DH_SAMPLE_BYTES),
             ("TCS_ATTRIBUTE_BYTES", tcsprotocol::ATTRIBUTE_BYTES),
             ("TCS_VALUE_BYTES", tcsprotocol::VALUE_BYTES),
+            ("TCS_THREADS_PER_ANSWER", THREADS_PER_ANSWER),
         ] {
             let line = format!("#define {name} {size}");
             assert!(header.contains(&line), "the header has no \"{line}\"");
         }
+        let no_node =
+            format!("#define TCS_NO_NODE {:#X}u", tcsprotocol::NO_NODE.0)
+                .replace("0X", "0x");
+        assert!(header.contains(&no_node), "the header has no \"{no_node}\"");
+    }
+
+    /// Every role the header names has the number and the name the protocol
+    /// gives it.
+    #[test]
+    fn the_header_states_the_thread_roles() {
+        let header = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("include/tcsmoc-c.h"),
+        )
+        .expect("the header reads");
+        for (name, role) in [
+            ("MAIN", ThreadRole::Main),
+            ("SIGNALS", ThreadRole::Signals),
+            ("COMMANDS", ThreadRole::Commands),
+            ("BEACONS", ThreadRole::Beacons),
+            ("SEGSEND", ThreadRole::Segsend),
+            ("NODE", ThreadRole::Node),
+            ("GROUND_LINK", ThreadRole::GroundLink),
+        ] {
+            let line = format!("TCS_THREAD_{name} = {}", role.to_u8());
+            assert!(header.contains(&line), "the header has no \"{line}\"");
+            // SAFETY: tcs_thread_role_name returns a C string literal.
+            let said = unsafe {
+                CStr::from_ptr(tcs_thread_role_name(c_int::from(role.to_u8())))
+            };
+            assert_eq!(said.to_str(), Ok(role.as_str()));
+        }
+        // SAFETY: as above.
+        let unknown = unsafe { CStr::from_ptr(tcs_thread_role_name(200)) };
+        assert_eq!(unknown.to_bytes(), b"");
     }
 }

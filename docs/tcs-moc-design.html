@@ -616,7 +616,7 @@ spacecraft and one for every node. A command about the spacecraft --
 <tt class="docutils literal">tcs_cmd.recv</tt>; a command about a node -- <tt class="docutils literal">START_NODE</tt>, <tt class="docutils literal">STOP_NODE</tt>,
 <tt class="docutils literal">SET_NODE</tt>, <tt class="docutils literal">QUERY_NODE</tt>, <tt class="docutils literal">QUERY_NODE_SAMPLE</tt> -- arrives on
 <tt class="docutils literal">payload_command.dest_base</tt>, with nothing added to it, and is answered
-there. <tt class="docutils literal">CONNECT</tt> is the spacecraft's: it asks whether there is a
+there, as <tt class="docutils literal">QUERY_THREADS</tt>, about the vehicle's threads, does. <tt class="docutils literal">CONNECT</tt> is the spacecraft's: it asks whether there is a
 connection to the vehicle, which is what that link is, and a ground
 station without one has nothing to ask a node. A <tt class="docutils literal">CONNECT</tt> that arrives
 on the node link is refused like any other command on the wrong one.</p>

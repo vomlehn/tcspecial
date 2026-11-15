@@ -290,8 +290,12 @@ impl Commands {
             let malformed = bus.malformed();
             let serving = serving(malformed.clone());
             let answers = bus.publisher();
-            let thread = crate::runtime::thread::named("commands")
-                .spawn(move || serving.run_on_bus(reader, answers))?;
+            let thread = crate::runtime::thread::spawn(
+                tcsprotocol::ThreadRole::Commands,
+                tcsprotocol::NO_NODE,
+                "commands",
+                move || serving.run_on_bus(reader, answers),
+            )?;
             return Ok(Commands {
                 spacecraft_at: at,
                 nodes_at: at,
@@ -339,8 +343,12 @@ impl Commands {
 
         let malformed = Arc::new(AtomicU64::new(0));
         let serving = serving(malformed.clone());
-        let thread = crate::runtime::thread::named("commands")
-            .spawn(move || serving.run(spacecraft, nodes))?;
+        let thread = crate::runtime::thread::spawn(
+            tcsprotocol::ThreadRole::Commands,
+            tcsprotocol::NO_NODE,
+            "commands",
+            move || serving.run(spacecraft, nodes),
+        )?;
 
         Ok(Commands {
             spacecraft_at,
@@ -1191,6 +1199,21 @@ impl Serving {
                     ))
                 }
             },
+
+            // Each thread's stack, measured now, into the answer itself, so
+            // that nothing is allocated: see `runtime::thread`.
+            Command::QueryThreads(cmd) => {
+                let mut answer = tcsprotocol::QueryThreadsTelemetry::new(
+                    sequence,
+                    CommandStatus::Success,
+                    cmd.first,
+                );
+                let (total, told) = crate::runtime::thread::stacks(
+                    cmd.first as usize,
+                    &mut answer.threads,
+                );
+                Telemetry::QueryThreads(answer.tell(total, told))
+            }
 
             // Armed for the next restart_arm_valid, with this key, onto this
             // target, which the vehicle must hold: one it does not is

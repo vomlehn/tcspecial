@@ -180,9 +180,9 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Failed> {
         ConfigVersion::of_this_build()
     ));
 
-    // The stack every thread from here on is given, before the first is
-    // made: segsend's, just below. Said in the summary, because a stack too
-    // small is a vehicle that aborts, and whoever reads why first asks this.
+    // The stack each node's thread is given, before the first is made. Said
+    // in the summary, because a stack too small is a vehicle that aborts,
+    // and whoever reads why first asks this.
     let stack = graph
         .tcspecial
         .as_ref()
@@ -195,7 +195,11 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Failed> {
         })
         .map_or(tcsprotocol::THREAD_STACK_DEFAULT, |ci| ci.thread_stack);
     crate::runtime::thread::set_stack(stack);
-    summary(format!("thread stack: {stack} bytes"));
+    summary(format!("node thread stack: {stack} bytes"));
+    // Room to measure a thread for each node and each payload's link to
+    // the ground, which are at most as many as the nodes, and tcspecial's
+    // own: see `runtime::thread`.
+    crate::runtime::thread::expect(2 * graph.nodes.len() + 8);
 
     // What every log hands its filled segments to, found before any log is
     // opened: opening one hands over what an earlier run left in it.

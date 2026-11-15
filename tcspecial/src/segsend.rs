@@ -149,11 +149,15 @@ impl SegSend {
             })?;
         let (queue, waiting) = sync_channel::<Name>(WAITING);
         let shown = program.display().to_string();
-        crate::runtime::thread::named(SEGSEND)
-            .spawn(move || send_each(&program_c, &shown, waiting))
-            .map_err(|e| {
-                format!("the thread that runs {SEGSEND} cannot be started: {e}")
-            })?;
+        crate::runtime::thread::spawn(
+            tcsprotocol::ThreadRole::Segsend,
+            tcsprotocol::NO_NODE,
+            SEGSEND,
+            move || send_each(&program_c, &shown, waiting),
+        )
+        .map_err(|e| {
+            format!("the thread that runs {SEGSEND} cannot be started: {e}")
+        })?;
         Ok(SegSend {
             queue: Some(queue),
             swept: Arc::new(Mutex::new(Vec::new())),

@@ -1661,21 +1661,44 @@ a start that carried on would hide it.</dd>
 supervisor -- for a vehicle and a desk alike, and the systemd unit
 shipped with tcspecial sets it.</dd>
 <dt>Requirement</dt>
-<dd><p class="first">Each of tcspecial's threads is given a small stack, the running
-configuration's <tt class="docutils literal">thread_stack</tt>, 256 KiB where it says nothing, rather
-than the 2 MiB a Rust thread has, so that what is locked is mostly what
-tcspecial uses. Less than 128 KiB is refused when the configuration is
-checked (<tt class="docutils literal"><span class="pre">tcsprotocol::THREAD_STACK_LEAST</span></tt>): the least the tests pass
-with in a debug build, which uses more than a release build, the
-default being twice that. Every thread the flight software runs on is
-made by <tt class="docutils literal"><span class="pre">runtime::thread::named</span></tt>, so none takes the standard
-library's default by being made elsewhere. The signal thread, made
-before any configuration is read, has the default. One setting for
-every thread: a node's own may be added later without changing what
-this one means.</p>
-<p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal">thread_stack</tt>, for the nodes', the
-commands', the beacons' and segsend's threads, said in the startup
-summary. The lock itself is not built yet.</p>
+<dd><p class="first">Each of tcspecial's threads is given a small stack rather than the 2
+MiB a Rust thread has, so that what is locked is mostly what tcspecial
+uses. A node's thread, and a payload's link to the ground, are given the
+running configuration's <tt class="docutils literal">thread_stack</tt>, 64 KiB where it says nothing;
+less than 32 KiB is refused when the configuration is checked
+(<tt class="docutils literal"><span class="pre">tcsprotocol::THREAD_STACK_LEAST</span></tt>), a little more than the 26 KiB
+the deepest node thread the tests run reaches in a debug build, which
+uses more than a release build. tcspecial's own threads -- signals,
+commands, beacons and segsend -- are given a fixed 256 KiB
+(<tt class="docutils literal"><span class="pre">runtime::thread::SERVICE_STACK</span></tt>), two and a half times the 96 KiB
+the commands thread, the deepest of them, reaches. Every thread the
+flight software runs on is made by <tt class="docutils literal"><span class="pre">runtime::thread::spawn</span></tt>, so none
+takes the standard library's default by being made elsewhere. One
+setting for every node: a node's own may be added later without
+changing what this one means.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal">thread_stack</tt> for nodes' threads, said in
+the startup summary, and the fixed stack for tcspecial's own. The lock
+itself is not built yet.</p>
+</dd>
+<dt>Requirement</dt>
+<dd><p class="first">How deep each thread has been into its stack is measured aboard and
+told to the ground on request, so that a vehicle's <tt class="docutils literal">thread_stack</tt> is
+set from what that vehicle does: the paths a vehicle runs -- its
+devices, its errors -- are not all the paths a desk runs. Each thread,
+as it starts, fills the part of its stack it has not used with a
+pattern; how much of the pattern is gone is how deep it has been. The
+figure is a little more than the thread used and never less. A page
+counted as touched would not do: once the process's memory is locked,
+every page is. QUERY_THREADS, on the node command link, is answered
+with each thread's role, the node it belongs to, its stack and its
+deepest, up to <tt class="docutils literal"><span class="pre">tcsprotocol::THREADS_PER_ANSWER</span></tt> threads an answer,
+from the one the command names, and how many there are in all, so the
+ground reads a vehicle with more by asking again. Reading the figures
+allocates nothing, since it is done in the loop.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal"><span class="pre">runtime::thread</span></tt>, <tt class="docutils literal"><span class="pre">tcsprotocol::threads</span></tt>,
+QUERY_THREADS, <tt class="docutils literal"><span class="pre">tcsmoc::TcsClient::query_threads</span></tt> and
+<tt class="docutils literal">threads</tt>, and the C library's <tt class="docutils literal">tcs_client_query_threads</tt>. Not yet
+in tcs-moc's window or the F´ bridge.</p>
 </dd>
 <dt>Requirement</dt>
 <dd><p class="first">Every thread of the child allocates from one malloc arena, the main
@@ -1686,8 +1709,10 @@ everything mapped is refused when that is more than the limit on what
 may be locked. tcspecial allocates while it loads a configuration and
 not in its loop, so its threads have little to contend for in one.</p>
 <p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">runtime::thread::one_arena</span></tt>. With no nodes,
-a release build maps about 8.7 MiB, where it mapped 200 MiB; each ping
-node, two threads, adds about 0.7 MiB, where it added 128 MiB.</p>
+a release build maps about 8.9 MiB, where it mapped 200 MiB; each ping
+node, two threads of 64 KiB, adds about 0.3 MiB, where it added 128
+MiB. Filling the stacks to measure them makes all of each stack
+resident, which locking does anyway.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>Whether there is memory enough is not tcspecial's to judge. A total of
@@ -1830,7 +1855,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;c7820f9bfe585feab72247ece0a2261d&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2f452fd334eb3cc535b5b1f01bb64c2f&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">
@@ -4402,6 +4427,12 @@ would be asking twice every time.</dd>
 <dt><tt class="docutils literal">QUERY_NODE_SAMPLE</tt></dt>
 <dd>The last datum that node moved each way, for an operator who wants to see
 the bytes rather than a count of them.</dd>
+<dt><tt class="docutils literal">QUERY_THREADS</tt></dt>
+<dd>What tcspecial's threads are for -- each node's, each payload's link to
+the ground, and its own -- the stack each was given and how deep each
+has been into it, measured as <tt class="docutils literal"><span class="pre">runtime::thread</span></tt> says, from the thread
+the command names. About the vehicle rather than a node, but asked at
+leisure, so on the node link.</dd>
 <dt><tt class="docutils literal">SET_NODE</tt></dt>
 <dd><p class="first">Sets an attribute of a node. A graph's <tt class="docutils literal">commands</tt> section says which
 attribute of which node the ground may set, so this is the command that
@@ -8939,7 +8970,8 @@ drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
 are PING, CONNECT, RESTART_ARM and RESTART; the per-node ones are
-START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE.</p>
+START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE; and
+QUERY_THREADS asks of the vehicle's threads, on the node link.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>An operation that is not answered within the client's timeout is an error.

@@ -755,6 +755,10 @@ impl crate::runtime::fabric::Watch for NodeStates {
             state.sample_given(data);
         }
     }
+
+    fn id_of(&self, node: &str) -> Option<NodeId> {
+        self.named(node).map(|state| state.id())
+    }
 }
 
 #[cfg(test)]

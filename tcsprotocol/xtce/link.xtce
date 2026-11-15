@@ -91,6 +91,53 @@
           <Enumeration value="10" label="Unmatched"/>
         </EnumerationList>
       </EnumeratedParameterType>
+      <!-- What a thread of tcspecial's is for: tcsprotocol::ThreadRole,
+           whose numbers these are. A node's thread and a payload's link to
+           the ground belong to the node their Node names; the rest to no
+           node, and their Node is all ones. -->
+      <EnumeratedParameterType name="ThreadRoleType">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <EnumerationList>
+          <Enumeration value="0" label="Main"/>
+          <Enumeration value="1" label="Signals"/>
+          <Enumeration value="2" label="Commands"/>
+          <Enumeration value="3" label="Beacons"/>
+          <Enumeration value="4" label="Segsend"/>
+          <Enumeration value="5" label="Node"/>
+          <Enumeration value="6" label="GroundLink"/>
+        </EnumerationList>
+      </EnumeratedParameterType>
+      <!-- How many threads one answer to QUERY_THREADS tells of: up to 32,
+           tcsprotocol::THREADS_PER_ANSWER. -->
+      <IntegerParameterType name="ThreadsToldType" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="32"/>
+      </IntegerParameterType>
+      <!-- One thread: what it is for, its node, the stack it was given and
+           the most of it it has used since it started, both in bytes. -->
+      <AggregateParameterType name="ThreadType">
+        <MemberList>
+          <Member name="Role" typeRef="ThreadRoleType"/>
+          <Member name="Node" typeRef="U32Type"/>
+          <Member name="StackBytes" typeRef="U32Type"/>
+          <Member name="DeepestBytes" typeRef="U32Type"/>
+        </MemberList>
+      </AggregateParameterType>
+      <ArrayParameterType name="ThreadsType" arrayTypeRef="ThreadType">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex>
+              <FixedValue>0</FixedValue>
+            </StartingIndex>
+            <EndingIndex>
+              <DynamicValue>
+                <ParameterInstanceRef parameterRef="ThreadsTold"/>
+                <LinearAdjustment intercept="-1"/>
+              </DynamicValue>
+            </EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
     </ParameterTypeSet>
     <ParameterSet>
       <Parameter name="Opcode" parameterTypeRef="U8Type"/>
@@ -128,6 +175,13 @@
       <Parameter name="GivenLength" parameterTypeRef="U8Type"/>
       <Parameter name="GivenTotal" parameterTypeRef="U32Type"/>
       <Parameter name="GivenBytesShown" parameterTypeRef="SampleBytesType"/>
+      <!-- An answer to QUERY_THREADS: the position of the first thread it
+           tells of, in the order they started, how many threads there are
+           in all, how many it tells of, and those. -->
+      <Parameter name="FirstThread" parameterTypeRef="U32Type"/>
+      <Parameter name="ThreadTotal" parameterTypeRef="U32Type"/>
+      <Parameter name="ThreadsTold" parameterTypeRef="ThreadsToldType"/>
+      <Parameter name="Threads" parameterTypeRef="ThreadsType"/>
     </ParameterSet>
     <ContainerSet>
       <!-- What every answer holds first. -->
@@ -218,6 +272,19 @@
         <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
             <Comparison parameterRef="Opcode" value="52"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="QueryThreadsAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="FirstThread"/>
+          <ParameterRefEntry parameterRef="ThreadTotal"/>
+          <ParameterRefEntry parameterRef="ThreadsTold"/>
+          <ParameterRefEntry parameterRef="Threads"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="53"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -380,6 +447,25 @@
         <CommandContainer name="QueryNodeSampleContainer">
           <EntryList>
             <ArgumentRefEntry argumentRef="Node"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- What tcspecial's threads are for and how deep each has been into
+           its stack, from the thread at position First, in the order they
+           started: see tcsprotocol/src/threads.rs. -->
+      <MetaCommand name="QueryThreads">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="53"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="First" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryThreadsContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="First"/>
           </EntryList>
           <BaseContainer containerRef="TcsCommandContainer"/>
         </CommandContainer>

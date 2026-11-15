@@ -22,7 +22,8 @@ use tcsprotocol::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
     CommandType, ConfigDigest, ConfigVersion, ConnectCommand, DHSample,
     NodeCommand, NodeCounts, NodeId, PingCommand, Reason, RestartArmCommand,
-    RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry, Timestamp,
+    RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry,
+    ThreadStack, ThreadsCommand, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -851,6 +852,79 @@ impl TcsClient {
             }
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
+        }
+    }
+
+    /// What tcspecial's threads are for and how deep each has been into its
+    /// stack, from the `first`: QUERY_THREADS.
+    ///
+    /// One answer tells of up to [`tcsprotocol::THREADS_PER_ANSWER`]
+    /// threads; [`TcsClient::threads`] asks as often as it takes to have
+    /// them all.
+    ///
+    /// # Arguments
+    ///
+    /// * `first` - The position of the first thread to tell of, in the order
+    ///             they started.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with, how many threads it has in
+    /// all, and the ones the answer told of.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` if the client has no node link,
+    /// `TcsError::Unmatched` if the station is not matched for commanding,
+    /// `TcsError::Io` if it cannot be sent or no answer comes in time,
+    /// and `TcsError::Protocol` if the answer is not this command's.
+    pub fn query_threads(
+        &mut self,
+        first: u32,
+    ) -> TcsResult<(CommandStatus, u32, Vec<ThreadStack>)> {
+        let seq = self.next_sequence();
+        let cmd = Command::QueryThreads(ThreadsCommand::new(seq, first));
+        match self.send_command(cmd)? {
+            Telemetry::QueryThreads(tm) => {
+                Ok((tm.header.status, tm.total, tm.told().to_vec()))
+            }
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
+        }
+    }
+
+    /// Every one of tcspecial's threads: QUERY_THREADS, asked from the first
+    /// thread and again from where each answer stopped, until every thread
+    /// the vehicle has is told of.
+    ///
+    /// The threads can change between two answers, as the ground starts a
+    /// node, so an answer that tells of none ends it early rather than
+    /// asking for ever.
+    ///
+    /// # Returns
+    ///
+    /// The threads, in the order they started.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`TcsClient::query_threads`], and `TcsError::Protocol` for
+    /// an answer that refused the command.
+    pub fn threads(&mut self) -> TcsResult<Vec<ThreadStack>> {
+        let mut all = Vec::new();
+        loop {
+            let first = u32::try_from(all.len()).unwrap_or(u32::MAX);
+            let (status, total, told) = self.query_threads(first)?;
+            if !status.is_success() {
+                return Err(TcsError::Protocol(format!(
+                    "the vehicle refused QUERY_THREADS: {status:?}"
+                )));
+            }
+            let none = told.is_empty();
+            all.extend(told);
+            if none || all.len() >= total as usize {
+                return Ok(all);
             }
         }
     }

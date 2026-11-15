@@ -29,10 +29,10 @@ use tcsprotocol::node::vehicle::ping;
 // The link's command, beside std's process Command.
 use tcsprotocol::Command as LinkCommand;
 use tcsprotocol::{
-    Beacon, CommandStatus, ConnectTelemetry, DHSample, NodeCounts,
-    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry, Reason,
-    RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
-    Timestamp,
+    Beacon, CommandStatus, ConnectTelemetry, DHSample, NodeCounts, NodeId,
+    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
+    QueryThreadsTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
+    SetNodeTelemetry, Telemetry, ThreadRole, ThreadStack, Timestamp, NO_NODE,
 };
 
 fn here() -> PathBuf {
@@ -205,7 +205,7 @@ fn against_a_vehicle(program: &Path) -> String {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"c7820f9bfe585feab72247ece0a2261d\"
+  interface: \"2f452fd334eb3cc535b5b1f01bb64c2f\"
   beacon:
     default_interval: \"5 s\"
     recv: \"127.0.0.1:{beacons}\"
@@ -351,6 +351,37 @@ vehicle:
                                 ),
                             )
                         }
+                        // Three threads: the main thread, the commands
+                        // thread and the ping node's.
+                        LinkCommand::QueryThreads(cmd) => {
+                            assert_eq!(cmd.first, 0, "from the first");
+                            let mut answer = QueryThreadsTelemetry::new(
+                                seq,
+                                CommandStatus::Success,
+                                cmd.first,
+                            );
+                            answer.threads[..3].copy_from_slice(&[
+                                ThreadStack {
+                                    role: ThreadRole::Main,
+                                    node: NO_NODE,
+                                    stack: 8_388_608,
+                                    deepest: 40_960,
+                                },
+                                ThreadStack {
+                                    role: ThreadRole::Commands,
+                                    node: NO_NODE,
+                                    stack: 262_144,
+                                    deepest: 12_288,
+                                },
+                                ThreadStack {
+                                    role: ThreadRole::Node,
+                                    node: NodeId(1),
+                                    stack: 65_536,
+                                    deepest: 8_192,
+                                },
+                            ]);
+                            Telemetry::QueryThreads(answer.tell(3, 3))
+                        }
                         // Onto the configuration the station read, which is
                         // what a NULL target says.
                         LinkCommand::RestartArm(cmd) => {
@@ -416,6 +447,7 @@ vehicle:
             tcsprotocol::CommandType::QueryNode,
             tcsprotocol::CommandType::SetNode,
             tcsprotocol::CommandType::QueryNodeSample,
+            tcsprotocol::CommandType::QueryThreads,
             tcsprotocol::CommandType::RestartArm,
             tcsprotocol::CommandType::Restart,
         ],
@@ -449,16 +481,20 @@ vehicle:
         "ping sends values: no".to_string(),
         "ping sends decisions: no".to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
+        "threads: Success, 3 of 3".to_string(),
+        "thread main: 40960 of 8388608 bytes".to_string(),
+        "thread commands: 12288 of 262144 bytes".to_string(),
+        "thread node (node 1): 8192 of 65536 bytes".to_string(),
         "restart: armed done, restarted done".to_string(),
         "ping ping through gateway: sent".to_string(),
         "data from ping: hello from ping".to_string(),
         "ping ping: answered, round trip timed, up and down summing to it \
         yes"
         .to_string(),
-        // Seven answers and two data, every one read: the vehicle beacons
+        // Eight answers and two data, every one read: the vehicle beacons
         // clear and with this configuration's checksum, so nothing it sends
         // is dropped.
-        "packets: 9 received = 9 processed + 0 malformed + 0 mismatched"
+        "packets: 10 received = 10 processed + 0 malformed + 0 mismatched"
             .to_string(),
     ];
     let lines: Vec<&str> = printed.lines().collect();

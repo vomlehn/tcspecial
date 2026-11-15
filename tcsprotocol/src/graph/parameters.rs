@@ -741,7 +741,7 @@ fn at_least_one(
     }
 }
 
-/// Refuses a `thread_stack` too small for tcspecial's threads.
+/// Refuses a `thread_stack` too small for a node's thread.
 ///
 /// # Arguments
 ///
@@ -759,7 +759,7 @@ fn enough_stack(bytes: u32) -> Result<u32, String> {
     let least = crate::types::THREAD_STACK_LEAST;
     if bytes < least {
         return Err(format!(
-            "thread_stack is {bytes} bytes, and tcspecial's threads need at \
+            "thread_stack is {bytes} bytes, and a node's thread needs at \
              least {least}: a thread that overflows its stack aborts the \
              vehicle's software, so make it {least} or more, or leave it out \
              for {}",
@@ -928,7 +928,7 @@ mod tests {
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
             ("gateway", "radio"),
-            ("interface", "c7820f9bfe585feab72247ece0a2261d"),
+            ("interface", "2f452fd334eb3cc535b5b1f01bb64c2f"),
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_command.source_base", "127.0.0.1:4300"),
@@ -954,7 +954,7 @@ mod tests {
     fn on_the_bus() -> Vec<(&'static str, &'static str)> {
         vec![
             ("gateway", "cfs"),
-            ("interface", "c7820f9bfe585feab72247ece0a2261d"),
+            ("interface", "2f452fd334eb3cc535b5b1f01bb64c2f"),
             ("sbn.release", "v7.0.1"),
             ("sbn.ident", "3b339a5e0f686cef822a5d6ea95004222ab7af33"),
             ("sbn.spacecraft_id", "0x42"),
@@ -1370,8 +1370,8 @@ mod tests {
         }
     }
 
-    /// `thread_stack` is 256 KiB where it is not said, is taken as said
-    /// where it is at least 128 KiB, and is refused below that, naming the
+    /// `thread_stack` is 64 KiB where it is not said, is taken as said
+    /// where it is at least 32 KiB, and is refused below that, naming the
     /// attribute and the least.
     #[test]
     fn the_thread_stack_has_a_default_and_a_least() {
@@ -1390,17 +1390,17 @@ mod tests {
             crate::types::THREAD_STACK_DEFAULT
         );
         assert_eq!(
-            settled(Some("131072")).expect("the least").thread_stack,
-            131_072
+            settled(Some("32768")).expect("the least").thread_stack,
+            32_768
         );
         assert_eq!(
             settled(Some("1048576")).expect("more").thread_stack,
             1_048_576
         );
-        for small in ["131071", "65536", "0"] {
+        for small in ["32767", "16384", "0"] {
             let why = settled(Some(small)).expect_err(small);
             assert!(why.contains("thread_stack"), "{why}");
-            assert!(why.contains("131072"), "{why}");
+            assert!(why.contains("32768"), "{why}");
         }
         assert!(settled(Some("big")).is_err());
     }
@@ -1422,7 +1422,7 @@ mod tests {
         };
         let ours = crate::InterfaceDigest::of_this_build();
         assert_eq!(
-            with(Some("c7820f9bfe585feab72247ece0a2261d"))
+            with(Some("2f452fd334eb3cc535b5b1f01bb64c2f"))
                 .expect("this build's")
                 .interface,
             ours,

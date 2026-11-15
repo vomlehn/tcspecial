@@ -30,21 +30,25 @@
 
 use std::fmt;
 
-use tcsxtce::packet::{Codec, FixedBytes, FixedString, Packet, PacketError};
+use tcsxtce::packet::{
+    self as pk, Codec, FixedBytes, FixedString, Packet, PacketError,
+};
 
 use crate::commands::{
     Attribute, Command, CommandHeader, CommandType, ConnectCommand,
     NodeCommand, PingCommand, RestartArmCommand, RestartCommand,
-    SetNodeCommand, Value,
+    SetNodeCommand, ThreadsCommand, Value,
 };
 use crate::config_digest::{ConfigDigest, ConfigVersion};
 use crate::fixed_packet as fixed;
 use crate::link_packet as packet;
 use crate::telemetry::{
     ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, Telemetry, TelemetryHeader, TelemetryType,
+    QueryNodeTelemetry, QueryThreadsTelemetry, Reason, RestartArmTelemetry,
+    RestartTelemetry, SetNodeTelemetry, Telemetry, TelemetryHeader,
+    TelemetryType,
 };
+use crate::threads::{ThreadRole, ThreadStack, THREADS_PER_ANSWER};
 use crate::types::{
     ArmKey, CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
     DH_SAMPLE_BYTES,
@@ -277,6 +281,9 @@ impl Command {
                 header: header(p.sequence, CommandType::QueryNodeSample),
                 node: NodeId(p.node),
             }),
+            K::QueryThreads(p) => {
+                Command::QueryThreads(ThreadsCommand::new(p.sequence, p.first))
+            }
             K::SetNode(p) => Command::SetNode(SetNodeCommand {
                 header: header(p.sequence, CommandType::SetNode),
                 node: NodeId(p.node),
@@ -388,6 +395,10 @@ impl CommandPacker {
                 node: c.node.0,
                 attribute: text(c.attribute.as_str()),
                 value_: fixed_bytes(c.value.as_bytes()),
+            }),
+            Command::QueryThreads(c) => K::QueryThreads(packet::QueryThreads {
+                sequence,
+                first: c.first,
             }),
         };
         encoded(&mut self.ordinary, &ordinary)
@@ -601,6 +612,29 @@ impl Telemetry {
                     )?,
                 })
             }
+            K::QueryThreadsAnswer(p) => {
+                let mut threads = [ThreadStack::default(); THREADS_PER_ANSWER];
+                for (slot, thread) in threads.iter_mut().zip(p.threads.iter()) {
+                    *slot = ThreadStack {
+                        role: ThreadRole::from_u8(
+                            u8::try_from(thread.role.0).map_err(|_| {
+                                LinkError::Value("a thread's role")
+                            })?,
+                        ),
+                        node: NodeId(thread.node),
+                        stack: thread.stack_bytes,
+                        deepest: thread.deepest_bytes,
+                    };
+                }
+                Telemetry::QueryThreads(QueryThreadsTelemetry {
+                    header: head!(p, TelemetryType::QueryThreads),
+                    first: p.first_thread,
+                    total: p.thread_total,
+                    // The XTCE's capacity is THREADS_PER_ANSWER.
+                    told: p.threads.len() as u8,
+                    threads,
+                })
+            }
         })
     }
 
@@ -748,6 +782,28 @@ impl AnswerPacker {
                         given_bytes_shown: fixed_bytes(&t.given.bytes),
                 ))
             }
+            Telemetry::QueryThreads(t) => {
+                let mut threads = pk::FixedVec::new();
+                for thread in t.told() {
+                    // Never full: the XTCE's capacity is THREADS_PER_ANSWER.
+                    let _ = threads.push(packet::ThreadType {
+                        role: packet::ThreadRoleType(i64::from(
+                            thread.role.to_u8(),
+                        )),
+                        node: thread.node.0,
+                        stack_bytes: thread.stack,
+                        deepest_bytes: thread.deepest,
+                    });
+                }
+                K::QueryThreadsAnswer(fill!(
+                    packet,
+                    QueryThreadsAnswer,
+                    t.header;
+                        first_thread: t.first,
+                        thread_total: t.total,
+                        threads: threads,
+                ))
+            }
         };
         encoded(&mut self.ordinary, &p)
     }
@@ -807,6 +863,7 @@ mod tests {
             Command::StopNode(NodeCommand::stop(7, NodeId(7))),
             Command::QueryNode(NodeCommand::query(8, NodeId(7))),
             Command::QueryNodeSample(NodeCommand::query_sample(9, NodeId(7))),
+            Command::QueryThreads(ThreadsCommand::new(10, 33)),
             Command::SetNode(
                 SetNodeCommand::new(10, NodeId(7), "setpoint", b"295.0")
                     .expect("it fits"),
@@ -907,7 +964,58 @@ mod tests {
                 taken,
                 DHSample::new(),
             )),
+            // None told, some, and as many as an answer holds, the last
+            // with a role a later build might give.
+            Telemetry::QueryThreads(
+                QueryThreadsTelemetry::new(14, CommandStatus::Success, 40)
+                    .tell(40, 0),
+            ),
+            Telemetry::QueryThreads(threads_told(15, 2)),
+            Telemetry::QueryThreads(threads_told(16, THREADS_PER_ANSWER)),
         ]
+    }
+
+    /// Each thread role has the number `link.xtce` gives it, so that the
+    /// two cannot come to differ.
+    #[test]
+    fn every_thread_role_has_the_number_the_xtce_gives_it() {
+        use packet::ThreadRoleType as X;
+        for (role, xtce) in [
+            (ThreadRole::Main, X::MAIN),
+            (ThreadRole::Signals, X::SIGNALS),
+            (ThreadRole::Commands, X::COMMANDS),
+            (ThreadRole::Beacons, X::BEACONS),
+            (ThreadRole::Segsend, X::SEGSEND),
+            (ThreadRole::Node, X::NODE),
+            (ThreadRole::GroundLink, X::GROUND_LINK),
+        ] {
+            assert_eq!(i64::from(role.to_u8()), xtce.0, "{role:?}");
+        }
+    }
+
+    /// An answer to QUERY_THREADS telling of `told` threads, each unlike
+    /// the others.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `told`     - How many threads it tells of.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    fn threads_told(sequence: u32, told: usize) -> QueryThreadsTelemetry {
+        let mut answer =
+            QueryThreadsTelemetry::new(sequence, CommandStatus::Success, 3);
+        for (at, thread) in answer.threads[..told].iter_mut().enumerate() {
+            *thread = ThreadStack {
+                role: ThreadRole::from_u8(at as u8 % 8),
+                node: NodeId(at as u32 * 3),
+                stack: 65_536 + at as u32,
+                deepest: 1_000 + at as u32 * 7,
+            };
+        }
+        answer.tell(3 + told + 1, told)
     }
 
     #[test]

@@ -311,6 +311,31 @@ int main(int argc, char **argv)
 			    node_name.c_str(), took.c_str(),
 			    static_cast<unsigned>(taken.total),
 			    given.moved ? "gave something" : "gave nothing");
+
+		// How deep each thread has been into its stack, which is what
+		// a configuration's thread_stack is set from.
+		tcs_thread threads[TCS_THREADS_PER_ANSWER];
+		std::uint32_t total = 0;
+		std::size_t told = 0;
+		if (tcs_client_query_threads(client.get(), 0, &status, &total,
+					     threads, &told) != 0) {
+			return fail("threads");
+		}
+		std::printf("threads: %s, %u of %u\n", tcs_status_name(status),
+			    static_cast<unsigned>(told),
+			    static_cast<unsigned>(total));
+		for (std::size_t at = 0; at < told; at++) {
+			const tcs_thread &thread = threads[at];
+			std::printf("thread %s",
+				    tcs_thread_role_name(thread.role));
+			if (thread.node != TCS_NO_NODE) {
+				std::printf(" (node %u)",
+					    static_cast<unsigned>(thread.node));
+			}
+			std::printf(": %u of %u bytes\n",
+				    static_cast<unsigned>(thread.deepest),
+				    static_cast<unsigned>(thread.stack));
+		}
 	}
 
 	if (restart) {

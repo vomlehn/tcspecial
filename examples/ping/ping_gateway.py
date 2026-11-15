@@ -144,6 +144,14 @@ def arguments(argv):
         ),
     )
     parser.add_argument(
+        "--no-memlock",
+        action="store_true",
+        help=(
+            "run tcspecial without locking its memory into RAM: for a desk "
+            "whose limit on locked memory is too small for it"
+        ),
+    )
+    parser.add_argument(
         "--pings",
         type=int,
         metavar="N",
@@ -394,6 +402,7 @@ def main(argv):
                 options.configuration,
                 options.tcspecial,
                 verbose=options.verbose,
+                memlock=not options.no_memlock,
             )
             vehicle.start()
         except (OSError, ValueError) as why:

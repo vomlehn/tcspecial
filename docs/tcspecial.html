@@ -4662,6 +4662,14 @@ either way.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>tcspecial<span class="whitespace"> </span>--quiet<span class="whitespace"> </span>examples/ping/ping.xtcs
 </pre>
+<p><tt class="docutils literal">tcspecial <span class="pre">--help</span></tt> lists every option. The run targets of the
+Makefiles start tcspecial locking its memory, as it does by default; on a
+desk whose limit on locked memory is too small, <tt class="docutils literal">NO_MEMLOCK=1</tt> has them
+give it <tt class="docutils literal"><span class="pre">--no-memlock</span></tt>, and the examples' ground stations, the ping and
+the Yamcs ones, and the beacon example take <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> themselves:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-thermostat<span class="whitespace"> </span><span class="name variable">NO_MEMLOCK</span><span class="operator">=</span><span class="literal number">1</span>
+</pre>
 <p>A beacon address tcspecial cannot bind, or a <tt class="docutils literal">beacon.recv</tt> that names no
 address, stops it before it starts, saying which setting to change: a vehicle
 flying without beacons is one the ground cannot tell from a dead one.</p>

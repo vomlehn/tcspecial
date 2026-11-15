@@ -94,6 +94,13 @@ class VehicleTest(unittest.TestCase):
                                                    verbose=True)
         self.assertEqual(loud.args, ["a.xtcs"])
 
+    def test_it_is_told_not_to_lock_its_memory_where_asked(self):
+        unlocked = processes.Vehicle.for_configuration(
+            "a.xtcs", "tcspecial", simulate="all", memlock=False)
+        self.assertEqual(unlocked.args,
+                         ["--quiet", "--simulate=all", "--no-memlock",
+                          "a.xtcs"])
+
 
 class ChildTest(unittest.TestCase):
     def test_one_that_stops_by_itself_is_seen_to_have(self):

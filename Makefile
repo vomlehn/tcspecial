@@ -132,6 +132,14 @@ RUST_LOG = info
 #   make runmocy SIMULATE=some
 SIMULATE = all
 
+# Whether the tcspecial a run target starts locks its memory into RAM, which
+# it does unless given --no-memlock. NO_MEMLOCK=1 gives it, for a desk whose
+# limit on locked memory is too small for the lock: see "Locking memory" in
+# docs/tcspecial.rst.
+#   make runmocy NO_MEMLOCK=1
+NO_MEMLOCK =
+MEMLOCK_FLAG = $(if $(NO_MEMLOCK),--no-memlock)
+
 RELEASE = --release
 RELEASE =
 
@@ -344,7 +352,7 @@ run:
 		cargo build -q --bin segsend; \
 		RUST_LOG=$(RUST_LOG) \
 			cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) \
-			$(TCSPECIAL_CONFIG_FILE).ytcs \
+			$(MEMLOCK_FLAG) $(TCSPECIAL_CONFIG_FILE).ytcs \
 	)
 
 # Running tcs-moc on one spelling of the tcspecial configuration.
@@ -371,6 +379,7 @@ define runmoc_on
 		RUST_LOG=$(RUST_LOG) \
 			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
 			cargo run -q --bin tcs-moc -- --simulate=$(SIMULATE) \
+			$(MEMLOCK_FLAG) \
 			$(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
 	)
 endef

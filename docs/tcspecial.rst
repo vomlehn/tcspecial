@@ -4605,6 +4605,16 @@ either way.
 
    $ tcspecial --quiet examples/ping/ping.xtcs
 
+``tcspecial --help`` lists every option. The run targets of the
+Makefiles start tcspecial locking its memory, as it does by default; on a
+desk whose limit on locked memory is too small, ``NO_MEMLOCK=1`` has them
+give it ``--no-memlock``, and the examples' ground stations, the ping and
+the Yamcs ones, and the beacon example take ``--no-memlock`` themselves:
+
+.. code-block:: console
+
+   $ make -C examples run-thermostat NO_MEMLOCK=1
+
 A beacon address tcspecial cannot bind, or a ``beacon.recv`` that names no
 address, stops it before it starts, saying which setting to change: a vehicle
 flying without beacons is one the ground cannot tell from a dead one.

@@ -143,7 +143,8 @@ class Vehicle(Child):
         super().__init__(program, args, "tcspecial", verbose)
 
     @staticmethod
-    def for_configuration(path, program=None, verbose=False, simulate=None):
+    def for_configuration(path, program=None, verbose=False, simulate=None,
+                          memlock=True):
         """tcspecial on this configuration: the one named, or the build's.
 
         Told ``--quiet`` unless ``verbose``, so that the console is this
@@ -156,6 +157,9 @@ class Vehicle(Child):
             verbose:  Whether to let tcspecial print its startup summary.
             simulate: The ``--simulate`` mode to give it, or ``None`` for
                       none, which is the flight setting.
+            memlock:  Whether it is to lock its memory into RAM, as it does
+                      unless given ``--no-memlock``: a desk whose limit is
+                      too small for the lock runs it without.
 
         Returns:
             The :class:`Vehicle`, not yet started.
@@ -168,4 +172,6 @@ class Vehicle(Child):
         args = [] if verbose else ["--quiet"]
         if simulate is not None:
             args.append(f"--simulate={simulate}")
+        if not memlock:
+            args.append("--no-memlock")
         return Vehicle(program, args + [str(path)], verbose)

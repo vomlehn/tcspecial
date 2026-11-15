@@ -45,6 +45,22 @@ use tcsprotocol::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 #[global_allocator]
 static ALLOCATOR: runtime::memory::Allocator = runtime::memory::Allocator;
 
+/// What `--help` prints.
+const USAGE: &str = "\
+usage: tcspecial [options] [configuration]
+
+  configuration      the .ytcs or .xtcs file to fly (default: the
+                     PAYLOAD_CONFIG_PATH environment variable, or the
+                     build's default)
+  --simulate=MODE    none (the default, the flight setting), some or all
+  --no-memlock       run without locking memory into RAM
+  -q, --quiet        no startup summary; warnings and worse only
+  --visual           show the graph in a window (a build with the visual
+                     feature, under --simulate=some or all)
+  --types            print the payload types this build contains, and exit
+  -h, --help         print this, and exit
+";
+
 /// Runs tcspecial as the command line asks, as the module documentation
 /// says, and exits with the run's status; 1 for a command line,
 /// configuration or build that refuses it, with the reason said.
@@ -75,6 +91,17 @@ fn main() {
         // lost. See `runtime::signals`. The supervisor blocks them itself
         // and takes them in its own loop.
         runtime::signals::start(runtime::start::stop_as_signalled);
+    }
+
+    // How it is run, on stdout and nothing else done, before anything is
+    // read: a flag it does not know would otherwise be taken for the name
+    // of a configuration.
+    if env::args()
+        .skip(1)
+        .any(|arg| arg == "-h" || arg == "--help")
+    {
+        print!("{USAGE}");
+        return;
     }
 
     // What this build contains, asked of the binary rather than recalled

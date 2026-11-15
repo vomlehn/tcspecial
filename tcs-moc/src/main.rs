@@ -580,17 +580,53 @@ fn child_command(
     mode: Mode,
     installed: Option<&Path>,
 ) -> Result<Command, String> {
-    let flag = format!("{}={mode}", tcsprotocol::simulate::FLAG);
+    let args = child_args(
+        name,
+        payload_path,
+        mode,
+        NO_MEMLOCK.get().copied().unwrap_or(false),
+    );
     if let Some(program) = child_program(name, installed)? {
         let mut command = Command::new(program);
-        command.args([flag.as_str(), payload_path]);
+        command.args(&args);
         dies_with_the_moc(&mut command);
         return Ok(command);
     }
     let mut command = Command::new("cargo");
-    command.args(["run", "--bin", name, "--", &flag, payload_path]);
+    command.args(["run", "--bin", name, "--"]).args(&args);
     dies_with_the_moc(&mut command);
     Ok(command)
+}
+
+/// Whether the MOC was given `--no-memlock`, which it passes on to the
+/// tcspecial it starts: set once, as the MOC reads its command line.
+static NO_MEMLOCK: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+/// The arguments a child is started with.
+///
+/// # Arguments
+///
+/// * `name`         - The binary, `tcspecial` or `tcs-sim`.
+/// * `payload_path` - The tcspecial configuration it is to read.
+/// * `mode`         - The run's simulation mode, passed on as the flag.
+/// * `no_memlock`   - Whether tcspecial is to run without locking its
+///                    memory; tcs-sim locks nothing, and is not told.
+///
+/// # Returns
+///
+/// The arguments, the configuration last.
+fn child_args(
+    name: &str,
+    payload_path: &str,
+    mode: Mode,
+    no_memlock: bool,
+) -> Vec<String> {
+    let mut args = vec![format!("{}={mode}", tcsprotocol::simulate::FLAG)];
+    if no_memlock && name == "tcspecial" {
+        args.push("--no-memlock".to_string());
+    }
+    args.push(payload_path.to_string());
+    args
 }
 
 /// Has the kernel stop a child when the MOC ends, however it ends.
@@ -838,7 +874,29 @@ impl ProcessManager {
 ///
 /// Exits with status 1 on a bad command line or a configuration that stops
 /// the MOC.
+/// What `--help` prints.
+const USAGE: &str = "\
+usage: tcs-moc [options] configuration
+
+  configuration      the .ytcs or .xtcs file of the vehicle to command; the
+                     simulator file beside it, NAME-sim.yaml, is read too
+  --simulate=MODE    none (the default, the flight setting), some or all,
+                     given to the tcspecial and tcs-sim it starts
+  --no-memlock       have the tcspecial it starts run without locking its
+                     memory into RAM
+  -h, --help         print this, and exit
+";
+
 fn main() {
+    // How it is run, before anything is read or started: a flag it does
+    // not know would otherwise be taken for the name of a configuration.
+    if env::args()
+        .skip(1)
+        .any(|arg| arg == "-h" || arg == "--help")
+    {
+        print!("{USAGE}");
+        return;
+    }
     eprintln!("Tcs-moc running");
 
     // Read the payload configuration before anything else, so a file the MOC
@@ -860,6 +918,11 @@ fn main() {
             }
         };
     eprintln!("simulation mode: {mode}");
+    // Passed on to the tcspecial this starts, under any mode: a desk that
+    // will not let tcspecial lock its memory runs it without the lock.
+    let (no_memlock, args): (Vec<String>, Vec<String>) =
+        args.into_iter().partition(|arg| arg == "--no-memlock");
+    let _ = NO_MEMLOCK.set(!no_memlock.is_empty());
     let payload_path = match payload_path_from_args(args.into_iter(), None) {
         Ok(payload_path) => payload_path,
         Err(e) => {
@@ -2350,6 +2413,32 @@ mod tests {
                 command.get_envs().collect();
             assert!(envs.is_empty(), "{name} was given {envs:?}");
         }
+    }
+
+    /// What `--help` prints names every option the MOC takes.
+    #[test]
+    fn the_usage_names_every_option() {
+        for option in ["--simulate=", "--no-memlock", "--help"] {
+            assert!(USAGE.contains(option), "{option}");
+        }
+    }
+
+    /// `--no-memlock` reaches tcspecial, and only tcspecial, before the
+    /// configuration.
+    #[test]
+    fn no_memlock_is_passed_on_to_tcspecial_alone() {
+        assert_eq!(
+            child_args("tcspecial", "v.ytcs", Mode::All, true),
+            ["--simulate=all", "--no-memlock", "v.ytcs"]
+        );
+        assert_eq!(
+            child_args("tcs-sim", "v.ytcs", Mode::All, true),
+            ["--simulate=all", "v.ytcs"]
+        );
+        assert_eq!(
+            child_args("tcspecial", "v.ytcs", Mode::None, false),
+            ["--simulate=none", "v.ytcs"]
+        );
     }
 
     /// The file a child is started on is the one named on the MOC's own

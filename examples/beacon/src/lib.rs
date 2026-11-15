@@ -149,6 +149,8 @@ impl Vehicle {
     /// * `configuration` - The configuration file tcspecial is to read.
     /// * `verbose`       - Whether to let tcspecial print its startup
     ///                     summary.
+    /// * `memlock`       - Whether tcspecial is to lock its memory into
+    ///                     RAM, as it does unless given `--no-memlock`.
     ///
     /// # Returns
     ///
@@ -161,6 +163,7 @@ impl Vehicle {
     pub fn beside_this_program(
         configuration: &str,
         verbose: bool,
+        memlock: bool,
     ) -> Result<Vehicle, String> {
         let here = std::env::current_exe().map_err(|e| {
             format!("cannot tell where this program is, to find tcspecial: {e}")
@@ -176,12 +179,16 @@ impl Vehicle {
         // As every example is run, though `all` and the flight setting a
         // run without the flag gets would each take this one: its payload is
         // a network node, which the mode does not count.
-        let args: &[&str] = if verbose {
-            &["--simulate=all", configuration]
-        } else {
-            &["--quiet", "--simulate=all", configuration]
-        };
-        Ok(Vehicle::new(program, args))
+        let mut args = Vec::new();
+        if !verbose {
+            args.push("--quiet");
+        }
+        args.push("--simulate=all");
+        if !memlock {
+            args.push("--no-memlock");
+        }
+        args.push(configuration);
+        Ok(Vehicle::new(program, &args))
     }
 
     /// Whether it is running, as far as this window knows.

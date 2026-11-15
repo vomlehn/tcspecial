@@ -25,8 +25,9 @@
 //!
 //! Arguments, all optional: the configuration; `--yaml` or `--xml`, but not
 //! both, saying which of the example's two files to read, YAML where neither
-//! is given; and `-v` or `--verbose`. Run from the repository's root it needs
-//! none.
+//! is given; `-v` or `--verbose`; and `--no-memlock`, which runs tcspecial
+//! without locking its memory, for a desk whose limit is too small for the
+//! lock. Run from the repository's root it needs none.
 //!
 //! Quiet unless `-v` or `--verbose` is given: the console then says where it
 //! is listening, each remark a beacon pass makes -- beacons missed, a vehicle
@@ -59,10 +60,14 @@ const CONFIGURATION: &str = "examples/beacon/beacon";
 /// The spelling read where neither `--yaml` nor `--xml` is given.
 const SPELLING: ConfigFormat = ConfigFormat::Yaml;
 
-/// What the command line says: the configuration, and whether to talk.
+/// What the command line says.
 struct Arguments {
+    /// The configuration.
     path: String,
+    /// Whether to talk.
     verbose: bool,
+    /// Whether tcspecial is to lock its memory.
+    memlock: bool,
 }
 
 impl Arguments {
@@ -85,6 +90,7 @@ impl Arguments {
     fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
         let mut path = None;
         let mut verbose = false;
+        let mut memlock = true;
         let mut spelling = Spelling::default();
         for arg in args {
             if spelling.take(&arg)? {
@@ -92,10 +98,11 @@ impl Arguments {
             }
             match arg.as_str() {
                 "-v" | "--verbose" => verbose = true,
+                "--no-memlock" => memlock = false,
                 flag if flag.starts_with('-') => {
                     return Err(format!(
                         "{flag} is not an option: the options are --yaml, \
-                         --xml, -v and --verbose"
+                         --xml, -v, --verbose and --no-memlock"
                     ))
                 }
                 _ if path.is_some() => {
@@ -109,6 +116,7 @@ impl Arguments {
         Ok(Arguments {
             path: spelling.configuration(path, CONFIGURATION, SPELLING)?,
             verbose,
+            memlock,
         })
     }
 }
@@ -124,18 +132,21 @@ impl Arguments {
 ///
 /// The window cannot be made or run.
 fn main() -> Result<(), slint::PlatformError> {
-    let Arguments { path, verbose } =
-        match Arguments::of(std::env::args().skip(1)) {
-            Ok(arguments) => arguments,
-            Err(why) => {
-                eprintln!("{why}");
-                eprintln!(
-                    "usage: beacon [--yaml | --xml] [-v | --verbose] \
-                 [configuration]"
-                );
-                std::process::exit(2);
-            }
-        };
+    let Arguments {
+        path,
+        verbose,
+        memlock,
+    } = match Arguments::of(std::env::args().skip(1)) {
+        Ok(arguments) => arguments,
+        Err(why) => {
+            eprintln!("{why}");
+            eprintln!(
+                "usage: beacon [--yaml | --xml] [-v | --verbose] \
+                 [--no-memlock] [configuration]"
+            );
+            std::process::exit(2);
+        }
+    };
 
     let graph = match Graph::load(&path) {
         Ok(graph) => graph,
@@ -209,7 +220,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // The vehicle the button starts, which is not running until it is
     // pressed. Found before the window opens, so that a tcspecial nobody has
     // built is said once, here, and not on every press.
-    let vehicle = match Vehicle::beside_this_program(&path, verbose) {
+    let vehicle = match Vehicle::beside_this_program(&path, verbose, memlock) {
         Ok(vehicle) => vehicle,
         Err(why) => {
             eprintln!("{why}");

@@ -129,6 +129,10 @@ def arguments(argv):
                              "stop")
     parser.add_argument("--no-vehicle", action="store_true",
                         help="do not start tcspecial")
+    parser.add_argument("--no-memlock", action="store_true",
+                        help="run tcspecial without locking its memory into "
+                             "RAM: for a desk whose limit on locked memory "
+                             "is too small for it")
     parser.add_argument("--no-yamcs", action="store_true",
                         help="do not start Yamcs; use one already running")
     parser.add_argument("--tcspecial", help="the tcspecial program to run")
@@ -401,8 +405,9 @@ def main(argv):
             yamcs.start()
             status(f"Yamcs is at http://localhost:{options.http_port}")
         if not options.no_vehicle:
-            vehicle = Vehicle.for_configuration(setup.path, options.tcspecial,
-                                                options.verbose)
+            vehicle = Vehicle.for_configuration(
+                setup.path, options.tcspecial, options.verbose,
+                memlock=not options.no_memlock)
             vehicle.start()
         if not connect(yamcs, setup.digest, say=status):
             print("ping_yamcs: the vehicle never answered CONNECT with this "

@@ -17,6 +17,16 @@ vehicle and tcs-sim simulating its payloads. How to start the three together
 is in Running the Programs, in `the tcspecial manual
 <tcspecial.html#running-the-programs>`__.
 
+.. code-block:: console
+
+   $ tcs-moc --simulate=all examples/thermostat/thermostat.ytcs
+
+``--simulate`` is given to the tcspecial and the tcs-sim it starts.
+``--no-memlock`` is given to the tcspecial alone, which then runs without
+locking its memory into RAM: for a desk whose limit on locked memory is too
+small for the lock, as "Locking memory" in the tcspecial manual says.
+``tcs-moc --help`` lists the options.
+
 The tcs-moc window
 ==================
 Across the top, from the left:

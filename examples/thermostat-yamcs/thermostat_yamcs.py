@@ -137,6 +137,10 @@ def arguments(argv):
                              "and stop")
     parser.add_argument("--no-vehicle", action="store_true",
                         help="do not start tcspecial")
+    parser.add_argument("--no-memlock", action="store_true",
+                        help="run tcspecial without locking its memory into "
+                             "RAM: for a desk whose limit on locked memory "
+                             "is too small for it")
     parser.add_argument("--no-simulator", action="store_true",
                         help="do not start tcs-sim")
     parser.add_argument("--no-yamcs", action="store_true",
@@ -633,8 +637,9 @@ def main(argv):
             status("waiting for tcs-sim to make its simulated devices")
             simulator_ready(setup.path, tcs_sim, SIMULATOR_PATIENCE)
         if not options.no_vehicle:
-            vehicle = Vehicle.for_configuration(setup.path, options.tcspecial,
-                                                options.verbose, SIMULATE)
+            vehicle = Vehicle.for_configuration(
+                setup.path, options.tcspecial, options.verbose, SIMULATE,
+                memlock=not options.no_memlock)
             vehicle.start()
             started.append(vehicle)
         if not connect(yamcs, setup.digest, say=status):

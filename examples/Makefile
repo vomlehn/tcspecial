@@ -17,6 +17,14 @@ RUST_LOG = info
 #   make run-simple SIMULATE=some
 SIMULATE = all
 
+# Whether the tcspecial a run target starts locks its memory into RAM, which
+# it does unless given --no-memlock. NO_MEMLOCK=1 gives it, for a desk whose
+# limit on locked memory is too small for the lock: see "Locking memory" in
+# docs/tcspecial.rst.
+#   make run-simple NO_MEMLOCK=1
+NO_MEMLOCK =
+MEMLOCK_FLAG = $(if $(NO_MEMLOCK),--no-memlock)
+
 # Where the examples' logs are written. The examples' configurations name
 # the same directory, so a change here is a change there as well.
 TELEMETRY = /tmp/telemetry
@@ -94,7 +102,8 @@ define runexample_on
 		cargo build -q --bin tcspecial --bin tcs-sim --bin tcs-moc \
 			--bin segsend; \
 		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcs-moc -- \
-			--simulate=$(SIMULATE) examples/$(1)/$(1).ytcs \
+			--simulate=$(SIMULATE) $(MEMLOCK_FLAG) \
+			examples/$(1)/$(1).ytcs \
 	)
 endef
 
@@ -198,7 +207,7 @@ run-simple-app: check-python3
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet \
-			--simulate=$(SIMULATE) \
+			--simulate=$(SIMULATE) $(MEMLOCK_FLAG) \
 			examples/simple-app/simple-app.ytcs & \
 		vehicle=$$!; \
 		trap 'pkill -P $$vehicle || true; \
@@ -233,7 +242,7 @@ run-beacon:
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/beacon \
+		RUST_LOG=$(RUST_LOG) target/debug/beacon $(MEMLOCK_FLAG) \
 			examples/beacon/beacon.ytcs \
 	)
 
@@ -263,7 +272,7 @@ run-ping: check-tkinter
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
 		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_gateway.py \
-			examples/ping/ping.xtcs \
+			$(MEMLOCK_FLAG) examples/ping/ping.xtcs \
 	)
 
 # The ping example with Yamcs between the ground station and the vehicle.
@@ -282,7 +291,8 @@ run-ping-yamcs: check-tkinter
 	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
 		--bin segsend
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
-		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)"
+		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)" \
+		$(MEMLOCK_FLAG)
 
 # The thermostat example with Yamcs between the ground station and the
 # vehicle. YAMCS_HOME is where a Yamcs release is unpacked;
@@ -308,7 +318,7 @@ run-thermostat-yamcs: check-tkinter
 	mkdir $(TELEMETRY)
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
 		examples/thermostat-yamcs/thermostat_yamcs.py \
-		--yamcs "$(YAMCS_HOME)"
+		--yamcs "$(YAMCS_HOME)" $(MEMLOCK_FLAG)
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
 #

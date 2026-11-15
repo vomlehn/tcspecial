@@ -3775,7 +3775,7 @@ impl Document {
     /// # Returns
     ///
     /// The other spelling's path, if that file exists.
-    fn other_spelling(
+    pub(crate) fn other_spelling(
         &self,
         path: &std::path::Path,
     ) -> Option<std::path::PathBuf> {

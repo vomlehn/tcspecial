@@ -115,9 +115,11 @@ The window
 ==========
 
 The main window's title says what it is editing, ``TCSpecial
-Configuration:`` and the configuration's absolute path, shortened in the
-middle when it is too long for the title bar. A read-only session says
-``(read-only)`` in the title.
+Configuration:`` and the configuration's path, shortened the way file
+managers shorten one: your home directory as ``~``, and, when it is too
+long for the title bar, the directories between the first and the last few
+left out, as ``…``, so that it always ends with the file's name. A
+read-only session says ``(read-only)`` in the title.
 
 Under the menu bar is a bar of buttons and messages, and under that, side by
 side, the selection column on the left and the sheet on the right.
@@ -762,6 +764,25 @@ one.
 A configuration kept in both spellings -- ``vehicle.ytcs`` beside
 ``vehicle.xtcs`` -- is written in both, and so is each included file that has
 both. tcs-cfge never makes the second spelling of a file that has only one.
+
+Each edit is merged into what each file holds, so where the two spellings
+already say different things -- one of them edited by hand, say -- an edit
+does not make them agree. So tcs-cfge compares them as it starts, as
+``tcs-verify`` does two files given together (see `the tcs-verify manual
+<tcs-verify.html>`__), the files each includes with it, and where they
+differ asks, before anything else, in front of the drawing. It lists each
+difference at the line of the other spelling it is on, saying what each
+says, and offers:
+
+* **Rewrite**, which writes the other spelling whole from the one opened,
+  so that both say the same; its comments and layout are then the
+  editor's;
+* **Keep both**, which leaves both as they are, every edit going to both
+  and the differences staying;
+* **Quit**, for opening the other spelling instead where it is the one
+  that is right.
+
+A read-only session lists the differences and changes nothing.
 
 Where each node was drawn is written in a ``tcs-cfge`` section at the end of
 each file, with the concerns set aside; tcspecial ignores the section. tcs-cfge

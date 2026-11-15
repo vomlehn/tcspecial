@@ -1084,7 +1084,11 @@ fn open_main(
     // after this is what goes wrong *while somebody works*: a fault they
     // introduced, which is news, where the state the file arrived in is what
     // the warning says.
-    warn_of_errors(editor, &views);
+    //
+    // Before it, where the configuration is kept in both spellings and the
+    // two differ, the question about that, which asks for the warning once
+    // it is answered: see `warn_of_spellings`.
+    warn_of_spellings(editor, &views);
 
     // And the main window takes no presses while any of that is still being
     // read: the question about the file's problems, the alert about a file
@@ -3701,6 +3705,104 @@ fn warn_of_errors(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     views.borrow_mut().names = Some(window.as_weak());
 }
 
+/// Asks, as the editor starts, what to do about the two spellings of the
+/// configuration saying different things, where it is kept in both and they
+/// do; and otherwise, or once that is answered, warns of the errors it
+/// opened with.
+///
+/// The differences are those `tcs-verify` finds in the two files, each at
+/// its line, said in a panel in front of the drawing: see SpellingsPanel.
+/// Rewrite writes the other spelling whole from the one opened, so that both
+/// say the same; Keep both leaves them, every edit going to both and the
+/// differences staying; Quit leaves, for the other to be opened instead
+/// where it is the one that is right. A read-only session is told and not
+/// asked: it may write nothing.
+///
+/// The warning about errors is asked for before this panel is taken down,
+/// so that the main window, which takes no presses while either is up, is
+/// not given them back between the two.
+///
+/// # Arguments
+///
+/// * `editor` - The session just opened.
+/// * `views`  - The windows, the main one of which asks.
+fn warn_of_spellings(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let (said, opened, other) = {
+        let editor = editor.borrow();
+        let other = editor.other_spelling();
+        let said = if other.is_some() {
+            editor.spellings_differ()
+        } else {
+            Vec::new()
+        };
+        (said, editor.files().0.to_path_buf(), other)
+    };
+    let Some(other) = other.filter(|_| !said.is_empty()) else {
+        warn_of_errors(editor, views);
+        return;
+    };
+    let top = views.borrow().top.upgrade();
+    let Some(window) = top else {
+        // The differences are still there for tcs-verify to find, so this
+        // failing is a quieter editor rather than a broken one.
+        eprintln!("tcs-cfge: the spellings cannot be compared: no window");
+        warn_of_errors(editor, views);
+        return;
+    };
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_spellings_rewrite(move || {
+            editor.borrow_mut().rewrite_spellings();
+            let trouble = editor.borrow().trouble().map(str::to_string);
+            if let Some(trouble) = trouble {
+                views.borrow().say(
+                    "The other spelling could not be rewritten",
+                    &trouble,
+                    "Put the cause right and press Save, which writes both \
+                     spellings, or open the other one instead.",
+                );
+            }
+            warn_of_errors(&editor, &views);
+            hide_spellings(&views);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_spellings_kept(move || {
+            warn_of_errors(&editor, &views);
+            hide_spellings(&views);
+        });
+    }
+    {
+        let editor = editor.clone();
+        let views = views.clone();
+        // Through the same path the menu's Exit takes: nothing has been
+        // edited yet, so it ends there and then.
+        window.on_spellings_quit(move || leave(&editor, &views));
+    }
+    window.set_spellings_opened(opened.display().to_string().into());
+    window.set_spellings_other(other.display().to_string().into());
+    window.set_spellings_said(said.join("\n").into());
+    window.set_spellings_can_rewrite(!read_only());
+    window.set_spellings_up(true);
+}
+
+/// Takes the question about the two spellings away, however it was
+/// answered.
+///
+/// # Arguments
+///
+/// * `views` - The windows, the main one of which asks it.
+fn hide_spellings(views: &Rc<RefCell<Views>>) {
+    listen_when_read(views, Some(Startup::Spellings));
+    let top = views.borrow().top.upgrade();
+    if let Some(top) = top {
+        top.set_spellings_up(false);
+    }
+}
+
 /// Counts what the file arrived with as already said, so the alert leaves it
 /// to the window that asks about it.
 ///
@@ -3819,6 +3921,7 @@ fn hide_what_is_wrong(views: &Rc<RefCell<Views>>) {
     }
     let top = views.borrow().top.upgrade();
     if let Some(top) = top {
+        top.set_spellings_up(false);
         top.set_alert_up(false);
     }
     if let Some(window) = alert {
@@ -3833,6 +3936,8 @@ fn hide_what_is_wrong(views: &Rc<RefCell<Views>>) {
 /// one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Startup {
+    /// The question about the two spellings saying different things.
+    Spellings,
     /// The question about the problems the file opened with.
     Problems,
     /// The alert, about a file that could not be read or a simulator file
@@ -3854,6 +3959,11 @@ enum Startup {
 /// `true` while the question or the alert is still up.
 fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
     let views = views.borrow();
+    let spellings = going != Some(Startup::Spellings)
+        && views
+            .top
+            .upgrade()
+            .is_some_and(|top| top.get_spellings_up());
     let problems = going != Some(Startup::Problems) && views.names.is_some();
     let alert = going != Some(Startup::Alert)
         && (views
@@ -3861,7 +3971,7 @@ fn startup_waiting(views: &Rc<RefCell<Views>>, going: Option<Startup>) -> bool {
             .as_ref()
             .is_some_and(|window| window.window().is_visible())
             || views.top.upgrade().is_some_and(|top| top.get_alert_up()));
-    problems || alert
+    spellings || problems || alert
 }
 
 /// Gives the main window its presses back, once what came up as the editor
@@ -13217,6 +13327,7 @@ mod tests {
         the_line_being_drawn_follows_the_pointer();
         deleting_a_node_asks_first();
         the_main_window_is_inert_until_what_came_up_is_read();
+        two_spellings_that_differ_are_asked_about_first();
         ignoring_the_warning_gives_the_presses_back();
         the_warning_offers_a_way_out_of_the_editor();
         an_error_chosen_from_the_button_is_gone_to_and_leaves_when_put_right();
@@ -14179,6 +14290,66 @@ mod tests {
         assert!(!ui.get_problems_up(), "and is no longer in front of it");
         assert!(ui.window().is_visible(), "the main window is still up");
         assert!(!ui.get_inert(), "and takes presses again");
+        let _ = ui.hide();
+    }
+
+    /// A configuration kept in both spellings that say different things is
+    /// asked about before anything else, in front of the drawing: each
+    /// difference listed, and Rewrite making the other spelling say what the
+    /// one opened says. Answered, the warning about errors comes up next,
+    /// without the main window taking presses between the two; Keep both
+    /// leaves the files as they are.
+    fn two_spellings_that_differ_are_asked_about_first() {
+        use std::rc::Rc;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let from = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/minimal/minimal");
+        let xml = where_.path().join("minimal.xtcs");
+        let yaml = where_.path().join("minimal.ytcs");
+        std::fs::copy(from.with_extension("xtcs"), &xml).expect("copied");
+        let by_hand = std::fs::read_to_string(from.with_extension("ytcs"))
+            .expect("readable")
+            .replacen("segment_size: \"65536\"", "segment_size: \"32768\"", 1);
+        std::fs::write(&yaml, &by_hand).expect("written");
+
+        // Asked, and kept: nothing is written.
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&xml, dividers()).expect("it opens"),
+        ));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        ui.show().expect("the window shows");
+        warn_of_spellings(&editor, &views);
+        ui.set_inert(startup_waiting(&views, None));
+        assert!(ui.get_spellings_up(), "the question is in front of it");
+        assert!(ui.get_inert(), "and the drawing takes no presses");
+        assert!(
+            ui.get_spellings_said().contains("segment_size"),
+            "{}",
+            ui.get_spellings_said()
+        );
+        assert!(ui.get_spellings_other().contains("minimal.ytcs"));
+        ui.invoke_spellings_kept();
+        assert!(!ui.get_spellings_up(), "the question has gone");
+        assert!(!ui.get_inert(), "and the drawing takes presses");
+        assert_eq!(std::fs::read_to_string(&yaml).unwrap(), by_hand);
+        let _ = ui.hide();
+
+        // Asked, and rewritten: both say the same, and the question about
+        // errors, of which this file has none, leaves the presses given back.
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&xml, dividers()).expect("it opens"),
+        ));
+        let ui = MainWindow::new().expect("a window");
+        let views = views_for(&ui);
+        ui.show().expect("the window shows");
+        warn_of_spellings(&editor, &views);
+        ui.set_inert(startup_waiting(&views, None));
+        ui.invoke_spellings_rewrite();
+        assert!(!ui.get_spellings_up(), "the question has gone");
+        assert!(editor.borrow().spellings_differ().is_empty());
+        assert!(!ui.get_inert(), "and the drawing takes presses");
         let _ = ui.hide();
     }
 

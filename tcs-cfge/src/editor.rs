@@ -500,6 +500,97 @@ impl Editor {
         crate::history::journal_for(&self.path)
     }
 
+    /// The configuration's top file in its other spelling, where that file
+    /// is there too: `vehicle.ytcs` for a session on `vehicle.xtcs`.
+    ///
+    /// # Returns
+    ///
+    /// Its path, or `None` where the configuration is kept in one spelling.
+    pub fn other_spelling(&self) -> Option<PathBuf> {
+        self.document.other_spelling(&self.path)
+    }
+
+    /// What the two spellings of the configuration say differently, as the
+    /// files on the disk have them: the comparison `tcs-verify` makes of two
+    /// files given together, the files each includes compared with it.
+    ///
+    /// A save cannot put a difference right. Each edit is written to both
+    /// spellings, but merged into what each file holds -- see
+    /// `crate::faithful` -- so what the other file says differently it goes
+    /// on saying. [`Editor::rewrite_spellings`] is what does.
+    ///
+    /// # Returns
+    ///
+    /// Each difference, at the file and line of the other spelling it is
+    /// on, saying what each says; none where the configuration is kept in
+    /// one spelling, or both say the same.
+    pub fn spellings_differ(&self) -> Vec<String> {
+        let Some(other) = self.other_spelling() else {
+            return Vec::new();
+        };
+        let mut report = tcsverify::Report::default();
+        tcsverify::compare(&self.path, &other, &mut report);
+        report
+            .findings
+            .iter()
+            .map(|found| {
+                format!(
+                    "{}:{}: {}",
+                    found.file.display(),
+                    found.line,
+                    found.message
+                )
+            })
+            .collect()
+    }
+
+    /// Writes the configuration's files in the other spelling from what
+    /// this session read, so that both spellings say the same: the top
+    /// file's other spelling, and each included file's where it is kept in
+    /// both.
+    ///
+    /// Each is written whole, as the editor writes it, rather than merged
+    /// into what it held: a merge keeps what the file said differently,
+    /// which is what is being put right. Its comments and layout are the
+    /// editor's afterwards. The files in this session's own spelling, and
+    /// the simulator file, are written as every save writes them, which
+    /// leaves them as they are. A read-only session writes nothing.
+    pub fn rewrite_spellings(&mut self) {
+        if self.read_only {
+            return;
+        }
+        let own = self.path.extension().map(|e| e.to_ascii_lowercase());
+        let files = match self.document.files(&self.path) {
+            Ok(files) => files,
+            Err(why) => {
+                self.trouble = Some(why);
+                return;
+            }
+        };
+        let mut rewritten = Vec::new();
+        for (path, _) in files {
+            let ext = path.extension().map(|e| e.to_ascii_lowercase());
+            let spelled =
+                ext.as_ref().is_some_and(|e| e == "xtcs" || e == "ytcs");
+            if spelled && ext != own {
+                self.written.remove(&path);
+                rewritten.push(path);
+            }
+        }
+        self.persist();
+        if self.trouble.is_none() {
+            let names: Vec<String> = rewritten
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect();
+            self.said = Some(format!(
+                "rewrote {} to say what {} says",
+                names.join(", "),
+                self.path.display()
+            ));
+        }
+    }
+
     /// Write every file of the configuration now.
     ///
     /// There is nothing to do here in the ordinary case -- every edit is
@@ -999,6 +1090,49 @@ mod tests {
             node_type: node_type.to_string(),
             home: None,
         }
+    }
+
+    /// Two spellings that say different things are found, and Rewrite makes
+    /// the other say what the one opened says, leaving that one as it was.
+    ///
+    /// The minimal example in both spellings, the YAML's segment size
+    /// changed by hand. A save does not put it right -- an edit is merged into
+    /// what each file holds -- and Rewrite does: the comparison finds nothing
+    /// afterwards, and the XML opened is byte for byte what it was. A
+    /// read-only session is told of the difference and writes nothing.
+    #[test]
+    fn two_spellings_that_differ_are_found_and_rewritten_alike() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let from = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/minimal/minimal");
+        let xml = where_.path().join("minimal.xtcs");
+        let yaml = where_.path().join("minimal.ytcs");
+        std::fs::copy(from.with_extension("xtcs"), &xml).expect("copied");
+        let by_hand = std::fs::read_to_string(from.with_extension("ytcs"))
+            .expect("readable")
+            .replacen("segment_size: \"65536\"", "segment_size: \"32768\"", 1);
+        assert!(by_hand.contains("32768"), "the example changed shape");
+        std::fs::write(&yaml, &by_hand).expect("written");
+        let xml_before = std::fs::read_to_string(&xml).unwrap();
+
+        let mut looking =
+            Editor::open(&xml, crate::pane::default_dividers()).expect("opens");
+        looking.set_read_only(true);
+        assert_eq!(looking.other_spelling(), Some(yaml.clone()));
+        let said = looking.spellings_differ();
+        assert!(said.iter().any(|s| s.contains("segment_size")), "{said:?}");
+        looking.rewrite_spellings();
+        assert_eq!(std::fs::read_to_string(&yaml).unwrap(), by_hand);
+
+        let mut editor =
+            Editor::open(&xml, crate::pane::default_dividers()).expect("opens");
+        editor.save();
+        assert!(!editor.spellings_differ().is_empty(), "a save fixed it");
+        editor.rewrite_spellings();
+        assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
+        assert_eq!(editor.spellings_differ(), Vec::<String>::new());
+        assert_eq!(std::fs::read_to_string(&xml).unwrap(), xml_before);
+        assert!(editor.said().is_some_and(|s| s.contains("minimal.ytcs")));
     }
 
     /// Every edit reaches the disk as it is made.

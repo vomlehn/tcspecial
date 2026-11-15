@@ -6,8 +6,9 @@
 //! and a window system that cuts a title short cuts it at the end -- which is
 //! the file's name, the one part that cannot be spared. So the path is
 //! shortened here first, the way file managers and editors shorten one: the
-//! first element and as many of the last as there is room for, with an
-//! ellipsis for the elements left out between them.
+//! home directory said as `~`, then the first element and as many of the
+//! last as there is room for, with an ellipsis for the elements left out
+//! between them.
 
 /// How many logical pixels wide a character of the title is, taken across a
 /// typical title: a title bar's font is the desktop's, which this program
@@ -41,9 +42,36 @@ pub fn titled(base: &str, path: &str, width: f32) -> String {
     let whole = std::path::absolute(path)
         .map(|absolute| absolute.display().to_string())
         .unwrap_or_else(|_| path.to_string());
+    let whole = homed(&whole, std::env::var("HOME").ok().as_deref());
     let room = ((width - DECORATION) / CHARACTER).max(0.0) as usize;
     let room = room.saturating_sub(base.chars().count() + 2);
     format!("{base}: {}", shortened(&whole, room))
+}
+
+/// A path with the home directory it is in said as `~`, as shells and file
+/// managers say it.
+///
+/// # Arguments
+///
+/// * `path` - The path, absolute.
+/// * `home` - The home directory, if there is one.
+///
+/// # Returns
+///
+/// The path, with `~` for the home directory where it starts with it.
+pub fn homed(path: &str, home: Option<&str>) -> String {
+    let separator = std::path::MAIN_SEPARATOR_STR;
+    let Some(home) = home.map(|h| h.trim_end_matches(separator)) else {
+        return path.to_string();
+    };
+    if home.is_empty() {
+        return path.to_string();
+    }
+    match path.strip_prefix(home) {
+        Some("") => "~".to_string(),
+        Some(rest) if rest.starts_with(separator) => format!("~{rest}"),
+        _ => path.to_string(),
+    }
 }
 
 /// A path shortened to fit in `room` characters, if it can be.
@@ -116,6 +144,22 @@ fn joined(elements: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The home directory is said as `~`, and only where the path is in it.
+    #[test]
+    fn the_home_directory_is_a_tilde() {
+        let home = joined(&["home", "someone"]);
+        let file = joined(&["home", "someone", "working", "v.xtcs"]);
+        let separator = std::path::MAIN_SEPARATOR_STR;
+        assert_eq!(
+            homed(&file, Some(&home)),
+            format!("~{separator}working{separator}v.xtcs")
+        );
+        assert_eq!(homed(&home, Some(&home)), "~");
+        let beside = joined(&["home", "someone-else", "v.xtcs"]);
+        assert_eq!(homed(&beside, Some(&home)), beside);
+        assert_eq!(homed(&file, None), file);
+    }
 
     const ELEMENTS: [&str; 5] = [
         "home",

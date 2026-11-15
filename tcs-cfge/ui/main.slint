@@ -1902,6 +1902,111 @@ component ProblemsPanel inherits Rectangle {
     }
 }
 
+// The question asked as the editor starts when the configuration is kept
+// in both spellings, XTCS and YTCS, and the two say different things.
+//
+// Each difference is listed, at the line of the other spelling it is on,
+// as tcs-verify gives it, scrolling where there are many. An edit is
+// written to both spellings but merged into what each holds, so a
+// difference outlives every save: Rewrite is what puts it right, writing
+// the other spelling whole from the one opened. Quit leaves, for the other
+// to be opened instead where it is the one that is right; Keep both edits
+// on with both as they are. A read-only session can only look, so Rewrite
+// is not offered. See warn_of_spellings in main.rs.
+component SpellingsPanel inherits Rectangle {
+    // Drawn inside the main window, over the veil, as ProblemsPanel is and
+    // for the same reason.
+    background: Colors.window;
+    border-width: 1px;
+    border-color: #808080;
+    border-radius: 4px;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000040;
+    drop-shadow-offset-y: 4px;
+    min-width: 420px;
+    preferred-width: 640px;
+    preferred-height: whole.preferred-height;
+
+    // The file opened, and its other spelling, as the session names them.
+    in property <string> opened: "";
+    in property <string> other: "";
+    // The differences, one a line. Set from Rust: see warn_of_spellings.
+    in property <string> said: "";
+    // Whether Rewrite may be offered: not in a read-only session.
+    in property <bool> can-rewrite: true;
+
+    // The other spelling written whole from the one opened.
+    callback rewrite();
+    // Both left as they are.
+    callback kept();
+    // Out of the editor.
+    callback quit();
+
+    whole := VerticalLayout {
+        padding: Space.wide;
+        spacing: Space.step;
+
+        Copyable {
+            text: "The two spellings of this configuration say different "
+                + "things";
+            font-size: Type.strong;
+            font-weight: Type.bold;
+            wrap: word-wrap;
+        }
+        Copyable {
+            text: root.opened + " and " + root.other + " are one "
+                + "configuration, in XML and in YAML, and they differ:";
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+        ScrollView {
+            min-height: 80px;
+            preferred-height: min(list.preferred-height, 240px);
+            list := Copyable {
+                width: parent.visible-width;
+                text: root.said;
+                font-size: Type.body;
+                wrap: word-wrap;
+            }
+        }
+        Copyable {
+            text: root.can-rewrite
+                ? "Rewrite makes " + root.other + " say what " + root.opened
+                    + " says, writing it whole, its comments and layout the "
+                    + "editor's. Where " + root.other + " is the one that is "
+                    + "right, quit and open it instead. Keep both leaves "
+                    + "them as they are: every edit is written to both, and "
+                    + "the differences stay."
+                : "This session changes nothing, so both stay as they are.";
+            font-size: Type.body;
+            wrap: word-wrap;
+        }
+
+        HorizontalLayout {
+            spacing: Space.step;
+            CopyButton {
+                said: root.opened + " and " + root.other + " differ:\n"
+                    + root.said;
+            }
+            Rectangle { }
+            Button {
+                text: "Quit";
+                clicked => { root.quit(); }
+            }
+            Button {
+                text: "Keep both";
+                primary: !root.can-rewrite;
+                clicked => { root.kept(); }
+            }
+            if root.can-rewrite: Button {
+                text: "Rewrite";
+                primary: true;
+                clicked => { root.rewrite(); }
+            }
+        }
+    }
+}
+
 export component MainWindow inherits Window {
     default-font-size: Fonts.window;
     // Saying in the title bar when this session changes nothing, and which
@@ -1972,6 +2077,19 @@ export component MainWindow inherits Window {
     in property <string> problems-said: "";
     callback problems-ignored();
     callback problems-quit();
+
+    // The question about the two spellings saying different things, asked
+    // before the warning about errors: see SpellingsPanel. Its properties
+    // and callbacks are the panel's, with "spellings-" in front. Set and
+    // answered from Rust: see warn_of_spellings in main.rs.
+    in property <bool> spellings-up: false;
+    in property <string> spellings-opened: "";
+    in property <string> spellings-other: "";
+    in property <string> spellings-said: "";
+    in property <bool> spellings-can-rewrite: true;
+    callback spellings-rewrite();
+    callback spellings-kept();
+    callback spellings-quit();
 
     // And the alert, when what went wrong is the file the editor started on:
     // said in front of the drawing in the same way. What goes wrong later is
@@ -2398,6 +2516,19 @@ export component MainWindow inherits Window {
         said: root.problems-said;
         ignored => { root.problems-ignored(); }
         quit => { root.problems-quit(); }
+    }
+    if root.spellings-up: SpellingsPanel {
+        width: min(self.preferred-width, root.width - 2 * Space.wide);
+        height: min(self.preferred-height, root.height - 2 * Space.wide);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        opened: root.spellings-opened;
+        other: root.spellings-other;
+        said: root.spellings-said;
+        can-rewrite: root.spellings-can-rewrite;
+        rewrite => { root.spellings-rewrite(); }
+        kept => { root.spellings-kept(); }
+        quit => { root.spellings-quit(); }
     }
     if root.alert-up: AlertPanel {
         width: min(self.preferred-width, root.width - 2 * Space.wide);

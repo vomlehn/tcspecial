@@ -513,9 +513,11 @@ it back. <tt class="docutils literal">make verify</tt> checks the file the same 
 <div class="section" id="the-window">
 <h1><a class="toc-backref" href="#toc-entry-6">The window</a></h1>
 <p>The main window's title says what it is editing, <tt class="docutils literal">TCSpecial
-Configuration:</tt> and the configuration's absolute path, shortened in the
-middle when it is too long for the title bar. A read-only session says
-<tt class="docutils literal"><span class="pre">(read-only)</span></tt> in the title.</p>
+Configuration:</tt> and the configuration's path, shortened the way file
+managers shorten one: your home directory as <tt class="docutils literal">~</tt>, and, when it is too
+long for the title bar, the directories between the first and the last few
+left out, as <tt class="docutils literal">…</tt>, so that it always ends with the file's name. A
+read-only session says <tt class="docutils literal"><span class="pre">(read-only)</span></tt> in the title.</p>
 <p>Under the menu bar is a bar of buttons and messages, and under that, side by
 side, the selection column on the left and the sheet on the right.</p>
 <div class="figure">
@@ -1047,6 +1049,23 @@ one.</p>
 <p>A configuration kept in both spellings -- <tt class="docutils literal">vehicle.ytcs</tt> beside
 <tt class="docutils literal">vehicle.xtcs</tt> -- is written in both, and so is each included file that has
 both. tcs-cfge never makes the second spelling of a file that has only one.</p>
+<p>Each edit is merged into what each file holds, so where the two spellings
+already say different things -- one of them edited by hand, say -- an edit
+does not make them agree. So tcs-cfge compares them as it starts, as
+<tt class="docutils literal"><span class="pre">tcs-verify</span></tt> does two files given together (see <a class="reference external" href="tcs-verify.html">the tcs-verify manual</a>), the files each includes with it, and where they
+differ asks, before anything else, in front of the drawing. It lists each
+difference at the line of the other spelling it is on, saying what each
+says, and offers:</p>
+<ul class="simple">
+<li><strong>Rewrite</strong>, which writes the other spelling whole from the one opened,
+so that both say the same; its comments and layout are then the
+editor's;</li>
+<li><strong>Keep both</strong>, which leaves both as they are, every edit going to both
+and the differences staying;</li>
+<li><strong>Quit</strong>, for opening the other spelling instead where it is the one
+that is right.</li>
+</ul>
+<p>A read-only session lists the differences and changes nothing.</p>
 <p>Where each node was drawn is written in a <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section at the end of
 each file, with the concerns set aside; tcspecial ignores the section. tcs-cfge
 also writes into each configuration a reference to its schema -- in XML an

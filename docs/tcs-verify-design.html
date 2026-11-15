@@ -481,13 +481,14 @@ status 1.</dd>
 checks it as any run does and then prints, after the problems, what it uses
 of what must not clash or overflow: every address and port it states or
 implies and who binds it, every node's device id, every message ID and APID,
-and how many data and bytes a second each link to the ground carries, with
-the beacon's and the total. Plain text in aligned columns under a heading
+how many data and bytes a second each link to the ground carries, with
+the beacon's and the total, and each consolidator's inputs and the bits
+each takes, saying which is sent twice, alone and in the datum. Plain text in aligned columns under a heading
 each, in orders no file can change, so that two summaries can be compared
 with <tt class="docutils literal">diff</tt>. Every list is <tt class="docutils literal">tcsprotocol</tt>'s --
 <tt class="docutils literal"><span class="pre">graph::sockets::of</span></tt>, <tt class="docutils literal"><span class="pre">graph::telemetry::ids</span></tt>, <tt class="docutils literal">msgids</tt> and <tt class="docutils literal">apids</tt>,
-<tt class="docutils literal"><span class="pre">graph::rates::of</span></tt> -- and tcs-verify lays them out and states none of
-them. A configuration that does not read has no summary, which fails the
+<tt class="docutils literal"><span class="pre">graph::rates::of</span></tt>, <tt class="docutils literal"><span class="pre">consolidation::Layout::of_node</span></tt> -- and
+tcs-verify lays them out and states none of them. A configuration that does not read has no summary, which fails the
 run, as a digest not given does.</dd>
 <dt>Requirement</dt>
 <dd><tt class="docutils literal"><span class="pre">--links</span></tt>, with one configuration and nothing else, prints its link

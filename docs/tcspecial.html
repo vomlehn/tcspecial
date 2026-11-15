@@ -4393,7 +4393,8 @@ soon as it is regenerated:</p>
 <ul class="simple">
 <li>the beacon's container, <tt class="docutils literal">BeaconPacket</tt>, and the answers',
 <tt class="docutils literal">AnswerPacket</tt>, restricted to <tt class="docutils literal">beacon.apid</tt> and <tt class="docutils literal">tcs_cmd.apid</tt>, and
-<tt class="docutils literal">Connect</tt> on <tt class="docutils literal">tcs_cmd.apid</tt>;</li>
+<tt class="docutils literal">Connect</tt>, <tt class="docutils literal">QueryThreads</tt> and <tt class="docutils literal">QueryConsolidator</tt> on
+<tt class="docutils literal">tcs_cmd.apid</tt>;</li>
 <li>a command for each <tt class="docutils literal">gateway_yamcs</tt> node, on its <tt class="docutils literal">apid_base</tt>: the
 command of the nodes' interface document, where every node its data goes
 to has the same one (see below); otherwise named after the node, carrying
@@ -4567,8 +4568,13 @@ has refused for not being of their input's type, and, for each input, how
 many datums it went into held and how many none. How many it went into new
 is the datums sent less those two. One answer tells of up to 32 inputs and
 says how many there are; ask again from where it stopped for the rest.
-<tt class="docutils literal"><span class="pre">TcsClient::consolidator</span></tt> in tcsmoc reads them all. A node that is not a
-consolidator is answered <tt class="docutils literal">InvalidParameter</tt>.</p>
+<tt class="docutils literal"><span class="pre">TcsClient::consolidator</span></tt> in tcsmoc reads them all;
+<tt class="docutils literal">tcs_client_query_consolidator</tt> asks from C and C++, an answer at a time
+of up to <tt class="docutils literal">TCS_INPUTS_PER_ANSWER</tt> inputs; and a Python station that
+reaches tcspecial through Yamcs asks with
+<tt class="docutils literal">tcsmoc.yamcs_ground.query_consolidator</tt>, which has Yamcs send the
+mission database's <tt class="docutils literal">QueryConsolidator</tt>. A node that is not a consolidator
+is answered <tt class="docutils literal">InvalidParameter</tt>.</p>
 </div>
 <div class="section" id="thread-stacks">
 <h2><a class="toc-backref" href="#toc-entry-72">Thread stacks</a></h2>

@@ -4257,7 +4257,8 @@ soon as it is regenerated:
 
 * the beacon's container, ``BeaconPacket``, and the answers',
   ``AnswerPacket``, restricted to ``beacon.apid`` and ``tcs_cmd.apid``, and
-  ``Connect`` on ``tcs_cmd.apid``;
+  ``Connect``, ``QueryThreads`` and ``QueryConsolidator`` on
+  ``tcs_cmd.apid``;
 * a command for each ``gateway_yamcs`` node, on its ``apid_base``: the
   command of the nodes' interface document, where every node its data goes
   to has the same one (see below); otherwise named after the node, carrying
@@ -4450,8 +4451,13 @@ has refused for not being of their input's type, and, for each input, how
 many datums it went into held and how many none. How many it went into new
 is the datums sent less those two. One answer tells of up to 32 inputs and
 says how many there are; ask again from where it stopped for the rest.
-``TcsClient::consolidator`` in tcsmoc reads them all. A node that is not a
-consolidator is answered ``InvalidParameter``.
+``TcsClient::consolidator`` in tcsmoc reads them all;
+``tcs_client_query_consolidator`` asks from C and C++, an answer at a time
+of up to ``TCS_INPUTS_PER_ANSWER`` inputs; and a Python station that
+reaches tcspecial through Yamcs asks with
+``tcsmoc.yamcs_ground.query_consolidator``, which has Yamcs send the
+mission database's ``QueryConsolidator``. A node that is not a consolidator
+is answered ``InvalidParameter``.
 
 Thread stacks
 -------------

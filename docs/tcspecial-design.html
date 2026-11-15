@@ -3710,7 +3710,10 @@ consolidator's port in its place, takes each datum apart with tcsmoc's
 unpacking, and sends each new input on as though its source were drawn
 into the gateway node: on the port and under the APID it would then
 have (<tt class="docutils literal"><span class="pre">graph::telemetry::relayed</span></tt>), which are held to the same rules
-as every other link's, so none lands where another does. Yamcs decodes
+as every other link's, so none lands where another does. Only through a
+<tt class="docutils literal">gateway_yamcs</tt> node: a station built on tcsmoc takes the datum apart
+as it receives it, and binds no port for an input, so another gateway
+node's consolidator reserves none. Yamcs decodes
 each as it decodes any source, by the configuration's own XTCE, which
 describes every input's source. The relay is a thread of the ground
 station's process, not a program of its own, so it ends when the
@@ -3760,17 +3763,36 @@ with the same function the live data is taken apart with, so a datum
 from the log reaches a station as it would have live, its states with
 it.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--fprime-model</span></tt> gives each input of a consolidator a
-channel of its own, named by the consolidator and the input --
-<tt class="docutils literal">pack.temp1</tt> -- and of the input's type, and the F´ bridge writes
-each input there. A channel has no state, so a held input is not
-written to it, as it is not passed to any station that is given
-readings and nothing more; a new one is.</dd>
+<dd><p class="first"><tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--fprime-model</span></tt> gives each input of a consolidator the
+channel its source would have were it drawn into the gateway node
+itself -- named after the source, at <tt class="docutils literal">fprime_id_base</tt> plus the
+source's device id, of the type the source sends -- and the
+consolidator none. The F´ bridge reads through tcsmoc-c's gateway
+receive, which takes the datum apart and hands out each new input as
+though its source had sent it, so the bridge writes it to that channel
+by the source's name, as it writes any source's. A channel has no
+state, so a held input is not written to it, as it is not passed to
+any station that is given readings and nothing more; a new one is. A
+channel named by the consolidator and the input, <tt class="docutils literal">pack.temp1</tt>, was
+the first thought, and F´ cannot name a channel with a full stop in
+it; the source's name is one it already takes.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): the model's channels; the bridge needs nothing
+new to write them.</p>
+</dd>
 <dt>Requirement</dt>
-<dd>tcs-moc shows a consolidator as a row for each input, each saying in
-words whether it is new, held or none. A test station can show a
-state, so a held value is shown, marked held; the words, not a colour,
-carry it.</dd>
+<dd>tcs-moc reads the vehicle's data through tcsmoc's gateway receive, which
+hands out a consolidator's new inputs, each as though its source had
+sent it. So each input's reading is shown in its source's row, as any
+reading of that source is, and a held input adds no arrival: the row's
+<tt class="docutils literal">Last recv</tt> time goes on ageing, which is what tells an operator that
+nothing new came. An input from which nothing has arrived shows
+nothing. The consolidator's own row shows what QUERY_CONSOLIDATOR
+answers: what it has sent, by trigger, and how often each input went
+into a datum held or none, in words and numbers. A second view of the
+datum that showed each input's state beside its value would be a
+second unpacking on the ground, which tcsmoc's one replaces; the
+counts say how often each was held, which is what an operator looking
+for a quiet payload wants.</dd>
 <dt>Requirement</dt>
 <dd><p class="first">The <tt class="docutils literal">tcspecial</tt> section states <tt class="docutils literal">max_consolidator_inputs</tt>, the most
 inputs one consolidator may have, at least 2, and required, for the
@@ -3781,7 +3803,8 @@ more readings than that are better served by a second consolidator
 than by a larger one.</p>
 <p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal">max_consolidator_inputs</tt>, required and
 checked, in every shipped configuration in both spellings, and in the
-schemas; nothing yet is limited by it.</p>
+schemas; a consolidator with more inputs is refused, naming both
+numbers (see below).</p>
 </dd>
 <dt>Requirement</dt>
 <dd>A consolidator with more inputs than <tt class="docutils literal">max_consolidator_inputs</tt>, or
@@ -3954,8 +3977,11 @@ which changes the interface digest and so every configuration's
 state as it opens (<tt class="docutils literal"><span class="pre">Port::consolidator_counters</span></tt>), and the command
 interpreter reads them there, waiting for no pass and allocating nothing.
 <tt class="docutils literal"><span class="pre">tcsmoc::TcsClient::query_consolidator</span></tt> asks for one answer and
-<tt class="docutils literal">consolidator</tt> for every input. Not yet: the C/C++ library, the Python
-spelling, tcs-moc and the F´ bridge, which are step 3's.</p>
+<tt class="docutils literal">consolidator</tt> for every input; tcsmoc-c's
+<tt class="docutils literal">tcs_client_query_consolidator</tt> asks from C and C++, and the Python
+Yamcs stations ask through Yamcs, by the template's <tt class="docutils literal">QueryConsolidator</tt>
+(<tt class="docutils literal">tcsmoc.yamcs_ground.query_consolidator</tt>). Not yet: tcs-moc and the F´
+bridge.</p>
 </div>
 <div class="section" id="app-nodes">
 <h2><a class="toc-backref" href="#toc-entry-34">App nodes</a></h2>

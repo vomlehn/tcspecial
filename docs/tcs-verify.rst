@@ -205,6 +205,16 @@ nodes sees it in one place:
   out of the total, which says how many were. The bytes are the data's
   alone, not the packets', and a string or bytes has no size its type
   gives.
+* **Consolidators**: each one, the gateway nodes it is drawn into and the
+  most bytes a datum of it may be; then each input in the order of its
+  ``world-in``, with its source, its type and the bits it takes in the
+  datum -- a fixed width, or a string's or bytes' length field and its
+  bytes. An input whose source is drawn into one of those gateway nodes
+  itself too is said to be *sent twice*: it costs the link what the
+  consolidator was there to save. Where the gateway node is a
+  ``gateway_yamcs`` one, the ports and APIDs the ground relays each input
+  on are among the addresses and APIDs above, named as relayed from the
+  consolidator.
 
 The lists are each in an order no file can change -- by kind, then by
 gateway node and device id, then by name -- so two summaries can be

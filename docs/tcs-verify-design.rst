@@ -129,13 +129,14 @@ Requirement
     checks it as any run does and then prints, after the problems, what it uses
     of what must not clash or overflow: every address and port it states or
     implies and who binds it, every node's device id, every message ID and APID,
-    and how many data and bytes a second each link to the ground carries, with
-    the beacon's and the total. Plain text in aligned columns under a heading
+    how many data and bytes a second each link to the ground carries, with
+    the beacon's and the total, and each consolidator's inputs and the bits
+    each takes, saying which is sent twice, alone and in the datum. Plain text in aligned columns under a heading
     each, in orders no file can change, so that two summaries can be compared
     with ``diff``. Every list is ``tcsprotocol``'s --
     ``graph::sockets::of``, ``graph::telemetry::ids``, ``msgids`` and ``apids``,
-    ``graph::rates::of`` -- and tcs-verify lays them out and states none of
-    them. A configuration that does not read has no summary, which fails the
+    ``graph::rates::of``, ``consolidation::Layout::of_node`` -- and
+    tcs-verify lays them out and states none of them. A configuration that does not read has no summary, which fails the
     run, as a digest not given does.
 
 Requirement

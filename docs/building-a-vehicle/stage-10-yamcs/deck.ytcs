@@ -28,7 +28,7 @@ tcspecial:
   # commands' in tcs_cmd, and the readings' in payload_telemetry and the
   # gateway node.
   gateway: "yamcs"
-  interface: "2f452fd334eb3cc535b5b1f01bb64c2f"
+  interface: "a28fbfe632aca562d9d9ac8d37ba5476"
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"

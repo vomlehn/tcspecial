@@ -315,12 +315,17 @@ int main(int argc, char **argv)
 		// How deep each thread has been into its stack, which is what
 		// a configuration's thread_stack is set from.
 		tcs_thread threads[TCS_THREADS_PER_ANSWER];
+		tcs_memory memory{};
 		std::uint32_t total = 0;
 		std::size_t told = 0;
-		if (tcs_client_query_threads(client.get(), 0, &status, &total,
-					     threads, &told) != 0) {
+		if (tcs_client_query_threads(client.get(), 0, &status, &memory,
+					     &total, threads, &told) != 0) {
 			return fail("threads");
 		}
+		std::printf("memory: %llu mapped, %llu resident, %llu locked\n",
+			    static_cast<unsigned long long>(memory.mapped),
+			    static_cast<unsigned long long>(memory.resident),
+			    static_cast<unsigned long long>(memory.locked));
 		std::printf("threads: %s, %u of %u\n", tcs_status_name(status),
 			    static_cast<unsigned>(told),
 			    static_cast<unsigned>(total));

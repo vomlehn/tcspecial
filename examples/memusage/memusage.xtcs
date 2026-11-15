@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
+    <description>How much memory tcspecial has, and each thread's stack, in Yamcs</description>
+    <tcspecial>
+        <!-- A vehicle to watch the memory of: a gateway node and three ping
+             nodes, each a thread of its own, answering to Yamcs.
+             memusage.py asks it QUERY_THREADS through Yamcs: the memory
+             the whole process has, and how deep each thread has been into
+             its stack.
+
+             Every port is in the eighteen thousands, which no other example
+             uses, and it keeps no log, so it can run beside another
+             example, ping-yamcs among them, which memusage.py can watch in
+             the same Yamcs: tcs-conflict says the two can run at once. -->
+        <beacon>
+            <apid>0x100</apid>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:18510</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:18500</send>
+        </beacon>
+        <gateway>yamcs</gateway>
+        <interface>a28fbfe632aca562d9d9ac8d37ba5476</interface>
+        <!-- Yamcs sends QUERY_THREADS, on this link, from a port the
+             system chooses, as it sends its other commands: so they are
+             taken from any port of this host, port 0, and each answer goes
+             back to the port its command came from. -->
+        <payload_command>
+            <dest_base>0.0.0.0:18300</dest_base>
+            <source_base>127.0.0.1:0</source_base>
+        </payload_command>
+        <!-- A payload nothing in the drawing touches would report to
+             dest_base plus its device id, as telemetry of APID apid_base
+             plus that device id. This vehicle has none, but a
+             configuration that answers to Yamcs says where their APIDs
+             would begin all the same. -->
+        <payload_telemetry>
+            <apid_base>0x300</apid_base>
+            <dest_base>127.0.0.1:18410</dest_base>
+            <source_base>0.0.0.0:18400</source_base>
+        </payload_telemetry>
+        <!-- tcspecial keeps in this file its configuration stack and how
+             many starts of the top have ended before a matching CONNECT, so
+             on a vehicle it must be on storage that survives a power
+             cycle. -->
+        <state_file>/tmp/tcspecial-memusage.state</state_file>
+        <!-- Yamcs sends its commands from a port the system chooses, and
+             takes the answers on the same socket, so the commands are taken
+             from any port of this host, port 0, and each answer goes back
+             to the port its command came from. -->
+        <tcs_cmd>
+            <apid>0x101</apid>
+            <recv>0.0.0.0:18200</recv>
+            <send>127.0.0.1:0</send>
+        </tcs_cmd>
+    </tcspecial>
+    <gateways>
+        <type name="gateway_yamcs">
+            <!-- Yamcs's end of the link to the ping nodes, both ways.
+                 Nothing pings them here: they are three threads with stacks
+                 to measure, and what the example shows is those stacks.
+                 Each answers to Yamcs at ground_base plus its device id
+                 (gateway is 0, and ping1, ping2 and ping3 are 1, 2 and 3)
+                 as telemetry of APID apid_base plus that id. -->
+            <gateway name="gateway">
+                <address>127.0.0.1:18600</address>
+                <apid_base>0x200</apid_base>
+                <ground_base>127.0.0.1:18700</ground_base>
+                <moc-out>ping1.gateway</moc-out>
+                <moc-out>ping2.gateway</moc-out>
+                <moc-out>ping3.gateway</moc-out>
+                <world-in>ping1</world-in>
+                <world-in>ping2</world-in>
+                <world-in>ping3</world-in>
+            </gateway>
+        </type>
+    </gateways>
+    <vehicle>
+        <type name="ping">
+            <compute name="ping1">
+                <world-out>gateway.ping1</world-out>
+                <moc-in>gateway</moc-in>
+            </compute>
+            <compute name="ping2">
+                <world-out>gateway.ping2</world-out>
+                <moc-in>gateway</moc-in>
+            </compute>
+            <compute name="ping3">
+                <world-out>gateway.ping3</world-out>
+                <moc-in>gateway</moc-in>
+            </compute>
+        </type>
+    </vehicle>
+    <tcs-gui>
+        <nodes>
+            <node name="gateway" x="34" y="34"/>
+            <node name="ping1" x="469" y="34"/>
+            <node name="ping2" x="469" y="200"/>
+            <node name="ping3" x="469" y="366"/>
+        </nodes>
+    </tcs-gui>
+</configuration>

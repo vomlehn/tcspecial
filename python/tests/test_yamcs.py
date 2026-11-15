@@ -255,7 +255,9 @@ class MdbTest(unittest.TestCase):
                              "[@argumentName='CcsdsApid']"):
                 assigned[command.get("name")] = int(
                     assignment.get("argumentValue"))
-        self.assertEqual(assigned, {"Connect": 0x101, "m": 0x200})
+        # CONNECT and QUERY_THREADS both on the command links' APID.
+        self.assertEqual(assigned, {"Connect": 0x101, "QueryThreads": 0x101,
+                                    "m": 0x200})
         # The data of a node with no document is its parameter, of the
         # type the configuration's own XTCE gives it: bytes for one that
         # states none, after bytes_length, the count of them.
@@ -361,6 +363,7 @@ class MdbTest(unittest.TestCase):
                          [("p", 0x203, 9003), ("n", 0x301, 9201)])
         # "m" binds nothing aboard, so the ground has nowhere to send to
         # it: its command is counted, but nothing carries it.
+        # And with no node command link, nothing carries QUERY_THREADS.
         self.assertEqual([stream["tcPatterns"] for stream
                           in generated.command_streams(config)],
                          [["/TcsYamcs/Connect"]])

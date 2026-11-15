@@ -1200,14 +1200,16 @@ impl Serving {
                 }
             },
 
-            // Each thread's stack, measured now, into the answer itself, so
-            // that nothing is allocated: see `runtime::thread`.
+            // The process's memory and each thread's stack, measured now,
+            // into the answer itself, so that nothing is allocated: see
+            // `runtime::memory` and `runtime::thread`.
             Command::QueryThreads(cmd) => {
                 let mut answer = tcsprotocol::QueryThreadsTelemetry::new(
                     sequence,
                     CommandStatus::Success,
                     cmd.first,
                 );
+                answer.memory = crate::runtime::memory::now();
                 let (total, told) = crate::runtime::thread::stacks(
                     cmd.first as usize,
                     &mut answer.threads,

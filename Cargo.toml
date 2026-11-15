@@ -42,6 +42,8 @@ members = [
     "examples/ping-yamcs",
     # And for the thermostat example through Yamcs.
     "examples/thermostat-yamcs",
+    # And for the memusage example, through Yamcs too.
+    "examples/memusage",
     # What the tests of the examples through Yamcs share: an interpreter of
     # the mission database tcsprotocol/yamcs.py generates. Not an example.
     "examples/yamcs-common",

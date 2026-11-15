@@ -262,6 +262,28 @@
           <BaseContainer containerRef="CcsdsTcContainer"/>
         </CommandContainer>
       </MetaCommand>
+      <!-- QUERY_THREADS, on tcs_cmd.apid too, which tcsprotocol/yamcs.py
+           assigns, and on the node command link: the command of
+           tcsprotocol/xtce/link.xtce, opcode 53, behind the header. Stated
+           again here for the reason CONNECT is; the interface digest every
+           configuration names holds the two to the same layout. Its answer
+           is read as every ordinary answer is, by LinkAnswerPacket. -->
+      <MetaCommand name="QueryThreads">
+        <BaseMetaCommand metaCommandRef="CcsdsTc"/>
+        <ArgumentList>
+          <Argument name="Opcode" argumentTypeRef="U8Arg" initialValue="53"/>
+          <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+          <Argument name="First" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryThreadsPacket">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Opcode"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+            <ArgumentRefEntry argumentRef="First"/>
+          </EntryList>
+          <BaseContainer containerRef="CcsdsTcContainer"/>
+        </CommandContainer>
+      </MetaCommand>
     </MetaCommandSet>
   </CommandMetaData>
 </SpaceSystem>

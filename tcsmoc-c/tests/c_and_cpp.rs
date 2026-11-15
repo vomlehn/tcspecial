@@ -205,7 +205,7 @@ fn against_a_vehicle(program: &Path) -> String {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"2f452fd334eb3cc535b5b1f01bb64c2f\"
+  interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   beacon:
     default_interval: \"5 s\"
     recv: \"127.0.0.1:{beacons}\"
@@ -380,6 +380,12 @@ vehicle:
                                     deepest: 8_192,
                                 },
                             ]);
+                            answer.memory = tcsprotocol::ProcessMemory {
+                                mapped: 9_437_184,
+                                resident: 7_340_032,
+                                locked: 9_437_184,
+                                lock_limit: tcsprotocol::UNLIMITED,
+                            };
                             Telemetry::QueryThreads(answer.tell(3, 3))
                         }
                         // Onto the configuration the station read, which is
@@ -481,6 +487,7 @@ vehicle:
         "ping sends values: no".to_string(),
         "ping sends decisions: no".to_string(),
         "sample ping: took \"ping\" of 6 bytes, gave nothing".to_string(),
+        "memory: 9437184 mapped, 7340032 resident, 9437184 locked".to_string(),
         "threads: Success, 3 of 3".to_string(),
         "thread main: 40960 of 8388608 bytes".to_string(),
         "thread commands: 12288 of 262144 bytes".to_string(),

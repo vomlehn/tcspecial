@@ -30,6 +30,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicI32, Ordering};
 
 use tcsprotocol::simulate::Mode;
+use tcsprotocol::ProcessMemory;
 
 use crate::runtime::supervisor;
 
@@ -159,6 +160,92 @@ fn mapped() -> Option<u64> {
     Some(kib * 1024)
 }
 
+/// How much memory the whole process has, as QUERY_THREADS tells the ground.
+///
+/// Allocates nothing, since it is asked from the loop: `/proc/self/status`
+/// is read into a buffer on the stack. A figure that cannot be read is
+/// nought.
+///
+/// # Returns
+///
+/// What is mapped, resident and locked, and the limit on what may be.
+pub fn now() -> ProcessMemory {
+    let mut buffer = [0u8; 4096];
+    let read = status_into(&mut buffer);
+    let status = &buffer[..read];
+    ProcessMemory {
+        mapped: field_of(status, b"VmSize:"),
+        resident: field_of(status, b"VmRSS:"),
+        locked: field_of(status, b"VmLck:"),
+        lock_limit: limit().unwrap_or(0),
+    }
+}
+
+/// Reads `/proc/self/status` into `buffer`, without allocating.
+///
+/// # Arguments
+///
+/// * `buffer` - Where it goes; what does not fit is left out.
+///
+/// # Returns
+///
+/// How many bytes were read: nought where it cannot be.
+fn status_into(buffer: &mut [u8]) -> usize {
+    // SAFETY: a path that is a nul-terminated literal, a descriptor that is
+    // closed before the function returns, and reads into the buffer's own
+    // bytes, no more than it holds.
+    unsafe {
+        let fd = libc::open(
+            c"/proc/self/status".as_ptr(),
+            libc::O_RDONLY | libc::O_CLOEXEC,
+        );
+        if fd < 0 {
+            return 0;
+        }
+        let mut filled = 0;
+        while filled < buffer.len() {
+            let got = libc::read(
+                fd,
+                buffer[filled..].as_mut_ptr().cast(),
+                buffer.len() - filled,
+            );
+            if got <= 0 {
+                break;
+            }
+            filled += got as usize;
+        }
+        libc::close(fd);
+        filled
+    }
+}
+
+/// One of `/proc/self/status`'s sizes, in bytes.
+///
+/// # Arguments
+///
+/// * `status` - The file's text.
+/// * `label`  - The field's label, its colon included: `VmSize:`.
+///
+/// # Returns
+///
+/// The size, which the file gives in KiB; nought where there is none.
+fn field_of(status: &[u8], label: &[u8]) -> u64 {
+    for line in status.split(|&byte| byte == b'\n') {
+        if let Some(rest) = line.strip_prefix(label) {
+            let kib = rest
+                .iter()
+                .skip_while(|byte| byte.is_ascii_whitespace())
+                .take_while(|byte| byte.is_ascii_digit())
+                .fold(0u64, |sum, digit| {
+                    sum.saturating_mul(10)
+                        .saturating_add(u64::from(digit - b'0'))
+                });
+            return kib.saturating_mul(1024);
+        }
+    }
+    0
+}
+
 /// tcspecial's allocator: the system's, ending the process when it fails.
 ///
 /// The standard library aborts when an allocation fails, which a
@@ -286,6 +373,19 @@ impl Digits {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The process's figures are read from its status, the mapped at least
+    /// as large as the resident, and a field the status lacks is nought.
+    #[test]
+    fn the_process_memory_is_read() {
+        let memory = now();
+        assert!(memory.mapped > 0, "{memory:?}");
+        assert!(memory.resident > 0, "{memory:?}");
+        assert!(memory.mapped >= memory.resident, "{memory:?}");
+        assert!(memory.lock_limit > 0, "{memory:?}");
+        assert_eq!(field_of(b"VmSize:\t  1234 kB\n", b"VmSize:"), 1234 * 1024);
+        assert_eq!(field_of(b"VmRSS:\t5 kB\n", b"VmSize:"), 0);
+    }
 
     /// A number is written in decimal, from nought to the largest.
     #[test]

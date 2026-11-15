@@ -175,9 +175,15 @@
       <Parameter name="GivenLength" parameterTypeRef="U8Type"/>
       <Parameter name="GivenTotal" parameterTypeRef="U32Type"/>
       <Parameter name="GivenBytesShown" parameterTypeRef="SampleBytesType"/>
-      <!-- An answer to QUERY_THREADS: the position of the first thread it
-           tells of, in the order they started, how many threads there are
-           in all, how many it tells of, and those. -->
+      <!-- An answer to QUERY_THREADS: the memory the whole of tcspecial
+           has, in bytes (mapped, resident, locked, and the limit on what
+           it may lock, all ones where there is none), then the position of
+           the first thread it tells of, in the order they started, how many
+           threads there are in all, how many it tells of, and those. -->
+      <Parameter name="MappedBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="ResidentBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="LockedBytes" parameterTypeRef="U64Type"/>
+      <Parameter name="LockLimitBytes" parameterTypeRef="U64Type"/>
       <Parameter name="FirstThread" parameterTypeRef="U32Type"/>
       <Parameter name="ThreadTotal" parameterTypeRef="U32Type"/>
       <Parameter name="ThreadsTold" parameterTypeRef="ThreadsToldType"/>
@@ -277,6 +283,10 @@
       </SequenceContainer>
       <SequenceContainer name="QueryThreadsAnswer">
         <EntryList>
+          <ParameterRefEntry parameterRef="MappedBytes"/>
+          <ParameterRefEntry parameterRef="ResidentBytes"/>
+          <ParameterRefEntry parameterRef="LockedBytes"/>
+          <ParameterRefEntry parameterRef="LockLimitBytes"/>
           <ParameterRefEntry parameterRef="FirstThread"/>
           <ParameterRefEntry parameterRef="ThreadTotal"/>
           <ParameterRefEntry parameterRef="ThreadsTold"/>
@@ -451,9 +461,10 @@
           <BaseContainer containerRef="TcsCommandContainer"/>
         </CommandContainer>
       </MetaCommand>
-      <!-- What tcspecial's threads are for and how deep each has been into
-           its stack, from the thread at position First, in the order they
-           started: see tcsprotocol/src/threads.rs. -->
+      <!-- The memory the whole of tcspecial has, and what its threads are
+           for and how deep each has been into its stack, from the thread at
+           position First, in the order they started: see
+           tcsprotocol/src/threads.rs. -->
       <MetaCommand name="QueryThreads">
         <BaseMetaCommand metaCommandRef="TcsCommand">
           <ArgumentAssignmentList>

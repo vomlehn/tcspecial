@@ -1215,6 +1215,14 @@ pub struct QueryThreadsAnswer {
     pub status: StatusType,
     /// `/TcsLink/Timestamp` (/TcsLink/U64Type)
     pub timestamp: u64,
+    /// `/TcsLink/MappedBytes` (/TcsLink/U64Type)
+    pub mapped_bytes: u64,
+    /// `/TcsLink/ResidentBytes` (/TcsLink/U64Type)
+    pub resident_bytes: u64,
+    /// `/TcsLink/LockedBytes` (/TcsLink/U64Type)
+    pub locked_bytes: u64,
+    /// `/TcsLink/LockLimitBytes` (/TcsLink/U64Type)
+    pub lock_limit_bytes: u64,
     /// `/TcsLink/FirstThread` (/TcsLink/U32Type)
     pub first_thread: u32,
     /// `/TcsLink/ThreadTotal` (/TcsLink/U32Type)
@@ -1277,7 +1285,7 @@ impl QueryThreadsAnswer {
 
 impl Packet for QueryThreadsAnswer {
     const NAME: &'static str = "/TcsLink/QueryThreadsAnswer";
-    const MAX_BYTES: usize = 439;
+    const MAX_BYTES: usize = 471;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -1291,11 +1299,15 @@ impl Packet for QueryThreadsAnswer {
                 criterion: "/TcsLink/Opcode == 53",
             });
         }
-        let v34 = r.uint_order(32, false, "FirstThread")? as u32;
-        let v35 = r.uint_order(32, false, "ThreadTotal")? as u32;
-        let v36 = r.uint_order(8, false, "ThreadsTold")? as u8;
-        let v37 = {
-            let n = pk::dynamic_size(v36 as f64, 1.0, 0.0, 1, 32, "Threads")?;
+        let v34 = r.uint_order(64, false, "MappedBytes")? as u64;
+        let v35 = r.uint_order(64, false, "ResidentBytes")? as u64;
+        let v36 = r.uint_order(64, false, "LockedBytes")? as u64;
+        let v37 = r.uint_order(64, false, "LockLimitBytes")? as u64;
+        let v38 = r.uint_order(32, false, "FirstThread")? as u32;
+        let v39 = r.uint_order(32, false, "ThreadTotal")? as u32;
+        let v40 = r.uint_order(8, false, "ThreadsTold")? as u8;
+        let v41 = {
+            let n = pk::dynamic_size(v40 as f64, 1.0, 0.0, 1, 32, "Threads")?;
             let mut a = pk::FixedVec::<ThreadType, 32>::new();
             for i in 0..n {
                 if a.push(ThreadType {
@@ -1318,16 +1330,20 @@ impl Packet for QueryThreadsAnswer {
                 sequence: v2,
                 status: v3,
                 timestamp: v4,
-                first_thread: v34,
-                thread_total: v35,
-                threads: v37,
+                mapped_bytes: v34,
+                resident_bytes: v35,
+                locked_bytes: v36,
+                lock_limit_bytes: v37,
+                first_thread: v38,
+                thread_total: v39,
+                threads: v41,
             },
             r.used(),
         ))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d36 = u8::try_from(pk::size_source(
+        let d40 = u8::try_from(pk::size_source(
             self.threads.len(),
             1.0,
             0.0,
@@ -1355,6 +1371,30 @@ impl Packet for QueryThreadsAnswer {
             pk::from_unsigned(self.timestamp as u64, 64, "Timestamp")?,
         );
         w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.mapped_bytes as u64, 64, "MappedBytes")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.resident_bytes as u64, 64, "ResidentBytes")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.locked_bytes as u64, 64, "LockedBytes")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(
+                self.lock_limit_bytes as u64,
+                64,
+                "LockLimitBytes",
+            )?,
+        );
+        w.uint_order(
             32,
             false,
             pk::from_unsigned(self.first_thread as u64, 32, "FirstThread")?,
@@ -1367,10 +1407,10 @@ impl Packet for QueryThreadsAnswer {
         w.uint_order(
             8,
             false,
-            pk::from_unsigned(d36 as u64, 8, "ThreadsTold")?,
+            pk::from_unsigned(d40 as u64, 8, "ThreadsTold")?,
         );
         {
-            let n = pk::dynamic_size(d36 as f64, 1.0, 0.0, 1, 32, "Threads")?;
+            let n = pk::dynamic_size(d40 as f64, 1.0, 0.0, 1, 32, "Threads")?;
             if self.threads.len() != n {
                 return Err(PacketError::BadSize { field: "Threads" });
             }
@@ -1421,6 +1461,14 @@ impl fmt::Display for QueryThreadsAnswer {
         write!(f, "{}", self.status)?;
         f.write_str(", timestamp=")?;
         write!(f, "{}", self.timestamp)?;
+        f.write_str(", mapped_bytes=")?;
+        write!(f, "{}", self.mapped_bytes)?;
+        f.write_str(", resident_bytes=")?;
+        write!(f, "{}", self.resident_bytes)?;
+        f.write_str(", locked_bytes=")?;
+        write!(f, "{}", self.locked_bytes)?;
+        f.write_str(", lock_limit_bytes=")?;
+        write!(f, "{}", self.lock_limit_bytes)?;
         f.write_str(", first_thread=")?;
         write!(f, "{}", self.first_thread)?;
         f.write_str(", thread_total=")?;
@@ -1517,15 +1565,15 @@ impl Packet for Ping {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 1) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 1) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/Ping",
                 criterion: "Opcode = 1",
             });
         }
-        Ok((Ping { sequence: v39 }, r.used()))
+        Ok((Ping { sequence: v43 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1617,19 +1665,19 @@ impl Packet for StartNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 48) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 48) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/StartNode",
                 criterion: "Opcode = 48",
             });
         }
-        let v40 = r.uint_order(32, false, "Node")? as u32;
+        let v44 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             StartNode {
-                sequence: v39,
-                node: v40,
+                sequence: v43,
+                node: v44,
             },
             r.used(),
         ))
@@ -1730,19 +1778,19 @@ impl Packet for StopNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 49) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 49) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/StopNode",
                 criterion: "Opcode = 49",
             });
         }
-        let v41 = r.uint_order(32, false, "Node")? as u32;
+        let v45 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             StopNode {
-                sequence: v39,
-                node: v41,
+                sequence: v43,
+                node: v45,
             },
             r.used(),
         ))
@@ -1850,16 +1898,16 @@ impl Packet for SetNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 50) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 50) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/SetNode",
                 criterion: "Opcode = 50",
             });
         }
-        let v42 = r.uint_order(32, false, "Node")? as u32;
-        let v43 = pk::read_fixed_string::<64, 65>(
+        let v46 = r.uint_order(32, false, "Node")? as u32;
+        let v47 = pk::read_fixed_string::<64, 65>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -1870,24 +1918,24 @@ impl Packet for SetNode {
             },
             "Attribute",
         )?;
-        let v44 = r.uint_order(16, false, "ValueLength")? as u16;
-        let v45 = r.fixed_bytes::<256>(
-            pk::dynamic_size(v44 as f64, 8.0, 0.0, 8, 256, "Value")?,
+        let v48 = r.uint_order(16, false, "ValueLength")? as u16;
+        let v49 = r.fixed_bytes::<256>(
+            pk::dynamic_size(v48 as f64, 8.0, 0.0, 8, 256, "Value")?,
             "Value",
         )?;
         Ok((
             SetNode {
-                sequence: v39,
-                node: v42,
-                attribute: v43,
-                value_: v45,
+                sequence: v43,
+                node: v46,
+                attribute: v47,
+                value_: v49,
             },
             r.used(),
         ))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d44 = u16::try_from(pk::size_source(
+        let d48 = u16::try_from(pk::size_source(
             self.value_.len(),
             8.0,
             0.0,
@@ -1924,10 +1972,10 @@ impl Packet for SetNode {
         w.uint_order(
             16,
             false,
-            pk::from_unsigned(d44 as u64, 16, "ValueLength")?,
+            pk::from_unsigned(d48 as u64, 16, "ValueLength")?,
         );
         {
-            let n = pk::dynamic_size(d44 as f64, 8.0, 0.0, 8, 256, "Value")?;
+            let n = pk::dynamic_size(d48 as f64, 8.0, 0.0, 8, 256, "Value")?;
             if self.value_.len() != n {
                 return Err(PacketError::BadSize { field: "Value" });
             }
@@ -2021,19 +2069,19 @@ impl Packet for QueryNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 51) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 51) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryNode",
                 criterion: "Opcode = 51",
             });
         }
-        let v46 = r.uint_order(32, false, "Node")? as u32;
+        let v50 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             QueryNode {
-                sequence: v39,
-                node: v46,
+                sequence: v43,
+                node: v50,
             },
             r.used(),
         ))
@@ -2135,19 +2183,19 @@ impl Packet for QueryNodeSample {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 52) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 52) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryNodeSample",
                 criterion: "Opcode = 52",
             });
         }
-        let v47 = r.uint_order(32, false, "Node")? as u32;
+        let v51 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             QueryNodeSample {
-                sequence: v39,
-                node: v47,
+                sequence: v43,
+                node: v51,
             },
             r.used(),
         ))
@@ -2249,19 +2297,19 @@ impl Packet for QueryThreads {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v38 as i128) == 53) {
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v42 as i128) == 53) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryThreads",
                 criterion: "Opcode = 53",
             });
         }
-        let v48 = r.uint_order(32, false, "First")? as u32;
+        let v52 = r.uint_order(32, false, "First")? as u32;
         Ok((
             QueryThreads {
-                sequence: v39,
-                first: v48,
+                sequence: v43,
+                first: v52,
             },
             r.used(),
         ))
@@ -2308,7 +2356,7 @@ pub enum AnswerLayoutKind {
 
 impl Packet for AnswerLayoutKind {
     const NAME: &'static str = "/TcsLink/AnswerLayout";
-    const MAX_BYTES: usize = 439;
+    const MAX_BYTES: usize = 471;
 
     /// Decodes the root's entries, then picks the first child (in
     /// document order) whose criteria match, recursively.
@@ -2447,12 +2495,16 @@ impl Packet for AnswerLayoutKind {
             ));
         }
         if (v1 as i128) == 53 {
-            let v34 = r.uint_order(32, false, "FirstThread")? as u32;
-            let v35 = r.uint_order(32, false, "ThreadTotal")? as u32;
-            let v36 = r.uint_order(8, false, "ThreadsTold")? as u8;
-            let v37 = {
+            let v34 = r.uint_order(64, false, "MappedBytes")? as u64;
+            let v35 = r.uint_order(64, false, "ResidentBytes")? as u64;
+            let v36 = r.uint_order(64, false, "LockedBytes")? as u64;
+            let v37 = r.uint_order(64, false, "LockLimitBytes")? as u64;
+            let v38 = r.uint_order(32, false, "FirstThread")? as u32;
+            let v39 = r.uint_order(32, false, "ThreadTotal")? as u32;
+            let v40 = r.uint_order(8, false, "ThreadsTold")? as u8;
+            let v41 = {
                 let n =
-                    pk::dynamic_size(v36 as f64, 1.0, 0.0, 1, 32, "Threads")?;
+                    pk::dynamic_size(v40 as f64, 1.0, 0.0, 1, 32, "Threads")?;
                 let mut a = pk::FixedVec::<ThreadType, 32>::new();
                 for i in 0..n {
                     if a.push(ThreadType {
@@ -2476,9 +2528,13 @@ impl Packet for AnswerLayoutKind {
                     sequence: v2,
                     status: v3,
                     timestamp: v4,
-                    first_thread: v34,
-                    thread_total: v35,
-                    threads: v37,
+                    mapped_bytes: v34,
+                    resident_bytes: v35,
+                    locked_bytes: v36,
+                    lock_limit_bytes: v37,
+                    first_thread: v38,
+                    thread_total: v39,
+                    threads: v41,
                 }),
                 r.used(),
             ));
@@ -2737,34 +2793,34 @@ impl Packet for TcsCommandKind {
     /// document order) whose criteria match, recursively.
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v38 = r.uint_order(8, false, "Opcode")? as u8;
-        let v39 = r.uint_order(32, false, "Sequence")? as u32;
-        if (v38 as i128) == 1 {
-            return Ok((Self::Ping(Ping { sequence: v39 }), r.used()));
+        let v42 = r.uint_order(8, false, "Opcode")? as u8;
+        let v43 = r.uint_order(32, false, "Sequence")? as u32;
+        if (v42 as i128) == 1 {
+            return Ok((Self::Ping(Ping { sequence: v43 }), r.used()));
         }
-        if (v38 as i128) == 48 {
-            let v40 = r.uint_order(32, false, "Node")? as u32;
+        if (v42 as i128) == 48 {
+            let v44 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::StartNode(StartNode {
-                    sequence: v39,
-                    node: v40,
+                    sequence: v43,
+                    node: v44,
                 }),
                 r.used(),
             ));
         }
-        if (v38 as i128) == 49 {
-            let v41 = r.uint_order(32, false, "Node")? as u32;
+        if (v42 as i128) == 49 {
+            let v45 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::StopNode(StopNode {
-                    sequence: v39,
-                    node: v41,
+                    sequence: v43,
+                    node: v45,
                 }),
                 r.used(),
             ));
         }
-        if (v38 as i128) == 50 {
-            let v42 = r.uint_order(32, false, "Node")? as u32;
-            let v43 = pk::read_fixed_string::<64, 65>(
+        if (v42 as i128) == 50 {
+            let v46 = r.uint_order(32, false, "Node")? as u32;
+            let v47 = pk::read_fixed_string::<64, 65>(
                 &mut r,
                 &StringSpec {
                     fixed_bits: None,
@@ -2775,47 +2831,47 @@ impl Packet for TcsCommandKind {
                 },
                 "Attribute",
             )?;
-            let v44 = r.uint_order(16, false, "ValueLength")? as u16;
-            let v45 = r.fixed_bytes::<256>(
-                pk::dynamic_size(v44 as f64, 8.0, 0.0, 8, 256, "Value")?,
+            let v48 = r.uint_order(16, false, "ValueLength")? as u16;
+            let v49 = r.fixed_bytes::<256>(
+                pk::dynamic_size(v48 as f64, 8.0, 0.0, 8, 256, "Value")?,
                 "Value",
             )?;
             return Ok((
                 Self::SetNode(SetNode {
-                    sequence: v39,
-                    node: v42,
-                    attribute: v43,
-                    value_: v45,
+                    sequence: v43,
+                    node: v46,
+                    attribute: v47,
+                    value_: v49,
                 }),
                 r.used(),
             ));
         }
-        if (v38 as i128) == 51 {
-            let v46 = r.uint_order(32, false, "Node")? as u32;
+        if (v42 as i128) == 51 {
+            let v50 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::QueryNode(QueryNode {
-                    sequence: v39,
-                    node: v46,
+                    sequence: v43,
+                    node: v50,
                 }),
                 r.used(),
             ));
         }
-        if (v38 as i128) == 52 {
-            let v47 = r.uint_order(32, false, "Node")? as u32;
+        if (v42 as i128) == 52 {
+            let v51 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::QueryNodeSample(QueryNodeSample {
-                    sequence: v39,
-                    node: v47,
+                    sequence: v43,
+                    node: v51,
                 }),
                 r.used(),
             ));
         }
-        if (v38 as i128) == 53 {
-            let v48 = r.uint_order(32, false, "First")? as u32;
+        if (v42 as i128) == 53 {
+            let v52 = r.uint_order(32, false, "First")? as u32;
             return Ok((
                 Self::QueryThreads(QueryThreads {
-                    sequence: v39,
-                    first: v48,
+                    sequence: v43,
+                    first: v52,
                 }),
                 r.used(),
             ));

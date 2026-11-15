@@ -88,7 +88,8 @@ class WriteYamcsTest(unittest.TestCase):
                               "ping", "ping_yamcs.py")
         self.assertEqual(wrapper_apids(self.run / "tcs-ccsds.xtce"),
                          {("BeaconPacket", 0x100), ("AnswerPacket", 0x101),
-                          ("Connect", 0x101), ("Ping", 0x200),
+                          ("Connect", 0x101), ("QueryThreads", 0x101),
+                          ("Ping", 0x200),
                           ("pingPacket", 0x201)})
         self.assertEqual(setup.ping_command, PING_COMMAND)
         self.assertEqual(setup.ping_reply, PING_REPLY)
@@ -102,14 +103,16 @@ class WriteYamcsTest(unittest.TestCase):
             (self.run / "etc" / "yamcs.ping.yaml").read_text())
         self.assertEqual([(link["name"], link["port"])
                           for link in instance["dataLinks"]],
-                         [("commands", 16200), ("beacon", 16510),
-                          ("gateway-uplink", 16600),
+                         [("commands", 16200), ("node-commands", 16300),
+                          ("beacon", 16510), ("gateway-uplink", 16600),
                           ("ping-downlink", 16701)])
         self.assertEqual([(stream["name"], stream["tcPatterns"])
                           for stream in instance["streamConfig"]["tc"]],
                          [("tc_commands", ["/TcsYamcs/Connect"]),
+                          ("tc_node_commands", ["/TcsYamcs/QueryThreads"]),
                           ("tc_gateway", ["/TcsYamcs/Ping"])])
-        self.assertIn('streams: ["tc_commands", "tc_gateway"]',
+        self.assertIn('streams: ["tc_commands", "tc_node_commands", '
+                      '"tc_gateway"]',
                       (self.run / "etc" / "processor.yaml").read_text())
 
     def test_added_nodes_get_their_own_containers_and_links(self):
@@ -122,13 +125,14 @@ class WriteYamcsTest(unittest.TestCase):
         # gateway 0, ping 1, pong 2, sensor 3, tank 4.
         self.assertEqual(wrapper_apids(self.run / "tcs-ccsds.xtce"),
                          {("BeaconPacket", 0x100), ("AnswerPacket", 0x101),
-                          ("Connect", 0x101), ("Ping", 0x200),
+                          ("Connect", 0x101), ("QueryThreads", 0x101),
+                          ("Ping", 0x200),
                           ("pingPacket", 0x201), ("pongPacket", 0x202),
                           ("sensorPacket", 0x303), ("tankPacket", 0x304)})
         instance = yaml.safe_load(
             (self.run / "etc" / "yamcs.ping.yaml").read_text())
         self.assertEqual([(link["name"], link["port"])
-                          for link in instance["dataLinks"]][3:],
+                          for link in instance["dataLinks"]][4:],
                          [("ping-downlink", 16701), ("pong-downlink", 16702),
                           ("sensor-downlink", 16413),
                           ("tank-downlink", 16414)])

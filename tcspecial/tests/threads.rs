@@ -127,6 +127,14 @@ vehicle:
     let answer = threads(&nodes, to, 0);
     assert_eq!(answer.header.status, CommandStatus::Success);
     assert_eq!(answer.first, 0);
+    // The whole process's memory: mapped, some of it resident, none of it
+    // locked, since the tests run it with --no-memlock, and a limit.
+    let memory = answer.memory;
+    assert!(memory.mapped >= memory.resident, "{memory:?}");
+    assert!(memory.resident > 0, "{memory:?}");
+    assert_eq!(memory.locked, 0, "{memory:?}");
+    assert!(memory.lock_limit > 0, "{memory:?}");
+
     let told: Vec<ThreadStack> = answer.told().to_vec();
     assert_eq!(told.len(), answer.total as usize, "all in one answer");
 

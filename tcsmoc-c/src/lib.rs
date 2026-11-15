@@ -2185,6 +2185,15 @@ pub struct tcs_thread {
     deepest: u32,
 }
 
+/// What the header's `tcs_memory` is.
+#[repr(C)]
+pub struct tcs_memory {
+    mapped: u64,
+    resident: u64,
+    locked: u64,
+    lock_limit: u64,
+}
+
 /// Names a thread's role, as the header's `tcs_thread_role_name` says.
 ///
 /// # Arguments
@@ -2218,6 +2227,7 @@ pub extern "C" fn tcs_thread_role_name(role: c_int) -> *const c_char {
 /// * `client`  - The client.
 /// * `first`   - The position of the first thread to tell of.
 /// * `status`  - Where what the vehicle answered is written.
+/// * `memory`  - Where the memory the whole process has is written.
 /// * `total`   - Where how many threads the vehicle has is written.
 /// * `threads` - Where the threads are written: room for
 ///               `TCS_THREADS_PER_ANSWER`.
@@ -2229,13 +2239,14 @@ pub extern "C" fn tcs_thread_role_name(role: c_int) -> *const c_char {
 ///
 /// # Safety
 ///
-/// As [`tcs_client_connect`]; `status`, `total` and `told` NULL or
-/// writable, and `threads` NULL or room for `TCS_THREADS_PER_ANSWER`.
+/// As [`tcs_client_connect`]; `status`, `memory`, `total` and `told` NULL
+/// or writable, and `threads` NULL or room for `TCS_THREADS_PER_ANSWER`.
 #[no_mangle]
 pub unsafe extern "C" fn tcs_client_query_threads(
     client: *mut tcs_client,
     first: u32,
     status: *mut c_int,
+    memory: *mut tcs_memory,
     total: *mut u32,
     threads: *mut tcs_thread,
     told: *mut usize,
@@ -2243,12 +2254,13 @@ pub unsafe extern "C" fn tcs_client_query_threads(
     guard(-1, || {
         let link = handle_of_mut(client, "the client")?;
         let status_out = out_of(status, "the status")?;
+        let memory_out = out_of(memory, "the memory")?;
         let total_out = out_of(total, "the total")?;
         let told_out = out_of(told, "told")?;
         if threads.is_null() {
             return Err(fail("the threads is NULL"));
         }
-        let (answered, all, them) = link
+        let (answered, has, all, them) = link
             .client
             .query_threads(first)
             .map_err(|e| fail(format_args!("QUERY_THREADS {first}: {e}")))?;
@@ -2264,6 +2276,12 @@ pub unsafe extern "C" fn tcs_client_query_threads(
             };
         }
         *status_out = status_number(answered);
+        *memory_out = tcs_memory {
+            mapped: has.mapped,
+            resident: has.resident,
+            locked: has.locked,
+            lock_limit: has.lock_limit,
+        };
         *total_out = all;
         *told_out = them.len().min(THREADS_PER_ANSWER);
         Ok(0)

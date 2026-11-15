@@ -187,7 +187,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"2f452fd334eb3cc535b5b1f01bb64c2f\"
+  interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   beacon: {{ default_interval: \"100 ms\", reset_interval: \"100 ms\", \
   recv: \"127.0.0.1:{}\", send: \"{}\" }}
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}

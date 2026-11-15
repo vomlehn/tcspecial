@@ -8,7 +8,7 @@
 //! `xtce/beacon.xtce`, is in [`crate::beacon`].
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
-use crate::threads::{ThreadStack, THREADS_PER_ANSWER};
+use crate::threads::{ProcessMemory, ThreadStack, THREADS_PER_ANSWER};
 use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 
 /// Telemetry message header
@@ -609,8 +609,9 @@ impl QueryNodeSampleTelemetry {
     }
 }
 
-/// The answer to a QUERY_THREADS: what tcspecial's threads are for and how
-/// deep each has been into its stack, from the one the command asked for.
+/// The answer to a QUERY_THREADS: the memory the whole of tcspecial has, and
+/// what its threads are for and how deep each has been into its stack, from
+/// the one the command asked for.
 ///
 /// Up to [`THREADS_PER_ANSWER`] of them, and how many there are in all: a
 /// ground station that wants every thread asks again from `first` plus
@@ -620,6 +621,8 @@ impl QueryNodeSampleTelemetry {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QueryThreadsTelemetry {
     pub header: TelemetryHeader,
+    /// The memory the whole process has, measured as the answer is made.
+    pub memory: ProcessMemory,
     /// The position of the first thread told of, in the order they
     /// started.
     pub first: u32,
@@ -651,6 +654,7 @@ impl QueryThreadsTelemetry {
                 TelemetryType::QueryThreads,
                 status,
             ),
+            memory: ProcessMemory::default(),
             first,
             total: 0,
             told: 0,

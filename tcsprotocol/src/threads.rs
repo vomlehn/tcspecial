@@ -1,5 +1,6 @@
-//! What the ground is told of tcspecial's threads: what each is for, the
-//! stack it was given, and the most of that stack it has used.
+//! What the ground is told of tcspecial's threads -- what each is for, the
+//! stack it was given, and the most of that stack it has used -- and of
+//! the memory the whole process has.
 //!
 //! A thread whose stack overflows aborts the vehicle's software, and how
 //! deep a thread goes is not something a desk can say for a vehicle: the
@@ -130,6 +131,29 @@ pub struct ThreadStack {
     /// `runtime::thread`.
     pub deepest: u32,
 }
+
+/// How much memory the whole of tcspecial -- the process that runs the
+/// nodes -- has, as the ground is told of it with its threads.
+///
+/// What decides whether its memory can be locked: a lock of everything the
+/// process has mapped is refused when that is more than the limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ProcessMemory {
+    /// Everything mapped, in bytes: touched or not, which is what a lock
+    /// of everything is held to the limit by.
+    pub mapped: u64,
+    /// What is in RAM, in bytes.
+    pub resident: u64,
+    /// What is locked into RAM, in bytes: as much as is mapped once the
+    /// lock has succeeded, nought where it has not.
+    pub locked: u64,
+    /// The limit on what the process may lock, in bytes; [`UNLIMITED`]
+    /// where there is none.
+    pub lock_limit: u64,
+}
+
+/// What [`ProcessMemory::lock_limit`] is where there is no limit.
+pub const UNLIMITED: u64 = u64::MAX;
 
 /// The node id a thread that belongs to no node is given.
 pub const NO_NODE: NodeId = NodeId(u32::MAX);

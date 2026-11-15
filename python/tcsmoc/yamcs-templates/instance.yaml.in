@@ -18,6 +18,9 @@ services:
     args:
       name: realtime
       type: realtime
+  # Parameter lists, which the web interface shows: memusage gives each
+  # instance one of what QUERY_THREADS is answered with.
+  - class: org.yamcs.plists.ParameterListService
 
 # tcspecial's own XTCE, as it is, and the wrapper that puts a CCSDS header
 # around it, written by tcsprotocol/yamcs.py with every APID the
@@ -38,7 +41,7 @@ mdb:
       file: $xtce_dir/beacon.xtce
   - type: xtce
     args:
-      file: $run_dir/tcs-ccsds.xtce
+      file: $mdb_file
 
 # Every packet carries a CCSDS primary header and no time stamp, so Yamcs
 # stamps each with the time it arrived, and fills in each command's sequence

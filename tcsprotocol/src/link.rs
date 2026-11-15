@@ -48,7 +48,9 @@ use crate::telemetry::{
     RestartTelemetry, SetNodeTelemetry, Telemetry, TelemetryHeader,
     TelemetryType,
 };
-use crate::threads::{ThreadRole, ThreadStack, THREADS_PER_ANSWER};
+use crate::threads::{
+    ProcessMemory, ThreadRole, ThreadStack, THREADS_PER_ANSWER,
+};
 use crate::types::{
     ArmKey, CommandStatus, DHSample, NodeCounts, NodeId, Timestamp,
     DH_SAMPLE_BYTES,
@@ -628,6 +630,12 @@ impl Telemetry {
                 }
                 Telemetry::QueryThreads(QueryThreadsTelemetry {
                     header: head!(p, TelemetryType::QueryThreads),
+                    memory: ProcessMemory {
+                        mapped: p.mapped_bytes,
+                        resident: p.resident_bytes,
+                        locked: p.locked_bytes,
+                        lock_limit: p.lock_limit_bytes,
+                    },
                     first: p.first_thread,
                     total: p.thread_total,
                     // The XTCE's capacity is THREADS_PER_ANSWER.
@@ -799,6 +807,10 @@ impl AnswerPacker {
                     packet,
                     QueryThreadsAnswer,
                     t.header;
+                        mapped_bytes: t.memory.mapped,
+                        resident_bytes: t.memory.resident,
+                        locked_bytes: t.memory.locked,
+                        lock_limit_bytes: t.memory.lock_limit,
                         first_thread: t.first,
                         thread_total: t.total,
                         threads: threads,
@@ -1007,6 +1019,12 @@ mod tests {
     fn threads_told(sequence: u32, told: usize) -> QueryThreadsTelemetry {
         let mut answer =
             QueryThreadsTelemetry::new(sequence, CommandStatus::Success, 3);
+        answer.memory = ProcessMemory {
+            mapped: 9_000_000 + told as u64,
+            resident: 7_000_000,
+            locked: 0,
+            lock_limit: crate::threads::UNLIMITED,
+        };
         for (at, thread) in answer.threads[..told].iter_mut().enumerate() {
             *thread = ThreadStack {
                 role: ThreadRole::from_u8(at as u8 % 8),

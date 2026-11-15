@@ -100,6 +100,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcsmoc::beacon` to listen and `tcs-ui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 | `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
+| `memusage` | How much memory tcspecial has, and how deep each of its threads has been into its stack, watched through Yamcs: `memusage.py` has Yamcs send QUERY_THREADS and prints the answer, and given several configurations watches a tcspecial on each in one Yamcs, an instance each. Needs a Yamcs release unpacked somewhere. |
 | `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
 | `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `thermostat` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
 | `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcs-moc on it, tcs-sim simulating the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcsmoc. |
@@ -548,6 +549,40 @@ Languages:
 - Payload: Rust -- tcs-sim simulates the three sensors, with the zone
   they read, and the heaters' switches, on the kernel's simulated GPIO
   chip.
+
+### memusage
+
+A vehicle to watch the memory of: a `gateway_yamcs` node and three ping
+nodes, each a thread of its own, answering to Yamcs. Nothing is pinged.
+`memusage.py` has Yamcs send QUERY_THREADS, on the node command link, every
+five seconds, and prints what each tcspecial answers: what the whole process
+has mapped, resident and locked, the limit on what it may lock, and, for each
+thread, what it is for, its node, and the most of its stack it has used of
+the stack it was given.
+
+```
+make run-memusage YAMCS_HOME=~/yamcs-5.14.0
+make run-memusage YAMCS_HOME=~/yamcs-5.14.0 NO_MEMLOCK=1   # a desk's small limit
+make run-memusage YAMCS_HOME=~/yamcs-5.14.0 \
+    MEMUSAGE="examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs"
+```
+
+The last watches two tcspecials, as a vehicle that runs more than one would
+have them, in one Yamcs: one server, with an instance for each, named after
+its configuration, `memusage` and `ping_yamcs`, each with its own links and
+mission database, and a parameter list, `memusage`, of the answer's
+parameters, which Yamcs's web interface at http://localhost:18090 shows. The
+two can run at once -- other ports, another state file, no log in common --
+which `tcs-conflict` says of them. A configuration given to it must answer
+to Yamcs and take node commands from any port, `payload_command.source_base`
+with port 0, since Yamcs sends QUERY_THREADS from a port the system chooses.
+`test_memusage.py` is its tests, which need no Yamcs; `cargo test` runs
+them.
+
+Languages:
+
+- MOC: Python 3 -- `memusage.py`, through Yamcs.
+- Vehicle: Rust -- tcspecial.
 
 ### thermostat-yamcs
 

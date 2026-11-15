@@ -706,6 +706,19 @@ typedef struct tcs_thread {
 	                      a little more than it used, never less */
 } tcs_thread;
 
+/* What lock_limit is where there is no limit. */
+#define TCS_UNLIMITED UINT64_MAX
+
+/* The memory the whole of tcspecial has, in bytes. */
+typedef struct tcs_memory {
+	uint64_t mapped;      /* everything mapped, touched or not: what a
+	                         lock of everything is held to the limit by */
+	uint64_t resident;    /* what is in RAM */
+	uint64_t locked;      /* what is locked into RAM */
+	uint64_t lock_limit;  /* the limit on what it may lock, or
+	                         TCS_UNLIMITED */
+} tcs_memory;
+
 /** Names a thread's role.
  *
  * @param role  The role.
@@ -713,23 +726,25 @@ typedef struct tcs_thread {
  *              that is no role this library knows; static, never freed. */
 const char *tcs_thread_role_name(int role);
 
-/** Sends QUERY_THREADS, to ask what tcspecial's threads are for and how deep
- * each has been into its stack, from the thread at position first, in the
- * order they started. One answer tells of up to TCS_THREADS_PER_ANSWER;
+/** Sends QUERY_THREADS, to ask how much memory tcspecial has, and what its
+ * threads are for and how deep each has been into its stack, from the thread
+ * at position first, in the order they started. One answer tells of up to TCS_THREADS_PER_ANSWER;
  * ask again from first plus told until first reaches total for the rest.
  * Asking changes nothing aboard.
  *
  * @param client   The client.
  * @param first    The position of the first thread to tell of.
  * @param status   Where what the vehicle answered is written.
+ * @param memory   Where the memory the whole process has is written.
  * @param total    Where how many threads the vehicle has is written.
  * @param threads  Where the threads are written: room for
  *                 TCS_THREADS_PER_ANSWER.
  * @param told     Where how many of threads were written is written.
  * @return         0, or -1 on an error. */
 int tcs_client_query_threads(tcs_client *client, uint32_t first,
-			     tcs_status *status, uint32_t *total,
-			     tcs_thread *threads, size_t *told);
+			     tcs_status *status, tcs_memory *memory,
+			     uint32_t *total, tcs_thread *threads,
+			     size_t *told);
 
 /** Closes the command links and frees the client.
  *

@@ -21,9 +21,9 @@ use std::time::{Duration, Instant};
 use tcsprotocol::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
     CommandType, ConfigDigest, ConfigVersion, ConnectCommand, DHSample,
-    NodeCommand, NodeCounts, NodeId, PingCommand, Reason, RestartArmCommand,
-    RestartCommand, SetNodeCommand, TcsError, TcsResult, Telemetry,
-    ThreadStack, ThreadsCommand, Timestamp,
+    NodeCommand, NodeCounts, NodeId, PingCommand, ProcessMemory, Reason,
+    RestartArmCommand, RestartCommand, SetNodeCommand, TcsError, TcsResult,
+    Telemetry, ThreadStack, ThreadsCommand, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -856,8 +856,9 @@ impl TcsClient {
         }
     }
 
-    /// What tcspecial's threads are for and how deep each has been into its
-    /// stack, from the `first`: QUERY_THREADS.
+    /// The memory the whole of tcspecial has, and what its threads are for
+    /// and how deep each has been into its stack, from the `first`:
+    /// QUERY_THREADS.
     ///
     /// One answer tells of up to [`tcsprotocol::THREADS_PER_ANSWER`]
     /// threads; [`TcsClient::threads`] asks as often as it takes to have
@@ -870,8 +871,8 @@ impl TcsClient {
     ///
     /// # Returns
     ///
-    /// The status the vehicle answered with, how many threads it has in
-    /// all, and the ones the answer told of.
+    /// The status the vehicle answered with, the process's memory, how
+    /// many threads it has in all, and the ones the answer told of.
     ///
     /// # Errors
     ///
@@ -882,12 +883,12 @@ impl TcsClient {
     pub fn query_threads(
         &mut self,
         first: u32,
-    ) -> TcsResult<(CommandStatus, u32, Vec<ThreadStack>)> {
+    ) -> TcsResult<(CommandStatus, ProcessMemory, u32, Vec<ThreadStack>)> {
         let seq = self.next_sequence();
         let cmd = Command::QueryThreads(ThreadsCommand::new(seq, first));
         match self.send_command(cmd)? {
             Telemetry::QueryThreads(tm) => {
-                Ok((tm.header.status, tm.total, tm.told().to_vec()))
+                Ok((tm.header.status, tm.memory, tm.total, tm.told().to_vec()))
             }
             _ => {
                 Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
@@ -905,17 +906,18 @@ impl TcsClient {
     ///
     /// # Returns
     ///
-    /// The threads, in the order they started.
+    /// The threads, in the order they started, and the process's memory as
+    /// the last answer gave it.
     ///
     /// # Errors
     ///
     /// Those of [`TcsClient::query_threads`], and `TcsError::Protocol` for
     /// an answer that refused the command.
-    pub fn threads(&mut self) -> TcsResult<Vec<ThreadStack>> {
+    pub fn threads(&mut self) -> TcsResult<(Vec<ThreadStack>, ProcessMemory)> {
         let mut all = Vec::new();
         loop {
             let first = u32::try_from(all.len()).unwrap_or(u32::MAX);
-            let (status, total, told) = self.query_threads(first)?;
+            let (status, memory, total, told) = self.query_threads(first)?;
             if !status.is_success() {
                 return Err(TcsError::Protocol(format!(
                     "the vehicle refused QUERY_THREADS: {status:?}"
@@ -924,7 +926,7 @@ impl TcsClient {
             let none = told.is_empty();
             all.extend(told);
             if none || all.len() >= total as usize {
-                return Ok(all);
+                return Ok((all, memory));
             }
         }
     }

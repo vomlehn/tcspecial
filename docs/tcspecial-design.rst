@@ -1388,7 +1388,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "2f452fd334eb3cc535b5b1f01bb64c2f"
+     interface: "a28fbfe632aca562d9d9ac8d37ba5476"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -6209,6 +6209,54 @@ Requirement
     station that reads XTCE is given what the document states --
     `Gateways: what the vehicle answers to`_ says how Yamcs's mission
     database takes it -- and one that does not uses the type's code.
+
+More than one tcspecial on a vehicle
+------------------------------------
+
+A vehicle may run several tcspecials at once, each on a configuration of its
+own, so that a fault that ends one leaves the rest running, and each is
+restarted, rolled back and commanded apart. "More than one tcspecial on a
+vehicle" in the manual says how.
+
+Requirement
+    Nothing is shared between two tcspecials but the machine: each is a
+    supervisor and its child, with its own configuration, configuration
+    stack, state file, store of configurations, beacon, command links,
+    devices, logs and memory lock. A rule that would hold the two to each
+    other in flight -- a second reading the first's state, or waiting for
+    it -- is not made: each must be able to run, fail and come back alone.
+
+Requirement
+    What two tcspecials cannot both have is said before they fly, of a
+    pair of configurations, by tcs-conflict, with each thing's file and
+    line: every socket either binds, every device, state file, store and
+    log directory, and where tcs-sim answers (see
+    ``docs/tcs-conflict-design.rst``). What it cannot see is refused as the
+    second starts: the state file and every device are locked by the
+    tcspecial that holds them, and a socket already bound fails to bind.
+
+    **Built** (2026-11-14): tcs-conflict, and the locks of "No two
+    tcspecials want the same device".
+
+Requirement
+    To the ground, each tcspecial is a vehicle of its own: matched by its
+    own configuration's checksum, commanded on its own links. A ground
+    station keeps one client, one beacon listener and one receiver for
+    each, and shares none of them between two; the one thing shared is the
+    peer of a cFS software bus, one for each bus.
+
+Requirement
+    Every tcspecial on a vehicle can be watched in one Yamcs: one server,
+    with an instance for each tcspecial, each instance's links and mission
+    database generated from that tcspecial's configuration, as one
+    tcspecial's are. An instance each, because every tcspecial's answers are
+    laid out by the same mission database, ``tcsprotocol/xtce/link.xtce``,
+    whose parameters two tcspecials in one instance would share. The
+    tcspecials of several vehicles in one Yamcs are not asked for.
+
+    **Built** (2026-11-15): ``tcsmoc.yamcs_ground.write_yamcs_instances``,
+    and ``examples/memusage``, which watches each tcspecial it is given
+    through it.
 
 Fault Resiliency
 ================

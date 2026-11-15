@@ -131,7 +131,16 @@ class YamcsValueTest(unittest.TestCase):
                                               "booleanValue": True}), True)
         self.assertEqual(yamcs_ground.eng_value({"type": "SINT64",
                                                  "sint64Value": "-3"}), -3)
-        self.assertIsNone(yamcs_ground.eng_value({"type": "AGGREGATE"}))
+        # An array of aggregates, as an answer to QUERY_THREADS carries its
+        # threads; and a type this does not know.
+        self.assertEqual(yamcs_ground.eng_value({
+            "type": "ARRAY", "arrayValue": [{
+                "type": "AGGREGATE", "aggregateValue": {
+                    "name": ["Role", "StackBytes"],
+                    "value": [{"type": "ENUMERATED", "stringValue": "Node"},
+                              {"type": "UINT32", "uint32Value": 65536}]}}]}),
+            [{"Role": "Node", "StackBytes": 65536}])
+        self.assertIsNone(yamcs_ground.eng_value({"type": "TIMESTAMP"}))
 
 
 #: The examples' beacon interval, five seconds, in nanoseconds.

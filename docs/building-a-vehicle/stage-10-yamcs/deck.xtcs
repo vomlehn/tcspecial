@@ -33,7 +33,7 @@
              APID: the beacon's here, the commands' in tcs_cmd, and the
              readings' in payload_telemetry and the gateway node. -->
         <gateway>yamcs</gateway>
-        <interface>2f452fd334eb3cc535b5b1f01bb64c2f</interface>
+        <interface>a28fbfe632aca562d9d9ac8d37ba5476</interface>
         <log>
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>

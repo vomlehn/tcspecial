@@ -331,6 +331,14 @@ through it from the ping example’s window. Needs a Yamcs release
 unpacked somewhere.</td>
 </tr>
 <tr>
+<td><code>memusage</code></td>
+<td>How much memory tcspecial has, and how deep each of its threads has
+been into its stack, watched through Yamcs: <code>memusage.py</code> has
+Yamcs send QUERY_THREADS and prints the answer, and given several
+configurations watches a tcspecial on each in one Yamcs, an instance
+each. Needs a Yamcs release unpacked somewhere.</td>
+</tr>
+<tr>
 <td><code>tees</code></td>
 <td>The four nodes that do nothing to what passes: a
 <code>tee-gateway</code> sends each command on to a heater and back to
@@ -887,6 +895,37 @@ log are its own nodes.</li>
 <li>Payload: Rust – tcs-sim simulates the three sensors, with the zone
 they read, and the heaters’ switches, on the kernel’s simulated GPIO
 chip.</li>
+</ul>
+<h3 id="memusage">memusage</h3>
+<p>A vehicle to watch the memory of: a <code>gateway_yamcs</code> node
+and three ping nodes, each a thread of its own, answering to Yamcs.
+Nothing is pinged. <code>memusage.py</code> has Yamcs send
+QUERY_THREADS, on the node command link, every five seconds, and prints
+what each tcspecial answers: what the whole process has mapped, resident
+and locked, the limit on what it may lock, and, for each thread, what it
+is for, its node, and the most of its stack it has used of the stack it
+was given.</p>
+<pre><code>make run-memusage YAMCS_HOME=~/yamcs-5.14.0
+make run-memusage YAMCS_HOME=~/yamcs-5.14.0 NO_MEMLOCK=1   # a desk&#39;s small limit
+make run-memusage YAMCS_HOME=~/yamcs-5.14.0 \
+    MEMUSAGE=&quot;examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs&quot;</code></pre>
+<p>The last watches two tcspecials, as a vehicle that runs more than one
+would have them, in one Yamcs: one server, with an instance for each,
+named after its configuration, <code>memusage</code> and
+<code>ping_yamcs</code>, each with its own links and mission database,
+and a parameter list, <code>memusage</code>, of the answer’s parameters,
+which Yamcs’s web interface at http://localhost:18090 shows. The two can
+run at once – other ports, another state file, no log in common – which
+<code>tcs-conflict</code> says of them. A configuration given to it must
+answer to Yamcs and take node commands from any port,
+<code>payload_command.source_base</code> with port 0, since Yamcs sends
+QUERY_THREADS from a port the system chooses.
+<code>test_memusage.py</code> is its tests, which need no Yamcs;
+<code>cargo test</code> runs them.</p>
+<p>Languages:</p>
+<ul>
+<li>MOC: Python 3 – <code>memusage.py</code>, through Yamcs.</li>
+<li>Vehicle: Rust – tcspecial.</li>
 </ul>
 <h3 id="thermostat-yamcs">thermostat-yamcs</h3>
 <p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at

@@ -1,0 +1,14 @@
+[package]
+name = "memusage-example"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+The tests of the memusage example, whose ground station is Python 3: they \
+run the Python's own tests where the Rust's are run"""
+
+# Nothing is built for the example itself: its ground station is memusage.py
+# beside this.
+
+[lints]
+workspace = true

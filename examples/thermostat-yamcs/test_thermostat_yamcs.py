@@ -196,8 +196,8 @@ class MdbTest(unittest.TestCase):
         config = configuration.load(HERE / "thermostat-yamcs.xtcs")
         self.assertEqual([(link["name"], link["port"])
                           for link in generated.data_links(config)],
-                         [("commands", 17200), ("beacon", 17510),
-                          ("gateway-uplink", 17600),
+                         [("commands", 17200), ("node-commands", 17300),
+                          ("beacon", 17510), ("gateway-uplink", 17600),
                           ("consensus_temp-downlink", 17700),
                           ("gpio-out-tmass1-downlink", 17702),
                           ("gpio-out-tmass2-downlink", 17703),

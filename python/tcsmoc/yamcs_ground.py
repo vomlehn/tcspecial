@@ -7,14 +7,17 @@ station and the vehicle share -- ping-yamcs and thermostat-yamcs:
   configuration whose gateway is ``yamcs``, from the templates in
   ``yamcs-templates`` beside this, with the links, the command streams and
   the mission database :mod:`tcsprotocol.yamcs` works out of the
-  configuration;
+  configuration, and :func:`write_yamcs_instances` one server with an
+  instance for each of several tcspecials, which memusage uses;
 * :class:`Yamcs` starts it, told to die with the ground station, and talks
   to it over its REST API: commands issued, parameters read;
 * :func:`connect` has it send CONNECT, carrying the configuration's
   checksum, until the vehicle answers with it, as it sends nothing down
   until it has;
 * :class:`YamcsBeacons` reads each beacon Yamcs receives as
-  :class:`tcsmoc.beacon.Beacons` reads one from its own socket.
+  :class:`tcsmoc.beacon.Beacons` reads one from its own socket;
+* :func:`query_threads` has it send QUERY_THREADS and reads the answer:
+  the memory the whole of tcspecial has, and each thread's stack.
 
 Only the standard library is used, but for PyYAML, with which the
 instance's configuration is written.
@@ -116,16 +119,14 @@ def yamcs_home(said):
 
 def write_yamcs(config, run_dir, http_port, home, instance, writer,
                 world=False):
-    """Writes Yamcs's configuration for a tcspecial configuration.
-
-    The server's and the instance's from :data:`TEMPLATES`, with the instance's
-    links and command streams added, and the mission database's wrapper, each
-    worked out of the configuration by :mod:`tcsprotocol.yamcs`.
+    """Writes Yamcs's configuration for a tcspecial configuration: one
+    instance, as :func:`write_yamcs_instances` writes several.
 
     Args:
         config:    The :class:`tcsprotocol.configuration.Configuration`.
-        run_dir:   Where to write it: ``etc/``, the wrapper XTCE, and an
-                   empty ``data/``. Made afresh each run.
+        run_dir:   Where to write it: ``etc/``, the wrapper XTCE,
+                   ``tcs-ccsds.xtce``, and an empty ``data/``. Made afresh
+                   each run.
         http_port: Yamcs's web port.
         home:      Where Yamcs is unpacked, whose sample processor
                    configuration is used, releasing commands to the
@@ -136,32 +137,69 @@ def write_yamcs(config, run_dir, http_port, home, instance, writer,
                    ambient temperature: see :func:`tcsprotocol.yamcs.mdb`.
 
     Raises:
-        ValueError: The configuration does not give Yamcs what it needs: an
+        As :func:`write_yamcs_instances`.
+    """
+    write_yamcs_instances([(config, instance)], run_dir, http_port, home,
+                          writer, world)
+
+
+def write_yamcs_instances(vehicles, run_dir, http_port, home, writer,
+                          world=False):
+    """Writes Yamcs's configuration for one or more tcspecial configurations:
+    one server, with an instance for each.
+
+    The server's and each instance's from :data:`TEMPLATES`, with the
+    instance's links and command streams added, and the mission database's
+    wrapper, each worked out of its configuration by
+    :mod:`tcsprotocol.yamcs`. An instance each, because each tcspecial's
+    answers are laid out by the same mission database, whose parameters two
+    vehicles in one instance would share; Yamcs's web interface shows every
+    instance of the server.
+
+    Args:
+        vehicles:  Each configuration, a
+                   :class:`tcsprotocol.configuration.Configuration`, and the
+                   name of its instance, as ``(config, instance)``.
+        run_dir:   Where to write it: ``etc/``, the wrappers, and an empty
+                   ``data/``. Made afresh each run. The wrapper is
+                   ``tcs-ccsds.xtce`` for one instance, and
+                   ``tcs-ccsds.<instance>.xtce`` for each of several.
+        http_port: Yamcs's web port.
+        home:      Where Yamcs is unpacked, whose sample processor
+                   configuration is used, releasing commands to the
+                   instances' streams.
+        writer:    The program writing it, which each file says.
+        world:     Whether each mission database has the simulated world's
+                   ambient temperature: see :func:`tcsprotocol.yamcs.mdb`.
+
+    Raises:
+        ValueError: A configuration does not give Yamcs what it needs: an
                     APID that does not read or is used twice, or a node
-                    name XTCE does not allow.
+                    name XTCE does not allow; or two instances share a name.
         OSError: A file cannot be written, Yamcs's sample is missing or not
-                 Yamcs 5.14's, or PyYAML, which writes the instance's
-                 configuration, is not installed.
+                 Yamcs 5.14's, or PyYAML, which writes the instances'
+                 configurations, is not installed.
     """
     try:
         import yaml
     except ImportError:
         raise OSError(f"PyYAML is not installed, and {writer} writes "
                       "Yamcs's configuration with it: pip install PyYAML")
+    instances = [instance for _, instance in vehicles]
+    if len(set(instances)) != len(instances):
+        raise ValueError(f"two Yamcs instances are named alike: {instances}")
     run_dir = Path(run_dir)
     if run_dir.exists():
         shutil.rmtree(run_dir)
     (run_dir / "etc").mkdir(parents=True)
     (run_dir / "data").mkdir()
-    settings = {"http_port": str(http_port), "data_dir": str(run_dir / "data"),
-                "run_dir": str(run_dir), "xtce_dir": str(XTCE_DIR),
-                "instance": instance, "writer": writer}
 
-    def filled(template):
+    def filled(template, settings):
         """A template, its names filled in from ``settings``.
 
         Args:
             template: The template's name in :data:`TEMPLATES`.
+            settings: The names and what each is.
 
         Returns:
             Its text, filled in.
@@ -169,26 +207,39 @@ def write_yamcs(config, run_dir, http_port, home, instance, writer,
         text = (TEMPLATES / template).read_text()
         return string.Template(text).substitute(settings)
 
-    (run_dir / "etc" / "yamcs.yaml").write_text(filled("yamcs.yaml.in"))
-    said = yaml.safe_load(filled("instance.yaml.in"))
-    said["dataLinks"] = generated.data_links(config)
-    streams = generated.command_streams(config)
-    said["streamConfig"]["tc"] = streams
-    (run_dir / "etc" / f"yamcs.{instance}.yaml").write_text(
-        f"# Written by {writer} from\n"
-        "# python/tcsmoc/yamcs-templates/instance.yaml.in and\n"
-        f"# {config.path}, its links and command streams\n"
-        "# by tcsprotocol/yamcs.py: edit those, not this.\n"
-        + yaml.safe_dump(said, sort_keys=False))
-    generated.write_mdb(config, run_dir / "tcs-ccsds.xtce", world=world)
+    listed = "\n".join(f"  - {instance}" for instance in instances)
+    (run_dir / "etc" / "yamcs.yaml").write_text(filled(
+        "yamcs.yaml.in",
+        {"http_port": str(http_port), "data_dir": str(run_dir / "data"),
+         "instances": listed, "writer": writer}))
+    names = []
+    for config, instance in vehicles:
+        mdb_file = run_dir / ("tcs-ccsds.xtce" if len(vehicles) == 1
+                              else f"tcs-ccsds.{instance}.xtce")
+        said = yaml.safe_load(filled(
+            "instance.yaml.in",
+            {"xtce_dir": str(XTCE_DIR), "mdb_file": str(mdb_file),
+             "writer": writer}))
+        said["dataLinks"] = generated.data_links(config)
+        streams = generated.command_streams(config)
+        said["streamConfig"]["tc"] = streams
+        (run_dir / "etc" / f"yamcs.{instance}.yaml").write_text(
+            f"# Written by {writer} from\n"
+            "# python/tcsmoc/yamcs-templates/instance.yaml.in and\n"
+            f"# {config.path}, its links and command streams\n"
+            "# by tcsprotocol/yamcs.py: edit those, not this.\n"
+            + yaml.safe_dump(said, sort_keys=False))
+        generated.write_mdb(config, mdb_file, world=world)
+        names += [stream["name"] for stream in streams
+                  if stream["name"] not in names]
     sample = (Path(home) / "etc" / "processor.yaml.sample").read_text()
     if sample.count(ONE_STREAM) != 1:
         raise OSError(f"{home}/etc/processor.yaml.sample does not release "
                       f"commands with {ONE_STREAM}, as {writer} expects of "
                       "Yamcs 5.14")
-    names = ", ".join(f'"{stream["name"]}"' for stream in streams)
+    listed = ", ".join(f'"{name}"' for name in names)
     (run_dir / "etc" / "processor.yaml").write_text(
-        sample.replace(ONE_STREAM, f"streams: [{names}]"))
+        sample.replace(ONE_STREAM, f"streams: [{listed}]"))
 
 
 class Yamcs:
@@ -243,6 +294,21 @@ class Yamcs:
             time.sleep(0.5)
         raise RuntimeError(f"Yamcs's instance {self.instance} did not start: "
                            f"see {self.run_dir / 'yamcs.log'}")
+
+    def instance_of(self, instance):
+        """Another instance of this server: the same Yamcs, run once, and
+        its REST API for that instance.
+
+        Args:
+            instance: The other instance's name.
+
+        Returns:
+            A :class:`Yamcs` for it, which neither starts nor stops the
+            server: this one does.
+        """
+        other = Yamcs(self.home, self.run_dir, 0, instance)
+        other.base = self.base
+        return other
 
     def running(self):
         """Says whether the instance is running.
@@ -447,12 +513,19 @@ def eng_value(value):
                and the field that type names.
 
     Returns:
-        Bytes for a binary value, else the field's value; ``None`` for a
-        type it does not know.
+        Bytes for a binary value, a list of an array's values, a dictionary
+        of an aggregate's by member name, else the field's value; ``None``
+        for a type it does not know.
     """
     kind = value.get("type", "")
     if kind == "BINARY":
         return base64.b64decode(value.get("binaryValue", ""))
+    if kind == "ARRAY":
+        return [eng_value(each) for each in value.get("arrayValue", [])]
+    if kind == "AGGREGATE":
+        members = value.get("aggregateValue", {})
+        return {name: eng_value(each) for name, each
+                in zip(members.get("name", []), members.get("value", []))}
     for field in ("stringValue", "uint32Value", "uint64Value", "sint32Value",
                   "sint64Value", "floatValue", "doubleValue", "booleanValue"):
         if field in value:
@@ -506,6 +579,63 @@ def connect(yamcs, digest, attempts=30, say=_quiet):
                 return True
             time.sleep(0.05)
     return False
+
+
+#: The parameters of an answer to QUERY_THREADS, in tcsprotocol's
+#: ``link.xtce``: the sequence of the command it answers, the process's
+#: memory, and the threads.
+THREAD_PARAMETERS = ("/TcsLink/Sequence", "/TcsLink/Status",
+                     "/TcsLink/MappedBytes", "/TcsLink/ResidentBytes",
+                     "/TcsLink/LockedBytes", "/TcsLink/LockLimitBytes",
+                     "/TcsLink/FirstThread", "/TcsLink/ThreadTotal",
+                     "/TcsLink/Threads")
+
+#: The limit on locked memory where there is none, as the answer says it.
+UNLIMITED = 2 ** 64 - 1
+
+
+def query_threads(yamcs, sequence, first=0, timeout=5.0):
+    """Has Yamcs send QUERY_THREADS, and reads the answer it receives.
+
+    Args:
+        yamcs:    The :class:`Yamcs` instance of the tcspecial to ask.
+        sequence: The command's sequence number: past every command this
+                  start of tcspecial has taken, or it is answered Stale.
+        first:    The position of the first thread to tell of.
+        timeout:  How long to wait for the answer, in seconds.
+
+    Returns:
+        A dictionary: ``status``, the answer's status as Yamcs names it;
+        ``mapped``, ``resident``, ``locked`` and ``lock_limit``, in bytes,
+        the last :data:`UNLIMITED` where there is no limit; ``first`` and
+        ``total``, the first thread told of and how many there are; and
+        ``threads``, each a dictionary of ``role``, ``node``, ``stack`` and
+        ``deepest``. ``None`` where no answer to this command arrives.
+    """
+    yamcs.issue(generated.qualified(generated.QUERY_THREADS),
+                {"Sequence": sequence, "First": first})
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        said = yamcs.parameters(list(THREAD_PARAMETERS))
+        if said is not None:
+            values, _ = said
+            if values["/TcsLink/Sequence"] == sequence:
+                return {
+                    "status": values["/TcsLink/Status"],
+                    "mapped": values["/TcsLink/MappedBytes"],
+                    "resident": values["/TcsLink/ResidentBytes"],
+                    "locked": values["/TcsLink/LockedBytes"],
+                    "lock_limit": values["/TcsLink/LockLimitBytes"],
+                    "first": values["/TcsLink/FirstThread"],
+                    "total": values["/TcsLink/ThreadTotal"],
+                    "threads": [
+                        {"role": thread["Role"], "node": thread["Node"],
+                         "stack": thread["StackBytes"],
+                         "deepest": thread["DeepestBytes"]}
+                        for thread in values["/TcsLink/Threads"] or []],
+                }
+        time.sleep(0.05)
+    return None
 
 
 class YamcsBeacons:

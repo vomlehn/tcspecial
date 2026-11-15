@@ -916,6 +916,32 @@ class Configuration:
             recv=HostPort.of("tcs_cmd.recv", self._said("tcs_cmd.recv")),
         )
 
+    def node_command_link(self):
+        """The node command link: ``payload_command.source_base``, where the
+        ground sends from, and ``payload_command.dest_base``, where the
+        vehicle takes the commands about nodes, and QUERY_THREADS.
+
+        Returns:
+            The :class:`CommandLink`, or ``None`` where the section states
+            neither: a configuration may have no node command link.
+
+        Raises:
+            ValueError: One is missing or is not an address and a port, or
+                        the configuration answers over a bus.
+        """
+        self._not_on_a_bus("its node command link")
+        if not any(name in self.tcspecial for name in
+                   ("payload_command.source_base",
+                    "payload_command.dest_base")):
+            return None
+        return CommandLink(
+            send=HostPort.of("payload_command.source_base",
+                             self._said("payload_command.source_base"),
+                             any_port=True),
+            recv=HostPort.of("payload_command.dest_base",
+                             self._said("payload_command.dest_base")),
+        )
+
     def beacon_interval(self):
         """How often tcspecial beacons, in nanoseconds:
         ``beacon.default_interval``, read as :func:`parse_interval` reads it.

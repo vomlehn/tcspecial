@@ -18,13 +18,17 @@ tcspecial:
     reset_interval: "1 s"
     send: "0.0.0.0:16500"
   gateway: "yamcs"
-  interface: "2f452fd334eb3cc535b5b1f01bb64c2f"
+  interface: "a28fbfe632aca562d9d9ac8d37ba5476"
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"
+  # Yamcs sends QUERY_THREADS, on this link, from a port the system
+  # chooses, as it sends its other commands: so they are taken from any port
+  # of this host -- port 0 -- and each answer goes back to the port its
+  # command came from.
   payload_command:
     dest_base: "0.0.0.0:16300"
-    source_base: "127.0.0.1:16310"
+    source_base: "127.0.0.1:0"
   # A payload nothing in the drawing touches would report to dest_base plus
   # its device id, as telemetry of APID apid_base plus that device id. This
   # vehicle has none, but a configuration that answers to Yamcs says where

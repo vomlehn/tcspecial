@@ -329,9 +329,11 @@ fn rust_apids(path: &Path) -> BTreeSet<(String, u16)> {
     for used in telemetry::apids(&graph).expect("its APIDs work out") {
         let names = match &used.carries {
             ApidCarries::Beacon => vec!["BeaconPacket".to_string()],
-            ApidCarries::Commands => {
-                vec!["AnswerPacket".to_string(), "Connect".to_string()]
-            }
+            ApidCarries::Commands => vec![
+                "AnswerPacket".to_string(),
+                "Connect".to_string(),
+                "QueryThreads".to_string(),
+            ],
             ApidCarries::Uplink(gateway) => {
                 vec![uplink_command(&graph, gateway)]
             }

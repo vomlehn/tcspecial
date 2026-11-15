@@ -54,6 +54,10 @@ help:
 	@echo "  make run-ping-yamcs  - Run the ping-yamcs example: a Python" \
 		"window that pings the vehicle through Yamcs, over CCSDS" \
 		"packets (YAMCS_HOME=<yamcs>)"
+	@echo "  make run-memusage    - Run the memusage example: tcspecial's" \
+		"memory and every thread's stack, watched through Yamcs" \
+		"(YAMCS_HOME=<yamcs>; MEMUSAGE=<configurations> for more" \
+		"than one tcspecial)"
 	@echo "  make run-thermostat-yamcs - Run the thermostat-yamcs" \
 		"example: the thermostat, watched through Yamcs, over CCSDS" \
 		"packets (YAMCS_HOME=<yamcs>)"
@@ -293,6 +297,32 @@ run-ping-yamcs: check-tkinter
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
 		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)" \
 		$(MEMLOCK_FLAG)
+
+# The memusage example: tcspecial's memory, and each of its threads'
+# stacks, watched through Yamcs. YAMCS_HOME is where a Yamcs release is
+# unpacked; memusage.py starts Yamcs, with an instance for each tcspecial,
+# and a tcspecial on each configuration MEMUSAGE names, memusage's own where
+# it names none, and prints what each answers QUERY_THREADS with every five
+# seconds until it is stopped. Yamcs's web interface, at
+# http://localhost:18090, shows the same. Two tcspecials, which tcs-conflict
+# says can run at once:
+#   make run-memusage MEMUSAGE="examples/memusage/memusage.xtcs \
+#       examples/ping-yamcs/ping-yamcs.xtcs"
+MEMUSAGE = examples/memusage/memusage.xtcs
+
+.PHONY: run-memusage
+run-memusage:
+	@test -x "$(YAMCS_HOME)/bin/yamcsd" || { \
+		echo "say where Yamcs is unpacked: make run-memusage" \
+			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
+		exit 1; \
+	}
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
+		--bin segsend
+	mkdir -p $(TELEMETRY)
+	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
+		examples/memusage/memusage.py --yamcs "$(YAMCS_HOME)" \
+		$(MEMLOCK_FLAG) $(MEMUSAGE)
 
 # The thermostat example with Yamcs between the ground station and the
 # vehicle. YAMCS_HOME is where a Yamcs release is unpacked;

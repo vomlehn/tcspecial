@@ -928,7 +928,7 @@ mod tests {
     fn whole() -> Vec<(&'static str, &'static str)> {
         vec![
             ("gateway", "radio"),
-            ("interface", "2f452fd334eb3cc535b5b1f01bb64c2f"),
+            ("interface", "a28fbfe632aca562d9d9ac8d37ba5476"),
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_command.source_base", "127.0.0.1:4300"),
@@ -954,7 +954,7 @@ mod tests {
     fn on_the_bus() -> Vec<(&'static str, &'static str)> {
         vec![
             ("gateway", "cfs"),
-            ("interface", "2f452fd334eb3cc535b5b1f01bb64c2f"),
+            ("interface", "a28fbfe632aca562d9d9ac8d37ba5476"),
             ("sbn.release", "v7.0.1"),
             ("sbn.ident", "3b339a5e0f686cef822a5d6ea95004222ab7af33"),
             ("sbn.spacecraft_id", "0x42"),
@@ -1422,7 +1422,7 @@ mod tests {
         };
         let ours = crate::InterfaceDigest::of_this_build();
         assert_eq!(
-            with(Some("2f452fd334eb3cc535b5b1f01bb64c2f"))
+            with(Some("a28fbfe632aca562d9d9ac8d37ba5476"))
                 .expect("this build's")
                 .interface,
             ours,

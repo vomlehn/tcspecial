@@ -2900,11 +2900,77 @@ can come out a fraction of a millisecond either side of nought.
 Yamcs sends its commands from a port the system chooses and takes the
 answers on the same socket, so the configuration's ``tcs_cmd.send`` is
 ``127.0.0.1:0``: commands from any port of this host, each answer going back
-to the port its command came from.
+to the port its command came from. ``payload_command.source_base`` is too,
+for QUERY_THREADS, which Yamcs sends on the node command link: see `The
+memusage example`_.
 
 Starting Yamcs, its REST API, CONNECT and the beacon through Yamcs are
 ``python/tcsmoc/yamcs_ground.py``'s, which `The thermostat-yamcs example`_
 shares, as it shares the Yamcs templates beside it.
+
+The memusage example
+--------------------
+.. figure:: ../examples/memusage/memusage.svg
+   :alt: The memusage example: memusage.py has Yamcs send QUERY_THREADS to
+         tcspecial's node command link, which answers on the same link with
+         the memory the whole process has and every thread's stack: the
+         gateway node's, the three ping nodes', and tcspecial's own. Yamcs
+         runs an instance for each tcspecial it is given.
+   :width: 100%
+
+   ``examples/memusage``: how much memory tcspecial has, and how deep each
+   of its threads has been into its stack, watched through Yamcs.
+
+A vehicle to watch the memory of: a ``gateway_yamcs`` node and three ping
+nodes, ``ping1``, ``ping2`` and ``ping3``, each a thread of its own, answering
+to Yamcs. Nothing is pinged. ``examples/memusage/memusage.py`` has Yamcs send
+QUERY_THREADS every five seconds and prints what comes back: what the whole
+process has mapped, has resident and has locked, the limit on what it may
+lock, and a line for each thread -- what it is for, the node it belongs to,
+and the most of its stack it has used, of the stack it was given:
+
+.. code-block:: text
+
+   memusage: 17.9 MiB mapped, 13.4 MiB resident, 0 KiB locked, limit 8192 KiB; 11 threads
+     main                        105 KiB of   8188 KiB    1%
+     signals                       7 KiB of    256 KiB    3%
+     node gateway                 10 KiB of     64 KiB   16%
+     node ping1                    7 KiB of     64 KiB   11%
+     ...
+     commands                     35 KiB of    256 KiB   14%
+
+That is a debug build run with ``--no-memlock`` on a desk whose limit is 8
+MiB: locked, it would need a limit of more than the 17.9 MiB it maps. See
+`How deep each thread has been`_ and `Locking memory`_.
+
+It runs given a Yamcs release unpacked somewhere:
+
+.. code-block:: sh
+
+   make -C examples run-memusage YAMCS_HOME=~/yamcs-5.14.0
+   python3 examples/memusage/memusage.py --yamcs ~/yamcs-5.14.0 --polls 1
+
+Given more than one configuration, it watches a tcspecial on each in the one
+Yamcs, an instance for each, as `More than one tcspecial on a vehicle`_
+says: ping-yamcs uses other ports and keeps another state file, which
+tcs-conflict says can run beside it:
+
+.. code-block:: sh
+
+   make -C examples run-memusage YAMCS_HOME=~/yamcs-5.14.0 \
+       MEMUSAGE="examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs"
+
+Each instance is named after its configuration's file, ``memusage`` and
+``ping_yamcs`` here, and has a parameter list, ``memusage``, of the answer's
+parameters, which Yamcs's web interface, at ``http://localhost:18090``,
+shows: ``/TcsLink/MappedBytes`` and the rest, and ``/TcsLink/Threads``, an
+array of each thread's role, node, stack and deepest. A configuration it is
+given must answer to Yamcs, and take node commands from any port --
+``payload_command.source_base`` with port 0 -- since Yamcs sends
+QUERY_THREADS from a port the system chooses; memusage.py refuses one that
+does not, saying what to change. ``--no-memlock`` runs each tcspecial without
+the lock, ``--interval`` sets how often it asks, and ``--polls`` how many
+times before it stops.
 
 The thermostat-yamcs example
 ----------------------------
@@ -4373,6 +4439,111 @@ the window and run with ``--visual``, it does not: the window's memory has
 no counterpart in flight, so a run with it is no measure of what a vehicle
 maps, and its threads are given the arenas glibc gives them.
 
+More than one tcspecial on a vehicle
+------------------------------------
+
+A vehicle may run several tcspecials at once, each on a configuration of
+its own: one for each group of payloads, say, so that a fault that ends
+one leaves the others running, and each is restarted, rolled back and
+commanded apart from the rest. Nothing in tcspecial is shared between them.
+Each is a supervisor and its child, as `The supervisor and the
+configuration stack <tcspecial-design.html#the-supervisor-and-the-configuration-stack>`__
+in the design describes, with its own configuration stack, its own beacon,
+its own command links and its own memory lock.
+
+What each must have of its own
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Two tcspecials cannot share anything one of them binds, opens or keeps:
+
+* every socket either binds: ``tcs_cmd.recv``, ``payload_command.dest_base``,
+  ``beacon.send``, each payload's and each gateway node's address, and, on a
+  ground station on the same machine, ``tcs_cmd.send``, ``beacon.recv`` and
+  each ``ground_base``;
+* every device: a serial line, an I2C, SPI or IIO device, a GPIO line, an
+  rpmsg channel, an address on a bus;
+* ``state_file``, which holds the configuration stack;
+* ``configurations``, the directory the configurations a RESTART may name
+  are kept in;
+* ``log.directory``, and each log node's directory;
+* on a desk, where tcs-sim answers.
+
+A named pipe, a socket file or a plain file two tcspecials name is allowed,
+being a channel two processes may share by design, and so is a CAN
+identifier or a raw IP protocol on one interface, which each tcspecial then
+sees all of.
+
+Checking a pair before they fly
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``tcs-conflict`` says whether two configurations can run at once, naming
+everything both want, with its file and line: see `the tcs-conflict
+manual <tcs-conflict.html>`__. It compares a pair, so three tcspecials are
+three pairs:
+
+.. code-block:: console
+
+   $ tcs-conflict payloads-a.ytcs payloads-b.ytcs
+   $ tcs-conflict payloads-a.ytcs payloads-c.ytcs
+   $ tcs-conflict payloads-b.ytcs payloads-c.ytcs
+
+What it misses is caught as the second starts: a tcspecial locks its state
+file and every device it opens, and a second given either is refused,
+saying which, as is one whose socket is already bound.
+
+Starting each
+^^^^^^^^^^^^^
+
+Each tcspecial is started on its own configuration, by a unit or a script
+of its own. The shipped systemd unit, ``tcspecial.service``, starts one, on
+``tcspecial.ytcs``; for each more, make a unit beside it, the same but for
+the file it names:
+
+.. code-block:: ini
+
+   # /etc/systemd/system/tcspecial-b.service
+   [Unit]
+   Description=tcspecial: payloads b
+   ConditionPathExists=/etc/opt/tcs/tcspecial/payloads-b.ytcs
+
+   [Service]
+   WorkingDirectory=/var/opt/tcs/tcspecial
+   ExecStart=/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/payloads-b.ytcs
+   Restart=always
+   RestartSec=1
+   LimitMEMLOCK=infinity
+
+   [Install]
+   WantedBy=multi-user.target
+
+Each locks its own memory, against its own limit, so ``LimitMEMLOCK`` is
+set in each unit; the RAM they lock between them is the sum of what each
+maps, which the vehicle must have.
+
+From the ground
+^^^^^^^^^^^^^^^
+
+To the ground each tcspecial is a vehicle of its own: it beacons with its
+own configuration's checksum, is matched by a CONNECT carrying that
+checksum, and is commanded on its own links, by a station that reads its
+configuration. So a ground station has one of everything for each
+tcspecial: in tcsmoc, a ``TcsClient``, a beacon listener and a
+``GatewayReceiver`` each; in the C/C++ library, a ``tcs_client`` and a
+``tcs_configuration`` each. Nothing in them is shared between two, but for
+the peer of a cFS software bus, of which there is one for each bus, which
+every configuration on that bus shares. tcs-moc shows one configuration, so
+two tcspecials are two tcs-moc windows.
+
+Every tcspecial on a vehicle can be watched in one Yamcs: one Yamcs server,
+with an instance for each tcspecial, each instance's links and mission
+database generated from that tcspecial's configuration. An instance each,
+because every tcspecial's answers are laid out by one mission database, whose
+parameters two in one instance would share. Yamcs's web interface shows
+every instance of the server. ``write_yamcs_instances`` in the Python
+``tcsmoc.yamcs_ground`` writes such a server, and the memusage example
+runs one: see `The memusage example`_. One Yamcs for the tcspecials of
+several vehicles is not supported.
+
 Which interface it is written for
 ---------------------------------
 
@@ -4382,7 +4553,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "2f452fd334eb3cc535b5b1f01bb64c2f"
+     interface: "a28fbfe632aca562d9d9ac8d37ba5476"
 
 It is the digest of the ``tcsprotocol/xtce/link.xtce`` a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4397,7 +4568,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --interface-digest
-   2f452fd334eb3cc535b5b1f01bb64c2f
+   a28fbfe632aca562d9d9ac8d37ba5476
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -4408,8 +4579,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to 2f452fd334eb3cc535b5b1f01bb64c2f, from 0123...
-   vehicle.xtcs: interface is 2f452fd334eb3cc535b5b1f01bb64c2f already
+   vehicle.ytcs: interface set to a28fbfe632aca562d9d9ac8d37ba5476, from 0123...
+   vehicle.xtcs: interface is a28fbfe632aca562d9d9ac8d37ba5476 already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

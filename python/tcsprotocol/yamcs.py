@@ -97,8 +97,11 @@ XTCE_NAME = re.compile(r"[^./:\[\] ]+")
 #: the APID carries.
 RESTRICTED = {"beacon": "BeaconPacket", "commands": "AnswerPacket"}
 
-#: The template's command the command links' APID is assigned to.
+#: The template's commands the command links' APID is assigned to: CONNECT,
+#: on the spacecraft command link, and QUERY_THREADS, on the node command
+#: link, which tcspecial frames with the same APID.
 CONNECT = "Connect"
+QUERY_THREADS = "QueryThreads"
 
 #: The binary parameter type a node's data is read as where it is a
 #: structure: what follows the header, whole.
@@ -130,8 +133,13 @@ DATA_BITS_TYPE = "U32Arg"
 #: The base command every command is built on.
 BASE_COMMAND = "CcsdsTc"
 
-#: The command stream and link of the command links, which CONNECT goes on.
+#: The command stream and link of the spacecraft command link, which CONNECT
+#: goes on.
 COMMAND_STREAM = "tc_commands"
+
+#: The command stream and link of the node command link, which QUERY_THREADS
+#: goes on.
+NODE_COMMAND_STREAM = "tc_node_commands"
 
 #: The stream every packet from the vehicle arrives on.
 TM_STREAM = "tm_realtime"
@@ -1042,9 +1050,10 @@ def mdb(config, template=TEMPLATE, world=False):
                               "/x:BaseContainer", f"{container} bases")
             _restrict(base, use.apid)
         if use.carries == "commands":
-            base = _one(root, f".//x:MetaCommand[@name='{CONNECT}']"
-                              "/x:BaseMetaCommand", f"{CONNECT} bases")
-            _assign(base, use.apid)
+            for command in (CONNECT, QUERY_THREADS):
+                base = _one(root, f".//x:MetaCommand[@name='{command}']"
+                                  "/x:BaseMetaCommand", f"{command} bases")
+                _assign(base, use.apid)
 
     # Each source's data under its APID, as its document lays it out or
     # whole; and a command for each gateway node, likewise.
@@ -1229,9 +1238,9 @@ def serialized(root):
 
 
 def data_links(config):
-    """The Yamcs instance's links to the vehicle: the command links, the
-    beacon, an uplink to each ``gateway_yamcs`` node that binds aboard and a
-    link on each port a source's data arrives at.
+    """The Yamcs instance's links to the vehicle: the spacecraft and the node
+    command links, the beacon, an uplink to each ``gateway_yamcs`` node that
+    binds aboard and a link on each port a source's data arrives at.
 
     Args:
         config: The :class:`tcsprotocol.configuration.Configuration`.
@@ -1248,10 +1257,21 @@ def data_links(config):
                    "class": "org.yamcs.tctm.UdpTcTmDataLink",
                    "host": local(command.address), "port": command.port,
                    "tmStream": TM_STREAM, "tcStream": COMMAND_STREAM},
-                  **PREPROCESSOR, **POSTPROCESSOR),
-             dict({"name": "beacon", "class": "org.yamcs.tctm.UdpTmDataLink",
-                   "stream": TM_STREAM,
-                   "port": config.beacon_link().recv.port}, **PREPROCESSOR)]
+                  **PREPROCESSOR, **POSTPROCESSOR)]
+    nodes = config.node_command_link()
+    if nodes is not None:
+        links.append(dict({"name": "node-commands",
+                           "class": "org.yamcs.tctm.UdpTcTmDataLink",
+                           "host": local(nodes.recv.address),
+                           "port": nodes.recv.port,
+                           "tmStream": TM_STREAM,
+                           "tcStream": NODE_COMMAND_STREAM},
+                          **PREPROCESSOR, **POSTPROCESSOR))
+    links.append(dict({"name": "beacon",
+                       "class": "org.yamcs.tctm.UdpTmDataLink",
+                       "stream": TM_STREAM,
+                       "port": config.beacon_link().recv.port},
+                      **PREPROCESSOR))
     for uplink in uplinks(config):
         if uplink.vehicle is None:
             continue
@@ -1270,8 +1290,8 @@ def data_links(config):
 
 def command_streams(config):
     """The command streams that route each command to its link: CONNECT to
-    the command links, each gateway node's command to its uplink, where it
-    binds aboard.
+    the spacecraft command link, QUERY_THREADS to the node command link, each
+    gateway node's command to its uplink, where it binds aboard.
 
     Args:
         config: The :class:`tcsprotocol.configuration.Configuration`.
@@ -1284,6 +1304,9 @@ def command_streams(config):
     """
     streams = [{"name": COMMAND_STREAM, "processor": "realtime",
                 "tcPatterns": [qualified(CONNECT)]}]
+    if config.node_command_link() is not None:
+        streams.append({"name": NODE_COMMAND_STREAM, "processor": "realtime",
+                        "tcPatterns": [qualified(QUERY_THREADS)]})
     for uplink in uplinks(config):
         if uplink.vehicle is None:
             continue

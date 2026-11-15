@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" role="img" aria-labelledby="title desc">
+  <title id="title">The memusage example</title>
+  <desc id="desc">memusage.py has Yamcs send QUERY_THREADS, as a CCSDS telecommand of APID 0x101, to tcspecial's node command link at 0.0.0.0:18300. tcspecial answers on the same link with the memory the whole process has, mapped, resident, locked and the limit on locking, and with each of its threads: the main, signals, commands and beacons threads, and one each for the gateway node, a gateway_yamcs node, and the ping nodes ping1, ping2 and ping3, each with the stack it was given and the most of it it has used. Yamcs decodes the answer, and memusage.py reads it from Yamcs and prints it. Yamcs runs one instance for each tcspecial memusage.py is given, so that several tcspecials on one vehicle are watched in one Yamcs. The query goes up as a solid line with an open arrowhead, labelled QUERY_THREADS; the answer comes down as a dashed line, labelled answer; the beacon as a dotted line, labelled beacon.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .vehicle { fill: #eef7ee; stroke: #009E73; stroke-width: 1.6; }
+      .socket { fill: #ffffff; stroke: #0072B2; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .up { fill: none; stroke: #D55E00; stroke-width: 2; }
+      .down { fill: none; stroke: #0072B2; stroke-width: 2; stroke-dasharray: 8 4; }
+      .beacon { fill: none; stroke: #009E73; stroke-width: 2.4; stroke-dasharray: 2 4; }
+    </style>
+    <marker id="arrow-up" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10" fill="none" stroke="#D55E00" stroke-width="1.6"/>
+    </marker>
+    <marker id="arrow-down" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0072B2"/>
+    </marker>
+    <marker id="arrow-beacon" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#009E73"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="470" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="45" y="44">TCSPECIAL (VEHICLE)</text>
+  <text class="heading" x="700" y="44">MOC</text>
+
+  <rect class="boundary" x="30" y="58" width="570" height="390" rx="14"/>
+
+  <!-- The gateway node, Yamcs's end of the link to the ping nodes -->
+  <rect class="socket" x="55" y="80" width="230" height="96" rx="10"/>
+  <text class="name" x="71" y="107">gateway</text>
+  <text class="kind" x="71" y="128">gateway_yamcs, device id 0</text>
+  <text class="detail" x="71" y="148">binds 127.0.0.1:18600</text>
+  <text class="detail" x="71" y="166">a thread of its own</text>
+
+  <!-- The three ping nodes, each a thread of its own -->
+  <rect class="vehicle" x="55" y="196" width="230" height="64" rx="10"/>
+  <text class="name" x="71" y="222">ping1</text>
+  <text class="kind" x="71" y="243">ping node, device id 1</text>
+  <rect class="vehicle" x="55" y="276" width="230" height="64" rx="10"/>
+  <text class="name" x="71" y="302">ping2</text>
+  <text class="kind" x="71" y="323">ping node, device id 2</text>
+  <rect class="vehicle" x="55" y="356" width="230" height="64" rx="10"/>
+  <text class="name" x="71" y="382">ping3</text>
+  <text class="kind" x="71" y="403">ping node, device id 3</text>
+
+  <!-- What the commands thread measures -->
+  <rect class="socket" x="330" y="150" width="245" height="190" rx="10"/>
+  <text class="name" x="346" y="177">commands thread</text>
+  <text class="kind" x="346" y="198">node command link</text>
+  <text class="detail" x="346" y="216">0.0.0.0:18300</text>
+  <text class="label" x="346" y="242">answers QUERY_THREADS with:</text>
+  <text class="detail" x="346" y="262">mapped, resident, locked,</text>
+  <text class="detail" x="346" y="279">lock limit: the process</text>
+  <text class="detail" x="346" y="299">each thread's role, node,</text>
+  <text class="detail" x="346" y="316">stack and deepest</text>
+
+  <!-- The beacon, tcspecial's own -->
+  <rect class="socket" x="330" y="80" width="245" height="40" rx="8"/>
+  <text class="label" x="346" y="105">beacon: APID 0x100, every 5 s</text>
+
+  <!-- The threads it measures: the nodes' -->
+  <path d="M285,128 L330,200 M285,228 L330,230 M285,308 L330,270 M285,388 L330,320" fill="none" stroke="#6b7280" stroke-width="1" stroke-dasharray="3 3"/>
+  <text class="note" x="55" y="440">Every thread is measured: these four, and tcspecial's own.</text>
+
+  <!-- The ground station -->
+  <rect class="ground" x="700" y="80" width="280" height="160" rx="10"/>
+  <text class="name" x="716" y="107">Yamcs</text>
+  <text class="kind" x="716" y="128">one server, an instance for</text>
+  <text class="kind" x="716" y="146">each tcspecial given:</text>
+  <text class="detail" x="716" y="168">memusage, and ping-yamcs</text>
+  <text class="detail" x="716" y="186">beside it, say</text>
+  <text class="detail" x="716" y="210">web: http://localhost:18090</text>
+
+  <rect class="ground" x="700" y="270" width="280" height="100" rx="10"/>
+  <text class="name" x="716" y="297">memusage.py</text>
+  <text class="kind" x="716" y="318">asks each instance, every</text>
+  <text class="kind" x="716" y="336">interval, and prints what</text>
+  <text class="kind" x="716" y="354">the answer said</text>
+
+  <!-- Up: QUERY_THREADS, through Yamcs to the node command link -->
+  <path class="up" d="M696,200 L579,200" marker-end="url(#arrow-up)"/>
+  <text class="label" x="590" y="192">QUERY_THREADS</text>
+  <!-- Down: the answer, back on the same link -->
+  <path class="down" d="M579,250 L696,250" marker-end="url(#arrow-down)"/>
+  <text class="label" x="612" y="268">answer</text>
+  <!-- The beacon -->
+  <path class="beacon" d="M579,100 L696,100" marker-end="url(#arrow-beacon)"/>
+  <text class="label" x="612" y="92">beacon</text>
+  <!-- memusage.py and Yamcs's REST API -->
+  <path class="up" d="M820,270 L820,244" marker-end="url(#arrow-up)"/>
+  <path class="down" d="M860,244 L860,270" marker-end="url(#arrow-down)"/>
+  <text class="note" x="870" y="262">REST API</text>
+</svg>

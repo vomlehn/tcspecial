@@ -20,9 +20,10 @@ use tcsmoc::{TcsClient, UdpConnection};
 use tcsprotocol::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
-    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
+    PingTelemetry, ProcessMemory, QueryNodeSampleTelemetry, QueryNodeTelemetry,
     QueryThreadsTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
     SetNodeTelemetry, Telemetry, ThreadRole, ThreadStack, THREADS_PER_ANSWER,
+    UNLIMITED,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -150,6 +151,7 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                         CommandStatus::Success,
                         cmd.first,
                     );
+                    answer.memory = stub_memory();
                     let first = cmd.first as usize;
                     let told = STUB_THREADS
                         .saturating_sub(first)
@@ -268,6 +270,16 @@ fn stub_thread(at: usize) -> ThreadStack {
     }
 }
 
+/// The memory a simulated vehicle says it has.
+fn stub_memory() -> ProcessMemory {
+    ProcessMemory {
+        mapped: 9_437_184,
+        resident: 7_340_032,
+        locked: 9_437_184,
+        lock_limit: UNLIMITED,
+    }
+}
+
 /// Every thread comes back, though the vehicle has more than one answer
 /// tells of, in the order the vehicle has them.
 #[test]
@@ -276,7 +288,8 @@ fn every_thread_comes_back_across_answers() {
     let (addr, stub) = stub_spacecraft(3);
     let mut client = client_to(&addr);
 
-    let threads = client.threads().expect("the threads");
+    let (threads, memory) = client.threads().expect("the threads");
+    assert_eq!(memory, stub_memory(), "and the process's memory");
     let expected: Vec<ThreadStack> =
         (0..STUB_THREADS).map(stub_thread).collect();
     assert_eq!(threads, expected);

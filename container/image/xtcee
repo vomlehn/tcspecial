@@ -1,0 +1,80 @@
+#!/bin/sh
+# xtcee: open an XTCE document, or one of tcs-xtce's examples, in the
+# editor, tcs-xtcee, in a test container with the tcs-xtce package
+# installed.
+#
+#   xtcee FILE
+#   xtcee -e NAME | --example NAME | --example=NAME
+#   xtcee -e | --example
+#
+# With FILE it opens that file. With -e or --example, NAME is an example's,
+# the name of its directory among those the package installs, and it opens
+# the example's .xtce file, or, for an example of several, all of them
+# together, as one mission. -e with no NAME lists the examples.
+
+set -eu
+
+# Where the tcs-xtce package installs the editor and the examples.
+EDITOR=/opt/tcs/bin/tcs-xtcee
+EXAMPLES=/opt/tcs/share/examples/tcs-xtce
+
+# Prints how to call this command.
+usage() {
+	echo "usage: xtcee FILE"
+	echo "       xtcee -e NAME | --example NAME | --example=NAME"
+	echo "       xtcee -e | --example     (lists the examples)"
+}
+
+# Says what is wrong and stops.
+#
+# Arguments:
+#   $@  What to say.
+die() {
+	echo "xtcee: $*" >&2
+	exit 1
+}
+
+# Lists the examples, those with an .xtce file, one a line.
+list() {
+	for dir in "$EXAMPLES"/*/; do
+		set -- "$dir"*.xtce
+		[ -f "$1" ] && basename "$dir"
+	done
+	return 0
+}
+
+[ -x "$EDITOR" ] || die "no $EDITOR: install the tcs-xtce package"
+example=
+case ${1:-} in
+-e | --example)
+	if [ $# -eq 1 ]; then
+		list
+		exit 0
+	fi
+	example=$2
+	shift 2
+	;;
+--example=*)
+	example=${1#--example=}
+	shift
+	;;
+-h | --help)
+	usage
+	exit 0
+	;;
+"" | -*)
+	usage >&2
+	exit 2
+	;;
+*)
+	[ $# -eq 1 ] || { usage >&2; exit 2; }
+	exec "$EDITOR" "$1"
+	;;
+esac
+[ $# -eq 0 ] || { usage >&2; exit 2; }
+case $example in
+"" | */* | .*) die "no example ${example:-named}: xtcee -e lists them" ;;
+esac
+set -- "$EXAMPLES/$example"/*.xtce
+[ -f "$1" ] || die "no example $example: xtcee -e lists them"
+exec "$EDITOR" "$@"

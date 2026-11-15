@@ -1,0 +1,397 @@
+#!/bin/sh
+# tcs-container: a test system, in a container, to install the TCS packages
+# into and remove them from as an administrator would, and to build a
+# checkout in, without touching the machine it runs on.
+#
+#   tcs-container [--distro kubuntu|fedora] COMMAND [ARGUMENT...]
+#
+#   build              build the image, from
+#                      image/Containerfile.DISTRO
+#   fresh              throw the container away, with all that was done in
+#                      it, and start a new one from the image, building the
+#                      image first if there is none
+#   shell [COMMAND...] a login shell in it as the user tcs, or COMMAND;
+#                      --root before COMMAND runs it as root
+#   install FILE...    install the .deb or .rpm files, with apt-get or dnf
+#   remove PACKAGE...  remove the packages, configuration and all
+#   installed          list the TCS packages installed in it
+#   copy DIR...        copy each checkout into /home/tcs/src/, leaving out
+#                      what building made, to build there: its make
+#                      install-tools installs what that needs
+#   example [--hidden] [NAME [ARGUMENT...]]
+#                      run tcspecial's example NAME, or with no NAME list
+#                      them: see example() below
+#   wait               wait until it stops
+#   stop               stop it, keeping what was done in it
+#   destroy [--image]  remove it, and with --image the image too
+#
+# The distribution is kubuntu, for the .debs, unless --distro or
+# TCS_CONTAINER_DISTRO says fedora, for the RPMs. The container is
+# tcs-test-DISTRO, made from the image localhost/tcs-test-DISTRO, and runs
+# systemd as its first process, so that a package's scripts and its units
+# behave as they would on a real system; a command that needs it running
+# starts it. It is Podman's, rootless: PODMAN names another program.
+#
+# Its user, tcs, is whoever built the image, on the host as well, so that a
+# program with a window run in it shows it on their desktop: fresh gives the
+# container the host's Wayland and X11 sockets, X authority and GPU, where
+# there are any, and shell points WAYLAND_DISPLAY, DISPLAY and XAUTHORITY at
+# them. A display that has gone since, as after logging out and in again,
+# needs a fresh container.
+#
+# It is in tcspecial's container/, whose make container-install and the
+# rest call it with the packages a project has built.
+
+set -eu
+
+# Prints how to call this command.
+usage() {
+	echo "usage: tcs-container [--distro kubuntu|fedora] build | fresh |"
+	echo "       shell [--root] [COMMAND...] | install FILE... |"
+	echo "       remove PACKAGE... | installed | copy DIR... |"
+	echo "       example [--hidden] [NAME [ARGUMENT...]] |"
+	echo "       wait | stop | destroy [--image]"
+}
+
+# Says what is wrong and stops.
+#
+# Arguments:
+#   $@  What to say.
+die() {
+	echo "tcs-container: $*" >&2
+	exit 1
+}
+
+# Says whether the container exists, running or not.
+#
+# Returns:
+#   0 if it does, 1 if not.
+exists() {
+	"$podman" container exists "$name"
+}
+
+# Says whether the image exists.
+#
+# Returns:
+#   0 if it does, 1 if not.
+image_exists() {
+	"$podman" image exists "$image"
+}
+
+# Builds the image from its Containerfile, with the user tcs given the uid
+# and gid of whoever runs this.
+build() {
+	images=$here/image
+	"$podman" build -t "$image" -f "$images/Containerfile.$distro" \
+		--build-arg TCS_UID="$(id -u)" --build-arg TCS_GID="$(id -g)" \
+		"$images"
+}
+
+# Where the host's display is put in the container.
+DISPLAY_DIR=/mnt/tcs-display
+
+# Makes the container afresh from the image, building the image first if
+# there is none, and starts it.
+fresh() {
+	image_exists || build
+	if exists; then
+		"$podman" rm -f "$name" > /dev/null
+	fi
+	# The display, as far as the host has one: the Wayland socket, the
+	# X11 sockets with the authority file that lets a client use them,
+	# and the GPU. keep-id makes the host's uid the same in the container,
+	# where it is tcs's, and would run systemd as it too, but systemd must
+	# be root.
+	set --
+	runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
+	wayland=$runtime/${WAYLAND_DISPLAY:-}
+	if [ -n "${WAYLAND_DISPLAY:-}" ] && [ -S "$wayland" ]; then
+		set -- "$@" -v "$wayland:$DISPLAY_DIR/wayland-0"
+	fi
+	if [ -n "${DISPLAY:-}" ] && [ -d /tmp/.X11-unix ]; then
+		set -- "$@" -v /tmp/.X11-unix:/tmp/.X11-unix:ro
+		if [ -n "${XAUTHORITY:-}" ] && [ -f "$XAUTHORITY" ]; then
+			set -- "$@" -v "$XAUTHORITY:$DISPLAY_DIR/Xauthority:ro"
+		fi
+	fi
+	[ ! -d /dev/dri ] || set -- "$@" --device /dev/dri
+	"$podman" run -d --name "$name" --hostname "$name" \
+		--systemd=always --userns=keep-id --user root "$@" "$image" \
+		> /dev/null
+	echo "[OK] $name is new and running"
+}
+
+# Starts the container, making it first if there is none.
+running() {
+	if ! exists; then
+		fresh
+	elif [ "$("$podman" container inspect -f '{{.State.Running}}' \
+		"$name")" != true ]; then
+		"$podman" start "$name" > /dev/null
+	fi
+}
+
+# Runs a command in the container as root.
+#
+# Arguments:
+#   $@  The command and its arguments.
+as_root() {
+	"$podman" exec "$name" "$@"
+}
+
+# Copies files into a directory of the container's that is emptied first.
+#
+# Arguments:
+#   $1  The directory in the container.
+#   $@  After it, the files.
+copy_in() {
+	dir=$1
+	shift
+	as_root rm -rf "$dir"
+	as_root mkdir -p "$dir"
+	for file in "$@"; do
+		"$podman" cp "$file" "$name:$dir/"
+	done
+}
+
+# Installs package files: copied in, then given to apt-get or dnf, which
+# fetch what they depend on. A package already installed at the same
+# version is installed again, so that a package rebuilt without a new
+# version is the one tested.
+#
+# Arguments:
+#   $@  The .deb or .rpm files.
+install() {
+	[ $# -gt 0 ] || die "install needs the package files to install"
+	case $distro in
+	kubuntu) want=deb ;;
+	fedora) want=rpm ;;
+	esac
+	for file in "$@"; do
+		[ -f "$file" ] || die "no file $file"
+		case $file in
+		*."$want") ;;
+		*) die "$file is not a .$want, which $distro installs" ;;
+		esac
+	done
+	running
+	copy_in /tmp/tcs-packages "$@"
+	if [ "$distro" = kubuntu ]; then
+		as_root apt-get update -qq
+		as_root sh -c 'apt-get install -y --reinstall \
+			/tmp/tcs-packages/*.deb'
+	else
+		# dnf reinstalls only what is installed at the version given,
+		# and installs, or upgrades to, only what is not, so each
+		# package goes to the one that fits it: those not installed at
+		# that version in one transaction, so that one may require
+		# another given with it, a new one an upgraded one, then those
+		# that are.
+		# shellcheck disable=SC2016 # expanded in the container
+		as_root sh -c 'new= old=
+		for f in /tmp/tcs-packages/*.rpm; do
+			nvr=$(rpm -qp --qf "%{NAME}-%{VERSION}-%{RELEASE}" "$f")
+			if rpm -q "$nvr" > /dev/null 2>&1; then
+				old="$old $f"
+			else
+				new="$new $f"
+			fi
+		done
+		[ -z "$new" ] || dnf -y install $new || exit 1
+		[ -z "$old" ] || dnf -y reinstall $old'
+	fi
+}
+
+# Removes packages, with their configuration.
+#
+# Arguments:
+#   $@  The packages' names.
+remove() {
+	[ $# -gt 0 ] || die "remove needs the names of the packages"
+	running
+	if [ "$distro" = kubuntu ]; then
+		as_root apt-get purge -y "$@"
+	else
+		as_root dnf -y remove "$@"
+	fi
+}
+
+# Lists the TCS packages installed: those whose names start tcs.
+installed() {
+	running
+	if [ "$distro" = kubuntu ]; then
+		# shellcheck disable=SC2016 # expanded in the container
+		as_root dpkg-query -W -f \
+			'${db:Status-Abbrev} ${binary:Package} ${Version}\n' \
+			'tcs*' 2>/dev/null | sed -n 's/^ii  *//p' || true
+	else
+		as_root sh -c "rpm -qa --qf '%{NAME} %{VERSION}-%{RELEASE}\n' \
+			'tcs*' | sort"
+	fi
+}
+
+# Copies checkouts into the container, for the user tcs, leaving out what
+# building made, which is large and is the host's.
+#
+# Arguments:
+#   $@  The checkouts' directories.
+copy() {
+	[ $# -gt 0 ] || die "copy needs the checkouts to copy"
+	running
+	as_root mkdir -p /home/tcs/src
+	for dir in "$@"; do
+		[ -d "$dir" ] || die "no directory $dir"
+		top=$(cd "$dir" && pwd)
+		base=$(basename "$top")
+		as_root rm -rf "/home/tcs/src/$base"
+		tar -C "$(dirname "$top")" --exclude="$base/target" \
+			--exclude="$base/build" --exclude='*/target' \
+			--exclude='__pycache__' -cf - "$base" \
+			| "$podman" exec -i "$name" tar -C /home/tcs/src -xf -
+		echo "[OK] $base is in /home/tcs/src/$base"
+	done
+	as_root chown -R tcs:tcs /home/tcs/src
+}
+
+# Runs a login shell, or a command, in the container.
+#
+# Arguments:
+#   $@  --root to run as root, then the command; nothing for a shell.
+shell() {
+	running
+	user=tcs
+	if [ "${1:-}" = --root ]; then
+		user=root
+		shift
+	fi
+	flags=-i
+	[ ! -t 0 ] || flags=-it
+	# The host's display, as fresh gave it the container, and a runtime
+	# directory of the user's own, which Wayland clients need. None of
+	# the values has a space in it, so the options are a list of words.
+	uid=$(as_root id -u tcs)
+	as_root install -d -m 700 -o tcs -g tcs "/run/user/$uid"
+	envs="-e XDG_RUNTIME_DIR=/run/user/$uid"
+	if as_root test -S "$DISPLAY_DIR/wayland-0"; then
+		envs="$envs -e WAYLAND_DISPLAY=$DISPLAY_DIR/wayland-0"
+	fi
+	if [ -n "${DISPLAY:-}" ] && as_root test -d /tmp/.X11-unix/.; then
+		envs="$envs -e DISPLAY=$DISPLAY"
+		if as_root test -f "$DISPLAY_DIR/Xauthority"; then
+			envs="$envs -e XAUTHORITY=$DISPLAY_DIR/Xauthority"
+		fi
+	fi
+	if [ $# -eq 0 ]; then
+		# shellcheck disable=SC2086 # -e options, split on purpose
+		"$podman" exec "$flags" $envs -u "$user" -w /home/tcs "$name" \
+			bash -l
+	else
+		# shellcheck disable=SC2086 # -e options, split on purpose
+		"$podman" exec "$flags" $envs -u "$user" -w /home/tcs "$name" \
+			bash -lc '"$@"' bash "$@"
+	fi
+}
+
+# Runs one of tcspecial's examples, or lists them, by tcsx, which the
+# tcspecial-examples package installs: see its comments for what it does.
+# It is given --no-memlock, since a rootless container's limit on locked
+# memory is the host's, too small for tcspecial to lock its memory into
+# RAM as it does by default. The examples through Yamcs find it where the
+# image unpacked it, as the login shell's YAMCS_HOME says.
+# ARGUMENTs go to tcsx. --hidden is for testing: the window is drawn by
+# Xvfb, where nobody sees it, instead of on the host's desktop, so that a
+# test opens no window there. The run lasts until its window is closed, or
+# Ctrl+C, so a test gives it a time to last.
+#
+# Arguments:
+#   $@  --hidden, then the example's name and the ARGUMENTs; nothing to
+#       list the examples.
+example() {
+	hidden=
+	if [ "${1:-}" = --hidden ]; then
+		hidden=1
+		shift
+	fi
+	running
+	as_root test -x /opt/tcs/bin/tcsx \
+		|| die "no tcsx: install tcspecial-examples, as bin/start does"
+	if [ $# -eq 0 ]; then
+		shell /opt/tcs/bin/tcsx
+		return
+	fi
+	# A run stopped from outside, as when the terminal it was started in
+	# closed, leaves its programs running in the container, holding the
+	# examples' ports, so they are stopped first.
+	# shellcheck disable=SC2016 # expanded in the container, not here
+	shell bash -c '
+		programs="tcs-moc|tcs-sim|tcspecial|beacon|lorem_gateway"
+		# The ground stations are Python, run as python3 examples/...
+		pkill -u "$(id -u)" -f "^python3 examples/" || true
+		pkill -u "$(id -u)" -x "$programs|Xvfb" || true
+		for _ in 1 2 3 4 5 6 7 8 9 10; do
+			pgrep -u "$(id -u)" -x "$programs" > /dev/null || exit 0
+			sleep 0.5
+		done
+		pkill -KILL -u "$(id -u)" -x "$programs"
+		true'
+	# Hidden, the window goes to Xvfb's X display, so the desktop's
+	# Wayland one, which a Wayland client would take first, is not named.
+	wrap=
+	[ -z "$hidden" ] || wrap="env -u WAYLAND_DISPLAY xvfb-run -a"
+	# shellcheck disable=SC2086 # $wrap is words, or none
+	shell $wrap /opt/tcs/bin/tcsx --no-memlock "$@"
+}
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+podman=${PODMAN:-podman}
+distro=${TCS_CONTAINER_DISTRO:-kubuntu}
+if [ "${1:-}" = --distro ]; then
+	[ $# -ge 2 ] || { usage >&2; exit 2; }
+	distro=$2
+	shift 2
+fi
+case $distro in
+kubuntu | fedora) ;;
+*) die "no image for $distro: kubuntu or fedora" ;;
+esac
+[ $# -gt 0 ] || { usage >&2; exit 2; }
+command -v "$podman" > /dev/null 2>&1 \
+	|| die "no $podman: install Podman (sudo apt install podman)"
+name=tcs-test-$distro
+image=localhost/tcs-test-$distro
+
+command=$1
+shift
+case $command in
+build) build ;;
+fresh) fresh ;;
+shell) shell "$@" ;;
+install) install "$@" ;;
+remove) remove "$@" ;;
+installed) installed ;;
+copy) copy "$@" ;;
+example) example "$@" ;;
+wait)
+	if exists; then
+		"$podman" wait "$name" > /dev/null
+	fi
+	;;
+stop)
+	if exists; then
+		"$podman" stop "$name" > /dev/null
+	fi
+	;;
+destroy)
+	if exists; then
+		"$podman" rm -f "$name" > /dev/null
+	fi
+	if [ "${1:-}" = --image ] && image_exists; then
+		"$podman" rmi "$image" > /dev/null
+	fi
+	;;
+-h | --help) usage ;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

@@ -1,0 +1,71 @@
+# The Fedora test container: a system to install the TCS packages' RPMs
+# into and remove them from, as an administrator would, without touching
+# the machine it runs on. tcs-container builds it as
+# localhost/tcs-test-fedora.
+#
+# systemd runs as the container's first process, so that a package's
+# scripts and a unit such as tcspecial.service behave as they do on a real
+# system.
+FROM registry.fedoraproject.org/fedora:latest
+
+# The basic command set, Python, git and make for a checkout copied in, a
+# virtual display for the programs that open a window, Java for Yamcs,
+# and sudo for the user the tests run as. What a TCS package needs it
+# brings with it, and what building a project needs its make install-tools
+# installs.
+# Fedora's image tells dnf to skip every package's documentation, which a
+# Fedora system installs; a package's %doc files are tested only if they
+# are installed, so the image installs them as a system does.
+RUN sed -i '/^tsflags=nodocs$/d' /etc/dnf/dnf.conf
+
+RUN dnf -y install \
+	bash-completion ca-certificates curl file findutils gawk git gzip \
+	iproute iputils less lsof make nano nmap-ncat procps-ng psmisc \
+	python3 strace sudo systemd tar vim-minimal which xauth \
+	xorg-x11-server-Xvfb xz java-25-openjdk-headless \
+ && dnf clean all
+
+# Yamcs, which tcspecial's examples through it start, unpacked where
+# tcs-profile.sh, which each login shell reads, says it is; the Java it
+# runs on is installed above. The release is checked against the SHA-256
+# digest GitHub gives it.
+ARG YAMCS_VERSION=5.14.0
+ARG YAMCS_SUM=35004954a65021a06182928bbc344adfb09b11599dd009863745010e98527356
+RUN release=https://github.com/yamcs/yamcs/releases/download \
+ && curl -fsSL -o /tmp/yamcs.tar.gz \
+	"$release/yamcs-$YAMCS_VERSION/yamcs-$YAMCS_VERSION-linux-x86_64.tar.gz" \
+ && echo "$YAMCS_SUM  /tmp/yamcs.tar.gz" | sha256sum -c --quiet - \
+ && mkdir /opt/yamcs \
+ && tar xzf /tmp/yamcs.tar.gz -C /opt/yamcs --strip-components=1 \
+ && rm /tmp/yamcs.tar.gz
+COPY tcs-profile.sh /etc/profile.d/tcs-profile.sh
+
+# xtcee, which opens a file or one of tcs-xtce's examples in its editor,
+# once the tcs-xtce package is installed, and cfge, which does the same
+# for tcspecial's configurations in tcs-cfge.
+COPY xtcee cfge /usr/local/bin/
+
+# A user to run things as, as a person would, with sudo for installing,
+# and the tools cargo install puts in ~/.cargo/bin on the path of its login
+# shells. It has the uid and gid of whoever built the image, which
+# tcs-container gives, and runs as that user on the host too, so that it
+# may use their display to show its windows. Ubuntu's image has a user of
+# its own, ubuntu, at the uid most first users have, so it goes.
+ARG TCS_UID=1000
+ARG TCS_GID=1000
+RUN groupadd --gid "$TCS_GID" tcs \
+ && useradd --create-home --shell /bin/bash --uid "$TCS_UID" --gid tcs tcs \
+ && echo 'tcs ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tcs \
+ && chmod 440 /etc/sudoers.d/tcs \
+ && echo 'PATH="$HOME/.cargo/bin:$PATH"' >> /home/tcs/.bash_profile
+
+# The out-of-memory killer, the name resolver and polkit cannot run in a
+# container without privileges, and would leave systemd degraded: the
+# container's DNS is Podman's, and with no desktop session there is nothing
+# for polkit to authorize.
+RUN systemctl mask systemd-oomd.service systemd-oomd.socket \
+	systemd-resolved.service systemd-resolved-monitor.socket \
+	systemd-resolved-varlink.socket polkit.service
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

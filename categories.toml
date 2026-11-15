@@ -28,10 +28,10 @@ software-tools = [
 ]
 
 # What stands in for the payloads and the MOC, the test apps, the kernel's
-# dummy devices, and every test. cfs/ and fprime/ are cFS's and F´'s
-# software, generated or not, used only to test tcspecial beside them: it
-# is not TCS software, is never counted as such, and is listed here only so
-# that every directory is in a category.
+# dummy devices, the test container, and every test. cfs/ and fprime/ are
+# cFS's and F´'s software, generated or not, used only to test tcspecial
+# beside them: it is not TCS software, is never counted as such, and is
+# listed here only so that every directory is in a category.
 verification-tools = [
 	"tcs-sim",
 	"tcs-moc",
@@ -42,6 +42,7 @@ verification-tools = [
 	"app_all_veh",
 	"bin",
 	"cfs",
+	"container",
 	"fprime",
 	"tests",
 	"python/tests",

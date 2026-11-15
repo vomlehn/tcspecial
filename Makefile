@@ -1458,6 +1458,7 @@ check:
 	$(MAKE) --no-print-directory xtce-check
 	$(MAKE) --no-print-directory operational-names
 	$(MAKE) --no-print-directory html-check
+	$(MAKE) --no-print-directory -C container check
 
 # The F´ bridge, which F´'s own tools build rather than cargo: see
 # fprime/Makefile, which says where it looks for F´ and how to say
@@ -1582,7 +1583,7 @@ screenshots: screenshots-tcs-cfge screenshots-tcs-moc screenshots-tcs-sim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
-HTML_DIRS = $(DOCS_DIR) examples tcsmoc tcsmoc-c tcsprotocol
+HTML_DIRS = $(DOCS_DIR) examples tcsmoc tcsmoc-c tcsprotocol container
 
 # Fail where a committed page has fallen behind its source, naming it, having
 # made every page again in place: tcs-helpers' html-pages check, which also

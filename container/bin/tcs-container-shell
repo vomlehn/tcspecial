@@ -1,0 +1,23 @@
+#!/bin/sh
+# tcs-container-shell: tcs-container shell, as a command of its own: a login
+# shell in the container, or a command.
+#
+#   tcs-container-shell [--distro kubuntu|fedora] [ARGUMENT...]
+#
+# Runs bin/tcs-container beside it with the command shell, passing --distro,
+# when it comes first, and every other argument as tcs-container takes them.
+
+set -eu
+
+here=$(cd "$(dirname "$0")" && pwd)
+if [ "${1:-}" = --distro ]; then
+	[ $# -ge 2 ] || {
+		echo "usage: tcs-container-shell [--distro DISTRO]" \
+			"[ARGUMENT...]" >&2
+		exit 2
+	}
+	distro=$2
+	shift 2
+	exec "$here/tcs-container" --distro "$distro" shell "$@"
+fi
+exec "$here/tcs-container" shell "$@"

@@ -1,0 +1,200 @@
+#!/bin/sh
+# bin/start: start the test container afresh, install the newest build of
+# every TCS package in it, and open a terminal window with a shell in it.
+#
+#   bin/start [-f | --fedora] [DIR...]
+#
+# The packages are the .deb files, for the kubuntu container, or with -f or
+# --fedora the .rpm files, for the fedora one, in each DIR's build/packages:
+# each TCS checkout, ../../tcs* from container/, when no DIR is given: the
+# tcspecial checkout this is in and those beside it. A project builds all
+# its packages at one version, so from each DIR only the files at the
+# version of its newest file are installed, by the time each was written:
+# an older version left beside them, or a package since renamed, is not.
+# It is tcs-container fresh and tcs-container install, one after the
+# other: see bin/tcs-container.
+#
+# Then it opens a new terminal window running tcs-container shell, a login
+# shell in the container as tcs. Leaving the shell, or closing the window,
+# stops the container, with every other shell and program in it. bin/start
+# waits until the container stops, and Ctrl+C, or any other signal that
+# would end it, stops the container. The terminal is $TERMINAL, or the
+# first there of x-terminal-emulator, konsole, gnome-terminal and xterm.
+# Without a display or a terminal, it says so and stops before starting
+# anything, the window being where what is done in the container is seen.
+
+set -eu
+
+# Prints how to call this command.
+usage() {
+	echo "usage: bin/start [-f | --fedora] [DIR...]"
+}
+
+# Says what is wrong and stops.
+#
+# Arguments:
+#   $@  What to say.
+die() {
+	echo "bin/start: $*" >&2
+	exit 1
+}
+
+# Gives the version of the package a package file holds, from the file's
+# name: a .deb's is between its first two _, without the revision after its
+# last hyphen, and an RPM's is between the last two hyphens, which end the
+# name and begin the release.
+#
+# Arguments:
+#   $1  The file.
+#
+# Returns:
+#   0, printing the version.
+version_of() {
+	file=$(basename "$1")
+	case $file in
+	*.deb)
+		version=${file#*_}
+		version=${version%%_*}
+		echo "${version%-*}"
+		;;
+	*.rpm)
+		version=${file%-*}
+		echo "${version##*-}"
+		;;
+	esac
+}
+
+# What the window runs: a login shell in the container, and the container
+# stopped when it ends, or when the window is closed under it, which hangs
+# it up. podman exec does not end when hung up, and sh runs a trap only once
+# the command it waits for has ended, so the shell is run in the background,
+# its input the window's, kept on 3 since a background command's is
+# /dev/null otherwise, and waited for: a signal ends the wait. The stop
+# is in a session of its own, so that a terminal ending what it started does
+# not end it, and says nothing, there being no window left to say it in.
+#
+# Arguments:
+#   $1  bin/tcs-container.
+#   $2  The container's distribution.
+# shellcheck disable=SC2016 # expanded by the window's sh, not here
+WINDOW='
+container=$0
+distro=$1
+stop() {
+	setsid "$container" --distro "$distro" stop \
+		< /dev/null > /dev/null 2>&1
+}
+trap "stop; exit 0" HUP TERM
+exec 3<&0
+"$container" --distro "$distro" shell 0<&3 3<&- &
+wait $!
+stop
+'
+
+# Prints the terminal the window is opened with.
+#
+# Returns:
+#   0, printing it, or 1 if there is none.
+terminal() {
+	for terminal in ${TERMINAL:-} x-terminal-emulator konsole \
+		gnome-terminal xterm; do
+		if command -v "$terminal" > /dev/null 2>&1; then
+			echo "$terminal"
+			return 0
+		fi
+	done
+	return 1
+}
+
+# Opens a terminal window running a login shell in the container, in the
+# background, so that this returns while the window stays.
+#
+# Arguments:
+#   $1  The terminal.
+#   $2  The container's distribution.
+open_window() {
+	# Each runs a command after -e, but gnome-terminal after --.
+	run=-e
+	[ "$(basename "$1")" != gnome-terminal ] || run=--
+	setsid "$1" "$run" sh -c "$WINDOW" "$here/tcs-container" "$2" \
+		< /dev/null > /dev/null 2>&1 &
+	echo "A shell in the $2 container is in a new $1 window;" \
+		"closing it stops the container"
+}
+
+here=$(cd "$(dirname "$0")" && pwd)
+distro=kubuntu
+kind=deb
+while [ $# -gt 0 ]; do
+	case $1 in
+	-f | --fedora)
+		distro=fedora
+		kind=rpm
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	-*)
+		usage >&2
+		exit 2
+		;;
+	*)
+		break
+		;;
+	esac
+	shift
+done
+if [ $# -eq 0 ]; then
+	for dir in "$here"/../../../tcs*/; do
+		if [ -d "$dir/.git" ]; then
+			set -- "$@" "${dir%/}"
+		fi
+	done
+fi
+
+# From each directory, the files at the version of its newest one.
+newest=$(for dir in "$@"; do
+	[ -d "$dir" ] || die "no directory $dir"
+	files=$(for file in "$dir"/build/packages/*."$kind"; do
+		if [ -f "$file" ]; then
+			echo "$file"
+		fi
+	done | xargs -r ls -t)
+	[ -n "$files" ] || continue
+	version=$(version_of "$(echo "$files" | head -n 1)")
+	echo "$files" | while read -r file; do
+		if [ "$(version_of "$file")" = "$version" ]; then
+			echo "$file"
+		fi
+	done
+done)
+[ -n "$newest" ] || die "no .$kind files in build/packages of $*:" \
+	"build them with make packages there"
+
+# The window is where the container is used, so there must be one to open
+# before anything is started.
+[ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ] \
+	|| die "no display to open the container's window on"
+terminal=$(terminal) || die "no terminal to open the container's window" \
+	"with: x-terminal-emulator, konsole, gnome-terminal or xterm, or" \
+	"one TERMINAL names"
+
+echo "Installing in the $distro container:"
+echo "$newest" | sed 's/^/  /'
+"$here/tcs-container" --distro "$distro" fresh
+# shellcheck disable=SC2086 # one file a word; TCS paths have no spaces
+"$here/tcs-container" --distro "$distro" install $newest
+open_window "$terminal" "$distro"
+
+# Waits in the background, so that a signal ends the wait at once, as it
+# would not end a command waited for in the foreground.
+echo "The $distro container is running: Ctrl+C here stops it"
+trap 'echo; echo "Stopping the $distro container"
+	"$here/tcs-container" --distro "$distro" stop
+	exit 130' INT HUP TERM
+"$here/tcs-container" --distro "$distro" wait > /dev/null &
+# Ctrl+C ends the wait in the background as well, and the wait, failing,
+# would end this before the trap could run, under set -e.
+wait $! || :
+echo "The $distro container has stopped"

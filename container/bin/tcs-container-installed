@@ -1,0 +1,24 @@
+#!/bin/sh
+# tcs-container-installed: tcs-container installed, as a command of its own:
+# list the TCS packages installed in the container.
+#
+#   tcs-container-installed [--distro kubuntu|fedora] [ARGUMENT...]
+#
+# Runs bin/tcs-container beside it with the command installed, passing
+# --distro, when it comes first, and every other argument as tcs-container
+# takes them.
+
+set -eu
+
+here=$(cd "$(dirname "$0")" && pwd)
+if [ "${1:-}" = --distro ]; then
+	[ $# -ge 2 ] || {
+		echo "usage: tcs-container-installed [--distro DISTRO]" \
+			"[ARGUMENT...]" >&2
+		exit 2
+	}
+	distro=$2
+	shift 2
+	exec "$here/tcs-container" --distro "$distro" installed "$@"
+fi
+exec "$here/tcs-container" installed "$@"

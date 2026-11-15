@@ -1,0 +1,23 @@
+#!/bin/sh
+# tcs-container-install: tcs-container install, as a command of its own:
+# install .deb or .rpm files in the container.
+#
+#   tcs-container-install [--distro kubuntu|fedora] [ARGUMENT...]
+#
+# Runs bin/tcs-container beside it with the command install, passing --distro,
+# when it comes first, and every other argument as tcs-container takes them.
+
+set -eu
+
+here=$(cd "$(dirname "$0")" && pwd)
+if [ "${1:-}" = --distro ]; then
+	[ $# -ge 2 ] || {
+		echo "usage: tcs-container-install [--distro DISTRO]" \
+			"[ARGUMENT...]" >&2
+		exit 2
+	}
+	distro=$2
+	shift 2
+	exec "$here/tcs-container" --distro "$distro" install "$@"
+fi
+exec "$here/tcs-container" install "$@"

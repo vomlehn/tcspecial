@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>The TCS test container</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<h1 id="the-tcs-test-container">The TCS test container</h1>
+<p>A test system, in a container, in which the TCS projects’ packages
+are installed and tried as an administrator would, and a checkout built,
+without touching the machine it runs on: tcspecial’s own, and those of
+the TCS projects checked out beside it, such as tcs-xtce, tcslog and
+tcslog-tools. Everything here is run from this directory,
+<code>container/</code> in tcspecial’s checkout.</p>
+<ul>
+<li><code>bin/</code> – the commands: <code>bin/start</code>,
+<code>bin/tcs-container</code>, and a script for each of its
+commands.</li>
+<li><code>image/</code> – what the images are built from: a
+Containerfile for each distribution, and what each puts in its image:
+<code>tcs-profile.sh</code>, which each login shell reads, and the
+<code>cfge</code> and <code>xtcee</code> commands.</li>
+<li><code>Makefile</code> – <code>make container</code> builds both
+images, <code>make kubuntu</code> and <code>make fedora</code> one each,
+and the <code>container-</code> targets below use the container;
+<code>make help</code> lists them.</li>
+<li><code>README.html</code> – this page as HTML, made from
+<code>README.md</code> with <code>make html</code>, which tcspecial’s
+manual links.</li>
+</ul>
+<h2 id="what-it-is">What it is</h2>
+<p>The scripts in <code>bin/</code> keep a test system in a container,
+to install a project’s packages into and remove them from as an
+administrator would, and to build a checkout in, without touching the
+machine it runs on. It uses Podman, rootless
+(<code>sudo apt install podman</code> on Ubuntu), and its images are
+built from <code>image/Containerfile.kubuntu</code>, for the .debs –
+Ubuntu with KDE Plasma’s libraries, theme and fonts, as on a Kubuntu
+machine – and <code>image/Containerfile.fedora</code>, for the RPMs.
+Each holds the basic command set, Python, git and make, systemd, which
+runs as the container’s first process so that a package’s scripts and
+units behave as on a real system, and a user, <code>tcs</code>, with
+sudo. Fedora’s own image tells dnf to leave out every package’s
+documentation; this one does not, so that a package’s documents are
+installed and tested as on a Fedora machine.</p>
+<p>They are used from a terminal, with no desktop session of their own,
+but a program with a window shows it on your desktop. <code>tcs</code>
+has your uid, there as on the host, and <code>fresh</code> gives the
+container your Wayland and X11 sockets, your X authority and your GPU,
+so <code>bin/tcs-container-shell tcs-cfge</code> opens tcs-cfge’s window
+beside your others. A display gone since, as after logging out and in
+again, needs <code>bin/tcs-container-fresh</code>. Xvfb is there too,
+for a program to open its window where nobody sees it. What a package
+needs it brings with it, and what building a project needs that
+project’s <code>make install-tools</code> installs.</p>
+<p>The quickest way in: build the packages of whatever you are testing,
+then have the newest of them installed in a container just made:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> <span class="at">-C</span> .. packages</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span>                               <span class="co"># the .debs, in kubuntu</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span> <span class="at">-f</span>                            <span class="co"># the RPMs, in fedora</span></span></code></pre></div>
+<p><code>bin/start [-f | --fedora] [DIR...]</code> takes the
+<code>.deb</code> files, or with <code>-f</code> or
+<code>--fedora</code> the <code>.rpm</code> files, from
+<code>build/packages</code> of each TCS checkout, this tcspecial and
+those beside it (<code>../../tcs*</code>), or of each DIR given. From
+each, it takes only the files at the version of its newest one, so that
+an older build left beside them, or a package since renamed, is not
+installed. It starts the container afresh, installs them all in one go,
+and opens a new terminal window with a login shell in the container, as
+<code>tcs</code>, to try them in. The terminal is
+<code>$TERMINAL</code>, or the first there of
+<code>x-terminal-emulator</code> (Konsole on Kubuntu),
+<code>konsole</code>, <code>gnome-terminal</code> and
+<code>xterm</code>; with no display, or no terminal,
+<code>bin/start</code> says so and starts nothing.</p>
+<p><code>bin/start</code> then waits until the container stops. Leaving
+the window’s shell, or closing the window, stops it, with everything in
+it, other shells such as <code>bin/tcs-container-shell</code> gives too,
+and so does Ctrl+C in the terminal <code>bin/start</code> was run from.
+The commands below are run from another terminal on the host while it
+waits.</p>
+<p>The commands, each a script of its own in <code>bin/</code>,
+<code>tcs-container-</code> and its name, such as
+<code>bin/tcs-container-fresh</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">fresh</span>             <span class="co"># throw the container away, start anew</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">install</span> FILE...   <span class="co"># install .deb or .rpm files</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">installed</span>         <span class="co"># the TCS packages it has</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span>             <span class="co"># a login shell in it, as tcs</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> tcslog-dump <span class="co"># or a command</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> tcs-cfge    <span class="co"># one with a window, on your desktop</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> <span class="at">--root</span> CMD  <span class="co"># a command as root</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">remove</span> PACKAGE... <span class="co"># remove packages, configuration too</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ex">copy</span> DIR...       <span class="co"># copy checkouts in, without their builds</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="ex">example</span> <span class="pp">[</span><span class="ss">NAME</span><span class="pp">]</span>    <span class="co"># run a tcspecial example, or list them</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="bu">wait</span>              <span class="co"># wait until it stops</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="ex">stop</span>              <span class="co"># stop it, keeping what was done in it</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="ex">build</span>             <span class="co"># build its image</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="ex">destroy</span> <span class="pp">[--</span><span class="ss">image</span><span class="pp">]</span> <span class="co"># remove it, and with --image its image</span></span></code></pre></div>
+<p>Each takes <code>--distro fedora</code> first for the Fedora
+container, kubuntu being the default:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-copy</span> ..</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-shell</span> make <span class="at">-C</span> src/tcspecial install-tools</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-fresh</span> <span class="at">--distro</span> fedora</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-installed</span> <span class="at">--distro</span> fedora</span></code></pre></div>
+<p><code>fresh</code> builds the image when there is none, and every
+command that needs the container starts it. A package installed again at
+the same version is reinstalled, so that a package rebuilt without a new
+version is the one tested.</p>
+<p><code>make container-install</code> builds the packages of the
+project checked out in <code>PROJECT</code>, this tcspecial checkout
+unless it names another, and installs them in the container;
+<code>make container-remove PACKAGES=...</code> removes them, and
+<code>make container-installed</code>, <code>make container-fresh</code>
+and <code>make container-shell</code> do what the commands above do.
+<code>PACKAGES</code> chooses packages to install, such as only the one
+that flies, and <code>DISTRO=fedora</code> the RPMs.
+<code>make container</code> builds both images, and
+<code>make kubuntu</code> and <code>make fedora</code> one each, as
+<code>build</code> does; <code>make check</code> runs shellcheck on the
+scripts:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> container-fresh</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> container-install PACKAGES=tcspecial</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> container-shell</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> container-remove PACKAGES=tcspecial</span></code></pre></div>
+<h2 id="running-tcspecials-examples">Running tcspecial’s examples</h2>
+<p>Every example tcspecial has is in its <code>tcspecial-examples</code>
+package, with the programs it runs and <code>tcsx</code>, which runs
+one, so <code>bin/start</code> installs them all with the rest of
+tcspecial’s packages. <code>bin/tcs-container-example</code> runs
+<code>tcsx</code> in the container, each example’s window on your
+desktop. With no name it lists them, saying what any needs beyond the
+packages:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> <span class="at">-C</span> .. packages</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span>                               <span class="co"># tcspecial&#39;s packages, installed</span></span></code></pre></div>
+<p>and, in another terminal on the host, while <code>bin/start</code>
+waits:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span>               <span class="co"># list the examples</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span> thermostat    <span class="co"># run one, until its window closes</span></span></code></pre></div>
+<p>The window <code>bin/start</code> opens says how to run them there:
+<code>tcsx</code> lists them, and <code>tcsx NAME</code> runs one.
+There, as from <code>bin/tcs-container-example</code>, <code>tcsx</code>
+is given <code>--no-memlock</code>: a rootless container’s limit on
+locked memory is the host’s, too small for tcspecial to lock its memory
+into RAM, as it does by default. Arguments after the name go to the
+example’s own ground station, <code>-v</code> making it say what it is
+doing. Yamcs 5.14.0, which the examples through Yamcs start, is in each
+image, in <code>/opt/yamcs</code>, with the Java it runs on, and the
+login shells’ <code>YAMCS_HOME</code> says so:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span> ping-yamcs</span></code></pre></div>
+<p><code>can</code>, <code>gpio</code> and <code>iio</code> drive the
+kernel’s dummy devices, which a rootless container cannot make, so they
+run only on the host. The logs the examples write are in the container’s
+<code>/tmp/telemetry</code>, made afresh for each run. A run lasts until
+its window is closed or Ctrl+C, and one left running, as by a terminal
+closed under it, is stopped by the next.
+<code>make container-example EXAMPLE=thermostat</code> does the same,
+with <code>HIDDEN=1</code> and <code>ARGS=</code> for the options.</p>
+<p><code>--hidden</code> is for testing: it draws the example’s window
+with Xvfb, in the container, where nobody sees it, so that a test, or a
+check run while you work, opens no window on your desktop. Such a run
+has no window to close, so it is given a time to last, and what it did
+is read from its output and its log afterwards:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">timeout</span> 30 bin/tcs-container-example <span class="at">--hidden</span> battery <span class="op">&gt;</span> battery.out <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-c</span> ERROR battery.out                       <span class="co"># 0: nothing went wrong</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-shell</span> ls /tmp/telemetry       <span class="co"># the log it wrote</span></span></code></pre></div>
+<p>The next run stops what the timeout left running in the
+container.</p>
+<h2 id="editing-configurations">Editing configurations</h2>
+<p>Each image has <code>cfge</code>, which opens a tcspecial
+configuration in tcspecial’s configuration editor,
+<code>tcs-cfge</code>: a file, which need not exist yet, the editor
+beginning a new one there, or with <code>-e</code> or
+<code>--example</code> one of tcspecial’s examples by name, its
+<code>.xtcs</code> file with its simulator file. The editor writes every
+edit as it is made, so the first <code>-e</code> copies the installed
+examples to <code>~/tcspecial-examples</code>, and every <code>-e</code>
+edits the copy there. Remove the copy to start again from what is
+installed.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> vehicle.ytcs               <span class="co"># opens vehicle.ytcs, or begins it</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> <span class="at">-e</span>                         <span class="co"># lists the examples</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> <span class="at">-e</span> thermostat              <span class="co"># edits thermostat.xtcs, and its sim file</span></span></code></pre></div>
+<p>An example has both spellings, <code>.xtcs</code> and
+<code>.ytcs</code>, and the editor writes every edit to both, so editing
+one keeps the other the same.</p>
+<h2 id="editing-xtce">Editing XTCE</h2>
+<p>Each image has <code>xtcee</code>, which opens a file, or one of
+tcs-xtce’s examples by name, in tcs-xtce’s editor,
+<code>tcs-xtcee</code>, once the tcs-xtce package is installed, as
+<code>bin/start</code> installs it. An example of several documents,
+such as <code>split-mission</code>, opens all of them together, as one
+mission. The window <code>bin/start</code> opens says how to use it:</p>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> FILE                      <span class="co"># opens FILE</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span>                        <span class="co"># lists the examples</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span> housekeeping           <span class="co"># opens housekeeping.xtce</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">--example</span> split-mission   <span class="co"># opens its three documents</span></span></code></pre></div>
+<h2 id="tcs-container">tcs-container</h2>
+<p>Every command above is one of <code>bin/tcs-container</code>’s; the
+scripts named for them run it:</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container</span> [--distro kubuntu<span class="kw">|</span><span class="ex">fedora]</span> COMMAND <span class="pp">[</span><span class="ss">ARGUMENT...</span><span class="pp">]</span></span></code></pre></div>
+<p><code>TCS_CONTAINER_DISTRO</code> names the distribution too, when
+<code>--distro</code> does not, and <code>PODMAN</code> another program
+to run in Podman’s place. The container is
+<code>tcs-test-&lt;distro&gt;</code>, made from the image
+<code>localhost/tcs-test-&lt;distro&gt;</code>, which <code>build</code>
+makes from <code>image/Containerfile.&lt;distro&gt;</code> with the user
+<code>tcs</code> given your uid and gid. <code>fresh</code> runs it with
+<code>--systemd=always</code> and <code>--userns=keep-id</code>, so that
+systemd is its first process and <code>tcs</code> is you, and gives it
+your display, as above. <code>install</code> copies the files in and
+hands them to <code>apt-get</code> or <code>dnf</code>, which fetch what
+they depend on: the packages not installed at the version given in one
+transaction, new ones and upgrades together, so that one may require
+another given with it, and those already installed at that version
+reinstalled, so that a package rebuilt at the same version is the one
+tested.</p>
+</body>
+</html>

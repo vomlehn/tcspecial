@@ -3698,6 +3698,25 @@ lintian in ``packaging/deb/<package>/lintian-overrides``, which each .deb
 carries, and for rpmlint in ``packaging/rpm/rpmlint.toml``, which is not
 shipped.
 
+Trying the packages in a container
+----------------------------------
+
+``container/`` keeps a test system in a container, Kubuntu's for the
+``.deb`` files and Fedora's for the RPMs, in which the packages are
+installed and tried as an administrator would, without touching the
+machine it runs on. ``container/bin/start`` makes one afresh, installs
+the newest packages built here and in the TCS checkouts beside this one,
+and opens a terminal window with a shell in it, where ``tcsx`` runs the
+examples and ``cfge`` edits a configuration; closing the window stops it.
+It uses Podman, and ``make container`` in ``container/`` builds both
+images. See `The TCS test container <../container/README.html>`__.
+
+.. code-block:: console
+
+   $ make packages
+   $ container/bin/start            # the .debs, in Kubuntu
+   $ container/bin/start --fedora   # the RPMs, in Fedora
+
 The tools
 ---------
 

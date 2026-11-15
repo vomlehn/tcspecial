@@ -1,0 +1,75 @@
+# The Kubuntu test container: a system to install the TCS packages' .debs
+# into and remove them from, as an administrator would, without touching
+# the machine it runs on. tcs-container builds it as
+# localhost/tcs-test-kubuntu.
+#
+# Kubuntu is Ubuntu with KDE Plasma, so this is Ubuntu, at the release the
+# .debs are built on, so that what they depend on is there, with Plasma's
+# libraries, theme and fonts: what a TCS program finds on a Kubuntu machine.
+# It is used from a terminal; there is no desktop session. systemd runs as
+# the container's first process, so that a package's scripts and a unit such
+# as tcspecial.service behave as they do on a real system. The package lists
+# are kept out of the image and fetched when packages are installed, so that
+# the image does not go stale.
+
+FROM docker.io/library/ubuntu:26.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# The basic command set, Python, git and make for a checkout copied in, a
+# virtual display for the programs that open a window, Java for Yamcs,
+# and sudo for the user the tests run as. What a TCS package needs it
+# brings with it, and what building a project needs its make install-tools
+# installs.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+	bash-completion ca-certificates curl dbus file findutils gawk git \
+	gzip iproute2 iputils-ping less lsof make nano netcat-openbsd procps \
+	psmisc python3 strace sudo systemd systemd-sysv tar vim-tiny xauth \
+	xvfb xz-utils default-jre-headless \
+ && apt-get install -y --no-install-recommends kde-plasma-desktop \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# Yamcs, which tcspecial's examples through it start, unpacked where
+# tcs-profile.sh, which each login shell reads, says it is; the Java it
+# runs on is installed above. The release is checked against the SHA-256
+# digest GitHub gives it.
+ARG YAMCS_VERSION=5.14.0
+ARG YAMCS_SUM=35004954a65021a06182928bbc344adfb09b11599dd009863745010e98527356
+RUN release=https://github.com/yamcs/yamcs/releases/download \
+ && curl -fsSL -o /tmp/yamcs.tar.gz \
+	"$release/yamcs-$YAMCS_VERSION/yamcs-$YAMCS_VERSION-linux-x86_64.tar.gz" \
+ && echo "$YAMCS_SUM  /tmp/yamcs.tar.gz" | sha256sum -c --quiet - \
+ && mkdir /opt/yamcs \
+ && tar xzf /tmp/yamcs.tar.gz -C /opt/yamcs --strip-components=1 \
+ && rm /tmp/yamcs.tar.gz
+COPY tcs-profile.sh /etc/profile.d/tcs-profile.sh
+
+# xtcee, which opens a file or one of tcs-xtce's examples in its editor,
+# once the tcs-xtce package is installed, and cfge, which does the same
+# for tcspecial's configurations in tcs-cfge.
+COPY xtcee cfge /usr/local/bin/
+
+# A user to run things as, as a person would, with sudo for installing,
+# and the tools cargo install puts in ~/.cargo/bin on the path of its login
+# shells. It has the uid and gid of whoever built the image, which
+# tcs-container gives, and runs as that user on the host too, so that it
+# may use their display to show its windows. Ubuntu's image has a user of
+# its own, ubuntu, at the uid most first users have, so it goes.
+ARG TCS_UID=1000
+ARG TCS_GID=1000
+RUN userdel --remove ubuntu 2>/dev/null || true \
+ && groupadd --gid "$TCS_GID" tcs \
+ && useradd --create-home --shell /bin/bash --uid "$TCS_UID" --gid tcs tcs \
+ && echo 'tcs ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/tcs \
+ && chmod 440 /etc/sudoers.d/tcs \
+ && echo 'PATH="$HOME/.cargo/bin:$PATH"' >> /home/tcs/.profile
+
+# polkit, which KDE brings, cannot run in a container without privileges,
+# and would leave systemd degraded; with no desktop session there is
+# nothing for it to authorize.
+RUN systemctl mask polkit.service
+
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

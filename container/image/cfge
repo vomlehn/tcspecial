@@ -1,0 +1,101 @@
+#!/bin/sh
+# cfge: edit a tcspecial configuration, or one of tcspecial's examples, in
+# tcs-cfge, the configuration editor, in a test container with tcspecial's
+# packages installed.
+#
+#   cfge FILE
+#   cfge -e NAME | --example NAME | --example=NAME
+#   cfge -e | --example
+#
+# With FILE it edits that configuration, which need not exist yet: the
+# editor begins a new one there. Its extension says its format, .xtcs for
+# XML and .ytcs for YAML. With -e or --example, NAME is an example's, the
+# name of its directory among those tcspecial-examples installs, and it
+# edits the example's .xtcs file, with its simulator file where it has one.
+# -e with no NAME lists the examples.
+#
+# The editor writes every edit as it is made, and the installed examples
+# are not to be written, so the first -e copies them all to EXAMPLES_COPY,
+# and every -e edits the copy: an edit is kept there, and an example that
+# names another, as thermostat does thermostat-common, still finds it.
+# Remove the copy to start again from what is installed.
+
+set -eu
+
+# Where the packages install the editor and the examples, and where the
+# examples are copied to be edited.
+EDITOR=/opt/tcs/bin/tcs-cfge
+EXAMPLES=/opt/tcs/share/examples/tcspecial
+EXAMPLES_COPY=$HOME/tcspecial-examples
+
+# Prints how to call this command.
+usage() {
+	echo "usage: cfge FILE"
+	echo "       cfge -e NAME | --example NAME | --example=NAME"
+	echo "       cfge -e | --example     (lists the examples)"
+}
+
+# Says what is wrong and stops.
+#
+# Arguments:
+#   $@  What to say.
+die() {
+	echo "cfge: $*" >&2
+	exit 1
+}
+
+# Lists the examples, those with an .xtcs file named for them, one a line.
+list() {
+	for dir in "$EXAMPLES"/*/; do
+		name=$(basename "$dir")
+		[ -f "$dir$name.xtcs" ] && echo "$name"
+	done
+	return 0
+}
+
+[ -x "$EDITOR" ] || die "no tcs-cfge: install tcspecial's tcs-tools package"
+example=
+case ${1:-} in
+-e | --example)
+	if [ $# -eq 1 ]; then
+		list
+		exit 0
+	fi
+	example=$2
+	shift 2
+	;;
+--example=*)
+	example=${1#--example=}
+	shift
+	;;
+-h | --help)
+	usage
+	exit 0
+	;;
+"" | -*)
+	usage >&2
+	exit 2
+	;;
+*)
+	[ $# -eq 1 ] || { usage >&2; exit 2; }
+	exec "$EDITOR" "$1"
+	;;
+esac
+[ $# -eq 0 ] || { usage >&2; exit 2; }
+case $example in
+"" | */* | .*) die "no example ${example:-named}: cfge -e lists them" ;;
+esac
+[ -f "$EXAMPLES/$example/$example.xtcs" ] \
+	|| die "no example $example: cfge -e lists them"
+if [ ! -d "$EXAMPLES_COPY" ]; then
+	cp -R "$EXAMPLES" "$EXAMPLES_COPY"
+	chmod -R u+w "$EXAMPLES_COPY"
+	echo "cfge: copied the examples to $EXAMPLES_COPY, to be edited there"
+fi
+here=$EXAMPLES_COPY/$example
+[ -f "$here/$example.xtcs" ] \
+	|| die "no $here/$example.xtcs: remove $EXAMPLES_COPY to copy again"
+if [ -f "$here/$example-sim.yaml" ]; then
+	exec "$EDITOR" "$here/$example.xtcs" "$here/$example-sim.yaml"
+fi
+exec "$EDITOR" "$here/$example.xtcs"

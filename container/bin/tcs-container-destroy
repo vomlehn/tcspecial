@@ -1,0 +1,23 @@
+#!/bin/sh
+# tcs-container-destroy: tcs-container destroy, as a command of its own:
+# remove the container, and with --image its image.
+#
+#   tcs-container-destroy [--distro kubuntu|fedora] [ARGUMENT...]
+#
+# Runs bin/tcs-container beside it with the command destroy, passing --distro,
+# when it comes first, and every other argument as tcs-container takes them.
+
+set -eu
+
+here=$(cd "$(dirname "$0")" && pwd)
+if [ "${1:-}" = --distro ]; then
+	[ $# -ge 2 ] || {
+		echo "usage: tcs-container-destroy [--distro DISTRO]" \
+			"[ARGUMENT...]" >&2
+		exit 2
+	}
+	distro=$2
+	shift 2
+	exec "$here/tcs-container" --distro "$distro" destroy "$@"
+fi
+exec "$here/tcs-container" destroy "$@"

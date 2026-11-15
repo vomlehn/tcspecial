@@ -10,6 +10,15 @@ TCS Design and Documentation
    Feedback is welcome, even at this stage: open an issue at
    https://github.com/vomlehn/tcspecial/issues.
 
+.. tip::
+   **A complete example, worked step by step:** `Building a vehicle
+   <building-a-vehicle.html>`__ is a document of its own that builds a small
+   lunar lander's science deck in ten stages, from one payload to a whole
+   vehicle -- payloads, computations, commands, rates, a vote, included
+   files, a log aboard, a payload program and the gateway. Each stage is a
+   configuration that tcs-verify passes and that runs on a desk, and a test
+   keeps it so. Start there to see how the pieces fit together.
+
 TCSpecial is **telemetry and control, special**, and it is flight software.
 It connects the devices aboard a vehicle -- on an I\ :superscript:`2`\ C
 bus, a SPI link, a serial line, a CAN bus, a set of discrete lines, a
@@ -262,9 +271,9 @@ Other documents
 ===============
 
 `Building a vehicle <building-a-vehicle.html>`__
-    From the shipped examples to a whole vehicle, a stage at a time: the
-    payloads, computations, files and gateway of a lander's science deck.
-    An outline for now.
+    The complete example, worked step by step: from the shipped examples
+    to a whole vehicle in ten stages, the payloads, computations, files
+    and gateway of a lander's science deck.
 
 `From the desk to flight <desk-to-flight.html>`__
     What changes between a configuration that has run on a desk and one

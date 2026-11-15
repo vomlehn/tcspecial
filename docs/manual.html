@@ -373,6 +373,15 @@ changes only the patch number never breaks code built against it.
 Feedback is welcome, even at this stage: open an issue at
 <a class="reference external" href="https://github.com/vomlehn/tcspecial/issues">https://github.com/vomlehn/tcspecial/issues</a>.</p>
 </div>
+<div class="admonition tip">
+<p class="first admonition-title">Tip</p>
+<p class="last"><strong>A complete example, worked step by step:</strong> <a class="reference external" href="building-a-vehicle.html">Building a vehicle</a> is a document of its own that builds a small
+lunar lander's science deck in ten stages, from one payload to a whole
+vehicle -- payloads, computations, commands, rates, a vote, included
+files, a log aboard, a payload program and the gateway. Each stage is a
+configuration that tcs-verify passes and that runs on a desk, and a test
+keeps it so. Start there to see how the pieces fit together.</p>
+</div>
 <p>TCSpecial is <strong>telemetry and control, special</strong>, and it is flight software.
 It connects the devices aboard a vehicle -- on an I<sup>2</sup>C
 bus, a SPI link, a serial line, a CAN bus, a set of discrete lines, a
@@ -595,9 +604,9 @@ the addresses it talks to come from.</dd>
 <h1>Other documents</h1>
 <dl class="docutils">
 <dt><a class="reference external" href="building-a-vehicle.html">Building a vehicle</a></dt>
-<dd>From the shipped examples to a whole vehicle, a stage at a time: the
-payloads, computations, files and gateway of a lander's science deck.
-An outline for now.</dd>
+<dd>The complete example, worked step by step: from the shipped examples
+to a whole vehicle in ten stages, the payloads, computations, files
+and gateway of a lander's science deck.</dd>
 <dt><a class="reference external" href="desk-to-flight.html">From the desk to flight</a></dt>
 <dd>What changes between a configuration that has run on a desk and one
 that flies, as a checklist.</dd>

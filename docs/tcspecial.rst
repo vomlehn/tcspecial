@@ -22,6 +22,15 @@ Introduction
    such as submersibles, drones, etc. Simply translate "spacecraft" to your
    device type.
 
+.. tip::
+   **A complete example, worked step by step:** `Building a vehicle
+   <building-a-vehicle.html>`__ is a document of its own that builds a small
+   lunar lander's science deck in ten stages, from one payload to a whole
+   vehicle -- payloads, computations, commands, rates, a vote, included
+   files, a log aboard, a payload program and the gateway. Each stage is a
+   configuration that tcs-verify passes and that runs on a desk, and a test
+   keeps it so. Start there to see how the pieces fit together.
+
 TCSpecial is **telemetry and control, special**, and it is flight software. It
 connects the devices aboard a vehicle -- sensors, actuators, and whatever else
 arrives on an I\ :superscript:`2`\ C bus, a SPI link, a serial line, a CAN bus,

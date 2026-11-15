@@ -82,6 +82,7 @@ fn every_thread_is_told_of_with_its_role_and_stack() {
   source_base: \"127.0.0.1:{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   thread_stack: \"{NODE_STACK}\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \
   send: \"127.0.0.1:{}\" }}

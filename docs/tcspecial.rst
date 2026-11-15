@@ -4316,6 +4316,25 @@ holds.
 vehicle is to keep, which nothing removes below; nothing in flight removes
 configurations yet.
 
+How many inputs a consolidator may have
+---------------------------------------
+
+Every configuration states the most inputs one consolidator may have:
+
+.. code-block:: yaml
+
+   tcspecial:
+     max_consolidator_inputs: "32"
+
+It is required, and has no default: a configuration that has not been asked
+how large a consolidation may grow has not answered it. It is at least 2,
+the fewest a consolidator has. 32 is suggested -- their states then take 64
+bits -- and more readings than that are better served by a second
+consolidator than by a larger one. A consolidator, the computation that sends
+several readings to the ground as one datum, is being built: see "Compute
+elements" in the design. Until it is, the setting is checked and limits
+nothing.
+
 Thread stacks
 -------------
 

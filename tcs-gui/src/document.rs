@@ -4354,6 +4354,7 @@ pub fn thermostat_example() -> Document {
         ("beacon.send", "0.0.0.0:5550"),
         ("beacon.recv", "127.0.0.1:5650"),
         ("state_file", "/tmp/tcspecial-thermostat.state"),
+        ("max_consolidator_inputs", "32"),
         ("log.directory", "/var/log/tcspecial"),
         ("log.segment_size", "65536"),
     ] {
@@ -4824,6 +4825,7 @@ mod tests {
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
             ("state_file", "/var/lib/tcspecial/state"),
+            ("max_consolidator_inputs", "32"),
         ];
 
         let filled = |wrong: Option<(&str, &str)>| {

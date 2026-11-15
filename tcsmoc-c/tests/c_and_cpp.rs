@@ -221,6 +221,7 @@ fn against_a_vehicle(program: &Path) -> String {
     dest_base: \"127.0.0.1:{}\"
     source_base: \"127.0.0.1:{}\"
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd:
     recv: \"127.0.0.1:{}\"
     send: \"127.0.0.1:{cmd_from}\"

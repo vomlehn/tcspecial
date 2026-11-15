@@ -2298,6 +2298,7 @@ mod tests {
                 ("beacon.default_interval", "5 s"),
                 ("beacon.reset_interval", "1 s"),
                 ("state_file", "/var/lib/tcspecial/state"),
+                ("max_consolidator_inputs", "32"),
                 ("beacon.send", "0.0.0.0:5550"),
                 ("beacon.recv", "127.0.0.1:5650"),
                 ("log.directory", "/var/log/tcspecial"),

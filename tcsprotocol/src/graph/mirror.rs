@@ -295,6 +295,7 @@ mod tests {
   gateway: radio
   interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   state_file: /tmp/tcspecial-test.state
+  max_consolidator_inputs: 32
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100

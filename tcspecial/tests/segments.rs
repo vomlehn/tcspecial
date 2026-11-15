@@ -60,6 +60,7 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"{}\", send: \"{}\" }}
 ",
             at(),

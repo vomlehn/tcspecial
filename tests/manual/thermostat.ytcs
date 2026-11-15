@@ -12,6 +12,7 @@ tcspecial:
   log:
     directory: "/var/log/tcspecial"
     segment_size: "65536"
+  max_consolidator_inputs: "32"
   payload_command:
     dest_base: "0.0.0.0:4200"
     source_base: "127.0.0.1:4300"

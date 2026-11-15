@@ -281,6 +281,7 @@ pub const ATTRIBUTES: &[(&str, Needed)] = &[
     ("beacon.default_interval", Needed::Always),
     ("beacon.reset_interval", Needed::Always),
     ("state_file", Needed::Always),
+    ("max_consolidator_inputs", Needed::Always),
     ("tcs_cmd.recv", Needed::Sockets),
     ("tcs_cmd.send", Needed::Sockets),
     ("payload_command.source_base", Needed::Sockets),
@@ -644,6 +645,9 @@ pub fn ci_config_of(
             }
             _ => None,
         },
+        max_consolidator_inputs: Some(enough_inputs(number(
+            "max_consolidator_inputs",
+        )?)?),
         log: LogJson {
             // Absent is "run without a telemetry log", which is a
             // configuration somebody may mean: a vehicle with no writable
@@ -739,6 +743,31 @@ fn at_least_one(
         )),
         count => Ok(count),
     }
+}
+
+/// Refuses a `max_consolidator_inputs` that would let no consolidator be.
+///
+/// # Arguments
+///
+/// * `inputs` - What `max_consolidator_inputs` says.
+///
+/// # Returns
+///
+/// It, where it is at least two.
+///
+/// # Errors
+///
+/// A sentence saying the least, where it is less.
+fn enough_inputs(inputs: u32) -> Result<u32, String> {
+    let least = crate::types::MAX_CONSOLIDATOR_INPUTS_LEAST;
+    if inputs < least {
+        return Err(format!(
+            "max_consolidator_inputs is {inputs}, and a consolidator has at \
+             least {least} inputs, one reading needing nothing put with it: \
+             make it {least} or more -- 32 is suggested"
+        ));
+    }
+    Ok(inputs)
 }
 
 /// Refuses a `thread_stack` too small for a node's thread.
@@ -938,6 +967,7 @@ mod tests {
             ("beacon.default_interval", "5 s"),
             ("beacon.reset_interval", "1 s"),
             ("state_file", "/var/lib/tcspecial/state"),
+            ("max_consolidator_inputs", "32"),
             ("beacon.send", "0.0.0.0:5550"),
             ("beacon.recv", "127.0.0.1:5650"),
             ("log.directory", "/var/log/tcspecial"),
@@ -977,6 +1007,7 @@ mod tests {
             ("cfe_time.scale", "tai"),
             ("cfe_time.leap_seconds", "37"),
             ("state_file", "/var/lib/tcspecial/state"),
+            ("max_consolidator_inputs", "32"),
         ]
     }
 

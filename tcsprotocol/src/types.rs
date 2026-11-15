@@ -2084,7 +2084,16 @@ pub struct CIConfigJson {
     /// [`THREAD_STACK_DEFAULT`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_stack: Option<u32>,
+    /// The most inputs one consolidator may have, at least
+    /// [`MAX_CONSOLIDATOR_INPUTS_LEAST`]. Required: see
+    /// [`CIConfig::max_consolidator_inputs`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_consolidator_inputs: Option<u32>,
 }
+
+/// The fewest inputs a configuration may let a consolidator have: two, the
+/// fewest a consolidator has, since one reading needs nothing put with it.
+pub const MAX_CONSOLIDATOR_INPUTS_LEAST: u32 = 2;
 
 /// The stack each node's thread is given where the section does not say,
 /// in bytes: 64 KiB, twice the least.
@@ -2274,6 +2283,14 @@ pub struct CIConfig {
     pub load_trials: u32,
     /// The stack each node's thread is given, in bytes: `thread_stack`.
     pub thread_stack: u32,
+    /// The most inputs one consolidator may have: `max_consolidator_inputs`.
+    ///
+    /// Stated by every configuration, with no default, as its links are: a
+    /// configuration that has not been asked how large a consolidation may
+    /// grow has not answered it. 32 is what is suggested -- their states
+    /// then take 64 bits -- and more readings than that are better served by
+    /// a second consolidator than by a larger one.
+    pub max_consolidator_inputs: u32,
 }
 
 impl CIConfig {
@@ -2443,6 +2460,14 @@ impl CIConfigJson {
                 .unwrap_or(CONFIGURATIONS_KEPT_DEFAULT),
             load_trials: self.load_trials.unwrap_or(LOAD_TRIALS_DEFAULT),
             thread_stack: self.thread_stack.unwrap_or(THREAD_STACK_DEFAULT),
+            max_consolidator_inputs: self.max_consolidator_inputs.ok_or_else(
+                || {
+                    "max_consolidator_inputs is not stated, and it has no \
+                     default: say how many inputs one consolidator may have \
+                     -- 32 is suggested"
+                        .to_string()
+                },
+            )?,
         })
     }
 

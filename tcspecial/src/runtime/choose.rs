@@ -484,6 +484,7 @@ tcspecial:
   beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \
             \"127.0.0.1:7\", recv: \"127.0.0.1:8\" }}
   state_file: \"{}\"
+  max_consolidator_inputs: \"32\"
   configurations: \"{}\"
   load_trials: \"{trials}\"
 gateways:

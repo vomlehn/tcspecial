@@ -571,6 +571,10 @@
       <!-- The file tcspecial keeps what must survive a restart in, on
            storage that survives a power cycle. -->
       <xs:element name="state_file" type="xs:string" minOccurs="0"/>
+      <!-- The most inputs one consolidator may have: 2 or more, with no
+           default; 32 is suggested. -->
+      <xs:element name="max_consolidator_inputs" type="xs:string"
+                  minOccurs="0"/>
       <!-- The directory the vehicle keeps configurations in, each under its
            checksum. Absent is a vehicle that keeps none. -->
       <xs:element name="configurations" type="xs:string" minOccurs="0"/>

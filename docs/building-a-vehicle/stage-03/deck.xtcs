@@ -26,6 +26,7 @@
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>
         </log>
+        <max_consolidator_inputs>32</max_consolidator_inputs>
         <!-- Commands to a node are sent from source_base to tcspecial at
              dest_base: one link for every node, each command naming its node by
              its device id, and its answer going back to source_base.

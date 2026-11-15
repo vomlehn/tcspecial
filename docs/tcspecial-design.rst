@@ -3303,6 +3303,10 @@ Requirement
     more readings than that are better served by a second consolidator
     than by a larger one.
 
+    **Built** (2026-11-15): ``max_consolidator_inputs``, required and
+    checked, in every shipped configuration in both spellings, and in the
+    schemas; nothing yet is limited by it.
+
 Requirement
     A consolidator with more inputs than ``max_consolidator_inputs``, or
     whose largest datum -- the sum of its inputs', with their lengths and

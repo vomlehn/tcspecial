@@ -45,6 +45,7 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"{}\", send: \"{}\" }}
 ",
             tcsprotocol::InterfaceDigest::of_this_build(),

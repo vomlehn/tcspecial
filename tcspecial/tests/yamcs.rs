@@ -94,6 +94,7 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\", \
             apid_base: \"0x300\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:0\", apid: \
             \"0x101\" }}
 gateways:
@@ -266,6 +267,7 @@ fn an_untouched_payload_reports_framed_under_its_counted_apid() {
   payload_telemetry: {{ dest_base: \"127.0.0.1:{}\", source_base: \"{}\", \
             apid_base: \"0x300\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", send: \"127.0.0.1:0\", apid: \
             \"0x101\" }}
 payloads:

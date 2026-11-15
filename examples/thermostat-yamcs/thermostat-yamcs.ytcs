@@ -24,6 +24,7 @@ tcspecial:
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"
+  max_consolidator_inputs: "32"
   # Yamcs sends QUERY_THREADS, on this link, from a port the system
   # chooses, as it sends its other commands: so they are taken from any port
   # of this host -- port 0 -- and each answer goes back to the port its

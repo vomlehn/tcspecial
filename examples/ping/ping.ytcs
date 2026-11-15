@@ -19,6 +19,7 @@ tcspecial:
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"
+  max_consolidator_inputs: "32"
   payload_command:
     dest_base: "0.0.0.0:7300"
     source_base: "127.0.0.1:7310"

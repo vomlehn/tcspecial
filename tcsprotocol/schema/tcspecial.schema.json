@@ -2429,6 +2429,13 @@
           "description": "The file tcspecial keeps what must survive a restart in: which configuration the next start loads, which is confirmed, and whether the next start is commanded. On storage that survives a power cycle.",
           "type": "string"
         },
+        "max_consolidator_inputs": {
+          "description": "The most inputs one consolidator may have: a whole number, 2 or more, with no default. 32 is suggested, their states then taking 64 bits.",
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
         "configurations": {
           "description": "The directory the vehicle keeps configurations in, each under its checksum, as <checksum>.yaml or <checksum>.xml. Absent is a vehicle that keeps none, which a RESTART may restart only onto the configuration it runs.",
           "type": "string"

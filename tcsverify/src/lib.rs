@@ -1731,6 +1731,7 @@ mod tests {
   gateway: radio
   interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   state_file: /tmp/tcspecial-test.state
+  max_consolidator_inputs: 32
   tcs_cmd:
     recv: 0.0.0.0:4000
     send: 127.0.0.1:4100
@@ -2081,6 +2082,7 @@ tcspecial:
   gateway: radio
   interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   state_file: /tmp/tcspecial-test.state
+  max_consolidator_inputs: 32
   beacon:
     default_interval: \"5 s\"
     reset_interval: \"5 s\"
@@ -2177,7 +2179,7 @@ payloads:
         // names, which is the one order a configuration has.
         let lines: Vec<usize> =
             report.findings.iter().map(|f| f.line).collect();
-        assert_eq!(lines, vec![25, 29, 33], "{:?}", report.findings);
+        assert_eq!(lines, vec![26, 30, 34], "{:?}", report.findings);
         for (finding, missing) in
             report
                 .findings

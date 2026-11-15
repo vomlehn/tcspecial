@@ -117,6 +117,7 @@ fn configuration(dir: &std::path::Path, payloads: &str) -> std::path::PathBuf {
   payload_telemetry: {{ dest_base: \"127.0.0.1:5\", source_base: \
             \"127.0.0.1:6\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
 {payloads}",
@@ -311,6 +312,7 @@ fn a_sim_address_is_where_a_simulated_channel_is_reached() {
   payload_telemetry: {{ dest_base: \"127.0.0.1:5\", source_base: \
             \"127.0.0.1:6\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"127.0.0.1:7\", send: \"127.0.0.1:8\" }}
 payloads:
   - type rpmsg:

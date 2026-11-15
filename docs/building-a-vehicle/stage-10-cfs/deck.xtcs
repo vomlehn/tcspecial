@@ -41,6 +41,7 @@
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>
         </log>
+        <max_consolidator_inputs>32</max_consolidator_inputs>
         <!-- The block of message IDs the mission allotted tcspecial:
              subsystem 0x42, its telemetry below 0x4280 and its commands
              from there. Every message ID below is in it. -->

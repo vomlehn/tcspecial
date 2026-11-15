@@ -1558,6 +1558,7 @@ mod tests {
             ("beacon.recv", "127.0.0.1:5650"),
             ("beacon.send", "0.0.0.0:5550"),
             ("state_file", "/tmp/state"),
+            ("max_consolidator_inputs", "32"),
         ] {
             document.tcspecial.insert(attribute.into(), value.into());
         }

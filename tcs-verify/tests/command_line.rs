@@ -25,6 +25,7 @@ tcspecial:
   gateway: radio
   interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   state_file: /tmp/tcspecial-test.state
+  max_consolidator_inputs: 32
   beacon:
     default_interval: \"5 s\"
     reset_interval: \"5 s\"
@@ -493,6 +494,7 @@ tcspecial:
   gateway: radio
   interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
   state_file: /tmp/tcspecial-test.state
+  max_consolidator_inputs: 32
   beacon:
     default_interval: \"5 s\"
     reset_interval: \"5 s\"

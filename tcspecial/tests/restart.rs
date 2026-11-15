@@ -193,6 +193,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \
   send: \"127.0.0.1:{commands_at}\" }}
 ",
@@ -418,6 +419,7 @@ fn written(
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{}\"
+  max_consolidator_inputs: \"32\"
   configurations: \"{}\"
   restart_arm_valid: \"{arm}\"
   tcs_cmd: {{ recv: \"127.0.0.1:{take_at}\", \

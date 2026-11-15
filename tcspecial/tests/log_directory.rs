@@ -44,6 +44,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
   payload_command: {{ dest_base: \"{}\", source_base: \"{}\" }}
   payload_telemetry: {{ dest_base: \"{}\", source_base: \"{}\" }}
   state_file: \"{state}\"
+  max_consolidator_inputs: \"32\"
   tcs_cmd: {{ recv: \"{}\", send: \"{}\" }}
 ",
             at(),

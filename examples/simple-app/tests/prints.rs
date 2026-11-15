@@ -232,6 +232,7 @@ fn it_connects_until_matched_and_then_prints_the_line() {
   beacon: {{ default_interval: \"1 s\", reset_interval: \"1 s\", send: \
             \"127.0.0.1:{}\", recv: \"127.0.0.1:{}\" }}
   state_file: \"/tmp/lorem-test.state\"
+  max_consolidator_inputs: \"32\"
 gateways:
   - type gateway_radio:
       - gateway: gateway

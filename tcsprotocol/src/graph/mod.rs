@@ -2400,6 +2400,7 @@ tcspecial:
              0.0.0.0:6000
     dest_base: 127.0.0.1:6100
   state_file: /var/lib/tcspecial/state
+  max_consolidator_inputs: 32
   beacon:
     \
              default_interval: 5 s

@@ -3716,13 +3716,17 @@ words whether it is new, held or none. A test station can show a
 state, so a held value is shown, marked held; the words, not a colour,
 carry it.</dd>
 <dt>Requirement</dt>
-<dd>The <tt class="docutils literal">tcspecial</tt> section states <tt class="docutils literal">max_consolidator_inputs</tt>, the most
+<dd><p class="first">The <tt class="docutils literal">tcspecial</tt> section states <tt class="docutils literal">max_consolidator_inputs</tt>, the most
 inputs one consolidator may have, at least 2, and required, for the
 reason its other attributes are: a configuration that has not been
 asked the question has not answered it. 32 is suggested -- their
 states then take 64 bits -- and, as cFS's and F´'s packetizers find,
 more readings than that are better served by a second consolidator
-than by a larger one.</dd>
+than by a larger one.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal">max_consolidator_inputs</tt>, required and
+checked, in every shipped configuration in both spellings, and in the
+schemas; nothing yet is limited by it.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>A consolidator with more inputs than <tt class="docutils literal">max_consolidator_inputs</tt>, or
 whose largest datum -- the sum of its inputs', with their lengths and

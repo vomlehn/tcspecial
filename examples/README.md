@@ -247,10 +247,10 @@ ping #<count> <seconds>.<nanoseconds>                    up
 ping #<count> <seconds>.<nanoseconds> <seconds>.<nanoseconds>   down
 ```
 
-The ground station, `ping_gateway.py`, is Python 3 and uses nothing outside the
-standard library to read its configuration's XML, the default; with `--yaml`
-it reads the YAML instead, which needs PyYAML (`python3-yaml` on Debian and
-Ubuntu). Its window shows the beacon panel, the last ping sent and
+The ground station, `ping_gateway.py`, is Python 3. It reads its
+configuration's XML, the default, or with `--yaml` the YAML, and asks
+libtcsmoc-c (`cargo build -p tcsmoc-c`) where its links arrive, which it reads
+with PyYAML (`python3-yaml` on Debian and Ubuntu). Its window shows the beacon panel, the last ping sent and
 when, the last answer and when, and three times: the round trip, MOC to
 tcspecial, and tcspecial to MOC. The last two are each read across two clocks,
 so each includes their offset and may be negative; their sum is the round

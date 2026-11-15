@@ -38,7 +38,7 @@ class WatchedTest(unittest.TestCase):
     """What is read of each configuration."""
 
     def test_the_example_is_read(self):
-        one = memusage.Watched(HERE / "memusage.xtcs", "memusage", None)
+        one = memusage.Watched(HERE / "memusage.xtcs", "memusage")
         self.assertEqual(one.nodes.port, 18300)
         self.assertIn("instance memusage", one.describe())
 
@@ -49,7 +49,7 @@ class WatchedTest(unittest.TestCase):
                 'source_base: "127.0.0.1:0"\n  # A payload',
                 'source_base: "127.0.0.1:18310"\n  # A payload'))
             with self.assertRaisesRegex(ValueError, "127.0.0.1:0"):
-                memusage.Watched(path, "fixed", None)
+                memusage.Watched(path, "fixed")
 
     def test_instances_are_named_apart(self):
         self.assertEqual(memusage.instance_name(Path("a/ping-yamcs.xtcs"),
@@ -80,7 +80,7 @@ class WriteTest(unittest.TestCase):
         for path in paths:
             name = memusage.instance_name(Path(path), names)
             names.append(name)
-            watched.append(memusage.Watched(path, name, None))
+            watched.append(memusage.Watched(path, name))
         ground.write_yamcs_instances(
             [(one.config, one.instance) for one in watched], run, 18090,
             home, "test")
@@ -112,7 +112,7 @@ class ReportTest(unittest.TestCase):
     """What is printed of an answer."""
 
     def test_each_thread_is_a_line_and_its_node_is_named(self):
-        one = memusage.Watched(HERE / "memusage.xtcs", "memusage", None)
+        one = memusage.Watched(HERE / "memusage.xtcs", "memusage")
         answer = {"mapped": 9 * 1024 * 1024, "resident": 7 * 1024 * 1024,
                   "locked": 0, "lock_limit": memusage.UNLIMITED,
                   "first": 0, "total": 2, "status": "Success",

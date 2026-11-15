@@ -25,6 +25,13 @@ peer (see "A vehicle on a cFS software bus" in
 - **The configuration.** `tcs_configuration_open` reads and checks a
   configuration, YAML or XML, as the vehicle does. It gives the
   configuration's digest and each node's id.
+- **What a configuration works out to.** `tcs_links_of_file` writes its link
+  table -- every node's device id, every link to the ground with its port,
+  APID or message ID, every APID and message ID, each consolidation's layout,
+  and the link digest of all of it -- as the YAML `tcs-verify --links` prints,
+  into the caller's buffer as `snprintf` does; `tcs_digest_of_file` writes its
+  digest. Neither opens the configuration as a station, so one with warnings
+  still has them. The Python stations read both through these.
 - **Beacons.** `tcs_beacons_listen` listens where the configuration says
   beacons arrive, and each `tcs_beacons_pass` says how long since the last
   one: the stage (Unheard, Heard, Aging or Waiting), whether an indicator

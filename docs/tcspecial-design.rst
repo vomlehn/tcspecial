@@ -3299,8 +3299,37 @@ Requirement
     which tcsmoc-c's ``tcs_gateway_receive`` hands on as it stands; the
     relay, ``tcsmoc::relay``, ``tcs_relay_open`` in tcsmoc-c and
     ``python/tcsmoc/relay.py``, which the Yamcs examples start; the
-    relayed links and their APIDs in both spellings of the rule; and every
-    input's source in the configuration's own XTCE.
+    relayed links and their APIDs; and every input's source in the
+    configuration's own XTCE.
+
+Requirement
+    What the vehicle and the ground work out of a configuration rather than
+    read in it -- each node's device id; every link to the ground, sent or
+    relayed, with its ports or message ID, its APID and how a string or
+    bytes on it is counted; every APID and message ID; each consolidation's
+    layout -- is worked out in one place, ``tcsprotocol::graph::link_table``,
+    and nowhere else. A ground station not built on tcsprotocol reads it,
+    as YAML, rather than working it out again: a second statement of a rule
+    is a second answer on the day the first changes. The Python stations
+    read it through libtcsmoc-c (``tcs_links_of_file``), operational code,
+    and not from ``tcs-verify --links``, which prints the same text but is a
+    software tool, which an operational station does not run.
+
+Requirement
+    The table's **link digest**, the MD5 of the table as YAML in one order
+    and one spelling, is what lets two ends that read one configuration
+    know they worked the same things out of it. The configuration digest
+    says the file is the same; it cannot say that a vehicle and a ground
+    station built from different versions of tcsprotocol counted its ports
+    and APIDs, or laid out its consolidations, alike, and when they did not,
+    packets would be read as another's and a consolidation's inputs at the
+    wrong bits, without a word. So tcspecial puts its link digest in every
+    beacon, and a ground station whose own differs says so and is not
+    matched, as one whose configuration digest differs is not.
+
+    **Built** (2026-11-15): the table and its digest, ``tcs-verify
+    --links``, ``tcs_links_of_file`` and ``tcs_digest_of_file`` in
+    tcsmoc-c, and the Python reading both through them.
 
 Requirement
     A log that takes a consolidation keeps it packed, as it was sent, the

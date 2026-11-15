@@ -29,7 +29,15 @@ VEHICLE = """\
 tcspecial:
   gateway: yamcs
   interface: "{interface}"
-  beacon: {{ apid: "0x100", recv: "127.0.0.1:9100", send: "0.0.0.0:9101" }}
+  beacon: {{ apid: "0x100", recv: "127.0.0.1:9100", send: "0.0.0.0:9101",
+            default_interval: "5 s", reset_interval: "1 s" }}
+  log: {{ directory: "/tmp/telemetry", segment_size: "65536" }}
+  max_consolidator_inputs: "32"
+  payload_command: {{ dest_base: "127.0.0.1:9600",
+                     source_base: "127.0.0.1:0" }}
+  payload_telemetry: {{ apid_base: "0x300", dest_base: "127.0.0.1:9200",
+                       source_base: "0.0.0.0:9300" }}
+  state_file: "/tmp/tcspecial-test-form.state"
   tcs_cmd: {{ apid: "0x101", recv: "127.0.0.1:4000", send: "127.0.0.1:0" }}
 gateways:
   - type gateway_yamcs:

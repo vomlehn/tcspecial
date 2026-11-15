@@ -2,8 +2,8 @@ Name:           tcsmoc
 %include %{_sourcedir}/common.inc
 Summary:        TCSpecial MOC Correspondent: what a ground station is built on
 Group:          Development/Libraries
-Requires:       python3
-Recommends:     python3-pyyaml, pkgconf-pkg-config
+Requires:       python3, python3-pyyaml
+Recommends:     pkgconf-pkg-config
 # This package was tcspecial-moc, and before that tcspecial-ground, whose
 # operational code it holds now: an upgrade takes the old one out. Every
 # one of them built was 0.1.0.

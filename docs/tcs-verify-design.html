@@ -490,6 +490,14 @@ with <tt class="docutils literal">diff</tt>. Every list is <tt class="docutils l
 them. A configuration that does not read has no summary, which fails the
 run, as a digest not given does.</dd>
 <dt>Requirement</dt>
+<dd><tt class="docutils literal"><span class="pre">--links</span></tt>, with one configuration and nothing else, prints its link
+table, <tt class="docutils literal"><span class="pre">tcsprotocol::graph::link_table</span></tt>, as YAML after its link digest:
+what the vehicle and the ground work out of it, for a ground station to
+read rather than work out again. tcs-verify prints what tcsprotocol
+writes and states none of it; libtcsmoc-c gives the same text
+(<tt class="docutils literal">tcs_links_of_file</tt>), which is what a ground station reads, since a
+station is operational code and runs no software tool.</dd>
+<dt>Requirement</dt>
 <dd><p class="first">No two sockets a configuration states or implies are one socket:
 one port of one protocol on one host, the names of this host being one
 host, or a port on every interface and the same port on this host.

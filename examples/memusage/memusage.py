@@ -131,9 +131,6 @@ def arguments(argv):
     parser.add_argument("--no-yamcs", action="store_true",
                         help="do not start Yamcs; use one already running")
     parser.add_argument("--tcspecial", help="the tcspecial program to run")
-    parser.add_argument("--tcs-verify",
-                        help="the tcs-verify program that gives each "
-                             "configuration's checksum")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="say what it is doing")
     return parser.parse_args(argv)
@@ -173,16 +170,15 @@ class Watched:
     instance it is watched in.
 
     Args:
-        path:       The configuration's path.
-        instance:   The Yamcs instance's name.
-        tcs_verify: The tcs-verify that gives its checksum, or ``None``.
+        path:     The configuration's path.
+        instance: The Yamcs instance's name.
 
     Raises:
         ValueError: The configuration is wrong for this program.
         OSError: The configuration cannot be read.
     """
 
-    def __init__(self, path, instance, tcs_verify):
+    def __init__(self, path, instance):
         self.path = Path(path).resolve()
         self.instance = instance
         self.config = configuration.load(self.path)
@@ -204,7 +200,7 @@ class Watched:
                 f"{nodes.send.address}:0, any port of that host")
         self.nodes = nodes.recv
         self.digest, self.why_no_digest = configuration.digest(
-            self.path, tcs_verify)
+            self.path)
         self.next_sequence = FIRST_SEQUENCE
 
     def sequence(self):
@@ -399,7 +395,7 @@ def main(argv):
         for path in options.configurations:
             name = instance_name(Path(path),
                                  [one.instance for one in watched])
-            watched.append(Watched(path, name, options.tcs_verify))
+            watched.append(Watched(path, name))
     except (ValueError, OSError) as why:
         print(f"memusage: {why}", file=sys.stderr)
         return 2

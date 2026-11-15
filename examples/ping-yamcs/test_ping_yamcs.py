@@ -27,8 +27,7 @@ from tcsprotocol import yamcs as generated  # noqa: E402
 
 
 def options(**changed):
-    """The options ping_yamcs reads, for the example's configuration, with
-    no tcs-verify asked for: the digest is not what these tests are about.
+    """The options ping_yamcs reads, for the example's configuration.
 
     Args:
         changed: Options to change.
@@ -36,7 +35,7 @@ def options(**changed):
     Returns:
         A namespace like the one :func:`ping_yamcs.arguments` gives.
     """
-    said = dict(configuration=str(HERE / "ping-yamcs.xtcs"), tcs_verify=None)
+    said = dict(configuration=str(HERE / "ping-yamcs.xtcs"))
     said.update(changed)
     return types.SimpleNamespace(**said)
 

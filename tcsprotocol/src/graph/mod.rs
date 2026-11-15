@@ -52,6 +52,7 @@ pub mod fprime;
 pub mod grouped;
 pub mod interface;
 pub mod largest;
+pub mod link_table;
 pub mod link_types;
 pub mod mirror;
 pub mod own_xtce;

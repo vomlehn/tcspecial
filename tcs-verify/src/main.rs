@@ -15,6 +15,7 @@
 //! tcs-verify --keep=/var/lib/tcspecial/configurations vehicle.ytcs
 //! tcs-verify --fprime-model=fprime/Tcs/TcsBridge/model fprime.ytcs
 //! tcs-verify --summary examples/thermostat/thermostat.ytcs
+//! tcs-verify --links examples/thermostat-yamcs/thermostat-yamcs.ytcs
 //! ```
 //!
 //! Prints one line per problem -- file, line, and what is wrong -- and exits
@@ -44,6 +45,7 @@ usage: tcs-verify [options] <tcspecial configuration file> \
        tcs-verify --set-interface <configuration>...
        tcs-verify --xtce <configuration>...
        tcs-verify --xtce-check <configuration>...
+       tcs-verify --links <configuration>
        tcs-verify -h | --help
 
 Checks the files and prints the problems it finds, each as
@@ -158,6 +160,17 @@ configuration.
   --xtce-check       as --xtce, writing nothing: name each configuration
                      whose own XTCE is not what --xtce would write, with
                      status 1 where there is one
+  --links            with one configuration and nothing else: print, as
+                     YAML, what the vehicle and the ground work out of
+                     it -- each node's device id; every link to the
+                     ground, the sent and those relayed from a
+                     consolidator, with where it arrives, its APID and
+                     how it is counted; every APID and message ID; each
+                     consolidation's layout -- after its link_digest, the
+                     digest every beacon carries of the same. For a
+                     ground station to read rather than work out again;
+                     a configuration whose links do not work out is said
+                     on stderr, with status 1
   -h, --help         print this message and exit
 
 Exit status: 0 no error was printed -- a run that stopped before it found
@@ -203,6 +216,11 @@ const FPRIME_MODEL_FLAG: &str = "--fprime-model=";
 /// once it is checked: see `tcs_verify::summary`.
 const SUMMARY_FLAG: &str = "--summary";
 
+/// Prints the links a configuration's vehicle and ground work out of it, and
+/// their link digest, as YAML: see `tcsprotocol::graph::link_table`. A
+/// shape of its own, with one configuration.
+const LINKS_FLAG: &str = "--links";
+
 /// Asks for the interface digest of this build, alone on the command line.
 ///
 /// A shape of its own, with nothing beside it: it is a fact about this
@@ -243,6 +261,9 @@ fn main() -> ExitCode {
     }
     if args.first().is_some_and(|arg| arg == SET_INTERFACE_FLAG) {
         return set_interfaces(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == LINKS_FLAG) {
+        return links(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == XTCE_FLAG) {
         return own_xtces(&args[1..], true);
@@ -660,6 +681,50 @@ fn set_interfaces(files: &[std::ffi::OsString]) -> ExitCode {
         ExitCode::from(1)
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+/// Prints a configuration's link table and its digest, as YAML.
+///
+/// # Arguments
+///
+/// * `files` - What followed the flag: one configuration.
+///
+/// # Returns
+///
+/// 0 with the table printed, 1 where the configuration does not read or its
+/// links do not work out, said on stderr, and 2 for anything but one file.
+fn links(files: &[std::ffi::OsString]) -> ExitCode {
+    let [file] = files else {
+        eprintln!(
+            "tcs-verify: {LINKS_FLAG} is given one configuration and nothing \
+             else\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
+    };
+    if file.to_string_lossy().starts_with('-') {
+        eprintln!(
+            "tcs-verify: {LINKS_FLAG} is given one configuration and nothing \
+             else\n\n{USAGE}"
+        );
+        return ExitCode::from(2);
+    }
+    let path = Path::new(file);
+    let table = tcsprotocol::graph::Graph::load(path)
+        .map_err(|why| why.to_string())
+        .and_then(|graph| {
+            tcsprotocol::graph::link_table::LinkTable::of(&graph)
+                .map_err(|refused| refused.why)
+        });
+    match table {
+        Ok(table) => {
+            print!("{}", table.yaml(&path.display().to_string()));
+            ExitCode::SUCCESS
+        }
+        Err(why) => {
+            eprintln!("tcs-verify: {}: {why}", path.display());
+            ExitCode::from(1)
+        }
     }
 }
 

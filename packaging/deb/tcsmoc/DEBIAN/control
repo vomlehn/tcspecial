@@ -3,8 +3,8 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: David VomLehn <dvomlehn@gmail.com>
 Installed-Size: @SIZE@
-Depends: @SHLIBS@, python3
-Recommends: python3-yaml, pkgconf
+Depends: @SHLIBS@, python3, python3-yaml
+Recommends: pkgconf
 Replaces: tcspecial-ground, tcspecial-moc
 Conflicts: tcspecial-ground, tcspecial-moc
 Section: misc

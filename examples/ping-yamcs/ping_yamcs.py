@@ -137,9 +137,6 @@ def arguments(argv):
     parser.add_argument("--no-yamcs", action="store_true",
                         help="do not start Yamcs; use one already running")
     parser.add_argument("--tcspecial", help="the tcspecial program to run")
-    parser.add_argument("--tcs-verify",
-                        help="the tcs-verify program that gives the "
-                             "configuration's checksum")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="say what it is doing")
     return parser.parse_args(argv)
@@ -201,7 +198,7 @@ class Setup:
         self.ping_reply = [generated.qualified(name)
                            for name in REPLY_PARAMETERS.values()]
         self.digest, self.why_no_digest = configuration.digest(
-            self.path, options.tcs_verify)
+            self.path)
 
     def yamcs_settings(self, run_dir, http_port):
         """The names the Yamcs templates are filled in with, and the facts

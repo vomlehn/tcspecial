@@ -52,6 +52,7 @@ use tcsmoc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcsmoc::relay::Relay;
 use tcsmoc::{command_links_of, CommandStatus, TcsClient};
 use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
+use tcsprotocol::graph::link_table::LinkTable;
 use tcsprotocol::graph::parameters::beacon_interval_of;
 use tcsprotocol::graph::units;
 use tcsprotocol::graph::{telemetry, Graph};
@@ -439,6 +440,105 @@ pub unsafe extern "C" fn tcs_configuration_digest(
             .digest_text
             .as_ptr())
     })
+}
+
+/// Writes what the vehicle and the ground work out of the configuration at
+/// `path` -- its link table, as YAML, after its link digest: what
+/// `tcs-verify --links` prints (`tcsprotocol::graph::link_table`) -- into
+/// `out`, as `snprintf` does: as much as fits, NUL-terminated, and the
+/// length of the whole.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file, YAML or XML by its extension.
+/// * `out`  - Where the text is written, or NULL to ask only its length.
+/// * `size` - How many bytes `out` holds, its NUL included.
+///
+/// # Returns
+///
+/// The text's length, without its NUL, which is all of it where it is less
+/// than `size`; or -1 where the file does not read or its links do not work
+/// out.
+///
+/// # Safety
+///
+/// `path` NULL or a NUL-terminated string; `out` NULL or writable for
+/// `size` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_links_of_file(
+    path: *const c_char,
+    out: *mut c_char,
+    size: usize,
+) -> i64 {
+    guard(-1, || {
+        let path = PathBuf::from(text_of(path, "the path")?);
+        // Allocates: the graph and the text, once, for a station starting.
+        let graph = Graph::load(&path)
+            .map_err(|e| fail(format_args!("{}: {e}", path.display())))?;
+        let table = LinkTable::of(&graph).map_err(|refused| {
+            fail(format_args!("{}: {}", path.display(), refused.why))
+        })?;
+        let text = table.yaml(&path.display().to_string());
+        Ok(written(text.as_bytes(), out, size))
+    })
+}
+
+/// Writes the digest of the configuration at `path` -- what the vehicle
+/// flying it announces in every beacon, as `tcs-verify --digest` gives it
+/// -- into `out`, as thirty-two hex digits and a NUL.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file, YAML or XML by its extension.
+/// * `out`  - Where the digest is written: 33 bytes.
+///
+/// # Returns
+///
+/// 0, or -1 where the file does not read.
+///
+/// # Safety
+///
+/// `path` NULL or a NUL-terminated string; `out` NULL or writable for 33
+/// bytes.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_digest_of_file(
+    path: *const c_char,
+    out: *mut c_char,
+) -> c_int {
+    guard(-1, || {
+        let path = PathBuf::from(text_of(path, "the path")?);
+        let digest = tcsprotocol::config_digest::digest_of_file(&path)
+            .map_err(|e| fail(format_args!("{}: {e}", path.display())))?;
+        if out.is_null() {
+            return Err(fail("where the digest is written is NULL"));
+        }
+        written(digest.to_string().as_bytes(), out, 33);
+        Ok(0)
+    })
+}
+
+/// Copies text into a C buffer as `snprintf` does.
+///
+/// # Arguments
+///
+/// * `text` - The text, with no NUL in it.
+/// * `out`  - The buffer, or NULL to write nothing.
+/// * `size` - How many bytes it holds.
+///
+/// # Returns
+///
+/// The text's length.
+///
+/// # Safety
+///
+/// `out` NULL or writable for `size` bytes.
+unsafe fn written(text: &[u8], out: *mut c_char, size: usize) -> i64 {
+    if !out.is_null() && size > 0 {
+        let fits = text.len().min(size - 1);
+        std::ptr::copy_nonoverlapping(text.as_ptr(), out.cast::<u8>(), fits);
+        *out.add(fits) = 0;
+    }
+    i64::try_from(text.len()).unwrap_or(i64::MAX)
 }
 
 /// Finds the id of the node called `name`.

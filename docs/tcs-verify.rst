@@ -308,6 +308,39 @@ cannot be taken does. With two spellings and a simulator file there is
 none either -- the two say one thing -- and the command line is none of
 the shapes.
 
+Links
+=====
+
+``--links``, with one configuration and nothing else, prints what the
+vehicle and the ground work out of it rather than read in it, as YAML, for
+a ground station to read rather than work out again:
+
+* ``link_digest``, the MD5 of everything after its line, which tcspecial
+  puts in every beacon: a ground station whose own differs was built to
+  work these out otherwise than the vehicle;
+* ``ids``, every node's device id;
+* ``links``, every link to the ground -- the sent, those the ground relays
+  from a consolidator, and the untouched payloads' -- each with its source,
+  its gateway node, where it leaves the vehicle and arrives at the ground or
+  its message ID, its APID, its type, how a string or bytes on it is
+  counted, the largest datum it carries and the consolidator it is relayed
+  from;
+* ``apids`` and ``msgids``, every APID and message ID the configuration
+  uses and what each carries;
+* ``consolidations``, each consolidator's inputs in order, with the bits of
+  each fixed-width field or the most and length field of a string or bytes.
+
+It is written in one order and one spelling, so the same configuration
+gives the same text, and the two spellings of one the same digest. Comments
+at its top say what it is. The same text comes from libtcsmoc-c's
+``tcs_links_of_file``, through which the Python ground stations read it. A
+configuration that does not read, or whose links do not work out -- two on
+one port, an APID used twice -- is said on stderr, with status 1.
+
+.. code-block:: console
+
+   $ cargo run --bin tcs-verify -- --links tests/consolidator/yamcs.ytcs
+
 See Also
 ========
 

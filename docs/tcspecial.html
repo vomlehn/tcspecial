@@ -3020,9 +3020,10 @@ link back to the gateway node and so down to the ground, at <tt class="docutils 
 its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 <tt class="docutils literal">1760900000.000000001</tt>. What a ping and its answer say is
 <tt class="docutils literal"><span class="pre">tcsprotocol::node::vehicle::ping</span></tt>.</p>
-<p>The ground station is a Python 3 program, <tt class="docutils literal">ping_gateway.py</tt>, that uses nothing
-outside the standard library to read the XML spelling of its configuration --
-its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
+<p>The ground station is a Python 3 program, <tt class="docutils literal">ping_gateway.py</tt>, that reads its
+configuration with the standard library and PyYAML -- its window is tkinter --
+and asks libtcsmoc-c where each link arrives and what the configuration's
+digest is. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
 out with tcsxtce, tcs-xtce's runtime, which is taken from the tcs-xtce
 checkout beside this tree, <tt class="docutils literal"><span class="pre">../tcs-xtce</span></tt>. It shows the beacon
@@ -3936,11 +3937,12 @@ operational code, one distribution, <tt class="docutils literal"><span class="pr
 its own, <tt class="docutils literal"><span class="pre">tcs-ui</span></tt>, which needs the first:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./python<span class="whitespace">
-</span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="literal string single">'./python[yaml]'</span><span class="whitespace">
 </span><span class="generic prompt">$ </span>pip<span class="whitespace"> </span>install<span class="whitespace"> </span>./tcs-ui/python
 </pre>
-<p>The extra brings PyYAML, which a station reading a YAML configuration
-needs. <tt class="docutils literal">tcs_ui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
+<p>The first brings PyYAML, which reads a YAML configuration and the link
+table every station reads its ports and APIDs from, through libtcsmoc-c,
+which is installed with the <tt class="docutils literal">tcsmoc</tt> package or built with <tt class="docutils literal">cargo build
+<span class="pre">-p</span> <span class="pre">tcsmoc-c</span></tt>. <tt class="docutils literal">tcs_ui</tt> needs tkinter, which pip cannot install: <tt class="docutils literal"><span class="pre">python3-tk</span></tt> on
 Debian, <tt class="docutils literal"><span class="pre">python3-tkinter</span></tt> on Fedora. The XTCE documents the interface
 digest is taken over, and the part of tcs-xtce that takes it, are inside
 <tt class="docutils literal">tcsprotocol</tt>, so an installed station needs nothing from the source tree.</p>

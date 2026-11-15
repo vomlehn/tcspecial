@@ -10,13 +10,15 @@ sockets, it reads the bus instead: its SBN peer and every message ID, counted as
 ``graph::telemetry::msgids`` counts them -- see
 :meth:`Configuration.bus`.
 For a configuration that answers to Yamcs, whose packets carry CCSDS
-headers, it reads the APIDs, counted as ``graph::telemetry::apids`` counts
-them -- see :meth:`Configuration.framed`.
+headers, it reads the APIDs, as ``graph::telemetry::apids`` counts them --
+see :meth:`Configuration.framed`.
 
 It reads either spelling, chosen by the file's extension as the Rust's
-``format::ConfigFormat`` chooses it. The XML with the standard library alone;
-the YAML with PyYAML, which is imported only when a YAML file is read, so that
-a station reading XML needs nothing outside the standard library. Both are
+``format::ConfigFormat`` chooses it: the XML with the standard library, the
+YAML with PyYAML. What is worked out of a configuration -- device ids, the
+port, APID or message ID of every link, each consolidation's layout -- is not
+worked out here but read from the link table libtcsmoc-c gives
+(:meth:`Configuration.links`), so the rules are stated once. Both are
 read into the same :class:`Configuration`, and the two spellings say the same
 thing, which ``make comparespellings`` and tcs-verify hold them to;
 ``examples/ping/tests/agrees.rs`` holds what this reads to what the Rust
@@ -158,30 +160,6 @@ class Bus:
     beacon_msgid: int
 
 
-def counted(attribute, base, device_id):
-    """A message ID counted on from a base by a node's device id:
-    ``graph::telemetry::counted``.
-
-    Args:
-        attribute: The base's attribute, for the error message.
-        base:      The base.
-        device_id: The node's device id.
-
-    Returns:
-        The message ID.
-
-    Raises:
-        ValueError: The sum is more than a message ID's sixteen bits.
-    """
-    msgid = base + device_id
-    if msgid > 0xFFFF:
-        raise ValueError(
-            f"{attribute} {base:#06x} plus {device_id} is more than a message "
-            "ID's sixteen bits"
-        )
-    return msgid
-
-
 #: The largest APID, eleven bits: ``tcsprotocol::ccsds::MAX_APID``.
 MAX_APID = 0x7FF
 
@@ -206,31 +184,6 @@ def apid(attribute, said):
                          "whose gateway is yamcs must state it: the APID, 0 "
                          f"to {MAX_APID:#x}")
     return whole(attribute, said, MAX_APID)
-
-
-def counted_apid(attribute, base, device_id):
-    """An APID counted on from a base by a node's device id:
-    ``graph::telemetry::counted_apid``.
-
-    Args:
-        attribute: The base's attribute, for the error message.
-        base:      The base.
-        device_id: The node's device id.
-
-    Returns:
-        The APID.
-
-    Raises:
-        ValueError: The sum is past an APID's eleven bits.
-    """
-    counted = base + device_id
-    if counted > MAX_APID:
-        raise ValueError(
-            f"{attribute} {base:#x} plus the device id {device_id} is past an "
-            f"APID's eleven bits, {MAX_APID:#x}: lower the base, or give the "
-            "node a name that sorts earlier"
-        )
-    return counted
 
 
 @dataclass(frozen=True)
@@ -412,6 +365,8 @@ class Configuration:
     #: files around it may join: only an included file may. What it says is
     #: the Rust checking's business, a ground station reading nothing of it.
     has_exports: bool = False
+    #: What :meth:`links` read, once it has.
+    _links: dict = field(default=None, repr=False, compare=False)
 
     def node(self, name):
         """The node called ``name``.
@@ -431,22 +386,23 @@ class Configuration:
         raise ValueError(f'{self.path}: there is no node called "{name}"')
 
     def device_id(self, name):
-        """A node's device id.
+        """A node's device id: its place among the configuration's nodes
+        sorted by name, counting from nought, as ``graph::telemetry::ids``
+        gives it in :meth:`links`.
 
         Args:
             name: The node's name.
 
         Returns:
-            Its position among the configuration's nodes sorted by name,
-            counting from nought: ``graph::telemetry::ids``. The order the
-            file writes them in changes no id.
+            Its device id.
 
         Raises:
-            ValueError: There is no node called ``name``.
+            ValueError: There is no node called ``name``, or as
+                        :meth:`links`.
         """
-        names = sorted(node.name for node in self.nodes)
-        if name in names:
-            return names.index(name)
+        ids = self.links()["ids"]
+        if name in ids:
+            return ids[name]
         raise ValueError(f'{self.path}: there is no node called "{name}"')
 
     def answers_over_bus(self):
@@ -497,7 +453,8 @@ class Configuration:
 
     def node_command_msgid(self, name):
         """The message ID commands about a node are published under:
-        ``payload_command.cmd_base`` plus its device id.
+        ``payload_command.cmd_base`` plus its device id, as :meth:`links`
+        gives it.
 
         Args:
             name: The node's name.
@@ -507,15 +464,14 @@ class Configuration:
 
         Raises:
             ValueError: The configuration does not answer over a bus, there
-                        is no such node, or the sum does not fit.
+                        is no such node, or as :meth:`links`.
         """
-        bus = self._bus()
-        return counted("payload_command.cmd_base", bus.cmd_base,
-                       self.device_id(name))
+        return self._node_msgid(name, "node_commands")
 
     def node_answer_msgid(self, name):
         """The message ID the answers about a node are published under:
-        ``payload_command.response_base`` plus its device id.
+        ``payload_command.response_base`` plus its device id, as
+        :meth:`links` gives it.
 
         Args:
             name: The node's name.
@@ -526,14 +482,32 @@ class Configuration:
         Raises:
             ValueError: As :meth:`node_command_msgid`.
         """
-        bus = self._bus()
-        return counted("payload_command.response_base", bus.response_base,
-                       self.device_id(name))
+        return self._node_msgid(name, "node_answers")
+
+    def _node_msgid(self, name, carries):
+        """The message ID that carries a node's commands or answers.
+
+        Args:
+            name:    The node's name.
+            carries: ``node_commands`` or ``node_answers``.
+
+        Returns:
+            The message ID.
+
+        Raises:
+            ValueError: As :meth:`node_command_msgid`.
+        """
+        self._bus()
+        self.node(name)
+        for used in self.links()["msgids"]:
+            if used["carries"] == carries and used["node"] == name:
+                return used["msgid"]
+        raise ValueError(f'{self.path}: "{name}" has no {carries} message ID')
 
     def downlink_msgid(self, gateway, source):
         """The message ID what ``source`` sends to the ``gateway_cfs`` node
         called ``gateway`` is published under: its ``tlm_base`` plus the
-        source's device id.
+        source's device id, as :meth:`links` gives it.
 
         Args:
             gateway: The gateway node's name.
@@ -545,7 +519,7 @@ class Configuration:
         Raises:
             ValueError: Either node is missing, ``gateway`` is not a gateway
                         on a bus, ``source`` has no ``world-out`` link to
-                        it, or the base does not read or the sum not fit.
+                        it, or as :meth:`links`.
         """
         node = self._gateway(gateway)
         if node.node_type not in ON_BUS:
@@ -553,39 +527,26 @@ class Configuration:
                 f'{self.path}: "{gateway}" is a {node.node_type} node, whose '
                 "data arrives at a socket: see downlink"
             )
-        self._sends_to(gateway, source)
-        base = whole(f'"{gateway}" tlm_base',
-                     node.attributes.get("tlm_base", ""), 0xFFFF)
-        return counted(f'"{gateway}" tlm_base', base, self.device_id(source))
+        return self._link_to(gateway, source)["msgid"]
 
     def telemetry_msgids(self):
         """Every message ID the vehicle publishes on the bus, which a ground
         station subscribes to: the spacecraft's answers, the beacon, each
         node's answers, what each source drawn into a ``gateway_cfs`` node
-        sends, and the telemetry of each payload nothing touches, over
-        ``payload_telemetry.tlm_base`` -- the telemetry half of
-        ``graph::telemetry::msgids``.
+        sends, and the telemetry of each payload nothing touches -- the
+        telemetry half of ``graph::telemetry::msgids``, as :meth:`links`
+        gives it.
 
         Returns:
             The message IDs, sorted, each once.
 
         Raises:
-            ValueError: The configuration does not answer over a bus, or a
-                        message ID does not read or fit.
+            ValueError: The configuration does not answer over a bus, or as
+                        :meth:`links`.
         """
-        bus = self._bus()
-        msgids = {bus.response_msgid, bus.beacon_msgid}
-        for name in (node.name for node in self.nodes):
-            msgids.add(self.node_answer_msgid(name))
-        for node in self.nodes:
-            for target in node.links.get("world-out", []):
-                kind = self._kind(target)
-                if kind in ON_BUS:
-                    msgids.add(self.downlink_msgid(target, node.name))
-        for name in self.untouched_payloads():
-            msgids.add(counted("payload_telemetry.tlm_base", bus.tlm_base,
-                               self.device_id(name)))
-        return sorted(msgids)
+        self._bus()
+        return sorted({used["msgid"] for used in self.links()["msgids"]
+                       if not used["command"]})
 
     def framed(self):
         """Whether every packet to and from the ground carries a CCSDS
@@ -647,8 +608,9 @@ class Configuration:
 
     def downlink_apid(self, gateway, source):
         """The APID what ``source`` sends to the ``gateway_yamcs`` node
-        called ``gateway`` carries as telemetry: its ``apid_base`` plus the
-        source's device id, as :meth:`downlink`'s port is counted.
+        called ``gateway`` carries as telemetry, or is relayed under: its
+        ``apid_base`` plus the source's device id, as :meth:`links` gives
+        it.
 
         Args:
             gateway: The gateway node's name.
@@ -659,30 +621,32 @@ class Configuration:
 
         Raises:
             ValueError: As :meth:`uplink_apid`, ``source`` has no
-                        ``world-out`` link to ``gateway``, or the sum is
-                        past eleven bits.
+                        ``world-out`` link to ``gateway`` and is not relayed
+                        to it, or as :meth:`links`.
         """
-        base = self.uplink_apid(gateway)
-        self._sends_to(gateway, source)
-        return counted_apid(f'"{gateway}" apid_base', base,
-                            self.device_id(source))
+        self.uplink_apid(gateway)
+        return self._link_to(gateway, source)["apid"]
 
     def untouched_payloads(self):
         """The payloads nothing in the drawing touches -- no link to or from
         them, no command binding naming them -- each of which reports over
-        the section's ``payload_telemetry``: ``graph::telemetry::of``.
+        the section's ``payload_telemetry``: ``graph::telemetry::of``, as
+        :meth:`links` gives it.
 
         Returns:
             Their names, in order.
+
+        Raises:
+            ValueError: As :meth:`links`.
         """
-        touched = self._touched()
-        return [node.name for node in self.nodes
-                if node.section == "payloads" and node.name not in touched]
+        return [link["source"] for link in self.links()["links"]
+                if link["gateway"] is None]
 
     def payload_telemetry_link(self, payload):
         """Where the telemetry of ``payload``, which nothing touches, leaves
         the vehicle and arrives at the ground: ``payload_telemetry``'s
-        ``source_base`` and ``dest_base``, each counted on by its device id.
+        ``source_base`` and ``dest_base``, each counted on by its device id,
+        as :meth:`links` gives them.
 
         Args:
             payload: The payload's name.
@@ -692,28 +656,18 @@ class Configuration:
 
         Raises:
             ValueError: The payload is not one nothing touches, the
-                        configuration answers over a bus, or a base does not
-                        read or its port counted on is past 65535.
+                        configuration answers over a bus, or as
+                        :meth:`links`.
         """
         self._not_on_a_bus("a payload's telemetry")
-        device_id = self._untouched(payload)
-        ends = []
-        for attribute in ("payload_telemetry.source_base",
-                          "payload_telemetry.dest_base"):
-            base = HostPort.of(attribute, self._said(attribute))
-            port = base.port + device_id
-            if port > 65535:
-                raise ValueError(
-                    f"{self.path}: {attribute} {base} plus {payload}'s "
-                    f"device id is port {port}, and a port is at most 65535"
-                )
-            ends.append(HostPort(base.address, port))
-        return tuple(ends)
+        link = self._untouched(payload)
+        return (HostPort.of("payload_telemetry.source_base", link["vehicle"]),
+                HostPort.of("payload_telemetry.dest_base", link["ground"]))
 
     def payload_telemetry_apid(self, payload):
         """The APID the telemetry of ``payload``, which nothing touches,
         carries as CCSDS telemetry: ``payload_telemetry.apid_base`` plus its
-        device id, as its port is counted.
+        device id, as :meth:`links` gives it.
 
         Args:
             payload: The payload's name.
@@ -723,77 +677,47 @@ class Configuration:
 
         Raises:
             ValueError: The configuration does not answer to Yamcs, the
-                        payload is not one nothing touches, or the base is
-                        missing, not an APID, or the sum past eleven bits.
+                        payload is not one nothing touches, or as
+                        :meth:`links`.
         """
         self._framed()
-        device_id = self._untouched(payload)
-        base = apid("payload_telemetry.apid_base",
-                    self.tcspecial.get("payload_telemetry.apid_base"))
-        return counted_apid("payload_telemetry.apid_base", base, device_id)
+        return self._untouched(payload)["apid"]
 
     def apids(self):
         """Every APID the configuration uses, each checked: an APID, and
-        used once. ``graph::telemetry::apids``.
+        used once. ``graph::telemetry::apids``, as :meth:`links` gives it.
 
         The beacon's and the command links', each ``gateway_yamcs`` node's
         ``apid_base``, every source drawn into one at that base plus its
         device id, every source :meth:`relayed` to one at the same, and
-        every payload nothing touches at
-        ``payload_telemetry.apid_base`` plus its device id. Two uses may
-        share an APID only as :meth:`ApidUse.may_share` allows.
+        every payload nothing touches at ``payload_telemetry.apid_base``
+        plus its device id. Two uses may share an APID only as
+        :meth:`ApidUse.may_share` allows: tcs-verify refuses any other two.
 
         Returns:
             The :class:`ApidUse` of each, in that order: the gateway nodes,
-            their sources, the sources relayed to them, and the payloads,
-            by name.
+            their sources, the sources relayed to them, and the payloads.
 
         Raises:
-            ValueError: The configuration does not answer to Yamcs, an APID
-                        is missing or not one, a sum is past eleven bits, or
-                        two uses share an APID, naming both.
+            ValueError: The configuration does not answer to Yamcs, or as
+                        :meth:`links`, which names two uses of one APID.
         """
-        used = [ApidUse(self.beacon_apid(), "beacon", "beacon.apid"),
-                ApidUse(self.command_apid(), "commands", "tcs_cmd.apid")]
-        gateways = [node for node in self.nodes
-                    if node.node_type == "gateway_yamcs"]
-        for gateway in gateways:
-            used.append(ApidUse(self.uplink_apid(gateway.name), "uplink",
-                                f'the apid_base of "{gateway.name}"',
-                                node=gateway.name))
-        for gateway in gateways:
-            for node in self.nodes:
-                if gateway.name not in node.links.get("world-out", []):
-                    continue
-                used.append(ApidUse(
-                    self.downlink_apid(gateway.name, node.name), "downlink",
-                    f'the APID of what "{node.name}" sends to '
-                    f'"{gateway.name}", its apid_base plus the device id '
-                    f"{self.device_id(node.name)}",
-                    node=node.name, gateway=gateway.name))
-        for gateway in gateways:
-            for source, consolidator in self.relayed(gateway.name):
-                used.append(ApidUse(
-                    self.downlink_apid(gateway.name, source), "downlink",
-                    f'the APID "{source}"\'s readings are relayed under '
-                    f'from "{consolidator}" to "{gateway.name}", its '
-                    f"apid_base plus the device id {self.device_id(source)}",
-                    node=source, gateway=gateway.name,
-                    relayed_by=consolidator))
-        for name in self.untouched_payloads():
+        self._framed()
+        table = self.links()
+        relayed_by = {(link["gateway"], link["source"]): link["relayed_by"]
+                      for link in table["links"]}
+        used = []
+        for one in table["apids"]:
+            carries = one["carries"]
+            node = one["node"]
+            gateway = one["gateway"]
+            # The node of an uplink is its gateway; of a link, its source.
+            what = carries if node is None else f'{carries} "{node}"'
             used.append(ApidUse(
-                self.payload_telemetry_apid(name), "payload_telemetry",
-                f'the APID of "{name}"\'s telemetry, '
-                "payload_telemetry.apid_base plus its device id "
-                f"{self.device_id(name)}",
-                node=name))
-        for at, one in enumerate(used):
-            for before in used[:at]:
-                if before.apid == one.apid and not before.may_share(one):
-                    raise ValueError(
-                        f"{self.path}: {before.what} and {one.what} are both "
-                        f"APID {one.apid:#x}: Yamcs sorts packets by APID, so "
-                        "each would be read as the other")
+                one["apid"], carries, what, node=node,
+                gateway=gateway if carries == "downlink" else None,
+                relayed_by=relayed_by.get((gateway, node))
+                if carries == "downlink" else None))
         return used
 
     def _framed(self):
@@ -811,44 +735,27 @@ class Configuration:
             )
 
     def _untouched(self, payload):
-        """The device id of a payload nothing touches.
+        """The link of a payload nothing touches.
 
         Args:
             payload: The payload's name.
 
         Returns:
-            Its device id.
+            Its link, as :meth:`links` gives it.
 
         Raises:
             ValueError: There is no such node, or it is not a payload
                         nothing touches.
         """
-        if payload not in self.untouched_payloads():
-            self.node(payload)
-            raise ValueError(
-                f'{self.path}: "{payload}" is not a payload nothing in the '
-                "drawing touches, so it does not report over "
-                "payload_telemetry: it goes where the drawing says"
-            )
-        return self.device_id(payload)
-
-    def _touched(self):
-        """Every node the drawing touches: an end of a link, or of a command
-        binding. ``graph::telemetry``'s ``touched``.
-
-        Returns:
-            Their names.
-        """
-        touched = set()
-        for node in self.nodes:
-            for targets in node.links.values():
-                if targets:
-                    touched.add(node.name)
-                    touched.update(targets)
-        for came, sets in self.commands:
-            touched.add(came)
-            touched.add(sets.split(".", 1)[0])
-        return touched
+        for link in self.links()["links"]:
+            if link["gateway"] is None and link["source"] == payload:
+                return link
+        self.node(payload)
+        raise ValueError(
+            f'{self.path}: "{payload}" is not a payload nothing in the '
+            "drawing touches, so it does not report over "
+            "payload_telemetry: it goes where the drawing says"
+        )
 
     def _kind(self, name):
         """The node type of the node called ``name``.
@@ -995,7 +902,7 @@ class Configuration:
 
     def downlink(self, gateway, source):
         """Where the ground receives what ``source`` sends to the gateway node
-        called ``gateway``.
+        called ``gateway``, or is relayed to it.
 
         Args:
             gateway: The gateway node's name.
@@ -1005,13 +912,12 @@ class Configuration:
             The :class:`HostPort`: the gateway's ``ground_base`` -- or
             ``bridge_base``, for an F´ gateway -- its port counted on by the
             source's device id, so that each source arrives on a port of its
-            own.
+            own, as :meth:`links` gives it.
 
         Raises:
-            ValueError: Either node is missing, ``gateway`` is not a gateway,
-                        ``source`` has no ``world-out`` link to it, the base
-                        is not an address and a port, or the port counted on
-                        is past 65535.
+            ValueError: Either node is missing, ``gateway`` is not a gateway
+                        or is on a bus, ``source`` has no ``world-out`` link
+                        to it, or as :meth:`links`.
         """
         node = self._gateway(gateway)
         attribute = GATEWAY_BASES[node.node_type]
@@ -1020,21 +926,12 @@ class Configuration:
                 f'{self.path}: "{gateway}" is a {node.node_type} node, whose '
                 "data is published on a software bus: see downlink_msgid"
             )
-        self._sends_to(gateway, source)
-        base = HostPort.of(
-            f'"{gateway}" {attribute}', node.attributes.get(attribute, "")
-        )
-        port = base.port + self.device_id(source)
-        if port > 65535:
-            raise ValueError(
-                f'{self.path}: "{gateway}" {attribute} {base} plus {source}\'s '
-                f"device id is port {port}, and a port is at most 65535"
-            )
-        return HostPort(base.address, port)
+        link = self._link_to(gateway, source)
+        return HostPort.of(f'"{gateway}" {attribute}', link["ground"])
 
     def is_consolidator(self, name):
-        """Whether the node called ``name`` is a consolidator: a compute
-        node whose ``function`` is ``consolidator``.
+        """Whether the node called ``name`` is a consolidator, as
+        :meth:`links` lays out its consolidations.
 
         Args:
             name: The node's name.
@@ -1043,63 +940,90 @@ class Configuration:
             Whether it is one.
 
         Raises:
-            ValueError: There is no such node.
+            ValueError: There is no such node, or as :meth:`links`.
         """
-        node = self.node(name)
-        return (node.node_type == "compute"
-                and node.attributes.get("function") == "consolidator")
+        self.node(name)
+        return name in self.links()["consolidations"]
 
     def relayed(self, gateway):
         """The sources whose readings reach ``gateway`` only in a
         consolidator's datum, which the ground relays to a station that
         reads the node's ports itself as though each were drawn in, on its
-        own port and under its own APID: ``graph::telemetry::relayed``.
+        own port and under its own APID: ``graph::telemetry::relayed``, as
+        :meth:`links` gives it.
 
         Args:
             gateway: The gateway node's name.
 
         Returns:
             Each source and the consolidator that carries it, by
-            consolidator in the order the file writes them, then by the
-            source's device id; a source drawn into ``gateway`` itself is
-            not among them.
-        """
-        drawn = {node.name for node in self.nodes
-                 if gateway in node.links.get("world-out", [])}
-        found = []
-        for consolidator in self.nodes:
-            if (consolidator.name not in drawn
-                    or not self.is_consolidator(consolidator.name)):
-                continue
-            inputs = sorted(
-                (node.name for node in self.nodes
-                 if consolidator.name in node.links.get("world-out", [])),
-                key=self.device_id)
-            for source in inputs:
-                if source in drawn or any(source == s for s, _ in found):
-                    continue
-                found.append((source, consolidator.name))
-        return found
+            consolidator, then by the source's device id; a source drawn
+            into ``gateway`` itself is not among them.
 
-    def _sends_to(self, gateway, source):
-        """Refuses a source that sends nothing to ``gateway``, drawn in or
-        :meth:`relayed`.
+        Raises:
+            ValueError: As :meth:`links`.
+        """
+        return [(link["source"], link["relayed_by"])
+                for link in self.links()["links"]
+                if link["gateway"] == gateway and link["relayed_by"]]
+
+    def _link_to(self, gateway, source):
+        """The link on which what ``source`` sends reaches ``gateway``,
+        drawn in or :meth:`relayed`.
 
         Args:
             gateway: The gateway node's name.
             source:  The source's name.
 
+        Returns:
+            The link, as :meth:`links` gives it.
+
         Raises:
             ValueError: ``source`` is missing, or has no ``world-out`` link
-                        to ``gateway`` and is not relayed to it.
+                        to ``gateway`` and is not relayed to it, or as
+                        :meth:`links`.
         """
-        if any(source == s for s, _ in self.relayed(gateway)):
-            return
-        if gateway not in self.node(source).links.get("world-out", []):
-            raise ValueError(
-                f'{self.path}: "{source}" sends nothing to "{gateway}": it has '
-                "no world-out link to it"
-            )
+        self.node(source)
+        for link in self.links()["links"]:
+            if link["gateway"] == gateway and link["source"] == source:
+                return link
+        raise ValueError(
+            f'{self.path}: "{source}" sends nothing to "{gateway}": it has '
+            "no world-out link to it"
+        )
+
+    def links(self):
+        """What the vehicle and the ground work out of this configuration:
+        each node's device id, every link to the ground, every APID and
+        message ID, each consolidation's layout and the link digest of all
+        of it, as ``tcs-verify --links`` gives them. Read once, and kept.
+
+        Read rather than worked out again here, so that the rules are
+        stated once, in tcsprotocol: see ``graph::link_table``.
+
+        Returns:
+            The table, as a dictionary: ``link_digest``, ``ids``, ``links``,
+            ``apids``, ``msgids`` and ``consolidations``.
+
+        Raises:
+            ValueError: tcs-verify is not built, or refuses the
+                        configuration, saying why.
+        """
+        if self._links is None:
+            self._links = link_table(self.path)
+        return self._links
+
+    def link_digest(self):
+        """The link digest of the configuration, which tcspecial puts in
+        every beacon: see :meth:`links`.
+
+        Returns:
+            The digest, as thirty-two hex digits.
+
+        Raises:
+            ValueError: As :meth:`links`.
+        """
+        return self.links()["link_digest"]
 
     def _gateway(self, name):
         """The gateway node called ``name``.
@@ -2477,38 +2401,50 @@ def write_own_xtce(path, tcs_verify=None):
     return True, None
 
 
-def digest(path, tcs_verify=None):
-    """The configuration's digest, as tcs-verify works it out.
+def link_table(path):
+    """What the vehicle and the ground work out of a configuration, as
+    ``tcs-verify --links`` prints it (``graph::link_table``), read through
+    libtcsmoc-c: see :mod:`tcsprotocol.library`.
+
+    Args:
+        path: The configuration file.
+
+    Returns:
+        The table, as a dictionary.
+
+    Raises:
+        ValueError: libtcsmoc-c is not built or installed, or refuses the
+                    configuration, saying why.
+    """
+    import yaml
+
+    from tcsprotocol import library
+
+    try:
+        text = library.links_text(path)
+    except OSError as why:
+        raise ValueError(f"{path}: {why}") from why
+    return yaml.safe_load(text)
+
+
+def digest(path):
+    """The configuration's digest, as the vehicle flying it works it out,
+    read through libtcsmoc-c: see :mod:`tcsprotocol.library`.
 
     ``None`` is not a failure. A station that cannot digest its own
     configuration compares nothing, as the Rust ground programs do, and says
     so rather than claiming every beacon agrees.
 
     Args:
-        path:       The configuration file.
-        tcs_verify: The tcs-verify program to run, or ``None`` to find one
-                    with :func:`find_tcs_verify`.
+        path: The configuration file.
 
     Returns:
         A pair: the digest, as thirty-two hex digits, and ``None``; or
         ``None`` and the reason it cannot be had.
     """
-    program = tcs_verify or find_tcs_verify()
-    if program is None:
-        return None, "tcs-verify is not built or on the PATH"
+    from tcsprotocol import library
+
     try:
-        done = subprocess.run(
-            [program, "--digest", "--error-limit=0", str(path)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-    except OSError as why:
-        return None, f"{program} cannot be run: {why}"
-    for line in done.stdout.splitlines():
-        if ": md5 " in line:
-            return line.rsplit(": md5 ", 1)[1].strip(), None
-    return None, (
-        f"{program} gave no digest: "
-        f"{done.stdout.strip() or done.stderr.strip()}"
-    )
+        return library.digest_of_file(path), None
+    except (OSError, ValueError) as why:
+        return None, str(why)

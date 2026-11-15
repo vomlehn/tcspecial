@@ -560,16 +560,17 @@ vehicle’s time on the end, and the answer comes back down. What a ping
 and its answer say is <code>tcsprotocol::node::vehicle::ping</code>:</p>
 <pre><code>ping #&lt;count&gt; &lt;seconds&gt;.&lt;nanoseconds&gt;                    up
 ping #&lt;count&gt; &lt;seconds&gt;.&lt;nanoseconds&gt; &lt;seconds&gt;.&lt;nanoseconds&gt;   down</code></pre>
-<p>The ground station, <code>ping_gateway.py</code>, is Python 3 and
-uses nothing outside the standard library to read its configuration’s
-XML, the default; with <code>--yaml</code> it reads the YAML instead,
-which needs PyYAML (<code>python3-yaml</code> on Debian and Ubuntu). Its
-window shows the beacon panel, the last ping sent and when, the last
-answer and when, and three times: the round trip, MOC to tcspecial, and
-tcspecial to MOC. The last two are each read across two clocks, so each
-includes their offset and may be negative; their sum is the round trip.
-Press <code>Send ping</code> to send one: it clears the time received
-until its own answer, matched by count, arrives.</p>
+<p>The ground station, <code>ping_gateway.py</code>, is Python 3. It
+reads its configuration’s XML, the default, or with <code>--yaml</code>
+the YAML, and asks libtcsmoc-c (<code>cargo build -p tcsmoc-c</code>)
+where its links arrive, which it reads with PyYAML
+(<code>python3-yaml</code> on Debian and Ubuntu). Its window shows the
+beacon panel, the last ping sent and when, the last answer and when, and
+three times: the round trip, MOC to tcspecial, and tcspecial to MOC. The
+last two are each read across two clocks, so each includes their offset
+and may be negative; their sum is the round trip. Press
+<code>Send ping</code> to send one: it clears the time received until
+its own answer, matched by count, arrives.</p>
 <p>It is built the way the <code>beacon</code> program is, from the same
 two halves written again in Python: <code>python/tcsmoc/beacon.py</code>
 after <code>tcsmoc::beacon</code>,

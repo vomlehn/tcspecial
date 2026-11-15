@@ -229,7 +229,7 @@ class Setup:
                              f'"{self.gateway}" sends values, and this '
                              "program shows a thermostat's temperatures")
         self.digest, self.why_no_digest = configuration.digest(
-            self.path, options.tcs_verify)
+            self.path)
         # The simulated world's ambient temperature, which the vehicle does
         # not send, read from the simulator file and set in Yamcs as a local
         # parameter, so that Yamcs shows the surroundings beside the zone.

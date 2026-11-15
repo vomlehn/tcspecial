@@ -93,6 +93,28 @@ void tcs_configuration_close(tcs_configuration *configuration);
  *                       error. */
 const char *tcs_configuration_digest(const tcs_configuration *configuration);
 
+/** Writes what the vehicle and the ground work out of the configuration at
+ * path -- its link table, as YAML, after its link digest, as tcs-verify
+ * --links prints it -- into out, as snprintf does: as much as fits,
+ * NUL-terminated. Call it with out NULL to learn the length.
+ *
+ * @param path  The configuration file, YAML or XML by its extension.
+ * @param out   Where the text is written, or NULL.
+ * @param size  How many bytes out holds, its NUL included.
+ * @return      The text's length without its NUL, all of it written where
+ *              it is less than size; or -1 on an error. */
+int64_t tcs_links_of_file(const char *path, char *out, size_t size);
+
+/** Writes the digest of the configuration at path -- what the vehicle
+ * flying it announces in every beacon -- into out, without opening it as a
+ * station: a configuration with problems still has a digest.
+ *
+ * @param path  The configuration file, YAML or XML by its extension.
+ * @param out   Where the digest is written: 33 bytes, thirty-two hex digits
+ *              and a NUL.
+ * @return      0, or -1 on an error. */
+int tcs_digest_of_file(const char *path, char *out);
+
 /** Finds the id of a node: its place among the configuration's nodes sorted
  * by name, which is what a node command names.
  *

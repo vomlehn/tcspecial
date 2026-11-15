@@ -528,7 +528,7 @@ pub fn relayed(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
 /// # Errors
 ///
 /// As [`of`].
-fn every(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
+pub(crate) fn every(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     let ids = ids(graph);
     let mut links = Vec::new();
 

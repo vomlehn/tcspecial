@@ -61,11 +61,26 @@ class YamcsGatewayTest(unittest.TestCase):
             path.write_text(
                 "<configuration>"
                 "<tcspecial><gateway>yamcs</gateway>"
+                "<beacon><apid>0x100</apid><recv>127.0.0.1:9100</recv>"
+                "<send>0.0.0.0:9101</send>"
+                "<default_interval>5 s</default_interval>"
+                "<reset_interval>1 s</reset_interval></beacon>"
+                "<log><directory>/tmp/telemetry</directory>"
+                "<segment_size>65536</segment_size></log>"
+                "<max_consolidator_inputs>32</max_consolidator_inputs>"
+                "<payload_telemetry><apid_base>0x300</apid_base>"
+                "<dest_base>127.0.0.1:9200</dest_base>"
+                "<source_base>0.0.0.0:9300</source_base></payload_telemetry>"
+                "<state_file>/tmp/tcspecial-test-yamcs.state</state_file>"
                 f"<interface>{interface.of_this_tree().hex()}</interface>"
-                "<tcs_cmd><send>127.0.0.1:0</send><recv>127.0.0.1:4000</recv>"
-                "</tcs_cmd></tcspecial><gateways><type name=\"gateway_yamcs\">"
+                "<tcs_cmd><apid>0x101</apid><send>127.0.0.1:0</send>"
+                "<recv>127.0.0.1:4000</recv>"
+                "</tcs_cmd><payload_command><dest_base>127.0.0.1:9600"
+                "</dest_base><source_base>127.0.0.1:0</source_base>"
+                "</payload_command></tcspecial><gateways><type name=\"gateway_yamcs\">"
                 "<gateway name=\"m\"><ground_base>127.0.0.1:9000</ground_base>"
-                "<apid_base>0x200</apid_base></gateway></type></gateways>"
+                "<apid_base>0x200</apid_base><world-in>p</world-in>"
+                "</gateway></type></gateways>"
                 "<vehicle><type name=\"ping\"><compute name=\"p\">"
                 "<world-out>m.p</world-out></compute>"
                 "</type></vehicle></configuration>")
@@ -84,7 +99,13 @@ YAMCS = """\
 tcspecial:
   gateway: yamcs
   interface: "{interface}"
-  beacon: {{ apid: "0x100", recv: "127.0.0.1:9100", send: "0.0.0.0:9101" }}
+  beacon: {{ apid: "0x100", recv: "127.0.0.1:9100", send: "0.0.0.0:9101",
+            default_interval: "5 s", reset_interval: "1 s" }}
+  log: {{ directory: "/tmp/telemetry", segment_size: "65536" }}
+  max_consolidator_inputs: "32"
+  state_file: "/tmp/tcspecial-test-yamcs.state"
+  payload_command: {{ dest_base: "127.0.0.1:9600",
+                     source_base: "127.0.0.1:0" }}
   payload_telemetry: {{ apid_base: "{base}", dest_base: "127.0.0.1:9200",
                        source_base: "0.0.0.0:9300" }}
   tcs_cmd: {{ apid: "0x101", recv: "127.0.0.1:4000", send: "127.0.0.1:0" }}
@@ -316,7 +337,9 @@ class MdbTest(unittest.TestCase):
         path = Path(config.path)
         path.write_text(path.read_text().replace(
             "          - p.m\n",
-            "          - p.m\n          - n.m\n"))
+            "          - p.m\n          - n.m\n").replace(
+            "      - payload: n\n",
+            "      - payload: n\n        moc-in: [m]\n"))
         config = loaded(path)
         uplink, = generated.uplinks(config)
         self.assertEqual((uplink.command, uplink.document), ("m", None))
@@ -362,15 +385,16 @@ class MdbTest(unittest.TestCase):
                           for link in generated.telemetry(config)],
                          [("p", 0x203, 9003), ("n", 0x301, 9201)])
         # "m" binds nothing aboard, so the ground has nowhere to send to
-        # it: its command is counted, but nothing carries it.
-        # And with no node command link, nothing carries QUERY_THREADS.
+        # it: its command is counted, but nothing carries it. The node
+        # command link carries QUERY_THREADS.
         self.assertEqual([stream["tcPatterns"] for stream
                           in generated.command_streams(config)],
-                         [["/TcsYamcs/Connect"]])
+                         [["/TcsYamcs/Connect"], ["/TcsYamcs/QueryThreads"]])
         self.assertEqual([(link["name"], link["port"])
                           for link in generated.data_links(config)],
-                         [("commands", 4000), ("beacon", 9100),
-                          ("p-downlink", 9003), ("n-downlink", 9201)])
+                         [("commands", 4000), ("node-commands", 9600),
+                          ("beacon", 9100), ("p-downlink", 9003),
+                          ("n-downlink", 9201)])
 
     def test_a_name_the_wrapper_has_is_refused(self):
         config = yamcs(self.directory.name, renamed={"m": "Connect"})

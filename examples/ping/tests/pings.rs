@@ -52,6 +52,11 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
         .set_read_timeout(Some(Duration::from_secs(20)))
         .expect("a timeout");
     let (answers, beacons, ground_commands) = (free(), free(), free());
+    // Where nodes take commands and where untouched payloads report: this
+    // configuration has none of either, but every one says where they
+    // would be, as tcspecial reads it.
+    let (node_commands, payload_telemetry, payload_sources) =
+        (free(), free(), free());
 
     let dir = tempfile::tempdir().expect("a directory");
     let configuration = dir.path().join("ping.xtcs");
@@ -68,6 +73,20 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             <recv>127.0.0.1:{beacons}</recv>
             <send>127.0.0.1:{}</send>
         </beacon>
+        <log>
+            <directory>/tmp/telemetry</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <max_consolidator_inputs>32</max_consolidator_inputs>
+        <payload_command>
+            <dest_base>127.0.0.1:{node_commands}</dest_base>
+            <source_base>127.0.0.1:0</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <dest_base>127.0.0.1:{payload_telemetry}</dest_base>
+            <source_base>0.0.0.0:{payload_sources}</source_base>
+        </payload_telemetry>
+        <state_file>/tmp/tcspecial-ping-example-test.state</state_file>
         <tcs_cmd>
             <recv>127.0.0.1:{}</recv>
             <send>127.0.0.1:{ground_commands}</send>

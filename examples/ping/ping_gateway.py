@@ -53,8 +53,8 @@ so is what ``--pings`` and ``--describe`` print, which is what they are for.
 The configuration is ``examples/ping/ping.xtcs`` unless another is named:
 ``--yaml`` reads ``ping.ytcs`` instead, and ``--xml`` says the default. One
 of the two at most, and a file named beside one has to be that spelling.
-Reading XML it uses nothing outside the standard library; reading YAML it
-needs PyYAML. Python 3.7 or later.
+It needs PyYAML, with which it reads the link table libtcsmoc-c gives it,
+and libtcsmoc-c. Python 3.9 or later.
 """
 
 import argparse
@@ -129,9 +129,6 @@ def arguments(argv):
         "--node", help="the ping node to ping, where there is more than one"
     )
     parser.add_argument(
-        "--tcs-verify", help="the tcs-verify to digest the configuration with"
-    )
-    parser.add_argument(
         "--tcspecial",
         help="the tcspecial to start (default: the repository's build)",
     )
@@ -200,8 +197,7 @@ class Setup:
         self.beacon = self.config.beacon_link()
         self.beacon_interval = self.config.beacon_interval()
         self.digest, self.why_no_digest = configuration.digest(
-            options.configuration, options.tcs_verify
-        )
+            options.configuration)
         # Where the CONNECT goes from and to, where the section says:
         # ``None`` for a section that states no command link.
         said = self.config.tcspecial

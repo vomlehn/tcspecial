@@ -3722,8 +3722,35 @@ it packed, and the one unpacking is tcsmoc's.</p>
 which tcsmoc-c's <tt class="docutils literal">tcs_gateway_receive</tt> hands on as it stands; the
 relay, <tt class="docutils literal"><span class="pre">tcsmoc::relay</span></tt>, <tt class="docutils literal">tcs_relay_open</tt> in tcsmoc-c and
 <tt class="docutils literal">python/tcsmoc/relay.py</tt>, which the Yamcs examples start; the
-relayed links and their APIDs in both spellings of the rule; and every
-input's source in the configuration's own XTCE.</p>
+relayed links and their APIDs; and every input's source in the
+configuration's own XTCE.</p>
+</dd>
+<dt>Requirement</dt>
+<dd>What the vehicle and the ground work out of a configuration rather than
+read in it -- each node's device id; every link to the ground, sent or
+relayed, with its ports or message ID, its APID and how a string or
+bytes on it is counted; every APID and message ID; each consolidation's
+layout -- is worked out in one place, <tt class="docutils literal"><span class="pre">tcsprotocol::graph::link_table</span></tt>,
+and nowhere else. A ground station not built on tcsprotocol reads it,
+as YAML, rather than working it out again: a second statement of a rule
+is a second answer on the day the first changes. The Python stations
+read it through libtcsmoc-c (<tt class="docutils literal">tcs_links_of_file</tt>), operational code,
+and not from <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--links</span></tt>, which prints the same text but is a
+software tool, which an operational station does not run.</dd>
+<dt>Requirement</dt>
+<dd><p class="first">The table's <strong>link digest</strong>, the MD5 of the table as YAML in one order
+and one spelling, is what lets two ends that read one configuration
+know they worked the same things out of it. The configuration digest
+says the file is the same; it cannot say that a vehicle and a ground
+station built from different versions of tcsprotocol counted its ports
+and APIDs, or laid out its consolidations, alike, and when they did not,
+packets would be read as another's and a consolidation's inputs at the
+wrong bits, without a word. So tcspecial puts its link digest in every
+beacon, and a ground station whose own differs says so and is not
+matched, as one whose configuration digest differs is not.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): the table and its digest, <tt class="docutils literal"><span class="pre">tcs-verify</span>
+<span class="pre">--links</span></tt>, <tt class="docutils literal">tcs_links_of_file</tt> and <tt class="docutils literal">tcs_digest_of_file</tt> in
+tcsmoc-c, and the Python reading both through them.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>A log that takes a consolidation keeps it packed, as it was sent, the

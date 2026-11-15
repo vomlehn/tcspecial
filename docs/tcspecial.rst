@@ -2741,9 +2741,10 @@ its device id. Each time is seconds since the UNIX epoch to the nanosecond:
 ``1760900000.000000001``. What a ping and its answer say is
 ``tcsprotocol::node::vehicle::ping``.
 
-The ground station is a Python 3 program, ``ping_gateway.py``, that uses nothing
-outside the standard library to read the XML spelling of its configuration --
-its window is tkinter -- and PyYAML to read the YAML one. A beacon is text and
+The ground station is a Python 3 program, ``ping_gateway.py``, that reads its
+configuration with the standard library and PyYAML -- its window is tkinter --
+and asks libtcsmoc-c where each link arrives and what the configuration's
+digest is. A beacon is text and
 needs nothing to read; the interface digest it is compared with is worked
 out with tcsxtce, tcs-xtce's runtime, which is taken from the tcs-xtce
 checkout beside this tree, ``../tcs-xtce``. It shows the beacon
@@ -3756,11 +3757,12 @@ its own, ``tcs-ui``, which needs the first:
 .. code-block:: console
 
    $ pip install ./python
-   $ pip install './python[yaml]'
    $ pip install ./tcs-ui/python
 
-The extra brings PyYAML, which a station reading a YAML configuration
-needs. ``tcs_ui`` needs tkinter, which pip cannot install: ``python3-tk`` on
+The first brings PyYAML, which reads a YAML configuration and the link
+table every station reads its ports and APIDs from, through libtcsmoc-c,
+which is installed with the ``tcsmoc`` package or built with ``cargo build
+-p tcsmoc-c``. ``tcs_ui`` needs tkinter, which pip cannot install: ``python3-tk`` on
 Debian, ``python3-tkinter`` on Fedora. The XTCE documents the interface
 digest is taken over, and the part of tcs-xtce that takes it, are inside
 ``tcsprotocol``, so an installed station needs nothing from the source tree.

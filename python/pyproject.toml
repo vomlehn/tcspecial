@@ -24,13 +24,10 @@ readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }
 authors = [{ name = "David VomLehn", email = "dvomlehn@gmail.com" }]
 requires-python = ">=3.9"
-# Nothing outside the standard library is needed to import either of them.
-# A YAML configuration is read with PyYAML, imported only when one is read,
-# so it is an extra rather than a requirement.
-dependencies = []
-
-[project.optional-dependencies]
-yaml = ["PyYAML"]
+# PyYAML reads a YAML configuration, and the link table libtcsmoc-c gives
+# for either spelling (tcsprotocol.library), which every station that asks
+# where its data arrives reads.
+dependencies = ["PyYAML"]
 
 [tool.setuptools]
 # Named rather than found: tcsprotocol._xtce is a directory of links, which

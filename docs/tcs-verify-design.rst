@@ -139,6 +139,15 @@ Requirement
     run, as a digest not given does.
 
 Requirement
+    ``--links``, with one configuration and nothing else, prints its link
+    table, ``tcsprotocol::graph::link_table``, as YAML after its link digest:
+    what the vehicle and the ground work out of it, for a ground station to
+    read rather than work out again. tcs-verify prints what tcsprotocol
+    writes and states none of it; libtcsmoc-c gives the same text
+    (``tcs_links_of_file``), which is what a ground station reads, since a
+    station is operational code and runs no software tool.
+
+Requirement
     No two sockets a configuration states or implies are one socket:
     one port of one protocol on one host, the names of this host being one
     host, or a port on every interface and the same port on this host.

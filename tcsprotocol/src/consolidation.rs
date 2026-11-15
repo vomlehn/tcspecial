@@ -170,6 +170,13 @@ impl Shape {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedField(Field);
 
+impl FixedField {
+    /// How many bits it is in the datum: its width, or one for a boolean.
+    pub fn bits(&self) -> usize {
+        self.0.datum_bits()
+    }
+}
+
 /// One input of a consolidator, as its datum lays it out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Input {

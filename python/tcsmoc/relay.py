@@ -17,15 +17,8 @@ configuration has no consolidator does not need it built.
 """
 
 import ctypes
-import ctypes.util
 
-from tcsprotocol.configuration import find_built
-
-#: The library's file in this tree's build.
-BUILT = "libtcsmoc_c.so"
-
-#: The library's name, where it is installed.
-INSTALLED = "tcsmoc-c"
+from tcsprotocol.library import last_error, library
 
 
 def gateways_to_relay(config):
@@ -39,37 +32,6 @@ def gateways_to_relay(config):
     """
     return [node.name for node in config.nodes
             if node.node_type == "gateway_yamcs" and config.relayed(node.name)]
-
-
-def library():
-    """Loads libtcsmoc-c: this tree's build first, then where it is
-    installed.
-
-    Returns:
-        The library, its functions given their types.
-
-    Raises:
-        OSError: It is not built or installed.
-    """
-    path = find_built(BUILT) or ctypes.util.find_library(INSTALLED)
-    if path is None:
-        raise OSError(
-            "a consolidator's inputs are relayed to Yamcs by libtcsmoc-c, "
-            "which is not built or installed: build it with "
-            "`cargo build -p tcsmoc-c`")
-    lib = ctypes.CDLL(path)
-    lib.tcs_last_error.restype = ctypes.c_char_p
-    lib.tcs_last_error.argtypes = []
-    lib.tcs_configuration_open.restype = ctypes.c_void_p
-    lib.tcs_configuration_open.argtypes = [ctypes.c_char_p]
-    lib.tcs_configuration_close.restype = None
-    lib.tcs_configuration_close.argtypes = [ctypes.c_void_p]
-    lib.tcs_relay_open.restype = ctypes.c_int
-    lib.tcs_relay_open.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
-                                   ctypes.POINTER(ctypes.c_void_p)]
-    lib.tcs_relay_close.restype = None
-    lib.tcs_relay_close.argtypes = [ctypes.c_void_p]
-    return lib
 
 
 class Relays:
@@ -126,7 +88,7 @@ class Relays:
         Returns:
             The reason, as text.
         """
-        return self._lib.tcs_last_error().decode(errors="replace")
+        return last_error(self._lib)
 
     def close(self):
         """Stops every relay, waiting for its thread to end."""

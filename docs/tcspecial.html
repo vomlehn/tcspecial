@@ -4162,7 +4162,8 @@ statistics is a spacecraft that cannot be rescued while it is busy. <tt class="d
 <tt class="docutils literal">QUERY_NODE_SAMPLE</tt> go to <tt class="docutils literal">payload_command.dest_base</tt>, one socket for
 every node, the node's id being in the command, and so does
 <tt class="docutils literal">QUERY_THREADS</tt>, which is about the vehicle's threads but asked at
-leisure.
+leisure, and <tt class="docutils literal">QUERY_CONSOLIDATOR</tt>, which asks what a consolidator has
+sent.
 <tt class="docutils literal">CONNECT</tt> goes to <tt class="docutils literal">tcs_cmd.recv</tt> with the rest of the spacecraft's own:
 it asks whether there is a connection to the vehicle at all, and a ground
 station without one has nothing to ask a payload. One table in the library
@@ -4450,10 +4451,22 @@ configurations yet.</p>
 how large a consolidation may grow has not answered it. It is at least 2,
 the fewest a consolidator has. 32 is suggested -- their states then take 64
 bits -- and more readings than that are better served by a second
-consolidator than by a larger one. A consolidator, the computation that sends
-several readings to the ground as one datum, is being built: see &quot;Compute
-elements&quot; in the design. Until it is, the setting is checked and limits
-nothing.</p>
+consolidator than by a larger one. A consolidator is the computation that
+sends several readings to the ground as one datum: see &quot;Compute elements&quot; in
+the design. One with more inputs than this is refused where the
+configuration is read; and tcspecial itself packs at most 256, so one with
+more than that, which only a setting above 256 lets through, is refused as
+tcspecial starts.</p>
+<p>What a consolidator has sent is asked with <tt class="docutils literal">QUERY_CONSOLIDATOR</tt>, on the
+node command link, naming it by its node id: the datums it has sent in all
+and those each trigger sent -- <tt class="docutils literal">all_new</tt>, <tt class="docutils literal">interval</tt> and <tt class="docutils literal">moc</tt>, a
+datum two triggers sent in one pass counting under both -- the readings it
+has refused for not being of their input's type, and, for each input, how
+many datums it went into held and how many none. How many it went into new
+is the datums sent less those two. One answer tells of up to 32 inputs and
+says how many there are; ask again from where it stopped for the rest.
+<tt class="docutils literal"><span class="pre">TcsClient::consolidator</span></tt> in tcsmoc reads them all. A node that is not a
+consolidator is answered <tt class="docutils literal">InvalidParameter</tt>.</p>
 </div>
 <div class="section" id="thread-stacks">
 <h2><a class="toc-backref" href="#toc-entry-68">Thread stacks</a></h2>
@@ -4668,7 +4681,7 @@ several vehicles is not supported.</p>
 for, and every configuration states it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2de4e4035e84c174e51c66b0c402e9ca&quot;</span>
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5684f9b97e87a4e3294258ba473c2e79&quot;</span>
 </pre>
 <p>It is the digest of the <tt class="docutils literal">tcsprotocol/xtce/link.xtce</tt> a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4680,7 +4693,7 @@ command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcs-verify --interface-digest
-2de4e4035e84c174e51c66b0c402e9ca
+5684f9b97e87a4e3294258ba473c2e79
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.</p>
@@ -4688,8 +4701,8 @@ sends, so a person with only a packet capture can read it there too.</p>
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-vehicle.ytcs: interface set to 2de4e4035e84c174e51c66b0c402e9ca, from 0123...
-vehicle.xtcs: interface is 2de4e4035e84c174e51c66b0c402e9ca already
+vehicle.ytcs: interface set to 5684f9b97e87a4e3294258ba473c2e79, from 0123...
+vehicle.xtcs: interface is 5684f9b97e87a4e3294258ba473c2e79 already
 </pre>
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

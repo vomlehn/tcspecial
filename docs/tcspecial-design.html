@@ -1884,7 +1884,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2de4e4035e84c174e51c66b0c402e9ca&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;5684f9b97e87a4e3294258ba473c2e79&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">
@@ -3790,12 +3790,26 @@ hold some of a pass's readings and not the rest. Once it is sent, every
 new input becomes held. Two triggers firing in one pass send one
 datum.</dd>
 <dt>Requirement</dt>
-<dd>A consolidator keeps counters of its own beside every node's, which
-<tt class="docutils literal">QUERY_NODE</tt> answers with: the datums it has sent, for each trigger;
-for each input, how many datums went with it held and how many with it
-none; and the booleans refused for being neither 0 nor 1. They cost the
-link nothing until the ground asks, and say, input by input, what cFS's
-housekeeping app's <tt class="docutils literal">MissingDataCtr</tt> says for a whole packet.</dd>
+<dd><p class="first">A consolidator keeps counters of its own beside every node's, which
+<tt class="docutils literal">QUERY_CONSOLIDATOR</tt> answers with: the datums it has sent, in all and
+for each trigger, a datum two triggers sent in one pass counting once
+in all and once under each; for each input, how many datums went with
+it held and how many with it none; and the readings refused for not
+being of their input's type, a boolean neither 0 nor 1 among them. They
+cost the link nothing until the ground asks, and say, input by input,
+what cFS's housekeeping app's <tt class="docutils literal">MissingDataCtr</tt> says for a whole
+packet.</p>
+<p class="last">A command of its own, and not more of <tt class="docutils literal">QUERY_NODE</tt>'s answer, for
+reliability first: a consolidator may have up to 256 inputs aboard, two
+counts each, which no answer of a fixed size holds, so they are read in
+turns from an input the command names, 32
+(<tt class="docutils literal"><span class="pre">consolidation::INPUTS_PER_ANSWER</span></tt>) to an answer, as
+<tt class="docutils literal">QUERY_THREADS</tt>'s threads are. <tt class="docutils literal">QUERY_NODE</tt> names no position to
+read from, and a field for one would be in every node's command for the
+sake of one kind; and its answer, the same size for every node, would
+otherwise grow for all of them. A node that is not a consolidator is
+answered <tt class="docutils literal">InvalidParameter</tt>, one that does not exist <tt class="docutils literal">NotFound</tt>.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>An input may be linked to a gateway as well as to a consolidator, as
 any source may have several links; the reading then crosses the link
@@ -3875,8 +3889,19 @@ ground may set. Each consolidator's layout is worked out once, with the
 routing (<tt class="docutils literal"><span class="pre">Routes::consolidation_of</span></tt>). <tt class="docutils literal"><span class="pre">runtime::system</span></tt>'s tests drive
 one through passes -- every input new, nothing new, the interval with one
 new and one held, a boolean refused -- and hold a running one to allocating
-nothing; tcs-gui describes it. Not yet: its counters, which <tt class="docutils literal">QUERY_NODE</tt>
-is to answer with, a change to the link.</p>
+nothing; tcs-gui describes it.</p>
+<p><strong>Built</strong> (2026-11-15), the counters: <tt class="docutils literal">QUERY_CONSOLIDATOR</tt>, opcode
+<tt class="docutils literal">0x36</tt> on the node link (<tt class="docutils literal"><span class="pre">commands::ConsolidatorCommand</span></tt>,
+<tt class="docutils literal"><span class="pre">telemetry::QueryConsolidatorTelemetry</span></tt>, the counts in
+<tt class="docutils literal"><span class="pre">consolidation::ConsolidatorCounts</span></tt> and <tt class="docutils literal"><span class="pre">consolidation::InputCounts</span></tt>),
+which changes the interface digest and so every configuration's
+<tt class="docutils literal">interface</tt>. The port counts as it sends, in atomics
+(<tt class="docutils literal"><span class="pre">runtime::node_state::ConsolidatorCounters</span></tt>) that it hands its node's
+state as it opens (<tt class="docutils literal"><span class="pre">Port::consolidator_counters</span></tt>), and the command
+interpreter reads them there, waiting for no pass and allocating nothing.
+<tt class="docutils literal"><span class="pre">tcsmoc::TcsClient::query_consolidator</span></tt> asks for one answer and
+<tt class="docutils literal">consolidator</tt> for every input. Not yet: the C/C++ library, the Python
+spelling, tcs-moc and the F´ bridge, which are step 3's.</p>
 </div>
 <div class="section" id="app-nodes">
 <h2><a class="toc-backref" href="#toc-entry-34">App nodes</a></h2>
@@ -4499,6 +4524,11 @@ would be asking twice every time.</dd>
 <dt><tt class="docutils literal">QUERY_NODE_SAMPLE</tt></dt>
 <dd>The last datum that node moved each way, for an operator who wants to see
 the bytes rather than a count of them.</dd>
+<dt><tt class="docutils literal">QUERY_CONSOLIDATOR</tt></dt>
+<dd>What a consolidator has sent, by trigger, the readings it has refused,
+and how often each of its inputs went into a datum held or none, from
+the input the command names: see <a class="reference internal" href="#compute-elements">Compute elements</a>. On the node link,
+as <tt class="docutils literal">QUERY_NODE</tt> is.</dd>
 <dt><tt class="docutils literal">QUERY_THREADS</tt></dt>
 <dd>What tcspecial's threads are for -- each node's, each payload's link to
 the ground, and its own -- the stack each was given and how deep each
@@ -9087,8 +9117,9 @@ drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
 are PING, CONNECT, RESTART_ARM and RESTART; the per-node ones are
-START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE; and
-QUERY_THREADS asks of the vehicle's threads, on the node link.</p>
+START_NODE, STOP_NODE, SET_NODE, QUERY_NODE, QUERY_NODE_SAMPLE and
+QUERY_CONSOLIDATOR; and QUERY_THREADS asks of the vehicle's threads, on the
+node link.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>An operation that is not answered within the client's timeout is an error.

@@ -48,6 +48,9 @@ pub enum CommandType {
     /// What tcspecial's threads are for and how deep each has been into
     /// its stack: see [`crate::threads`].
     QueryThreads,
+    /// What a consolidator has sent, and how often each of its inputs went
+    /// in held or none: see [`crate::consolidation::ConsolidatorCounts`].
+    QueryConsolidator,
 }
 
 /// Which of the command interpreter's two links a command belongs on.
@@ -116,7 +119,8 @@ impl CommandType {
             | CommandType::QueryNodeSample
             // About the vehicle, not a payload, but asked at leisure, and
             // nothing that cannot wait should wait behind it.
-            | CommandType::QueryThreads => CommandLink::Payload,
+            | CommandType::QueryThreads
+            | CommandType::QueryConsolidator => CommandLink::Payload,
         }
     }
 
@@ -156,7 +160,8 @@ impl CommandType {
             | CommandType::SetNode
             | CommandType::QueryNode
             | CommandType::QueryNodeSample
-            | CommandType::QueryThreads => false,
+            | CommandType::QueryThreads
+            | CommandType::QueryConsolidator => false,
         }
     }
 
@@ -200,7 +205,8 @@ impl CommandType {
             | CommandType::SetNode
             | CommandType::QueryNode
             | CommandType::QueryNodeSample
-            | CommandType::QueryThreads => false,
+            | CommandType::QueryThreads
+            | CommandType::QueryConsolidator => false,
         }
     }
 
@@ -227,6 +233,7 @@ impl CommandType {
             CommandType::QueryNode => 0x33,
             CommandType::QueryNodeSample => 0x34,
             CommandType::QueryThreads => 0x35,
+            CommandType::QueryConsolidator => 0x36,
         }
     }
 
@@ -252,6 +259,7 @@ impl CommandType {
             0x33 => Some(CommandType::QueryNode),
             0x34 => Some(CommandType::QueryNodeSample),
             0x35 => Some(CommandType::QueryThreads),
+            0x36 => Some(CommandType::QueryConsolidator),
             _ => None,
         }
     }
@@ -450,6 +458,51 @@ impl ThreadsCommand {
                 sequence,
                 cmd_type: CommandType::QueryThreads,
             },
+            first,
+        }
+    }
+}
+
+/// QUERY_CONSOLIDATOR: what a consolidator has sent, by trigger, and how
+/// often each of its inputs, from the `first`, went into a datum held or
+/// none.
+///
+/// One answer tells of up to [`crate::consolidation::INPUTS_PER_ANSWER`]
+/// inputs and says how many there are in all, so a consolidator with more is
+/// read by asking again from where the last answer stopped, as
+/// [`ThreadsCommand`]'s threads are. A command of its own and not a part of
+/// QUERY_NODE's answer, so that every other node's answer stays the size it
+/// is and a node's counters are read in one answer, as they always have
+/// been. Asking changes nothing aboard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConsolidatorCommand {
+    pub header: CommandHeader,
+    /// The consolidator, by its node id.
+    pub node: NodeId,
+    /// The position of the first input to tell of, in the order of its
+    /// `world-in`.
+    pub first: u32,
+}
+
+impl ConsolidatorCommand {
+    /// Asks of a consolidator's counters, with its inputs' from the `first`.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The command's sequence number.
+    /// * `node`     - The consolidator.
+    /// * `first`    - The position of the first input to tell of.
+    ///
+    /// # Returns
+    ///
+    /// The command.
+    pub fn new(sequence: u32, node: NodeId, first: u32) -> Self {
+        Self {
+            header: CommandHeader {
+                sequence,
+                cmd_type: CommandType::QueryConsolidator,
+            },
+            node,
             first,
         }
     }
@@ -769,6 +822,7 @@ pub enum Command {
     QueryNode(NodeCommand),
     QueryNodeSample(NodeCommand),
     QueryThreads(ThreadsCommand),
+    QueryConsolidator(ConsolidatorCommand),
 }
 
 impl Command {
@@ -789,6 +843,7 @@ impl Command {
             | Command::QueryNodeSample(cmd) => cmd.header.sequence,
             Command::SetNode(cmd) => cmd.header.sequence,
             Command::QueryThreads(cmd) => cmd.header.sequence,
+            Command::QueryConsolidator(cmd) => cmd.header.sequence,
         }
     }
 
@@ -806,6 +861,7 @@ impl Command {
             | Command::QueryNode(cmd)
             | Command::QueryNodeSample(cmd) => Some(cmd.node),
             Command::SetNode(cmd) => Some(cmd.node),
+            Command::QueryConsolidator(cmd) => Some(cmd.node),
             Command::Ping(_)
             | Command::Connect(_)
             | Command::RestartArm(_)
@@ -836,6 +892,7 @@ impl Command {
             | Command::QueryNodeSample(cmd) => cmd.header.cmd_type,
             Command::SetNode(cmd) => cmd.header.cmd_type,
             Command::QueryThreads(cmd) => cmd.header.cmd_type,
+            Command::QueryConsolidator(cmd) => cmd.header.cmd_type,
         }
     }
 }
@@ -960,8 +1017,10 @@ mod tests {
             CommandType::SetNode,
             CommandType::QueryNode,
             CommandType::QueryNodeSample,
-            // And the vehicle's threads, asked at leisure too.
+            // And the vehicle's threads and a consolidator's counters,
+            // asked at leisure too.
             CommandType::QueryThreads,
+            CommandType::QueryConsolidator,
         ];
 
         for kind in spacecraft {

@@ -15,12 +15,14 @@
 //! held. An `interval` that comes round with nothing new sends nothing; a
 //! datum asked for at `moc-in` is always sent.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tcsprotocol::consolidation::{Layout, Shape, State};
 use tcsprotocol::node::vehicle::compute::{ConsolidatorParams, Triggers};
 
 use crate::runtime::fabric::{Arriving, Port, Taken};
+use crate::runtime::node_state::ConsolidatorCounters;
 
 /// One input's latest reading.
 struct Held {
@@ -49,8 +51,9 @@ pub struct ConsolidatorPort {
     held: Vec<Held>,
     /// Whether something has arrived at its `moc-in` since the last datum.
     asked: bool,
-    /// Readings refused for not being of their input's type.
-    refused: u64,
+    /// What it has sent and refused, which its node's state shares for
+    /// QUERY_CONSOLIDATOR.
+    counters: Arc<ConsolidatorCounters>,
 }
 
 impl ConsolidatorPort {
@@ -84,6 +87,7 @@ impl ConsolidatorPort {
                 layout.inputs.len()
             ));
         }
+        let counters = Arc::new(ConsolidatorCounters::new(layout.inputs.len()));
         let held = layout
             .inputs
             .iter()
@@ -107,17 +111,16 @@ impl ConsolidatorPort {
             due: params.interval.map(|every| now + every),
             held,
             asked: false,
-            refused: 0,
+            counters,
         })
     }
 
-    /// How many readings have been refused for not being of their input's
-    /// type.
-    pub fn refused(&self) -> u64 {
-        self.refused
+    /// What it has sent and refused.
+    pub fn counters(&self) -> &ConsolidatorCounters {
+        &self.counters
     }
 
-    /// Says whether a trigger has fired, and moves the interval on where it
+    /// Says which triggers have fired, and moves the interval on where it
     /// has come round.
     ///
     /// # Arguments
@@ -126,12 +129,15 @@ impl ConsolidatorPort {
     ///
     /// # Returns
     ///
-    /// Whether to send a datum.
-    fn fires(&mut self, now: Instant) -> bool {
+    /// The triggers that fired: a datum is sent where any did.
+    fn fires(&mut self, now: Instant) -> Triggers {
         let any_new = self.held.iter().any(|held| held.state == State::New);
         let all_new = self.held.iter().all(|held| held.state == State::New);
-        let mut fires =
-            (self.send.moc && self.asked) || (self.send.all_new && all_new);
+        let mut fired = Triggers {
+            all_new: self.send.all_new && all_new,
+            interval: false,
+            moc: self.send.moc && self.asked,
+        };
         if let (Some(every), Some(due)) = (self.interval, self.due) {
             if now >= due {
                 // From when it was due, so that it does not drift; one so
@@ -139,10 +145,10 @@ impl ConsolidatorPort {
                 // interval from now.
                 let next = due + every;
                 self.due = Some(if next <= now { now + every } else { next });
-                fires |= self.send.interval && any_new;
+                fired.interval = self.send.interval && any_new;
             }
         }
-        fires
+        fired
     }
 }
 
@@ -171,7 +177,7 @@ impl Port for ConsolidatorPort {
             ));
         };
         if !self.layout.accepts(at, data) {
-            self.refused += 1;
+            self.counters.refused();
             return Err(format!(
                 "\"{}\": what arrived at \"{name}\" is not of its type, {}, \
                  and the reading held before it stands",
@@ -225,7 +231,8 @@ impl Port for ConsolidatorPort {
         now: Instant,
         out: &mut [u8],
     ) -> Result<usize, String> {
-        if !self.fires(now) {
+        let fired = self.fires(now);
+        if !(fired.all_new || fired.interval || fired.moc) {
             return Ok(0);
         }
         // Each input's state and reading, on the stack: at most as many as
@@ -244,6 +251,8 @@ impl Port for ConsolidatorPort {
                     self.what, self.layout.inputs[at].name
                 )
             })?;
+        self.counters
+            .sent(fired, self.held.iter().map(|held| held.state));
         for held in &mut self.held {
             if held.state == State::New {
                 held.state = State::Held;
@@ -256,6 +265,11 @@ impl Port for ConsolidatorPort {
     /// When its interval next comes round, so that a pass is made then.
     fn due(&self) -> Option<Instant> {
         self.due
+    }
+
+    /// Its counters, for its node's state to share.
+    fn consolidator_counters(&self) -> Option<Arc<ConsolidatorCounters>> {
+        Some(Arc::clone(&self.counters))
     }
 }
 

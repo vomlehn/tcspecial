@@ -1390,7 +1390,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "2de4e4035e84c174e51c66b0c402e9ca"
+     interface: "5684f9b97e87a4e3294258ba473c2e79"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -3376,11 +3376,25 @@ Requirement
 
 Requirement
     A consolidator keeps counters of its own beside every node's, which
-    ``QUERY_NODE`` answers with: the datums it has sent, for each trigger;
-    for each input, how many datums went with it held and how many with it
-    none; and the booleans refused for being neither 0 nor 1. They cost the
-    link nothing until the ground asks, and say, input by input, what cFS's
-    housekeeping app's ``MissingDataCtr`` says for a whole packet.
+    ``QUERY_CONSOLIDATOR`` answers with: the datums it has sent, in all and
+    for each trigger, a datum two triggers sent in one pass counting once
+    in all and once under each; for each input, how many datums went with
+    it held and how many with it none; and the readings refused for not
+    being of their input's type, a boolean neither 0 nor 1 among them. They
+    cost the link nothing until the ground asks, and say, input by input,
+    what cFS's housekeeping app's ``MissingDataCtr`` says for a whole
+    packet.
+
+    A command of its own, and not more of ``QUERY_NODE``'s answer, for
+    reliability first: a consolidator may have up to 256 inputs aboard, two
+    counts each, which no answer of a fixed size holds, so they are read in
+    turns from an input the command names, 32
+    (``consolidation::INPUTS_PER_ANSWER``) to an answer, as
+    ``QUERY_THREADS``'s threads are. ``QUERY_NODE`` names no position to
+    read from, and a field for one would be in every node's command for the
+    sake of one kind; and its answer, the same size for every node, would
+    otherwise grow for all of them. A node that is not a consolidator is
+    answered ``InvalidParameter``, one that does not exist ``NotFound``.
 
 Requirement
     An input may be linked to a gateway as well as to a consolidator, as
@@ -3464,8 +3478,20 @@ ground may set. Each consolidator's layout is worked out once, with the
 routing (``Routes::consolidation_of``). ``runtime::system``'s tests drive
 one through passes -- every input new, nothing new, the interval with one
 new and one held, a boolean refused -- and hold a running one to allocating
-nothing; tcs-gui describes it. Not yet: its counters, which ``QUERY_NODE``
-is to answer with, a change to the link.
+nothing; tcs-gui describes it.
+
+**Built** (2026-11-15), the counters: ``QUERY_CONSOLIDATOR``, opcode
+``0x36`` on the node link (``commands::ConsolidatorCommand``,
+``telemetry::QueryConsolidatorTelemetry``, the counts in
+``consolidation::ConsolidatorCounts`` and ``consolidation::InputCounts``),
+which changes the interface digest and so every configuration's
+``interface``. The port counts as it sends, in atomics
+(``runtime::node_state::ConsolidatorCounters``) that it hands its node's
+state as it opens (``Port::consolidator_counters``), and the command
+interpreter reads them there, waiting for no pass and allocating nothing.
+``tcsmoc::TcsClient::query_consolidator`` asks for one answer and
+``consolidator`` for every input. Not yet: the C/C++ library, the Python
+spelling, tcs-moc and the F´ bridge, which are step 3's.
 
 App nodes
 ---------
@@ -4154,6 +4180,12 @@ both ends read; what follows is what a vehicle made of nodes does with each.
 ``QUERY_NODE_SAMPLE``
     The last datum that node moved each way, for an operator who wants to see
     the bytes rather than a count of them.
+
+``QUERY_CONSOLIDATOR``
+    What a consolidator has sent, by trigger, the readings it has refused,
+    and how often each of its inputs went into a datum held or none, from
+    the input the command names: see `Compute elements`_. On the node link,
+    as ``QUERY_NODE`` is.
 
 ``QUERY_THREADS``
     What tcspecial's threads are for -- each node's, each payload's link to
@@ -8769,8 +8801,9 @@ drives one of those rather than speaking the command and telemetry protocol
 itself: each operation sends its command, waits for the answering telemetry,
 and hands back what that telemetry carried. The spacecraft's own operations
 are PING, CONNECT, RESTART_ARM and RESTART; the per-node ones are
-START_NODE, STOP_NODE, SET_NODE, QUERY_NODE and QUERY_NODE_SAMPLE; and
-QUERY_THREADS asks of the vehicle's threads, on the node link.
+START_NODE, STOP_NODE, SET_NODE, QUERY_NODE, QUERY_NODE_SAMPLE and
+QUERY_CONSOLIDATOR; and QUERY_THREADS asks of the vehicle's threads, on the
+node link.
 
 Requirement
     An operation that is not answered within the client's timeout is an error.

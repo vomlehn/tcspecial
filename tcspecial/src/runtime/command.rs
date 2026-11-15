@@ -1217,6 +1217,41 @@ impl Serving {
                 Telemetry::QueryThreads(answer.tell(total, told))
             }
 
+            // A consolidator's counters, which its port writes as atomics
+            // in the pass, read into the answer itself: as the queries
+            // above, nothing waits for a pass and nothing is allocated. A
+            // node that is not a consolidator has none, and is refused
+            // InvalidParameter, so that the operator is told the node is
+            // there and is the wrong kind.
+            Command::QueryConsolidator(cmd) => {
+                let answer = |status| {
+                    tcsprotocol::QueryConsolidatorTelemetry::new(
+                        sequence, status, cmd.node, cmd.first,
+                    )
+                };
+                let Some(state) = self.states.at(cmd.node) else {
+                    self.no_such_node(cmd.node);
+                    return Telemetry::QueryConsolidator(answer(
+                        CommandStatus::NotFound,
+                    ));
+                };
+                let Some(counters) = state.consolidator() else {
+                    warn!(
+                        "QUERY_CONSOLIDATOR named \"{}\", which is not a \
+                         consolidator: refused",
+                        state.name()
+                    );
+                    return Telemetry::QueryConsolidator(answer(
+                        CommandStatus::InvalidParameter,
+                    ));
+                };
+                let mut answer = answer(CommandStatus::Success);
+                answer.counts = counters.counts();
+                let (total, told) =
+                    counters.inputs(cmd.first as usize, &mut answer.inputs);
+                Telemetry::QueryConsolidator(answer.tell(total, told))
+            }
+
             // Armed for the next restart_arm_valid, with this key, onto this
             // target, which the vehicle must hold: one it does not is
             // refused NotFound and arms nothing, so that an arm cannot stand
@@ -2209,6 +2244,101 @@ vehicle:
             Some(&Work::Enable("inside".into())),
             "opening a node is the pass's work, and the flag goes up with it"
         );
+    }
+
+    /// A consolidator's counts are answered from the counters its port
+    /// shares, its inputs' from the one asked for; a node that is not a
+    /// consolidator is refused, and an id the configuration has not got is
+    /// not found.
+    #[test]
+    fn a_consolidators_counters_are_answered_from_its_port() {
+        use crate::runtime::node_state::ConsolidatorCounters;
+        use tcsprotocol::consolidation::{InputCounts, State};
+        use tcsprotocol::node::vehicle::compute::Triggers;
+        use tcsprotocol::ConsolidatorCommand;
+
+        let graph = two_nodes();
+        let states = Arc::new(NodeStates::of(&graph).expect("states"));
+        let ids = tcsprotocol::graph::telemetry::ids(&graph);
+        let average = NodeId::of(ids["average"]);
+        let inside = NodeId::of(ids["inside"]);
+
+        // Three inputs; two datums sent, the first with the interval and
+        // the ground both firing and the last input not yet arrived, the
+        // second with every input new.
+        let counters = Arc::new(ConsolidatorCounters::new(3));
+        counters.sent(
+            Triggers {
+                all_new: false,
+                interval: true,
+                moc: true,
+            },
+            [State::New, State::Held, State::None].into_iter(),
+        );
+        counters.sent(
+            Triggers {
+                all_new: true,
+                interval: false,
+                moc: false,
+            },
+            [State::New; 3].into_iter(),
+        );
+        counters.refused();
+        states
+            .named("average")
+            .expect("a state")
+            .consolidates(counters);
+
+        let (ground, commands) = started(states);
+        let at = commands.node_address();
+        let query = |sequence, node, first| match ask(
+            &ground,
+            at,
+            &Command::QueryConsolidator(ConsolidatorCommand::new(
+                sequence, node, first,
+            )),
+        ) {
+            Some(Telemetry::QueryConsolidator(tm)) => tm,
+            other => panic!("expected its answer, got {other:?}"),
+        };
+
+        let tm = query(1, average, 0);
+        assert_eq!(tm.header.status, CommandStatus::Success);
+        assert_eq!(tm.node, average);
+        assert_eq!(
+            (
+                tm.counts.sent,
+                tm.counts.sent_all_new,
+                tm.counts.sent_interval,
+                tm.counts.sent_moc,
+                tm.counts.refused
+            ),
+            (2, 1, 1, 1, 1),
+            "a datum two triggers sent counts once, and under each"
+        );
+        assert_eq!((tm.first, tm.total), (0, 3));
+        assert_eq!(
+            tm.told(),
+            [
+                InputCounts { held: 0, none: 0 },
+                InputCounts { held: 1, none: 0 },
+                InputCounts { held: 0, none: 1 },
+            ]
+        );
+
+        // From the last input, and from past it.
+        let tm = query(2, average, 2);
+        assert_eq!(tm.told(), [InputCounts { held: 0, none: 1 }]);
+        let tm = query(3, average, 3);
+        assert_eq!(tm.header.status, CommandStatus::Success);
+        assert!(tm.told().is_empty(), "{tm:?}");
+        assert_eq!(tm.total, 3, "and how many there are, still");
+
+        let tm = query(4, inside, 0);
+        assert_eq!(tm.header.status, CommandStatus::InvalidParameter);
+        assert_eq!(tm.counts, Default::default(), "and nothing counted");
+        let tm = query(5, NodeId::of(ids.len() + 4), 0);
+        assert_eq!(tm.header.status, CommandStatus::NotFound);
     }
 
     /// A ping node is neither stopped nor started: both are answered with a

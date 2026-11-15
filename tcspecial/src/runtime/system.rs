@@ -444,6 +444,13 @@ impl System {
                     if node.node_type == "log" {
                         logs.push(node.name.clone());
                     }
+                    // A consolidator's counters, which the command
+                    // interpreter reads through the node's state.
+                    if let (Some(counters), Some(state)) =
+                        (port.consolidator_counters(), states.named(&node.name))
+                    {
+                        state.consolidates(counters);
+                    }
                     fabric.hold(&node.name, port);
                 }
                 Err(why) => refused.push(why),
@@ -1835,6 +1842,38 @@ vehicle:
         system.pass(start + Duration::from_millis(200));
         // 10 01, 0x0006, 1 -> 1001 0000 0000 0000 0110 1 -> 90 00 68.
         assert_eq!(sent(), vec![vec![0x90, 0x00, 0x68]]);
+
+        // And its node's state has what its port counted, for
+        // QUERY_CONSOLIDATOR: three datums, the first with every input
+        // new and the other two at the interval, the valve held in both,
+        // and the one boolean refused.
+        let states = system.states();
+        let counters = states
+            .named("pack")
+            .and_then(|state| state.consolidator())
+            .expect("the port's counters, given its node's state");
+        let counts = counters.counts();
+        assert_eq!(
+            (
+                counts.sent,
+                counts.sent_all_new,
+                counts.sent_interval,
+                counts.sent_moc,
+                counts.refused
+            ),
+            (3, 1, 2, 0, 1)
+        );
+        let mut inputs = [Default::default(); 2];
+        assert_eq!(counters.inputs(0, &mut inputs), (2, 2));
+        use tcsprotocol::consolidation::InputCounts;
+        assert_eq!(
+            inputs,
+            [
+                InputCounts { held: 0, none: 0 },
+                InputCounts { held: 2, none: 0 },
+            ],
+            "temp, then valve"
+        );
     }
 
     /// A consolidator's passes allocate nothing once the vehicle is

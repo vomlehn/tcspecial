@@ -4342,7 +4342,7 @@ pub fn thermostat_example() -> Document {
     // telemetry log is written, and what it answers to.
     for (attribute, value) in [
         ("gateway", "radio"),
-        ("interface", "2de4e4035e84c174e51c66b0c402e9ca"),
+        ("interface", "5684f9b97e87a4e3294258ba473c2e79"),
         ("tcs_cmd.recv", "0.0.0.0:4000"),
         ("tcs_cmd.send", "127.0.0.1:4100"),
         ("payload_command.source_base", "127.0.0.1:4300"),
@@ -4813,7 +4813,7 @@ mod tests {
     fn a_finished_tcspecial_section_is_checked_by_its_own_rules() {
         let whole = [
             ("gateway", "radio"),
-            ("interface", "2de4e4035e84c174e51c66b0c402e9ca"),
+            ("interface", "5684f9b97e87a4e3294258ba473c2e79"),
             ("tcs_cmd.recv", "0.0.0.0:4000"),
             ("tcs_cmd.send", "127.0.0.1:4100"),
             ("payload_command.source_base", "127.0.0.1:4300"),

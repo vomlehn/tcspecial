@@ -8,6 +8,9 @@
 //! `xtce/beacon.xtce`, is in [`crate::beacon`].
 
 use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::consolidation::{
+    ConsolidatorCounts, InputCounts, INPUTS_PER_ANSWER,
+};
 use crate::threads::{ProcessMemory, ThreadStack, THREADS_PER_ANSWER};
 use crate::types::{CommandStatus, DHSample, NodeCounts, NodeId, Timestamp};
 
@@ -83,6 +86,8 @@ pub enum TelemetryType {
     QueryNodeSample,
     /// And to a QUERY_THREADS: see [`QueryThreadsTelemetry`].
     QueryThreads,
+    /// And to a QUERY_CONSOLIDATOR: see [`QueryConsolidatorTelemetry`].
+    QueryConsolidator,
 }
 
 impl TelemetryType {
@@ -104,6 +109,7 @@ impl TelemetryType {
             TelemetryType::QueryNode => CommandType::QueryNode,
             TelemetryType::QueryNodeSample => CommandType::QueryNodeSample,
             TelemetryType::QueryThreads => CommandType::QueryThreads,
+            TelemetryType::QueryConsolidator => CommandType::QueryConsolidator,
         }
     }
 
@@ -142,6 +148,7 @@ impl TelemetryType {
             CommandType::QueryNode => TelemetryType::QueryNode,
             CommandType::QueryNodeSample => TelemetryType::QueryNodeSample,
             CommandType::QueryThreads => TelemetryType::QueryThreads,
+            CommandType::QueryConsolidator => TelemetryType::QueryConsolidator,
         })
     }
 }
@@ -685,6 +692,91 @@ impl QueryThreadsTelemetry {
     }
 }
 
+/// The answer to a QUERY_CONSOLIDATOR: what that consolidator has sent, by
+/// trigger, and how often each of its inputs, from the one the command
+/// asked for, went into a datum held or none.
+///
+/// Up to [`INPUTS_PER_ANSWER`] inputs, and how many there are in all, read
+/// in turns as [`QueryThreadsTelemetry`]'s threads are; a `first` at or past
+/// the last is answered with none. A node that is not a consolidator is
+/// refused, `InvalidParameter`, with nothing counted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QueryConsolidatorTelemetry {
+    pub header: TelemetryHeader,
+    /// The node the command named.
+    pub node: NodeId,
+    /// What it has sent since the vehicle started.
+    pub counts: ConsolidatorCounts,
+    /// The position of the first input told of, in the order of its
+    /// `world-in`.
+    pub first: u32,
+    /// How many inputs it has in all.
+    pub total: u32,
+    /// How many of `inputs` are told of, from its start.
+    pub told: u8,
+    /// The inputs' counts, of which the first `told` mean anything.
+    pub inputs: [InputCounts; INPUTS_PER_ANSWER],
+}
+
+impl QueryConsolidatorTelemetry {
+    /// Makes the answer to a QUERY_CONSOLIDATOR, made now, with nothing
+    /// counted and telling of no input yet: see
+    /// [`QueryConsolidatorTelemetry::tell`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `status`   - How the command went.
+    /// * `node`     - The node the command named.
+    /// * `first`    - The position of the first input it tells of.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    pub fn new(
+        sequence: u32,
+        status: CommandStatus,
+        node: NodeId,
+        first: u32,
+    ) -> Self {
+        Self {
+            header: TelemetryHeader::new(
+                sequence,
+                TelemetryType::QueryConsolidator,
+                status,
+            ),
+            node,
+            counts: ConsolidatorCounts::default(),
+            first,
+            total: 0,
+            told: 0,
+            inputs: [InputCounts::default(); INPUTS_PER_ANSWER],
+        }
+    }
+
+    /// Has it tell of `told` inputs of `total`, which are already in
+    /// [`QueryConsolidatorTelemetry::inputs`].
+    ///
+    /// # Arguments
+    ///
+    /// * `total` - How many inputs the consolidator has.
+    /// * `told`  - How many it tells of: at most [`INPUTS_PER_ANSWER`].
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    pub fn tell(mut self, total: usize, told: usize) -> Self {
+        self.total = u32::try_from(total).unwrap_or(u32::MAX);
+        self.told = told.min(INPUTS_PER_ANSWER) as u8;
+        self
+    }
+
+    /// The inputs it tells of.
+    pub fn told(&self) -> &[InputCounts] {
+        &self.inputs[..usize::from(self.told)]
+    }
+}
+
 /// Makes an answer of this status to a command of that kind.
 ///
 /// The telemetry type has to match the command, because that is how the ground
@@ -763,6 +855,11 @@ pub fn answer_to(
         Command::QueryThreads(cmd) => Telemetry::QueryThreads(
             QueryThreadsTelemetry::new(sequence, status, cmd.first),
         ),
+        Command::QueryConsolidator(cmd) => {
+            Telemetry::QueryConsolidator(QueryConsolidatorTelemetry::new(
+                sequence, status, cmd.node, cmd.first,
+            ))
+        }
     }
 }
 
@@ -784,6 +881,7 @@ pub enum Telemetry {
     QueryNode(QueryNodeTelemetry),
     QueryNodeSample(QueryNodeSampleTelemetry),
     QueryThreads(QueryThreadsTelemetry),
+    QueryConsolidator(QueryConsolidatorTelemetry),
 }
 
 impl Telemetry {
@@ -803,6 +901,7 @@ impl Telemetry {
             Telemetry::QueryNode(tm) => &tm.header,
             Telemetry::QueryNodeSample(tm) => &tm.header,
             Telemetry::QueryThreads(tm) => &tm.header,
+            Telemetry::QueryConsolidator(tm) => &tm.header,
         }
     }
 
@@ -824,6 +923,7 @@ impl Telemetry {
             Telemetry::QueryNode(tm) => &mut tm.header,
             Telemetry::QueryNodeSample(tm) => &mut tm.header,
             Telemetry::QueryThreads(tm) => &mut tm.header,
+            Telemetry::QueryConsolidator(tm) => &mut tm.header,
         }
     }
 
@@ -1005,6 +1105,12 @@ mod tests {
             Telemetry::QueryThreads(QueryThreadsTelemetry::new(
                 16,
                 CommandStatus::Success,
+                0,
+            )),
+            Telemetry::QueryConsolidator(QueryConsolidatorTelemetry::new(
+                17,
+                CommandStatus::Success,
+                NodeId::of(2),
                 0,
             )),
         ];

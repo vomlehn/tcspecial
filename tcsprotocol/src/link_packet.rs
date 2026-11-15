@@ -129,6 +129,15 @@ pub struct ThreadType {
     pub deepest_bytes: u32,
 }
 
+/// Aggregate `/TcsLink/InputCountsType`; its members are encoded in this order.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct InputCountsType {
+    /// `TimesHeld` (/TcsLink/U64Type)
+    pub times_held: u64,
+    /// `TimesNone` (/TcsLink/U64Type)
+    pub times_none: u64,
+}
+
 /// The functions the application supplies for the document's custom
 /// algorithms: set them before decoding or encoding a packet that needs
 /// them, or it fails with `NoAlgorithm`.
@@ -1499,6 +1508,291 @@ impl fmt::Display for QueryThreadsAnswer {
     }
 }
 
+/// Sequence container `/TcsLink/QueryConsolidatorAnswer`.
+///
+/// Fixed by its inheritance: `Opcode` = 54.
+///
+/// `InputsTold` gives the size of `Inputs`: computed from its length when
+/// encoding.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct QueryConsolidatorAnswer {
+    /// `/TcsLink/Sequence` (/TcsLink/U32Type)
+    pub sequence: u32,
+    /// `/TcsLink/Status` (/TcsLink/StatusType)
+    pub status: StatusType,
+    /// `/TcsLink/Timestamp` (/TcsLink/U64Type)
+    pub timestamp: u64,
+    /// `/TcsLink/Node` (/TcsLink/U32Type)
+    pub node: u32,
+    /// `/TcsLink/Sent` (/TcsLink/U64Type)
+    pub sent: u64,
+    /// `/TcsLink/SentAllNew` (/TcsLink/U64Type)
+    pub sent_all_new: u64,
+    /// `/TcsLink/SentInterval` (/TcsLink/U64Type)
+    pub sent_interval: u64,
+    /// `/TcsLink/SentMoc` (/TcsLink/U64Type)
+    pub sent_moc: u64,
+    /// `/TcsLink/Refused` (/TcsLink/U64Type)
+    pub refused: u64,
+    /// `/TcsLink/FirstInput` (/TcsLink/U32Type)
+    pub first_input: u32,
+    /// `/TcsLink/InputTotal` (/TcsLink/U32Type)
+    pub input_total: u32,
+    /// `/TcsLink/Inputs` (/TcsLink/InputsCountsType)
+    pub inputs: pk::FixedVec<InputCountsType, 32>,
+}
+
+impl QueryConsolidatorAnswer {
+    /// The number of fields with an alarm.
+    pub const ALARMS: usize = 0;
+
+    /// Evaluates the alarms of this `/TcsLink/QueryConsolidatorAnswer` packet's
+    /// fields. Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn alarms(&self) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// Evaluates the alarms of this `/TcsLink/QueryConsolidatorAnswer` packet's
+    /// fields like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// The number of MathAlgorithms this packet triggers.
+    pub const ALGORITHMS: usize = 0;
+
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryConsolidatorAnswer`
+    /// packet triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
+    pub fn algorithms(&self) -> pk::Outputs<0> {
+        let mut o = pk::Outputs::new();
+        o
+    }
+}
+
+impl Packet for QueryConsolidatorAnswer {
+    const NAME: &'static str = "/TcsLink/QueryConsolidatorAnswer";
+    const MAX_BYTES: usize = 579;
+
+    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        let mut r = BitReader::new(data);
+        let v1 = r.uint_order(8, false, "Opcode")? as u8;
+        let v2 = r.uint_order(32, false, "Sequence")? as u32;
+        let v3 = StatusType(r.uint_order(8, false, "Status")? as i64);
+        let v4 = r.uint_order(64, false, "Timestamp")? as u64;
+        if !((v1 as i128) == 54) {
+            return Err(PacketError::Mismatch {
+                container: "/TcsLink/QueryConsolidatorAnswer",
+                criterion: "/TcsLink/Opcode == 54",
+            });
+        }
+        let v42 = r.uint_order(32, false, "Node")? as u32;
+        let v43 = r.uint_order(64, false, "Sent")? as u64;
+        let v44 = r.uint_order(64, false, "SentAllNew")? as u64;
+        let v45 = r.uint_order(64, false, "SentInterval")? as u64;
+        let v46 = r.uint_order(64, false, "SentMoc")? as u64;
+        let v47 = r.uint_order(64, false, "Refused")? as u64;
+        let v48 = r.uint_order(32, false, "FirstInput")? as u32;
+        let v49 = r.uint_order(32, false, "InputTotal")? as u32;
+        let v50 = r.uint_order(8, false, "InputsTold")? as u8;
+        let v51 = {
+            let n = pk::dynamic_size(v50 as f64, 1.0, 0.0, 1, 32, "Inputs")?;
+            let mut a = pk::FixedVec::<InputCountsType, 32>::new();
+            for i in 0..n {
+                if a.push(InputCountsType {
+                    times_held: r.uint_order(64, false, "Inputs")? as u64,
+                    times_none: r.uint_order(64, false, "Inputs")? as u64,
+                })
+                .is_err()
+                {
+                    return Err(PacketError::BadSize { field: "Inputs" });
+                }
+            }
+            a
+        };
+        Ok((
+            QueryConsolidatorAnswer {
+                sequence: v2,
+                status: v3,
+                timestamp: v4,
+                node: v42,
+                sent: v43,
+                sent_all_new: v44,
+                sent_interval: v45,
+                sent_moc: v46,
+                refused: v47,
+                first_input: v48,
+                input_total: v49,
+                inputs: v51,
+            },
+            r.used(),
+        ))
+    }
+
+    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
+        let d50 = u8::try_from(pk::size_source(
+            self.inputs.len(),
+            1.0,
+            0.0,
+            1,
+            1,
+            "Inputs",
+        )?)
+        .map_err(|_| PacketError::OutOfRange {
+            field: "InputsTold",
+        })?;
+        w.uint_order(8, false, pk::from_unsigned(54 as u64, 8, "Opcode")?);
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
+        );
+        w.uint_order(
+            8,
+            false,
+            pk::from_signed(self.status.0, 8, IntEncoding::Unsigned, "Status")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.timestamp as u64, 64, "Timestamp")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.node as u64, 32, "Node")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.sent as u64, 64, "Sent")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.sent_all_new as u64, 64, "SentAllNew")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.sent_interval as u64, 64, "SentInterval")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.sent_moc as u64, 64, "SentMoc")?,
+        );
+        w.uint_order(
+            64,
+            false,
+            pk::from_unsigned(self.refused as u64, 64, "Refused")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.first_input as u64, 32, "FirstInput")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.input_total as u64, 32, "InputTotal")?,
+        );
+        w.uint_order(8, false, pk::from_unsigned(d50 as u64, 8, "InputsTold")?);
+        {
+            let n = pk::dynamic_size(d50 as f64, 1.0, 0.0, 1, 32, "Inputs")?;
+            if self.inputs.len() != n {
+                return Err(PacketError::BadSize { field: "Inputs" });
+            }
+            for (i, e) in self.inputs.iter().enumerate() {
+                {
+                    w.uint_order(
+                        64,
+                        false,
+                        pk::from_unsigned(e.times_held as u64, 64, "Inputs")?,
+                    );
+                    w.uint_order(
+                        64,
+                        false,
+                        pk::from_unsigned(e.times_none as u64, 64, "Inputs")?,
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for QueryConsolidatorAnswer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("QueryConsolidatorAnswer{")?;
+        f.write_str("sequence=")?;
+        write!(f, "{}", self.sequence)?;
+        f.write_str(", status=")?;
+        write!(f, "{}", self.status)?;
+        f.write_str(", timestamp=")?;
+        write!(f, "{}", self.timestamp)?;
+        f.write_str(", node=")?;
+        write!(f, "{}", self.node)?;
+        f.write_str(", sent=")?;
+        write!(f, "{}", self.sent)?;
+        f.write_str(", sent_all_new=")?;
+        write!(f, "{}", self.sent_all_new)?;
+        f.write_str(", sent_interval=")?;
+        write!(f, "{}", self.sent_interval)?;
+        f.write_str(", sent_moc=")?;
+        write!(f, "{}", self.sent_moc)?;
+        f.write_str(", refused=")?;
+        write!(f, "{}", self.refused)?;
+        f.write_str(", first_input=")?;
+        write!(f, "{}", self.first_input)?;
+        f.write_str(", input_total=")?;
+        write!(f, "{}", self.input_total)?;
+        f.write_str(", inputs=")?;
+        {
+            f.write_char('[')?;
+            for (i, e) in (self.inputs).iter().enumerate() {
+                if i > 0 {
+                    f.write_str(", ")?;
+                }
+                {
+                    f.write_char('{')?;
+                    f.write_str("times_held=")?;
+                    write!(f, "{}", (e).times_held)?;
+                    f.write_str(", times_none=")?;
+                    write!(f, "{}", (e).times_none)?;
+                    f.write_char('}')?
+                };
+            }
+            f.write_char(']')?
+        };
+        f.write_char('}')
+    }
+}
+
 /// Meta-command `/TcsLink/Ping`.
 ///
 /// Fixed by its inheritance: `Opcode` = 1.
@@ -1565,15 +1859,15 @@ impl Packet for Ping {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 1) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 1) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/Ping",
                 criterion: "Opcode = 1",
             });
         }
-        Ok((Ping { sequence: v43 }, r.used()))
+        Ok((Ping { sequence: v53 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1665,19 +1959,19 @@ impl Packet for StartNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 48) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 48) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/StartNode",
                 criterion: "Opcode = 48",
             });
         }
-        let v44 = r.uint_order(32, false, "Node")? as u32;
+        let v54 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             StartNode {
-                sequence: v43,
-                node: v44,
+                sequence: v53,
+                node: v54,
             },
             r.used(),
         ))
@@ -1778,19 +2072,19 @@ impl Packet for StopNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 49) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 49) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/StopNode",
                 criterion: "Opcode = 49",
             });
         }
-        let v45 = r.uint_order(32, false, "Node")? as u32;
+        let v55 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             StopNode {
-                sequence: v43,
-                node: v45,
+                sequence: v53,
+                node: v55,
             },
             r.used(),
         ))
@@ -1898,16 +2192,16 @@ impl Packet for SetNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 50) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 50) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/SetNode",
                 criterion: "Opcode = 50",
             });
         }
-        let v46 = r.uint_order(32, false, "Node")? as u32;
-        let v47 = pk::read_fixed_string::<64, 65>(
+        let v56 = r.uint_order(32, false, "Node")? as u32;
+        let v57 = pk::read_fixed_string::<64, 65>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -1918,24 +2212,24 @@ impl Packet for SetNode {
             },
             "Attribute",
         )?;
-        let v48 = r.uint_order(16, false, "ValueLength")? as u16;
-        let v49 = r.fixed_bytes::<256>(
-            pk::dynamic_size(v48 as f64, 8.0, 0.0, 8, 256, "Value")?,
+        let v58 = r.uint_order(16, false, "ValueLength")? as u16;
+        let v59 = r.fixed_bytes::<256>(
+            pk::dynamic_size(v58 as f64, 8.0, 0.0, 8, 256, "Value")?,
             "Value",
         )?;
         Ok((
             SetNode {
-                sequence: v43,
-                node: v46,
-                attribute: v47,
-                value_: v49,
+                sequence: v53,
+                node: v56,
+                attribute: v57,
+                value_: v59,
             },
             r.used(),
         ))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d48 = u16::try_from(pk::size_source(
+        let d58 = u16::try_from(pk::size_source(
             self.value_.len(),
             8.0,
             0.0,
@@ -1972,10 +2266,10 @@ impl Packet for SetNode {
         w.uint_order(
             16,
             false,
-            pk::from_unsigned(d48 as u64, 16, "ValueLength")?,
+            pk::from_unsigned(d58 as u64, 16, "ValueLength")?,
         );
         {
-            let n = pk::dynamic_size(d48 as f64, 8.0, 0.0, 8, 256, "Value")?;
+            let n = pk::dynamic_size(d58 as f64, 8.0, 0.0, 8, 256, "Value")?;
             if self.value_.len() != n {
                 return Err(PacketError::BadSize { field: "Value" });
             }
@@ -2069,19 +2363,19 @@ impl Packet for QueryNode {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 51) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 51) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryNode",
                 criterion: "Opcode = 51",
             });
         }
-        let v50 = r.uint_order(32, false, "Node")? as u32;
+        let v60 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             QueryNode {
-                sequence: v43,
-                node: v50,
+                sequence: v53,
+                node: v60,
             },
             r.used(),
         ))
@@ -2183,19 +2477,19 @@ impl Packet for QueryNodeSample {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 52) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 52) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryNodeSample",
                 criterion: "Opcode = 52",
             });
         }
-        let v51 = r.uint_order(32, false, "Node")? as u32;
+        let v61 = r.uint_order(32, false, "Node")? as u32;
         Ok((
             QueryNodeSample {
-                sequence: v43,
-                node: v51,
+                sequence: v53,
+                node: v61,
             },
             r.used(),
         ))
@@ -2297,19 +2591,19 @@ impl Packet for QueryThreads {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if !((v42 as i128) == 53) {
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 53) {
             return Err(PacketError::Mismatch {
                 container: "/TcsLink/QueryThreads",
                 criterion: "Opcode = 53",
             });
         }
-        let v52 = r.uint_order(32, false, "First")? as u32;
+        let v62 = r.uint_order(32, false, "First")? as u32;
         Ok((
             QueryThreads {
-                sequence: v43,
-                first: v52,
+                sequence: v53,
+                first: v62,
             },
             r.used(),
         ))
@@ -2342,6 +2636,131 @@ impl fmt::Display for QueryThreads {
     }
 }
 
+/// Meta-command `/TcsLink/QueryConsolidator`.
+///
+/// Fixed by its inheritance: `Opcode` = 54.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct QueryConsolidator {
+    /// `/TcsLink/TcsCommand#Sequence` (/TcsLink/U32Arg)
+    pub sequence: u32,
+    /// `/TcsLink/QueryConsolidator#Node` (/TcsLink/U32Arg)
+    pub node: u32,
+    /// `/TcsLink/QueryConsolidator#First` (/TcsLink/U32Arg)
+    pub first: u32,
+}
+
+impl QueryConsolidator {
+    /// The number of fields with an alarm.
+    pub const ALARMS: usize = 0;
+
+    /// Evaluates the alarms of this `/TcsLink/QueryConsolidator` packet's
+    /// fields. Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn alarms(&self) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// Evaluates the alarms of this `/TcsLink/QueryConsolidator` packet's
+    /// fields like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// The number of MathAlgorithms this packet triggers.
+    pub const ALGORITHMS: usize = 0;
+
+    /// Evaluates the MathAlgorithms that a `/TcsLink/QueryConsolidator` packet
+    /// triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
+    pub fn algorithms(&self) -> pk::Outputs<0> {
+        let mut o = pk::Outputs::new();
+        o
+    }
+}
+
+impl Packet for QueryConsolidator {
+    const NAME: &'static str = "/TcsLink/QueryConsolidator";
+    const MAX_BYTES: usize = 13;
+
+    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        let mut r = BitReader::new(data);
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if !((v52 as i128) == 54) {
+            return Err(PacketError::Mismatch {
+                container: "/TcsLink/QueryConsolidator",
+                criterion: "Opcode = 54",
+            });
+        }
+        let v63 = r.uint_order(32, false, "Node")? as u32;
+        let v64 = r.uint_order(32, false, "First")? as u32;
+        Ok((
+            QueryConsolidator {
+                sequence: v53,
+                node: v63,
+                first: v64,
+            },
+            r.used(),
+        ))
+    }
+
+    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
+        w.uint_order(8, false, pk::from_unsigned(54 as u64, 8, "Opcode")?);
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.sequence as u64, 32, "Sequence")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.node as u64, 32, "Node")?,
+        );
+        w.uint_order(
+            32,
+            false,
+            pk::from_unsigned(self.first as u64, 32, "First")?,
+        );
+        Ok(())
+    }
+}
+
+impl fmt::Display for QueryConsolidator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("QueryConsolidator{")?;
+        f.write_str("sequence=")?;
+        write!(f, "{}", self.sequence)?;
+        f.write_str(", node=")?;
+        write!(f, "{}", self.node)?;
+        f.write_str(", first=")?;
+        write!(f, "{}", self.first)?;
+        f.write_char('}')
+    }
+}
+
 /// Every concrete packet derived from `/TcsLink/AnswerLayout`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnswerLayoutKind {
@@ -2352,11 +2771,12 @@ pub enum AnswerLayoutKind {
     QueryNodeAnswer(QueryNodeAnswer),
     QueryNodeSampleAnswer(QueryNodeSampleAnswer),
     QueryThreadsAnswer(QueryThreadsAnswer),
+    QueryConsolidatorAnswer(QueryConsolidatorAnswer),
 }
 
 impl Packet for AnswerLayoutKind {
     const NAME: &'static str = "/TcsLink/AnswerLayout";
-    const MAX_BYTES: usize = 471;
+    const MAX_BYTES: usize = 579;
 
     /// Decodes the root's entries, then picks the first child (in
     /// document order) whose criteria match, recursively.
@@ -2539,6 +2959,50 @@ impl Packet for AnswerLayoutKind {
                 r.used(),
             ));
         }
+        if (v1 as i128) == 54 {
+            let v42 = r.uint_order(32, false, "Node")? as u32;
+            let v43 = r.uint_order(64, false, "Sent")? as u64;
+            let v44 = r.uint_order(64, false, "SentAllNew")? as u64;
+            let v45 = r.uint_order(64, false, "SentInterval")? as u64;
+            let v46 = r.uint_order(64, false, "SentMoc")? as u64;
+            let v47 = r.uint_order(64, false, "Refused")? as u64;
+            let v48 = r.uint_order(32, false, "FirstInput")? as u32;
+            let v49 = r.uint_order(32, false, "InputTotal")? as u32;
+            let v50 = r.uint_order(8, false, "InputsTold")? as u8;
+            let v51 = {
+                let n =
+                    pk::dynamic_size(v50 as f64, 1.0, 0.0, 1, 32, "Inputs")?;
+                let mut a = pk::FixedVec::<InputCountsType, 32>::new();
+                for i in 0..n {
+                    if a.push(InputCountsType {
+                        times_held: r.uint_order(64, false, "Inputs")? as u64,
+                        times_none: r.uint_order(64, false, "Inputs")? as u64,
+                    })
+                    .is_err()
+                    {
+                        return Err(PacketError::BadSize { field: "Inputs" });
+                    }
+                }
+                a
+            };
+            return Ok((
+                Self::QueryConsolidatorAnswer(QueryConsolidatorAnswer {
+                    sequence: v2,
+                    status: v3,
+                    timestamp: v4,
+                    node: v42,
+                    sent: v43,
+                    sent_all_new: v44,
+                    sent_interval: v45,
+                    sent_moc: v46,
+                    refused: v47,
+                    first_input: v48,
+                    input_total: v49,
+                    inputs: v51,
+                }),
+                r.used(),
+            ));
+        }
         return Err(PacketError::NoMatch {
             container: "/TcsLink/AnswerLayout",
         });
@@ -2553,6 +3017,7 @@ impl Packet for AnswerLayoutKind {
             Self::QueryNodeAnswer(p) => p.encode_into(w),
             Self::QueryNodeSampleAnswer(p) => p.encode_into(w),
             Self::QueryThreadsAnswer(p) => p.encode_into(w),
+            Self::QueryConsolidatorAnswer(p) => p.encode_into(w),
         }
     }
 }
@@ -2567,6 +3032,7 @@ impl fmt::Display for AnswerLayoutKind {
             Self::QueryNodeAnswer(p) => p.fmt(f),
             Self::QueryNodeSampleAnswer(p) => p.fmt(f),
             Self::QueryThreadsAnswer(p) => p.fmt(f),
+            Self::QueryConsolidatorAnswer(p) => p.fmt(f),
         }
     }
 }
@@ -2620,6 +3086,11 @@ impl AnswerLayoutKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryConsolidatorAnswer(p) => {
+                for a in p.alarms().as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -2667,6 +3138,11 @@ impl AnswerLayoutKind {
                 }
             }
             Self::QueryThreadsAnswer(p) => {
+                for o in p.algorithms().as_slice() {
+                    out.push(o.name, o.value);
+                }
+            }
+            Self::QueryConsolidatorAnswer(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -2726,6 +3202,11 @@ impl AnswerLayoutKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryConsolidatorAnswer(p) => {
+                for a in p.monitor(m, t).as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -2773,6 +3254,12 @@ impl From<QueryThreadsAnswer> for AnswerLayoutKind {
     }
 }
 
+impl From<QueryConsolidatorAnswer> for AnswerLayoutKind {
+    fn from(p: QueryConsolidatorAnswer) -> Self {
+        Self::QueryConsolidatorAnswer(p)
+    }
+}
+
 /// Every concrete packet derived from `/TcsLink/TcsCommand`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TcsCommandKind {
@@ -2783,6 +3270,7 @@ pub enum TcsCommandKind {
     QueryNode(QueryNode),
     QueryNodeSample(QueryNodeSample),
     QueryThreads(QueryThreads),
+    QueryConsolidator(QueryConsolidator),
 }
 
 impl Packet for TcsCommandKind {
@@ -2793,34 +3281,34 @@ impl Packet for TcsCommandKind {
     /// document order) whose criteria match, recursively.
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v42 = r.uint_order(8, false, "Opcode")? as u8;
-        let v43 = r.uint_order(32, false, "Sequence")? as u32;
-        if (v42 as i128) == 1 {
-            return Ok((Self::Ping(Ping { sequence: v43 }), r.used()));
+        let v52 = r.uint_order(8, false, "Opcode")? as u8;
+        let v53 = r.uint_order(32, false, "Sequence")? as u32;
+        if (v52 as i128) == 1 {
+            return Ok((Self::Ping(Ping { sequence: v53 }), r.used()));
         }
-        if (v42 as i128) == 48 {
-            let v44 = r.uint_order(32, false, "Node")? as u32;
+        if (v52 as i128) == 48 {
+            let v54 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::StartNode(StartNode {
-                    sequence: v43,
-                    node: v44,
+                    sequence: v53,
+                    node: v54,
                 }),
                 r.used(),
             ));
         }
-        if (v42 as i128) == 49 {
-            let v45 = r.uint_order(32, false, "Node")? as u32;
+        if (v52 as i128) == 49 {
+            let v55 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::StopNode(StopNode {
-                    sequence: v43,
-                    node: v45,
+                    sequence: v53,
+                    node: v55,
                 }),
                 r.used(),
             ));
         }
-        if (v42 as i128) == 50 {
-            let v46 = r.uint_order(32, false, "Node")? as u32;
-            let v47 = pk::read_fixed_string::<64, 65>(
+        if (v52 as i128) == 50 {
+            let v56 = r.uint_order(32, false, "Node")? as u32;
+            let v57 = pk::read_fixed_string::<64, 65>(
                 &mut r,
                 &StringSpec {
                     fixed_bits: None,
@@ -2831,47 +3319,59 @@ impl Packet for TcsCommandKind {
                 },
                 "Attribute",
             )?;
-            let v48 = r.uint_order(16, false, "ValueLength")? as u16;
-            let v49 = r.fixed_bytes::<256>(
-                pk::dynamic_size(v48 as f64, 8.0, 0.0, 8, 256, "Value")?,
+            let v58 = r.uint_order(16, false, "ValueLength")? as u16;
+            let v59 = r.fixed_bytes::<256>(
+                pk::dynamic_size(v58 as f64, 8.0, 0.0, 8, 256, "Value")?,
                 "Value",
             )?;
             return Ok((
                 Self::SetNode(SetNode {
-                    sequence: v43,
-                    node: v46,
-                    attribute: v47,
-                    value_: v49,
+                    sequence: v53,
+                    node: v56,
+                    attribute: v57,
+                    value_: v59,
                 }),
                 r.used(),
             ));
         }
-        if (v42 as i128) == 51 {
-            let v50 = r.uint_order(32, false, "Node")? as u32;
+        if (v52 as i128) == 51 {
+            let v60 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::QueryNode(QueryNode {
-                    sequence: v43,
-                    node: v50,
+                    sequence: v53,
+                    node: v60,
                 }),
                 r.used(),
             ));
         }
-        if (v42 as i128) == 52 {
-            let v51 = r.uint_order(32, false, "Node")? as u32;
+        if (v52 as i128) == 52 {
+            let v61 = r.uint_order(32, false, "Node")? as u32;
             return Ok((
                 Self::QueryNodeSample(QueryNodeSample {
-                    sequence: v43,
-                    node: v51,
+                    sequence: v53,
+                    node: v61,
                 }),
                 r.used(),
             ));
         }
-        if (v42 as i128) == 53 {
-            let v52 = r.uint_order(32, false, "First")? as u32;
+        if (v52 as i128) == 53 {
+            let v62 = r.uint_order(32, false, "First")? as u32;
             return Ok((
                 Self::QueryThreads(QueryThreads {
-                    sequence: v43,
-                    first: v52,
+                    sequence: v53,
+                    first: v62,
+                }),
+                r.used(),
+            ));
+        }
+        if (v52 as i128) == 54 {
+            let v63 = r.uint_order(32, false, "Node")? as u32;
+            let v64 = r.uint_order(32, false, "First")? as u32;
+            return Ok((
+                Self::QueryConsolidator(QueryConsolidator {
+                    sequence: v53,
+                    node: v63,
+                    first: v64,
                 }),
                 r.used(),
             ));
@@ -2890,6 +3390,7 @@ impl Packet for TcsCommandKind {
             Self::QueryNode(p) => p.encode_into(w),
             Self::QueryNodeSample(p) => p.encode_into(w),
             Self::QueryThreads(p) => p.encode_into(w),
+            Self::QueryConsolidator(p) => p.encode_into(w),
         }
     }
 }
@@ -2904,6 +3405,7 @@ impl fmt::Display for TcsCommandKind {
             Self::QueryNode(p) => p.fmt(f),
             Self::QueryNodeSample(p) => p.fmt(f),
             Self::QueryThreads(p) => p.fmt(f),
+            Self::QueryConsolidator(p) => p.fmt(f),
         }
     }
 }
@@ -2957,6 +3459,11 @@ impl TcsCommandKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryConsolidator(p) => {
+                for a in p.alarms().as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -3004,6 +3511,11 @@ impl TcsCommandKind {
                 }
             }
             Self::QueryThreads(p) => {
+                for o in p.algorithms().as_slice() {
+                    out.push(o.name, o.value);
+                }
+            }
+            Self::QueryConsolidator(p) => {
                 for o in p.algorithms().as_slice() {
                     out.push(o.name, o.value);
                 }
@@ -3063,6 +3575,11 @@ impl TcsCommandKind {
                     out.push(a.field, a.level);
                 }
             }
+            Self::QueryConsolidator(p) => {
+                for a in p.monitor(m, t).as_slice() {
+                    out.push(a.field, a.level);
+                }
+            }
         }
         out
     }
@@ -3107,5 +3624,11 @@ impl From<QueryNodeSample> for TcsCommandKind {
 impl From<QueryThreads> for TcsCommandKind {
     fn from(p: QueryThreads) -> Self {
         Self::QueryThreads(p)
+    }
+}
+
+impl From<QueryConsolidator> for TcsCommandKind {
+    fn from(p: QueryConsolidator) -> Self {
+        Self::QueryConsolidator(p)
     }
 }

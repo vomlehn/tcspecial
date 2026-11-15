@@ -20,10 +20,11 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 use tcsprotocol::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
-    CommandType, ConfigDigest, ConfigVersion, ConnectCommand, DHSample,
-    NodeCommand, NodeCounts, NodeId, PingCommand, ProcessMemory, Reason,
-    RestartArmCommand, RestartCommand, SetNodeCommand, TcsError, TcsResult,
-    Telemetry, ThreadStack, ThreadsCommand, Timestamp,
+    CommandType, ConfigDigest, ConfigVersion, ConnectCommand,
+    ConsolidatorCommand, DHSample, NodeCommand, NodeCounts, NodeId,
+    PingCommand, ProcessMemory, Reason, RestartArmCommand, RestartCommand,
+    SetNodeCommand, TcsError, TcsResult, Telemetry, ThreadStack,
+    ThreadsCommand, Timestamp,
 };
 
 use crate::connection::Connection;
@@ -927,6 +928,98 @@ impl TcsClient {
             all.extend(told);
             if none || all.len() >= total as usize {
                 return Ok((all, memory));
+            }
+        }
+    }
+
+    /// What a consolidator has sent, by trigger, and how often each of its
+    /// inputs, from the `first`, went into a datum held or none:
+    /// QUERY_CONSOLIDATOR.
+    ///
+    /// One answer tells of up to
+    /// [`tcsprotocol::consolidation::INPUTS_PER_ANSWER`] inputs;
+    /// [`TcsClient::consolidator`] asks as often as it takes to have them
+    /// all.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`  - The consolidator.
+    /// * `first` - The position of the first input to tell of, in the order
+    ///             of its `world-in`.
+    ///
+    /// # Returns
+    ///
+    /// The status the vehicle answered with -- `InvalidParameter` for a
+    /// node that is not a consolidator -- its counts, how many inputs it
+    /// has in all, and the ones the answer told of.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`TcsClient::query_threads`].
+    pub fn query_consolidator(
+        &mut self,
+        node: NodeId,
+        first: u32,
+    ) -> TcsResult<(
+        CommandStatus,
+        tcsprotocol::consolidation::ConsolidatorCounts,
+        u32,
+        Vec<tcsprotocol::consolidation::InputCounts>,
+    )> {
+        let seq = self.next_sequence();
+        let cmd = Command::QueryConsolidator(ConsolidatorCommand::new(
+            seq, node, first,
+        ));
+        match self.send_command(cmd)? {
+            Telemetry::QueryConsolidator(tm) => {
+                Ok((tm.header.status, tm.counts, tm.total, tm.told().to_vec()))
+            }
+            _ => {
+                Err(TcsError::Protocol("Unexpected telemetry type".to_string()))
+            }
+        }
+    }
+
+    /// A consolidator's counts and every one of its inputs':
+    /// QUERY_CONSOLIDATOR, asked from the first input and again from where
+    /// each answer stopped, until every input is told of.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The consolidator.
+    ///
+    /// # Returns
+    ///
+    /// Its counts, as the last answer gave them, and its inputs', in the
+    /// order of its `world-in`.
+    ///
+    /// # Errors
+    ///
+    /// Those of [`TcsClient::query_consolidator`], and
+    /// `TcsError::Protocol` for an answer that refused the command, such as
+    /// for a node that is not a consolidator.
+    pub fn consolidator(
+        &mut self,
+        node: NodeId,
+    ) -> TcsResult<(
+        tcsprotocol::consolidation::ConsolidatorCounts,
+        Vec<tcsprotocol::consolidation::InputCounts>,
+    )> {
+        let mut all = Vec::new();
+        loop {
+            let first = u32::try_from(all.len()).unwrap_or(u32::MAX);
+            let (status, counts, total, told) =
+                self.query_consolidator(node, first)?;
+            if !status.is_success() {
+                return Err(TcsError::Protocol(format!(
+                    "the vehicle refused QUERY_CONSOLIDATOR of node {node}: \
+                     {status:?}"
+                )));
+            }
+            let none = told.is_empty();
+            all.extend(told);
+            if none || all.len() >= total as usize {
+                return Ok((counts, all));
             }
         }
     }

@@ -531,6 +531,49 @@ impl Layout {
     }
 }
 
+/// How many inputs one answer to QUERY_CONSOLIDATOR tells of.
+///
+/// A fixed number, so that the answer has one size and packs without
+/// allocating, as [`crate::THREADS_PER_ANSWER`] is for the threads. A
+/// consolidator with more inputs is read in turns, each QUERY_CONSOLIDATOR
+/// naming the first input it asks about; the answer says how many there
+/// are in all.
+pub const INPUTS_PER_ANSWER: usize = 32;
+
+/// What a consolidator has sent since the vehicle started, which
+/// QUERY_CONSOLIDATOR answers with.
+///
+/// A datum sent in a pass in which two triggers fired is one datum, counted
+/// once in `sent` and once under each trigger that fired, so the three
+/// triggers' counts may add up to more than `sent`: what each says is how
+/// often that trigger would have sent on its own.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ConsolidatorCounts {
+    /// The datums it has sent.
+    pub sent: u64,
+    /// Those sent with every input new, where `send` names `all_new`.
+    pub sent_all_new: u64,
+    /// Those sent as its interval came round.
+    pub sent_interval: u64,
+    /// Those sent because something arrived at its `moc-in`.
+    pub sent_moc: u64,
+    /// Readings refused for not being of their input's type, such as a
+    /// boolean that is neither 0 nor 1.
+    pub refused: u64,
+}
+
+/// How often one input went into a consolidator's datum other than new.
+///
+/// How often it went in new is the datums sent less these two, so it is not
+/// sent: one count fewer for every input, on a link that may be slow.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct InputCounts {
+    /// The datums it went into held: the reading before, again.
+    pub held: u64,
+    /// The datums it went into none: nothing has arrived from it yet.
+    pub none: u64,
+}
+
 /// Bits written into, or read out of, a run of bytes, most significant bit
 /// first.
 struct Bits<'a> {

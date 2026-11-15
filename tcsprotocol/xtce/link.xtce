@@ -138,6 +138,37 @@
           </Dimension>
         </DimensionList>
       </ArrayParameterType>
+      <!-- How many inputs one answer to QUERY_CONSOLIDATOR tells of: up to
+           32, tcsprotocol::consolidation::INPUTS_PER_ANSWER. -->
+      <IntegerParameterType name="InputsToldType" signed="false">
+        <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="32"/>
+      </IntegerParameterType>
+      <!-- One input of a consolidator: how many datums it went into held,
+           and how many none. How many it went into new is the datums sent
+           less these. -->
+      <AggregateParameterType name="InputCountsType">
+        <MemberList>
+          <Member name="TimesHeld" typeRef="U64Type"/>
+          <Member name="TimesNone" typeRef="U64Type"/>
+        </MemberList>
+      </AggregateParameterType>
+      <ArrayParameterType name="InputsCountsType"
+                          arrayTypeRef="InputCountsType">
+        <DimensionList>
+          <Dimension>
+            <StartingIndex>
+              <FixedValue>0</FixedValue>
+            </StartingIndex>
+            <EndingIndex>
+              <DynamicValue>
+                <ParameterInstanceRef parameterRef="InputsTold"/>
+                <LinearAdjustment intercept="-1"/>
+              </DynamicValue>
+            </EndingIndex>
+          </Dimension>
+        </DimensionList>
+      </ArrayParameterType>
     </ParameterTypeSet>
     <ParameterSet>
       <Parameter name="Opcode" parameterTypeRef="U8Type"/>
@@ -188,6 +219,21 @@
       <Parameter name="ThreadTotal" parameterTypeRef="U32Type"/>
       <Parameter name="ThreadsTold" parameterTypeRef="ThreadsToldType"/>
       <Parameter name="Threads" parameterTypeRef="ThreadsType"/>
+      <!-- An answer to QUERY_CONSOLIDATOR: the datums the consolidator has
+           sent, and those sent by each trigger, a datum two triggers sent
+           counting under both; the readings it has refused for not being
+           of their input's type; then the position of the first input it
+           tells of, in the order of the consolidator's world-in, how many
+           inputs it has, how many it tells of, and those. -->
+      <Parameter name="Sent" parameterTypeRef="U64Type"/>
+      <Parameter name="SentAllNew" parameterTypeRef="U64Type"/>
+      <Parameter name="SentInterval" parameterTypeRef="U64Type"/>
+      <Parameter name="SentMoc" parameterTypeRef="U64Type"/>
+      <Parameter name="Refused" parameterTypeRef="U64Type"/>
+      <Parameter name="FirstInput" parameterTypeRef="U32Type"/>
+      <Parameter name="InputTotal" parameterTypeRef="U32Type"/>
+      <Parameter name="InputsTold" parameterTypeRef="InputsToldType"/>
+      <Parameter name="Inputs" parameterTypeRef="InputsCountsType"/>
     </ParameterSet>
     <ContainerSet>
       <!-- What every answer holds first. -->
@@ -295,6 +341,25 @@
         <BaseContainer containerRef="AnswerLayout">
           <RestrictionCriteria>
             <Comparison parameterRef="Opcode" value="53"/>
+          </RestrictionCriteria>
+        </BaseContainer>
+      </SequenceContainer>
+      <SequenceContainer name="QueryConsolidatorAnswer">
+        <EntryList>
+          <ParameterRefEntry parameterRef="Node"/>
+          <ParameterRefEntry parameterRef="Sent"/>
+          <ParameterRefEntry parameterRef="SentAllNew"/>
+          <ParameterRefEntry parameterRef="SentInterval"/>
+          <ParameterRefEntry parameterRef="SentMoc"/>
+          <ParameterRefEntry parameterRef="Refused"/>
+          <ParameterRefEntry parameterRef="FirstInput"/>
+          <ParameterRefEntry parameterRef="InputTotal"/>
+          <ParameterRefEntry parameterRef="InputsTold"/>
+          <ParameterRefEntry parameterRef="Inputs"/>
+        </EntryList>
+        <BaseContainer containerRef="AnswerLayout">
+          <RestrictionCriteria>
+            <Comparison parameterRef="Opcode" value="54"/>
           </RestrictionCriteria>
         </BaseContainer>
       </SequenceContainer>
@@ -476,6 +541,28 @@
         </ArgumentList>
         <CommandContainer name="QueryThreadsContainer">
           <EntryList>
+            <ArgumentRefEntry argumentRef="First"/>
+          </EntryList>
+          <BaseContainer containerRef="TcsCommandContainer"/>
+        </CommandContainer>
+      </MetaCommand>
+      <!-- What the consolidator Node has sent, by trigger, and how often
+           each of its inputs went into a datum held or none, from the input
+           at position First, in the order of its world-in: see
+           tcsprotocol/src/consolidation.rs. -->
+      <MetaCommand name="QueryConsolidator">
+        <BaseMetaCommand metaCommandRef="TcsCommand">
+          <ArgumentAssignmentList>
+            <ArgumentAssignment argumentName="Opcode" argumentValue="54"/>
+          </ArgumentAssignmentList>
+        </BaseMetaCommand>
+        <ArgumentList>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+          <Argument name="First" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryConsolidatorContainer">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Node"/>
             <ArgumentRefEntry argumentRef="First"/>
           </EntryList>
           <BaseContainer containerRef="TcsCommandContainer"/>

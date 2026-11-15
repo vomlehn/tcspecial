@@ -34,10 +34,12 @@
 use std::collections::BTreeMap;
 use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use tcsprotocol::consolidation::{ConsolidatorCounts, InputCounts};
 use tcsprotocol::graph::Graph;
+use tcsprotocol::node::vehicle::compute::Triggers;
 use tcsprotocol::{DHSample, NodeCounts, NodeId, Timestamp};
 
 /// A descriptor a wait can be woken through.
@@ -347,6 +349,142 @@ impl Counters {
     }
 }
 
+/// What a consolidator has sent, and how often each input went into a datum
+/// held or none, counted as it sends: see
+/// [`tcsprotocol::consolidation::ConsolidatorCounts`].
+///
+/// Atomics, as [`Counters`] are and for the same reason: the port writes
+/// them in the pass and the command interpreter reads them on a thread of
+/// its own. One for each input, made as the port is, so counting allocates
+/// nothing.
+#[derive(Debug)]
+pub struct ConsolidatorCounters {
+    /// The datums sent.
+    sent: AtomicU64,
+    /// Those sent with every input new.
+    sent_all_new: AtomicU64,
+    /// Those sent as the interval came round.
+    sent_interval: AtomicU64,
+    /// Those sent because something arrived at `moc-in`.
+    sent_moc: AtomicU64,
+    /// Readings refused for not being of their input's type.
+    refused: AtomicU64,
+    /// Each input's, in the order of the consolidator's `world-in`: the
+    /// datums it went into held, and those it went into none.
+    inputs: Vec<(AtomicU64, AtomicU64)>,
+}
+
+impl ConsolidatorCounters {
+    /// Makes the counters of a consolidator with `inputs` inputs, every one
+    /// nought.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - How many inputs it has.
+    ///
+    /// # Returns
+    ///
+    /// The counters.
+    pub fn new(inputs: usize) -> ConsolidatorCounters {
+        ConsolidatorCounters {
+            sent: AtomicU64::new(0),
+            sent_all_new: AtomicU64::new(0),
+            sent_interval: AtomicU64::new(0),
+            sent_moc: AtomicU64::new(0),
+            refused: AtomicU64::new(0),
+            inputs: (0..inputs)
+                .map(|_| (AtomicU64::new(0), AtomicU64::new(0)))
+                .collect(),
+        }
+    }
+
+    /// Counts a datum sent: under each trigger that fired, and under each
+    /// input that went into it held or none.
+    ///
+    /// # Arguments
+    ///
+    /// * `fired`  - The triggers that fired in the pass it was sent at.
+    /// * `states` - Each input's state as it went into the datum, in the
+    ///              order of the inputs.
+    pub fn sent(
+        &self,
+        fired: Triggers,
+        states: impl Iterator<Item = tcsprotocol::consolidation::State>,
+    ) {
+        use tcsprotocol::consolidation::State;
+        let add = |counter: &AtomicU64| {
+            counter.fetch_add(1, Ordering::Relaxed);
+        };
+        add(&self.sent);
+        if fired.all_new {
+            add(&self.sent_all_new);
+        }
+        if fired.interval {
+            add(&self.sent_interval);
+        }
+        if fired.moc {
+            add(&self.sent_moc);
+        }
+        for ((held, none), state) in self.inputs.iter().zip(states) {
+            match state {
+                State::Held => add(held),
+                State::None => add(none),
+                State::New => {}
+            }
+        }
+    }
+
+    /// Counts a reading refused for not being of its input's type.
+    pub fn refused(&self) {
+        self.refused.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Reads the counts that are the whole consolidator's.
+    ///
+    /// # Returns
+    ///
+    /// The counts, as the ground is told them.
+    pub fn counts(&self) -> ConsolidatorCounts {
+        let read = |counter: &AtomicU64| counter.load(Ordering::Relaxed);
+        ConsolidatorCounts {
+            sent: read(&self.sent),
+            sent_all_new: read(&self.sent_all_new),
+            sent_interval: read(&self.sent_interval),
+            sent_moc: read(&self.sent_moc),
+            refused: read(&self.refused),
+        }
+    }
+
+    /// Reads the inputs' counts from the `first`, into `out`, as many as
+    /// it holds.
+    ///
+    /// # Arguments
+    ///
+    /// * `first` - The position of the first input to read.
+    /// * `out`   - Where they go, from its start.
+    ///
+    /// # Returns
+    ///
+    /// How many inputs there are in all, and how many were read into
+    /// `out`: none for a `first` at or past the last.
+    pub fn inputs(
+        &self,
+        first: usize,
+        out: &mut [InputCounts],
+    ) -> (usize, usize) {
+        let from = self.inputs.get(first..).unwrap_or(&[]);
+        let mut told = 0;
+        for (slot, (held, none)) in out.iter_mut().zip(from) {
+            *slot = InputCounts {
+                held: held.load(Ordering::Relaxed),
+                none: none.load(Ordering::Relaxed),
+            };
+            told += 1;
+        }
+        (self.inputs.len(), told)
+    }
+}
+
 /// The last datum each way, for an operator who wants the bytes rather than a
 /// count of them.
 ///
@@ -385,6 +523,9 @@ pub struct NodeState {
     counters: Counters,
     /// The last datum each way.
     samples: Mutex<Samples>,
+    /// A consolidator's own counters, given by its port as it opens; never
+    /// set for any other node.
+    consolidator: OnceLock<Arc<ConsolidatorCounters>>,
     /// Whether the ground may start and stop it: see
     /// [`tcsprotocol::graph::starts_and_stops`]. Fixed when the state is
     /// made, because a node's type is.
@@ -423,6 +564,7 @@ impl NodeState {
             counters: Counters::default(),
             samples: Mutex::new(Samples::default()),
             switchable: true,
+            consolidator: OnceLock::new(),
         })
     }
 
@@ -438,6 +580,22 @@ impl NodeState {
 
     pub fn id(&self) -> NodeId {
         self.id
+    }
+
+    /// Gives this node the counters its consolidator's port keeps, so that
+    /// QUERY_CONSOLIDATOR can read them. Once, as the port opens; a second
+    /// is ignored, there being one port to a node.
+    ///
+    /// # Arguments
+    ///
+    /// * `counters` - The port's counters.
+    pub fn consolidates(&self, counters: Arc<ConsolidatorCounters>) {
+        let _ = self.consolidator.set(counters);
+    }
+
+    /// The counters of a consolidator, or `None` for any other node.
+    pub fn consolidator(&self) -> Option<&ConsolidatorCounters> {
+        self.consolidator.get().map(Arc::as_ref)
     }
 
     /// Whether the ground may start and stop this node.

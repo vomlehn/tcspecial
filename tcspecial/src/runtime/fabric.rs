@@ -472,6 +472,16 @@ pub trait Port: Send {
     fn due(&self) -> Option<std::time::Instant> {
         None
     }
+
+    /// A consolidator's counters, which its node's state shares so that the
+    /// command interpreter can answer QUERY_CONSOLIDATOR: asked once, as
+    /// the port opens. `None` for every other node.
+    fn consolidator_counters(
+        &self,
+    ) -> Option<std::sync::Arc<crate::runtime::node_state::ConsolidatorCounters>>
+    {
+        None
+    }
 }
 
 /// Whether this link carries a datum on this stream.

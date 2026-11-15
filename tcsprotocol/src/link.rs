@@ -36,17 +36,20 @@ use tcsxtce::packet::{
 
 use crate::commands::{
     Attribute, Command, CommandHeader, CommandType, ConnectCommand,
-    NodeCommand, PingCommand, RestartArmCommand, RestartCommand,
-    SetNodeCommand, ThreadsCommand, Value,
+    ConsolidatorCommand, NodeCommand, PingCommand, RestartArmCommand,
+    RestartCommand, SetNodeCommand, ThreadsCommand, Value,
 };
 use crate::config_digest::{ConfigDigest, ConfigVersion};
+use crate::consolidation::{
+    ConsolidatorCounts, InputCounts, INPUTS_PER_ANSWER,
+};
 use crate::fixed_packet as fixed;
 use crate::link_packet as packet;
 use crate::telemetry::{
-    ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryNodeSampleTelemetry,
-    QueryNodeTelemetry, QueryThreadsTelemetry, Reason, RestartArmTelemetry,
-    RestartTelemetry, SetNodeTelemetry, Telemetry, TelemetryHeader,
-    TelemetryType,
+    ConnectTelemetry, NodeTelemetry, PingTelemetry, QueryConsolidatorTelemetry,
+    QueryNodeSampleTelemetry, QueryNodeTelemetry, QueryThreadsTelemetry,
+    Reason, RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
+    TelemetryHeader, TelemetryType,
 };
 use crate::threads::{
     ProcessMemory, ThreadRole, ThreadStack, THREADS_PER_ANSWER,
@@ -286,6 +289,9 @@ impl Command {
             K::QueryThreads(p) => {
                 Command::QueryThreads(ThreadsCommand::new(p.sequence, p.first))
             }
+            K::QueryConsolidator(p) => Command::QueryConsolidator(
+                ConsolidatorCommand::new(p.sequence, NodeId(p.node), p.first),
+            ),
             K::SetNode(p) => Command::SetNode(SetNodeCommand {
                 header: header(p.sequence, CommandType::SetNode),
                 node: NodeId(p.node),
@@ -402,6 +408,13 @@ impl CommandPacker {
                 sequence,
                 first: c.first,
             }),
+            Command::QueryConsolidator(c) => {
+                K::QueryConsolidator(packet::QueryConsolidator {
+                    sequence,
+                    node: c.node.0,
+                    first: c.first,
+                })
+            }
         };
         encoded(&mut self.ordinary, &ordinary)
     }
@@ -643,6 +656,31 @@ impl Telemetry {
                     threads,
                 })
             }
+            K::QueryConsolidatorAnswer(p) => {
+                let mut inputs = [InputCounts::default(); INPUTS_PER_ANSWER];
+                for (slot, input) in inputs.iter_mut().zip(p.inputs.iter()) {
+                    *slot = InputCounts {
+                        held: input.times_held,
+                        none: input.times_none,
+                    };
+                }
+                Telemetry::QueryConsolidator(QueryConsolidatorTelemetry {
+                    header: head!(p, TelemetryType::QueryConsolidator),
+                    node: NodeId(p.node),
+                    counts: ConsolidatorCounts {
+                        sent: p.sent,
+                        sent_all_new: p.sent_all_new,
+                        sent_interval: p.sent_interval,
+                        sent_moc: p.sent_moc,
+                        refused: p.refused,
+                    },
+                    first: p.first_input,
+                    total: p.input_total,
+                    // The XTCE's capacity is INPUTS_PER_ANSWER.
+                    told: p.inputs.len() as u8,
+                    inputs,
+                })
+            }
         })
     }
 
@@ -816,6 +854,31 @@ impl AnswerPacker {
                         threads: threads,
                 ))
             }
+            Telemetry::QueryConsolidator(t) => {
+                let mut inputs = pk::FixedVec::new();
+                for input in t.told() {
+                    // Never full: the XTCE's capacity is INPUTS_PER_ANSWER.
+                    let _ = inputs.push(packet::InputCountsType {
+                        times_held: input.held,
+                        times_none: input.none,
+                    });
+                }
+                let c = &t.counts;
+                K::QueryConsolidatorAnswer(fill!(
+                    packet,
+                    QueryConsolidatorAnswer,
+                    t.header;
+                        node: t.node.0,
+                        sent: c.sent,
+                        sent_all_new: c.sent_all_new,
+                        sent_interval: c.sent_interval,
+                        sent_moc: c.sent_moc,
+                        refused: c.refused,
+                        first_input: t.first,
+                        input_total: t.total,
+                        inputs: inputs,
+                ))
+            }
         };
         encoded(&mut self.ordinary, &p)
     }
@@ -876,6 +939,11 @@ mod tests {
             Command::QueryNode(NodeCommand::query(8, NodeId(7))),
             Command::QueryNodeSample(NodeCommand::query_sample(9, NodeId(7))),
             Command::QueryThreads(ThreadsCommand::new(10, 33)),
+            Command::QueryConsolidator(ConsolidatorCommand::new(
+                11,
+                NodeId(7),
+                64,
+            )),
             Command::SetNode(
                 SetNodeCommand::new(10, NodeId(7), "setpoint", b"295.0")
                     .expect("it fits"),
@@ -984,7 +1052,46 @@ mod tests {
             ),
             Telemetry::QueryThreads(threads_told(15, 2)),
             Telemetry::QueryThreads(threads_told(16, THREADS_PER_ANSWER)),
+            // And of a consolidator's inputs: none told, some, and as many
+            // as an answer holds.
+            Telemetry::QueryConsolidator(inputs_told(17, 0)),
+            Telemetry::QueryConsolidator(inputs_told(18, 3)),
+            Telemetry::QueryConsolidator(inputs_told(19, INPUTS_PER_ANSWER)),
         ]
+    }
+
+    /// An answer to QUERY_CONSOLIDATOR telling of `told` inputs, each
+    /// unlike the others, and every count unlike every other.
+    ///
+    /// # Arguments
+    ///
+    /// * `sequence` - The sequence number of the command it answers.
+    /// * `told`     - How many inputs it tells of.
+    ///
+    /// # Returns
+    ///
+    /// The answer.
+    fn inputs_told(sequence: u32, told: usize) -> QueryConsolidatorTelemetry {
+        let mut answer = QueryConsolidatorTelemetry::new(
+            sequence,
+            CommandStatus::Success,
+            NodeId(9),
+            2,
+        );
+        answer.counts = ConsolidatorCounts {
+            sent: 1_000 + told as u64,
+            sent_all_new: 400,
+            sent_interval: 500,
+            sent_moc: 101,
+            refused: u64::MAX,
+        };
+        for (at, input) in answer.inputs[..told].iter_mut().enumerate() {
+            *input = InputCounts {
+                held: 10 + at as u64,
+                none: 1 << (at + 20),
+            };
+        }
+        answer.tell(2 + told + 5, told)
     }
 
     /// Each thread role has the number `link.xtce` gives it, so that the

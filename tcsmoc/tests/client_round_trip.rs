@@ -17,13 +17,16 @@ use std::time::Duration;
 use tcsmoc::beacon::Stage;
 use tcsmoc::matched::Matched;
 use tcsmoc::{TcsClient, UdpConnection};
+use tcsprotocol::consolidation::{
+    ConsolidatorCounts, InputCounts, INPUTS_PER_ANSWER,
+};
 use tcsprotocol::{
     ArmKey, Command, CommandStatus, ConfigDigest, ConfigVersion,
     ConnectTelemetry, DHSample, NodeCounts, NodeId, NodeTelemetry,
-    PingTelemetry, ProcessMemory, QueryNodeSampleTelemetry, QueryNodeTelemetry,
-    QueryThreadsTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, Telemetry, ThreadRole, ThreadStack, THREADS_PER_ANSWER,
-    UNLIMITED,
+    PingTelemetry, ProcessMemory, QueryConsolidatorTelemetry,
+    QueryNodeSampleTelemetry, QueryNodeTelemetry, QueryThreadsTelemetry,
+    Reason, RestartArmTelemetry, RestartTelemetry, SetNodeTelemetry, Telemetry,
+    ThreadRole, ThreadStack, THREADS_PER_ANSWER, UNLIMITED,
 };
 
 fn stub_sample(first: u8) -> DHSample {
@@ -163,6 +166,39 @@ fn stub_spacecraft(count: usize) -> (String, thread::JoinHandle<()>) {
                     }
                     Telemetry::QueryThreads(answer.tell(STUB_THREADS, told))
                 }
+                // Node 3 is a consolidator with more inputs than one answer
+                // tells of; any other node is not one.
+                Command::QueryConsolidator(cmd)
+                    if cmd.node == NodeId::of(3) =>
+                {
+                    let mut answer = QueryConsolidatorTelemetry::new(
+                        seq,
+                        CommandStatus::Success,
+                        cmd.node,
+                        cmd.first,
+                    );
+                    answer.counts = stub_consolidator();
+                    let first = cmd.first as usize;
+                    let told = STUB_INPUTS
+                        .saturating_sub(first)
+                        .min(INPUTS_PER_ANSWER);
+                    for (at, slot) in
+                        answer.inputs[..told].iter_mut().enumerate()
+                    {
+                        *slot = stub_input(first + at);
+                    }
+                    Telemetry::QueryConsolidator(answer.tell(STUB_INPUTS, told))
+                }
+                Command::QueryConsolidator(cmd) => {
+                    Telemetry::QueryConsolidator(
+                        QueryConsolidatorTelemetry::new(
+                            seq,
+                            CommandStatus::InvalidParameter,
+                            cmd.node,
+                            cmd.first,
+                        ),
+                    )
+                }
             };
 
             let data = answer.to_bytes();
@@ -278,6 +314,64 @@ fn stub_memory() -> ProcessMemory {
         locked: 9_437_184,
         lock_limit: UNLIMITED,
     }
+}
+
+/// How many inputs the simulated vehicle's consolidator has: more than one
+/// answer to QUERY_CONSOLIDATOR tells of.
+const STUB_INPUTS: usize = INPUTS_PER_ANSWER + 3;
+
+/// The counts of a simulated vehicle's consolidator, each unlike the
+/// others.
+fn stub_consolidator() -> ConsolidatorCounts {
+    ConsolidatorCounts {
+        sent: 900,
+        sent_all_new: 300,
+        sent_interval: 650,
+        sent_moc: 7,
+        refused: 2,
+    }
+}
+
+/// One input of a simulated vehicle's consolidator.
+///
+/// # Arguments
+///
+/// * `at` - The input's position, in the order of its `world-in`.
+///
+/// # Returns
+///
+/// Its counts, unlike every other input's.
+fn stub_input(at: usize) -> InputCounts {
+    InputCounts {
+        held: 100 + at as u64,
+        none: at as u64,
+    }
+}
+
+/// A consolidator's counts come back with every input's, though it has
+/// more than one answer tells of, and a node that is not one is refused.
+#[test]
+fn a_consolidators_counts_come_back_across_answers() {
+    // The CONNECT that matches the client, two questions, and one about a
+    // node that is not a consolidator.
+    let (addr, stub) = stub_spacecraft(4);
+    let mut client = client_to(&addr);
+
+    let (counts, inputs) =
+        client.consolidator(NodeId::of(3)).expect("the counts");
+    assert_eq!(counts, stub_consolidator());
+    let expected: Vec<InputCounts> = (0..STUB_INPUTS).map(stub_input).collect();
+    assert_eq!(inputs, expected);
+
+    let refused = client.consolidator(NodeId::of(2));
+    assert!(
+        matches!(&refused, Err(tcsprotocol::TcsError::Protocol(why))
+            if why.contains("InvalidParameter")),
+        "{refused:?}"
+    );
+
+    stub.join()
+        .expect("the simulated spacecraft answered all four");
 }
 
 /// Every thread comes back, though the vehicle has more than one answer

@@ -4013,7 +4013,8 @@ statistics is a spacecraft that cannot be rescued while it is busy. ``PING``,
 ``QUERY_NODE_SAMPLE`` go to ``payload_command.dest_base``, one socket for
 every node, the node's id being in the command, and so does
 ``QUERY_THREADS``, which is about the vehicle's threads but asked at
-leisure.
+leisure, and ``QUERY_CONSOLIDATOR``, which asks what a consolidator has
+sent.
 ``CONNECT`` goes to ``tcs_cmd.recv`` with the rest of the spacecraft's own:
 it asks whether there is a connection to the vehicle at all, and a ground
 station without one has nothing to ask a payload. One table in the library
@@ -4341,10 +4342,23 @@ It is required, and has no default: a configuration that has not been asked
 how large a consolidation may grow has not answered it. It is at least 2,
 the fewest a consolidator has. 32 is suggested -- their states then take 64
 bits -- and more readings than that are better served by a second
-consolidator than by a larger one. A consolidator, the computation that sends
-several readings to the ground as one datum, is being built: see "Compute
-elements" in the design. Until it is, the setting is checked and limits
-nothing.
+consolidator than by a larger one. A consolidator is the computation that
+sends several readings to the ground as one datum: see "Compute elements" in
+the design. One with more inputs than this is refused where the
+configuration is read; and tcspecial itself packs at most 256, so one with
+more than that, which only a setting above 256 lets through, is refused as
+tcspecial starts.
+
+What a consolidator has sent is asked with ``QUERY_CONSOLIDATOR``, on the
+node command link, naming it by its node id: the datums it has sent in all
+and those each trigger sent -- ``all_new``, ``interval`` and ``moc``, a
+datum two triggers sent in one pass counting under both -- the readings it
+has refused for not being of their input's type, and, for each input, how
+many datums it went into held and how many none. How many it went into new
+is the datums sent less those two. One answer tells of up to 32 inputs and
+says how many there are; ask again from where it stopped for the rest.
+``TcsClient::consolidator`` in tcsmoc reads them all. A node that is not a
+consolidator is answered ``InvalidParameter``.
 
 Thread stacks
 -------------
@@ -4590,7 +4604,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "2de4e4035e84c174e51c66b0c402e9ca"
+     interface: "5684f9b97e87a4e3294258ba473c2e79"
 
 It is the digest of the ``tcsprotocol/xtce/link.xtce`` a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4605,7 +4619,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --interface-digest
-   2de4e4035e84c174e51c66b0c402e9ca
+   5684f9b97e87a4e3294258ba473c2e79
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -4616,8 +4630,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to 2de4e4035e84c174e51c66b0c402e9ca, from 0123...
-   vehicle.xtcs: interface is 2de4e4035e84c174e51c66b0c402e9ca already
+   vehicle.ytcs: interface set to 5684f9b97e87a4e3294258ba473c2e79, from 0123...
+   vehicle.xtcs: interface is 5684f9b97e87a4e3294258ba473c2e79 already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

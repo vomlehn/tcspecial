@@ -4,11 +4,12 @@
 #   tcsx [--no-memlock] [--simulate=MODE] [NAME [ARGUMENT...]]
 #
 # With no NAME it lists the examples, saying what each needs beyond what is
-# installed. With one it runs it as its make run target in the examples'
-# Makefile does in a checkout: most by tcs-moc, which starts tcs-sim and
-# tcspecial on its configuration, and the rest by their own ground station,
-# which starts tcspecial itself. ARGUMENTs go to that ground station; for
-# memusage, configurations among them are watched in place of its own.
+# installed, Yamcs only while YAMCS_HOME does not name it. With one it runs
+# it as its make run target in the examples' Makefile does in a checkout:
+# most by tcs-moc, which starts tcs-sim and tcspecial on its configuration,
+# and the rest by their own ground station, which starts tcspecial itself.
+# ARGUMENTs go to that ground station; for memusage, configurations among
+# them are watched in place of its own.
 #
 #   --no-memlock     tcspecial does not lock its memory into RAM, as a desk
 #                    whose limit on locked memory is too small needs
@@ -73,12 +74,15 @@ among() {
 	esac
 }
 
-# Lists the examples, one a line, with what each needs.
+# Lists the examples, one a line, with what each needs that is not there:
+# Yamcs only while YAMCS_HOME does not say where it is.
 list() {
+	yamcs=
+	[ -x "${YAMCS_HOME:-}/bin/yamcsd" ] || yamcs=$YAMCS
 	for dir in "$examples"/*/; do
 		name=$(basename "$dir")
 		[ -f "$dir/$name.ytcs" ] || continue
-		if among "$name" "$YAMCS"; then
+		if among "$name" "$yamcs"; then
 			echo "$name (needs Yamcs: YAMCS_HOME)"
 		elif among "$name" "$KERNEL_DUMMIES"; then
 			echo "$name (needs the kernel's dummy devices)"

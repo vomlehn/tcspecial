@@ -887,7 +887,15 @@ LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 # well. Taken from git, so that a scratch file left in examples/ is not
 # shipped. A simulator file two examples share is a link in each to the one
 # in their -common directory, and is installed as the same link.
-EXAMPLE_FILES = examples/README.html $(shell git ls-files \
+#
+# With them, the programs that battery's and descent's process nodes run,
+# so that those two run from what is installed, as the rest that need no
+# program of their own do: each configuration names its program at its path
+# in the checkout, examples/NAME/..., which is its path here too. A
+# program's #!/usr/bin/env python3 is installed as #!/usr/bin/python3, where
+# Debian and Fedora both put it and as both want an installed script to say.
+EXAMPLE_PROGRAMS = examples/battery/charge.py examples/descent/guidance.py
+EXAMPLE_FILES = examples/README.html $(EXAMPLE_PROGRAMS) $(shell git ls-files \
 		'examples/*/*.ytcs' 'examples/*/*.xtcs' \
 		'examples/*/*-sim.yaml' 'examples/*/*.svg')
 
@@ -1184,6 +1192,9 @@ install-tcspecial-doc: tcs-helpers
 		mode=644; \
 		[ "$$(head -c 2 $$file)" != '#!' ] || mode=755; \
 		install -D -m $$mode $$file $$to || exit 1; \
+		if [ "$$(head -n 1 $$file)" = '#!/usr/bin/env python3' ]; then \
+			sed -i '1s|.*|#!/usr/bin/python3|' $$to || exit 1; \
+		fi; \
 	done
 
 # The verification tools: the test ground station, the payload simulator,

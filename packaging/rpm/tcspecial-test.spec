@@ -3,6 +3,20 @@ Name:           tcspecial-test
 Summary:        Test ground station and payload simulator for tcspecial
 Group:          Applications/Engineering
 Requires:       tcspecial = %{version}-%{release}
+# The windows open through libraries loaded when tcs-moc and tcs-sim run, which
+# RPM cannot see that they need: the keyboard, X11 or Wayland, EGL and
+# OpenGL. The .deb names the same ones.
+Requires:       libxkbcommon.so.0()(64bit)
+Requires:       libxkbcommon-x11.so.0()(64bit)
+Requires:       libX11.so.6()(64bit)
+Requires:       libX11-xcb.so.1()(64bit)
+Requires:       libXcursor.so.1()(64bit)
+Requires:       libXi.so.6()(64bit)
+Requires:       libXrender.so.1()(64bit)
+Requires:       libEGL.so.1()(64bit)
+Requires:       libGL.so.1()(64bit)
+Requires:       libwayland-client.so.0()(64bit)
+Requires:       libwayland-egl.so.1()(64bit)
 # The test apps were tcspecial's before 0.1.1.
 Conflicts:      tcspecial < 0.1.1
 

@@ -5,6 +5,7 @@ Maintainer: David VomLehn <dvomlehn@gmail.com>
 Installed-Size: @SIZE@
 Replaces: tcspecial (<< 0.1.1)
 Breaks: tcspecial (<< 0.1.1)
+Depends: python3
 Section: doc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
@@ -13,6 +14,6 @@ Description: manuals, designs and example configurations for tcspecial
  head, as HTML with their figures and screenshots, under
  /opt/tcs/share/doc/tcspecial-doc, and the example configurations, in both
  spellings with their simulator files and diagrams, which the manuals'
- figures come from, under /opt/tcs/share/examples/tcspecial.
- Documentation alone: no program, and nothing a vehicle or a ground station
- needs to run.
+ figures come from, under /opt/tcs/share/examples/tcspecial, and
+ the two Python programs the battery and descent examples run. Nothing a
+ vehicle or a ground station needs to run.

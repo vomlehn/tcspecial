@@ -4,6 +4,20 @@ Summary:        Configuration editor and checker for tcspecial
 Group:          Applications/Engineering
 # tcs_ui shows what tcsmoc's beacon code works out, and imports it.
 Requires:       tcsmoc = %{version}-%{release}
+# The windows open through libraries loaded when tcs-gui runs, which
+# RPM cannot see that it needs: the keyboard, X11 or Wayland, EGL and
+# OpenGL. The .deb names the same ones.
+Requires:       libxkbcommon.so.0()(64bit)
+Requires:       libxkbcommon-x11.so.0()(64bit)
+Requires:       libX11.so.6()(64bit)
+Requires:       libX11-xcb.so.1()(64bit)
+Requires:       libXcursor.so.1()(64bit)
+Requires:       libXi.so.6()(64bit)
+Requires:       libXrender.so.1()(64bit)
+Requires:       libEGL.so.1()(64bit)
+Requires:       libGL.so.1()(64bit)
+Requires:       libwayland-client.so.0()(64bit)
+Requires:       libwayland-egl.so.1()(64bit)
 Recommends:     python3-tkinter
 # tcs-gui was tcspecial-moc's, which tcsmoc obsoletes; tcs-verify, the test
 # apps and the examples were tcspecial's. Every one of them built was 0.1.0.

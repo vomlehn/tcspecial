@@ -3,7 +3,7 @@ Version: @VERSION@
 Architecture: @ARCH@
 Maintainer: David VomLehn <dvomlehn@gmail.com>
 Installed-Size: @SIZE@
-Depends: @SHLIBS@, tcsmoc (= @VERSION@), python3
+Depends: @SHLIBS@, tcsmoc (= @VERSION@), python3, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libxcursor1, libxi6, libxrender1, libegl1, libgl1, libwayland-client0, libwayland-egl1
 Recommends: python3-tk
 Replaces: tcspecial (<< 0.1.1), tcspecial-moc
 Breaks: tcspecial (<< 0.1.1), tcspecial-moc

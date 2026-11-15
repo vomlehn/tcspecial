@@ -142,6 +142,29 @@ pub enum Shape {
     },
 }
 
+impl Shape {
+    /// How an input of one basic type is laid out.
+    ///
+    /// # Arguments
+    ///
+    /// * `basic` - The type.
+    /// * `most`  - The most bytes it may hold, where it is a string or
+    ///             bytes; not read otherwise.
+    ///
+    /// # Returns
+    ///
+    /// Its shape: its one field, or a length and bytes.
+    pub fn of_basic(basic: Basic, most: usize) -> Shape {
+        match Field::of(basic) {
+            Some(field) => Shape::Fixed(vec![FixedField(field)]),
+            None => Shape::Counted {
+                most,
+                length_bits: length_bits(most),
+            },
+        }
+    }
+}
+
 /// A field of a fixed-width input, as [`Shape::Fixed`] lists them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedField(Field);
@@ -252,18 +275,10 @@ impl Layout {
                 Carries::Any => LinkType::Basic(Basic::Bytes(None)),
             };
             let shape = match &kind {
-                LinkType::Basic(basic) => match Field::of(*basic) {
-                    Some(field) => Shape::Fixed(vec![FixedField(field)]),
-                    None => {
-                        let most =
-                            crate::graph::largest::largest_datum(graph, source)
-                                .bytes;
-                        Shape::Counted {
-                            most,
-                            length_bits: length_bits(most),
-                        }
-                    }
-                },
+                LinkType::Basic(basic) => Shape::of_basic(
+                    *basic,
+                    crate::graph::largest::largest_datum(graph, source).bytes,
+                ),
                 LinkType::Structure(fields) => Shape::Fixed(
                     fields
                         .iter()

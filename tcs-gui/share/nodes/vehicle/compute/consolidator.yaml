@@ -1,0 +1,35 @@
+# Several readings of different things, sent to the ground as one datum.
+node: consolidator
+type: compute
+about: >
+  Several readings of different things sent as one datum, a consolidation,
+  so that what belongs together reaches the ground together: one datum
+  arrives whole or not at all, where two packets may half arrive. It sends
+  what it has and says of each input whether it is new, held or none, and
+  it sends to a gateway, a log or a tee and to nothing else.
+sets:
+  function: consolidator
+payload-sink: true
+payload-source: true
+gateway-sink: true
+gateway-source: false
+attributes:
+  - name: inputs
+    required: true
+    about: >
+      Which inputs it puts together, comma separated, which the file writes
+      as the names under its world-in, in the order they take in its datum.
+      Each may be of any type, the type of the source linked to it, and the
+      links must bind exactly these.
+  - name: send
+    required: true
+    about: >
+      When it sends: any of all_new, as soon as every input is new;
+      interval, every interval, where an input is new; and moc, when
+      anything arrives at its moc-in from a gateway, new or not. all_new
+      alone is refused, since one input that stops would stop it for good.
+  - name: interval
+    required: false
+    about: >
+      How often it sends where send names interval, as a length of time:
+      1 s. Given with that trigger and only with it. The ground may set it.

@@ -3449,8 +3449,23 @@ input is of a fixed width, at its width; the datum's layout, packing and
 unpacking (``tcsprotocol::consolidation``), and its largest datum from it;
 and the one-bit boolean, ``boolean_bit`` in ``types.xtce``, which the
 interface digest covers. ``tests/consolidator.rs`` holds a configuration to
-the checks, and the module's own tests the bits. tcspecial refuses a
-consolidator by name until step 2 builds it aboard.
+the checks, and the module's own tests the bits. Until step 2, tcspecial
+refused a consolidator by name.
+
+**Built** (2026-11-15), step 2, in tcspecial: the consolidator's port
+(``node::vehicle::compute::consolidator``), holding each input's latest
+reading and state in storage made as the configuration is loaded, refusing a
+reading not of its input's type and keeping the one before, and taking what
+arrives at its ``moc-in`` as asking for a datum; a hook at the end of a pass
+(``Port::end_of_pass``) at which the system asks each consolidator for its
+datum and delivers it before the logs are flushed, and its interval, which
+the port keeps and the system wakes for (``Port::due``), and which the
+ground may set. Each consolidator's layout is worked out once, with the
+routing (``Routes::consolidation_of``). ``runtime::system``'s tests drive
+one through passes -- every input new, nothing new, the interval with one
+new and one held, a boolean refused -- and hold a running one to allocating
+nothing; tcs-gui describes it. Not yet: its counters, which ``QUERY_NODE``
+is to answer with, a change to the link.
 
 App nodes
 ---------

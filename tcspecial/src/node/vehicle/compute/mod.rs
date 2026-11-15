@@ -38,6 +38,9 @@
 //! once all three have arrived and not before, so a reading is never averaged
 //! against a stale one from the pass before.
 
+// Several readings sent to the ground as one datum: a port of its own, not
+// a `Function`, since it sends at the end of a pass.
+pub mod consolidator;
 pub mod process;
 pub mod thermostat;
 pub mod to_kelvin;
@@ -339,12 +342,13 @@ pub fn make(
 
             Ok(Box::new(vote::Vote::of(params.clone(), reads()?)))
         }
-        // Checked on the ground and in the configuration, and not yet run
-        // aboard: refused here, by name, rather than built as something it
-        // is not. See "Compute elements" in the design.
+        // Not a function: a port of its own, which `runtime::system::open`
+        // makes from the routing's layout of its datum. Reached only by a
+        // caller that skipped that, which is refused rather than built as
+        // something it is not.
         Computation::Consolidator(_) => Err(format!(
-            "\"{}\" (consolidator): this tcspecial cannot run a \
-             consolidator yet; fly a configuration without it",
+            "\"{}\" (consolidator) is a port of its own, made with its \
+             datum's layout: see node::vehicle::compute::consolidator",
             node.name
         )),
         Computation::Thermostat(params) => {

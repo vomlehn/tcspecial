@@ -35,6 +35,9 @@ use tcsprotocol::graph::terminals::{self, Stream};
 use tcsprotocol::graph::units;
 use tcsprotocol::graph::{Destination, Graph, Link};
 use tcsprotocol::link_type::LinkType;
+use tcsprotocol::node::vehicle::compute::{
+    self, Computation, ConsolidatorParams,
+};
 use tcsprotocol::unit::Unit;
 
 /// What a command from the ground sets.
@@ -181,6 +184,16 @@ fn stream_of(graph: &Graph, link: &Link) -> Option<Stream> {
         .or_else(|| agreed(&|to| only(&to.node, true)))
 }
 
+/// A consolidator, as the routing found it: what its node says and how its
+/// datum is laid out.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Consolidating {
+    /// What its node says: its inputs, when it sends.
+    pub params: ConsolidatorParams,
+    /// How its datum is laid out.
+    pub layout: tcsprotocol::consolidation::Layout,
+}
+
 /// The table: what goes where.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Routes {
@@ -220,6 +233,10 @@ pub struct Routes {
     /// `tcsprotocol::graph::largest::largest_result`, asked once as the
     /// configuration is loaded.
     largest: BTreeMap<String, usize>,
+    /// Each consolidator's datum's layout, by node name, worked out from
+    /// the configuration as it is loaded: see
+    /// `tcsprotocol::consolidation::Layout::of`.
+    consolidations: BTreeMap<String, Consolidating>,
     /// The most any datum may be in this configuration, which a buffer for
     /// something not a node is made: see
     /// `tcsprotocol::graph::largest::most_datum`.
@@ -362,7 +379,45 @@ impl Routes {
             );
         }
 
+        // Each consolidator's layout, which its port packs by: one that does
+        // not work out is a configuration the check has refused.
+        for node in graph.nodes.iter().filter(|n| n.node_type == "compute") {
+            let Ok(Computation::Consolidator(params)) =
+                compute::params_of(&node.name, &node.attributes)
+            else {
+                continue;
+            };
+            if let Ok(layout) = tcsprotocol::consolidation::Layout::of(
+                graph,
+                &node.name,
+                &params.inputs,
+            ) {
+                routes.consolidations.insert(
+                    node.name.clone(),
+                    Consolidating { params, layout },
+                );
+            }
+        }
+
         routes
+    }
+
+    /// A consolidator's parameters and the layout of its datum.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// Both, or `None` for a node that is not a consolidator.
+    pub fn consolidation_of(&self, node: &str) -> Option<&Consolidating> {
+        self.consolidations.get(node)
+    }
+
+    /// Every consolidator, by name.
+    pub fn consolidators(&self) -> impl Iterator<Item = &str> {
+        self.consolidations.keys().map(String::as_str)
     }
 
     /// The largest result a node can produce, which its buffers are made.

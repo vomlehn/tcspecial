@@ -882,6 +882,7 @@ mod tests {
                 "app_all_veh",
                 "app_gateway_veh",
                 "app_payload_veh",
+                "consolidator",
                 "process",
                 "thermostat",
                 "to_kelvin",
@@ -1241,7 +1242,7 @@ mod tests {
             .iter()
             .filter(|one| one.node_type == "compute")
             .collect();
-        assert_eq!(computations.len(), 5, "every computation is described");
+        assert_eq!(computations.len(), 6, "every computation is described");
 
         for one in computations {
             let function = one.sets.get("function").unwrap_or_else(|| {

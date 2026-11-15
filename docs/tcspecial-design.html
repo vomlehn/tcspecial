@@ -3861,8 +3861,22 @@ input is of a fixed width, at its width; the datum's layout, packing and
 unpacking (<tt class="docutils literal"><span class="pre">tcsprotocol::consolidation</span></tt>), and its largest datum from it;
 and the one-bit boolean, <tt class="docutils literal">boolean_bit</tt> in <tt class="docutils literal">types.xtce</tt>, which the
 interface digest covers. <tt class="docutils literal">tests/consolidator.rs</tt> holds a configuration to
-the checks, and the module's own tests the bits. tcspecial refuses a
-consolidator by name until step 2 builds it aboard.</p>
+the checks, and the module's own tests the bits. Until step 2, tcspecial
+refused a consolidator by name.</p>
+<p><strong>Built</strong> (2026-11-15), step 2, in tcspecial: the consolidator's port
+(<tt class="docutils literal"><span class="pre">node::vehicle::compute::consolidator</span></tt>), holding each input's latest
+reading and state in storage made as the configuration is loaded, refusing a
+reading not of its input's type and keeping the one before, and taking what
+arrives at its <tt class="docutils literal"><span class="pre">moc-in</span></tt> as asking for a datum; a hook at the end of a pass
+(<tt class="docutils literal"><span class="pre">Port::end_of_pass</span></tt>) at which the system asks each consolidator for its
+datum and delivers it before the logs are flushed, and its interval, which
+the port keeps and the system wakes for (<tt class="docutils literal"><span class="pre">Port::due</span></tt>), and which the
+ground may set. Each consolidator's layout is worked out once, with the
+routing (<tt class="docutils literal"><span class="pre">Routes::consolidation_of</span></tt>). <tt class="docutils literal"><span class="pre">runtime::system</span></tt>'s tests drive
+one through passes -- every input new, nothing new, the interval with one
+new and one held, a boolean refused -- and hold a running one to allocating
+nothing; tcs-gui describes it. Not yet: its counters, which <tt class="docutils literal">QUERY_NODE</tt>
+is to answer with, a change to the link.</p>
 </div>
 <div class="section" id="app-nodes">
 <h2><a class="toc-backref" href="#toc-entry-34">App nodes</a></h2>

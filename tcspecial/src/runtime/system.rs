@@ -41,6 +41,7 @@ use tcsprotocol::link_type::Count;
 use std::sync::Arc;
 
 use crate::endpoint::{bind_oc_pair, CcsdsWriter, EndpointWritable};
+use crate::node::vehicle::compute::consolidator::ConsolidatorPort;
 use crate::node::vehicle::log::LogNode;
 use crate::runtime::bus::{Bus, BusDownlink, BusGatewayPort};
 use crate::runtime::fabric::{Arriving, Fabric, Moved, Port, Read, Taken};
@@ -283,6 +284,10 @@ pub struct System {
     paced: BTreeMap<String, (Pace, Instant)>,
     /// The logs, which are flushed at the end of a pass.
     logs: Vec<String>,
+    /// The consolidators, which send at the end of a pass, each with where
+    /// its datum is packed: as long as its largest, made as the
+    /// configuration is loaded so that sending allocates nothing.
+    consolidators: Vec<(String, Vec<u8>)>,
     /// What each node's state is, shared with whatever reads commands.
     ///
     /// The fabric holds the same `Arc` as its gate, so the pass asks the one
@@ -463,12 +468,23 @@ impl System {
         let (bench, desk) = Workbench::in_two()
             .map_err(|e| vec![format!("the loop's own wakeup: {e}")])?;
 
+        let consolidators = routes
+            .consolidators()
+            .map(|name| {
+                let bytes = routes
+                    .consolidation_of(name)
+                    .map_or(1, |c| c.layout.largest_bytes().max(1));
+                (name.to_string(), vec![0; bytes])
+            })
+            .collect();
+
         Ok(System {
             fabric,
             schedule: Schedule::of(graph, now),
             polled,
             paced,
             logs,
+            consolidators,
             states,
             nodes: graph
                 .nodes
@@ -554,6 +570,21 @@ impl System {
 
         self.take_the_work();
 
+        // The consolidators, at the end of the pass: what each sends holds
+        // every reading of the pass, however deep in the graph it arrived.
+        // Before the logs are flushed, so that a log taking a datum writes
+        // it this pass.
+        for (name, out) in &mut self.consolidators {
+            match self.fabric.end_of_pass(name, now, out) {
+                Some(Ok(0)) | None => {}
+                Some(Ok(bytes)) => {
+                    moved.add(self.fabric.deliver(name, &out[..bytes]))
+                }
+                Some(Err(why)) => moved.refused.push((name.clone(), why)),
+            }
+        }
+        self.take_the_work();
+
         // The logs, once, at the end. A log flushed per record is a write
         // system call per reading; a log flushed per pass is every record of
         // a pass on the far side of one call.
@@ -589,10 +620,14 @@ impl System {
             .values()
             .map(|(_, due)| due.saturating_duration_since(now))
             .min();
-        let due = match (groups, paced) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (a, b) => a.or(b),
-        };
+        // A consolidator's interval, which a pass must be made for.
+        let consolidated = self
+            .consolidators
+            .iter()
+            .filter_map(|(name, _)| self.fabric.due_of(name))
+            .map(|due| due.saturating_duration_since(now))
+            .min();
+        let due = [groups, paced, consolidated].into_iter().flatten().min();
         // Only a node read on every pass needs the pause.
         let every_pass = self.polled.iter().any(|node| {
             !matches!(
@@ -1262,6 +1297,20 @@ pub fn open(
     bus: Option<&Bus>,
 ) -> Result<Box<dyn Port>, String> {
     match node.node_type.as_str() {
+        // A consolidator is a port of its own, holding its inputs' readings
+        // and sending at the end of a pass: see
+        // `crate::node::vehicle::consolidator`.
+        "compute" if routes.consolidation_of(&node.name).is_some() => {
+            let consolidating = routes
+                .consolidation_of(&node.name)
+                .expect("a consolidator, as just asked");
+            Ok(Box::new(ConsolidatorPort::of(
+                &node.name,
+                &consolidating.params,
+                consolidating.layout.clone(),
+                Instant::now(),
+            )?))
+        }
         "compute" => {
             let inputs = routes.inputs_of(&node.name);
             let unit = routes.input_unit_of(&node.name);
@@ -1648,6 +1697,175 @@ payloads:
         )
         .expect("it opens");
         (system, counts)
+    }
+
+    /// A consolidator of a `u16` and a boolean, sending when both are new
+    /// and every 100 ms, its sensors scripted and its link to the ground
+    /// watched.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - When the system starts.
+    ///
+    /// # Returns
+    ///
+    /// The system, the two sensors' scripts by name, and what reaches the
+    /// ground.
+    ///
+    /// # Panics
+    ///
+    /// If the configuration cannot be written, read or opened.
+    fn consolidating(now: Instant) -> (System, BTreeMap<String, Kept>, Kept) {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("pack.ytcs");
+        std::fs::write(
+            &path,
+            "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:5100\"
+        world-in: [pack]
+payloads:
+  - type network:
+      - payload: temp
+        address: \"127.0.0.1:7001\"
+        protocol: udp
+        world-out-type: u16
+        world-out: [pack.temp]
+      - payload: valve
+        address: \"127.0.0.1:7002\"
+        protocol: udp
+        world-out-type: boolean
+        world-out: [pack.valve]
+vehicle:
+  - type compute:
+      - compute: pack
+        function: consolidator
+        send: [all_new, interval]
+        interval: \"100 ms\"
+        world-in: [temp, valve]
+        world-out: [ground.pack]
+",
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let sensors: BTreeMap<String, Kept> = ["temp", "valve"]
+            .into_iter()
+            .map(|name| (name.to_string(), kept()))
+            .collect();
+        let ground = kept();
+        let opening = sensors.clone();
+        let watching = Arc::clone(&ground);
+        let system = System::of_opening(
+            &graph,
+            now,
+            move |node: &Node, routes: &Routes, _: &Abandon| {
+                if let Some(c) = routes.consolidation_of(&node.name) {
+                    return Ok(Box::new(ConsolidatorPort::of(
+                        &node.name,
+                        &c.params,
+                        c.layout.clone(),
+                        now,
+                    )?) as Box<dyn Port>);
+                }
+                match opening.get(&node.name) {
+                    Some(readings) => Ok(Box::new(Sensor {
+                        readings: Arc::clone(readings),
+                    })
+                        as Box<dyn Port>),
+                    None => Ok(Box::new(Ground::default()) as Box<dyn Port>),
+                }
+            },
+            move |_: &Telemetered| {
+                Ok(Box::new(Ground {
+                    got: Arc::clone(&watching),
+                }) as Box<dyn Port>)
+            },
+        )
+        .expect("it opens");
+        (system, sensors, ground)
+    }
+
+    /// A consolidator sends at the end of the pass in which a trigger
+    /// fires, saying of each input whether it is new or held: when both
+    /// are new, then nothing while nothing is, then, the interval come
+    /// round, the one new beside the one held. A boolean that is neither 0
+    /// nor 1 is refused, and the reading before it stands.
+    #[test]
+    fn a_consolidator_sends_what_it_has_at_the_end_of_a_pass() {
+        let start = Instant::now();
+        let (mut system, sensors, ground) = consolidating(start);
+        let said = |name: &str, datum: &[u8]| {
+            sensors[name]
+                .lock()
+                .expect("the script")
+                .push(datum.to_vec());
+        };
+        let sent = || std::mem::take(&mut *ground.lock().expect("the record"));
+
+        // Both new: 10 10, then 0x1234 and 1, padded.
+        said("temp", &[0x12, 0x34]);
+        said("valve", &[1]);
+        system.pass(start);
+        // 1010 0001 0010 0011 0100 1 -> a1 23 48.
+        assert_eq!(sent(), vec![vec![0xa1, 0x23, 0x48]]);
+
+        // Nothing new, and the interval not yet round: nothing.
+        system.pass(start + Duration::from_millis(10));
+        assert!(sent().is_empty());
+
+        // The temperature alone, before the interval: nothing yet, all_new
+        // not being met; then the interval, and it goes, the valve held.
+        said("temp", &[0x00, 0x05]);
+        system.pass(start + Duration::from_millis(20));
+        assert!(sent().is_empty());
+        system.pass(start + Duration::from_millis(100));
+        // 10 01, 0x0005, 1 -> 1001 0000 0000 0000 0101 1 -> 90 00 58.
+        assert_eq!(sent(), vec![vec![0x90, 0x00, 0x58]]);
+
+        // A valve reading of 2 is no boolean: refused, and the 1 stands.
+        said("valve", &[2]);
+        let moved = system.pass(start + Duration::from_millis(110));
+        assert!(
+            moved.refused.iter().any(|(_, why)| why.contains("boolean")),
+            "{:?}",
+            moved.refused
+        );
+        said("temp", &[0x00, 0x06]);
+        system.pass(start + Duration::from_millis(200));
+        // 10 01, 0x0006, 1 -> 1001 0000 0000 0000 0110 1 -> 90 00 68.
+        assert_eq!(sent(), vec![vec![0x90, 0x00, 0x68]]);
+    }
+
+    /// A consolidator's passes allocate nothing once the vehicle is
+    /// running: its readings are held, and its datum packed, in storage made
+    /// as the configuration was loaded.
+    #[test]
+    fn a_consolidator_allocates_nothing_as_it_runs() {
+        let start = Instant::now();
+        let (mut system, sensors, ground) = consolidating(start);
+        // Every reading the counted passes take, scripted beforehand, since
+        // scripting one is the test's allocation and not the vehicle's.
+        for count in 0..30u8 {
+            for (name, datum) in [("temp", vec![0, count]), ("valve", vec![1])]
+            {
+                sensors[name].lock().expect("the script").push(datum);
+            }
+        }
+        let at = |pass: u32| start + Duration::from_millis(100) * pass;
+        for pass in 0..10 {
+            system.pass(at(pass));
+        }
+        let made = counting::allocations_in(|| {
+            for pass in 10..20 {
+                let _ = system.pass(at(pass));
+            }
+        });
+        assert!(
+            ground.lock().expect("the record").len() >= 20,
+            "the passes should have sent a datum each"
+        );
+        assert_eq!(made, 0, "a consolidating pass allocated");
     }
 
     /// A part that originates nothing and is asked has the whole exchange

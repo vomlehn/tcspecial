@@ -438,6 +438,40 @@ pub trait Port: Send {
     fn ready(&self) -> bool {
         false
     }
+
+    /// What this node sends at the end of a pass, where it sends then: a
+    /// consolidator, which sends once a pass's every reading has reached it
+    /// rather than at the arrival that fired a trigger. Nothing for every
+    /// other node, which is the default.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The time of the end of the pass.
+    /// * `out` - Where what it sends is written, from the start: as long as
+    ///           its largest datum.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes of `out` it sends; nought for nothing.
+    ///
+    /// # Errors
+    ///
+    /// Why what it would send could not be made.
+    fn end_of_pass(
+        &mut self,
+        now: std::time::Instant,
+        out: &mut [u8],
+    ) -> Result<usize, String> {
+        let _ = (now, out);
+        Ok(0)
+    }
+
+    /// When this node next has something to do at the end of a pass by
+    /// itself, so that a pass is made then: a consolidator's interval.
+    /// `None` for every other node.
+    fn due(&self) -> Option<std::time::Instant> {
+        None
+    }
 }
 
 /// Whether this link carries a datum on this stream.
@@ -933,6 +967,45 @@ impl Fabric {
                 crate::runtime::memory::ran_out(crate::runtime::thread::stack())
             }
         }
+    }
+
+    /// Asks a node for what it sends at the end of a pass: see
+    /// [`Port::end_of_pass`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    /// * `now`  - The time of the end of the pass.
+    /// * `out`  - Where what it sends is written.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes it sends; `None` for a node not held, or one the
+    /// ground has stopped, which sends nothing.
+    pub fn end_of_pass(
+        &mut self,
+        name: &str,
+        now: std::time::Instant,
+        out: &mut [u8],
+    ) -> Option<Result<usize, String>> {
+        if !read(&self.shared.watch).is_enabled(name) {
+            return None;
+        }
+        self.with_port(name, |node| node.end_of_pass(now, out))
+    }
+
+    /// When a node next has something to do at the end of a pass by
+    /// itself: see [`Port::due`].
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - What the configuration calls the node.
+    ///
+    /// # Returns
+    ///
+    /// When, or `None` for nothing, or a node not held.
+    pub fn due_of(&self, name: &str) -> Option<std::time::Instant> {
+        self.with_port(name, |node| node.due()).flatten()
     }
 
     /// This node's thread and port, if it is held.

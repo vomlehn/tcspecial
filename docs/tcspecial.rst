@@ -3714,9 +3714,22 @@ besides:
 Running tcspecial under a supervisor
 ------------------------------------
 
-tcspecial relies on a supervisor to start it again whenever it exits: a
-restart that cannot run itself again, and a crash, both end the process.
-The ``tcspecial`` package's systemd unit is that supervisor. It runs
+tcspecial is two processes. The one that is started is tcspecial's own
+supervisor: it starts a second, its *child*, to run the vehicle, waits for
+it, and starts a fresh one when it ends -- on the configuration a RESTART
+named, or, when the child failed, on the configuration beneath the one that
+failed (see `Configurations kept on board`_). It passes SIGINT and SIGTERM
+on to the child, and a child whose supervisor has gone ends too. ``ps``
+shows both, the child the supervisor's. The supervisor exits 0 when its
+child was told to stop and stopped, and 1 when it gives up: the command
+line's configuration refused before anything was opened, which would be
+refused again at every start, or, under ``--simulate``, any failure of it.
+In flight, a command line's configuration that fails as it opens is
+started again, after a delay that doubles from a second to a minute.
+
+Something must still start the supervisor again if it ends: a power cycle
+and a machine that hangs end it too. The ``tcspecial`` package's systemd
+unit does that. It runs
 ``/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.ytcs`` in
 ``/var/opt/tcs/tcspecial``, with no ``--simulate`` and so the flight
 setting, and starts it again a second after it exits, however often it
@@ -3733,9 +3746,13 @@ So, as root:
 
 The configuration's ``state_file`` and ``log.directory`` belong under
 ``/var/opt/tcs/tcspecial``, on storage that survives a power cycle. tcspecial
-keeps a lock beside the state file, its name with ``.lock`` added, and
-locks each device its nodes open; a second tcspecial given the same state
-file or the same device is refused, naming it. To run two on one machine,
+keeps two locks beside the state file: its name with ``.lock`` added,
+which the supervisor holds for as long as it runs, so that a second
+tcspecial given the same state file is refused, naming it; and its name
+with ``.update`` added, which anything changing the state file takes while
+it does (see `Configurations kept on board`_). Each device its nodes open
+is locked too, and a second tcspecial given the same device is refused,
+naming it. To run two on one machine,
 give each its own ``state_file``, ``log.directory``, addresses and devices. An XML
 configuration is named with ``systemctl edit tcspecial``, in a drop-in
 that sets ``ExecStart`` and ``ConditionPathExists`` to the ``.xtcs`` file.
@@ -4172,17 +4189,45 @@ provisioner's to do. In flight, which configurations the vehicle holds
 is managed from the ground, outside tcspecial: tcspecial transfers no
 files.
 
-Every start loads the first of these that passes its checks, and says in
-its startup summary and its log which it loaded and why: the configuration
-the state file names -- the one the last restart named, or the one the
-start before ran; else the *confirmed* one, the last one a matching
-``Connect`` was taken on; else the one on its command line. A state file
-that is missing or damaged names nothing, and the start loads the one on
-its command line. A configuration whose starts keep ending before a
-matching ``Connect`` -- it crashes, or fails its checks -- is given up after
-``load_trials`` of them, three where it is not said, for the confirmed one.
-``state_file``, ``configurations`` and ``load_trials`` are always the
-command line's configuration's, whichever configuration runs.
+Which configuration a start runs is the top of the *configuration stack*,
+which the state file keeps, and the start says which in its startup summary
+and its log. The bottom is the configuration on the command line, which is
+not written in the state file and is never popped. A ``Connect`` carrying a
+configuration's checksum pushes it, unless it is the top already, and a
+restart pushes the configuration it names. When a child fails -- a top
+that will not load or check, a vehicle that crashes -- the supervisor pops
+the top and starts a child on the one beneath, the last one the ground had
+heard. The supervisor also counts the children started on the top, in the
+state file, and pops a top that has had ``load_trials`` of them, three
+where it is not said, without a matching ``Connect``: a power cycle or a
+hang gives no failure to see, and the count still gives such a
+configuration up. A matching ``Connect`` sets the count back to nought. A
+state file that is missing or damaged names nothing, and the start runs
+the one on its command line. ``state_file``, ``configurations`` and
+``load_trials`` are always the command line's configuration's, whichever
+configuration runs.
+
+The state file is a few lines of text, the stack from the bottom up, one
+``stack`` line for each configuration above the command line's, then the
+top's count and, after a restart is taken, ``next_start commanded``, and
+last a CRC of everything before it:
+
+.. code-block:: text
+
+   # tcspecial's state, which it writes on every start: do not edit.
+   stack 0123456789abcdef0123456789abcdef
+   trials 1
+   crc16 0x1a2b
+
+Software outside tcspecial may push and pop the stack -- a mission's own
+tools, provisioning -- by changing this file while it holds an exclusive
+``flock`` on the file beside it named with ``.update`` added, as tcspecial
+does (``flock state.update -c ...``), and writing the new file beside the
+old and renaming it over, with its CRC -- the CCSDS CRC-16, which the CRC
+catalogue calls CRC-16/IBM-3740, of every byte before the ``crc16`` line,
+written ``0x`` and four hex digits; the supervisor reads it afresh
+before every child. What is pushed must be a configuration the vehicle
+holds.
 ``configurations_kept``, two where it is not said, is the fewest the
 vehicle is to keep, which nothing removes below; nothing in flight removes
 configurations yet.

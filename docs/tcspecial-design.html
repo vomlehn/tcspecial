@@ -4829,7 +4829,9 @@ are atomics and the samples are taken only if the lock is free.</p>
 </div>
 <div class="section" id="restarting">
 <h3><a class="toc-backref" href="#toc-entry-49">Restarting</a></h3>
-<p>A RESTART runs tcspecial again, in the process it is already running in.</p>
+<p>A RESTART ends the child that runs the vehicle, and its supervisor starts a
+fresh child on the configuration the RESTART named: see <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and
+the configuration stack</a>.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>A RESTART_ARM is taken, with its key, and answered <tt class="docutils literal">Success</tt>. A second
@@ -4847,8 +4849,9 @@ answered <tt class="docutils literal">NotArmed</tt>. A key that does not match l
 so an operator who mistyped it sends the RESTART again without arming
 again.</dd>
 <dt>Requirement</dt>
-<dd>A RESTART is taken only once the state file says the next start is a
-commanded one -- see <a class="reference internal" href="#the-state-file">The state file</a> -- so
+<dd>A RESTART is taken only once the state file has the configuration it
+names on top of the stack and says the next start is a commanded one
+-- see <a class="reference internal" href="#the-state-file">The state file</a> -- so
 that the start it asks for says in its startup summary that it was
 commanded. Where that cannot be written the RESTART is answered
 <tt class="docutils literal">Failure</tt>, nothing restarts, and the arm stands: a vehicle that came
@@ -4864,40 +4867,49 @@ closed, the telemetry log flushed, every node released -- because a
 restart that left a log part way through a record would lose what the
 restart was meant to keep going.</dd>
 <dt>Requirement</dt>
-<dd>Then every descriptor tcspecial opened is closed, and it <tt class="docutils literal">exec</tt>s its own
-executable with the arguments it was started with, keeping the
-descriptors it was started with and only those: the standard three and
-whatever a supervisor handed it. Which those were is asked as the process
-starts, before anything is opened, from <tt class="docutils literal">/proc/self/fd</tt> or <tt class="docutils literal">/dev/fd</tt>.
-The process id stays the same, so a supervisor sees one process
-throughout, and the beacons start again at #1, which is how the ground
-tells a restart from a gap: see <a class="reference internal" href="#the-beacon-across-a-restart">The beacon across a restart</a>.</dd>
+<dd>Then the child exits with the restart status, and the supervisor starts
+a fresh child, the same program with the arguments it was started with,
+on the configuration the RESTART put on top of the stack. The fresh
+child is handed what the supervisor was handed and only that: the
+standard three and whatever started tcspecial gave it. Nothing the old
+child opened reaches it, because everything tcspecial opens is opened
+close-on-exec. The process id the outside world sees, the supervisor's,
+stays the same, and the child's changes; the beacons start again at #1,
+which is how the ground tells a restart from a gap: see <a class="reference internal" href="#the-beacon-across-a-restart">The beacon
+across a restart</a>.</dd>
 <dt>Requirement</dt>
 <dd>A stop asked for while a restart is under way -- a SIGINT or a SIGTERM
-that arrives after the RESTART is taken and before the <tt class="docutils literal">exec</tt> -- stops
-the vehicle: it is not lost with the process image that took it, and the
-vehicle does not restart instead. The state file already names the
-RESTART's target for the next start, as a commanded one, so whatever
-starts tcspecial next runs that target, as a restart would have.</dd>
+that arrives after the RESTART is taken and before the child exits --
+stops the vehicle: it is not lost, and the vehicle does not restart
+instead. The state file already has the RESTART's target on top, and
+says the next start is commanded, so whatever starts tcspecial next runs
+that target, as a restart would have.</dd>
 </dl>
-<p>The two signals are blocked in every thread from the first moment of
-<tt class="docutils literal">main</tt>, before any thread is made, and one thread of their own takes them
+<p>The two signals are blocked in every thread of the child from the first
+moment of <tt class="docutils literal">main</tt>, before any thread is made -- the supervisor starts the
+child with them blocked already -- and one thread of their own takes them
 with <tt class="docutils literal">sigtimedwait</tt> (<tt class="docutils literal"><span class="pre">runtime::signals</span></tt>). A handler could not do it: it
-runs in whichever thread the kernel picks, and the flag it sets is in an
-image the <tt class="docutils literal">exec</tt> is about to replace. Before the <tt class="docutils literal">exec</tt> the restart ends
-that thread, so that nothing takes either signal from then on, and looks
-whether one was taken or is pending: if so the process stops rather than
-restarting. One that arrives after that look stays pending, blocked in every
-thread, is carried pending through the <tt class="docutils literal">exec</tt>, and is the first thing the
-new image's thread takes: before its loop is running, which ends the process
-at once, as an unhandled stop signal would. Either way the vehicle stops.</p>
+runs in whichever thread the kernel picks and can only set a flag, and a
+stop that arrives just as the child exits for the restart must still be
+seen. Before the child exits for the restart it ends that thread, so that
+nothing takes either signal from then on, and looks whether one was taken
+or is pending: if so it exits with the good status, as a stopped child
+does, and the supervisor stops rather than starting another. A stop sent to
+the supervisor itself, which is where a service manager sends one, is
+passed on to the child, and the supervisor stops whatever the child exits
+with. Either way the vehicle stops. One gap is left: a stop sent to the
+child alone, after it has looked and before it has exited, ends with the
+child and is not seen, and the supervisor starts the RESTART's target. A
+stop sent to the supervisor, or to both, as systemd sends one to every
+process of a service, is not affected.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>Where that cannot be done -- neither directory could be read as the
-process started, or the <tt class="docutils literal">exec</tt> fails -- tcspecial says why on its error
-output and exits. A restart that cannot keep what it was handed is not
-one, and a process that carried on after being told to restart would be
-flying something the ground believes has gone.</dd>
+<dd>Where the supervisor cannot start a child, it says why in its log, and
+tries again after a delay in flight, as it does for a bottom that
+fails, and stops under <tt class="docutils literal"><span class="pre">--simulate</span></tt>. A process that carried on after
+being told to restart would be flying something the ground believes
+has gone, so the old child never carries on: it has exited before the
+new one is started.</dd>
 </dl>
 </div>
 </div>
@@ -6442,14 +6454,18 @@ it. The checksum in a beacon identifies the configuration tcspecial is
 running, and the ground reads the vehicle's data and commands it with
 that configuration and no other.</dd>
 <dt>Requirement</dt>
-<dd>A start that falls back to the command line's configuration and then
-fails falls back to it again, never to anything else, because there is
-nothing surer to go to.</dd>
+<dd>A start on the command line's configuration that fails is followed by
+another on it, never by anything else, because there is nothing surer
+to go to: it is the bottom of the configuration stack, which nothing
+pops.</dd>
 <dt>Requirement</dt>
-<dd>tcspecial runs under a supervisor that starts it again when it exits.
-Every failure that ends the process -- a restart that cannot <tt class="docutils literal">exec</tt>, a
-crash -- relies on that, and the manual
-says how to set one up.</dd>
+<dd>tcspecial is its own supervisor: the process that is started starts a
+child to run the vehicle, and starts another when that one ends, as
+<a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and the configuration stack</a> says. Every failure that
+ends a child -- a crash, a configuration that will not load -- relies on
+that. What ends the supervisor too -- a power loss, a machine that
+hangs -- relies on whatever starts tcspecial when the computer starts,
+and the manual says how to set that up.</dd>
 <dt>Requirement</dt>
 <dd>The state file is kept on storage that survives a power cycle, which is
 what lets a count of starts, and whether the next start is commanded,
@@ -6535,7 +6551,10 @@ file naming the next start's configuration and the confirmed one, a
 matching CONNECT confirming, the order a start loads them in and saying
 which and why, a damaged or missing state file loading the command
 line's, and <tt class="docutils literal">load_trials</tt>, read from the command line's
-configuration. In <a class="reference internal" href="#the-three-commands-that-always-go">The three commands that always go</a>, every
+configuration. (The next and the confirmed configuration, and the order
+a start loaded them in, gave way on 2026-11-14 to the configuration
+stack of <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and the configuration stack</a>.) In <a class="reference internal" href="#the-three-commands-that-always-go">The three
+commands that always go</a>, every
 requirement: a target the vehicle does not hold refused <tt class="docutils literal">NotFound</tt> at
 the arm, the target loaded and checked again just before the restart, a
 RESTART naming the running configuration a plain restart, and the two
@@ -6666,10 +6685,11 @@ is in it are the procedure's last steps.</dd>
 <h3><a class="toc-backref" href="#toc-entry-77">Starting, and the restart flag</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">How a start chooses its configuration here -- <tt class="docutils literal">next</tt>, <tt class="docutils literal">confirmed</tt>
-and the command line's -- is to be replaced by the configuration stack
-of <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and the configuration stack</a>, designed and not yet
-built.</p>
+<p class="last"><strong>Built</strong> (2026-11-14): a start chooses its configuration from the
+configuration stack of <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and the configuration stack</a>.
+It once chose from the state file's <tt class="docutils literal">next</tt> and <tt class="docutils literal">confirmed</tt> and the
+command line's, in that order; a state file that still names those is
+read as the stack of the two, the confirmed one beneath.</p>
 </div>
 <dl class="docutils">
 <dt>Requirement</dt>
@@ -6677,11 +6697,11 @@ built.</p>
 restart flag, and which configuration it runs by its checksum; nothing
 in the state file, the beacon, the answers or <tt class="docutils literal">tcsmoc</tt> counts starts.</dd>
 <dt>Requirement</dt>
-<dd>The state file names, by checksum, the configuration the next start
-loads -- the one the last taken RESTART named, or else the one the
-start before ran -- and the <em>confirmed</em> configuration: the last one a
-matching CONNECT was taken on. A matching CONNECT writes the running
-configuration to it as confirmed.</dd>
+<dd>The state file keeps the configuration stack, by checksum, above the
+configuration on tcspecial's command line, which is its bottom, is
+never written in it and is never popped. A matching CONNECT pushes the
+running configuration, unless it is already the top, or is the bottom
+with nothing above it; an armed RESTART pushes the one it names.</dd>
 </dl>
 <p>The state file is the command line's configuration's, whichever
 configuration runs, and so are <tt class="docutils literal">configurations</tt> and <tt class="docutils literal">load_trials</tt>: a
@@ -6690,28 +6710,30 @@ configuration that names another state file is run with the command line's,
 and the start says so in its log.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>Every start loads the first of these that passes its check: the
-configuration the state file names for it; else the confirmed one;
-else the configuration given on tcspecial's command line, which
-provisioning installed and made read-only. Whichever it loads, it says
-in the log which and why, and from its first beacon on every beacon
-carries that configuration's checksum, so the ground sees which
-configuration a start is running whatever chose it.</dd>
+<dd>Every start runs the top of the stack, or the configuration given on
+tcspecial's command line, which provisioning installed and made
+read-only, where nothing is stacked above it. It does not fall back
+itself: a top that will not load or pass its check fails the start,
+and the supervisor pops it and starts a fresh child on what is beneath.
+Whichever it runs, it says in the log which and why, and from its first
+beacon on every beacon carries that configuration's checksum, so the
+ground sees which configuration a start is running whatever chose it.</dd>
 <dt>Requirement</dt>
 <dd>A state file that does not exist, or that fails its CRC or cannot be
 read, names nothing: the start loads the configuration on its command
 line, and says so. A vehicle that would not start because its state
 file was damaged would be lost to a counter.</dd>
 <dt>Requirement</dt>
-<dd>The state file counts the starts of the configuration it names for the
-next start that ended -- a crash, a power loss, a failed check --
-before a matching CONNECT, and a matching CONNECT sets the count back
-to nought. When the count reaches <tt class="docutils literal">load_trials</tt>, from the
+<dd>The state file counts the starts of the top of the stack since a
+matching CONNECT was last taken on it: the supervisor adds one before
+each child it starts on a stacked top, and a matching CONNECT sets the
+count back to nought. When the count reaches <tt class="docutils literal">load_trials</tt>, from the
 <tt class="docutils literal">tcspecial</tt> section of the configuration on the command line and
-three where it does not say, that configuration is no longer named:
-the next start loads the confirmed one, and says so. A configuration
-that passes its check but takes tcspecial down at every start is then
-given up, rather than started for ever.</dd>
+three where it does not say, the supervisor pops that configuration
+before the next child, which runs the one beneath, and says so. A
+configuration that passes its check but takes tcspecial down at every
+start, or the whole machine with it, is then given up, rather than
+started for ever. The command line's configuration is never counted.</dd>
 <dt>Requirement</dt>
 <dd>The beacon's restart flag is set at every start: the first start, a
 commanded restart, a crash the supervisor restarted, a power cycle. It
@@ -6725,7 +6747,7 @@ with a matching checksum, tcspecial sends nothing to the ground but its
 beacons and answers. What its nodes produce meanwhile is still written
 to the on-board log, so it is kept, and reaches the ground later as the
 log's segment files do. After a RESTART is taken there is no match
-again: the process ends first.</dd>
+again: the child ends first.</dd>
 <dt>Requirement</dt>
 <dd>Over the same span, a command other than CONNECT, RESTART_ARM and
 RESTART is not acted on, and is answered with a refusal saying the
@@ -6778,9 +6800,9 @@ configuration already running is allowed, and is a plain restart.</dd>
 configuration: every node stopped, every thread joined, every link
 closed and what was queued on it dropped, the log flushed. The other
 loads a configuration by its checksum. A restart calls the first,
-writes the state file, and runs the process again, whose start calls
-the second, so that nothing the old configuration left in memory
-survives into the new one.</dd>
+writes the state file, and ends the child, and the fresh child its
+supervisor starts calls the second, so that nothing the old
+configuration left in memory survives into the new one.</dd>
 </dl>
 <p>As built, the clean-up is <tt class="docutils literal"><span class="pre">start::clean_up</span></tt> and the load
 <tt class="docutils literal"><span class="pre">choose::Boot::load</span></tt>, which the RESTART also calls just before it is
@@ -6788,7 +6810,8 @@ taken, to check its target as it would be loaded. The state file is written
 as the RESTART is taken, before its answer, rather than after the clean-up,
 so that a RESTART the state file cannot say is refused <tt class="docutils literal">Failure</tt> and
 nothing restarts, as <a class="reference internal" href="#restarting">Restarting</a> requires. The beacon thread is not
-joined: the <tt class="docutils literal">exec</tt> ends it, and it holds nothing the next start reads.</p>
+joined: the child's exit ends it, and it holds nothing the next start
+reads.</p>
 </div>
 <div class="section" id="on-the-ground">
 <h3><a class="toc-backref" href="#toc-entry-79">On the ground</a></h3>
@@ -6904,8 +6927,9 @@ that does not match its name is not loaded. Configurations installed
 at first provisioning are read-only and immutable, and one kept in
 flight is never written again.</dd>
 <dt>A configuration that checks but fails at every start</dt>
-<dd>The state file counts its starts that end before a matching CONNECT,
-and <tt class="docutils literal">load_trials</tt> of them give it up for the confirmed configuration.</dd>
+<dd>The state file counts its starts since a matching CONNECT, and
+<tt class="docutils literal">load_trials</tt> of them pop it from the configuration stack, for the
+one beneath.</dd>
 <dt>A damaged or missing state file</dt>
 <dd>It names nothing, and the start loads the configuration on its command
 line, which is read-only. The ground sees which from the beacon's
@@ -6968,9 +6992,9 @@ every requirement that an answer carries a generation or that the ground
 compares generations: there is no generation.</li>
 <li><a class="reference internal" href="#kinds-of-restart">Kinds of restart</a>: only a commanded start changing the definitions.
 The checksum in the beacon says which configuration a start is running,
-whichever kind it is, and a start nobody commanded may load the
-confirmed or the command line's configuration when the one the state
-file names will not load or is given up.</li>
+whichever kind it is, and a start nobody commanded may run the one
+beneath on the configuration stack when the top would not load or is
+given up.</li>
 <li><a class="reference internal" href="#what-the-ground-may-send-meanwhile">What the ground may send meanwhile</a>: the ground's wait after a
 RESTART for a beacon whose number went back, during which its client
 sent nothing but the three. It guarded on the ground what the vehicle
@@ -7191,8 +7215,10 @@ named by their checksum</a> -- and the startup summary says which it was.</p>
 took an armed RESTART with the right key. A commanded start
 may change the definitions it runs with. A start nobody commanded -- a
 crash, a power cycle, a supervisor's restart -- runs with the
-definitions it had. Either begins with the restart flag set, and the
-checksum in its beacons says which configuration it runs.</dd>
+definitions it had, unless the supervisor has popped the configuration
+it had, when it runs the one beneath on the stack. Either begins with
+the restart flag set, and the checksum in its beacons says which
+configuration it runs.</dd>
 </dl>
 <p>Which configuration a start runs, and when one is given up for failing to
 be heard from, is in <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>.</p>
@@ -7201,21 +7227,27 @@ be heard from, is in <a class="reference internal" href="#starting-and-the-resta
 <h2><a class="toc-backref" href="#toc-entry-89">The supervisor and the configuration stack</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last"><strong>Not yet built</strong> (designed 2026-11-14). Once built, this replaces how
-<a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> chooses a configuration -- the state
-file's <tt class="docutils literal">next</tt> and <tt class="docutils literal">confirmed</tt> -- and how <a class="reference internal" href="#a-commanded-restart">A commanded restart</a>
-runs tcspecial again, and the state file holds the stack (see <a class="reference internal" href="#the-state-file">The
-state file</a>). The restart flag, the three commands that always go and
-<tt class="docutils literal">load_trials</tt> are unchanged.</p>
+<p class="last"><strong>Partly built</strong> (2026-11-14): the supervisor and its child
+(<tt class="docutils literal"><span class="pre">runtime::supervisor</span></tt>), the stack in the state file, its short lock,
+the pushes, the pops and the attempt count. Not yet: the memory lock,
+and the allocations of a load that fail rather than end the process.
+It replaced how <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> chose a configuration
+-- the state file's <tt class="docutils literal">next</tt> and <tt class="docutils literal">confirmed</tt> -- and how a restart, as
+in <a class="reference internal" href="#a-commanded-restart">A commanded restart</a>, ran tcspecial again, by <tt class="docutils literal">exec</tt>ing the
+process; the state file now holds the stack (see <a class="reference internal" href="#the-state-file">The state file</a>),
+and a RESTART ends the child for the supervisor to start another. The
+restart flag, the three commands that always go and <tt class="docutils literal">load_trials</tt>
+are unchanged.</p>
 </div>
 <p>tcspecial is two processes. The <em>supervisor</em> is what is started -- by
-systemd, by tcs-moc, from a shell -- and does almost nothing: it chooses a
-configuration, starts a <em>child</em> to run it, waits for the child to end,
-and decides from how it ended what to start next. The child is the
-tcspecial of everything else in this document: it locks its memory, opens
-the nodes and runs them. The supervisor locks nothing, opens no node and
-allocates nothing once it is waiting, so that the process a vehicle
-depends on to try again is one that has nothing in it to fail.</p>
+systemd, by tcs-moc, from a shell -- and does almost nothing: it keeps
+the configuration stack, starts a <em>child</em> to run its top, waits for the
+child to end, and decides from how it ended what to start next. The child
+is the tcspecial of everything else in this document: it locks its
+memory, opens the nodes and runs them. The supervisor locks no memory,
+opens no node and allocates nothing while it waits, so
+that the process a vehicle depends on to try again is one that has
+nothing in it to fail.</p>
 <p>Each attempt is a fresh child, so that nothing a failed configuration did
 -- memory it took and did not give back, a descriptor it left open, a
 thread it left stuck -- is still there for the next.</p>
@@ -7262,8 +7294,9 @@ beneath, which the ground had heard, runs again.</dd>
 configuration the RESTART pushed</td>
 </tr>
 <tr><td>fatal: a lock that failed under
-<tt class="docutils literal"><span class="pre">--simulate</span></tt>, a command line
-that is not one</td>
+<tt class="docutils literal"><span class="pre">--simulate</span></tt>, the command
+line's configuration refused
+before anything was opened</td>
 <td>stops, the stack unchanged, saying
 why</td>
 </tr>
@@ -7286,10 +7319,20 @@ to nought. A configuration whose count reaches <tt class="docutils literal">load
 popped, whatever ended its attempts, so that one that takes the
 vehicle down at every start is given up rather than started for ever.</dd>
 <dt>Requirement</dt>
-<dd>When the bottom fails, there is nothing to pop: the supervisor starts
-it again after a delay that doubles at each failure, from one second
-to at most a minute, and goes back to nought once the bottom has
-stayed up for a minute. A configuration that fails at once is then
+<dd>The command line's configuration refused before anything is opened --
+problems in it, types this build lacks, payloads the simulation mode
+refuses -- is refused the same way at every start, so its child exits
+fatal, and the supervisor, which checks the file itself before its
+first child, stops. Starting it again would change nothing, and a
+vehicle whose own configuration is refused is one for the ground to
+see stopped, not one to spin.</dd>
+<dt>Requirement</dt>
+<dd>When the bottom fails otherwise -- as it opens, or as it runs -- there
+is nothing to pop: the supervisor starts it again after a delay that
+doubles at each failure, from one second to at most a minute, and goes
+back to one second once the bottom has stayed up for a minute. Under
+<tt class="docutils literal"><span class="pre">--simulate</span></tt> it stops instead: a desk is not helped by trying for
+ever, and a test that starts a failing tcspecial is owed an answer. A configuration that fails at once is then
 not started thousands of times an hour, and one that recovers is not
 kept waiting.</dd>
 <dt>Requirement</dt>
@@ -7362,34 +7405,36 @@ without a header</a>.</p>
 <dt>Requirement</dt>
 <dd>The <tt class="docutils literal">tcspecial</tt> section's <tt class="docutils literal">state_file</tt>, required, is the path of the
 file in which tcspecial keeps what must survive a restart: whether the
-next start is one the ground commanded, and which configurations it
-names and how many of its starts have been tried, as <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the
-restart flag</a> says.</dd>
+next start is one the ground commanded, the configuration stack, and
+how many starts its top has been given, as <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart
+flag</a> and <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and the configuration stack</a> say.</dd>
 </dl>
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">Once <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and the configuration stack</a> is built, the lock
-below is two: an <em>instance lock</em>, on the <tt class="docutils literal">.lock</tt> file, which the
-supervisor holds for as long as it runs, so that no second tcspecial
-runs on this state file; and a <em>short lock</em>, taken by anything that
-changes the state file -- the supervisor, the child, software outside
-tcspecial pushing or popping the stack -- for no longer than it takes
-to read it, change it and rename the new one over it, so that no two
-changes are lost to each other.</p>
-</div>
+<p>The state file has two locks: an <em>instance lock</em>, which the supervisor
+holds for as long as it runs, and a <em>short lock</em>, which anything that
+changes the file holds while it does.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd><p class="first">A start locks its state file before it reads it, and holds the lock
-until the process ends or runs itself again, so that no two tcspecials
-keep one state file: each would overwrite what the other is to start
-with. The lock is on a file beside it, its name and <tt class="docutils literal">.lock</tt>, because
-the state file itself is replaced by a rename at every write; that file
-is never removed. A state file another process holds refuses the start,
-naming the file and <tt class="docutils literal">state_file</tt>. A lock that cannot be taken at all
-refuses it as well, since the state file is what every later start of
-this vehicle depends on.</p>
+<dd><p class="first">The supervisor takes the instance lock before its first child starts,
+and holds it until it ends, through every child it starts, so that no
+two tcspecials keep one state file: each would overwrite what the
+other is to start with. The lock is on a file beside it, its name and
+<tt class="docutils literal">.lock</tt>, because the state file itself is replaced by a rename at
+every write; that file is never removed. A state file another process
+holds refuses the start, naming the file and <tt class="docutils literal">state_file</tt>. A lock
+that cannot be taken at all refuses it as well, since the state file
+is what every later start of this vehicle depends on.</p>
 <p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">tcspecial::exclusive::state_file</span></tt>, called by
-<tt class="docutils literal"><span class="pre">runtime::choose</span></tt> before the state file is read.</p>
+<tt class="docutils literal"><span class="pre">runtime::supervisor</span></tt> before its first child.</p>
+</dd>
+<dt>Requirement</dt>
+<dd><p class="first">Anything that changes the state file -- the supervisor, the child,
+software outside tcspecial pushing or popping the stack -- takes the
+short lock first, and holds it for no longer than it takes to read the
+file, change it and rename the new one over it, so that no two changes
+are lost to each other. The short lock is an exclusive <tt class="docutils literal">flock</tt> on the
+file beside the state file named with <tt class="docutils literal">.update</tt> added, so that a
+script can take it with <tt class="docutils literal">flock(1)</tt>.</p>
+<p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">tcspecial::state::update</span></tt>.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>An armed RESTART that is taken writes to the state file that
@@ -7403,9 +7448,9 @@ changes the beacons: every start begins with the restart flag set.</dd>
 <dd>There is no generation number. Nothing in the state file counts every
 start, as a generation did: a start is told by its beacons' restart flag
 and by their number going back, and which configuration it runs by the
-checksum they carry. What it does count is the trials of the
-configuration a start is to run -- its starts that ended before a
-matching CONNECT -- which <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> gives up at
+checksum they carry. What it does count is the trials of the top of the
+configuration stack -- its starts since a matching CONNECT was last
+taken on it -- which <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a> gives up at
 <tt class="docutils literal">load_trials</tt>. A
 state file written by a build that kept a generation holds a
 <tt class="docutils literal">generation</tt> line, which is read and dropped, the start saying so in
@@ -7413,11 +7458,15 @@ its log, and the file written again without it: a vehicle given a new
 build starts as it did, rather than taking its state file for a damaged
 one.</dd>
 <dt>Requirement</dt>
-<dd>Every start reads and writes the state file before its first beacon
-goes. A start that cannot write it says why on its error output and
-does not start: a vehicle that could not write it could not say a
-RESTART was commanded either, and a later start of its own would read
-whatever the old file said.</dd>
+<dd>The supervisor writes the state file before every child, counting the
+attempt on the top. One it cannot write is said in its log, and the
+child is started all the same: a vehicle that would not start because
+its storage refused a write would be lost to a counter, and a child
+that runs uncounted is given up only by a failure the supervisor sees.
+A child that was commanded writes the file again, without the word that
+it was, before its first beacon goes; one that cannot says why on its
+error output and does not start, since a later start of its own would
+otherwise be taken for a commanded one.</dd>
 <dt>Requirement</dt>
 <dd>The state file is written whole, to a file beside it that is then
 renamed over it, with the file and its directory flushed to storage
@@ -7458,9 +7507,10 @@ start sets it.</dd>
 A start nobody commanded runs with the definitions the start before it
 had, so that the format of what crosses the link never changes under a
 ground station that did not ask for it to. The exceptions are the
-starts that give up a configuration that will not load, or has failed
-to be heard from <tt class="docutils literal">load_trials</tt> times, for the confirmed one or the
-command line's: see <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>.</dd>
+starts that follow the supervisor's popping the top of the stack --
+after a child on it failed, or once it has failed to be heard from
+<tt class="docutils literal">load_trials</tt> times -- and run the one beneath it: see <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The
+supervisor and the configuration stack</a>.</dd>
 <dt>Requirement</dt>
 <dd>The beacon has two intervals, both required and both lengths of time:
 <tt class="docutils literal">beacon.default_interval</tt>, how often it beacons once the MOC has
@@ -7489,7 +7539,7 @@ then on beacons every <tt class="docutils literal">default_interval</tt>. One ca
 checksum does neither.
 Once a restart has been initiated a CONNECT does neither, and is
 refused <tt class="docutils literal">Unmatched</tt>: the flag stays set and the beacons stay at
-<tt class="docutils literal">reset_interval</tt> until the process ends. No other command slows the
+<tt class="docutils literal">reset_interval</tt> until the child ends. No other command slows the
 beacons or clears the flag.</dd>
 </dl>
 <p>The beacon goes fast across a restart because that is when the ground most
@@ -7618,8 +7668,8 @@ follows them through the ways a restart can go. What the vehicle does is
 fixed, and is the same in each:</p>
 <ol class="arabic simple">
 <li>It takes the RESTART: checks that the target will load, writes the state
-file to say the next start is commanded, uses up the arm, and sets the
-restart flag. From here it acts on nothing but the three.</li>
+file to put the target on top of the configuration stack and to say the
+next start is commanded, uses up the arm, and sets the restart flag. From here it acts on nothing but the three.</li>
 <li>It answers the RESTART, and then sends a beacon at once, carrying the
 flag and the next number of the old start's count. A periodic beacon
 that falls between setting the flag and answering carries the flag
@@ -7630,8 +7680,8 @@ up. A CONNECT that arrives meanwhile is refused <tt class="docutils literal">Unm
 old start's checksum, and changes nothing: the flag stays set and the
 beacons fast.
 Once the command links are closed nothing is answered.</li>
-<li>It <tt class="docutils literal">exec</tt>s. The new start reads and writes the state file and sends
-its first beacon at once: #1, with the flag set and the checksum of the
+<li>The child exits, and the supervisor starts a fresh one. The new start
+reads and writes the state file and sends its first beacon at once: #1, with the flag set and the checksum of the
 configuration it loaded. It beacons every <tt class="docutils literal">reset_interval</tt> until a
 CONNECT carrying that checksum, which clears the flag, sends a beacon at
 once, and slows the beacons to <tt class="docutils literal">default_interval</tt>.</li>
@@ -7722,7 +7772,8 @@ RESTART. The vehicle takes it, setting the flag, answers Success,
 and sends beacon 42 at once with the flag set, which ends the
 station's match. While it cleans up it beacons every
 reset_interval, and beacon 43 counts up: the same start, ending.
-After the exec the new start's beacon 1 goes at once with the
+After the child exits and the supervisor starts another, the
+new start's beacon 1 goes at once with the
 flag set; the number went back, so the station takes its link
 down. The station sends CONNECT with A, which matches: the vehicle
 clears the flag, answers, and sends beacon 2, normal, at once,
@@ -7775,9 +7826,9 @@ start.</p>
 <p>What the vehicle downlinks from a node is the node's bytes and nothing else:
 no header, no generation, no time. Which node sent a datum is the port it
 arrives at, and how to read it is that node's configuration. A change of
-configuration -- commanded, or a start that gives one up for the confirmed
-or the command line's -- can give a port to another node, or a node
-another format.</p>
+configuration -- commanded, or a start that runs the one beneath on the
+configuration stack once the top is popped -- can give a port to another
+node, or a node another format.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>The ground reads every datum with the definitions of the last beacon
@@ -7811,8 +7862,13 @@ provisioning makes its directory read-only too, and sets the immutable
 attribute where the file system has one: see <a class="reference internal" href="#keeping-configurations-on-board">Keeping configurations on
 board</a>.</dd>
 <dt>A restart that never comes back</dt>
-<dd>A restart whose <tt class="docutils literal">exec</tt> fails ends the process. The supervisor starts it
-again; without one the vehicle is gone, which is why one is required.</dd>
+<dd>A restart is a child that exits for the supervisor to start another,
+and a child that fails or never comes up is followed by another, on
+the configuration beneath where there is one: see <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and
+the configuration stack</a>. What ends the supervisor too, a power loss
+or a machine that hangs, leaves the vehicle to whatever starts
+tcspecial when the computer starts; without that the vehicle is gone,
+which is why one is required.</dd>
 <dt>A damaged or half-written state file</dt>
 <dd>Written whole and renamed into place, with a CRC; a damaged one names
 nothing, and the start loads the configuration on its command line. The
@@ -7829,17 +7885,18 @@ the beacon as a field of its own, in decimal, which the ground compares
 with each datum's.</dd>
 <dt>A restart nobody commanded changing the format</dt>
 <dd>A crash or a power cycle is a restart the ground did not ask for. It
-runs with the definitions it had, so nothing the ground sends is read
-differently. Its beacons carry the restart flag, as every start's do,
-and the checksum of the configuration it runs, which the ground matches
-before it reads anything of it.</dd>
+runs with the definitions it had, or, where the supervisor has popped
+the top it failed on, with those of the one beneath. Its beacons carry
+the restart flag, as every start's do, and the checksum of the
+configuration it runs, which the ground matches before it reads
+anything of it, so nothing the ground sends is read differently.</dd>
 <dt>Commands in flight across the restart</dt>
 <dd>A command sent before the RESTART arrives before it, because the link
 delivers in order, and is read by the start whose definitions it was
 built with. One sent after it reaches a start that has taken a RESTART,
 or one not yet matched, and is answered <tt class="docutils literal">Unmatched</tt> by either. The
-same holds for a start nobody commanded, one that gives up a
-configuration for the confirmed or the command line's among them: it
+same holds for a start nobody commanded, one that runs the
+configuration beneath a popped top among them: it
 acts on nothing but the three until a CONNECT carries its checksum, so
 commands already on their way when it began are refused, not read with
 its definitions.</dd>
@@ -7883,12 +7940,15 @@ Connect to send the CONNECT the start needs. Should a missed start
 ever matter more than that, the remedy is a count of starts in the
 beacon, as a field of its own, at the cost of up to ten more digits in
 every beacon.</dd>
-<dt>A confirmed configuration that later fails at every start</dt>
-<dd>A crash keeps the definitions it had, so a configuration that fails at
-every start would be started for ever. Every start of it that ends
-before a matching CONNECT is counted, in a row and whether it was
-confirmed or not, and <tt class="docutils literal">load_trials</tt> of them give it up: see
-<a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>.</dd>
+<dt>A configuration the ground has heard that later fails at every start</dt>
+<dd>A child that fails on it -- a crash, a check it does not pass --
+pops it at once. What ends the supervisor too, a power loss or a
+machine that hangs, the supervisor never sees, so every start of it
+since a matching CONNECT was last taken on it is counted, whether or
+not one ever was, and <tt class="docutils literal">load_trials</tt> of them pop it from the
+configuration stack: see <a class="reference internal" href="#starting-and-the-restart-flag">Starting, and the restart flag</a>. The command line's
+configuration is never counted or popped: it is the one <a class="reference internal" href="#what-is-assumed">What is
+assumed</a> requires always to work.</dd>
 <dt>Who may command the vehicle</dt>
 <dd>TCSpecial does not enforce security. Anyone who can reach the command
 link can arm and restart the vehicle; an arm key on an open link is a
@@ -10507,8 +10567,12 @@ parity, and the baud rates above 921600</td>
 <td>The <tt class="docutils literal">serial</tt> node's RS-485 and parity settings</td>
 </tr>
 <tr><td><tt class="docutils literal">/proc</tt></td>
-<td><tt class="docutils literal">/proc/self/exe</tt> and <tt class="docutils literal">/proc/self/fd</tt> (or <tt class="docutils literal">/dev/fd</tt>)</td>
-<td>Restarting by re-executing itself with its descriptors</td>
+<td><tt class="docutils literal">/proc/self/exe</tt></td>
+<td>The supervisor finding its own program, to start each child</td>
+</tr>
+<tr><td><tt class="docutils literal">prctl</tt></td>
+<td><tt class="docutils literal">PR_SET_PDEATHSIG</tt></td>
+<td>A child ending when its supervisor does</td>
 </tr>
 <tr><td><tt class="docutils literal">pipe2</tt></td>
 <td>A non-blocking pipe made in one call</td>
@@ -10541,7 +10605,9 @@ needs only <tt class="docutils literal">open</tt> and <tt class="docutils litera
 input and output on pipes; the app nodes start a program with socket
 pairs and close descriptors in the child, which is the <tt class="docutils literal">fork</tt> and
 <tt class="docutils literal">exec</tt> model; segment handoff runs its command with <tt class="docutils literal">posix_spawn</tt>
-and <tt class="docutils literal">waitpid</tt>; and a restart re-executes the program with <tt class="docutils literal">execv</tt>.</li>
+and <tt class="docutils literal">waitpid</tt>; and the supervisor starts each child, a fresh process
+for every start and every restart, with <tt class="docutils literal">posix_spawn</tt>, and waits for
+it with <tt class="docutils literal">waitpid</tt>.</li>
 <li>Signals: <tt class="docutils literal">SIGINT</tt> and <tt class="docutils literal">SIGTERM</tt> stop TCSpecial.</li>
 <li>Unix file descriptors themselves: <tt class="docutils literal">RawFd</tt>, <tt class="docutils literal">AsRawFd</tt> and
 <tt class="docutils literal">BorrowedFd</tt> run through every endpoint.</li>
@@ -10607,8 +10673,8 @@ whose interfaces differ from Linux's. On FreeRTOS and OpenRTOS the
 drivers are the board vendor's HAL, and each node would be written
 against it.</dd>
 <dt>Processes</dt>
-<dd>The <tt class="docutils literal">process</tt> and app nodes, segment handoff and restart by
-re-execution assume processes. VxWorks has them as real-time
+<dd>The <tt class="docutils literal">process</tt> and app nodes, segment handoff and the supervisor and
+its children assume processes. VxWorks has them as real-time
 processes (<tt class="docutils literal">rtpSpawn</tt>), QNX and INTEGRITY have them natively, and
 RTEMS, FreeRTOS, OpenRTOS and Zephyr do not: they have one address
 space and tasks. On those, a <tt class="docutils literal">process</tt> node would become a task
@@ -10616,9 +10682,9 @@ running code linked into the image, app nodes would not be built,
 segment handoff would call a function rather than a program, and a
 restart would be a reset of the processor -- by a watchdog, or the
 operating system's own restart -- with what must survive it kept in the
-state file as it is now. Re-execution also needs the program's path
-and its open descriptors, which Linux finds in <tt class="docutils literal">/proc</tt>; elsewhere
-they would be passed in or kept.</dd>
+state file as it is now. Starting a child also needs the program's
+path, which Linux finds in <tt class="docutils literal">/proc</tt>; elsewhere it would be passed in
+or kept.</dd>
 <dt>Stopping</dt>
 <dd><tt class="docutils literal">SIGINT</tt> and <tt class="docutils literal">SIGTERM</tt> would become the operating system's own way
 of asking a task to stop, or a command from the ground.</dd>

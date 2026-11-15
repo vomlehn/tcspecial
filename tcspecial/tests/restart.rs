@@ -1,5 +1,6 @@
-//! An armed RESTART runs tcspecial again in the same process, keeping the
-//! descriptors it was started with and none it opened itself.
+//! An armed RESTART runs tcspecial again: its supervisor, the process that
+//! was started, starts a fresh child, which is handed the descriptors the
+//! supervisor was started with and none the child before opened.
 //!
 //! Through tcspecial itself, as the ground commands it: armed, restarted, and
 //! watched by its beacons, which start again at #1 when it comes back, each
@@ -73,6 +74,32 @@ fn descriptors(pid: u32) -> Vec<i32> {
         .collect();
     open.sort_unstable();
     open
+}
+
+/// The one child of tcspecial's supervisor: the tcspecial running the
+/// vehicle.
+///
+/// # Arguments
+///
+/// * `pid` - The supervisor's process ID.
+///
+/// # Returns
+///
+/// The child's.
+///
+/// # Panics
+///
+/// If it has none, or more than one.
+fn child_of(pid: u32) -> u32 {
+    let listed =
+        std::fs::read_to_string(format!("/proc/{pid}/task/{pid}/children"))
+            .expect("its children can be read");
+    let children: Vec<u32> = listed
+        .split_whitespace()
+        .map(|child| child.parse().expect("a process ID"))
+        .collect();
+    assert_eq!(children.len(), 1, "one child: {children:?}");
+    children[0]
 }
 
 /// Waits for the next beacon.
@@ -247,7 +274,8 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let before = beacon(&beacons);
     assert!(!before.restart_flag, "cleared by the matching CONNECT");
     assert_eq!(ask(&commands, take_at, &ping(4)), CommandStatus::Success);
-    let open_before = descriptors(pid);
+    let child_before = child_of(pid);
+    let open_before = descriptors(child_before);
     assert!(
         open_before.contains(&handed),
         "the handed descriptor, {handed}, is not open in tcspecial: \
@@ -332,9 +360,11 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     assert_eq!(
         vehicle.0.id(),
         pid,
-        "the same process, as a supervisor sees it"
+        "the same process, as whatever started it sees it"
     );
-    let open_after = descriptors(pid);
+    let child_after = child_of(pid);
+    assert_ne!(child_after, child_before, "a fresh child");
+    let open_after = descriptors(child_after);
     assert!(
         open_after.contains(&handed),
         "the handed descriptor, {handed}, did not survive the restart: \
@@ -438,7 +468,7 @@ fn next_start(beacons: &UdpSocket, mut last: u32) -> Beacon {
 /// One naming a configuration the vehicle does not hold is refused
 /// `NotFound`, and one whose configuration has gone between the arm and the
 /// restart is refused `NotFound` too, and nothing restarts. A matching
-/// CONNECT confirms what runs, so the state file names it.
+/// CONNECT on what runs sets its attempts back to nought.
 #[test]
 fn a_restart_runs_the_configuration_it_names() {
     let dir = tempfile::tempdir().expect("a directory");
@@ -534,11 +564,13 @@ fn a_restart_runs_the_configuration_it_names() {
     assert_eq!(back.digest, theirs, "the configuration the RESTART named");
     assert!(back.restart_flag);
     let said = std::fs::read_to_string(&state).expect("the state file");
+    // Pushed above the command line's, which is the bottom and is not
+    // written, and counted once, for the child running it.
     assert!(
-        said.contains(&format!("next {theirs}\ntrials 1\n")),
+        said.contains(&format!("\nstack {theirs}\ntrials 1\n")),
         "{said}"
     );
-    assert!(said.contains(&format!("confirmed {ours}\n")), "{said}");
+    assert!(!said.contains(&format!("stack {ours}")), "{said}");
 
     // Matched with its own checksum, which confirms it.
     assert_eq!(
@@ -554,16 +586,16 @@ fn a_restart_runs_the_configuration_it_names() {
     assert!(!beacon(&beacons).restart_flag, "matched");
     let said = std::fs::read_to_string(&state).expect("the state file");
     assert!(
-        said.contains(&format!("next {theirs}\ntrials 0\n")),
+        said.contains(&format!("\nstack {theirs}\ntrials 0\n")),
         "{said}"
     );
-    assert!(said.contains(&format!("confirmed {theirs}\n")), "{said}");
 }
 
 /// A SIGTERM that arrives after a RESTART is taken and before the process
 /// runs itself again stops the vehicle rather than being lost: the process
-/// ends, with success, and no start comes back. The state file names the
-/// RESTART's target for the next start, as a commanded one.
+/// ends, with success, and no start comes back. The state file says the
+/// next start is a commanded one, of the RESTART's target, which is the
+/// command line's and so pushes nothing.
 #[test]
 fn a_stop_during_a_restart_stops_the_vehicle() {
     let dir = tempfile::tempdir().expect("a directory");
@@ -655,6 +687,68 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
         );
     }
     let said = std::fs::read_to_string(&state).expect("the state file");
-    assert!(said.contains(&format!("next {ours}\ntrials 0\n")), "{said}");
+    assert!(!said.contains("stack "), "{said}");
     assert!(said.contains("next_start commanded"), "{said}");
+}
+
+/// A child that dies -- killed here, as a crash would end it -- is given up
+/// for what is beneath it: its supervisor pops it from the configuration
+/// stack and starts a fresh child on the command line's, and is the same
+/// process throughout.
+#[test]
+fn a_child_that_dies_is_given_up_for_what_is_beneath() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let beacons = socket();
+    let commands = socket();
+    let commands_at = commands.local_addr().expect("where").port();
+    let beacons_at = beacons.local_addr().expect("where").port();
+    let take_at = free();
+    let kept = dir.path().join("kept");
+    std::fs::create_dir(&kept).expect("a store");
+    let state = dir.path().join("tcspecial.state");
+
+    let first = dir.path().join("first.ytcs");
+    let second = dir.path().join("second.ytcs");
+    for (path, arm) in [(&first, "20 min"), (&second, "30 min")] {
+        written(path, &state, &kept, take_at, commands_at, beacons_at, arm);
+    }
+    let ours = common::checksum_of(&first);
+    let theirs = common::checksum_of(&second);
+    tcsprotocol::store::Store::at(&kept)
+        .keep(&second)
+        .expect("kept");
+    tcspecial::state::write(
+        &state,
+        &tcspecial::state::State {
+            stack: vec![theirs],
+            trials: 0,
+            commanded: false,
+        },
+    )
+    .expect("the stack");
+
+    let vehicle = Running(
+        Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+            .arg(&first)
+            .arg("--quiet")
+            .arg("--simulate=all")
+            .env_remove("RUST_LOG")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("tcspecial runs"),
+    );
+    let started = beacon(&beacons);
+    assert_eq!(started.digest, theirs, "the top of the stack");
+
+    let pid = vehicle.0.id();
+    let child = child_of(pid);
+    // SAFETY: a signal to a process this test's tcspecial started.
+    unsafe { libc::kill(child as libc::pid_t, libc::SIGKILL) };
+
+    let back = next_start(&beacons, started.sequence);
+    assert_eq!(back.digest, ours, "the command line's, beneath it");
+    assert_ne!(child_of(pid), child, "a fresh child");
+    let said = std::fs::read_to_string(&state).expect("the state file");
+    assert!(!said.contains("stack "), "popped: {said}");
 }

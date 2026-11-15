@@ -7,10 +7,81 @@
 //! address a configuration states is a port below 1024, which a test cannot
 //! bind: a run the mode refuses says so before it tries, and a run it allows
 //! goes on to say its digest and then fails to bind, so nothing here holds a
-//! port another test might want.
+//! port another test might want. A run that fails to bind, in the flight
+//! setting, is one its supervisor starts again, after a delay, for ever:
+//! that is stopped once the supervisor says it will start it again.
 
 use std::fs::File;
-use std::process::Command;
+use std::io::Read;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+/// Runs tcspecial as `command` says until it ends, or until its supervisor
+/// says it will start it again, when it is stopped, and collects what it
+/// says.
+///
+/// # Arguments
+///
+/// * `command` - tcspecial, with its arguments.
+///
+/// # Returns
+///
+/// What it wrote on stderr.
+///
+/// # Panics
+///
+/// If it cannot be run, exits successfully having been neither stopped nor
+/// refused, or neither ends nor says it will start again within thirty
+/// seconds.
+fn stderr_of(command: &mut Command) -> String {
+    let mut child = command
+        .env_remove("RUST_LOG")
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("tcspecial runs");
+    let mut stderr = child.stderr.take().expect("its stderr");
+    let said = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let filling = said.clone();
+    let reader = std::thread::spawn(move || {
+        let mut chunk = [0u8; 4096];
+        while let Ok(size) = stderr.read(&mut chunk) {
+            if size == 0 {
+                break;
+            }
+            filling
+                .lock()
+                .expect("what it said")
+                .push_str(&String::from_utf8_lossy(&chunk[..size]));
+        }
+    });
+    let by = Instant::now() + Duration::from_secs(30);
+    loop {
+        if let Some(status) = child.try_wait().expect("it can be asked") {
+            assert!(!status.success(), "no run binds a port below 1024");
+            break;
+        }
+        if said
+            .lock()
+            .expect("what it said")
+            .contains("starting it again")
+        {
+            // SAFETY: a signal to a child this test started.
+            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGTERM) };
+            child.wait().expect("it stops");
+            break;
+        }
+        if Instant::now() > by {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("tcspecial neither ended nor said it would start again");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    reader.join().expect("its stderr is read");
+    let said = said.lock().expect("what it said").clone();
+    said
+}
 
 /// Writes a test's configuration: the given payloads, and every address a port
 /// below 1024.
@@ -147,18 +218,15 @@ const ON_THE_NETWORK: &str = "  - type network:
 ///
 /// # Panics
 ///
-/// If tcspecial cannot be run or exits successfully.
+/// If tcspecial cannot be run, or as [`stderr_of`] panics.
 fn run(args: &[&str], payloads: &str) -> String {
     let dir = tempfile::tempdir().expect("a directory");
     let path = configuration(dir.path(), payloads);
-    let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
-        .args(args)
-        .arg(&path)
-        .env_remove("RUST_LOG")
-        .output()
-        .expect("tcspecial runs");
-    assert!(!ran.status.success(), "no run binds a port below 1024");
-    String::from_utf8_lossy(&ran.stderr).into_owned()
+    stderr_of(
+        Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+            .args(args)
+            .arg(&path),
+    )
 }
 
 /// Left out, the mode is the flight setting, and a simulated device is refused
@@ -252,13 +320,11 @@ payloads:
     )
     .expect("written");
     let said = |mode: &str| {
-        let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
-            .arg(mode)
-            .arg(&path)
-            .env_remove("RUST_LOG")
-            .output()
-            .expect("tcspecial runs");
-        String::from_utf8_lossy(&ran.stderr).into_owned()
+        stderr_of(
+            Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+                .arg(mode)
+                .arg(&path),
+        )
     };
 
     let all = said("--simulate=all");

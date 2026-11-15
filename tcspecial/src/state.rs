@@ -1,32 +1,36 @@
 //! The state file: what tcspecial keeps across a restart.
 //!
-//! Which configuration the next start loads, by its checksum -- the one the
-//! last taken RESTART named, or else the one the start before ran -- and how
-//! many of its starts have ended before a matching CONNECT; which
-//! configuration is *confirmed*, the last one a matching CONNECT was taken
-//! on; and whether the next start is one the ground commanded, which the
-//! startup summary then says. (The beacon's restart flag does not depend on
-//! any of it: every start begins with the flag set.) It is kept in the file
-//! the `tcspecial` section's `state_file` names, on storage that survives a
-//! power cycle, because what is kept in memory is gone at every crash and
-//! every power cycle -- which are the restarts this is most needed across.
-//! How a start uses it is in [`crate::runtime::choose`].
+//! The *configuration stack*: the configurations a start may run, by
+//! checksum, the top being the one the next child runs, above the
+//! configuration on tcspecial's command line, which is the bottom, is not
+//! written, and is never popped. A matching CONNECT pushes the running
+//! configuration, and an armed RESTART the one it names; the supervisor pops
+//! the top when its child fails. With it, how many attempts the top has had
+//! since a matching CONNECT was last taken on it, and whether the next start
+//! is one the ground commanded. It is kept in the file the `tcspecial`
+//! section's `state_file` names, on storage that survives a power cycle,
+//! because what is kept in memory is gone at every crash and every power
+//! cycle -- which are the restarts this is most needed across. How it is
+//! used is in [`crate::runtime::supervisor`] and [`crate::runtime::choose`].
 //!
 //! There is no generation number. A start of tcspecial is told by its
 //! beacon's restart flag and its number going back, and which configuration
 //! it runs by its checksum; nothing in the state file counts starts but the
-//! trials of the configuration it names. A file written by a build that
-//! kept a generation still has a `generation` line, which is read and
-//! dropped, and the start says so in its log.
+//! attempts on the top. A file written by a build that kept a generation
+//! still has a `generation` line, which is read and dropped, and the start
+//! says so in its log. One written before the stack, which named a `next`
+//! and a `confirmed` configuration, is read as the stack of the two, the
+//! confirmed one beneath.
 //!
 //! The file is a few lines of text, so that somebody at a console can read
-//! it, and ends with a CRC of everything before it:
+//! it, and ends with a CRC of everything before it. The stack is written
+//! from the bottom up, one `stack` line for each configuration:
 //!
 //! ```text
 //! # tcspecial's state, which it writes on every start: do not edit.
-//! next 0123456789abcdef0123456789abcdef
+//! stack 0123456789abcdef0123456789abcdef
+//! stack 89abcdef0123456789abcdef01234567
 //! trials 1
-//! confirmed 0123456789abcdef0123456789abcdef
 //! next_start commanded
 //! crc16 0x1a2b
 //! ```
@@ -36,8 +40,12 @@
 //!
 //! It is written whole to a file beside it, flushed, and renamed over it, and
 //! the directory is flushed after: a power failure part way through leaves
-//! the old file or the new one, never half of each. See "The state file" in
-//! `docs/tcspecial-design.rst`.
+//! the old file or the new one, never half of each. Every change is made
+//! under the *short lock*, an exclusive `flock` on the file beside it named
+//! with `.update` added, held while the file is read, changed and renamed:
+//! tcspecial's supervisor, its child and software outside tcspecial that
+//! pushes or pops the stack all change it, and two changes made at once
+//! would lose one. See "The state file" in `docs/tcspecial-design.rst`.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -49,18 +57,56 @@ use tcsprotocol::ConfigDigest;
 /// What a state file holds.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct State {
-    /// The configuration the next start loads, by its checksum, or `None`
-    /// where the file names none.
-    pub next: Option<ConfigDigest>,
-    /// How many starts of `next` have ended -- a crash, a power loss, a
-    /// failed check -- before a matching CONNECT. Each start of it adds one
-    /// as it starts, and a matching CONNECT sets it back to nought, so a
-    /// start that ran until it was matched leaves nought behind.
+    /// The configuration stack above the command line's, bottom first: the
+    /// last is the top, which the next child runs. Empty is the command
+    /// line's alone.
+    pub stack: Vec<ConfigDigest>,
+    /// How many children have been started on the top since a matching
+    /// CONNECT was last taken on it: the supervisor adds one before each,
+    /// and a matching CONNECT sets it back to nought, so one that has run
+    /// until it was matched leaves nought behind. Of a stacked
+    /// configuration only: the command line's is never given up.
     pub trials: u32,
-    /// The last configuration a matching CONNECT was taken on, or `None`.
-    pub confirmed: Option<ConfigDigest>,
     /// Whether the next start is one the ground commanded.
     pub commanded: bool,
+}
+
+impl State {
+    /// The configuration the next child runs, where it is a stacked one.
+    ///
+    /// # Returns
+    ///
+    /// The top, or `None` where the stack holds only the command line's.
+    pub fn top(&self) -> Option<ConfigDigest> {
+        self.stack.last().copied()
+    }
+
+    /// Pushes `digest`, unless it is the top already, its attempts starting
+    /// again at nought.
+    ///
+    /// # Arguments
+    ///
+    /// * `digest` - The configuration's checksum.
+    fn push(&mut self, digest: ConfigDigest) {
+        if self.top() != Some(digest) {
+            self.stack.push(digest);
+            self.trials = 0;
+        }
+    }
+}
+
+/// The command line's configuration, which is the bottom of the stack and is
+/// not written in it: set once a start knows it, so that a CONNECT matching
+/// it pushes nothing.
+static BOTTOM: std::sync::OnceLock<ConfigDigest> = std::sync::OnceLock::new();
+
+/// Says which configuration is the bottom of the stack.
+///
+/// # Arguments
+///
+/// * `digest` - The command line's configuration's checksum.
+pub fn set_bottom(digest: ConfigDigest) {
+    let _ = BOTTOM.set(digest);
 }
 
 /// What a start found in the state file.
@@ -119,11 +165,12 @@ pub fn read(path: &Path) -> Found {
 }
 
 /// Says in the state file at `path` that the next start is one the ground
-/// commanded, and that it loads the configuration whose checksum is
-/// `target`: an armed RESTART naming it has been taken.
+/// commanded, and pushes the configuration whose checksum is `target`, which
+/// the next child then runs: an armed RESTART naming it has been taken.
 ///
-/// Its trials start again at nought, since nothing has yet tried it, and
-/// what the file says is confirmed is kept.
+/// Its attempts start at nought, since nothing has yet tried it, and the
+/// configuration it was pushed above stays beneath it, to be run again if it
+/// fails.
 ///
 /// Written before the RESTART is answered and before anything stops, so that
 /// a RESTART the file cannot say is refused and nothing restarts: a vehicle
@@ -148,21 +195,25 @@ pub fn commanded_restart(
     path: &Path,
     target: ConfigDigest,
 ) -> Result<(), String> {
-    let mut state = read(path).state;
-    state.next = Some(target);
-    state.trials = 0;
-    state.commanded = true;
-    write(path, &state)
+    update(path, |state| {
+        if BOTTOM.get() == Some(&target) && state.stack.is_empty() {
+            state.trials = 0;
+        } else {
+            state.push(target);
+        }
+        state.commanded = true;
+    })
+    .map(|_| ())
 }
 
 /// Says in the state file at `path` that the configuration running, whose
-/// checksum is `running`, is confirmed: a CONNECT carrying it has been
-/// taken. It is what the next start loads, and its trials go back to
-/// nought.
+/// checksum is `running`, has been heard: a CONNECT carrying it has been
+/// taken. It is pushed, unless it is the top already or is the bottom with
+/// nothing above it, and its attempts go back to nought.
 ///
 /// Allocates, in the command loop: the file is read and its text made.
-/// Once a start, at its match, and a confirmation that could not be kept
-/// would be one the next start did not know of.
+/// Once a start, at its match, and a match that could not be kept would be
+/// one the next start did not know of.
 ///
 /// # Arguments
 ///
@@ -173,11 +224,102 @@ pub fn commanded_restart(
 ///
 /// Why the file could not be written, naming it and the attribute.
 pub fn confirmed(path: &Path, running: ConfigDigest) -> Result<(), String> {
+    update(path, |state| {
+        if !(BOTTOM.get() == Some(&running) && state.stack.is_empty()) {
+            state.push(running);
+        }
+        state.trials = 0;
+    })
+    .map(|_| ())
+}
+
+/// Changes the state file at `path`, under its short lock: reads it, lets
+/// `change` change what it holds, and writes it whole.
+///
+/// A damaged or missing file is changed from nothing, as [`read`] reads it.
+///
+/// # Arguments
+///
+/// * `path`   - The state file.
+/// * `change` - What to do to what it holds.
+///
+/// # Returns
+///
+/// What it holds now.
+///
+/// # Errors
+///
+/// Why the lock could not be taken or the file written, naming it and the
+/// attribute.
+pub fn update(
+    path: &Path,
+    change: impl FnOnce(&mut State),
+) -> Result<State, String> {
+    let _held = short_lock(path)?;
     let mut state = read(path).state;
-    state.next = Some(running);
-    state.trials = 0;
-    state.confirmed = Some(running);
-    write(path, &state)
+    change(&mut state);
+    write(path, &state)?;
+    Ok(state)
+}
+
+/// The file the short lock is taken on: beside the state file, with
+/// `.update` added. Never removed, because a lock file removed while
+/// another waits on it is two lock files.
+///
+/// # Arguments
+///
+/// * `path` - The state file.
+///
+/// # Returns
+///
+/// The lock file's path.
+pub fn short_lock_of(path: &Path) -> PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".update");
+    path.with_file_name(name)
+}
+
+/// Takes the short lock on the state file at `path`, waiting for whoever
+/// holds it.
+///
+/// # Arguments
+///
+/// * `path` - The state file.
+///
+/// # Returns
+///
+/// The lock file, held until it is dropped.
+///
+/// # Errors
+///
+/// Why the lock could not be made or taken, naming it and the attribute.
+fn short_lock(path: &Path) -> Result<File, String> {
+    let lock = short_lock_of(path);
+    let cannot = |e: std::io::Error| {
+        format!(
+            "the state file's short lock {} cannot be taken ({e}): \
+             state_file in the configuration's tcspecial section must name \
+             a file in a directory tcspecial can write",
+            lock.display()
+        )
+    };
+    let file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&lock)
+        .map_err(cannot)?;
+    use std::os::fd::AsRawFd;
+    loop {
+        // SAFETY: flock on a descriptor `file` holds open, with no pointer.
+        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
+            return Ok(file);
+        }
+        let e = std::io::Error::last_os_error();
+        if e.kind() != std::io::ErrorKind::Interrupted {
+            return Err(cannot(e));
+        }
+    }
 }
 
 /// What a state file's text says, a generation an older build wrote
@@ -202,11 +344,11 @@ fn text_of(state: &State) -> Vec<u8> {
     let mut text = String::from(
         "# tcspecial's state, which it writes on every start: do not edit.\n",
     );
-    if let Some(next) = state.next {
-        text.push_str(&format!("next {next}\ntrials {}\n", state.trials));
+    for digest in &state.stack {
+        text.push_str(&format!("stack {digest}\n"));
     }
-    if let Some(confirmed) = state.confirmed {
-        text.push_str(&format!("confirmed {confirmed}\n"));
+    if !state.stack.is_empty() {
+        text.push_str(&format!("trials {}\n", state.trials));
     }
     if state.commanded {
         text.push_str("next_start commanded\n");
@@ -271,20 +413,24 @@ fn state_in(text: &[u8]) -> Result<Said, String> {
             .map_err(|_| format!("its {what} is {said:?}, not a count"))
     };
     let mut read = Said::default();
+    // What a file written before the stack named, read as the stack of the
+    // two, the confirmed one beneath.
+    let (mut next, mut confirmed) = (None, None);
     for line in body.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         match line.split_once(' ') {
-            Some(("next", said)) => {
-                read.state.next = Some(checksum("next", said)?)
+            Some(("stack", said)) => {
+                read.state.stack.push(checksum("stack", said)?)
             }
+            Some(("next", said)) => next = Some(checksum("next", said)?),
             Some(("trials", said)) => {
                 read.state.trials = count("trials", said)?
             }
             Some(("confirmed", said)) => {
-                read.state.confirmed = Some(checksum("confirmed", said)?)
+                confirmed = Some(checksum("confirmed", said)?)
             }
             Some(("next_start", "commanded")) => read.state.commanded = true,
             // What a build that counted generations wrote, read so that its
@@ -295,6 +441,15 @@ fn state_in(text: &[u8]) -> Result<Said, String> {
             }
             _ => return Err(format!("it says {line:?}, which is not state")),
         }
+    }
+    if read.state.stack.is_empty() {
+        // The trials were next's, which is the top however it got there.
+        let trials = read.state.trials;
+        read.state.stack.extend(confirmed);
+        if let Some(next) = next {
+            read.state.push(next);
+        }
+        read.state.trials = trials;
     }
     Ok(read)
 }
@@ -376,25 +531,25 @@ mod tests {
     }
 
     /// What is written reads back, and is text a person can read, holding
-    /// no generation: nothing in it counts starts but the trials.
+    /// no generation: nothing in it counts starts but the trials. The stack
+    /// is written bottom first.
     #[test]
     fn what_is_written_reads_back_and_is_text() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tcspecial.state");
         let state = State {
-            next: Some(ONE),
+            stack: vec![ONE, TWO],
             trials: 2,
-            confirmed: Some(TWO),
             commanded: true,
         };
         write(&path, &state).expect("written");
         assert_eq!(read(&path).state, state);
+        assert_eq!(read(&path).state.top(), Some(TWO));
         let text = std::fs::read_to_string(&path).expect("it is text");
         assert!(
-            text.contains(&format!("\nnext {ONE}\ntrials 2\n")),
+            text.contains(&format!("\nstack {ONE}\nstack {TWO}\ntrials 2\n")),
             "{text}"
         );
-        assert!(text.contains(&format!("\nconfirmed {TWO}\n")), "{text}");
         assert!(!text.contains("generation"), "{text}");
         assert!(
             text.lines().last().unwrap().starts_with("crc16 0x"),
@@ -403,20 +558,19 @@ mod tests {
         assert!(!beside(&path).exists(), "nothing is left beside it");
     }
 
-    /// A RESTART taken names its target for the next start, with no trials
-    /// yet, and says it is commanded, keeping what is confirmed; a matching
-    /// CONNECT confirms the running configuration and sets the trials back
-    /// to nought.
+    /// A RESTART taken pushes its target, with no trials yet, and says it is
+    /// commanded, keeping what it was pushed above; a matching CONNECT on
+    /// the top pushes nothing and sets the trials back to nought, and one on
+    /// a configuration that is not the top pushes it.
     #[test]
-    fn a_restart_names_its_target_and_a_connect_confirms() {
+    fn a_restart_pushes_its_target_and_a_connect_resets_the_trials() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tcspecial.state");
         write(
             &path,
             &State {
-                next: Some(ONE),
+                stack: vec![ONE],
                 trials: 1,
-                confirmed: Some(ONE),
                 commanded: false,
             },
         )
@@ -426,33 +580,93 @@ mod tests {
         assert_eq!(
             read(&path).state,
             State {
-                next: Some(TWO),
+                stack: vec![ONE, TWO],
                 trials: 0,
-                confirmed: Some(ONE),
                 commanded: true,
             }
         );
 
-        write(
-            &path,
-            &State {
-                next: Some(TWO),
-                trials: 2,
-                confirmed: Some(ONE),
-                commanded: false,
-            },
-        )
+        update(&path, |state| {
+            state.trials = 2;
+            state.commanded = false;
+        })
         .expect("written");
         confirmed(&path, TWO).expect("confirmed");
         assert_eq!(
             read(&path).state,
             State {
-                next: Some(TWO),
+                stack: vec![ONE, TWO],
                 trials: 0,
-                confirmed: Some(TWO),
                 commanded: false,
             }
         );
+
+        let three = ConfigDigest([0x33; 16]);
+        confirmed(&path, three).expect("confirmed");
+        assert_eq!(read(&path).state.stack, vec![ONE, TWO, three]);
+    }
+
+    /// A file written before the stack, naming a next and a confirmed
+    /// configuration, is read as the stack of the two, the confirmed one
+    /// beneath, with next's trials; one that names only one of them is the
+    /// stack of that one.
+    #[test]
+    fn a_file_from_before_the_stack_is_read_as_one() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("tcspecial.state");
+        let old = |body: String| {
+            let mut text = format!(
+                "# tcspecial's state, which it writes on every start: do not \
+                 edit.\n{body}"
+            )
+            .into_bytes();
+            let crc = crc16(&text);
+            text.extend_from_slice(format!("crc16 {crc:#06x}\n").as_bytes());
+            text
+        };
+        std::fs::write(
+            &path,
+            old(format!("next {TWO}\ntrials 2\nconfirmed {ONE}\n")),
+        )
+        .expect("written");
+        assert_eq!(
+            read(&path).state,
+            State {
+                stack: vec![ONE, TWO],
+                trials: 2,
+                commanded: false,
+            }
+        );
+        std::fs::write(
+            &path,
+            old(format!("next {ONE}\ntrials 1\nconfirmed {ONE}\n")),
+        )
+        .expect("written");
+        assert_eq!(read(&path).state.stack, vec![ONE]);
+        assert_eq!(read(&path).state.trials, 1);
+    }
+
+    /// Two changes made at once are both kept: each is made under the short
+    /// lock, so neither reads what the other is about to replace.
+    #[test]
+    fn changes_made_at_once_are_both_kept() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("tcspecial.state");
+        let threads: Vec<_> = (0..8u8)
+            .map(|at| {
+                let path = path.clone();
+                std::thread::spawn(move || {
+                    update(&path, |state| {
+                        state.stack.push(ConfigDigest([at; 16]))
+                    })
+                    .expect("changed")
+                })
+            })
+            .collect();
+        for thread in threads {
+            thread.join().expect("it ends");
+        }
+        assert_eq!(read(&path).state.stack.len(), 8);
     }
 
     /// A file an older build wrote, which counted generations, is read: its
@@ -472,7 +686,7 @@ do not edit.\ngeneration 7\nnext_start commanded\n"
         assert_eq!(found.dropped_generation, Some(7));
         assert_eq!(found.damaged, None, "not a damaged file");
         assert!(found.state.commanded, "what else it says is read");
-        assert_eq!(found.state.next, None, "and it names no configuration");
+        assert_eq!(found.state.top(), None, "and it names no configuration");
     }
 
     /// A file damaged on its storage, edited by hand or cut short is said to

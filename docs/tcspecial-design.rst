@@ -4539,7 +4539,9 @@ node's wait and no other.
 Restarting
 ~~~~~~~~~~
 
-A RESTART runs tcspecial again, in the process it is already running in.
+A RESTART ends the child that runs the vehicle, and its supervisor starts a
+fresh child on the configuration the RESTART named: see `The supervisor and
+the configuration stack`_.
 
 Requirement
     A RESTART_ARM is taken, with its key, and answered ``Success``. A second
@@ -4559,8 +4561,9 @@ Requirement
     again.
 
 Requirement
-    A RESTART is taken only once the state file says the next start is a
-    commanded one -- see `The state file`_ -- so
+    A RESTART is taken only once the state file has the configuration it
+    names on top of the stack and says the next start is a commanded one
+    -- see `The state file`_ -- so
     that the start it asks for says in its startup summary that it was
     commanded. Where that cannot be written the RESTART is answered
     ``Failure``, nothing restarts, and the arm stands: a vehicle that came
@@ -4578,41 +4581,50 @@ Requirement
     restart was meant to keep going.
 
 Requirement
-    Then every descriptor tcspecial opened is closed, and it ``exec``\ s its own
-    executable with the arguments it was started with, keeping the
-    descriptors it was started with and only those: the standard three and
-    whatever a supervisor handed it. Which those were is asked as the process
-    starts, before anything is opened, from ``/proc/self/fd`` or ``/dev/fd``.
-    The process id stays the same, so a supervisor sees one process
-    throughout, and the beacons start again at #1, which is how the ground
-    tells a restart from a gap: see `The beacon across a restart`_.
+    Then the child exits with the restart status, and the supervisor starts
+    a fresh child, the same program with the arguments it was started with,
+    on the configuration the RESTART put on top of the stack. The fresh
+    child is handed what the supervisor was handed and only that: the
+    standard three and whatever started tcspecial gave it. Nothing the old
+    child opened reaches it, because everything tcspecial opens is opened
+    close-on-exec. The process id the outside world sees, the supervisor's,
+    stays the same, and the child's changes; the beacons start again at #1,
+    which is how the ground tells a restart from a gap: see `The beacon
+    across a restart`_.
 
 Requirement
     A stop asked for while a restart is under way -- a SIGINT or a SIGTERM
-    that arrives after the RESTART is taken and before the ``exec`` -- stops
-    the vehicle: it is not lost with the process image that took it, and the
-    vehicle does not restart instead. The state file already names the
-    RESTART's target for the next start, as a commanded one, so whatever
-    starts tcspecial next runs that target, as a restart would have.
+    that arrives after the RESTART is taken and before the child exits --
+    stops the vehicle: it is not lost, and the vehicle does not restart
+    instead. The state file already has the RESTART's target on top, and
+    says the next start is commanded, so whatever starts tcspecial next runs
+    that target, as a restart would have.
 
-The two signals are blocked in every thread from the first moment of
-``main``, before any thread is made, and one thread of their own takes them
+The two signals are blocked in every thread of the child from the first
+moment of ``main``, before any thread is made -- the supervisor starts the
+child with them blocked already -- and one thread of their own takes them
 with ``sigtimedwait`` (``runtime::signals``). A handler could not do it: it
-runs in whichever thread the kernel picks, and the flag it sets is in an
-image the ``exec`` is about to replace. Before the ``exec`` the restart ends
-that thread, so that nothing takes either signal from then on, and looks
-whether one was taken or is pending: if so the process stops rather than
-restarting. One that arrives after that look stays pending, blocked in every
-thread, is carried pending through the ``exec``, and is the first thing the
-new image's thread takes: before its loop is running, which ends the process
-at once, as an unhandled stop signal would. Either way the vehicle stops.
+runs in whichever thread the kernel picks and can only set a flag, and a
+stop that arrives just as the child exits for the restart must still be
+seen. Before the child exits for the restart it ends that thread, so that
+nothing takes either signal from then on, and looks whether one was taken
+or is pending: if so it exits with the good status, as a stopped child
+does, and the supervisor stops rather than starting another. A stop sent to
+the supervisor itself, which is where a service manager sends one, is
+passed on to the child, and the supervisor stops whatever the child exits
+with. Either way the vehicle stops. One gap is left: a stop sent to the
+child alone, after it has looked and before it has exited, ends with the
+child and is not seen, and the supervisor starts the RESTART's target. A
+stop sent to the supervisor, or to both, as systemd sends one to every
+process of a service, is not affected.
 
 Requirement
-    Where that cannot be done -- neither directory could be read as the
-    process started, or the ``exec`` fails -- tcspecial says why on its error
-    output and exits. A restart that cannot keep what it was handed is not
-    one, and a process that carried on after being told to restart would be
-    flying something the ground believes has gone.
+    Where the supervisor cannot start a child, it says why in its log, and
+    tries again after a delay in flight, as it does for a bottom that
+    fails, and stops under ``--simulate``. A process that carried on after
+    being told to restart would be flying something the ground believes
+    has gone, so the old child never carries on: it has exited before the
+    new one is started.
 
 Running a graph
 ---------------
@@ -6160,15 +6172,19 @@ Requirement
     that configuration and no other.
 
 Requirement
-    A start that falls back to the command line's configuration and then
-    fails falls back to it again, never to anything else, because there is
-    nothing surer to go to.
+    A start on the command line's configuration that fails is followed by
+    another on it, never by anything else, because there is nothing surer
+    to go to: it is the bottom of the configuration stack, which nothing
+    pops.
 
 Requirement
-    tcspecial runs under a supervisor that starts it again when it exits.
-    Every failure that ends the process -- a restart that cannot ``exec``, a
-    crash -- relies on that, and the manual
-    says how to set one up.
+    tcspecial is its own supervisor: the process that is started starts a
+    child to run the vehicle, and starts another when that one ends, as
+    `The supervisor and the configuration stack`_ says. Every failure that
+    ends a child -- a crash, a configuration that will not load -- relies on
+    that. What ends the supervisor too -- a power loss, a machine that
+    hangs -- relies on whatever starts tcspecial when the computer starts,
+    and the manual says how to set that up.
 
 Requirement
     The state file is kept on storage that survives a power cycle, which is
@@ -6260,7 +6276,10 @@ Configurations named by their checksum
    matching CONNECT confirming, the order a start loads them in and saying
    which and why, a damaged or missing state file loading the command
    line's, and ``load_trials``, read from the command line's
-   configuration. In `The three commands that always go`_, every
+   configuration. (The next and the confirmed configuration, and the order
+   a start loaded them in, gave way on 2026-11-14 to the configuration
+   stack of `The supervisor and the configuration stack`_.) In `The three
+   commands that always go`_, every
    requirement: a target the vehicle does not hold refused ``NotFound`` at
    the arm, the target loaded and checked again just before the restart, a
    RESTART naming the running configuration a plain restart, and the two
@@ -6398,10 +6417,11 @@ Starting, and the restart flag
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
-   How a start chooses its configuration here -- ``next``, ``confirmed``
-   and the command line's -- is to be replaced by the configuration stack
-   of `The supervisor and the configuration stack`_, designed and not yet
-   built.
+   **Built** (2026-11-14): a start chooses its configuration from the
+   configuration stack of `The supervisor and the configuration stack`_.
+   It once chose from the state file's ``next`` and ``confirmed`` and the
+   command line's, in that order; a state file that still names those is
+   read as the stack of the two, the confirmed one beneath.
 
 Requirement
     There is no generation number. A start of tcspecial is told by its
@@ -6409,11 +6429,11 @@ Requirement
     in the state file, the beacon, the answers or ``tcsmoc`` counts starts.
 
 Requirement
-    The state file names, by checksum, the configuration the next start
-    loads -- the one the last taken RESTART named, or else the one the
-    start before ran -- and the *confirmed* configuration: the last one a
-    matching CONNECT was taken on. A matching CONNECT writes the running
-    configuration to it as confirmed.
+    The state file keeps the configuration stack, by checksum, above the
+    configuration on tcspecial's command line, which is its bottom, is
+    never written in it and is never popped. A matching CONNECT pushes the
+    running configuration, unless it is already the top, or is the bottom
+    with nothing above it; an armed RESTART pushes the one it names.
 
 The state file is the command line's configuration's, whichever
 configuration runs, and so are ``configurations`` and ``load_trials``: a
@@ -6422,13 +6442,14 @@ configuration that names another state file is run with the command line's,
 and the start says so in its log.
 
 Requirement
-    Every start loads the first of these that passes its check: the
-    configuration the state file names for it; else the confirmed one;
-    else the configuration given on tcspecial's command line, which
-    provisioning installed and made read-only. Whichever it loads, it says
-    in the log which and why, and from its first beacon on every beacon
-    carries that configuration's checksum, so the ground sees which
-    configuration a start is running whatever chose it.
+    Every start runs the top of the stack, or the configuration given on
+    tcspecial's command line, which provisioning installed and made
+    read-only, where nothing is stacked above it. It does not fall back
+    itself: a top that will not load or pass its check fails the start,
+    and the supervisor pops it and starts a fresh child on what is beneath.
+    Whichever it runs, it says in the log which and why, and from its first
+    beacon on every beacon carries that configuration's checksum, so the
+    ground sees which configuration a start is running whatever chose it.
 
 Requirement
     A state file that does not exist, or that fails its CRC or cannot be
@@ -6437,15 +6458,16 @@ Requirement
     file was damaged would be lost to a counter.
 
 Requirement
-    The state file counts the starts of the configuration it names for the
-    next start that ended -- a crash, a power loss, a failed check --
-    before a matching CONNECT, and a matching CONNECT sets the count back
-    to nought. When the count reaches ``load_trials``, from the
+    The state file counts the starts of the top of the stack since a
+    matching CONNECT was last taken on it: the supervisor adds one before
+    each child it starts on a stacked top, and a matching CONNECT sets the
+    count back to nought. When the count reaches ``load_trials``, from the
     ``tcspecial`` section of the configuration on the command line and
-    three where it does not say, that configuration is no longer named:
-    the next start loads the confirmed one, and says so. A configuration
-    that passes its check but takes tcspecial down at every start is then
-    given up, rather than started for ever.
+    three where it does not say, the supervisor pops that configuration
+    before the next child, which runs the one beneath, and says so. A
+    configuration that passes its check but takes tcspecial down at every
+    start, or the whole machine with it, is then given up, rather than
+    started for ever. The command line's configuration is never counted.
 
 Requirement
     The beacon's restart flag is set at every start: the first start, a
@@ -6461,7 +6483,7 @@ Requirement
     beacons and answers. What its nodes produce meanwhile is still written
     to the on-board log, so it is kept, and reaches the ground later as the
     log's segment files do. After a RESTART is taken there is no match
-    again: the process ends first.
+    again: the child ends first.
 
 Requirement
     Over the same span, a command other than CONNECT, RESTART_ARM and
@@ -6519,9 +6541,9 @@ Requirement
     configuration: every node stopped, every thread joined, every link
     closed and what was queued on it dropped, the log flushed. The other
     loads a configuration by its checksum. A restart calls the first,
-    writes the state file, and runs the process again, whose start calls
-    the second, so that nothing the old configuration left in memory
-    survives into the new one.
+    writes the state file, and ends the child, and the fresh child its
+    supervisor starts calls the second, so that nothing the old
+    configuration left in memory survives into the new one.
 
 As built, the clean-up is ``start::clean_up`` and the load
 ``choose::Boot::load``, which the RESTART also calls just before it is
@@ -6529,7 +6551,8 @@ taken, to check its target as it would be loaded. The state file is written
 as the RESTART is taken, before its answer, rather than after the clean-up,
 so that a RESTART the state file cannot say is refused ``Failure`` and
 nothing restarts, as `Restarting`_ requires. The beacon thread is not
-joined: the ``exec`` ends it, and it holds nothing the next start reads.
+joined: the child's exit ends it, and it holds nothing the next start
+reads.
 
 On the ground
 ~~~~~~~~~~~~~
@@ -6657,8 +6680,9 @@ A configuration written partly, or damaged where it is kept
     flight is never written again.
 
 A configuration that checks but fails at every start
-    The state file counts its starts that end before a matching CONNECT,
-    and ``load_trials`` of them give it up for the confirmed configuration.
+    The state file counts its starts since a matching CONNECT, and
+    ``load_trials`` of them pop it from the configuration stack, for the
+    one beneath.
 
 A damaged or missing state file
     It names nothing, and the start loads the configuration on its command
@@ -6728,9 +6752,9 @@ Replaced already, and rewritten where they stand to say what runs:
   compares generations: there is no generation.
 - `Kinds of restart`_: only a commanded start changing the definitions.
   The checksum in the beacon says which configuration a start is running,
-  whichever kind it is, and a start nobody commanded may load the
-  confirmed or the command line's configuration when the one the state
-  file names will not load or is given up.
+  whichever kind it is, and a start nobody commanded may run the one
+  beneath on the configuration stack when the top would not load or is
+  given up.
 - `What the ground may send meanwhile`_: the ground's wait after a
   RESTART for a beacon whose number went back, during which its client
   sent nothing but the three. It guarded on the ground what the vehicle
@@ -6951,8 +6975,10 @@ Requirement
     took an armed RESTART with the right key. A commanded start
     may change the definitions it runs with. A start nobody commanded -- a
     crash, a power cycle, a supervisor's restart -- runs with the
-    definitions it had. Either begins with the restart flag set, and the
-    checksum in its beacons says which configuration it runs.
+    definitions it had, unless the supervisor has popped the configuration
+    it had, when it runs the one beneath on the stack. Either begins with
+    the restart flag set, and the checksum in its beacons says which
+    configuration it runs.
 
 Which configuration a start runs, and when one is given up for failing to
 be heard from, is in `Starting, and the restart flag`_.
@@ -6961,21 +6987,27 @@ The supervisor and the configuration stack
 ------------------------------------------
 
 .. note::
-   **Not yet built** (designed 2026-11-14). Once built, this replaces how
-   `Starting, and the restart flag`_ chooses a configuration -- the state
-   file's ``next`` and ``confirmed`` -- and how `A commanded restart`_
-   runs tcspecial again, and the state file holds the stack (see `The
-   state file`_). The restart flag, the three commands that always go and
-   ``load_trials`` are unchanged.
+   **Partly built** (2026-11-14): the supervisor and its child
+   (``runtime::supervisor``), the stack in the state file, its short lock,
+   the pushes, the pops and the attempt count. Not yet: the memory lock,
+   and the allocations of a load that fail rather than end the process.
+   It replaced how `Starting, and the restart flag`_ chose a configuration
+   -- the state file's ``next`` and ``confirmed`` -- and how a restart, as
+   in `A commanded restart`_, ran tcspecial again, by ``exec``\ ing the
+   process; the state file now holds the stack (see `The state file`_),
+   and a RESTART ends the child for the supervisor to start another. The
+   restart flag, the three commands that always go and ``load_trials``
+   are unchanged.
 
 tcspecial is two processes. The *supervisor* is what is started -- by
-systemd, by tcs-moc, from a shell -- and does almost nothing: it chooses a
-configuration, starts a *child* to run it, waits for the child to end,
-and decides from how it ended what to start next. The child is the
-tcspecial of everything else in this document: it locks its memory, opens
-the nodes and runs them. The supervisor locks nothing, opens no node and
-allocates nothing once it is waiting, so that the process a vehicle
-depends on to try again is one that has nothing in it to fail.
+systemd, by tcs-moc, from a shell -- and does almost nothing: it keeps
+the configuration stack, starts a *child* to run its top, waits for the
+child to end, and decides from how it ended what to start next. The child
+is the tcspecial of everything else in this document: it locks its
+memory, opens the nodes and runs them. The supervisor locks no memory,
+opens no node and allocates nothing while it waits, so
+that the process a vehicle depends on to try again is one that has
+nothing in it to fail.
 
 Each attempt is a fresh child, so that nothing a failed configuration did
 -- memory it took and did not give back, a descriptor it left open, a
@@ -7017,8 +7049,9 @@ Requirement
     |                                  | configuration the RESTART pushed     |
     +----------------------------------+--------------------------------------+
     | fatal: a lock that failed under  | stops, the stack unchanged, saying   |
-    | ``--simulate``, a command line   | why                                  |
-    | that is not one                  |                                      |
+    | ``--simulate``, the command      | why                                  |
+    | line's configuration refused     |                                      |
+    | before anything was opened       |                                      |
     +----------------------------------+--------------------------------------+
     | bad, or ended by a signal        | pops the top, unless it is the       |
     |                                  | bottom, and starts a child on what   |
@@ -7038,10 +7071,21 @@ Requirement
     vehicle down at every start is given up rather than started for ever.
 
 Requirement
-    When the bottom fails, there is nothing to pop: the supervisor starts
-    it again after a delay that doubles at each failure, from one second
-    to at most a minute, and goes back to nought once the bottom has
-    stayed up for a minute. A configuration that fails at once is then
+    The command line's configuration refused before anything is opened --
+    problems in it, types this build lacks, payloads the simulation mode
+    refuses -- is refused the same way at every start, so its child exits
+    fatal, and the supervisor, which checks the file itself before its
+    first child, stops. Starting it again would change nothing, and a
+    vehicle whose own configuration is refused is one for the ground to
+    see stopped, not one to spin.
+
+Requirement
+    When the bottom fails otherwise -- as it opens, or as it runs -- there
+    is nothing to pop: the supervisor starts it again after a delay that
+    doubles at each failure, from one second to at most a minute, and goes
+    back to one second once the bottom has stayed up for a minute. Under
+    ``--simulate`` it stops instead: a desk is not helped by trying for
+    ever, and a test that starts a failing tcspecial is owed an answer. A configuration that fails at once is then
     not started thousands of times an hour, and one that recovers is not
     kept waiting.
 
@@ -7118,33 +7162,38 @@ without a header`_.
 Requirement
     The ``tcspecial`` section's ``state_file``, required, is the path of the
     file in which tcspecial keeps what must survive a restart: whether the
-    next start is one the ground commanded, and which configurations it
-    names and how many of its starts have been tried, as `Starting, and the
-    restart flag`_ says.
+    next start is one the ground commanded, the configuration stack, and
+    how many starts its top has been given, as `Starting, and the restart
+    flag`_ and `The supervisor and the configuration stack`_ say.
 
-.. note::
-   Once `The supervisor and the configuration stack`_ is built, the lock
-   below is two: an *instance lock*, on the ``.lock`` file, which the
-   supervisor holds for as long as it runs, so that no second tcspecial
-   runs on this state file; and a *short lock*, taken by anything that
-   changes the state file -- the supervisor, the child, software outside
-   tcspecial pushing or popping the stack -- for no longer than it takes
-   to read it, change it and rename the new one over it, so that no two
-   changes are lost to each other.
+The state file has two locks: an *instance lock*, which the supervisor
+holds for as long as it runs, and a *short lock*, which anything that
+changes the file holds while it does.
 
 Requirement
-    A start locks its state file before it reads it, and holds the lock
-    until the process ends or runs itself again, so that no two tcspecials
-    keep one state file: each would overwrite what the other is to start
-    with. The lock is on a file beside it, its name and ``.lock``, because
-    the state file itself is replaced by a rename at every write; that file
-    is never removed. A state file another process holds refuses the start,
-    naming the file and ``state_file``. A lock that cannot be taken at all
-    refuses it as well, since the state file is what every later start of
-    this vehicle depends on.
+    The supervisor takes the instance lock before its first child starts,
+    and holds it until it ends, through every child it starts, so that no
+    two tcspecials keep one state file: each would overwrite what the
+    other is to start with. The lock is on a file beside it, its name and
+    ``.lock``, because the state file itself is replaced by a rename at
+    every write; that file is never removed. A state file another process
+    holds refuses the start, naming the file and ``state_file``. A lock
+    that cannot be taken at all refuses it as well, since the state file
+    is what every later start of this vehicle depends on.
 
     **Built** (2026-11-14): ``tcspecial::exclusive::state_file``, called by
-    ``runtime::choose`` before the state file is read.
+    ``runtime::supervisor`` before its first child.
+
+Requirement
+    Anything that changes the state file -- the supervisor, the child,
+    software outside tcspecial pushing or popping the stack -- takes the
+    short lock first, and holds it for no longer than it takes to read the
+    file, change it and rename the new one over it, so that no two changes
+    are lost to each other. The short lock is an exclusive ``flock`` on the
+    file beside the state file named with ``.update`` added, so that a
+    script can take it with ``flock(1)``.
+
+    **Built** (2026-11-14): ``tcspecial::state::update``.
 
 Requirement
     An armed RESTART that is taken writes to the state file that
@@ -7159,9 +7208,9 @@ Requirement
     There is no generation number. Nothing in the state file counts every
     start, as a generation did: a start is told by its beacons' restart flag
     and by their number going back, and which configuration it runs by the
-    checksum they carry. What it does count is the trials of the
-    configuration a start is to run -- its starts that ended before a
-    matching CONNECT -- which `Starting, and the restart flag`_ gives up at
+    checksum they carry. What it does count is the trials of the top of the
+    configuration stack -- its starts since a matching CONNECT was last
+    taken on it -- which `Starting, and the restart flag`_ gives up at
     ``load_trials``. A
     state file written by a build that kept a generation holds a
     ``generation`` line, which is read and dropped, the start saying so in
@@ -7170,11 +7219,15 @@ Requirement
     one.
 
 Requirement
-    Every start reads and writes the state file before its first beacon
-    goes. A start that cannot write it says why on its error output and
-    does not start: a vehicle that could not write it could not say a
-    RESTART was commanded either, and a later start of its own would read
-    whatever the old file said.
+    The supervisor writes the state file before every child, counting the
+    attempt on the top. One it cannot write is said in its log, and the
+    child is started all the same: a vehicle that would not start because
+    its storage refused a write would be lost to a counter, and a child
+    that runs uncounted is given up only by a failure the supervisor sees.
+    A child that was commanded writes the file again, without the word that
+    it was, before its first beacon goes; one that cannot says why on its
+    error output and does not start, since a later start of its own would
+    otherwise be taken for a commanded one.
 
 Requirement
     The state file is written whole, to a file beside it that is then
@@ -7218,9 +7271,10 @@ Requirement
     A start nobody commanded runs with the definitions the start before it
     had, so that the format of what crosses the link never changes under a
     ground station that did not ask for it to. The exceptions are the
-    starts that give up a configuration that will not load, or has failed
-    to be heard from ``load_trials`` times, for the confirmed one or the
-    command line's: see `Starting, and the restart flag`_.
+    starts that follow the supervisor's popping the top of the stack --
+    after a child on it failed, or once it has failed to be heard from
+    ``load_trials`` times -- and run the one beneath it: see `The
+    supervisor and the configuration stack`_.
 
 Requirement
     The beacon has two intervals, both required and both lengths of time:
@@ -7253,7 +7307,7 @@ Requirement
     checksum does neither.
     Once a restart has been initiated a CONNECT does neither, and is
     refused ``Unmatched``: the flag stays set and the beacons stay at
-    ``reset_interval`` until the process ends. No other command slows the
+    ``reset_interval`` until the child ends. No other command slows the
     beacons or clears the flag.
 
 The beacon goes fast across a restart because that is when the ground most
@@ -7392,8 +7446,8 @@ follows them through the ways a restart can go. What the vehicle does is
 fixed, and is the same in each:
 
 #. It takes the RESTART: checks that the target will load, writes the state
-   file to say the next start is commanded, uses up the arm, and sets the
-   restart flag. From here it acts on nothing but the three.
+   file to put the target on top of the configuration stack and to say the
+   next start is commanded, uses up the arm, and sets the restart flag. From here it acts on nothing but the three.
 #. It answers the RESTART, and then sends a beacon at once, carrying the
    flag and the next number of the old start's count. A periodic beacon
    that falls between setting the flag and answering carries the flag
@@ -7404,8 +7458,8 @@ fixed, and is the same in each:
    old start's checksum, and changes nothing: the flag stays set and the
    beacons fast.
    Once the command links are closed nothing is answered.
-#. It ``exec``\ s. The new start reads and writes the state file and sends
-   its first beacon at once: #1, with the flag set and the checksum of the
+#. The child exits, and the supervisor starts a fresh one. The new start
+   reads and writes the state file and sends its first beacon at once: #1, with the flag set and the checksum of the
    configuration it loaded. It beacons every ``reset_interval`` until a
    CONNECT carrying that checksum, which clears the flag, sends a beacon at
    once, and slows the beacons to ``default_interval``.
@@ -7482,7 +7536,8 @@ matched.
          and sends beacon 42 at once with the flag set, which ends the
          station's match. While it cleans up it beacons every
          reset_interval, and beacon 43 counts up: the same start, ending.
-         After the exec the new start's beacon 1 goes at once with the
+         After the child exits and the supervisor starts another, the
+         new start's beacon 1 goes at once with the
          flag set; the number went back, so the station takes its link
          down. The station sends CONNECT with A, which matches: the vehicle
          clears the flag, answers, and sends beacon 2, normal, at once,
@@ -7544,9 +7599,9 @@ Downlinked data across a restart
 What the vehicle downlinks from a node is the node's bytes and nothing else:
 no header, no generation, no time. Which node sent a datum is the port it
 arrives at, and how to read it is that node's configuration. A change of
-configuration -- commanded, or a start that gives one up for the confirmed
-or the command line's -- can give a port to another node, or a node
-another format.
+configuration -- commanded, or a start that runs the one beneath on the
+configuration stack once the top is popped -- can give a port to another
+node, or a node another format.
 
 Requirement
     The ground reads every datum with the definitions of the last beacon
@@ -7582,8 +7637,13 @@ A read-only file can still be deleted
     board`_.
 
 A restart that never comes back
-    A restart whose ``exec`` fails ends the process. The supervisor starts it
-    again; without one the vehicle is gone, which is why one is required.
+    A restart is a child that exits for the supervisor to start another,
+    and a child that fails or never comes up is followed by another, on
+    the configuration beneath where there is one: see `The supervisor and
+    the configuration stack`_. What ends the supervisor too, a power loss
+    or a machine that hangs, leaves the vehicle to whatever starts
+    tcspecial when the computer starts; without that the vehicle is gone,
+    which is why one is required.
 
 A damaged or half-written state file
     Written whole and renamed into place, with a CRC; a damaged one names
@@ -7603,18 +7663,19 @@ Downlinked data from before a restart
 
 A restart nobody commanded changing the format
     A crash or a power cycle is a restart the ground did not ask for. It
-    runs with the definitions it had, so nothing the ground sends is read
-    differently. Its beacons carry the restart flag, as every start's do,
-    and the checksum of the configuration it runs, which the ground matches
-    before it reads anything of it.
+    runs with the definitions it had, or, where the supervisor has popped
+    the top it failed on, with those of the one beneath. Its beacons carry
+    the restart flag, as every start's do, and the checksum of the
+    configuration it runs, which the ground matches before it reads
+    anything of it, so nothing the ground sends is read differently.
 
 Commands in flight across the restart
     A command sent before the RESTART arrives before it, because the link
     delivers in order, and is read by the start whose definitions it was
     built with. One sent after it reaches a start that has taken a RESTART,
     or one not yet matched, and is answered ``Unmatched`` by either. The
-    same holds for a start nobody commanded, one that gives up a
-    configuration for the confirmed or the command line's among them: it
+    same holds for a start nobody commanded, one that runs the
+    configuration beneath a popped top among them: it
     acts on nothing but the three until a CONNECT carries its checksum, so
     commands already on their way when it began are refused, not read with
     its definitions.
@@ -7664,12 +7725,15 @@ A restart whose first beacons are all lost
     beacon, as a field of its own, at the cost of up to ten more digits in
     every beacon.
 
-A confirmed configuration that later fails at every start
-    A crash keeps the definitions it had, so a configuration that fails at
-    every start would be started for ever. Every start of it that ends
-    before a matching CONNECT is counted, in a row and whether it was
-    confirmed or not, and ``load_trials`` of them give it up: see
-    `Starting, and the restart flag`_.
+A configuration the ground has heard that later fails at every start
+    A child that fails on it -- a crash, a check it does not pass --
+    pops it at once. What ends the supervisor too, a power loss or a
+    machine that hangs, the supervisor never sees, so every start of it
+    since a matching CONNECT was last taken on it is counted, whether or
+    not one ever was, and ``load_trials`` of them pop it from the
+    configuration stack: see `Starting, and the restart flag`_. The command line's
+    configuration is never counted or popped: it is the one `What is
+    assumed`_ requires always to work.
 
 Who may command the vehicle
     TCSpecial does not enforce security. Anyone who can reach the command
@@ -10194,8 +10258,11 @@ character device and ``ioctl``, a socket family, or a Linux file system.
        parity, and the baud rates above 921600
      - The ``serial`` node's RS-485 and parity settings
    * - ``/proc``
-     - ``/proc/self/exe`` and ``/proc/self/fd`` (or ``/dev/fd``)
-     - Restarting by re-executing itself with its descriptors
+     - ``/proc/self/exe``
+     - The supervisor finding its own program, to start each child
+   * - ``prctl``
+     - ``PR_SET_PDEATHSIG``
+     - A child ending when its supervisor does
    * - ``pipe2``
      - A non-blocking pipe made in one call
      - Waking a node's thread
@@ -10225,7 +10292,9 @@ FreeRTOS and Zephyr have only in part.
   input and output on pipes; the app nodes start a program with socket
   pairs and close descriptors in the child, which is the ``fork`` and
   ``exec`` model; segment handoff runs its command with ``posix_spawn``
-  and ``waitpid``; and a restart re-executes the program with ``execv``.
+  and ``waitpid``; and the supervisor starts each child, a fresh process
+  for every start and every restart, with ``posix_spawn``, and waits for
+  it with ``waitpid``.
 * Signals: ``SIGINT`` and ``SIGTERM`` stop TCSpecial.
 * Unix file descriptors themselves: ``RawFd``, ``AsRawFd`` and
   ``BorrowedFd`` run through every endpoint.
@@ -10297,8 +10366,8 @@ Device interfaces
     against it.
 
 Processes
-    The ``process`` and app nodes, segment handoff and restart by
-    re-execution assume processes. VxWorks has them as real-time
+    The ``process`` and app nodes, segment handoff and the supervisor and
+    its children assume processes. VxWorks has them as real-time
     processes (``rtpSpawn``), QNX and INTEGRITY have them natively, and
     RTEMS, FreeRTOS, OpenRTOS and Zephyr do not: they have one address
     space and tasks. On those, a ``process`` node would become a task
@@ -10306,9 +10375,9 @@ Processes
     segment handoff would call a function rather than a program, and a
     restart would be a reset of the processor -- by a watchdog, or the
     operating system's own restart -- with what must survive it kept in the
-    state file as it is now. Re-execution also needs the program's path
-    and its open descriptors, which Linux finds in ``/proc``; elsewhere
-    they would be passed in or kept.
+    state file as it is now. Starting a child also needs the program's
+    path, which Linux finds in ``/proc``; elsewhere it would be passed in
+    or kept.
 
 Stopping
     ``SIGINT`` and ``SIGTERM`` would become the operating system's own way

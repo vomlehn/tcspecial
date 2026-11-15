@@ -93,8 +93,7 @@ pub fn summary(line: impl std::fmt::Display) {
 /// Every reason it could not start, rather than the first: a file with three
 /// problems in it is one trip to a desk, where one problem at a time is three.
 ///
-/// The first mode given in the process is the one [`mode`] says from then
-/// on: a RESTART runs this again with the same one.
+/// The mode given is the one [`mode`] says from then on.
 ///
 /// # Arguments
 ///
@@ -111,17 +110,21 @@ pub fn summary(line: impl std::fmt::Display) {
 /// Every reason the configuration could not start, each a line beginning
 /// with the file it is about: a file that does not load, the checks'
 /// problems, types this build lacks, payloads the mode refuses, and anything
-/// that could not be opened, bound or started.
-pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
-    // Set once: a RESTART runs this again in the same process, with the mode
-    // it was started with, and the first is the one that holds.
+/// that could not be opened, bound or started; and whether that is final.
+pub fn run_graph(path: &str, mode: Mode) -> Result<(), Failed> {
     let _ = MODE.set(mode);
 
     // Which configuration, before anything else: the state file and the
     // configurations kept are read, every configuration tried is checked
     // with the checks the ground tool runs, against the same code, and the
     // state file is written with the choice before the first beacon goes.
-    let chosen = choose::choose(std::path::Path::new(path))?;
+    let chosen =
+        choose::choose(std::path::Path::new(path)).map_err(|refused| {
+            Failed {
+                problems: refused.problems,
+                final_: refused.of_the_bottom,
+            }
+        })?;
     for note in &chosen.notes {
         warn!("{note}");
     }
@@ -157,10 +160,15 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     // start needs to know first.
     let refused = judged_against(graph, mode);
     if !refused.is_empty() {
-        return Err(refused
-            .iter()
-            .map(|refusal| format!("{path}: {refusal}"))
-            .collect());
+        return Err(Failed {
+            problems: refused
+                .iter()
+                .map(|refusal| format!("{path}: {refusal}"))
+                .collect(),
+            // The same at every start, devices being what they are, and
+            // final where nothing is beneath to stand in.
+            final_: chosen.loaded.path == chosen.boot.command_line,
+        });
     }
 
     // What this vehicle is serving: the build and the configuration's
@@ -278,6 +286,31 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Vec<String>> {
     clean_up(running);
     info!("{path}: stopped");
     Ok(())
+}
+
+/// Why a configuration did not start.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Failed {
+    /// Each reason, a line beginning with the file it is about.
+    pub problems: Vec<String>,
+    /// Whether it is final: the command line's configuration, which nothing
+    /// is beneath, refused before anything was opened, for a reason that
+    /// is the same at every start. Starting it again would only fail again,
+    /// so the child exits with the fatal status. Anything that failed as it
+    /// was opened may not fail the next time -- a device that was not there
+    /// yet -- and is not final.
+    pub final_: bool,
+}
+
+impl From<Vec<String>> for Failed {
+    /// A failure that is not final: something could not be opened, bound or
+    /// started.
+    fn from(problems: Vec<String>) -> Failed {
+        Failed {
+            problems,
+            final_: false,
+        }
+    }
 }
 
 /// What a running configuration holds, which [`clean_up`] lets go of.
@@ -843,8 +876,7 @@ extern "C" fn stop(_signal: libc::c_int) {
 ///
 /// For `main`, which has one more thing to do than report: a vehicle that
 /// could not start must not look as though it is running. Every reason it
-/// could not start is logged and said on stderr. Where a RESTART was asked
-/// for, this does not return: see `restart::if_asked`.
+/// could not start is logged and said on stderr.
 ///
 /// # Arguments
 ///
@@ -853,16 +885,16 @@ extern "C" fn stop(_signal: libc::c_int) {
 ///
 /// # Returns
 ///
-/// The exit status: 0 for a vehicle that ran and stopped, 1 for one that
-/// could not start.
+/// The exit status, one of [`crate::runtime::supervisor`]'s: `GOOD` for a
+/// vehicle that ran and stopped, `RESTART` for one that stopped for a
+/// RESTART, `BAD` for one that could not start, and `FATAL` for one whose
+/// failure is final (see [`Failed::final_`]).
 pub fn run_or_report(path: &str, mode: Mode) -> i32 {
     match run_graph(path, mode) {
-        Ok(()) => {
-            // Does not return where a RESTART asked for one.
-            restart::if_asked();
-            0
-        }
-        Err(problems) => {
+        // The restart status where a RESTART asked for one, for the
+        // supervisor to start a child on what it pushed.
+        Ok(()) => restart::status(),
+        Err(Failed { problems, final_ }) => {
             for problem in &problems {
                 error!("{problem}");
             }
@@ -871,7 +903,11 @@ pub fn run_or_report(path: &str, mode: Mode) -> i32 {
             for problem in &problems {
                 eprintln!("{problem}");
             }
-            1
+            if final_ {
+                crate::runtime::supervisor::FATAL
+            } else {
+                crate::runtime::supervisor::BAD
+            }
         }
     }
 }
@@ -906,8 +942,10 @@ vehicle:
         )
         .expect("the file is written");
 
-        let problems = run_graph(path.to_str().expect("a path"), Mode::All)
+        let failed = run_graph(path.to_str().expect("a path"), Mode::All)
             .expect_err("a configuration with faults");
+        assert!(failed.final_, "the command line's, refused before opening");
+        let problems = failed.problems;
         assert!(
             problems.len() >= 2,
             "every problem should be given: {problems:?}"

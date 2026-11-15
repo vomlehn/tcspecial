@@ -5,27 +5,20 @@
 //! provisioning installed and made read-only. That configuration's
 //! `tcspecial` section says where the state file is, where configurations
 //! are kept and how many tries one is given: what a start needs before it
-//! can choose. Every start then loads the first of these that passes its
-//! check:
-//!
-//! 1. the configuration the state file names for it -- the one the last
-//!    taken RESTART named, or else the one the start before ran -- unless
-//!    `load_trials` of its starts have ended before a matching CONNECT;
-//! 2. else the *confirmed* configuration, the last one a matching CONNECT
-//!    was taken on;
-//! 3. else the configuration on its command line.
-//!
-//! Whichever it loads, it says in the log which and why, and writes the
-//! state file before its first beacon: the configuration it runs is what
-//! the next start loads, and this start is counted as one of its trials. A
-//! state file that is missing or damaged names nothing, and the start loads
-//! the configuration on its command line. See "Starting, and the restart
-//! flag" in `docs/tcspecial-design.rst`.
+//! can choose. A start -- a child of the supervisor -- runs the top of the
+//! configuration stack the state file keeps, which is the command line's
+//! where nothing is stacked above it. It does not fall back: a top that will
+//! not load or check fails the start, and the supervisor pops it and starts
+//! a fresh child on what is beneath (see [`crate::runtime::supervisor`]),
+//! so that one rule gives every configuration up, whatever failed. A state
+//! file that is missing or damaged names nothing, and the start runs the
+//! command line's. See "The supervisor and the configuration stack" in
+//! `docs/tcspecial-design.rst`.
 //!
 //! [`Boot::load`] is tcspecial's function that loads a configuration by its
-//! checksum: a start calls it for each configuration the state file names,
-//! and a RESTART calls it just before it is taken, to check that the
-//! configuration it names would load.
+//! checksum: a start calls it for the top of the stack, and a RESTART calls
+//! it just before it is taken, to check that the configuration it names
+//! would load.
 
 use std::path::{Path, PathBuf};
 
@@ -33,7 +26,7 @@ use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
 use tcsprotocol::graph::Graph;
 use tcsprotocol::store::Store;
 
-use crate::state::{self, State};
+use crate::state;
 
 /// What a start knows from the configuration on its command line before it
 /// chooses: where to find what it may choose from.
@@ -79,6 +72,52 @@ pub struct Chosen {
     /// What went wrong on the way, each for the log as a warning: a damaged
     /// state file, a configuration given up or that would not load.
     pub notes: Vec<String>,
+}
+
+/// Why a start could not choose, and whether what it could not run is the
+/// command line's configuration, which nothing is beneath.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refused {
+    /// Each problem, a line beginning with the file it is about.
+    pub problems: Vec<String>,
+    /// Whether it is the command line's configuration that cannot run: a
+    /// refusal that is the same at every start, which no other
+    /// configuration is there to stand in for.
+    pub of_the_bottom: bool,
+}
+
+impl Refused {
+    /// A refusal of the command line's configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `problems` - What is wrong with it.
+    ///
+    /// # Returns
+    ///
+    /// The refusal.
+    fn of_the_bottom(problems: Vec<String>) -> Refused {
+        Refused {
+            problems,
+            of_the_bottom: true,
+        }
+    }
+
+    /// A refusal of what is stacked above it, which the supervisor pops.
+    ///
+    /// # Arguments
+    ///
+    /// * `problems` - What is wrong with it.
+    ///
+    /// # Returns
+    ///
+    /// The refusal.
+    fn of_the_top(problems: Vec<String>) -> Refused {
+        Refused {
+            problems,
+            of_the_bottom: false,
+        }
+    }
 }
 
 /// Says what is wrong with a configuration, as a start checks it.
@@ -264,8 +303,8 @@ impl Boot {
     }
 }
 
-/// Chooses the configuration this start runs, says why, and writes the
-/// state file so that it is what the next start loads.
+/// Chooses the configuration this start runs, says why, and clears the
+/// state file's word that this start was commanded, which is said once.
 ///
 /// # Arguments
 ///
@@ -278,16 +317,19 @@ impl Boot {
 /// # Errors
 ///
 /// Each a line beginning with the file it is about: the command line's
-/// configuration not loading or having problems, where nothing the state
-/// file names could be loaded instead, or the state file not being written.
-pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
-    let (boot, command_line) = Boot::of_command_line(path)?;
+/// configuration not loading or having problems, where nothing is stacked
+/// above it; the top of the stack not loading or having problems; or the
+/// state file not being written.
+pub fn choose(path: &Path) -> Result<Chosen, Refused> {
+    let (boot, command_line) =
+        Boot::of_command_line(path).map_err(Refused::of_the_bottom)?;
+    state::set_bottom(boot.command_line_digest);
     let Some(state_file) = boot.state_file.clone() else {
         // A configuration with no tcspecial section takes no commands, so
         // nothing can have named another: it runs what it was given.
         let problems = problems_of(path, &command_line);
         if !problems.is_empty() {
-            return Err(problems);
+            return Err(Refused::of_the_bottom(problems));
         }
         let notes = warnings_of(path, &command_line);
         return Ok(Chosen {
@@ -305,10 +347,6 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
         });
     };
 
-    // Before it is read: another tcspecial writing it would make what is
-    // read here a guess, and what this one writes a loss to the other.
-    crate::exclusive::state_file(&state_file)
-        .map_err(|why| vec![format!("{}: {why}", path.display())])?;
     let found = state::read(&state_file);
     let mut notes = Vec::new();
     if let Some(why) = &found.damaged {
@@ -326,105 +364,52 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
         ));
     }
 
-    // The configurations the state file names, in the order they are
-    // tried, each with why.
     let was = &found.state;
-    let mut given_up = None;
-    let mut candidates: Vec<(ConfigDigest, String)> = Vec::new();
-    if let Some(next) = was.next {
-        if was.trials >= boot.load_trials {
-            notes.push(format!(
-                "configuration {next} is given up: {} of its starts ended \
-                 before a matching CONNECT, which is load_trials, so this \
-                 start does not load it",
-                was.trials
-            ));
-            given_up = Some(next);
-        } else {
-            candidates.push((
-                next,
+    let (loaded, why) = match was.top() {
+        Some(top) => {
+            let loaded = boot.load(top).map_err(|failed| {
+                Refused::of_the_top(vec![format!(
+                    "{}: configuration {top}, the top of the configuration \
+                     stack, cannot be run: {failed}",
+                    path.display()
+                )])
+            })?;
+            (
+                loaded,
                 if was.commanded {
-                    "the state file names it for this start, as the RESTART \
-                     that commanded it did"
-                        .to_string()
+                    "it is the top of the configuration stack, pushed by the \
+                     RESTART that commanded this start"
                 } else {
-                    "the state file names it for this start, as the one the \
-                     start before ran"
-                        .to_string()
-                },
-            ));
+                    "it is the top of the configuration stack"
+                }
+                .to_string(),
+            )
         }
-    }
-    if let Some(confirmed) = was.confirmed {
-        if Some(confirmed) != given_up
-            && !candidates.iter().any(|(digest, _)| *digest == confirmed)
-        {
-            candidates.push((
-                confirmed,
-                "it is the confirmed configuration, the last one a matching \
-                 CONNECT was taken on"
-                    .to_string(),
-            ));
-        }
-    }
-
-    let mut chosen = None;
-    for (digest, why) in candidates {
-        match boot.load(digest) {
-            Ok(loaded) => {
-                chosen = Some((loaded, why));
-                break;
-            }
-            Err(failed) => notes.push(format!(
-                "configuration {digest}, which {why}, cannot be loaded, so \
-                 this start does not run it: {failed}"
-            )),
-        }
-    }
-    let (loaded, why) = match chosen {
-        Some(chosen) => chosen,
         None => {
             let problems = problems_of(path, &command_line);
             if !problems.is_empty() {
-                return Err(problems);
+                return Err(Refused::of_the_bottom(problems));
             }
-            let because = if was.next.is_none() && was.confirmed.is_none() {
-                "the state file names nothing"
-            } else {
-                "no configuration the state file names could be run"
-            };
             (
                 Loaded {
                     path: path.to_path_buf(),
                     graph: command_line,
                     digest: boot.command_line_digest,
                 },
-                format!(
-                    "it is the configuration on tcspecial's command line, \
-                     since {because}"
-                ),
+                "it is the configuration on tcspecial's command line, the \
+                 bottom of the configuration stack, with nothing above it"
+                    .to_string(),
             )
         }
     };
 
-    // This start is one of the trials of what it runs: a start that ends
-    // before a matching CONNECT leaves it counted, and the CONNECT sets it
-    // back to nought.
-    let trials = if was.next == Some(loaded.digest) && given_up.is_none() {
-        was.trials.saturating_add(1)
-    } else {
-        1
-    };
-    state::write(
-        &state_file,
-        &State {
-            next: Some(loaded.digest),
-            trials,
-            confirmed: was.confirmed,
-            commanded: false,
-        },
-    )
-    .map_err(|why| vec![format!("{}: {why}", path.display())])?;
+    if was.commanded {
+        state::update(&state_file, |state| state.commanded = false).map_err(
+            |why| {
+                Refused::of_the_top(vec![format!("{}: {why}", path.display())])
+            },
+        )?;
+    }
 
     notes.extend(warnings_of(&loaded.path, &loaded.graph));
     Ok(Chosen {
@@ -439,6 +424,7 @@ pub fn choose(path: &Path) -> Result<Chosen, Vec<String>> {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::state::State;
 
     /// A vehicle on a desk: a command-line configuration naming a state file
     /// and a store, both in a directory of the test's. The command
@@ -553,130 +539,62 @@ vehicle:
     }
 
     /// A first start, with no state file, runs the command line's, says so,
-    /// and names it for the next start, as one trial of it.
+    /// and writes nothing: nothing is stacked, and it was not commanded.
     #[test]
-    fn a_first_start_runs_the_command_lines_and_names_it() {
+    fn a_first_start_runs_the_command_lines() {
         let desk = Desk::new(3);
         let chosen = choose(&desk.command_line).expect("it chooses");
         assert_eq!(chosen.loaded.path, desk.command_line);
         assert!(chosen.why.contains("command line"), "{}", chosen.why);
-        assert!(chosen.why.contains("names nothing"), "{}", chosen.why);
+        assert!(chosen.why.contains("bottom"), "{}", chosen.why);
         assert!(!chosen.commanded);
-        assert_eq!(
-            desk.state(),
-            State {
-                next: Some(chosen.loaded.digest),
-                trials: 1,
-                confirmed: None,
-                commanded: false,
-            }
-        );
+        assert_eq!(desk.state(), State::default());
     }
 
-    /// The configuration the state file names is the one loaded, from the
-    /// store, and a commanded start says so; its trial is counted.
+    /// The top of the stack is the one loaded, from the store, and a
+    /// commanded start says so, once.
     #[test]
-    fn the_named_configuration_is_loaded_from_the_store() {
+    fn the_top_of_the_stack_is_loaded_from_the_store() {
         let desk = Desk::new(3);
-        let other = desk.keep(1);
+        let beneath = desk.keep(1);
+        let top = desk.keep(2);
         desk.write(State {
-            next: Some(other),
-            trials: 0,
-            confirmed: None,
+            stack: vec![beneath, top],
+            trials: 1,
             commanded: true,
         });
         let chosen = choose(&desk.command_line).expect("it chooses");
-        assert_eq!(chosen.loaded.digest, other);
+        assert_eq!(chosen.loaded.digest, top);
         assert_eq!(
             chosen.loaded.path,
-            desk.dir.path().join(format!("kept/{other}/{other}.ytcs"))
+            desk.dir.path().join(format!("kept/{top}/{top}.ytcs"))
         );
         assert!(chosen.commanded);
         assert!(chosen.why.contains("RESTART"), "{}", chosen.why);
-        assert_eq!(desk.state().trials, 1);
         assert!(!desk.state().commanded, "said once");
+        assert_eq!(desk.state().stack, vec![beneath, top], "nothing popped");
+        assert_eq!(desk.state().trials, 1, "the supervisor counts them");
     }
 
-    /// A named configuration that will not load -- not kept, or damaged --
-    /// gives way to the confirmed one, and saying why.
+    /// A top that will not load -- not kept, or damaged -- fails the start,
+    /// naming it, rather than running what is beneath: the supervisor pops
+    /// it and starts afresh.
     #[test]
-    fn one_that_will_not_load_gives_way_to_the_confirmed_one() {
+    fn a_top_that_will_not_load_fails_the_start() {
         let desk = Desk::new(3);
-        let confirmed = desk.keep(1);
+        let beneath = desk.keep(1);
         let missing = ConfigDigest([0x77; 16]);
         desk.write(State {
-            next: Some(missing),
+            stack: vec![beneath, missing],
             trials: 0,
-            confirmed: Some(confirmed),
-            commanded: true,
+            commanded: false,
         });
-        let chosen = choose(&desk.command_line).expect("it chooses");
-        assert_eq!(chosen.loaded.digest, confirmed);
-        assert!(chosen.why.contains("confirmed"), "{}", chosen.why);
-        assert!(
-            chosen
-                .notes
-                .iter()
-                .any(|note| note.contains(&missing.to_string())),
-            "{:?}",
-            chosen.notes
-        );
-        assert_eq!(desk.state().next, Some(confirmed));
-        assert_eq!(desk.state().trials, 1, "a trial of the confirmed one");
-    }
-
-    /// A configuration whose starts keep ending before a matching CONNECT
-    /// is given up after load_trials of them, for the confirmed one; and
-    /// the confirmed one, given up in its turn, for the command line's.
-    #[test]
-    fn a_configuration_that_keeps_failing_is_given_up() {
-        let desk = Desk::new(2);
-        let confirmed = desk.keep(1);
-        let trying = desk.keep(2);
-        desk.write(State {
-            next: Some(trying),
-            trials: 0,
-            confirmed: Some(confirmed),
-            commanded: true,
-        });
-        // Two starts of it, each ending before a CONNECT.
-        for trial in 1..=2 {
-            let chosen = choose(&desk.command_line).expect("it chooses");
-            assert_eq!(chosen.loaded.digest, trying, "trial {trial}");
-            assert_eq!(desk.state().trials, trial);
-        }
-        // The third start gives it up.
-        let chosen = choose(&desk.command_line).expect("it chooses");
-        assert_eq!(chosen.loaded.digest, confirmed);
-        assert!(
-            chosen.notes.iter().any(|note| note.contains("given up")),
-            "{:?}",
-            chosen.notes
-        );
-        assert_eq!(desk.state().trials, 1);
-
-        // And the confirmed one, failing as often, gives way to the
-        // command line's.
-        choose(&desk.command_line).expect("its second");
-        let chosen = choose(&desk.command_line).expect("it chooses");
-        assert_eq!(chosen.loaded.path, desk.command_line);
-        assert!(chosen.why.contains("command line"), "{}", chosen.why);
-    }
-
-    /// A matching CONNECT sets the trials back to nought, so a configuration
-    /// that runs until it is matched is never given up.
-    #[test]
-    fn a_confirmed_start_is_never_counted_against_it() {
-        let desk = Desk::new(1);
-        let first = choose(&desk.command_line).expect("it chooses");
-        state::confirmed(&desk.state_file(), first.loaded.digest)
-            .expect("confirmed");
-        for _ in 0..3 {
-            let chosen = choose(&desk.command_line).expect("it chooses");
-            assert_eq!(chosen.loaded.digest, first.loaded.digest);
-            state::confirmed(&desk.state_file(), chosen.loaded.digest)
-                .expect("confirmed");
-        }
+        let why = choose(&desk.command_line).expect_err("it fails");
+        assert!(!why.of_the_bottom, "{why:?}");
+        let why = &why.problems;
+        assert!(why[0].contains(&missing.to_string()), "{why:?}");
+        assert!(why[0].contains("top of the configuration stack"), "{why:?}");
+        assert_eq!(desk.state().stack, vec![beneath, missing], "not popped");
     }
 
     /// A damaged state file names nothing: the command line's runs, and the
@@ -686,9 +604,8 @@ vehicle:
         let desk = Desk::new(3);
         let other = desk.keep(1);
         desk.write(State {
-            next: Some(other),
+            stack: vec![other],
             trials: 0,
-            confirmed: Some(other),
             commanded: true,
         });
         let mut text = std::fs::read(desk.state_file()).unwrap();

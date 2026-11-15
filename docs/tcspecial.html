@@ -3876,9 +3876,21 @@ besides:</p>
 </div>
 <div class="section" id="running-tcspecial-under-a-supervisor">
 <h2><a class="toc-backref" href="#toc-entry-59">Running tcspecial under a supervisor</a></h2>
-<p>tcspecial relies on a supervisor to start it again whenever it exits: a
-restart that cannot run itself again, and a crash, both end the process.
-The <tt class="docutils literal">tcspecial</tt> package's systemd unit is that supervisor. It runs
+<p>tcspecial is two processes. The one that is started is tcspecial's own
+supervisor: it starts a second, its <em>child</em>, to run the vehicle, waits for
+it, and starts a fresh one when it ends -- on the configuration a RESTART
+named, or, when the child failed, on the configuration beneath the one that
+failed (see <a class="reference internal" href="#configurations-kept-on-board">Configurations kept on board</a>). It passes SIGINT and SIGTERM
+on to the child, and a child whose supervisor has gone ends too. <tt class="docutils literal">ps</tt>
+shows both, the child the supervisor's. The supervisor exits 0 when its
+child was told to stop and stopped, and 1 when it gives up: the command
+line's configuration refused before anything was opened, which would be
+refused again at every start, or, under <tt class="docutils literal"><span class="pre">--simulate</span></tt>, any failure of it.
+In flight, a command line's configuration that fails as it opens is
+started again, after a delay that doubles from a second to a minute.</p>
+<p>Something must still start the supervisor again if it ends: a power cycle
+and a machine that hangs end it too. The <tt class="docutils literal">tcspecial</tt> package's systemd
+unit does that. It runs
 <tt class="docutils literal">/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.ytcs</tt> in
 <tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, with no <tt class="docutils literal"><span class="pre">--simulate</span></tt> and so the flight
 setting, and starts it again a second after it exits, however often it
@@ -3893,9 +3905,13 @@ So, as root:</p>
 </pre>
 <p>The configuration's <tt class="docutils literal">state_file</tt> and <tt class="docutils literal">log.directory</tt> belong under
 <tt class="docutils literal">/var/opt/tcs/tcspecial</tt>, on storage that survives a power cycle. tcspecial
-keeps a lock beside the state file, its name with <tt class="docutils literal">.lock</tt> added, and
-locks each device its nodes open; a second tcspecial given the same state
-file or the same device is refused, naming it. To run two on one machine,
+keeps two locks beside the state file: its name with <tt class="docutils literal">.lock</tt> added,
+which the supervisor holds for as long as it runs, so that a second
+tcspecial given the same state file is refused, naming it; and its name
+with <tt class="docutils literal">.update</tt> added, which anything changing the state file takes while
+it does (see <a class="reference internal" href="#configurations-kept-on-board">Configurations kept on board</a>). Each device its nodes open
+is locked too, and a second tcspecial given the same device is refused,
+naming it. To run two on one machine,
 give each its own <tt class="docutils literal">state_file</tt>, <tt class="docutils literal">log.directory</tt>, addresses and devices. An XML
 configuration is named with <tt class="docutils literal">systemctl edit tcspecial</tt>, in a drop-in
 that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils literal">ConditionPathExists</tt> to the <tt class="docutils literal">.xtcs</tt> file.</p>
@@ -4278,17 +4294,42 @@ read-only, or immutable, once every configuration is in it is the
 provisioner's to do. In flight, which configurations the vehicle holds
 is managed from the ground, outside tcspecial: tcspecial transfers no
 files.</p>
-<p>Every start loads the first of these that passes its checks, and says in
-its startup summary and its log which it loaded and why: the configuration
-the state file names -- the one the last restart named, or the one the
-start before ran; else the <em>confirmed</em> one, the last one a matching
-<tt class="docutils literal">Connect</tt> was taken on; else the one on its command line. A state file
-that is missing or damaged names nothing, and the start loads the one on
-its command line. A configuration whose starts keep ending before a
-matching <tt class="docutils literal">Connect</tt> -- it crashes, or fails its checks -- is given up after
-<tt class="docutils literal">load_trials</tt> of them, three where it is not said, for the confirmed one.
-<tt class="docutils literal">state_file</tt>, <tt class="docutils literal">configurations</tt> and <tt class="docutils literal">load_trials</tt> are always the
-command line's configuration's, whichever configuration runs.
+<p>Which configuration a start runs is the top of the <em>configuration stack</em>,
+which the state file keeps, and the start says which in its startup summary
+and its log. The bottom is the configuration on the command line, which is
+not written in the state file and is never popped. A <tt class="docutils literal">Connect</tt> carrying a
+configuration's checksum pushes it, unless it is the top already, and a
+restart pushes the configuration it names. When a child fails -- a top
+that will not load or check, a vehicle that crashes -- the supervisor pops
+the top and starts a child on the one beneath, the last one the ground had
+heard. The supervisor also counts the children started on the top, in the
+state file, and pops a top that has had <tt class="docutils literal">load_trials</tt> of them, three
+where it is not said, without a matching <tt class="docutils literal">Connect</tt>: a power cycle or a
+hang gives no failure to see, and the count still gives such a
+configuration up. A matching <tt class="docutils literal">Connect</tt> sets the count back to nought. A
+state file that is missing or damaged names nothing, and the start runs
+the one on its command line. <tt class="docutils literal">state_file</tt>, <tt class="docutils literal">configurations</tt> and
+<tt class="docutils literal">load_trials</tt> are always the command line's configuration's, whichever
+configuration runs.</p>
+<p>The state file is a few lines of text, the stack from the bottom up, one
+<tt class="docutils literal">stack</tt> line for each configuration above the command line's, then the
+top's count and, after a restart is taken, <tt class="docutils literal">next_start commanded</tt>, and
+last a CRC of everything before it:</p>
+<pre class="code text literal-block">
+# tcspecial's state, which it writes on every start: do not edit.
+stack 0123456789abcdef0123456789abcdef
+trials 1
+crc16 0x1a2b
+</pre>
+<p>Software outside tcspecial may push and pop the stack -- a mission's own
+tools, provisioning -- by changing this file while it holds an exclusive
+<tt class="docutils literal">flock</tt> on the file beside it named with <tt class="docutils literal">.update</tt> added, as tcspecial
+does (<tt class="docutils literal">flock state.update <span class="pre">-c</span> ...</tt>), and writing the new file beside the
+old and renaming it over, with its CRC -- the CCSDS CRC-16, which the CRC
+catalogue calls CRC-16/IBM-3740, of every byte before the <tt class="docutils literal">crc16</tt> line,
+written <tt class="docutils literal">0x</tt> and four hex digits; the supervisor reads it afresh
+before every child. What is pushed must be a configuration the vehicle
+holds.
 <tt class="docutils literal">configurations_kept</tt>, two where it is not said, is the fewest the
 vehicle is to keep, which nothing removes below; nothing in flight removes
 configurations yet.</p>

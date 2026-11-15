@@ -1,24 +1,24 @@
 //! The two signals that stop the vehicle, SIGINT and SIGTERM, taken by a
-//! thread of their own rather than by a handler.
+//! thread of their own rather than by a handler, in the child that runs the
+//! vehicle.
 //!
 //! A handler runs in whichever thread the kernel picks and can only set a
-//! flag. That loses a stop that arrives between a RESTART being taken and
-//! the `exec` that carries it out: the flag is set in a process image that
-//! is about to be replaced, and the start that comes back knows nothing of
-//! it, so a vehicle somebody asked to stop restarts instead. See
-//! "Restarting" in `docs/tcspecial-design.rst`.
+//! flag. A stop that arrives between a RESTART being taken and the child's
+//! exit for it must stop the vehicle rather than be turned into a restart,
+//! so it has to be seen however late it comes. See "Restarting" in
+//! `docs/tcspecial-design.rst`.
 //!
 //! So the two are blocked in every thread from the first moment of `main`,
-//! before any thread is made, and every thread inherits the block. A signal
-//! that is blocked everywhere stays pending in the process until something
-//! takes it, and is still pending in the image an `exec` makes. One thread,
-//! made here, takes them with `sigtimedwait` and turns each into a stop. A
-//! restart, about to `exec`, first ends that thread ([`before_exec`]):
-//! from then nothing takes the two, so one that arrives is pending, and is
-//! seen there -- the process then stops rather than restarting -- or, if it
-//! arrives after that look and before the `exec`, is carried pending into
-//! the new image, whose own thread takes it as its first act and stops.
-//! Either way the stop is not lost.
+//! before any thread is made -- the supervisor starts the child with them
+//! blocked already -- and every thread inherits the block. A signal that is
+//! blocked everywhere stays pending in the process until something takes
+//! it. One thread, made here, takes them with `sigtimedwait` and turns each
+//! into a stop. A child about to exit for a restart first ends that thread
+//! ([`before_exec`]) and looks at what is pending: a stop taken or pending
+//! then makes the exit a good one, and the supervisor stops rather than
+//! starting another. A stop sent to the supervisor itself, which is where a
+//! service manager sends one, is passed on to the child and stops the
+//! supervisor whatever the child exits with.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -133,13 +133,11 @@ pub fn listening() -> bool {
 }
 
 /// Ends the thread that takes the signals, so that nothing takes one from
-/// here to the `exec`, and says whether a stop has been asked for.
+/// here to the exit, and says whether a stop has been asked for.
 ///
-/// For a restart, just before it runs the process again: a stop asked for
-/// is one the restart is turned into, since a vehicle somebody asked to
-/// stop must stop. One that arrives after this has looked stays pending,
-/// blocked in every thread, and the image the `exec` makes takes it as it
-/// starts and stops.
+/// For a restart, just before the child exits for one: a stop asked for is
+/// one the restart is turned into, since a vehicle somebody asked to stop
+/// must stop.
 ///
 /// # Returns
 ///

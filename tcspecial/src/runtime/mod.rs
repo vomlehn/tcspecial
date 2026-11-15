@@ -27,6 +27,9 @@
 //!   the function that loads a configuration by its checksum, which a
 //!   RESTART asks too; [`held`] is which configurations a RESTART may
 //!   name.
+//! * [`supervisor`] is the process that is started: it starts a child to run
+//!   the vehicle, waits for it, and from how it ended pops or pushes
+//!   nothing, pops the top of the configuration stack, or starts again.
 //! * [`thread`] is how each of tcspecial's threads is made, with a small
 //!   stack.
 //! * [`matched`] is whether the ground has matched this start's
@@ -52,5 +55,6 @@ pub mod route;
 pub mod schedule;
 pub mod signals;
 pub mod start;
+pub mod supervisor;
 pub mod system;
 pub mod thread;

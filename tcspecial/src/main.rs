@@ -37,15 +37,21 @@ use tcsprotocol::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 /// says, and exits with the run's status; 1 for a command line,
 /// configuration or build that refuses it, with the reason said.
 fn main() {
-    // Before anything is opened, so that what a RESTART keeps is what this
-    // process was started with and nothing it opened itself.
-    runtime::restart::note_how_started();
+    // The process that was started is the supervisor, which starts this
+    // same program as its child to run the vehicle: see
+    // `runtime::supervisor`. A child ends when its supervisor does, and
+    // says so first, before anything is made.
+    let child = runtime::supervisor::is_child();
+    if child {
+        runtime::supervisor::child_follows_supervisor();
 
-    // And before any thread is made, so that every thread inherits the
-    // block on SIGINT and SIGTERM and one thread of their own takes them: a
-    // stop that arrives as a RESTART is under way is then not lost. See
-    // `runtime::signals`.
-    runtime::signals::start(runtime::start::stop_as_signalled);
+        // And before any thread is made, so that every thread inherits the
+        // block on SIGINT and SIGTERM and one thread of their own takes
+        // them: a stop that arrives as a RESTART is under way is then not
+        // lost. See `runtime::signals`. The supervisor blocks them itself
+        // and takes them in its own loop.
+        runtime::signals::start(runtime::start::stop_as_signalled);
+    }
 
     // What this build contains, asked of the binary rather than recalled
     // from how it was built: on stdout, because it is the answer, and nothing
@@ -148,47 +154,36 @@ fn main() {
             process::exit(1);
         }
     };
-    runtime::start::summary(format!("payload configuration: {payload_path}"));
-    // Before the configuration is checked, so that a node refused because
-    // this build lacks its type is read beside the list of what it has.
+    // The supervisor refuses a configuration with problems once, as the
+    // child would, rather than starting a child on it that fails, and then
+    // supervises. The startup summary is the child's.
+    //
+    // Which file was named is the summary's first line, said once, by the
+    // supervisor, and before the file is read.
     let built = tcspecial::node::payload::BUILT;
-    runtime::start::summary(format!(
-        "payload types built: {}",
-        if built.is_empty() {
-            "none but the network type".to_string()
-        } else {
-            built.join(", ")
-        }
-    ));
+    if !child {
+        runtime::start::summary(format!(
+            "payload configuration: {payload_path}"
+        ));
 
-    // What tcs-verify says about this file, asked before anything else is read
-    // from it and said in tcs-verify's own words: every problem at once, each
-    // with its file and line, rather than whichever of them a loader below
-    // happened to meet first. The same lines tcs-moc, tcs-sim and tcs-gui show
-    // as they start.
-    //
-    // Refused on a warning as well: a node whose attributes are not all in is
-    // a node that cannot be opened, so aboard it is not a question of degree
-    // -- see `tcsprotocol::graph::check::Severity`.
-    //
-    // Against the types this build contains, so that a configuration with a
-    // node of another type is refused here, before anything is opened, in
-    // the words tcs-verify's `--types` uses on the ground.
-    let report = tcsverify::verify_built(
-        std::path::Path::new(&payload_path),
-        None,
-        tcsverify::Limits::EVERYTHING,
-        built,
-    );
-    for (_, line) in report.lines() {
-        error!("{}", line);
-        // On stderr too, because a vehicle that will not start is read by
-        // whoever is standing there and not through RUST_LOG.
-        eprintln!("{}", line);
+        // Before the configuration is checked, so that a node refused because
+        // this build lacks its type is read beside the list of what it has.
+        runtime::start::summary(format!(
+            "payload types built: {}",
+            if built.is_empty() {
+                "none but the network type".to_string()
+            } else {
+                built.join(", ")
+            }
+        ));
+        if refused(&payload_path, built) {
+            process::exit(runtime::supervisor::BAD);
+        }
+        process::exit(runtime::supervisor::run(&payload_path, simulate));
     }
-    if report.found_anything() {
-        error!("{}: not started", payload_path);
-        process::exit(1);
+
+    if refused(&payload_path, built) {
+        process::exit(runtime::supervisor::BAD);
     }
 
     // The configuration is a graph, which is the only thing it can be: see
@@ -202,4 +197,49 @@ fn main() {
         process::exit(tcspecial::visual::run(&payload_path, simulate));
     }
     process::exit(runtime::start::run_or_report(&payload_path, simulate));
+}
+
+/// Says what tcs-verify says about the configuration at `payload_path`, and
+/// whether that refuses it.
+///
+/// Asked before anything else is read from it and said in tcs-verify's own
+/// words: every problem at once, each with its file and line, rather than
+/// whichever of them a loader happened to meet first. The same lines
+/// tcs-moc, tcs-sim and tcs-gui show as they start.
+///
+/// Refused on a warning as well: a node whose attributes are not all in is
+/// a node that cannot be opened, so aboard it is not a question of degree
+/// -- see `tcsprotocol::graph::check::Severity`.
+///
+/// Against the types this build contains, so that a configuration with a
+/// node of another type is refused here, before anything is opened, in the
+/// words tcs-verify's `--types` uses on the ground.
+///
+/// # Arguments
+///
+/// * `payload_path` - The configuration on the command line.
+/// * `built`        - The payload types this build contains.
+///
+/// # Returns
+///
+/// Whether it is refused, each problem having been logged and said on
+/// stderr.
+fn refused(payload_path: &str, built: &[&str]) -> bool {
+    let report = tcsverify::verify_built(
+        std::path::Path::new(payload_path),
+        None,
+        tcsverify::Limits::EVERYTHING,
+        built,
+    );
+    for (_, line) in report.lines() {
+        error!("{}", line);
+        // On stderr too, because a vehicle that will not start is read by
+        // whoever is standing there and not through RUST_LOG.
+        eprintln!("{}", line);
+    }
+    if report.found_anything() {
+        error!("{}: not started", payload_path);
+        return true;
+    }
+    false
 }

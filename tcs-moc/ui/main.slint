@@ -61,6 +61,10 @@ export struct DHInfo {
     // one binding -- the ordinary case -- then needs nothing typed but the
     // value.
     setting: string,
+    // A consolidator's inputs, as its world-in names them, a comma between
+    // each: what its QUERY_CONSOLIDATOR counts are shown against. Empty for
+    // a node that is not a consolidator, which is not asked one.
+    inputs: string,
 }
 
 component DHPanel inherits Rectangle {

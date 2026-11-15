@@ -3573,8 +3573,10 @@ interpreter reads them there, waiting for no pass and allocating nothing.
 ``consolidator`` for every input; tcsmoc-c's
 ``tcs_client_query_consolidator`` asks from C and C++, and the Python
 Yamcs stations ask through Yamcs, by the template's ``QueryConsolidator``
-(``tcsmoc.yamcs_ground.query_consolidator``). Not yet: tcs-moc and the F´
-bridge.
+(``tcsmoc.yamcs_ground.query_consolidator``). tcs-moc asks each
+consolidator's panel ``QUERY_CONSOLIDATOR`` with ``QUERY_NODE``, showing the
+counts by input in its ``Configuration``, and gives a panel to each input's
+source that is drawn into no gateway node itself. Not yet: the F´ bridge.
 
 App nodes
 ---------

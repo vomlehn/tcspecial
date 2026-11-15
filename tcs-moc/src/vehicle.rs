@@ -679,14 +679,29 @@ pub const NO_PACKET_SIZE: &str = "not fixed";
 /// The size in bytes, such as `2 bytes`, or [`NO_PACKET_SIZE`] where the
 /// configuration fixes none.
 fn packet_size_of(graph: &Graph, link: &Telemetered) -> String {
-    let width = match &link.carries {
+    size_of(graph, &link.source, &link.carries)
+}
+
+/// [`packet_size_of`], of a source and the type it sends.
+///
+/// # Arguments
+///
+/// * `graph`   - The configuration.
+/// * `source`  - The node that sends it.
+/// * `carries` - The type it sends.
+///
+/// # Returns
+///
+/// As [`packet_size_of`].
+fn size_of(graph: &Graph, source: &str, carries: &LinkType) -> String {
+    let width = match carries {
         LinkType::Basic(basic) => basic.width(),
         LinkType::Structure(fields) => {
             fields.iter().map(|(_, basic)| basic.width()).sum()
         }
     };
     let read = || {
-        let node = graph.node(&link.source)?;
+        let node = graph.node(source)?;
         let size = reach_of(node).ok()?.read_size?;
         usize::try_from(size).ok()
     };
@@ -719,8 +734,8 @@ pub fn panels(
 ) -> Vec<DHInfo> {
     let mut links: Vec<&Telemetered> = links.iter().collect();
     links.sort_by_key(|link| link.id);
-    links
-        .into_iter()
+    let mut panels: Vec<DHInfo> = links
+        .iter()
         .map(|link| {
             let via = match &link.via {
                 Via::Gateway(gateway) => format!("to {gateway}"),
@@ -764,9 +779,103 @@ pub fn panels(
                         .and_then(|theirs| theirs.first().cloned())
                         .unwrap_or_default(),
                 ),
+                inputs: SharedString::from(
+                    layout_of(graph, &link.source)
+                        .map(|layout| {
+                            layout
+                                .inputs
+                                .iter()
+                                .map(|input| input.name.as_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        })
+                        .unwrap_or_default(),
+                ),
             }
         })
-        .collect()
+        .collect();
+
+    // A consolidator's inputs reach the ground in its datum, which the
+    // receive takes apart, handing out each new one as though its source
+    // had sent it: a source that is drawn into no gateway node itself has
+    // a panel too, for them to be shown in.
+    let ids = tcsprotocol::graph::telemetry::ids(graph);
+    for link in &links {
+        let Some(layout) = layout_of(graph, &link.source) else {
+            continue;
+        };
+        let to = match &link.via {
+            Via::Gateway(gateway) => format!("to {gateway}"),
+            Via::PayloadTelemetry => "over payload_telemetry".to_string(),
+        };
+        for input in &layout.inputs {
+            if panels
+                .iter()
+                .any(|panel| panel.name == input.source.as_str())
+            {
+                continue;
+            }
+            let Some(&id) = ids.get(&input.source) else {
+                continue;
+            };
+            let via = format!("in \"{}\"'s datum {to}", link.source);
+            panels.push(DHInfo {
+                name: SharedString::from(input.source.clone()),
+                dev_id: i32::try_from(id).unwrap_or(i32::MAX),
+                config: SharedString::from(via.clone()),
+                packet_size: SharedString::from(size_of(
+                    graph,
+                    &input.source,
+                    &input.kind,
+                )),
+                status: SharedString::from(UNKNOWN_STATUS),
+                oc_time: SharedString::from(NO_TRANSFER_TIME),
+                oc_data: SharedString::new(),
+                packets_recv: 0,
+                parameters: SharedString::from(format!(
+                    "{} (device id {id})\nsends {via}, as its input \"{}\": \
+                     a held reading adds no arrival",
+                    input.source, input.name
+                )),
+                settable: SharedString::from(
+                    settable
+                        .get(&input.source)
+                        .map(|theirs| theirs.join(", "))
+                        .unwrap_or_default(),
+                ),
+                setting: SharedString::from(
+                    settable
+                        .get(&input.source)
+                        .and_then(|theirs| theirs.first().cloned())
+                        .unwrap_or_default(),
+                ),
+                inputs: SharedString::new(),
+            });
+        }
+    }
+    panels.sort_by_key(|panel| panel.dev_id);
+    panels
+}
+
+/// How a node lays out its datum, where it is a consolidator.
+///
+/// # Arguments
+///
+/// * `graph`  - The configuration.
+/// * `source` - The node's name.
+///
+/// # Returns
+///
+/// The layout, or `None` for a node that is not a consolidator or whose
+/// layout does not work out, which the check says.
+fn layout_of(
+    graph: &Graph,
+    source: &str,
+) -> Option<tcsprotocol::consolidation::Layout> {
+    let node = graph.node(source)?;
+    let (_, layout) =
+        tcsprotocol::consolidation::Layout::of_node(graph, node)?.ok()?;
+    Some(layout)
 }
 
 /// Whether the simulator file names any payload to simulate, so that tcs-sim
@@ -1267,7 +1376,24 @@ struct Asked {
     row: usize,
     /// The node's id, which the question names.
     node: tcsprotocol::NodeId,
+    /// A consolidator's inputs, in the order of its `world-in`, which are
+    /// asked QUERY_CONSOLIDATOR as well; empty for any other node.
+    inputs: Vec<String>,
 }
+
+/// What a consolidator's QUERY_CONSOLIDATOR came to: what it has sent and
+/// its inputs' counts; or why there was no answer, or a refusal.
+type Consolidated = Result<
+    (
+        tcsprotocol::consolidation::ConsolidatorCounts,
+        Vec<tcsprotocol::consolidation::InputCounts>,
+    ),
+    String,
+>;
+
+/// What asking one node came to: its panel's row, its QUERY_NODE, and its
+/// QUERY_CONSOLIDATOR where it is a consolidator.
+type Reply = (usize, Answered, Option<Consolidated>);
 
 /// What a node's QUERY_NODE came to: the status it was answered with,
 /// whether the node is running and what it has moved; or why there was no
@@ -1302,6 +1428,12 @@ fn to_ask(
                 node: tcsprotocol::NodeId(
                     u32::try_from(info.dev_id).unwrap_or(u32::MAX),
                 ),
+                inputs: info
+                    .inputs
+                    .split(", ")
+                    .filter(|input| !input.is_empty())
+                    .map(str::to_string)
+                    .collect(),
             })
         })
         .collect()
@@ -1318,12 +1450,10 @@ fn to_ask(
 ///
 /// # Returns
 ///
-/// Each node's panel row and what its question came to; a node asked
-/// after the link went down is answered with [`crate::ci_link::NOT_CONNECTED`].
-fn query_nodes(
-    link: &Mutex<CiLink>,
-    asked: &[Asked],
-) -> Vec<(usize, Answered)> {
+/// Each node's panel row and what its questions came to, a consolidator's
+/// QUERY_CONSOLIDATOR with them; a node asked after the link went down is
+/// answered with [`crate::ci_link::NOT_CONNECTED`].
+fn query_nodes(link: &Mutex<CiLink>, asked: &[Asked]) -> Vec<Reply> {
     asked
         .iter()
         .map(|asked| {
@@ -1336,7 +1466,17 @@ fn query_nodes(
                 },
                 Err(_) => Err(crate::ci_link::NOT_CONNECTED.to_string()),
             };
-            (asked.row, answer)
+            let consolidated =
+                (!asked.inputs.is_empty()).then(|| match link.lock() {
+                    Ok(mut guard) => match guard.client() {
+                        Some(client) => client
+                            .consolidator(asked.node)
+                            .map_err(|e| e.to_string()),
+                        None => Err(crate::ci_link::NOT_CONNECTED.to_string()),
+                    },
+                    Err(_) => Err(crate::ci_link::NOT_CONNECTED.to_string()),
+                });
+            (asked.row, answer, consolidated)
         })
         .collect()
 }
@@ -1354,10 +1494,10 @@ fn query_nodes(
 /// What was found, node by node, for `Last Response`.
 fn show_node_answers(
     model: &impl Model<Data = DHInfo>,
-    answers: &[(usize, Answered)],
+    answers: &[Reply],
 ) -> String {
     let mut said = Vec::new();
-    for (row, answer) in answers {
+    for (row, answer, consolidated) in answers {
         let Some(mut info) = model.row_data(*row) else {
             continue;
         };
@@ -1375,10 +1515,22 @@ fn show_node_answers(
                 } else {
                     STOPPED_STATUS
                 });
+                let consolidated = match consolidated {
+                    None => String::new(),
+                    Some(Ok((sent, inputs))) => format!(
+                        "\n\nwhat it has sent since the vehicle started\n{}",
+                        sent_by(sent, &info.inputs, inputs)
+                    ),
+                    Some(Err(e)) => format!(
+                        "\n\nwhat it has sent is not known: QUERY_CONSOLIDATOR \
+                         has no answer ({e})"
+                    ),
+                };
                 info.parameters = SharedString::from(format!(
-                    "{}\n\nwhat it has moved since the vehicle started\n{}",
+                    "{}\n\nwhat it has moved since the vehicle started\n{}{}",
                     describes(&info),
-                    counted(counts)
+                    counted(counts),
+                    consolidated
                 ));
                 said.push(format!("{}: {}", info.name, info.status));
                 model.set_row_data(*row, info);
@@ -1484,9 +1636,9 @@ pub(crate) struct Asking {
 struct Found {
     /// What a CONNECT sent first said, where one was.
     connected: Option<String>,
-    /// Each node's panel row and what its question came to; empty where
+    /// Each node's panel row and what its questions came to; empty where
     /// nothing was asked.
-    answers: Vec<(usize, Answered)>,
+    answers: Vec<Reply>,
 }
 
 impl Found {
@@ -1659,6 +1811,43 @@ impl Asking {
 /// reading one wants the other beside it.
 fn describes(info: &DHInfo) -> String {
     format!("{} (device id {})\n{}", info.name, info.dev_id, info.config)
+}
+
+/// What a consolidator has sent and how often each input went into a datum
+/// held or none, as the popup shows it: a column, as [`counted`]'s is, and
+/// in words, since a count of held is what says a payload has gone quiet.
+///
+/// # Arguments
+///
+/// * `sent`   - What it has sent.
+/// * `names`  - Its inputs' names, as the panel holds them.
+/// * `inputs` - Each input's counts, in the same order.
+///
+/// # Returns
+///
+/// The popup's lines.
+fn sent_by(
+    sent: &tcsprotocol::consolidation::ConsolidatorCounts,
+    names: &str,
+    inputs: &[tcsprotocol::consolidation::InputCounts],
+) -> String {
+    let mut lines = vec![
+        format!("datums sent    {}", sent.sent),
+        format!("  all new      {}", sent.sent_all_new),
+        format!("  interval     {}", sent.sent_interval),
+        format!("  moc          {}", sent.sent_moc),
+        format!("readings refused {}", sent.refused),
+    ];
+    let names: Vec<&str> = names.split(", ").collect();
+    for (at, input) in inputs.iter().enumerate() {
+        let name = names.get(at).copied().unwrap_or("?");
+        let new = sent.sent.saturating_sub(input.held + input.none);
+        lines.push(format!(
+            "input {name}: new {new}, held {}, none {}",
+            input.held, input.none
+        ));
+    }
+    lines.join("\n")
 }
 
 /// What a node has moved, as the popup shows it.
@@ -4112,6 +4301,78 @@ payloads:
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         Graph::load(root.join(format!("examples/{name}/{name}.ytcs")))
             .expect("the example reads")
+    }
+
+    /// A consolidator's inputs whose sources are drawn into no gateway node
+    /// themselves have panels too, saying they arrive in its datum; the
+    /// consolidator's panel names its inputs, which it is asked
+    /// QUERY_CONSOLIDATOR about, and no other panel does.
+    #[test]
+    fn a_consolidators_inputs_have_panels_of_their_own() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let graph = Graph::load(root.join("tests/consolidator/yamcs.ytcs"))
+            .expect("the fixture reads");
+        let links = telemetry::of(&graph).expect("its links");
+        let panels = panels(&graph, &links, &settable_of(&graph));
+        let named: Vec<(&str, i32, &str, &str)> = panels
+            .iter()
+            .map(|p| {
+                (
+                    p.name.as_str(),
+                    p.dev_id,
+                    p.config.as_str(),
+                    p.inputs.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            named,
+            vec![
+                ("label", 1, "to gateway, at 127.0.0.1:26701", ""),
+                (
+                    "pack",
+                    2,
+                    "to gateway, at 127.0.0.1:26702",
+                    "temp, valve, name"
+                ),
+                ("temp", 3, "in \"pack\"'s datum to gateway", ""),
+                ("valve", 4, "in \"pack\"'s datum to gateway", ""),
+            ]
+        );
+        assert_eq!(panels[2].packet_size, "2 bytes");
+        let asked = to_ask(&VecModel::from(panels), None);
+        assert_eq!(asked[1].inputs, ["temp", "valve", "name"]);
+        assert!(asked[0].inputs.is_empty());
+    }
+
+    /// What a consolidator has sent is shown by trigger, and each input's
+    /// new, held and none by name, new being what was sent less the other
+    /// two.
+    #[test]
+    fn a_consolidators_counts_are_shown_by_input() {
+        let sent = tcsprotocol::consolidation::ConsolidatorCounts {
+            sent: 10,
+            sent_all_new: 4,
+            sent_interval: 6,
+            sent_moc: 1,
+            refused: 2,
+        };
+        let inputs = [
+            tcsprotocol::consolidation::InputCounts { held: 3, none: 1 },
+            tcsprotocol::consolidation::InputCounts { held: 0, none: 0 },
+        ];
+        let shown = sent_by(&sent, "temp, valve", &inputs);
+        assert!(shown.contains("datums sent    10"), "{shown}");
+        assert!(shown.contains("interval     6"), "{shown}");
+        assert!(shown.contains("readings refused 2"), "{shown}");
+        assert!(
+            shown.contains("input temp: new 6, held 3, none 1"),
+            "{shown}"
+        );
+        assert!(
+            shown.contains("input valve: new 10, held 0, none 0"),
+            "{shown}"
+        );
     }
 
     /// One panel per source, in device id order, saying where its data

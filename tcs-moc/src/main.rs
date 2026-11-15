@@ -1271,6 +1271,7 @@ mod tests {
             parameters: SharedString::from(format!("{name} (device id {row})")),
             settable: SharedString::new(),
             setting: SharedString::new(),
+            inputs: SharedString::new(),
         }
     }
 

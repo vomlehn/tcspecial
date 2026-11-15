@@ -1,4 +1,4 @@
-// The visual window: a running tcspecial's graph, drawn as tcs-gui draws the
+// The visual window: a running tcspecial's graph, drawn as tcs-cfge draws the
 // configuration, with each link lit as data crosses it. One window a page:
 // the top file's, and one for each subdiagram the top file includes.
 //
@@ -95,7 +95,7 @@ export component VisualWindow inherits Window {
             border-color: #d8d8d4;
 
             // Right of the left margin, against the payloads it joins, as
-            // tcs-gui draws it.
+            // tcs-cfge draws it.
             PhysicsGround {
                 x: root.edge-width;
                 y: 0;
@@ -160,7 +160,7 @@ export component VisualWindow inherits Window {
                 node: n;
             }
 
-            // A subdiagram's edge, as tcs-gui draws it: a margin either side
+            // A subdiagram's edge, as tcs-cfge draws it: a margin either side
             // of the page's inside, each named as what it is, holding the
             // terminals a line from another file arrives at or leaves by.
             // Pale and named, so that what the margin is does not rest on

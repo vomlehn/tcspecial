@@ -327,7 +327,7 @@ def yaml_is_old(document):
 
     Returns:
         Which of its parts are old: some of ``gateway``, ``vehicle``,
-        ``payloads`` and ``tcs-gui``.
+        ``payloads`` and ``tcs-cfge``.
     """
     old = set()
     if not isinstance(document, dict):
@@ -339,7 +339,7 @@ def yaml_is_old(document):
             if any(isinstance(entry, dict)
                    and ("name" in entry or "type" in entry) for entry in value):
                 old.add(key)
-        elif key == "tcs-gui" and isinstance(value, dict):
+        elif key == "tcs-cfge" and isinstance(value, dict):
             placed = value.get("nodes") or []
             if (any(isinstance(entry, dict) and "name" in entry
                     for entry in placed)):
@@ -913,7 +913,7 @@ def plain(text):
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def yaml_tcs_gui(above, body, report):
+def yaml_tcs_cfge(above, body, report):
     """Write the editor's section in the new shape.
 
     Args:
@@ -924,16 +924,16 @@ def yaml_tcs_gui(above, body, report):
     Returns:
         Its lines.
     """
-    said = yaml.safe_load("\n".join(["tcs-gui:"] + body))["tcs-gui"] or {}
+    said = yaml.safe_load("\n".join(["tcs-cfge:"] + body))["tcs-cfge"] or {}
     if any(is_comment(line) for line in body):
-        report.say("tcs-gui: the comments inside the editor's section are "
+        report.say("tcs-cfge: the comments inside the editor's section are "
                    "dropped: the editor writes the section again from what it "
                    "holds")
     unknown = set(said) - {"nodes", "set-aside"}
     if unknown:
-        raise ValueError(f"tcs-gui: does not know {sorted(unknown)}")
+        raise ValueError(f"tcs-cfge: does not know {sorted(unknown)}")
     out = list(above)
-    out.append("tcs-gui:")
+    out.append("tcs-cfge:")
     placed = said.get("nodes") or []
     if placed:
         out.append("  nodes:")
@@ -977,13 +977,13 @@ def convert_yaml(text, report):
         if key in old and key in SECTIONS:
             out.extend(yaml_section(key, above, own[1:], report,
                                     arrivals))
-        elif key in old and key == "tcs-gui":
+        elif key in old and key == "tcs-cfge":
             # Its blank lines after are not its own.
             body = own[1:]
             tail = []
             while body and not body[-1].strip():
                 tail.insert(0, body.pop())
-            out.extend(yaml_tcs_gui(above, body, report))
+            out.extend(yaml_tcs_cfge(above, body, report))
             out.extend(tail)
         else:
             out.extend(above + own)
@@ -1426,7 +1426,7 @@ def xml_section(name, nodes, about, report, arrivals):
     return out
 
 
-def xml_tcs_gui(fragment, report):
+def xml_tcs_cfge(fragment, report):
     """Write the editor's section in the new shape.
 
     Args:
@@ -1442,7 +1442,7 @@ def xml_tcs_gui(fragment, report):
     old = False
     for child in element:
         if is_xml_comment(child):
-            report.say("tcs-gui: a comment inside the editor's section is "
+            report.say("tcs-cfge: a comment inside the editor's section is "
                        "dropped: the editor writes the section again from what "
                        "it holds")
             continue
@@ -1461,11 +1461,11 @@ def xml_tcs_gui(fragment, report):
             for one in child.findall("node"):
                 aside.append((one.get("name"), one.get("concern")))
         else:
-            raise ValueError(f"tcs-gui: does not know <{child.tag}>")
+            raise ValueError(f"tcs-cfge: does not know <{child.tag}>")
     if not old:
         return None
     pad = " " * XML_SECTION
-    out = [f"{pad}<tcs-gui>"]
+    out = [f"{pad}<tcs-cfge>"]
     if placed:
         out.append(f"{pad}    <nodes>")
         for name, x, y in sorted(placed):
@@ -1478,7 +1478,7 @@ def xml_tcs_gui(fragment, report):
             out.append(f"{pad}        <node name={quoteattr(name)} "
                        f"concern={quoteattr(concern)}/>")
         out.append(f"{pad}    </set-aside>")
-    out.append(f"{pad}</tcs-gui>")
+    out.append(f"{pad}</tcs-cfge>")
     return out
 
 
@@ -1536,8 +1536,8 @@ def convert_xml(text, report):
         if top.what != "element":
             continue
         fragment = data[top.start:top.end].decode("utf-8")
-        if top.tag == "tcs-gui":
-            lines = xml_tcs_gui(fragment, report)
+        if top.tag == "tcs-cfge":
+            lines = xml_tcs_cfge(fragment, report)
             if lines is not None:
                 start, end = line_span(data, top.start, top.end)
                 edits.append((start, end, "\n".join(lines) + "\n"))

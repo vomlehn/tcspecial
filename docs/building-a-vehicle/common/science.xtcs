@@ -133,7 +133,7 @@
         <from>gateway</from>
         <sets>probe_thermostat.setpoint</sets>
     </commands>
-    <tcs-gui>
+    <tcs-cfge>
         <nodes>
             <node name="probe_heater" x="34" y="224"/>
             <node name="probe_thermostat" x="525" y="224"/>
@@ -141,5 +141,5 @@
             <node name="regolith_thermometer" x="34" y="129"/>
             <node name="seismometer" x="34" y="34"/>
         </nodes>
-    </tcs-gui>
+    </tcs-cfge>
 </configuration>

@@ -102,7 +102,7 @@ vehicle:
           - heater_wanted.zone_temp
         world-in: [thermometer]
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: fsw, x: 469, y: 34 }
     - { node: heater, x: 34, y: 34 }

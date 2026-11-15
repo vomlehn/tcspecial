@@ -571,7 +571,7 @@ ambient temperature, the ``ambient_temp`` under ``world:`` in the simulator
 file, drawn as a dashed rule and labelled at its right end, as ``ambient
 288.15 K (simulated world)`` in the thermostat example: what the zone drifts
 towards when nothing heats it. It is read from the file, not sent by the
-vehicle, and so is not drawn in tcs-gui's diagram. A flight run, with
+vehicle, and so is not drawn in tcs-cfge's diagram. A flight run, with
 ``--simulate=none``, has no simulated world and draws none.
 
 The buttons at the top choose the span: the last ``10 s``, ``1 min`` or

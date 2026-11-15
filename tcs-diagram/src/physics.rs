@@ -5,7 +5,7 @@
 //!
 //! The Physics pane is left of the payloads, at negative x in the
 //! coordinates the configuration holds -- see `crate::pane`. A component
-//! is drawn where the simulator file's `tcs-gui` section says it was put,
+//! is drawn where the simulator file's `tcs-cfge` section says it was put,
 //! kept inside the pane; one the section does not place is laid out here,
 //! down the pane by name, so that a model nobody has arranged is drawn the
 //! same every time it is opened, in the one order a model has.
@@ -52,7 +52,7 @@ pub struct Component<'a> {
     pub kind: &'a str,
     /// Whether something is wrong with it, which paints it red.
     pub faulty: bool,
-    /// Where the simulator file's `tcs-gui` section says it was put, if it
+    /// Where the simulator file's `tcs-cfge` section says it was put, if it
     /// says.
     pub placed: Option<(i32, i32)>,
 }
@@ -78,7 +78,7 @@ pub struct Drawn {
     pub connections: Vec<(String, String)>,
     /// Each simulated payload and a terminal it is joined to.
     pub joins: Vec<(String, String)>,
-    /// Where the `tcs-gui` section put each component it places, by name.
+    /// Where the `tcs-cfge` section put each component it places, by name.
     pub placed: std::collections::BTreeMap<String, (i32, i32)>,
 }
 
@@ -125,7 +125,7 @@ impl Drawn {
 }
 
 /// What a simulator file's world draws on one page: its components that
-/// the `tcs-gui` section puts on that page -- on the top page, those it puts
+/// the `tcs-cfge` section puts on that page -- on the top page, those it puts
 /// on no subdiagram's -- its connections, and every simulated payload's
 /// `connects`, its group's where it states none.
 ///
@@ -158,8 +158,8 @@ pub fn of_simulator(
             .collect();
         drawn.connections.sort();
     }
-    if let Some(tcs_gui) = &sim.tcs_gui {
-        drawn.placed = tcs_gui
+    if let Some(tcs_cfge) = &sim.tcs_cfge {
+        drawn.placed = tcs_cfge
             .nodes
             .iter()
             .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
@@ -168,7 +168,7 @@ pub fn of_simulator(
     // The page's components only: one the editor put on a subdiagram's page
     // is drawn there and nowhere else, and one it put on none is the top
     // page's.
-    let pages = sim.tcs_gui.as_ref().map(|tcs_gui| &tcs_gui.pages);
+    let pages = sim.tcs_cfge.as_ref().map(|tcs_cfge| &tcs_cfge.pages);
     let page_of = |name: &String| {
         pages?
             .iter()
@@ -261,7 +261,7 @@ pub fn confine(at: (i32, i32), dividers: Dividers) -> (i32, i32) {
 
 /// Where each component goes.
 ///
-/// One the `tcs-gui` section placed goes where it was put, brought inside the
+/// One the `tcs-cfge` section placed goes where it was put, brought inside the
 /// pane by [`confine`]; one it did not goes down the pane, in name order, a
 /// step apart, clear of the heading. Then, in that order, any that covers
 /// one before it steps down until it is clear, as a configuration's nodes
@@ -684,7 +684,7 @@ mod tests {
     use super::*;
     use crate::pane::default_dividers;
 
-    /// Each page draws the components the `tcs-gui` section puts on it, and
+    /// Each page draws the components the `tcs-cfge` section puts on it, and
     /// the top page those it puts on none.
     #[test]
     fn each_page_draws_its_own_components() {
@@ -694,7 +694,7 @@ mod tests {
              power: \"4 W\"\n            voltage: \"28 V\"\n          \
              - component: heater_2\n            power: \"4 W\"\n            \
              voltage: \"28 V\"\n\
-             tcs-gui:\n  nodes: []\n  pages:\n    zone: [heater_2]\n",
+             tcs-cfge:\n  nodes: []\n  pages:\n    zone: [heater_2]\n",
             tcsprotocol::ConfigFormat::Yaml,
         )
         .expect("the file reads");
@@ -878,7 +878,7 @@ mod tests {
         }
     }
 
-    /// A component the `tcs-gui` section placed is drawn where it was put,
+    /// A component the `tcs-cfge` section placed is drawn where it was put,
     /// brought inside the pane when it was put outside it; one it did not
     /// place goes down the pane; and one put on top of another steps down
     /// until it is clear, the first keeping its place.

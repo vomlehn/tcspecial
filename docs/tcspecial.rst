@@ -255,14 +255,14 @@ terminal
     vote's world-in is its inputs, ``world-in: [in0, in1, in2]``. A line to a
     name its far end does not list is refused where the file is read, saying
     which names it does list. A name is one word with no dot in it, and may be
-    listed with nothing arriving at it yet. tcs-gui names a line it draws after
+    listed with nothing arriving at it yet. tcs-cfge names a line it draws after
     the node it leaves, and adds the name to the list for you.
 
     Each terminal may be linked to one other: a ``world-out`` to a
     ``world-in``, a ``world-in`` to a ``world-out``, a ``moc-out`` to
     a ``moc-in``, a ``moc-in`` to a ``moc-out``. Anything else would
-    carry one stream into the other. In tcs-gui the terminals are drawn as small
-    boxes in a node's corners, each with an arrow saying which way its data
+    carry one stream into the other. In tcs-cfge the terminals are drawn as
+    small boxes in a node's corners, each with an arrow saying which way its data
     goes: the payload's own data along the top pointing right, towards the
     ground, and what the ground sends along the bottom pointing left, towards
     the payloads -- the canvas having the payloads on the left, the vehicle in
@@ -292,7 +292,7 @@ terminal
     ``world-in`` in its upper left, and what it sends leaves by the
     ``moc-out`` in its lower left.
 
-    A line's names are not written beside it in tcs-gui. Resting the pointer
+    A line's names are not written beside it in tcs-cfge. Resting the pointer
     on a line shows a tip: the node it leaves, the node it reaches and the
     input there where it names one, and under them whatever comment the
     file has for it. A physics line's tip names the component's terminal,
@@ -461,7 +461,7 @@ Both schemas are in ``tcsprotocol/schema``, installed under
 ``share/tcspecial/schema``, beside the pair for the simulator's own file.
 They check a file's shape -- which sections there are and which words are
 words -- and not whether it can be flown, which is tcs-verify's to say: a file
-a schema accepts may still be refused. tcs-gui writes either spelling, and
+a schema accepts may still be refused. tcs-cfge writes either spelling, and
 writes into each file a reference to its schema, so that another editor can
 check it.
 
@@ -529,7 +529,7 @@ subdiagram, with a name of its own and its file's path under it:
 
 In XML it is one element with the two as attributes, ``<include
 name="thermostat-common" path="../thermostat-common/thermostat"/>``. The name
-is the subdiagram's, the name tcs-gui draws its box under, and is no node's
+is the subdiagram's, the name tcs-cfge draws its box under, and is no node's
 and no other subdiagram's, with no dot or slash in it. An include written as a
 bare path, as includes once were, is refused, saying how to write it now.
 
@@ -555,7 +555,7 @@ refused, saying which list to add the node to:
 
 In XML each name is an element of its own, ``<world-out>to_k1</world-out>``,
 inside ``<exports>``. A top file has nothing around it and may not have the
-section. tcs-gui draws an included file as a box whose corner terminals are
+section. tcs-cfge draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
 include, name and path, as it is written, so a set of files digests alike from
 wherever it is read. Two examples that fly one vehicle include it from a directory of their
@@ -3616,8 +3616,8 @@ software <manual.html#the-categories-of-tcs-software>`__):
    and the XTCS, YTCS and simulator schemas in ``share/tcspecial/schema``.
    It was ``tcspecial-moc``, which it replaces.
 ``tcs-tools``
-   Software tools, which never fly. ``bin/tcs-gui`` with its descriptions in
-   ``share/tcs-gui``; ``bin/tcs-verify``; and the Python ``tcs_ui``, the
+   Software tools, which never fly. ``bin/tcs-cfge`` with its descriptions in
+   ``share/tcs-cfge``; ``bin/tcs-verify``; and the Python ``tcs_ui``, the
    ``tcs-ui`` distribution, with a ``.pth`` file of its own. It depends on
    ``tcsmoc``, since ``tcs_ui`` imports ``tcsmoc``.
 ``tcspecial-test``
@@ -3847,11 +3847,11 @@ Each program's crate installs with cargo, into the prefix's ``bin``:
 
    $ cargo install --path tcspecial --root /opt/tcs
    $ cargo install --path tcs-verify --root /opt/tcs
-   $ cargo install --path tcs-gui --root /opt/tcs
+   $ cargo install --path tcs-cfge --root /opt/tcs
 
-cargo installs programs and nothing else, so tcs-gui installed this way has
+cargo installs programs and nothing else, so tcs-cfge installed this way has
 no descriptions or schemas until ``make install-data`` puts them in
-``/opt/tcs/share/tcs-gui`` and ``/opt/tcs/share/tcspecial/schema``, and an app program installed this way is in
+``/opt/tcs/share/tcs-cfge`` and ``/opt/tcs/share/tcspecial/schema``, and an app program installed this way is in
 ``bin`` rather than ``libexec``. The library crates -- ``tcsprotocol``,
 ``tcsmoc`` and the rest -- are taken by a Rust ground station as path or git
 dependencies, and are not installed.
@@ -5188,7 +5188,7 @@ programs, not for embedded systems.
    $ target/debug/tcspecial --visual --simulate=all \
        examples/simple-app/simple-app.ytcs
 
-The window draws the configuration as tcs-gui does -- the three working panes,
+The window draws the configuration as tcs-cfge does -- the three working panes,
 every node where the editor puts it, every link along its route, and the
 simulator file's physics in the Physics pane to their left, the simulator file
 being the one tcs-sim would read for the configuration, ``PAYLOAD_SIM_YAML`` or
@@ -5198,7 +5198,7 @@ link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.
 
 A configuration that includes other files opens a window for each of them as
-well, drawn as tcs-gui draws that subdiagram's page, with its edge in the
+well, drawn as tcs-cfge draws that subdiagram's page, with its edge in the
 margins and its own physics; on the top page, each is a box. A link that
 crosses a subdiagram's edge blinks on both pages.
 
@@ -5267,13 +5267,13 @@ that satisfies both.
    * - `i-slint-backend-testing <https://crates.io/crates/i-slint-backend-testing>`__
      - 1.18
      - `1.18.1 <https://docs.rs/i-slint-backend-testing/1.18.1>`__
-     - tcs-gui, tcs-moc, tcs-sim, examples/beacon (tests only)
+     - tcs-cfge, tcs-moc, tcs-sim, examples/beacon (tests only)
      - Runs the windows with no display, so their tests can press buttons.
      - `repository <https://github.com/slint-ui/slint>`__
    * - `libc <https://crates.io/crates/libc>`__
      - 0.2
      - `0.2.190 <https://docs.rs/libc/0.2.190>`__
-     - tcsapp, tcs-gui, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim
+     - tcsapp, tcs-cfge, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim
      - The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.
      - `repository <https://github.com/rust-lang/libc>`__
    * - `log <https://crates.io/crates/log>`__
@@ -5297,13 +5297,13 @@ that satisfies both.
    * - `path-clean <https://crates.io/crates/path-clean>`__
      - 1.0
      - `1.0.1 <https://docs.rs/path-clean/1.0.1>`__
-     - tcs-gui
+     - tcs-cfge
      - Where a name with ``..`` in it leads, for the files Save as writes.
      - `repository <https://github.com/danreeves/path-clean>`__
    * - `quick-xml <https://crates.io/crates/quick-xml>`__
      - 0.42
      - `0.42.0 <https://docs.rs/quick-xml/0.42.0>`__
-     - tcs-gui, tcsprotocol
+     - tcs-cfge, tcsprotocol
      - Reads configuration files written in XML.
      - `repository <https://github.com/tafia/quick-xml>`__
    * - `rand <https://crates.io/crates/rand>`__
@@ -5315,45 +5315,45 @@ that satisfies both.
    * - `rfd <https://crates.io/crates/rfd>`__
      - 0.17
      - `0.17.2 <https://docs.rs/rfd/0.17.2>`__
-     - tcs-gui
+     - tcs-cfge
      - The desktop's own Save dialog, for Save as, through the XDG desktop portal.
      - `repository <https://github.com/PolyMeilex/rfd>`__
    * - `serde <https://crates.io/crates/serde>`__
      - 1.0
      - `1.0.229 <https://docs.rs/serde/1.0.229>`__
-     - tcs-gui, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim
+     - tcs-cfge, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim
      - Turns the configuration, the commands and the telemetry into Rust types and back.
      - `repository <https://github.com/serde-rs/serde>`__
    * - `serde_json <https://crates.io/crates/serde_json>`__
      - 1.0
      - `1.0.151 <https://docs.rs/serde_json/1.0.151>`__
-     - tcs-gui (tests only), tcsprotocol, tcs-verify
+     - tcs-cfge (tests only), tcsprotocol, tcs-verify
      - The value tree a configuration's digest is taken over and its two spellings are compared as, and the schema tests. Nothing on the link is JSON.
      - `repository <https://github.com/serde-rs/json>`__
    * - `serde_norway <https://crates.io/crates/serde_norway>`__
      - 0.9.42
      - `0.9.42 <https://docs.rs/serde_norway/0.9.42>`__
-     - tcs-gui, tcsprotocol
+     - tcs-cfge, tcsprotocol
      - Reads configuration files written in YAML, and the editor's undo
        history, which it keeps on disk.
      - `repository <https://github.com/cafkafk/serde-yaml>`__
    * - `similar <https://crates.io/crates/similar>`__
      - 3.2
      - `3.2.1 <https://docs.rs/similar/3.2.1>`__
-     - tcs-gui
+     - tcs-cfge
      - The line diffs a save is merged from, so a file changes only where it was edited.
      - `repository <https://github.com/mitsuhiko/similar>`__
    * - `slint <https://crates.io/crates/slint>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint/1.18.1>`__
-     - tcs-gui, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial
+     - tcs-cfge, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial
        built with ``visual``
      - The toolkit every window is drawn with.
      - `repository <https://github.com/slint-ui/slint>`__
    * - `slint-build <https://crates.io/crates/slint-build>`__
      - 1.3, 1.18
      - `1.18.1 <https://docs.rs/slint-build/1.18.1>`__
-     - tcs-gui, tcs-moc, tcs-sim, examples/beacon, and tcspecial built with
+     - tcs-cfge, tcs-moc, tcs-sim, examples/beacon, and tcspecial built with
        ``visual`` (build scripts)
      - Compiles the ``.slint`` files that describe the windows.
      - `repository <https://github.com/slint-ui/slint>`__
@@ -5420,7 +5420,7 @@ See Also
     Every TCS manual and design document, divided by the category of
     TCS software each is about.
 
-`The tcs-gui manual <tcs-gui.html>`__
+`The tcs-cfge manual <tcs-cfge.html>`__
     The editor of configurations and simulator configurations.
 
 `The tcs-moc manual <tcs-moc.html>`__

@@ -79,7 +79,7 @@ list in the tests to update:
 - `tcs-verify/tests/examples.rs` runs `tcs-verify` on each configuration and its
   simulator file (any error or warning fails), and checks that the YAML and
   XML read as the same configuration.
-- `tcs-gui/tests/schema.rs` validates each XML file against `tcspecial.xsd`,
+- `tcs-cfge/tests/schema.rs` validates each XML file against `tcspecial.xsd`,
   checks each YAML key against `tcspecial.schema.json`, and checks that every
   file names its schema (`../../tcsprotocol/schema/...`).
 

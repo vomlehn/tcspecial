@@ -713,13 +713,13 @@ line may arrive there by -- <tt class="docutils literal"><span class="pre">world
 vote's world-in is its inputs, <tt class="docutils literal"><span class="pre">world-in:</span> [in0, in1, in2]</tt>. A line to a
 name its far end does not list is refused where the file is read, saying
 which names it does list. A name is one word with no dot in it, and may be
-listed with nothing arriving at it yet. tcs-gui names a line it draws after
+listed with nothing arriving at it yet. tcs-cfge names a line it draws after
 the node it leaves, and adds the name to the list for you.</p>
 <p>Each terminal may be linked to one other: a <tt class="docutils literal"><span class="pre">world-out</span></tt> to a
 <tt class="docutils literal"><span class="pre">world-in</span></tt>, a <tt class="docutils literal"><span class="pre">world-in</span></tt> to a <tt class="docutils literal"><span class="pre">world-out</span></tt>, a <tt class="docutils literal"><span class="pre">moc-out</span></tt> to
 a <tt class="docutils literal"><span class="pre">moc-in</span></tt>, a <tt class="docutils literal"><span class="pre">moc-in</span></tt> to a <tt class="docutils literal"><span class="pre">moc-out</span></tt>. Anything else would
-carry one stream into the other. In tcs-gui the terminals are drawn as small
-boxes in a node's corners, each with an arrow saying which way its data
+carry one stream into the other. In tcs-cfge the terminals are drawn as
+small boxes in a node's corners, each with an arrow saying which way its data
 goes: the payload's own data along the top pointing right, towards the
 ground, and what the ground sends along the bottom pointing left, towards
 the payloads -- the canvas having the payloads on the left, the vehicle in
@@ -748,7 +748,7 @@ main one, with the same panes, lists, Physics pane and edits.
 A node with no terminal of that stream offers nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
 <tt class="docutils literal"><span class="pre">world-in</span></tt> in its upper left, and what it sends leaves by the
 <tt class="docutils literal"><span class="pre">moc-out</span></tt> in its lower left.</p>
-<p class="last">A line's names are not written beside it in tcs-gui. Resting the pointer
+<p class="last">A line's names are not written beside it in tcs-cfge. Resting the pointer
 on a line shows a tip: the node it leaves, the node it reaches and the
 input there where it names one, and under them whatever comment the
 file has for it. A physics line's tip names the component's terminal,
@@ -905,7 +905,7 @@ to one schema:</p>
 <tt class="docutils literal">share/tcspecial/schema</tt>, beside the pair for the simulator's own file.
 They check a file's shape -- which sections there are and which words are
 words -- and not whether it can be flown, which is tcs-verify's to say: a file
-a schema accepts may still be refused. tcs-gui writes either spelling, and
+a schema accepts may still be refused. tcs-cfge writes either spelling, and
 writes into each file a reference to its schema, so that another editor can
 check it.</p>
 <p>The format is taken from the file's extension, which is a configuration's
@@ -965,7 +965,7 @@ subdiagram, with a name of its own and its file's path under it:</p>
 </pre>
 <p>In XML it is one element with the two as attributes, <tt class="docutils literal">&lt;include
 <span class="pre">name=&quot;thermostat-common&quot;</span> <span class="pre">path=&quot;../thermostat-common/thermostat&quot;/&gt;</span></tt>. The name
-is the subdiagram's, the name tcs-gui draws its box under, and is no node's
+is the subdiagram's, the name tcs-cfge draws its box under, and is no node's
 and no other subdiagram's, with no dot or slash in it. An include written as a
 bare path, as includes once were, is refused, saying how to write it now.</p>
 <p>An include's path is relative to the top file's directory: it is the file's path from
@@ -988,7 +988,7 @@ refused, saying which list to add the node to:</p>
 </pre>
 <p>In XML each name is an element of its own, <tt class="docutils literal"><span class="pre">&lt;world-out&gt;to_k1&lt;/world-out&gt;</span></tt>,
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
-section. tcs-gui draws an included file as a box whose corner terminals are
+section. tcs-cfge draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
 include, name and path, as it is written, so a set of files digests alike from
 wherever it is read. Two examples that fly one vehicle include it from a directory of their
@@ -3829,8 +3829,8 @@ packages <tt class="docutils literal">tcsprotocol</tt> and <tt class="docutils l
 and the XTCS, YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>.
 It was <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>, which it replaces.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcs-tools</span></tt></dt>
-<dd>Software tools, which never fly. <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in
-<tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt>; <tt class="docutils literal"><span class="pre">bin/tcs-verify</span></tt>; and the Python <tt class="docutils literal">tcs_ui</tt>, the
+<dd>Software tools, which never fly. <tt class="docutils literal"><span class="pre">bin/tcs-cfge</span></tt> with its descriptions in
+<tt class="docutils literal"><span class="pre">share/tcs-cfge</span></tt>; <tt class="docutils literal"><span class="pre">bin/tcs-verify</span></tt>; and the Python <tt class="docutils literal">tcs_ui</tt>, the
 <tt class="docutils literal"><span class="pre">tcs-ui</span></tt> distribution, with a <tt class="docutils literal">.pth</tt> file of its own. It depends on
 <tt class="docutils literal">tcsmoc</tt>, since <tt class="docutils literal">tcs_ui</tt> imports <tt class="docutils literal">tcsmoc</tt>.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-test</span></tt></dt>
@@ -4034,11 +4034,11 @@ digest is taken over, and the part of tcs-xtce that takes it, are inside
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
 </span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcs-verify<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
-</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcs-gui<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs
+</span><span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcs-cfge<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs
 </pre>
-<p>cargo installs programs and nothing else, so tcs-gui installed this way has
+<p>cargo installs programs and nothing else, so tcs-cfge installed this way has
 no descriptions or schemas until <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts them in
-<tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-gui</span></tt> and <tt class="docutils literal">/opt/tcs/share/tcspecial/schema</tt>, and an app program installed this way is in
+<tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-cfge</span></tt> and <tt class="docutils literal">/opt/tcs/share/tcspecial/schema</tt>, and an app program installed this way is in
 <tt class="docutils literal">bin</tt> rather than <tt class="docutils literal">libexec</tt>. The library crates -- <tt class="docutils literal">tcsprotocol</tt>,
 <tt class="docutils literal">tcsmoc</tt> and the rest -- are taken by a Rust ground station as path or git
 dependencies, and are not installed.</p>
@@ -5202,7 +5202,7 @@ programs, not for embedded systems.</p>
 </span><span class="generic prompt">$ </span>target/debug/tcspecial<span class="whitespace"> </span>--visual<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>examples/simple-app/simple-app.ytcs
 </pre>
-<p>The window draws the configuration as tcs-gui does -- the three working panes,
+<p>The window draws the configuration as tcs-cfge does -- the three working panes,
 every node where the editor puts it, every link along its route, and the
 simulator file's physics in the Physics pane to their left, the simulator file
 being the one tcs-sim would read for the configuration, <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> or
@@ -5211,7 +5211,7 @@ a link each time data is sent over it: a wide line, a shade lighter than the
 link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.</p>
 <p>A configuration that includes other files opens a window for each of them as
-well, drawn as tcs-gui draws that subdiagram's page, with its edge in the
+well, drawn as tcs-cfge draws that subdiagram's page, with its edge in the
 margins and its own physics; on the top page, each is a box. A link that
 crosses a subdiagram's edge blinks on both pages.</p>
 <p>Nothing in the windows can be pressed. Close any of them to stop tcspecial,
@@ -5283,14 +5283,14 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/i-slint-backend-testing">i-slint-backend-testing</a></td>
 <td>1.18</td>
 <td><a class="reference external" href="https://docs.rs/i-slint-backend-testing/1.18.1">1.18.1</a></td>
-<td>tcs-gui, tcs-moc, tcs-sim, examples/beacon (tests only)</td>
+<td>tcs-cfge, tcs-moc, tcs-sim, examples/beacon (tests only)</td>
 <td>Runs the windows with no display, so their tests can press buttons.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/libc">libc</a></td>
 <td>0.2</td>
 <td><a class="reference external" href="https://docs.rs/libc/0.2.190">0.2.190</a></td>
-<td>tcsapp, tcs-gui, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim</td>
+<td>tcsapp, tcs-cfge, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim</td>
 <td>The operating system's own calls: terminals and their settings, pseudo-terminals, device controls.</td>
 <td><a class="reference external" href="https://github.com/rust-lang/libc">repository</a></td>
 </tr>
@@ -5318,14 +5318,14 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/path-clean">path-clean</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/path-clean/1.0.1">1.0.1</a></td>
-<td>tcs-gui</td>
+<td>tcs-cfge</td>
 <td>Where a name with <tt class="docutils literal">..</tt> in it leads, for the files Save as writes.</td>
 <td><a class="reference external" href="https://github.com/danreeves/path-clean">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/quick-xml">quick-xml</a></td>
 <td>0.42</td>
 <td><a class="reference external" href="https://docs.rs/quick-xml/0.42.0">0.42.0</a></td>
-<td>tcs-gui, tcsprotocol</td>
+<td>tcs-cfge, tcsprotocol</td>
 <td>Reads configuration files written in XML.</td>
 <td><a class="reference external" href="https://github.com/tafia/quick-xml">repository</a></td>
 </tr>
@@ -5339,28 +5339,28 @@ that satisfies both.</p>
 <tr><td><a class="reference external" href="https://crates.io/crates/rfd">rfd</a></td>
 <td>0.17</td>
 <td><a class="reference external" href="https://docs.rs/rfd/0.17.2">0.17.2</a></td>
-<td>tcs-gui</td>
+<td>tcs-cfge</td>
 <td>The desktop's own Save dialog, for Save as, through the XDG desktop portal.</td>
 <td><a class="reference external" href="https://github.com/PolyMeilex/rfd">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde">serde</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/serde/1.0.229">1.0.229</a></td>
-<td>tcs-gui, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim</td>
+<td>tcs-cfge, tcsmoc, tcsprotocol, tcs-moc, tcspecial, tcs-sim</td>
 <td>Turns the configuration, the commands and the telemetry into Rust types and back.</td>
 <td><a class="reference external" href="https://github.com/serde-rs/serde">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde_json">serde_json</a></td>
 <td>1.0</td>
 <td><a class="reference external" href="https://docs.rs/serde_json/1.0.151">1.0.151</a></td>
-<td>tcs-gui (tests only), tcsprotocol, tcs-verify</td>
+<td>tcs-cfge (tests only), tcsprotocol, tcs-verify</td>
 <td>The value tree a configuration's digest is taken over and its two spellings are compared as, and the schema tests. Nothing on the link is JSON.</td>
 <td><a class="reference external" href="https://github.com/serde-rs/json">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/serde_norway">serde_norway</a></td>
 <td>0.9.42</td>
 <td><a class="reference external" href="https://docs.rs/serde_norway/0.9.42">0.9.42</a></td>
-<td>tcs-gui, tcsprotocol</td>
+<td>tcs-cfge, tcsprotocol</td>
 <td>Reads configuration files written in YAML, and the editor's undo
 history, which it keeps on disk.</td>
 <td><a class="reference external" href="https://github.com/cafkafk/serde-yaml">repository</a></td>
@@ -5368,14 +5368,14 @@ history, which it keeps on disk.</td>
 <tr><td><a class="reference external" href="https://crates.io/crates/similar">similar</a></td>
 <td>3.2</td>
 <td><a class="reference external" href="https://docs.rs/similar/3.2.1">3.2.1</a></td>
-<td>tcs-gui</td>
+<td>tcs-cfge</td>
 <td>The line diffs a save is merged from, so a file changes only where it was edited.</td>
 <td><a class="reference external" href="https://github.com/mitsuhiko/similar">repository</a></td>
 </tr>
 <tr><td><a class="reference external" href="https://crates.io/crates/slint">slint</a></td>
 <td>1.3, 1.18</td>
 <td><a class="reference external" href="https://docs.rs/slint/1.18.1">1.18.1</a></td>
-<td>tcs-gui, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial
+<td>tcs-cfge, tcs-moc, tcs-sim, tcs-ui, examples/beacon, and tcspecial
 built with <tt class="docutils literal">visual</tt></td>
 <td>The toolkit every window is drawn with.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
@@ -5383,7 +5383,7 @@ built with <tt class="docutils literal">visual</tt></td>
 <tr><td><a class="reference external" href="https://crates.io/crates/slint-build">slint-build</a></td>
 <td>1.3, 1.18</td>
 <td><a class="reference external" href="https://docs.rs/slint-build/1.18.1">1.18.1</a></td>
-<td>tcs-gui, tcs-moc, tcs-sim, examples/beacon, and tcspecial built with
+<td>tcs-cfge, tcs-moc, tcs-sim, examples/beacon, and tcspecial built with
 <tt class="docutils literal">visual</tt> (build scripts)</td>
 <td>Compiles the <tt class="docutils literal">.slint</tt> files that describe the windows.</td>
 <td><a class="reference external" href="https://github.com/slint-ui/slint">repository</a></td>
@@ -5454,7 +5454,7 @@ dual licensed as above, without any additional terms or conditions.</p>
 <dt><a class="reference external" href="manual.html">TCS Design and Documentation</a></dt>
 <dd>Every TCS manual and design document, divided by the category of
 TCS software each is about.</dd>
-<dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
+<dt><a class="reference external" href="tcs-cfge.html">The tcs-cfge manual</a></dt>
 <dd>The editor of configurations and simulator configurations.</dd>
 <dt><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a></dt>
 <dd>The simulated operations center.</dd>

@@ -1238,7 +1238,7 @@ fn main() {
 
     // Everything wrong with the pair, in tcs-verify's words and before
     // anything else is read from either: every problem at once, each with its
-    // file and line, which is what tcs-verify, tcs-moc, tcspecial and tcs-gui
+    // file and line, which is what tcs-verify, tcs-moc, tcspecial and tcs-cfge
     // say about the same files. Then what only a simulator has to ask. All of
     // it is shown before the main window is, and the window is not shown at
     // all where any of it is an error.

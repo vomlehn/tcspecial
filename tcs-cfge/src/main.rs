@@ -1,7 +1,7 @@
-//! tcs-gui: editing a TCSpecial configuration as a diagram.
+//! tcs-cfge: editing a TCSpecial configuration as a diagram.
 //!
 //! The configuration is a graph -- nodes joined by links, as
-//! `tcs-gui-design.rst` specifies -- and a graph is a thing better drawn than
+//! `tcs-cfge-design.rst` specifies -- and a graph is a thing better drawn than
 //! typed. What this program is for is placing nodes, joining them, and filling
 //! in what each one needs, with the file on disk kept in step as the work
 //! happens.
@@ -43,7 +43,7 @@ mod read;
 mod save;
 mod settings;
 /// The screenshots in the manual: an ignored test, `make
-/// screenshots-tcs-gui`.
+/// screenshots-tcs-cfge`.
 #[cfg(test)]
 mod shots;
 /// What the colours look like to a reader who cannot see all of them. Used by
@@ -506,7 +506,7 @@ impl Views {
         if let Err(e) = window.show() {
             // Nowhere to say it but the terminal, the thing that says things
             // having failed.
-            eprintln!("tcs-gui: {e}");
+            eprintln!("tcs-cfge: {e}");
         }
     }
 
@@ -759,7 +759,7 @@ fn command_line(
     }
     if files.len() > 2 {
         return Err(format!(
-            "{} files were named, and tcs-gui takes a configuration and a \
+            "{} files were named, and tcs-cfge takes a configuration and a \
              simulator file",
             files.len()
         ));
@@ -767,15 +767,15 @@ fn command_line(
     Ok((files, read_only))
 }
 
-/// What is said when the command line is not one tcs-gui takes.
-const USAGE: &str =
-    "usage: tcs-gui [-r | --read-only] <configuration file> [<simulator file>]";
+/// What is said when the command line is not one tcs-cfge takes.
+const USAGE: &str = "usage: tcs-cfge [-r | --read-only] \
+     <configuration file> [<simulator file>]";
 
 /// Runs the editor: reads the command line and the files it names, opens
 /// and wires the windows, runs the event loop, and on the way out writes
 /// anything the files do not have and removes the session's history.
 ///
-/// A command line tcs-gui does not take, or no configuration named, says why
+/// A command line tcs-cfge does not take, or no configuration named, says why
 /// on standard error and exits with status 2.
 ///
 /// # Returns
@@ -795,8 +795,8 @@ fn main() -> Result<(), slint::PlatformError> {
     {
         Ok(said) => said,
         Err(why) => {
-            eprintln!("tcs-gui: {why}");
-            eprintln!("tcs-gui: {USAGE}");
+            eprintln!("tcs-cfge: {why}");
+            eprintln!("tcs-cfge: {USAGE}");
             std::process::exit(2);
         }
     };
@@ -804,25 +804,25 @@ fn main() -> Result<(), slint::PlatformError> {
     let mut files = files.into_iter();
 
     let path = files.next().unwrap_or_else(|| {
-        eprintln!("tcs-gui: {USAGE}");
+        eprintln!("tcs-cfge: {USAGE}");
         eprintln!(
-            "tcs-gui: the file need not exist yet; with Autosave on, as it is \
+            "tcs-cfge: the file need not exist yet; with Autosave on, as it is \
              unless turned off, it is written as edits are made"
         );
         eprintln!(
-            "tcs-gui: while it is edited, a history of the edits is kept in \
-             the state directory, $XDG_STATE_HOME/tcs-gui or \
-             ~/.local/state/tcs-gui, so that a crash loses nothing; leaving \
-             tcs-gui deletes it"
+            "tcs-cfge: while it is edited, a history of the edits is kept in \
+             the state directory, $XDG_STATE_HOME/tcs-cfge or \
+             ~/.local/state/tcs-cfge, so that a crash loses nothing; leaving \
+             tcs-cfge deletes it"
         );
         eprintln!(
-            "tcs-gui: a second file is the simulator's own configuration -- \
+            "tcs-cfge: a second file is the simulator's own configuration -- \
              how fast a simulated payload sends and what it does wrong -- and \
              is edited from the menu. It is written as YAML, so its name has \
              to end in \".yaml\""
         );
         eprintln!(
-            "tcs-gui: -r, --read-only or --readonly opens the files to look \
+            "tcs-cfge: -r, --read-only or --readonly opens the files to look \
              at: nothing in them can be changed and nothing is written"
         );
         std::process::exit(2);
@@ -838,7 +838,7 @@ fn main() -> Result<(), slint::PlatformError> {
     let simulator = files.next();
     if let Some(simulator) = &simulator {
         if let Err(why) = sim::must_be_yaml(std::path::Path::new(simulator)) {
-            eprintln!("tcs-gui: {why}");
+            eprintln!("tcs-cfge: {why}");
             std::process::exit(2);
         }
     }
@@ -872,7 +872,7 @@ fn main() -> Result<(), slint::PlatformError> {
     if !read_only() {
         let gone = history::prune(std::time::SystemTime::now());
         if gone > 0 {
-            eprintln!("tcs-gui: {gone} old session histories were removed");
+            eprintln!("tcs-cfge: {gone} old session histories were removed");
         }
     }
 
@@ -882,7 +882,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // a session on it would write over it at the first edit with what had
     // been drawn in an empty window. A file not there yet is begun.
     let refused = |why: String| -> ! {
-        eprintln!("tcs-gui: {why}");
+        eprintln!("tcs-cfge: {why}");
         std::process::exit(1);
     };
     let editor = Editor::open(std::path::Path::new(&path), divider.get())
@@ -927,15 +927,15 @@ fn main() -> Result<(), slint::PlatformError> {
         let path = editor.borrow().files().0.display().to_string();
         editor.borrow_mut().save();
         match editor.borrow().trouble() {
-            None => eprintln!("tcs-gui: saved {path} on the way out"),
+            None => eprintln!("tcs-cfge: saved {path} on the way out"),
             Some(why) => {
                 // The one case where the history is the only copy of a
                 // session's work, so it is the one case where it is kept:
                 // this exit is tidy as a gesture and not as an outcome.
                 kept = true;
                 eprintln!(
-                    "tcs-gui: {path} could not be saved: {why}\n\
-                     tcs-gui: the work of this session is in {}",
+                    "tcs-cfge: {path} could not be saved: {why}\n\
+                     tcs-cfge: the work of this session is in {}",
                     editor
                         .borrow()
                         .journal_path()
@@ -1946,7 +1946,7 @@ fn open_page(
             window
         }
         Err(e) => {
-            eprintln!("tcs-gui: {name} cannot be opened: {e}");
+            eprintln!("tcs-cfge: {name} cannot be opened: {e}");
             return;
         }
     };
@@ -1961,7 +1961,7 @@ fn open_page(
     wire(&window, editor, views, drawing, chosen, &home);
     wire_physics(&window, editor, views, &home);
     if let Err(e) = window.show() {
-        eprintln!("tcs-gui: {name} cannot be shown: {e}");
+        eprintln!("tcs-cfge: {name} cannot be shown: {e}");
         return;
     }
     views.borrow_mut().open.insert(name.to_string(), window);
@@ -2223,7 +2223,7 @@ fn show_node(
                 window
             }
             Err(e) => {
-                eprintln!("tcs-gui: {node} cannot be opened: {e}");
+                eprintln!("tcs-cfge: {node} cannot be opened: {e}");
                 return;
             }
         };
@@ -2245,7 +2245,7 @@ fn show_node(
     if let Some(window) = window.and_then(|window| window.upgrade()) {
         put_node(&window, &editor.borrow(), node);
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: {node} cannot be shown: {e}");
+            eprintln!("tcs-cfge: {node} cannot be shown: {e}");
         }
     }
 }
@@ -2767,7 +2767,7 @@ fn show_concerns(
                 window
             }
             Err(e) => {
-                eprintln!("tcs-gui: the list cannot be shown: {e}");
+                eprintln!("tcs-cfge: the list cannot be shown: {e}");
                 return;
             }
         };
@@ -2843,7 +2843,7 @@ fn show_concerns(
         .map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: the list cannot be shown: {e}");
+            eprintln!("tcs-cfge: the list cannot be shown: {e}");
         }
     }
 }
@@ -3110,7 +3110,7 @@ fn confirm_delete(
                 window
             }
             Err(e) => {
-                eprintln!("tcs-gui: {node} cannot be asked about: {e}");
+                eprintln!("tcs-cfge: {node} cannot be asked about: {e}");
                 return;
             }
         };
@@ -3155,7 +3155,7 @@ fn confirm_delete(
         window.set_node(node.into());
         window.set_carries(carries.into());
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: {node} cannot be asked about: {e}");
+            eprintln!("tcs-cfge: {node} cannot be asked about: {e}");
         }
     }
 }
@@ -3676,7 +3676,7 @@ fn warn_of_errors(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     let Some(window) = top else {
         // Every one of these is still drawn and listed, so this failing is a
         // quieter editor rather than a broken one.
-        eprintln!("tcs-gui: the errors cannot be warned of: no main window");
+        eprintln!("tcs-cfge: the errors cannot be warned of: no main window");
         return;
     };
     {
@@ -3949,7 +3949,7 @@ fn alerting(views: &Rc<RefCell<Views>>) {
             window
         }
         Err(e) => {
-            eprintln!("tcs-gui: errors cannot be shown in a window: {e}");
+            eprintln!("tcs-cfge: errors cannot be shown in a window: {e}");
             return;
         }
     };
@@ -4024,7 +4024,7 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 // Nothing to ask with. The work is still on the disk as of
                 // the last write that succeeded, and refusing to quit would
                 // trap somebody in an editor they asked to leave.
-                eprintln!("tcs-gui: the offer to save cannot be shown: {e}");
+                eprintln!("tcs-cfge: the offer to save cannot be shown: {e}");
                 slint::quit_event_loop().ok();
                 return;
             }
@@ -4041,7 +4041,7 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                     // Still not written. Said again, and the way out left
                     // open: the one thing not to do is quit quietly.
                     Some(why) => {
-                        eprintln!("tcs-gui: still not saved: {why}");
+                        eprintln!("tcs-cfge: still not saved: {why}");
                         views.borrow().refresh(&editor.borrow());
                     }
                 }
@@ -4092,7 +4092,7 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         window
             .set_trouble(editor.borrow().trouble().unwrap_or_default().into());
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: the offer to save cannot be shown: {e}");
+            eprintln!("tcs-cfge: the offer to save cannot be shown: {e}");
             slint::quit_event_loop().ok();
         }
     }
@@ -4146,7 +4146,7 @@ fn save_as(
         write_as(&editor, &views, &to, false, leaving);
     });
     if let Err(e) = asked {
-        eprintln!("tcs-gui: the Save as dialog cannot be shown: {e}");
+        eprintln!("tcs-cfge: the Save as dialog cannot be shown: {e}");
     }
 }
 
@@ -4183,7 +4183,7 @@ fn write_as(
     // Still not written. Said in the offer to leave, which is still open:
     // the one thing not to do is quit quietly.
     let trouble = editor.borrow().trouble().unwrap_or_default().to_string();
-    eprintln!("tcs-gui: still not saved: {trouble}");
+    eprintln!("tcs-cfge: still not saved: {trouble}");
     if let Some(window) = views.borrow().leaving.as_ref() {
         window.set_trouble(trouble.into());
     }
@@ -4213,7 +4213,7 @@ fn ask_replace(
         Err(e) => {
             // Nothing written, and nothing to ask with: said, rather than
             // writing over the files unasked.
-            eprintln!("tcs-gui: replacing files cannot be asked about: {e}");
+            eprintln!("tcs-cfge: replacing files cannot be asked about: {e}");
             return;
         }
     };
@@ -4236,7 +4236,7 @@ fn ask_replace(
         window.on_cancelled(move || hide_replacing(&views));
     }
     if let Err(e) = window.show() {
-        eprintln!("tcs-gui: replacing files cannot be asked about: {e}");
+        eprintln!("tcs-cfge: replacing files cannot be asked about: {e}");
         return;
     }
     if let Some(old) = views.borrow_mut().replacing.replace(window) {
@@ -4584,7 +4584,7 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             }
             Err(e) => {
                 eprintln!(
-                    "tcs-gui: the tcspecial parameters cannot be opened: {e}"
+                    "tcs-cfge: the tcspecial parameters cannot be opened: {e}"
                 );
                 return;
             }
@@ -4628,7 +4628,9 @@ fn show_parameters(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
     if let Some(window) = window.and_then(|window| window.upgrade()) {
         put_parameters(&window, &editor.borrow());
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: the tcspecial parameters cannot be shown: {e}");
+            eprintln!(
+                "tcs-cfge: the tcspecial parameters cannot be shown: {e}"
+            );
         }
     }
 }
@@ -4649,7 +4651,7 @@ fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 window
             }
             Err(e) => {
-                eprintln!("tcs-gui: a simulator window cannot be opened: {e}");
+                eprintln!("tcs-cfge: a simulator window cannot be opened: {e}");
                 return;
             }
         };
@@ -4684,7 +4686,7 @@ fn show_sim_groups(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             put_sim_groups(&window, &editor, &views.showing_sim_group.borrow());
         }
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: a simulator window cannot be shown: {e}");
+            eprintln!("tcs-cfge: a simulator window cannot be shown: {e}");
         }
     }
 }
@@ -4853,7 +4855,7 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 window
             }
             Err(e) => {
-                eprintln!("tcs-gui: a group window cannot be opened: {e}");
+                eprintln!("tcs-cfge: a group window cannot be opened: {e}");
                 return;
             }
         };
@@ -4869,7 +4871,7 @@ fn show_group(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let group = views.borrow().showing.borrow().clone();
         put_group(&window, &editor.borrow(), &group);
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: a group window cannot be shown: {e}");
+            eprintln!("tcs-cfge: a group window cannot be shown: {e}");
         }
     }
 }
@@ -6335,7 +6337,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 window
             }
             Err(e) => {
-                eprintln!("tcs-gui: the physics window cannot be opened: {e}");
+                eprintln!("tcs-cfge: the physics window cannot be opened: {e}");
                 return;
             }
         };
@@ -6428,7 +6430,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             &views.borrow().showing_physics.borrow(),
         );
         if let Err(e) = window.show() {
-            eprintln!("tcs-gui: the physics window cannot be shown: {e}");
+            eprintln!("tcs-cfge: the physics window cannot be shown: {e}");
         }
         fit!(&window);
     }
@@ -8187,11 +8189,11 @@ fn descriptions() -> &'static [nodes::Described] {
         // editor: what it would offer from a tree read round and round is
         // not the tree anyone wrote.
         let (described, trouble) = nodes::described().unwrap_or_else(|why| {
-            eprintln!("tcs-gui: {why}");
+            eprintln!("tcs-cfge: {why}");
             std::process::exit(1)
         });
         for said in trouble {
-            eprintln!("tcs-gui: {said}");
+            eprintln!("tcs-cfge: {said}");
         }
         described
     })
@@ -15650,7 +15652,7 @@ mod tests {
 
     /// Opening a configuration puts it on the canvas.
     ///
-    /// Which it did not: tcs-gui had no reader, so a file that already existed
+    /// Which it did not: tcs-cfge had no reader, so a file that already existed
     /// opened as an empty canvas -- and the first edit wrote that emptiness
     /// over the file. Both spellings of the shipped example, because the
     /// reader has a path for each.
@@ -15773,7 +15775,7 @@ mod tests {
         use slint::platform::{PointerEventButton, WindowEvent};
         use std::rc::Rc;
 
-        // An editor on a file of this test's own: tcs-gui saves as it edits,
+        // An editor on a file of this test's own: tcs-cfge saves as it edits,
         // and a test that wrote into the repository would be a test that
         // rewrote whatever it was pointed at.
         let where_ = tempfile::tempdir().expect("a directory");

@@ -1,6 +1,6 @@
-==============
-tcs-gui Manual
-==============
+===============
+tcs-cfge Manual
+===============
 .. contents:: Contents
    :depth: 2
    :local:
@@ -8,8 +8,8 @@ tcs-gui Manual
 Introduction
 ============
 
-tcs-gui is TCSpecial's configuration editor. A configuration is a graph --
-nodes, and the links that join them -- and tcs-gui draws that graph, lets you
+tcs-cfge is TCSpecial's configuration editor. A configuration is a graph --
+nodes, and the links that join them -- and tcs-cfge draws that graph, lets you
 change it by drawing, and writes the result back to the same file tcspecial
 will read aboard, in either of its spellings: YTCS, in YAML, or XTCS, in XML
 (see Configuration File Formats in `the tcspecial manual
@@ -18,13 +18,13 @@ never flies.
 
 It edits, in one session, everything a person draws a vehicle with: the top
 configuration file, every file it includes, and, where you name one, the
-simulator's own file, whose physics model tcs-gui draws beside the
+simulator's own file, whose physics model tcs-cfge draws beside the
 configuration. What the files mean -- node types, attributes, links, includes,
 the ``tcspecial`` section -- is described in `the tcspecial manual
-<tcspecial.html>`__; this manual says how tcs-gui shows them and how to change
+<tcspecial.html>`__; this manual says how tcs-cfge shows them and how to change
 them. The simulator file is described in the `tcs-sim manual <tcs-sim.html>`__.
 
-Two things about tcs-gui are worth knowing before anything else.
+Two things about tcs-cfge are worth knowing before anything else.
 
 **It writes as you go.** With Autosave on, which it is until you turn it off,
 every edit is written to the files as it is made. There is a Save command all
@@ -37,15 +37,15 @@ rules the flight software applies, in the same words. Requiring that
 everything be entered is the business of ``tcs-verify`` and of tcspecial
 itself; see the `tcs-verify manual <tcs-verify.html>`__.
 
-Starting tcs-gui
-================
+Starting tcs-cfge
+=================
 
 The command line
 ----------------
 
 .. code-block:: text
 
-   tcs-gui [-r | --read-only] <configuration file> [<simulator file>]
+   tcs-cfge [-r | --read-only] <configuration file> [<simulator file>]
 
 The configuration file is required. Its extension says its format: ``.xtcs``
 is XTCS, in XML, and anything else, normally ``.ytcs``, is YTCS, in YAML. The file need not
@@ -62,24 +62,24 @@ and it may go anywhere on the line: see `Read-only sessions`_. Any other word
 starting with a dash is refused, so that a mistyped flag is not taken for the
 name of a configuration to create. More than two files are refused too.
 
-Run with no file, or with a command line it does not take, tcs-gui prints its
+Run with no file, or with a command line it does not take, tcs-cfge prints its
 usage on the error output and exits with status 2. There is no ``--help``
 option; running it with no arguments is how to see the usage.
 
 What happens as it starts
 -------------------------
 
-Before any window opens, tcs-gui reads its preferences (see `Where tcs-gui
+Before any window opens, tcs-cfge reads its preferences (see `Where tcs-cfge
 keeps things`_) and deletes the undo histories of sessions nobody is coming
 back to -- any more than a week old, and any whose configuration is no longer
 there -- saying on the error output how many it removed.
 
 It then reads the files. **A file that is there and cannot be read ends
-tcs-gui**, with a message on the error output naming the file and saying why,
+tcs-cfge**, with a message on the error output naming the file and saying why,
 and exit status 1. That covers a file that does not parse, one that cannot be
 opened, and a simulator file that parses but cannot be joined to the
 configuration -- two entries of one name, or an entry naming a payload the
-configuration does not have. tcs-gui writes every edit as it is made, so a
+configuration does not have. tcs-cfge writes every edit as it is made, so a
 session opened on a file it had not read would replace that file at the first
 edit; such a file is put right in a text editor instead.
 
@@ -95,20 +95,20 @@ see `Crash recovery`_.
 From a checkout
 ---------------
 
-The top-level Makefile runs tcs-gui out of the source tree:
+The top-level Makefile runs tcs-cfge out of the source tree:
 
 .. code-block:: console
 
-   $ make runguiy TCS_GUI_FILE=tests/manual/thermostat
-   $ make runguix TCS_GUI_FILE=tests/manual/thermostat
-   $ make runsimguiy TCS_GUI_FILE=tests/manual/thermostat
+   $ make runguiy TCS_CFGE_FILE=tests/manual/thermostat
+   $ make runguix TCS_CFGE_FILE=tests/manual/thermostat
+   $ make runsimguiy TCS_CFGE_FILE=tests/manual/thermostat
 
-``runguiy`` opens the YAML spelling of ``TCS_GUI_FILE`` and ``runguix`` the
+``runguiy`` opens the YAML spelling of ``TCS_CFGE_FILE`` and ``runguix`` the
 XML; whatever extension the variable carries is replaced. ``runsimguiy`` and
 ``runsimguix`` open the simulator file beside it as well, named by
-``TCS_GUI_SIM``, which defaults to the configuration's stem with ``sim`` on
-the end. ``TCS_GUI_FILE`` defaults to ``example.ytcs``, the shipped example,
-which tcs-gui will rewrite as it is edited; ``git checkout example.ytcs`` puts
+``TCS_CFGE_SIM``, which defaults to the configuration's stem with ``sim`` on
+the end. ``TCS_CFGE_FILE`` defaults to ``example.ytcs``, the shipped example,
+which tcs-cfge will rewrite as it is edited; ``git checkout example.ytcs`` puts
 it back. ``make verify`` checks the file the same variable names.
 
 The window
@@ -122,9 +122,9 @@ middle when it is too long for the title bar. A read-only session says
 Under the menu bar is a bar of buttons and messages, and under that, side by
 side, the selection column on the left and the sheet on the right.
 
-.. figure:: shots/tcs-gui-window.png
+.. figure:: shots/tcs-cfge-window.png
    :width: 100%
-   :target: shots/tcs-gui-window.png
+   :target: shots/tcs-cfge-window.png
    :alt: The main window on the battery example, with eight numbered
          markers. Along the top the menus File, Edit and View (1). Under
          them the bar: the Undo and Redo arrows, greyed, the Save button,
@@ -183,7 +183,7 @@ heading. The lines between the lists can be dragged to share the column
 differently, no list going below a tenth of it; where they are is kept in the
 preferences file too.
 
-The types offered come from the description tree (see `Where tcs-gui keeps
+The types offered come from the description tree (see `Where tcs-cfge keeps
 things`_). A type the tree describes is offered as its descriptions -- the one
 ``compute`` type is offered as ``thermostat``, ``to_kelvin``, ``to_value``,
 ``vote`` and ``process``, each with its function already set -- and a type it
@@ -231,7 +231,7 @@ The menus
     positions written to the file are in the sheet's own pixels whatever the
     zoom.
 
-While a question tcs-gui asked at startup is waiting for an answer, the main
+While a question tcs-cfge asked at startup is waiting for an answer, the main
 window is greyed and takes no presses, and the menus are disabled.
 
 How a configuration is drawn
@@ -299,7 +299,7 @@ is one edit.
 
 A new node is named after what was placed, a hyphen and the first number no
 node has: ``i2c-1``, then ``i2c-2``, and ``i2c-1`` again if the first is
-deleted. The number says the name is tcs-gui's suggestion; rename it.
+deleted. The number says the name is tcs-cfge's suggestion; rename it.
 
 Selecting, moving and the node's menu
 -------------------------------------
@@ -340,13 +340,13 @@ is what an empty value means to the checking anyway.
 
 Going on from the example under `Drawing a line`_:
 
-#. .. figure:: shots/tcs-gui-edit-1.png
+#. .. figure:: shots/tcs-cfge-edit-1.png
       :alt: log-1, marked 1, outlined in dark grey as selected, and beside
             it a menu offering Edit and Delete.
 
       Right-click ``log-1`` (1). It is selected and its menu opens.
 
-#. .. figure:: shots/tcs-gui-edit-2.png
+#. .. figure:: shots/tcs-cfge-edit-2.png
       :alt: log-1's window: the name log-1 in a field with an x beside it,
             the type log under it, the fields directory, marked with an
             asterisk and holding /tmp/telemetry, and format, marked and
@@ -404,13 +404,13 @@ What cannot be made is in the menu too, greyed and saying why in words:
 ``world-in (fed by to_k1)`` for an input something else already feeds,
 ``world-in (joined already)`` for a line the configuration has. A node with
 nothing at all for the line offers no menu, and the line stays in hand while
-the box on the sheet says so. tcs-gui will not draw a line from a node to
+the box on the sheet says so. tcs-cfge will not draw a line from a node to
 itself, one that carries one stream into the other, one the configuration
 already has, or a second line into an input that does not merge.
 
 For example, to record the battery example's bus voltage in a log of its own:
 
-#. .. figure:: shots/tcs-gui-place-1.png
+#. .. figure:: shots/tcs-cfge-place-1.png
       :width: 100%
       :alt: The vehicle list scrolled down to the heading Ends of the
             graph, its log entry marked 1. On the sheet a new node, log-1,
@@ -424,7 +424,7 @@ For example, to record the battery example's bus voltage in a log of its own:
       ``tcs-verify`` warns of. That is how every node starts, not an error,
       so the bar's concerns button counts it (see `Concerns`_).
 
-#. .. figure:: shots/tcs-gui-place-2.png
+#. .. figure:: shots/tcs-cfge-place-2.png
       :width: 100%
       :alt: log-1's upper left terminal marked 2, a short dashed line
             running from it towards bus_volts, and along the bottom of the
@@ -435,7 +435,7 @@ For example, to record the battery example's bus voltage in a log of its own:
       The line is in hand: a dashed line follows the pointer, and the box at
       the foot of the sheet says what to do next.
 
-#. .. figure:: shots/tcs-gui-place-3.png
+#. .. figure:: shots/tcs-cfge-place-3.png
       :width: 100%
       :alt: bus_volts marked 3, and over it a menu headed bus_volts
             offering New line from world-out, and Cancel.
@@ -443,7 +443,7 @@ For example, to record the battery example's bus voltage in a log of its own:
       Click ``bus_volts``, anywhere on it (3). Its menu offers what the line
       can be there: a new line from its ``world-out``.
 
-#. .. figure:: shots/tcs-gui-place-4.png
+#. .. figure:: shots/tcs-cfge-place-4.png
       :width: 100%
       :alt: A line now runs from bus_volts's upper right terminal to
             log-1's upper left, log-1 marked 4. The bar's Undo button reads
@@ -476,7 +476,7 @@ a box, drawn in the Vehicle pane under the subdiagram's name, whose four
 corner terminals are its edge: what of it the files around it may join, as
 its ``exports`` section says (see `the tcspecial manual <tcspecial.html>`__).
 The ``subdiagram`` entry, under **Pages** in the vehicle list, places a new
-one, which tcs-gui writes to a file of its own beside the top file, in the top
+one, which tcs-cfge writes to a file of its own beside the top file, in the top
 file's format, and names in the top file's ``include`` list.
 
 **Open** in the box's menu, or the mark in the middle of its bottom edge,
@@ -505,19 +505,19 @@ Lines are drawn across the edge with the same three clicks:
   joins the node there. Showing, hiding and the line made with a showing are
   each one edit, and are written into the file's ``exports``.
 
-tcs-gui writes each node, group and command binding back to the file it was
+tcs-cfge writes each node, group and command binding back to the file it was
 read from.
 
 The simulator file
 ==================
 
-Given a simulator file, tcs-gui edits it in the same session: one Save writes
+Given a simulator file, tcs-cfge edits it in the same session: one Save writes
 both files, and one Undo takes back whichever the last edit touched. Without
 one, the physics list is greyed and the Physics pane says to open a simulator
 file.
 
 **A payload's simulator settings** are in its own node window, under their
-heading. A file tcs-gui begins names each payload of the configuration under
+heading. A file tcs-cfge begins names each payload of the configuration under
 its type and nothing else; a setting is written only when it holds a value.
 
 **Simulator groups** are edited from **File -> Edit simulated payload
@@ -538,7 +538,7 @@ input terminal to another component makes a physics connection; to a
 payload, or a subdiagram's box, it sets that payload's ``connects``. A line
 from a payload's terminal to a component does the same: from a ``moc``
 terminal it offers the component's inputs, from a ``world`` terminal its
-outputs. Where a line could mean more than one terminal tcs-gui asks, offering
+outputs. Where a line could mean more than one terminal tcs-cfge asks, offering
 each, with Cancel; a join already made is offered greyed, saying so.
 Deleting a component removes its connections and takes it out of every
 payload's ``connects``, and one Undo puts all of it back. The world's
@@ -546,8 +546,8 @@ payload's ``connects``, and one Undo puts all of it back. The world's
 simulator file by hand for now.
 
 Each component is drawn on the page it was placed from. Where each was drawn
-is kept in a ``tcs-gui`` section at the end of the simulator file, which tcs-sim
-ignores; see the `tcs-sim manual <tcs-sim.html>`__.
+is kept in a ``tcs-cfge`` section at the end of the simulator file, which
+tcs-sim ignores; see the `tcs-sim manual <tcs-sim.html>`__.
 
 Groups and tcspecial parameters
 ===============================
@@ -568,7 +568,7 @@ stated first and marked. A parameter cleared is left out of the file.
 Checking
 ========
 
-tcs-gui asks ``tcs-verify`` about the files as it starts and after every edit,
+tcs-cfge asks ``tcs-verify`` about the files as it starts and after every edit,
 so what it says about a configuration is what ``tcs-verify``, tcspecial,
 tcs-moc and tcs-sim say, in their words. There are three kinds of answer.
 
@@ -579,13 +579,13 @@ An **error** is something the vehicle would refuse: a value a rule refuses,
 two nodes of one name, two lines into one input, a line to a node that is not
 there. While there are any, the bar has a button saying how many --
 ``3 errors`` -- whose menu lists them one a line. The menu lists every
-error ``tcs-verify`` finds in the files, in its words, beside tcs-gui's own:
+error ``tcs-verify`` finds in the files, in its words, beside tcs-cfge's own:
 one about a node names the node, and any other starts with the name of the
 file and the line it is about, as ``battery-sim.yaml:97:``. What
 ``tcs-verify`` only warns of -- a node joined to nothing, or with fields it
 requires left empty, which is every node just placed -- is not an error and
 is not listed here, but counted with the concerns (see `Concerns`_). A node
-tcs-gui finds wrong is drawn red, and is always in the menu. Choosing one
+tcs-cfge finds wrong is drawn red, and is always in the menu. Choosing one
 goes to it:
 
 * a node's error shows the node in the middle of its page, selected, with its
@@ -593,7 +593,7 @@ goes to it:
 * a line's error shows the line in the middle of its page, lit by a wide pale
   line under it, so it stands out by its width;
 * a name two nodes share, or a node with no name, is first given a name
-  nothing has -- the one repair tcs-gui makes by itself -- and then shown as a
+  nothing has -- the one repair tcs-cfge makes by itself -- and then shown as a
   node's error is;
 * a group's error opens the groups window on that group, and an error in the
   ``tcspecial`` section opens the parameters window.
@@ -609,7 +609,7 @@ this session only and is not written anywhere. Either way every node is on
 the sheet in its pane, so a configuration can be looked at before it is put
 right.
 
-.. figure:: shots/tcs-gui-open-errors.png
+.. figure:: shots/tcs-cfge-open-errors.png
    :width: 100%
    :alt: The main window greyed, and in front of it a box headed This
          configuration has errors the vehicle would not fly with, saying
@@ -629,7 +629,7 @@ what it says on the clipboard.
 Here, in the battery example, a port that cannot be one is typed into the
 ``shunt``'s window:
 
-#. .. figure:: shots/tcs-gui-error-1.png
+#. .. figure:: shots/tcs-cfge-error-1.png
       :alt: A window headed Something is wrong with the configuration.,
             saying in red: "shunt": port 99999 is not a port -- a port is 1
             to 65535, and 0 is "whichever one is free", which a
@@ -639,7 +639,7 @@ Here, in the battery example, a port that cannot be one is typed into the
       The value is taken, and the window says what is wrong with it. Press
       **OK**.
 
-#. .. figure:: shots/tcs-gui-error-2.png
+#. .. figure:: shots/tcs-cfge-error-2.png
       :width: 100%
       :alt: The bar, its Undo button reading set port of "shunt" and a new
             button 2 errors; on the sheet the shunt, marked 2, is drawn red.
@@ -648,7 +648,7 @@ Here, in the battery example, a port that cannot be one is typed into the
       button: the port, and the simulator's file, which cannot simulate a
       payload on that port.
 
-#. .. figure:: shots/tcs-gui-error-3.png
+#. .. figure:: shots/tcs-cfge-error-3.png
       :width: 100%
       :alt: The 2 errors button pressed, marked 3, and under it a menu of
             two lines: the shunt's port, and one starting
@@ -656,7 +656,7 @@ Here, in the battery example, a port that cannot be one is typed into the
 
       Press the button (3): its menu lists the errors.
 
-#. .. figure:: shots/tcs-gui-error-4.png
+#. .. figure:: shots/tcs-cfge-error-4.png
       :width: 100%
       :alt: The shunt's window: its name, its type network, the same
             sentence about port 99999 in red italic, and its fields --
@@ -678,7 +678,7 @@ stops a configuration being read, and all are normal while a diagram is being
 drawn, so they are counted rather than refused, and not at all while the
 configuration has one node or none. What ``tcs-verify`` warns of is counted
 with them, in its words: a node joined to nothing at all, and a node whose
-required fields are not all filled in yet. tcs-gui does not call either an
+required fields are not all filled in yet. tcs-cfge does not call either an
 error, since every node is both when it is placed, but the vehicle refuses
 a configuration that still has them.
 
@@ -686,15 +686,15 @@ a configuration that still has them.
 **Go to it**, which selects the node, scrolls to it and opens its window, and
 **Set aside**. A concern set aside moves to the **N set aside** list, where
 **Take up again** moves it back. Setting aside is an edit, so Undo takes it
-back, and it is written in the configuration's ``tcs-gui`` section, so that
+back, and it is written in the configuration's ``tcs-cfge`` section, so that
 whoever opens the file next sees the same decision. It is kept by node and
 kind of concern: a concern that stops applying leaves both lists by itself.
 An open list is written again after every edit, Undo and Redo, as the
 errors' menu is, so it never shows a concern that has gone or leaves out
 one just raised.
 
-What tcs-gui refuses
---------------------
+What tcs-cfge refuses
+---------------------
 
 Some things are refused at once rather than counted, because they are slips
 of the hand rather than decisions about the vehicle: the lines described under
@@ -715,17 +715,17 @@ history is written after every edit either way, which is what lets an
 unsaved edit survive a crash (see `Crash recovery`_). Checking Autosave again
 writes at once whatever was waiting.
 
-.. figure:: shots/tcs-gui-not-saved.png
+.. figure:: shots/tcs-cfge-not-saved.png
    :width: 100%
    :alt: The bar with Autosave off: an Undo button reading comment on
          "bus_volts", 2 concerns, 1 edit can be undone, and not saved.
 
    With Autosave off, the bar says ``not saved`` until Save writes the edit.
 
-The setting is kept as ``<autosave>`` in ``$HOME/.tcs-gui/preferences.xml``,
+The setting is kept as ``<autosave>`` in ``$HOME/.tcs-cfge/preferences.xml``,
 ``true`` or ``false``, and is on by default.
 
-.. figure:: shots/tcs-gui-file-menu.png
+.. figure:: shots/tcs-cfge-file-menu.png
    :alt: The File menu open: Save, Save as..., Autosave with a tick beside
          it, then Edit payload groups and Edit simulated payload groups,
          then Exit.
@@ -761,15 +761,15 @@ one.
 
 A configuration kept in both spellings -- ``vehicle.ytcs`` beside
 ``vehicle.xtcs`` -- is written in both, and so is each included file that has
-both. tcs-gui never makes the second spelling of a file that has only one.
+both. tcs-cfge never makes the second spelling of a file that has only one.
 
-Where each node was drawn is written in a ``tcs-gui`` section at the end of
-each file, with the concerns set aside; tcspecial ignores the section. tcs-gui
+Where each node was drawn is written in a ``tcs-cfge`` section at the end of
+each file, with the concerns set aside; tcspecial ignores the section. tcs-cfge
 also writes into each configuration a reference to its schema -- in XML an
 ``xsi:noNamespaceSchemaLocation`` attribute, in YAML a
 ``# yaml-language-server: $schema=`` comment -- so that another editor can
 check the file's shape. See `Schemas beside the tree
-<tcs-gui-design.html#schemas-beside-the-tree>`__.
+<tcs-cfge-design.html#schemas-beside-the-tree>`__.
 
 When a write fails
 ------------------
@@ -794,7 +794,7 @@ not, a window says *There are changes the files do not have.* and offers:
 
 and **Copy**, which puts what the window says on the clipboard.
 
-.. figure:: shots/tcs-gui-leave.png
+.. figure:: shots/tcs-cfge-leave.png
    :alt: A window headed There are changes the files do not have., saying
          that saving writes the configuration and, where this session was
          given one, the simulator's file beside it. Buttons Stay, Copy,
@@ -806,7 +806,7 @@ and **Copy**, which puts what the window says on the clipboard.
 had, and the history goes with the session, as it does on any tidy exit, so
 the edits are lost.
 
-However else tcs-gui ends -- by Exit, or by its windows being closed -- it
+However else tcs-cfge ends -- by Exit, or by its windows being closed -- it
 then tries once more to write whatever the files do not have, and says on the
 error output whether it did. If that last write fails, the error output says
 where the session's history is, since it is then the only copy of the work.
@@ -827,7 +827,7 @@ configuration starts with.
 
 Going on from the example under `Errors`_:
 
-#. .. figure:: shots/tcs-gui-undo-1.png
+#. .. figure:: shots/tcs-cfge-undo-1.png
       :width: 100%
       :alt: The bar: an Undo button reading set port of "shunt", a greyed
             Redo arrow, 2 errors, 2 concerns, and 1 edit can be undone; the
@@ -835,7 +835,7 @@ Going on from the example under `Errors`_:
 
       The last edit set the shunt's port, and the Undo button says so.
 
-#. .. figure:: shots/tcs-gui-undo-2.png
+#. .. figure:: shots/tcs-cfge-undo-2.png
       :width: 100%
       :alt: The bar: a greyed Undo arrow, a Redo button reading set port
             of "shunt", no errors button, 2 concerns, and 0 edits can be
@@ -848,24 +848,24 @@ The history
 -----------
 
 The undo history is kept on the disk, not beside the configuration but in
-your state directory: ``$XDG_STATE_HOME/tcs-gui`` where ``XDG_STATE_HOME`` is
-set to an absolute path, ``~/.local/state/tcs-gui`` otherwise. Each
+your state directory: ``$XDG_STATE_HOME/tcs-cfge`` where ``XDG_STATE_HOME`` is
+set to an absolute path, ``~/.local/state/tcs-cfge`` otherwise. Each
 configuration's history is a YAML file named for the configuration's stem and
 a digest of its absolute path, such as ``graph-3f91c2d4e5f60718.yaml``, and it
 says inside which configuration it belongs to. With it is kept how far into
-the history the files go, and an MD5 digest of each file as tcs-gui last wrote
+the history the files go, and an MD5 digest of each file as tcs-cfge last wrote
 or read it.
 
-It is written after every edit, and deleted when tcs-gui exits cleanly having
+It is written after every edit, and deleted when tcs-cfge exits cleanly having
 written everything. It is kept after a crash, a kill or a machine going down,
 and after an exit whose last write failed. Histories more than a week old,
-and those whose configuration is no longer there, are deleted when tcs-gui
+and those whose configuration is no longer there, are deleted when tcs-cfge
 next starts.
 
 Crash recovery
 --------------
 
-When tcs-gui opens a configuration that has a history -- which means the last
+When tcs-cfge opens a configuration that has a history -- which means the last
 session on it did not end cleanly -- it holds the history to the files: each
 must still match the digest the history holds for it.
 
@@ -877,11 +877,11 @@ must still match the digest the history holds for it.
   longer describes it, so it is discarded and the bar says so. The files are
   left as they are; what is lost is the undo.
 
-A history written by an older tcs-gui that kept no digests is discarded the
+A history written by an older tcs-cfge that kept no digests is discarded the
 same way.
 
-.. figure:: tcs-gui-recovery.svg
-   :alt: A flow chart. tcs-gui opens a configuration. Is there a history of
+.. figure:: tcs-cfge-recovery.svg
+   :alt: A flow chart. tcs-cfge opens a configuration. Is there a history of
          an earlier session on it? No: the session starts with an empty
          history. Yes: does every file still match the digest the history
          keeps for it? Yes, in a box with a solid border headed Recovered:
@@ -893,13 +893,13 @@ same way.
          thrown away and the bar says so, and the files are left as they
          are.
 
-   What tcs-gui does with an earlier session's history as it opens a
+   What tcs-cfge does with an earlier session's history as it opens a
    configuration.
 
-.. figure:: shots/tcs-gui-recover.png
+.. figure:: shots/tcs-cfge-recover.png
    :width: 100%
    :alt: The bar: an Undo button reading set offset of "bus_volts", 2
-         edits can be undone, and in green: 2 edits not saved when tcs-gui
+         edits can be undone, and in green: 2 edits not saved when tcs-cfge
          last stopped put back, and saved.
 
    The battery example opened after a session that changed ``bus_volts``
@@ -909,7 +909,7 @@ same way.
 Read-only sessions
 ==================
 
-``tcs-gui --read-only thermostat.ytcs`` shows a configuration and changes
+``tcs-cfge --read-only thermostat.ytcs`` shows a configuration and changes
 nothing. The controls that would change something are greyed rather than
 hidden -- Undo, Redo, Save, Save as, Autosave, Arrange, the nodes' Edit and
 Delete -- and nodes stay where they are when dragged. What the files arrived
@@ -917,49 +917,49 @@ with is still checked and said as the session starts. Nothing is written: not
 the configuration, not the simulator file, not a history, and no other
 session's history is recovered, pruned or deleted.
 
-Where tcs-gui keeps things
-==========================
+Where tcs-cfge keeps things
+===========================
 
 Preferences
-    ``$HOME/.tcs-gui/preferences.xml``: the shares of the panes and of the
+    ``$HOME/.tcs-cfge/preferences.xml``: the shares of the panes and of the
     selection lists, and ``autosave``. The directory and file are made the
-    first time tcs-gui runs, the file with the defaults and comments saying
+    first time tcs-cfge runs, the file with the defaults and comments saying
     what each element is. It is rewritten whenever a divider is moved or
     Autosave is changed. A file that is missing, unreadable or hand-edited
     into nonsense leaves the defaults in place and says so on the error
-    output; tcs-gui still starts. A ``config.xml`` in the same directory,
+    output; tcs-cfge still starts. A ``config.xml`` in the same directory,
     the file's earlier name, is read when ``preferences.xml`` is absent.
     tcspecial's visual window reads the same file, so it divides its panes
     where your editor does, but never writes it.
 
 Undo histories
-    ``$XDG_STATE_HOME/tcs-gui`` or ``~/.local/state/tcs-gui``: see `The
+    ``$XDG_STATE_HOME/tcs-cfge`` or ``~/.local/state/tcs-cfge``: see `The
     history`_.
 
 Node descriptions and schemas
     What node types there are, which terminals each has and what each may be
     told comes from a tree of descriptions, one YAML or XML file per entry in
     the lists, under ``nodes``; beside it, under ``schema``, are a JSON Schema
-    and an XML Schema for the descriptions themselves. tcs-gui uses the first
+    and an XML Schema for the descriptions themselves. tcs-cfge uses the first
     of these directories that
-    exists: ``$TCS_GUI_DATA``; ``$XDG_DATA_HOME/tcs-gui``, or
-    ``~/.local/share/tcs-gui`` where that is not set; ``share/tcs-gui`` one
-    level up from the directory tcs-gui's own executable is in;
-    ``/usr/local/share/tcs-gui``; ``/usr/share/tcs-gui``; and ``tcs-gui/share``
-    and ``share`` under the working directory, which is what finds a
+    exists: ``$TCS_CFGE_DATA``; ``$XDG_DATA_HOME/tcs-cfge``, or
+    ``~/.local/share/tcs-cfge`` where that is not set; ``share/tcs-cfge`` one
+    level up from the directory tcs-cfge's own executable is in;
+    ``/usr/local/share/tcs-cfge``; ``/usr/share/tcs-cfge``; and
+    ``tcs-cfge/share`` and ``share`` under the working directory, which is what finds a
     checkout's own. A description file that cannot be read is reported on
     the error output and the rest of the tree is still used. See `The
-    description tree <tcs-gui-design.html#the-description-tree>`__.
+    description tree <tcs-cfge-design.html#the-description-tree>`__.
 
 In the configuration itself
-    The ``tcs-gui`` section at the end of each file: where each node was
+    The ``tcs-cfge`` section at the end of each file: where each node was
     drawn and which concerns were set aside. In the simulator file: where
     each physics component was drawn and on which page.
 
-Installed, tcs-gui is ``bin/tcs-gui`` with its descriptions in
-``share/tcs-gui`` under the same prefix, ``/opt/tcs`` by default, and the
+Installed, tcs-cfge is ``bin/tcs-cfge`` with its descriptions in
+``share/tcs-cfge`` under the same prefix, ``/opt/tcs`` by default, and the
 XTCS, YTCS and simulator schemas in ``share/tcspecial/schema``, which is
-what ``make install-data`` puts there. ``cargo install --path tcs-gui``
+what ``make install-data`` puts there. ``cargo install --path tcs-cfge``
 installs only the program, so the data needs ``make install-data`` as well;
 see `the tcspecial manual <tcspecial.html>`__.
 
@@ -969,13 +969,14 @@ See Also
 * `TCS Design and Documentation <manual.html>`__, the summary that leads to
   each program's manual.
 * `The tcspecial manual <tcspecial.html>`__: the flight software and the
-  configuration files tcs-gui edits.
+  configuration files tcs-cfge edits.
 * `The tcs-sim manual <tcs-sim.html>`__: the simulator and its file, including
   the physics model drawn in the Physics pane.
-* `The tcs-verify manual <tcs-verify.html>`__: the checks tcs-gui reports.
+* `The tcs-verify manual <tcs-verify.html>`__: the checks tcs-cfge reports.
 * `The tcs-moc manual <tcs-moc.html>`__: the ground station a configuration is
   run against.
 * `The design <design.html>`__, in particular `What is checked before
   anything runs <tcspecial-design.html#what-is-checked-before-anything-runs>`__, `The
-  undo history <tcs-gui-design.html#the-undo-history>`__ and `The editor is lazy
-  <tcs-gui-design.html#the-editor-is-lazy>`__, for why tcs-gui works as it does.
+  undo history <tcs-cfge-design.html#the-undo-history>`__ and `The editor is
+  lazy <tcs-cfge-design.html#the-editor-is-lazy>`__, for why tcs-cfge works as
+  it does.

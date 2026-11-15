@@ -313,7 +313,7 @@ fn sync_directory(directory: &Path) -> std::io::Result<()> {
 ///
 /// # Returns
 ///
-/// `.<name>.tcs-gui-<pid>` in the same directory as `path`.
+/// `.<name>.tcs-cfge-<pid>` in the same directory as `path`.
 fn temporary_beside(path: &Path) -> PathBuf {
     let name = path
         .file_name()
@@ -323,7 +323,7 @@ fn temporary_beside(path: &Path) -> PathBuf {
     temporary.extend_from_slice(b".");
     temporary.extend_from_slice(&name);
     temporary.extend_from_slice(
-        format!(".tcs-gui-{}", std::process::id()).as_bytes(),
+        format!(".tcs-cfge-{}", std::process::id()).as_bytes(),
     );
 
     let mut full = path.to_path_buf();
@@ -512,7 +512,7 @@ mod tests {
                 .file_name()
                 .unwrap()
                 .to_string_lossy()
-                .starts_with(".graph.ytcs.tcs-gui-"),
+                .starts_with(".graph.ytcs.tcs-cfge-"),
             "{temporary:?}"
         );
     }

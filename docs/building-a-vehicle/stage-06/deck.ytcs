@@ -265,7 +265,7 @@ commands:
   # attribute no binding names is refused.
   - { from: gateway, sets: probe_thermostat.setpoint }
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: gateway, x: 790, y: 34 }
     - { node: hull_kelvin_1, x: 299, y: 336 }

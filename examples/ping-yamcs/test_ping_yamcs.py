@@ -234,8 +234,8 @@ def with_more_nodes(directory):
             </type>
         </payloads>
         """), " " * 4)
-    if text.count("    <tcs-gui>") != 1:
-        raise ValueError("the example has no one tcs-gui section")
+    if text.count("    <tcs-cfge>") != 1:
+        raise ValueError("the example has no one tcs-cfge section")
     # The gateway node lists the name pong's line arrives by, as every node
     # a line reaches does.
     arrives = "<world-in>ping</world-in>"
@@ -248,7 +248,7 @@ def with_more_nodes(directory):
     shutil.copy(HERE.parent / "ping-common" / "ping.xtcs", common)
     (directory / "ping-yamcs").mkdir(exist_ok=True)
     path = directory / "ping-yamcs" / "with-more-nodes.xtcs"
-    path.write_text(text.replace("    <tcs-gui>", payloads + "    <tcs-gui>"))
+    path.write_text(text.replace("    <tcs-cfge>", payloads + "    <tcs-cfge>"))
     written, why = configuration.write_own_xtce(path)
     if not written:
         raise unittest.SkipTest(f"no own XTCE for the copy: {why}")

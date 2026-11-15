@@ -934,7 +934,7 @@ fn main() {
 
     // Everything wrong with the payload set, in tcs-verify's words: every
     // problem at once, each with its file and line, which is what tcs-verify,
-    // tcspecial, tcs-sim and tcs-gui say about the same files. The simulator
+    // tcspecial, tcs-sim and tcs-cfge say about the same files. The simulator
     // file is read loosely, as it is below: what is wrong with it is said,
     // and costs the panels the simulator half of what they show.
     //

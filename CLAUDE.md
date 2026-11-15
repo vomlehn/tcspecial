@@ -5,7 +5,7 @@ spacecraft's payloads as nodes in a configured graph, together with the ground
 software that commands it and the tools that write and check its
 configuration. Each program has a design document, its specification, and a
 manual, its user's guide: `docs/design.rst` and `docs/manual.rst` list them
-(`docs/tcspecial-design.rst`, `docs/tcs-gui.rst` and so on).
+(`docs/tcspecial-design.rst`, `docs/tcs-cfge.rst` and so on).
 
 ## What decides a design
 
@@ -35,16 +35,16 @@ argue from this order and say so.
 - `tcspecial` -- the flight software.
 - `tcs-moc` -- the test ground station (GUI).
 - `tcs-sim` -- the payload simulator (GUI).
-- `tcs-gui` -- the graphical configuration editor.
+- `tcs-cfge` -- the graphical configuration editor.
 - `tcsverify` -- checks a configuration and gives every problem with its
-  file and line. tcspecial, tcs-verify, tcs-moc, tcs-sim and tcs-gui all
+  file and line. tcspecial, tcs-verify, tcs-moc, tcs-sim and tcs-cfge all
   check through its `verify`, so they agree about what is wrong.
 - `tcs-verify` -- the program that prints those problems, and what only the
   tool does: `--summary`, `--set-interface`, `--xtce`, `--fprime-model`, and
   the start-up window tcs-moc and tcs-sim share.
 - `tcs-ui` -- window pieces the ground programs share.
 - `tcs-diagram` -- how a configuration is drawn: the working panes, node
-  shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcs-gui
+  shapes, link routes and colours, as Rust and as `ui/diagram.slint`. tcs-cfge
   draws with it, and so does tcspecial's visual window (`--visual`, in a
   build with the `visual` feature, which never flies).
 - `tcsapp` and the `app_*` crates -- the file interfaces an app node's program
@@ -60,7 +60,7 @@ attributes and checks in `tcsprotocol::node`, the flight-side node in
 TCS code is in six categories, which tcs-helpers' README defines under
 "Code categories": **operational code**, which a mission depends on while it
 operates, on the vehicle or in the MOC; **software tools**, which make or
-check what operational code is built from or loads (tcs-gui, tcs-verify,
+check what operational code is built from or loads (tcs-cfge, tcs-verify,
 tcs-diagram, tcs-ui); **verification tools**, used only to test (tcs-sim,
 tcs-moc, the test apps, `tests/`); **infrastructure**, which builds,
 packages, documents and checks; **analysis tools**, which work on what a
@@ -71,7 +71,7 @@ directory there.
 A TCS name says whether code is operational. Find the prefix, `tcslog` if
 the name starts with it and `tcs` otherwise. A letter after it, or nothing,
 is operational (`tcspecial`, `tcsmoc`, `tcsprotocol`, `tcslog`); a hyphen or
-an underscore is not (`tcs-gui`, `tcs-verify`, `tcs_xtce`, `tcslog-tools`).
+an underscore is not (`tcs-cfge`, `tcs-verify`, `tcs_xtce`, `tcslog-tools`).
 Name new work by it, and rename what moves from one side to the other.
 
 - **Published names**, such as a crate's on crates.io, follow the rule.
@@ -133,7 +133,7 @@ categories, for every TCS project.
   spellings of a configuration must say the same thing, so change both
   together. `tcs-verify a.xtcs a.ytcs a-sim.yaml` compares them, and
   `make comparespellings`, part of `make check`, compares every shipped
-  pair. tcs-gui writes both spellings when both exist; an edit by hand
+  pair. tcs-cfge writes both spellings when both exist; an edit by hand
   is made to both.
 
 ## Building and testing

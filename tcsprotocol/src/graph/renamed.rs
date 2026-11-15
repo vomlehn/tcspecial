@@ -16,9 +16,11 @@
 //! Then the programs: tcsgui and tcssim became tcs-gui and tcs-sim, a hyphen
 //! after `tcs` for every program and library that neither flies nor is a
 //! library a station or the vehicle runs on, so the sections named for them
-//! were renamed too. A configuration has a `tcs-gui` section; a simulator
-//! file has that and a `tcs-sim` section, and is held to its own list,
-//! [`SIMULATOR_RENAMED`], since nothing else a configuration renamed is in it.
+//! were renamed too; and then tcs-gui became tcs-cfge, the configuration
+//! editor, and its section with it. A configuration has a `tcs-cfge`
+//! section; a simulator file has that and a `tcs-sim` section, and is held
+//! to its own list, [`SIMULATOR_RENAMED`], since nothing else a
+//! configuration renamed is in it.
 //!
 //! A file still written in the old words is refused here, by line, and told
 //! the word to write instead. Refused rather than read as before, because one
@@ -158,11 +160,19 @@ const RENAMED: &[Renamed] = &[
         then: "",
         merged: false,
     },
-    // Named for the configuration editor, whose name has a hyphen now.
+    // Named for the configuration editor, whose name had a hyphen put in,
+    // and then was tcs-cfge.
     Renamed {
         old: "tcsgui",
         place: Place::Section,
-        new: "tcs-gui",
+        new: "tcs-cfge",
+        then: "",
+        merged: false,
+    },
+    Renamed {
+        old: "tcs-gui",
+        place: Place::Section,
+        new: "tcs-cfge",
         then: "",
         merged: false,
     },
@@ -183,7 +193,14 @@ const SIMULATOR_RENAMED: &[Renamed] = &[
     Renamed {
         old: "tcsgui",
         place: Place::Section,
-        new: "tcs-gui",
+        new: "tcs-cfge",
+        then: "",
+        merged: false,
+    },
+    Renamed {
+        old: "tcs-gui",
+        place: Place::Section,
+        new: "tcs-cfge",
         then: "",
         merged: false,
     },
@@ -920,7 +937,7 @@ mod tests {
     fn a_simulator_file_in_the_new_names_is_taken() {
         let yaml =
             "description: a file\ntcs-sim:\n  ready: \"127.0.0.1:7900\"\n\
-                    tcs-gui:\n  nodes: []\nmoc: []\n";
+                    tcs-cfge:\n  nodes: []\nmoc: []\n";
         assert_eq!(refused_in_simulator(yaml, ConfigFormat::Yaml), None);
     }
 

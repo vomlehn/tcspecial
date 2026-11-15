@@ -188,7 +188,7 @@ that opens one reads it through this crate:</p>
 <ul>
 <li>tcspecial runs it aboard.</li>
 <li>tcs-moc and tcs-sim build their panels from it.</li>
-<li>tcs-gui edits it.</li>
+<li>tcs-cfge edits it.</li>
 <li>tcs-verify checks it.</li>
 </ul>
 <p>So no program reads a file in a way of its own, and the error a
@@ -272,7 +272,7 @@ sending a command, receiving data and listening for beacons are all in
 flight software itself is <code>tcspecial</code>.</p>
 <h2 id="who-uses-it">Who uses it</h2>
 <p>Every crate in the workspace that has anything to do with the link or
-a configuration: tcspecial, tcsmoc, tcs-moc, tcs-sim, tcs-gui and
+a configuration: tcspecial, tcsmoc, tcs-moc, tcs-sim, tcs-cfge and
 tcs-verify, and <code>examples/beacon</code>.</p>
 <h2 id="building-and-testing">Building and testing</h2>
 <pre><code>cargo build -p tcsprotocol

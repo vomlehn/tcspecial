@@ -188,8 +188,8 @@ impl Editor {
             crate::history::forget(&self.path);
             self.said = Some(format!(
                 "the undo history of {} was set aside: the configuration \
-                 was changed by something other than tcs-gui after the history \
-                 was written, so the history no longer describes it",
+                 was changed by something other than tcs-cfge after the \
+                 history was written, so the history no longer describes it",
                 self.path.display()
             ));
             return;
@@ -211,7 +211,7 @@ impl Editor {
             "saved"
         };
         self.said = Some(format!(
-            "{count} {what} not saved when tcs-gui last stopped put back, and \
+            "{count} {what} not saved when tcs-cfge last stopped put back, and \
              {saved}"
         ));
     }
@@ -1111,7 +1111,7 @@ payloads:
         world-out: gateway.temp_1
         moc-in: [gateway]
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: gateway, x: 240, y: 40 }
     - { node: temp_1, x: 400, y: 240 }
@@ -1436,7 +1436,7 @@ tcs-gui:
         });
         assert!(
             read().contains(
-                "tcs-gui:\n  nodes:\n    - { node: zone, x: -180, y: 162 }"
+                "tcs-cfge:\n  nodes:\n    - { node: zone, x: -180, y: 162 }"
             ),
             "{}",
             read()
@@ -1466,7 +1466,7 @@ tcs-gui:
             .contains(&("heater_1.heat".into(), "zone.heat".into())));
         let file = tcsprotocol::sim_config::SimConfigFile::load(&sim)
             .expect("the simulator reads what the editor wrote");
-        assert_eq!(file.tcs_gui.expect("positions").nodes.len(), 1);
+        assert_eq!(file.tcs_cfge.expect("positions").nodes.len(), 1);
 
         // The zone removed takes its connection and its payload's join with
         // it, which would name nothing otherwise, and one undo puts all of
@@ -1505,7 +1505,7 @@ tcs-gui:
         assert!(world(&editor).connections.is_empty());
         editor.undo();
         assert!(world(&editor).placed.is_empty());
-        assert!(!read().contains("tcs-gui:"), "{}", read());
+        assert!(!read().contains("tcs-cfge:"), "{}", read());
     }
 
     /// A simulator file that is there and cannot be read is refused, and
@@ -2628,14 +2628,21 @@ tcs-gui:
                     std::fs::copy(entry.path(), &to).expect("copied");
                 }
                 if matches!(extension, Some("ytcs" | "xtcs")) {
-                    let stem = name.file_stem().expect("a stem");
-                    let sim = into
-                        .join(&directory)
-                        .join(format!("{}-sim.yaml", stem.to_string_lossy()));
-                    configurations.push((to, sim.exists().then_some(sim)));
+                    configurations.push(to);
                 }
             }
         }
+        // A configuration's simulator file is looked for once every file is
+        // copied, since a directory may list it after the configuration.
+        let mut configurations: Vec<_> = configurations
+            .into_iter()
+            .map(|to| {
+                let stem = to.file_stem().expect("a stem").to_string_lossy();
+                let sim = to.with_file_name(format!("{stem}-sim.yaml"));
+                let sim = sim.exists().then_some(sim);
+                (to, sim)
+            })
+            .collect();
         configurations.sort();
         configurations
     }

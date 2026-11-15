@@ -457,7 +457,7 @@ interface, and the devices as pseudo-terminals and loopback addresses that
 tcs-sim answers on a physics model of the payloads. A configuration can be
 developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.</p>
-<p>A configuration is written with <strong>tcs-gui</strong>, which draws it as a diagram of
+<p>A configuration is written with <strong>tcs-cfge</strong>, which draws it as a diagram of
 nodes and links, and checked with <strong>tcs-verify</strong>, which says what is wrong
 with it without running any of it. Both read it through <strong>tcsprotocol</strong>, the
 library the vehicle and the ground share, so the error a person sees on the
@@ -506,8 +506,8 @@ tcs-xtce manual.</dd>
 <div class="section" id="software-tools">
 <h2>Software tools</h2>
 <dl class="docutils">
-<dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
-<dd>The editor. tcs-gui draws a configuration and its simulator
+<dt><a class="reference external" href="tcs-cfge.html">The tcs-cfge manual</a></dt>
+<dd>The editor. tcs-cfge draws a configuration and its simulator
 configuration as diagrams of nodes and links, checks them as they are
 edited, and writes them back.</dd>
 <dt><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a></dt>
@@ -576,7 +576,7 @@ digest. The design is tcs-xtce's, and covers the compiler as well.</dd>
 <div class="section" id="software-tools-1">
 <h2>Software tools</h2>
 <dl class="docutils">
-<dt><a class="reference external" href="tcs-gui-design.html">The tcs-gui design</a></dt>
+<dt><a class="reference external" href="tcs-cfge-design.html">The tcs-cfge design</a></dt>
 <dd>The editor: how it draws, reads and writes a configuration, its undo
 history, autosave and recovery.</dd>
 <dt><a class="reference external" href="tcs-verify-design.html">The tcs-verify design</a></dt>
@@ -634,7 +634,7 @@ tcsccsds. It is built only from operational code.</dd>
 <dt><strong>Software tools</strong></dt>
 <dd>What makes or checks what operational code is built from or loads:
 the tcs-xtce compiler, which generates the link's packet code;
-tcs-gui and tcs-xtcee, which write configurations and XTCE; tcs-verify,
+tcs-cfge and tcs-xtcee, which write configurations and XTCE; tcs-verify,
 which checks them; and tcs-diagram and tcs-ui, which they draw with.
 They take the most care of all but operational code, since a mistake
 in what they make or pass reaches a vehicle with no fault in the
@@ -657,7 +657,7 @@ and the guide's lander.</dd>
 every tool, verification tools among them, and here they are the others.</p>
 <p>A name says whether code is operational: a letter, or nothing, straight
 after <tt class="docutils literal">tcs</tt> or <tt class="docutils literal">tcslog</tt> (tcspecial, tcsmoc, tcslog) is operational
-code's, and a hyphen or an underscore there (tcs-gui, tcs-sim,
+code's, and a hyphen or an underscore there (tcs-cfge, tcs-sim,
 tcslog-tools) is any other category's. Each project's <tt class="docutils literal">make
 <span class="pre">operational-names</span></tt> holds its names and its <tt class="docutils literal">categories.toml</tt> to each
 other. See <a class="reference external" href="tcspecial-design.html#operational-code-and-its-names">Operational code and its names</a> in the tcspecial

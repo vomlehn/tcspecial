@@ -35,7 +35,7 @@ Filters = [
 	# requires the old names, so they are not provided: providing one at
 	# this version would have the package obsolete itself.
 	'^tcsmoc\.[^:]+: [EW]: obsolete-not-provided tcspecial-(ground|moc)$',
-	# tcs-tools takes tcs-gui from tcspecial-moc, which it obsoletes too.
+	# tcs-tools takes tcs-cfge from tcspecial-moc, which it obsoletes too.
 	'^tcs-tools\.[^:]+: [EW]: obsolete-not-provided tcspecial-moc$',
 	# "moc" is the mission operations center, not the ISO 639 code of
 	# Mocovi, so tcsmoc has no locales package to depend on.

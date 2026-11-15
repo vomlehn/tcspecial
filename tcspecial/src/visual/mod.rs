@@ -1,6 +1,6 @@
 //! The visual window: what a running tcspecial is doing, drawn.
 //!
-//! The graph is drawn as tcs-gui draws the configuration -- the three working
+//! The graph is drawn as tcs-cfge draws the configuration -- the three working
 //! panes, every node where the editor would put it, every link along the
 //! route the editor gives it, all of it from `tcs-diagram` -- with the
 //! simulator file's physics in the Physics pane to their left, as the editor
@@ -328,10 +328,10 @@ struct Pages {
 impl Pages {
     /// Works out the pages of a configuration.
     ///
-    /// Where the panes are divided is the person's own tcs-gui setting, read
+    /// Where the panes are divided is the person's own tcs-cfge setting, read
     /// and never written, and every node and every subdiagram's box is
     /// settled into its pane as the editor settles a file it opens, all of
-    /// them together and in the order of their names -- see tcs-gui's
+    /// them together and in the order of their names -- see tcs-cfge's
     /// `Document::settle` -- so each is drawn where the editor would draw
     /// it.
     ///
@@ -426,7 +426,7 @@ impl Pages {
     }
 }
 
-/// Puts one page of the graph in a window, as tcs-gui would draw it.
+/// Puts one page of the graph in a window, as tcs-cfge would draw it.
 ///
 /// A node on another page is drawn as the editor draws it: on the top page,
 /// at its subdiagram's box; on a subdiagram's page, at the page's edge. Each
@@ -661,7 +661,7 @@ fn colour(hex: &str) -> slint::Color {
 
 /// Turns a node's look into what this window's markup takes.
 ///
-/// The same mapping tcs-gui makes of the same look, into its own build's
+/// The same mapping tcs-cfge makes of the same look, into its own build's
 /// struct: a Slint struct of one program is not a type of the other, so each
 /// says it once. Never selected: nothing here can be.
 ///

@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
 <!-- Refused: a position in the old shape. -->
 <configuration>
-    <tcs-gui><nodes><name>a</name><x>1</x><y>2</y></nodes></tcs-gui>
+    <tcs-cfge><nodes><name>a</name><x>1</x><y>2</y></nodes></tcs-cfge>
 </configuration>

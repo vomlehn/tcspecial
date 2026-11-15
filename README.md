@@ -64,7 +64,7 @@ Everything installs under `/opt/tcs`, as six packages, each built as a
   `include/tcsmoc-c.h`, `lib/pkgconfig/tcsmoc-c.pc`), the Python packages
   `tcsprotocol` and `tcsmoc`, and the configuration schemas. It was
   `tcspecial-moc`, which it replaces.
-* `tcs-tools`, software tools: `bin/tcs-gui` with its data,
+* `tcs-tools`, software tools: `bin/tcs-cfge` with its data,
   `bin/tcs-verify`, and the Python `tcs_ui`.
 * `tcspecial-test`, verification tools: the test ground station and
   simulator, `bin/tcs-moc` and `bin/tcs-sim`; `bin/segsend`, the test one,
@@ -154,11 +154,11 @@ Operational code, which a mission depends on while it operates:
 Software tools, which make or check what operational code is built from or
 loads:
 
-* [`tcs-gui/`](tcs-gui/): the graphical configuration editor.
+* [`tcs-cfge/`](tcs-cfge/): the graphical configuration editor.
 * [`tcs-verify/`](tcs-verify/): the configuration checker as a program.
 * [`tcs-conflict/`](tcs-conflict/): whether two configurations can be run
   at once.
-* [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-gui
+* [`tcs-diagram/`](tcs-diagram/): how a configuration is drawn, for tcs-cfge
   and tcspecial's visual window, which never flies.
 * [`tcs-ui/`](tcs-ui/): the window pieces tcs-moc and the desk tools
   share: the beacon and ping panels, fonts and colours, in Rust and Slint,
@@ -290,7 +290,7 @@ See also
 * [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
   how to write a configuration, and how to run the flight software and the
-  programs that test it. tcs-gui, tcs-moc, tcs-sim and tcs-verify each have a
+  programs that test it. tcs-cfge, tcs-moc, tcs-sim and tcs-verify each have a
   manual of their own, beside it.
 
 * [The tcspecial design](https://vomlehn.github.io/tcspecial/docs/design.html): the specification, and why
@@ -321,7 +321,7 @@ Each package lists the Rust crates compiled into its programs and
 libraries, with their licences and the notices those require, in
 `/opt/tcs/share/doc/<package>/THIRD-PARTY-NOTICES`.
 
-The graphical programs -- tcs-gui, tcs-moc, tcs-sim and tcspecial's visual
+The graphical programs -- tcs-cfge, tcs-moc, tcs-sim and tcspecial's visual
 window -- are built with [Slint](https://slint.dev), under its
 royalty-free licence for desktop applications, which asks for this
 attribution:

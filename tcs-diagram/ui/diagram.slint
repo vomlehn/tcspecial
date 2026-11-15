@@ -1,7 +1,7 @@
 // How a configuration is drawn: one node, one link line, and the sheet they
 // are drawn on, with the globals and structs those take.
 //
-// Shared by the editor, tcs-gui, and tcspecial's visual window, which draws a
+// Shared by the editor, tcs-cfge, and tcspecial's visual window, which draws a
 // running vehicle's graph as the editor draws the configuration. Each program
 // compiles this into its own build -- a Slint file is markup, imported by
 // path -- and fills these structs from tcs-diagram's NodeLook and LinkLook,
@@ -146,7 +146,7 @@ export struct NodeView {
     // What is wrong is not here. It was drawn under the name, which is a
     // sentence inside a box forty-eight pixels tall and a paragraph in the
     // middle of a diagram; it is said in the node's own window, and put in
-    // front of somebody once in the alert. See tcs_gui::Views::alert_faults.
+    // front of somebody once in the alert. See tcs_cfge::Views::alert_faults.
     faulty: bool,
     selected: bool,
     // What a closed subdiagram holds: how many nodes, and how many lines
@@ -252,7 +252,7 @@ export component Terminal inherits Rectangle {
 
 
     // A line is taken in hand from this terminal. Where it goes is the next
-    // click's business, which the sheet takes: see tcs-gui's Surface.
+    // click's business, which the sheet takes: see tcs-cfge's Surface.
     callback grabbed();
     // Where the pointer is while the button that took the line is still
     // down, so the line follows it from the start: reported by this terminal,
@@ -791,7 +791,7 @@ export component LinkLine inherits Rectangle {
     in property <bool> selected: false;
     // Whether the label and comment are written beside the line. A window
     // that can be pointed at says them in a tip instead, where they cannot
-    // be written over a neighbour's or over a node: see tcs-gui's Surface.
+    // be written over a neighbour's or over a node: see tcs-cfge's Surface.
     in property <bool> captioned: true;
     // How wide the line is drawn, and how wide its selection outline.
     property <length> weight: link.wide ? 5px : 2.5px;

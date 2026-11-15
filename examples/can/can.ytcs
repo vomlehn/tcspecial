@@ -68,7 +68,7 @@ payloads:
         world-out:
           - moc.motor_status
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: moc, x: 469, y: 34 }
     - { node: motor_command, x: 34, y: 134 }

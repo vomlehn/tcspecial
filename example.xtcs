@@ -48,10 +48,10 @@
             </payload>
         </type>
     </payloads>
-    <tcs-gui>
+    <tcs-cfge>
         <nodes>
             <node name="gateway-1" x="469" y="34"/>
             <node name="spi-1" x="15" y="34"/>
         </nodes>
-    </tcs-gui>
+    </tcs-cfge>
 </configuration>

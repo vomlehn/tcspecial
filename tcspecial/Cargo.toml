@@ -65,7 +65,7 @@ default = [
     "hdlc",
     "raw",
 ]
-# The visual window, `tcspecial --visual`: the graph drawn as tcs-gui draws it,
+# The visual window, `tcspecial --visual`: the graph drawn as tcs-cfge draws it,
 # each link lit as data crosses it. Not a default and never in a build that
 # flies -- it brings a window toolkit into the flight software -- so a
 # tcspecial without it says so when it is asked for one. See src/visual.

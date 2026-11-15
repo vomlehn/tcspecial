@@ -19,7 +19,7 @@ operational = [
 
 # What writes and checks configurations, and what draws them.
 software-tools = [
-	"tcs-gui",
+	"tcs-cfge",
 	"tcs-verify",
 	"tcs-conflict",
 	"tcs-diagram",

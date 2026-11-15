@@ -1,6 +1,6 @@
 //! Reading a configuration into a document.
 //!
-//! The other half of `document`'s writers, and it was missing: tcs-gui wrote
+//! The other half of `document`'s writers, and it was missing: tcs-cfge wrote
 //! configurations and never read one, so opening a file that already existed
 //! showed an empty canvas -- and the first edit wrote that emptiness over the
 //! file. An editor that cannot open what it writes is a program for making
@@ -1166,7 +1166,7 @@ mod tests {
     /// `tcsprotocol` reads to prove its two readers agree. Two files kept
     /// in step by hand are two files that drift.
     ///
-    /// Set TCS_GUI_WRITE_EXAMPLE to write it out after a deliberate change to
+    /// Set TCS_CFGE_WRITE_EXAMPLE to write it out after a deliberate change to
     /// the YAML, as `tests/manual/thermostat.*` is written.
     #[test]
     fn the_shipped_example_is_the_same_in_both_spellings() {
@@ -1180,7 +1180,7 @@ mod tests {
             .to_text(&path)
             .expect("XML is a format this writes");
 
-        if std::env::var("TCS_GUI_WRITE_EXAMPLE").is_ok() {
+        if std::env::var("TCS_CFGE_WRITE_EXAMPLE").is_ok() {
             std::fs::write(&path, &written).expect("the example is writable");
             return;
         }
@@ -1190,7 +1190,7 @@ mod tests {
             shipped,
             written,
             "{} is not example.ytcs in the other language any more. Run the \
-             tests with TCS_GUI_WRITE_EXAMPLE=1 to write it out",
+             tests with TCS_CFGE_WRITE_EXAMPLE=1 to write it out",
             path.display()
         );
     }

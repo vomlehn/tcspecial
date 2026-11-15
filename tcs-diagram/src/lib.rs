@@ -1,7 +1,7 @@
 //! How a configuration is drawn.
 //!
 //! The working panes, the shape of every node type, the routes the links take
-//! between them and the colours all of it is drawn in -- the drawing tcs-gui
+//! between them and the colours all of it is drawn in -- the drawing tcs-cfge
 //! edits, here so that something else can draw the same thing. Tcspecial's
 //! visual window is the other: it shows a running vehicle's graph as the
 //! editor shows the configuration, and lights a link as data crosses it. Two
@@ -19,7 +19,7 @@
 //! Each turns a [`view::NodeLook`] and a [`view::LinkLook`] into its own.
 //!
 //! Nothing here is an editor's either. What is selected, what is being
-//! dragged and what the history holds are tcs-gui's; what is drawn is a list
+//! dragged and what the history holds are tcs-cfge's; what is drawn is a list
 //! of nodes and the lines between them, [`view::OnSheet`] and
 //! [`view::LineOnSheet`].
 

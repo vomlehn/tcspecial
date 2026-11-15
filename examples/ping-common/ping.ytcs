@@ -21,6 +21,6 @@ vehicle:
           - gateway.ping
         moc-in: [gateway]
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: ping, x: 34, y: 34 }

@@ -1,8 +1,8 @@
 //! The schemas say what the software says.
 //!
-//! `tcsprotocol/schema` holds a schema for each file tcs-gui edits, in each
+//! `tcsprotocol/schema` holds a schema for each file tcs-cfge edits, in each
 //! spelling: a JSON Schema for the YAML, YTCS, and an XSD for the XML, XTCS;
-//! `tcs-gui/share/schema` holds those of tcs-gui's own node descriptions. They are data,
+//! `tcs-cfge/share/schema` holds those of tcs-cfge's own node descriptions. They are data,
 //! installed on a workstation so that somebody's own editor can tell them that
 //! `payloads` is a section and `payload` is not.
 //!
@@ -184,7 +184,7 @@ fn the_configuration_schema_has_the_sections_the_reader_reads() {
         "payloads",
         "commands",
         // The editor's own, last in the file: where each node was drawn.
-        "tcs-gui",
+        "tcs-cfge",
     ] {
         assert!(sections.contains(section), "the schema has no {section}");
     }
@@ -760,8 +760,8 @@ fn every_shipped_xml_file_is_well_formed() {
 /// being no other way to say it in YAML.
 ///
 /// The path is relative, which is how it stays true in a checkout: see
-/// `tcs_gui::nodes::schema_reference` for what is written where the schemas are
-/// not above the file.
+/// `tcs_cfge::nodes::schema_reference` for what is written where the schemas
+/// are not above the file.
 ///
 /// The worked example and not `example.*`: this pair is written by the editor
 /// and compared byte for byte against what it writes, so a reference that

@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
-<title>tcs-gui Manual</title>
+<title>tcs-cfge Manual</title>
 <style type="text/css">
 
 /*
@@ -361,14 +361,14 @@ ul.auto-toc {
 </style>
 </head>
 <body>
-<div class="document" id="tcs-gui-manual">
-<h1 class="title">tcs-gui Manual</h1>
+<div class="document" id="tcs-cfge-manual">
+<h1 class="title">tcs-cfge Manual</h1>
 
 <div class="contents local topic" id="contents">
 <p class="topic-title"><a class="reference internal" href="#top">Contents</a></p>
 <ul class="simple">
 <li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a></li>
-<li><a class="reference internal" href="#starting-tcs-gui" id="toc-entry-2">Starting tcs-gui</a><ul>
+<li><a class="reference internal" href="#starting-tcs-cfge" id="toc-entry-2">Starting tcs-cfge</a><ul>
 <li><a class="reference internal" href="#the-command-line" id="toc-entry-3">The command line</a></li>
 <li><a class="reference internal" href="#what-happens-as-it-starts" id="toc-entry-4">What happens as it starts</a></li>
 <li><a class="reference internal" href="#from-a-checkout" id="toc-entry-5">From a checkout</a></li>
@@ -401,7 +401,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#checking" id="toc-entry-24">Checking</a><ul>
 <li><a class="reference internal" href="#errors" id="toc-entry-25">Errors</a></li>
 <li><a class="reference internal" href="#concerns" id="toc-entry-26">Concerns</a></li>
-<li><a class="reference internal" href="#what-tcs-gui-refuses" id="toc-entry-27">What tcs-gui refuses</a></li>
+<li><a class="reference internal" href="#what-tcs-cfge-refuses" id="toc-entry-27">What tcs-cfge refuses</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#saving" id="toc-entry-28">Saving</a><ul>
@@ -419,25 +419,25 @@ ul.auto-toc {
 </ul>
 </li>
 <li><a class="reference internal" href="#read-only-sessions" id="toc-entry-38">Read-only sessions</a></li>
-<li><a class="reference internal" href="#where-tcs-gui-keeps-things" id="toc-entry-39">Where tcs-gui keeps things</a></li>
+<li><a class="reference internal" href="#where-tcs-cfge-keeps-things" id="toc-entry-39">Where tcs-cfge keeps things</a></li>
 <li><a class="reference internal" href="#see-also" id="toc-entry-40">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
 <h1><a class="toc-backref" href="#toc-entry-1">Introduction</a></h1>
-<p>tcs-gui is TCSpecial's configuration editor. A configuration is a graph --
-nodes, and the links that join them -- and tcs-gui draws that graph, lets you
+<p>tcs-cfge is TCSpecial's configuration editor. A configuration is a graph --
+nodes, and the links that join them -- and tcs-cfge draws that graph, lets you
 change it by drawing, and writes the result back to the same file tcspecial
 will read aboard, in either of its spellings: YTCS, in YAML, or XTCS, in XML
 (see Configuration File Formats in <a class="reference external" href="tcspecial.html#configuration-file-formats">the tcspecial manual</a>). It runs on the ground and
 never flies.</p>
 <p>It edits, in one session, everything a person draws a vehicle with: the top
 configuration file, every file it includes, and, where you name one, the
-simulator's own file, whose physics model tcs-gui draws beside the
+simulator's own file, whose physics model tcs-cfge draws beside the
 configuration. What the files mean -- node types, attributes, links, includes,
-the <tt class="docutils literal">tcspecial</tt> section -- is described in <a class="reference external" href="tcspecial.html">the tcspecial manual</a>; this manual says how tcs-gui shows them and how to change
+the <tt class="docutils literal">tcspecial</tt> section -- is described in <a class="reference external" href="tcspecial.html">the tcspecial manual</a>; this manual says how tcs-cfge shows them and how to change
 them. The simulator file is described in the <a class="reference external" href="tcs-sim.html">tcs-sim manual</a>.</p>
-<p>Two things about tcs-gui are worth knowing before anything else.</p>
+<p>Two things about tcs-cfge are worth knowing before anything else.</p>
 <p><strong>It writes as you go.</strong> With Autosave on, which it is until you turn it off,
 every edit is written to the files as it is made. There is a Save command all
 the same, for the cases described under <a class="reference internal" href="#saving">Saving</a>.</p>
@@ -448,12 +448,12 @@ rules the flight software applies, in the same words. Requiring that
 everything be entered is the business of <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> and of tcspecial
 itself; see the <a class="reference external" href="tcs-verify.html">tcs-verify manual</a>.</p>
 </div>
-<div class="section" id="starting-tcs-gui">
-<h1><a class="toc-backref" href="#toc-entry-2">Starting tcs-gui</a></h1>
+<div class="section" id="starting-tcs-cfge">
+<h1><a class="toc-backref" href="#toc-entry-2">Starting tcs-cfge</a></h1>
 <div class="section" id="the-command-line">
 <h2><a class="toc-backref" href="#toc-entry-3">The command line</a></h2>
 <pre class="code text literal-block">
-tcs-gui [-r | --read-only] &lt;configuration file&gt; [&lt;simulator file&gt;]
+tcs-cfge [-r | --read-only] &lt;configuration file&gt; [&lt;simulator file&gt;]
 </pre>
 <p>The configuration file is required. Its extension says its format: <tt class="docutils literal">.xtcs</tt>
 is XTCS, in XML, and anything else, normally <tt class="docutils literal">.ytcs</tt>, is YTCS, in YAML. The file need not
@@ -467,22 +467,22 @@ yet.</p>
 and it may go anywhere on the line: see <a class="reference internal" href="#read-only-sessions">Read-only sessions</a>. Any other word
 starting with a dash is refused, so that a mistyped flag is not taken for the
 name of a configuration to create. More than two files are refused too.</p>
-<p>Run with no file, or with a command line it does not take, tcs-gui prints its
+<p>Run with no file, or with a command line it does not take, tcs-cfge prints its
 usage on the error output and exits with status 2. There is no <tt class="docutils literal"><span class="pre">--help</span></tt>
 option; running it with no arguments is how to see the usage.</p>
 </div>
 <div class="section" id="what-happens-as-it-starts">
 <h2><a class="toc-backref" href="#toc-entry-4">What happens as it starts</a></h2>
-<p>Before any window opens, tcs-gui reads its preferences (see <a class="reference internal" href="#where-tcs-gui-keeps-things">Where tcs-gui
+<p>Before any window opens, tcs-cfge reads its preferences (see <a class="reference internal" href="#where-tcs-cfge-keeps-things">Where tcs-cfge
 keeps things</a>) and deletes the undo histories of sessions nobody is coming
 back to -- any more than a week old, and any whose configuration is no longer
 there -- saying on the error output how many it removed.</p>
 <p>It then reads the files. <strong>A file that is there and cannot be read ends
-tcs-gui</strong>, with a message on the error output naming the file and saying why,
+tcs-cfge</strong>, with a message on the error output naming the file and saying why,
 and exit status 1. That covers a file that does not parse, one that cannot be
 opened, and a simulator file that parses but cannot be joined to the
 configuration -- two entries of one name, or an entry naming a payload the
-configuration does not have. tcs-gui writes every edit as it is made, so a
+configuration does not have. tcs-cfge writes every edit as it is made, so a
 session opened on a file it had not read would replace that file at the first
 edit; such a file is put right in a text editor instead.</p>
 <p>A configuration that does not exist yet opens with a ground station already
@@ -495,18 +495,18 @@ see <a class="reference internal" href="#crash-recovery">Crash recovery</a>.</p>
 </div>
 <div class="section" id="from-a-checkout">
 <h2><a class="toc-backref" href="#toc-entry-5">From a checkout</a></h2>
-<p>The top-level Makefile runs tcs-gui out of the source tree:</p>
+<p>The top-level Makefile runs tcs-cfge out of the source tree:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>make<span class="whitespace"> </span>runguiy<span class="whitespace"> </span><span class="name variable">TCS_GUI_FILE</span><span class="operator">=</span>tests/manual/thermostat<span class="whitespace">
-</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runguix<span class="whitespace"> </span><span class="name variable">TCS_GUI_FILE</span><span class="operator">=</span>tests/manual/thermostat<span class="whitespace">
-</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runsimguiy<span class="whitespace"> </span><span class="name variable">TCS_GUI_FILE</span><span class="operator">=</span>tests/manual/thermostat
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>runguiy<span class="whitespace"> </span><span class="name variable">TCS_CFGE_FILE</span><span class="operator">=</span>tests/manual/thermostat<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runguix<span class="whitespace"> </span><span class="name variable">TCS_CFGE_FILE</span><span class="operator">=</span>tests/manual/thermostat<span class="whitespace">
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>runsimguiy<span class="whitespace"> </span><span class="name variable">TCS_CFGE_FILE</span><span class="operator">=</span>tests/manual/thermostat
 </pre>
-<p><tt class="docutils literal">runguiy</tt> opens the YAML spelling of <tt class="docutils literal">TCS_GUI_FILE</tt> and <tt class="docutils literal">runguix</tt> the
+<p><tt class="docutils literal">runguiy</tt> opens the YAML spelling of <tt class="docutils literal">TCS_CFGE_FILE</tt> and <tt class="docutils literal">runguix</tt> the
 XML; whatever extension the variable carries is replaced. <tt class="docutils literal">runsimguiy</tt> and
 <tt class="docutils literal">runsimguix</tt> open the simulator file beside it as well, named by
-<tt class="docutils literal">TCS_GUI_SIM</tt>, which defaults to the configuration's stem with <tt class="docutils literal">sim</tt> on
-the end. <tt class="docutils literal">TCS_GUI_FILE</tt> defaults to <tt class="docutils literal">example.ytcs</tt>, the shipped example,
-which tcs-gui will rewrite as it is edited; <tt class="docutils literal">git checkout example.ytcs</tt> puts
+<tt class="docutils literal">TCS_CFGE_SIM</tt>, which defaults to the configuration's stem with <tt class="docutils literal">sim</tt> on
+the end. <tt class="docutils literal">TCS_CFGE_FILE</tt> defaults to <tt class="docutils literal">example.ytcs</tt>, the shipped example,
+which tcs-cfge will rewrite as it is edited; <tt class="docutils literal">git checkout example.ytcs</tt> puts
 it back. <tt class="docutils literal">make verify</tt> checks the file the same variable names.</p>
 </div>
 </div>
@@ -519,8 +519,8 @@ middle when it is too long for the title bar. A read-only session says
 <p>Under the menu bar is a bar of buttons and messages, and under that, side by
 side, the selection column on the left and the sheet on the right.</p>
 <div class="figure">
-<a class="reference external image-reference" href="shots/tcs-gui-window.png">
-<img alt="The main window on the battery example, with eight numbered markers. Along the top the menus File, Edit and View (1). Under them the bar: the Undo and Redo arrows, greyed, the Save button, Arrange, 2 concerns, 0 edits can be undone and saved (2). Down the left the selection column, its lists headed Physics node types, Payload node types, Vehicle node types and Gateway node types (3). The rest is the sheet, divided into the Physics pane, with the simulator's components such as battery and sun as hexagons (4); the Payloads pane, with shunt, monitor and science as parallelograms (5); the Vehicle pane, with battery_amps, bus_volts, charge and shedding as rounded rectangles (6); and the Gateway pane, with the gateway node as a plain rectangle (7). A divider between two panes has a handle halfway down (8). Lines join the nodes." src="shots/tcs-gui-window.png" style="width: 100%;" />
+<a class="reference external image-reference" href="shots/tcs-cfge-window.png">
+<img alt="The main window on the battery example, with eight numbered markers. Along the top the menus File, Edit and View (1). Under them the bar: the Undo and Redo arrows, greyed, the Save button, Arrange, 2 concerns, 0 edits can be undone and saved (2). Down the left the selection column, its lists headed Physics node types, Payload node types, Vehicle node types and Gateway node types (3). The rest is the sheet, divided into the Physics pane, with the simulator's components such as battery and sun as hexagons (4); the Payloads pane, with shunt, monitor and science as parallelograms (5); the Vehicle pane, with battery_amps, bus_volts, charge and shedding as rounded rectangles (6); and the Gateway pane, with the gateway node as a plain rectangle (7). A divider between two panes has a handle halfway down (8). Lines join the nodes." src="shots/tcs-cfge-window.png" style="width: 100%;" />
 </a>
 <p class="caption">The battery example as it opens, with its simulator file: (1) the
 menus, (2) the bar, (3) the selection column, (4) to (7) the Physics,
@@ -559,7 +559,7 @@ drawn on the sheet, under headings, in alphabetical order within each
 heading. The lines between the lists can be dragged to share the column
 differently, no list going below a tenth of it; where they are is kept in the
 preferences file too.</p>
-<p>The types offered come from the description tree (see <a class="reference internal" href="#where-tcs-gui-keeps-things">Where tcs-gui keeps
+<p>The types offered come from the description tree (see <a class="reference internal" href="#where-tcs-cfge-keeps-things">Where tcs-cfge keeps
 things</a>). A type the tree describes is offered as its descriptions -- the one
 <tt class="docutils literal">compute</tt> type is offered as <tt class="docutils literal">thermostat</tt>, <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt>,
 <tt class="docutils literal">vote</tt> and <tt class="docutils literal">process</tt>, each with its function already set -- and a type it
@@ -605,7 +605,7 @@ sheet smaller rather than cutting panes off. Only the drawing is scaled:
 positions written to the file are in the sheet's own pixels whatever the
 zoom.</dd>
 </dl>
-<p>While a question tcs-gui asked at startup is waiting for an answer, the main
+<p>While a question tcs-cfge asked at startup is waiting for an answer, the main
 window is greyed and takes no presses, and the menus are disabled.</p>
 </div>
 </div>
@@ -664,7 +664,7 @@ pane's edge. Let go anywhere off the sheet, it places nothing. Either way it
 is one edit.</p>
 <p>A new node is named after what was placed, a hyphen and the first number no
 node has: <tt class="docutils literal"><span class="pre">i2c-1</span></tt>, then <tt class="docutils literal"><span class="pre">i2c-2</span></tt>, and <tt class="docutils literal"><span class="pre">i2c-1</span></tt> again if the first is
-deleted. The number says the name is tcs-gui's suggestion; rename it.</p>
+deleted. The number says the name is tcs-cfge's suggestion; rename it.</p>
 </div>
 <div class="section" id="selecting-moving-and-the-node-s-menu">
 <h2><a class="toc-backref" href="#toc-entry-14">Selecting, moving and the node's menu</a></h2>
@@ -700,12 +700,12 @@ is what an empty value means to the checking anyway.</p>
 <p>Going on from the example under <a class="reference internal" href="#drawing-a-line">Drawing a line</a>:</p>
 <ol class="arabic">
 <li><div class="first figure">
-<img alt="log-1, marked 1, outlined in dark grey as selected, and beside it a menu offering Edit and Delete." src="shots/tcs-gui-edit-1.png" />
+<img alt="log-1, marked 1, outlined in dark grey as selected, and beside it a menu offering Edit and Delete." src="shots/tcs-cfge-edit-1.png" />
 <p class="caption">Right-click <tt class="docutils literal"><span class="pre">log-1</span></tt> (1). It is selected and its menu opens.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="log-1's window: the name log-1 in a field with an x beside it, the type log under it, the fields directory, marked with an asterisk and holding /tmp/telemetry, and format, marked and empty; a comment box; under About, Records what reaches it rather than passing it on; and a Close button." src="shots/tcs-gui-edit-2.png" />
+<img alt="log-1's window: the name log-1 in a field with an x beside it, the type log under it, the fields directory, marked with an asterisk and holding /tmp/telemetry, and format, marked and empty; a comment box; under About, Records what reaches it rather than passing it on; and a Close button." src="shots/tcs-cfge-edit-2.png" />
 <p class="caption">Choose <strong>Edit</strong>, and the node's window opens. <tt class="docutils literal">directory</tt> and
 <tt class="docutils literal">format</tt> are marked <tt class="docutils literal">*</tt>, the configuration requiring them. A
 directory has been typed and taken; <tt class="docutils literal">format</tt> waits for an answer.</p>
@@ -756,13 +756,13 @@ changes nothing.</p>
 <tt class="docutils literal"><span class="pre">world-in</span> (fed by to_k1)</tt> for an input something else already feeds,
 <tt class="docutils literal"><span class="pre">world-in</span> (joined already)</tt> for a line the configuration has. A node with
 nothing at all for the line offers no menu, and the line stays in hand while
-the box on the sheet says so. tcs-gui will not draw a line from a node to
+the box on the sheet says so. tcs-cfge will not draw a line from a node to
 itself, one that carries one stream into the other, one the configuration
 already has, or a second line into an input that does not merge.</p>
 <p>For example, to record the battery example's bus voltage in a log of its own:</p>
 <ol class="arabic">
 <li><div class="first figure">
-<img alt="The vehicle list scrolled down to the heading Ends of the graph, its log entry marked 1. On the sheet a new node, log-1, in the upper right of the Vehicle pane. The bar's Undo button reads add log &quot;log-1&quot;, the concerns button 4 concerns, and the bar says 1 edit can be undone." src="shots/tcs-gui-place-1.png" style="width: 100%;" />
+<img alt="The vehicle list scrolled down to the heading Ends of the graph, its log entry marked 1. On the sheet a new node, log-1, in the upper right of the Vehicle pane. The bar's Undo button reads add log &quot;log-1&quot;, the concerns button 4 concerns, and the bar says 1 edit can be undone." src="shots/tcs-cfge-place-1.png" style="width: 100%;" />
 <p class="caption">Click <tt class="docutils literal">log</tt> in the vehicle list, under <em>Ends of the graph</em> (1). A
 node called <tt class="docutils literal"><span class="pre">log-1</span></tt> is placed as high in the Vehicle pane as it fits.
 Nothing is joined to it and nothing is filled in yet, which
@@ -771,20 +771,20 @@ so the bar's concerns button counts it (see <a class="reference internal" href="
 </div>
 </li>
 <li><div class="first figure">
-<img alt="log-1's upper left terminal marked 2, a short dashed line running from it towards bus_volts, and along the bottom of the sheet a box saying: A line from world-in is in hand: click a node to join it. Escape, or a click on bare sheet, puts it down." src="shots/tcs-gui-place-2.png" style="width: 100%;" />
+<img alt="log-1's upper left terminal marked 2, a short dashed line running from it towards bus_volts, and along the bottom of the sheet a box saying: A line from world-in is in hand: click a node to join it. Escape, or a click on bare sheet, puts it down." src="shots/tcs-cfge-place-2.png" style="width: 100%;" />
 <p class="caption">Click <tt class="docutils literal"><span class="pre">log-1</span></tt>'s <tt class="docutils literal"><span class="pre">world-in</span></tt> terminal, in its upper left corner (2).
 The line is in hand: a dashed line follows the pointer, and the box at
 the foot of the sheet says what to do next.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="bus_volts marked 3, and over it a menu headed bus_volts offering New line from world-out, and Cancel." src="shots/tcs-gui-place-3.png" style="width: 100%;" />
+<img alt="bus_volts marked 3, and over it a menu headed bus_volts offering New line from world-out, and Cancel." src="shots/tcs-cfge-place-3.png" style="width: 100%;" />
 <p class="caption">Click <tt class="docutils literal">bus_volts</tt>, anywhere on it (3). Its menu offers what the line
 can be there: a new line from its <tt class="docutils literal"><span class="pre">world-out</span></tt>.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="A line now runs from bus_volts's upper right terminal to log-1's upper left, log-1 marked 4. The bar's Undo button reads link &quot;bus_volts&quot; to &quot;log-1&quot;, the concerns button 3 concerns, and the bar says 2 edits can be undone." src="shots/tcs-gui-place-4.png" style="width: 100%;" />
+<img alt="A line now runs from bus_volts's upper right terminal to log-1's upper left, log-1 marked 4. The bar's Undo button reads link &quot;bus_volts&quot; to &quot;log-1&quot;, the concerns button 3 concerns, and the bar says 2 edits can be undone." src="shots/tcs-cfge-place-4.png" style="width: 100%;" />
 <p class="caption">Choose it. The line is drawn (4) and written, and Undo names it. One
 concern about the log is gone; another is left, since nothing of the
 log is filled in yet, which is done in its window, next.</p>
@@ -812,7 +812,7 @@ a box, drawn in the Vehicle pane under the subdiagram's name, whose four
 corner terminals are its edge: what of it the files around it may join, as
 its <tt class="docutils literal">exports</tt> section says (see <a class="reference external" href="tcspecial.html">the tcspecial manual</a>).
 The <tt class="docutils literal">subdiagram</tt> entry, under <strong>Pages</strong> in the vehicle list, places a new
-one, which tcs-gui writes to a file of its own beside the top file, in the top
+one, which tcs-cfge writes to a file of its own beside the top file, in the top
 file's format, and names in the top file's <tt class="docutils literal">include</tt> list.</p>
 <p><strong>Open</strong> in the box's menu, or the mark in the middle of its bottom edge,
 opens its page in a window like the main one, with the same panes, lists,
@@ -838,17 +838,17 @@ can take it. Hiding is greyed, saying why, while a line from another file
 joins the node there. Showing, hiding and the line made with a showing are
 each one edit, and are written into the file's <tt class="docutils literal">exports</tt>.</li>
 </ul>
-<p>tcs-gui writes each node, group and command binding back to the file it was
+<p>tcs-cfge writes each node, group and command binding back to the file it was
 read from.</p>
 </div>
 <div class="section" id="the-simulator-file">
 <h1><a class="toc-backref" href="#toc-entry-22">The simulator file</a></h1>
-<p>Given a simulator file, tcs-gui edits it in the same session: one Save writes
+<p>Given a simulator file, tcs-cfge edits it in the same session: one Save writes
 both files, and one Undo takes back whichever the last edit touched. Without
 one, the physics list is greyed and the Physics pane says to open a simulator
 file.</p>
 <p><strong>A payload's simulator settings</strong> are in its own node window, under their
-heading. A file tcs-gui begins names each payload of the configuration under
+heading. A file tcs-cfge begins names each payload of the configuration under
 its type and nothing else; a setting is written only when it holds a value.</p>
 <p><strong>Simulator groups</strong> are edited from <strong>File -&gt; Edit simulated payload
 groups</strong>, which can also make a group with <strong>New</strong> and remove one with
@@ -866,15 +866,15 @@ input terminal to another component makes a physics connection; to a
 payload, or a subdiagram's box, it sets that payload's <tt class="docutils literal">connects</tt>. A line
 from a payload's terminal to a component does the same: from a <tt class="docutils literal">moc</tt>
 terminal it offers the component's inputs, from a <tt class="docutils literal">world</tt> terminal its
-outputs. Where a line could mean more than one terminal tcs-gui asks, offering
+outputs. Where a line could mean more than one terminal tcs-cfge asks, offering
 each, with Cancel; a join already made is offered greyed, saying so.
 Deleting a component removes its connections and takes it out of every
 payload's <tt class="docutils literal">connects</tt>, and one Undo puts all of it back. The world's
 <tt class="docutils literal">ambient_temp</tt>, and taking away a connection or a join, are done in the
 simulator file by hand for now.</p>
 <p>Each component is drawn on the page it was placed from. Where each was drawn
-is kept in a <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section at the end of the simulator file, which tcs-sim
-ignores; see the <a class="reference external" href="tcs-sim.html">tcs-sim manual</a>.</p>
+is kept in a <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section at the end of the simulator file, which
+tcs-sim ignores; see the <a class="reference external" href="tcs-sim.html">tcs-sim manual</a>.</p>
 </div>
 <div class="section" id="groups-and-tcspecial-parameters">
 <h1><a class="toc-backref" href="#toc-entry-23">Groups and tcspecial parameters</a></h1>
@@ -892,7 +892,7 @@ stated first and marked. A parameter cleared is left out of the file.</p>
 </div>
 <div class="section" id="checking">
 <h1><a class="toc-backref" href="#toc-entry-24">Checking</a></h1>
-<p>tcs-gui asks <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> about the files as it starts and after every edit,
+<p>tcs-cfge asks <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> about the files as it starts and after every edit,
 so what it says about a configuration is what <tt class="docutils literal"><span class="pre">tcs-verify</span></tt>, tcspecial,
 tcs-moc and tcs-sim say, in their words. There are three kinds of answer.</p>
 <div class="section" id="errors">
@@ -901,13 +901,13 @@ tcs-moc and tcs-sim say, in their words. There are three kinds of answer.</p>
 two nodes of one name, two lines into one input, a line to a node that is not
 there. While there are any, the bar has a button saying how many --
 <tt class="docutils literal">3 errors</tt> -- whose menu lists them one a line. The menu lists every
-error <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> finds in the files, in its words, beside tcs-gui's own:
+error <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> finds in the files, in its words, beside tcs-cfge's own:
 one about a node names the node, and any other starts with the name of the
 file and the line it is about, as <tt class="docutils literal"><span class="pre">battery-sim.yaml:97:</span></tt>. What
 <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> only warns of -- a node joined to nothing, or with fields it
 requires left empty, which is every node just placed -- is not an error and
 is not listed here, but counted with the concerns (see <a class="reference internal" href="#concerns">Concerns</a>). A node
-tcs-gui finds wrong is drawn red, and is always in the menu. Choosing one
+tcs-cfge finds wrong is drawn red, and is always in the menu. Choosing one
 goes to it:</p>
 <ul class="simple">
 <li>a node's error shows the node in the middle of its page, selected, with its
@@ -915,7 +915,7 @@ window open;</li>
 <li>a line's error shows the line in the middle of its page, lit by a wide pale
 line under it, so it stands out by its width;</li>
 <li>a name two nodes share, or a node with no name, is first given a name
-nothing has -- the one repair tcs-gui makes by itself -- and then shown as a
+nothing has -- the one repair tcs-cfge makes by itself -- and then shown as a
 node's error is;</li>
 <li>a group's error opens the groups window on that group, and an error in the
 <tt class="docutils literal">tcspecial</tt> section opens the parameters window.</li>
@@ -930,7 +930,7 @@ this session only and is not written anywhere. Either way every node is on
 the sheet in its pane, so a configuration can be looked at before it is put
 right.</p>
 <div class="figure">
-<img alt="The main window greyed, and in front of it a box headed This configuration has errors the vehicle would not fly with, saying Some nodes have attribute values that are not valid. There are other errors as well. Each is drawn in red. Choose one from the errors button on the bar to go to it. Buttons Copy, Quit and Ignore." src="shots/tcs-gui-open-errors.png" style="width: 100%;" />
+<img alt="The main window greyed, and in front of it a box headed This configuration has errors the vehicle would not fly with, saying Some nodes have attribute values that are not valid. There are other errors as well. Each is drawn in red. Choose one from the errors button on the bar to go to it. Buttons Copy, Quit and Ignore." src="shots/tcs-cfge-open-errors.png" style="width: 100%;" />
 <p class="caption">The battery example opened with the shunt's port changed to 99999 in
 the file.</p>
 </div>
@@ -942,25 +942,25 @@ what it says on the clipboard.</p>
 <tt class="docutils literal">shunt</tt>'s window:</p>
 <ol class="arabic">
 <li><div class="first figure">
-<img alt="A window headed Something is wrong with the configuration., saying in red: &quot;shunt&quot;: port 99999 is not a port -- a port is 1 to 65535, and 0 is &quot;whichever one is free&quot;, which a configuration cannot mean. Under it, in grey, it says the node is drawn in red and nothing has been lost. Copy and OK buttons." src="shots/tcs-gui-error-1.png" />
+<img alt="A window headed Something is wrong with the configuration., saying in red: &quot;shunt&quot;: port 99999 is not a port -- a port is 1 to 65535, and 0 is &quot;whichever one is free&quot;, which a configuration cannot mean. Under it, in grey, it says the node is drawn in red and nothing has been lost. Copy and OK buttons." src="shots/tcs-cfge-error-1.png" />
 <p class="caption">The value is taken, and the window says what is wrong with it. Press
 <strong>OK</strong>.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The bar, its Undo button reading set port of &quot;shunt&quot; and a new button 2 errors; on the sheet the shunt, marked 2, is drawn red." src="shots/tcs-gui-error-2.png" style="width: 100%;" />
+<img alt="The bar, its Undo button reading set port of &quot;shunt&quot; and a new button 2 errors; on the sheet the shunt, marked 2, is drawn red." src="shots/tcs-cfge-error-2.png" style="width: 100%;" />
 <p class="caption">The <tt class="docutils literal">shunt</tt> is drawn red (2), and the bar has a <tt class="docutils literal">2 errors</tt>
 button: the port, and the simulator's file, which cannot simulate a
 payload on that port.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The 2 errors button pressed, marked 3, and under it a menu of two lines: the shunt's port, and one starting battery-sim.yaml:97: saying the shunt cannot be simulated." src="shots/tcs-gui-error-3.png" style="width: 100%;" />
+<img alt="The 2 errors button pressed, marked 3, and under it a menu of two lines: the shunt's port, and one starting battery-sim.yaml:97: saying the shunt cannot be simulated." src="shots/tcs-cfge-error-3.png" style="width: 100%;" />
 <p class="caption">Press the button (3): its menu lists the errors.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The shunt's window: its name, its type network, the same sentence about port 99999 in red italic, and its fields -- protocol udp, address 127.0.0.1, port 99999 and the rest -- with, under them, the heading simulated payload and the simulator's settings in two columns, in italic." src="shots/tcs-gui-error-4.png" style="width: 100%;" />
+<img alt="The shunt's window: its name, its type network, the same sentence about port 99999 in red italic, and its fields -- protocol udp, address 127.0.0.1, port 99999 and the rest -- with, under them, the heading simulated payload and the simulator's settings in two columns, in italic." src="shots/tcs-cfge-error-4.png" style="width: 100%;" />
 <p class="caption">Choose the first. The <tt class="docutils literal">shunt</tt> is selected in the middle of the
 sheet and its window opens, saying the same thing in red. Put the port
 right there, or press Undo (see <a class="reference internal" href="#undo-and-redo">Undo and redo</a>).</p>
@@ -977,22 +977,22 @@ stops a configuration being read, and all are normal while a diagram is being
 drawn, so they are counted rather than refused, and not at all while the
 configuration has one node or none. What <tt class="docutils literal"><span class="pre">tcs-verify</span></tt> warns of is counted
 with them, in its words: a node joined to nothing at all, and a node whose
-required fields are not all filled in yet. tcs-gui does not call either an
+required fields are not all filled in yet. tcs-cfge does not call either an
 error, since every node is both when it is placed, but the vehicle refuses
 a configuration that still has them.</p>
 <p><strong>N concerns</strong> on the bar opens a list with a line a concern, each with
 <strong>Go to it</strong>, which selects the node, scrolls to it and opens its window, and
 <strong>Set aside</strong>. A concern set aside moves to the <strong>N set aside</strong> list, where
 <strong>Take up again</strong> moves it back. Setting aside is an edit, so Undo takes it
-back, and it is written in the configuration's <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section, so that
+back, and it is written in the configuration's <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section, so that
 whoever opens the file next sees the same decision. It is kept by node and
 kind of concern: a concern that stops applying leaves both lists by itself.
 An open list is written again after every edit, Undo and Redo, as the
 errors' menu is, so it never shows a concern that has gone or leaves out
 one just raised.</p>
 </div>
-<div class="section" id="what-tcs-gui-refuses">
-<h2><a class="toc-backref" href="#toc-entry-27">What tcs-gui refuses</a></h2>
+<div class="section" id="what-tcs-cfge-refuses">
+<h2><a class="toc-backref" href="#toc-entry-27">What tcs-cfge refuses</a></h2>
 <p>Some things are refused at once rather than counted, because they are slips
 of the hand rather than decisions about the vehicle: the lines described under
 <a class="reference internal" href="#drawing-a-line">Drawing a line</a>, a rename to a name that is taken or cannot be a name, a
@@ -1011,13 +1011,13 @@ history is written after every edit either way, which is what lets an
 unsaved edit survive a crash (see <a class="reference internal" href="#crash-recovery">Crash recovery</a>). Checking Autosave again
 writes at once whatever was waiting.</p>
 <div class="figure">
-<img alt="The bar with Autosave off: an Undo button reading comment on &quot;bus_volts&quot;, 2 concerns, 1 edit can be undone, and not saved." src="shots/tcs-gui-not-saved.png" style="width: 100%;" />
+<img alt="The bar with Autosave off: an Undo button reading comment on &quot;bus_volts&quot;, 2 concerns, 1 edit can be undone, and not saved." src="shots/tcs-cfge-not-saved.png" style="width: 100%;" />
 <p class="caption">With Autosave off, the bar says <tt class="docutils literal">not saved</tt> until Save writes the edit.</p>
 </div>
-<p>The setting is kept as <tt class="docutils literal">&lt;autosave&gt;</tt> in <tt class="docutils literal"><span class="pre">$HOME/.tcs-gui/preferences.xml</span></tt>,
+<p>The setting is kept as <tt class="docutils literal">&lt;autosave&gt;</tt> in <tt class="docutils literal"><span class="pre">$HOME/.tcs-cfge/preferences.xml</span></tt>,
 <tt class="docutils literal">true</tt> or <tt class="docutils literal">false</tt>, and is on by default.</p>
 <div class="figure">
-<img alt="The File menu open: Save, Save as..., Autosave with a tick beside it, then Edit payload groups and Edit simulated payload groups, then Exit." src="shots/tcs-gui-file-menu.png" />
+<img alt="The File menu open: Save, Save as..., Autosave with a tick beside it, then Edit payload groups and Edit simulated payload groups, then Exit." src="shots/tcs-cfge-file-menu.png" />
 <p class="caption">The File menu, with Autosave on.</p>
 </div>
 </div>
@@ -1046,13 +1046,13 @@ a comment, so a run of hyphens in a comment written to an XML file becomes
 one.</p>
 <p>A configuration kept in both spellings -- <tt class="docutils literal">vehicle.ytcs</tt> beside
 <tt class="docutils literal">vehicle.xtcs</tt> -- is written in both, and so is each included file that has
-both. tcs-gui never makes the second spelling of a file that has only one.</p>
-<p>Where each node was drawn is written in a <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section at the end of
-each file, with the concerns set aside; tcspecial ignores the section. tcs-gui
+both. tcs-cfge never makes the second spelling of a file that has only one.</p>
+<p>Where each node was drawn is written in a <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section at the end of
+each file, with the concerns set aside; tcspecial ignores the section. tcs-cfge
 also writes into each configuration a reference to its schema -- in XML an
 <tt class="docutils literal">xsi:noNamespaceSchemaLocation</tt> attribute, in YAML a
 <tt class="docutils literal"># <span class="pre">yaml-language-server:</span> $schema=</tt> comment -- so that another editor can
-check the file's shape. See <a class="reference external" href="tcs-gui-design.html#schemas-beside-the-tree">Schemas beside the tree</a>.</p>
+check the file's shape. See <a class="reference external" href="tcs-cfge-design.html#schemas-beside-the-tree">Schemas beside the tree</a>.</p>
 </div>
 <div class="section" id="when-a-write-fails">
 <h2><a class="toc-backref" href="#toc-entry-32">When a write fails</a></h2>
@@ -1075,13 +1075,13 @@ not, a window says <em>There are changes the files do not have.</em> and offers:
 </ul>
 <p>and <strong>Copy</strong>, which puts what the window says on the clipboard.</p>
 <div class="figure">
-<img alt="A window headed There are changes the files do not have., saying that saving writes the configuration and, where this session was given one, the simulator's file beside it. Buttons Stay, Copy, Leave without saving, Save as and leave... and Save and leave." src="shots/tcs-gui-leave.png" />
+<img alt="A window headed There are changes the files do not have., saying that saving writes the configuration and, where this session was given one, the simulator's file beside it. Buttons Stay, Copy, Leave without saving, Save as and leave... and Save and leave." src="shots/tcs-cfge-leave.png" />
 <p class="caption">File -&gt; Exit with Autosave off and an edit not yet saved.</p>
 </div>
 <p><strong>Leave without saving</strong> lets the edits go: the files keep what they last
 had, and the history goes with the session, as it does on any tidy exit, so
 the edits are lost.</p>
-<p>However else tcs-gui ends -- by Exit, or by its windows being closed -- it
+<p>However else tcs-cfge ends -- by Exit, or by its windows being closed -- it
 then tries once more to write whatever the files do not have, and says on the
 error output whether it did. If that last write fails, the error output says
 where the session's history is, since it is then the only copy of the work.</p>
@@ -1101,12 +1101,12 @@ configuration starts with.</p>
 <p>Going on from the example under <a class="reference internal" href="#errors">Errors</a>:</p>
 <ol class="arabic">
 <li><div class="first figure">
-<img alt="The bar: an Undo button reading set port of &quot;shunt&quot;, a greyed Redo arrow, 2 errors, 2 concerns, and 1 edit can be undone; the shunt below, red and selected." src="shots/tcs-gui-undo-1.png" style="width: 100%;" />
+<img alt="The bar: an Undo button reading set port of &quot;shunt&quot;, a greyed Redo arrow, 2 errors, 2 concerns, and 1 edit can be undone; the shunt below, red and selected." src="shots/tcs-cfge-undo-1.png" style="width: 100%;" />
 <p class="caption">The last edit set the shunt's port, and the Undo button says so.</p>
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The bar: a greyed Undo arrow, a Redo button reading set port of &quot;shunt&quot;, no errors button, 2 concerns, and 0 edits can be undone; the shunt below no longer red." src="shots/tcs-gui-undo-2.png" style="width: 100%;" />
+<img alt="The bar: a greyed Undo arrow, a Redo button reading set port of &quot;shunt&quot;, no errors button, 2 concerns, and 0 edits can be undone; the shunt below no longer red." src="shots/tcs-cfge-undo-2.png" style="width: 100%;" />
 <p class="caption">Press it. The port is put back and written, the errors go, and
 <strong>Redo</strong> offers to set it again.</p>
 </div>
@@ -1116,22 +1116,22 @@ configuration starts with.</p>
 <div class="section" id="the-history">
 <h2><a class="toc-backref" href="#toc-entry-36">The history</a></h2>
 <p>The undo history is kept on the disk, not beside the configuration but in
-your state directory: <tt class="docutils literal"><span class="pre">$XDG_STATE_HOME/tcs-gui</span></tt> where <tt class="docutils literal">XDG_STATE_HOME</tt> is
-set to an absolute path, <tt class="docutils literal"><span class="pre">~/.local/state/tcs-gui</span></tt> otherwise. Each
+your state directory: <tt class="docutils literal"><span class="pre">$XDG_STATE_HOME/tcs-cfge</span></tt> where <tt class="docutils literal">XDG_STATE_HOME</tt> is
+set to an absolute path, <tt class="docutils literal"><span class="pre">~/.local/state/tcs-cfge</span></tt> otherwise. Each
 configuration's history is a YAML file named for the configuration's stem and
 a digest of its absolute path, such as <tt class="docutils literal"><span class="pre">graph-3f91c2d4e5f60718.yaml</span></tt>, and it
 says inside which configuration it belongs to. With it is kept how far into
-the history the files go, and an MD5 digest of each file as tcs-gui last wrote
+the history the files go, and an MD5 digest of each file as tcs-cfge last wrote
 or read it.</p>
-<p>It is written after every edit, and deleted when tcs-gui exits cleanly having
+<p>It is written after every edit, and deleted when tcs-cfge exits cleanly having
 written everything. It is kept after a crash, a kill or a machine going down,
 and after an exit whose last write failed. Histories more than a week old,
-and those whose configuration is no longer there, are deleted when tcs-gui
+and those whose configuration is no longer there, are deleted when tcs-cfge
 next starts.</p>
 </div>
 <div class="section" id="crash-recovery">
 <h2><a class="toc-backref" href="#toc-entry-37">Crash recovery</a></h2>
-<p>When tcs-gui opens a configuration that has a history -- which means the last
+<p>When tcs-cfge opens a configuration that has a history -- which means the last
 session on it did not end cleanly -- it holds the history to the files: each
 must still match the digest the history holds for it.</p>
 <ul class="simple">
@@ -1143,10 +1143,10 @@ and written if Autosave is on. The bar says how many edits were put back.</li>
 longer describes it, so it is discarded and the bar says so. The files are
 left as they are; what is lost is the undo.</li>
 </ul>
-<p>A history written by an older tcs-gui that kept no digests is discarded the
+<p>A history written by an older tcs-cfge that kept no digests is discarded the
 same way.</p>
 <div class="figure">
-<object data="tcs-gui-recovery.svg" type="image/svg+xml">A flow chart. tcs-gui opens a configuration. Is there a history of
+<object data="tcs-cfge-recovery.svg" type="image/svg+xml">A flow chart. tcs-cfge opens a configuration. Is there a history of
 an earlier session on it? No: the session starts with an empty
 history. Yes: does every file still match the digest the history
 keeps for it? Yes, in a box with a solid border headed Recovered:
@@ -1157,11 +1157,11 @@ with a dashed border headed Discarded: a file was changed by
 something else, or the history keeps no digests; the history is
 thrown away and the bar says so, and the files are left as they
 are.</object>
-<p class="caption">What tcs-gui does with an earlier session's history as it opens a
+<p class="caption">What tcs-cfge does with an earlier session's history as it opens a
 configuration.</p>
 </div>
 <div class="figure">
-<img alt="The bar: an Undo button reading set offset of &quot;bus_volts&quot;, 2 edits can be undone, and in green: 2 edits not saved when tcs-gui last stopped put back, and saved." src="shots/tcs-gui-recover.png" style="width: 100%;" />
+<img alt="The bar: an Undo button reading set offset of &quot;bus_volts&quot;, 2 edits can be undone, and in green: 2 edits not saved when tcs-cfge last stopped put back, and saved." src="shots/tcs-cfge-recover.png" style="width: 100%;" />
 <p class="caption">The battery example opened after a session that changed <tt class="docutils literal">bus_volts</tt>
 twice with Autosave off and then stopped without saving. Both edits are
 back, written, and can be undone.</p>
@@ -1170,7 +1170,7 @@ back, written, and can be undone.</p>
 </div>
 <div class="section" id="read-only-sessions">
 <h1><a class="toc-backref" href="#toc-entry-38">Read-only sessions</a></h1>
-<p><tt class="docutils literal"><span class="pre">tcs-gui</span> <span class="pre">--read-only</span> thermostat.ytcs</tt> shows a configuration and changes
+<p><tt class="docutils literal"><span class="pre">tcs-cfge</span> <span class="pre">--read-only</span> thermostat.ytcs</tt> shows a configuration and changes
 nothing. The controls that would change something are greyed rather than
 hidden -- Undo, Redo, Save, Save as, Autosave, Arrange, the nodes' Edit and
 Delete -- and nodes stay where they are when dragged. What the files arrived
@@ -1178,46 +1178,46 @@ with is still checked and said as the session starts. Nothing is written: not
 the configuration, not the simulator file, not a history, and no other
 session's history is recovered, pruned or deleted.</p>
 </div>
-<div class="section" id="where-tcs-gui-keeps-things">
-<h1><a class="toc-backref" href="#toc-entry-39">Where tcs-gui keeps things</a></h1>
+<div class="section" id="where-tcs-cfge-keeps-things">
+<h1><a class="toc-backref" href="#toc-entry-39">Where tcs-cfge keeps things</a></h1>
 <dl class="docutils">
 <dt>Preferences</dt>
-<dd><tt class="docutils literal"><span class="pre">$HOME/.tcs-gui/preferences.xml</span></tt>: the shares of the panes and of the
+<dd><tt class="docutils literal"><span class="pre">$HOME/.tcs-cfge/preferences.xml</span></tt>: the shares of the panes and of the
 selection lists, and <tt class="docutils literal">autosave</tt>. The directory and file are made the
-first time tcs-gui runs, the file with the defaults and comments saying
+first time tcs-cfge runs, the file with the defaults and comments saying
 what each element is. It is rewritten whenever a divider is moved or
 Autosave is changed. A file that is missing, unreadable or hand-edited
 into nonsense leaves the defaults in place and says so on the error
-output; tcs-gui still starts. A <tt class="docutils literal">config.xml</tt> in the same directory,
+output; tcs-cfge still starts. A <tt class="docutils literal">config.xml</tt> in the same directory,
 the file's earlier name, is read when <tt class="docutils literal">preferences.xml</tt> is absent.
 tcspecial's visual window reads the same file, so it divides its panes
 where your editor does, but never writes it.</dd>
 <dt>Undo histories</dt>
-<dd><tt class="docutils literal"><span class="pre">$XDG_STATE_HOME/tcs-gui</span></tt> or <tt class="docutils literal"><span class="pre">~/.local/state/tcs-gui</span></tt>: see <a class="reference internal" href="#the-history">The
+<dd><tt class="docutils literal"><span class="pre">$XDG_STATE_HOME/tcs-cfge</span></tt> or <tt class="docutils literal"><span class="pre">~/.local/state/tcs-cfge</span></tt>: see <a class="reference internal" href="#the-history">The
 history</a>.</dd>
 <dt>Node descriptions and schemas</dt>
 <dd>What node types there are, which terminals each has and what each may be
 told comes from a tree of descriptions, one YAML or XML file per entry in
 the lists, under <tt class="docutils literal">nodes</tt>; beside it, under <tt class="docutils literal">schema</tt>, are a JSON Schema
-and an XML Schema for the descriptions themselves. tcs-gui uses the first
+and an XML Schema for the descriptions themselves. tcs-cfge uses the first
 of these directories that
-exists: <tt class="docutils literal">$TCS_GUI_DATA</tt>; <tt class="docutils literal"><span class="pre">$XDG_DATA_HOME/tcs-gui</span></tt>, or
-<tt class="docutils literal"><span class="pre">~/.local/share/tcs-gui</span></tt> where that is not set; <tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt> one
-level up from the directory tcs-gui's own executable is in;
-<tt class="docutils literal"><span class="pre">/usr/local/share/tcs-gui</span></tt>; <tt class="docutils literal"><span class="pre">/usr/share/tcs-gui</span></tt>; and <tt class="docutils literal"><span class="pre">tcs-gui/share</span></tt>
-and <tt class="docutils literal">share</tt> under the working directory, which is what finds a
+exists: <tt class="docutils literal">$TCS_CFGE_DATA</tt>; <tt class="docutils literal"><span class="pre">$XDG_DATA_HOME/tcs-cfge</span></tt>, or
+<tt class="docutils literal"><span class="pre">~/.local/share/tcs-cfge</span></tt> where that is not set; <tt class="docutils literal"><span class="pre">share/tcs-cfge</span></tt> one
+level up from the directory tcs-cfge's own executable is in;
+<tt class="docutils literal"><span class="pre">/usr/local/share/tcs-cfge</span></tt>; <tt class="docutils literal"><span class="pre">/usr/share/tcs-cfge</span></tt>; and
+<tt class="docutils literal"><span class="pre">tcs-cfge/share</span></tt> and <tt class="docutils literal">share</tt> under the working directory, which is what finds a
 checkout's own. A description file that cannot be read is reported on
-the error output and the rest of the tree is still used. See <a class="reference external" href="tcs-gui-design.html#the-description-tree">The
+the error output and the rest of the tree is still used. See <a class="reference external" href="tcs-cfge-design.html#the-description-tree">The
 description tree</a>.</dd>
 <dt>In the configuration itself</dt>
-<dd>The <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section at the end of each file: where each node was
+<dd>The <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section at the end of each file: where each node was
 drawn and which concerns were set aside. In the simulator file: where
 each physics component was drawn and on which page.</dd>
 </dl>
-<p>Installed, tcs-gui is <tt class="docutils literal"><span class="pre">bin/tcs-gui</span></tt> with its descriptions in
-<tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt> under the same prefix, <tt class="docutils literal">/opt/tcs</tt> by default, and the
+<p>Installed, tcs-cfge is <tt class="docutils literal"><span class="pre">bin/tcs-cfge</span></tt> with its descriptions in
+<tt class="docutils literal"><span class="pre">share/tcs-cfge</span></tt> under the same prefix, <tt class="docutils literal">/opt/tcs</tt> by default, and the
 XTCS, YTCS and simulator schemas in <tt class="docutils literal">share/tcspecial/schema</tt>, which is
-what <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts there. <tt class="docutils literal">cargo install <span class="pre">--path</span> <span class="pre">tcs-gui</span></tt>
+what <tt class="docutils literal">make <span class="pre">install-data</span></tt> puts there. <tt class="docutils literal">cargo install <span class="pre">--path</span> <span class="pre">tcs-cfge</span></tt>
 installs only the program, so the data needs <tt class="docutils literal">make <span class="pre">install-data</span></tt> as well;
 see <a class="reference external" href="tcspecial.html">the tcspecial manual</a>.</p>
 </div>
@@ -1227,15 +1227,17 @@ see <a class="reference external" href="tcspecial.html">the tcspecial manual</a>
 <li><a class="reference external" href="manual.html">TCS Design and Documentation</a>, the summary that leads to
 each program's manual.</li>
 <li><a class="reference external" href="tcspecial.html">The tcspecial manual</a>: the flight software and the
-configuration files tcs-gui edits.</li>
+configuration files tcs-cfge edits.</li>
 <li><a class="reference external" href="tcs-sim.html">The tcs-sim manual</a>: the simulator and its file, including
 the physics model drawn in the Physics pane.</li>
-<li><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a>: the checks tcs-gui reports.</li>
+<li><a class="reference external" href="tcs-verify.html">The tcs-verify manual</a>: the checks tcs-cfge reports.</li>
 <li><a class="reference external" href="tcs-moc.html">The tcs-moc manual</a>: the ground station a configuration is
 run against.</li>
 <li><a class="reference external" href="design.html">The design</a>, in particular <a class="reference external" href="tcspecial-design.html#what-is-checked-before-anything-runs">What is checked before
-anything runs</a>, <a class="reference external" href="tcs-gui-design.html#the-undo-history">The
-undo history</a> and <a class="reference external" href="tcs-gui-design.html#the-editor-is-lazy">The editor is lazy</a>, for why tcs-gui works as it does.</li>
+anything runs</a>, <a class="reference external" href="tcs-cfge-design.html#the-undo-history">The
+undo history</a> and <a class="reference external" href="tcs-cfge-design.html#the-editor-is-lazy">The editor is
+lazy</a>, for why tcs-cfge works as
+it does.</li>
 </ul>
 </div>
 </div>

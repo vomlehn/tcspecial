@@ -310,8 +310,8 @@ pub struct Document {
     /// The concerns somebody has decided not to act on, by node and kind.
     ///
     /// A decision about this configuration rather than about this session, so
-    /// it is written in the file's own `tcs-gui` section beside where the nodes
-    /// were drawn: two people editing one configuration should not each have
+    /// it is written in the file's own `tcs-cfge` section beside where the
+    /// nodes were drawn: two people editing one configuration should not each have
     /// to decide again that a payload nobody reads yet is on purpose. See
     /// [`Concern::key`].
     #[serde(
@@ -1566,8 +1566,8 @@ impl Document {
     /// The name with a hyphen and the first free number, or the next free
     /// number where it already ends in one: `i2c` becomes `i2c-1`, and `i2c-1`
     /// becomes `i2c-2` rather than `i2c-1-1`. The same shape of name the editor
-    /// gives a node it places -- see `tcs_gui::fresh_name` -- so a derived name
-    /// looks like a name and not like a repair.
+    /// gives a node it places -- see `tcs_cfge::fresh_name` -- so a derived
+    /// name looks like a name and not like a repair.
     ///
     /// Within the home of the node at `at`, since that is where it has to be
     /// free.
@@ -3386,7 +3386,7 @@ impl Document {
         let placed = self.placed_in(home);
         let here = self.aside_in(home);
         if !placed.is_empty() || !here.is_empty() {
-            out.push_str("    <tcs-gui>\n");
+            out.push_str("    <tcs-cfge>\n");
         }
         if !placed.is_empty() {
             out.push_str("        <nodes>\n");
@@ -3413,7 +3413,7 @@ impl Document {
             out.push_str("        </set-aside>\n");
         }
         if !placed.is_empty() || !here.is_empty() {
-            out.push_str("    </tcs-gui>\n");
+            out.push_str("    </tcs-cfge>\n");
         }
 
         out.push_str("</configuration>\n");
@@ -3422,10 +3422,10 @@ impl Document {
 
     /// The document as a configuration file.
     ///
-    /// Written in the shape `tcs-gui-design.rst` specifies: three sections of
+    /// Written in the shape `tcs-cfge-design.rst` specifies: three sections of
     /// nodes, each grouped by type, each node carrying its name, its attributes
     /// and the links that leave it. The canvas positions are written as well,
-    /// in a `tcs-gui` section at the end, under a key the flight software
+    /// in a `tcs-cfge` section at the end, under a key the flight software
     /// ignores, so that reopening the file finds the diagram as it was left.
     #[cfg(test)]
     pub fn to_yaml(&self) -> String {
@@ -3735,7 +3735,7 @@ impl Document {
         let placed = self.placed_in(home);
         let here = self.aside_in(home);
         if !placed.is_empty() || !here.is_empty() {
-            out.push_str("\ntcs-gui:\n");
+            out.push_str("\ntcs-cfge:\n");
         }
         if !placed.is_empty() {
             out.push_str("  nodes:\n");
@@ -4138,7 +4138,7 @@ fn escape(text: &str) -> String {
 /// A run of hyphens becomes one, which reads as the dash it was and is the
 /// smallest change that makes the file legal. It is a thing the XML spelling
 /// does not preserve, and is listed with the others in
-/// `docs/tcs-gui-design.rst`.
+/// `docs/tcs-cfge-design.rst`.
 ///
 /// # Arguments
 ///
@@ -4288,7 +4288,7 @@ fn xml_comment(out: &mut String, comment: Option<&str>, indent: usize) {
     }
 }
 
-/// The worked example from `tcs-gui-design.rst`: a zone thermostat.
+/// The worked example from `tcs-cfge-design.rst`: a zone thermostat.
 ///
 /// Built here rather than written out by hand in two formats, so that the
 /// shipped `tests/manual/thermostat.ytcs` and `.xtcs` are what this editor
@@ -6891,7 +6891,7 @@ mod tests {
     /// cannot quietly stop being what the program produces -- which is the
     /// failure that makes an example worse than none.
     ///
-    /// Set TCS_GUI_WRITE_EXAMPLE to regenerate them after a deliberate change
+    /// Set TCS_CFGE_WRITE_EXAMPLE to regenerate them after a deliberate change
     /// to the format.
     #[test]
     fn the_shipped_example_is_what_the_editor_writes() {
@@ -6910,7 +6910,7 @@ mod tests {
             let written =
                 document.to_text(&path).expect("a format this writes");
 
-            if std::env::var("TCS_GUI_WRITE_EXAMPLE").is_ok() {
+            if std::env::var("TCS_CFGE_WRITE_EXAMPLE").is_ok() {
                 std::fs::write(&path, &written)
                     .expect("the example is writable");
                 continue;
@@ -6918,7 +6918,7 @@ mod tests {
 
             let shipped = std::fs::read_to_string(&path).unwrap_or_else(|e| {
                 panic!(
-                    "{}: {e}. Run the tests with TCS_GUI_WRITE_EXAMPLE=1 to \
+                    "{}: {e}. Run the tests with TCS_CFGE_WRITE_EXAMPLE=1 to \
                      write the examples out",
                     path.display()
                 )

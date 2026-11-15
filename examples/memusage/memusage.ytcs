@@ -81,7 +81,7 @@ vehicle:
           - gateway.ping3
         moc-in: [gateway]
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: gateway, x: 34, y: 34 }
     - { node: ping1, x: 469, y: 34 }

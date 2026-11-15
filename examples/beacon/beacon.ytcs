@@ -47,6 +47,6 @@ payloads:
         address: "127.0.0.1:5101"
         protocol: "udp"
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: sensor, x: 34, y: 34 }

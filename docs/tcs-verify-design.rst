@@ -50,7 +50,7 @@ Requirement
     because no amount of finishing makes it work: it is most likely a
     misspelling, and the flight software would have nothing to open it as. The
     types are ``tcsprotocol::graph::types_in``, one list per section, which
-    the configuration schemas beside tcs-gui are tested against.
+    the configuration schemas beside tcs-cfge are tested against.
 
     The split changes no rule. The flight software refuses a configuration
     with any problem in it, warnings included: a sensor whose device nobody
@@ -196,7 +196,7 @@ Requirement
 
 Requirement
     The programs that check a file before running it -- tcspecial, tcs-moc,
-    tcs-sim and tcs-gui -- set no limit and keep warnings on, so they look at
+    tcs-sim and tcs-cfge -- set no limit and keep warnings on, so they look at
     everything, and show all of it in the order found, as tcs-verify prints
     it: a configuration is small, and a problem left out of what is shown is
     a problem somebody has to run something else to find.
@@ -219,7 +219,7 @@ Requirement
 Requirement
     Every program that reads these files asks tcsverify about them as it
     starts, before anything else is read from them, and says what it says in its
-    words: tcspecial, tcs-moc, tcs-sim and tcs-gui report the same problems,
+    words: tcspecial, tcs-moc, tcs-sim and tcs-cfge report the same problems,
     each with its file and line, as ``tcs-verify`` does for the same files. What
     a program then refuses for its own reasons -- tcs-sim a payload it has it
     cannot simulate, tcs-moc a configuration it does not control -- is said
@@ -237,7 +237,7 @@ Requirement
     window of its own, before the main window, and the main window opens only
     once that one has been closed -- or not at all, where what was found stops
     the program. tcs-moc and tcs-sim share the window
-    (``tcs-verify/ui/startup.slint``); tcs-gui's is the one that offers a fix
+    (``tcs-verify/ui/startup.slint``); tcs-cfge's is the one that offers a fix
     for each problem, and lists beside its own faults whatever else tcs-verify
     finds, warnings included. Everything is said on stderr as well.
 

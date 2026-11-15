@@ -4834,22 +4834,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tcs-conflict"
-version = "0.1.0"
-dependencies = [
- "tcsverify",
- "tempfile",
-]
-
-[[package]]
-name = "tcs-diagram"
-version = "0.1.0"
-dependencies = [
- "tcsprotocol",
-]
-
-[[package]]
-name = "tcs-gui"
+name = "tcs-cfge"
 version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
@@ -4870,6 +4855,21 @@ dependencies = [
  "tcsprotocol",
  "tcsverify",
  "tempfile",
+]
+
+[[package]]
+name = "tcs-conflict"
+version = "0.1.0"
+dependencies = [
+ "tcsverify",
+ "tempfile",
+]
+
+[[package]]
+name = "tcs-diagram"
+version = "0.1.0"
+dependencies = [
+ "tcsprotocol",
 ]
 
 [[package]]

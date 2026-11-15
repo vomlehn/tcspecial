@@ -18,7 +18,7 @@ them (`graph`), and every program that opens one reads it through this crate:
 
 - tcspecial runs it aboard.
 - tcs-moc and tcs-sim build their panels from it.
-- tcs-gui edits it.
+- tcs-cfge edits it.
 - tcs-verify checks it.
 
 So no program reads a file in a way of its own, and the error a person sees in
@@ -89,7 +89,7 @@ itself is `tcspecial`.
 ## Who uses it
 
 Every crate in the workspace that has anything to do with the link or a
-configuration: tcspecial, tcsmoc, tcs-moc, tcs-sim, tcs-gui and tcs-verify,
+configuration: tcspecial, tcsmoc, tcs-moc, tcs-sim, tcs-cfge and tcs-verify,
 and `examples/beacon`.
 
 ## Building and testing

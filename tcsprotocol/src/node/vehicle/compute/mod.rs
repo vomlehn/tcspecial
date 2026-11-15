@@ -887,7 +887,7 @@ pub fn functions() -> &'static str {
 ///
 /// The list every computation is held to: `params_of` refuses an attribute
 /// that is not on it, and this is the same list said out loud so that a tool
-/// can ask. tcs-gui's description tree is what asks -- a description of a
+/// can ask. tcs-cfge's description tree is what asks -- a description of a
 /// computation names the attributes its panel offers, and a test holds those
 /// against this -- because a description that asked for something else would
 /// be a panel filling in a field the checking then refuses.

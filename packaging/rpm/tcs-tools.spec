@@ -4,7 +4,7 @@ Summary:        Configuration editor and checker for tcspecial
 Group:          Applications/Engineering
 # tcs_ui shows what tcsmoc's beacon code works out, and imports it.
 Requires:       tcsmoc = %{version}-%{release}
-# The windows open through libraries loaded when tcs-gui runs, which
+# The windows open through libraries loaded when tcs-cfge runs, which
 # RPM cannot see that it needs: the keyboard, X11 or Wayland, EGL and
 # OpenGL. The .deb names the same ones.
 Requires:       libxkbcommon.so.0()(64bit)
@@ -19,14 +19,14 @@ Requires:       libGL.so.1()(64bit)
 Requires:       libwayland-client.so.0()(64bit)
 Requires:       libwayland-egl.so.1()(64bit)
 Recommends:     python3-tkinter
-# tcs-gui was tcspecial-moc's, which tcsmoc obsoletes; tcs-verify, the test
+# tcs-cfge was tcspecial-moc's, which tcsmoc obsoletes; tcs-verify, the test
 # apps and the examples were tcspecial's. Every one of them built was 0.1.0.
 Obsoletes:      tcspecial-moc < 0.1.1
 Conflicts:      tcspecial < 0.1.1
 
 %description
 The software tools that write and check tcspecial's configurations:
-tcs-gui, the graphical configuration editor, with its node descriptions;
+tcs-cfge, the graphical configuration editor, with its node descriptions;
 tcs-verify, which says what is wrong with a configuration without running
 any of it; tcs-conflict, which says whether two configurations can be run
 at once; and tcs_ui, the Python window pieces the examples' ground
@@ -80,12 +80,12 @@ fi
 %dir /opt/tcs/lib/python3/site-packages
 %dir /opt/tcs/share
 %dir /opt/tcs/share/doc
-/opt/tcs/bin/tcs-gui
+/opt/tcs/bin/tcs-cfge
 /opt/tcs/bin/tcs-verify
 /opt/tcs/bin/tcs-conflict
 /opt/tcs/lib/python3/site-packages/tcs_ui
 /opt/tcs/lib/python3/site-packages/tcs_ui-%{version}.dist-info
-/opt/tcs/share/tcs-gui
+/opt/tcs/share/tcs-cfge
 %doc /opt/tcs/share/doc/tcs-tools
 %config(noreplace) /etc/profile.d/tcs-tools.sh
 /opt/tcs/sbin/tcs-tools-links

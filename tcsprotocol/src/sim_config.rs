@@ -1508,16 +1508,16 @@ pub struct SimConfigFile {
     pub simulated_payloads: Vec<SimPayload>,
     /// What the editor arranged: where each physics component was drawn.
     ///
-    /// Here, and not in a configuration's own `tcs-gui` section, because the
+    /// Here, and not in a configuration's own `tcs-cfge` section, because the
     /// physics is this file's: two configurations that share one simulator
     /// file share its world, and should be shown one drawing of it. Last in
     /// the file for the reason a configuration's is, being about a screen
-    /// and not the vehicle. See [`SimTcsGui`].
-    #[serde(default, rename = "tcs-gui")]
-    pub tcs_gui: Option<SimTcsGui>,
+    /// and not the vehicle. See [`SimTcsCfge`].
+    #[serde(default, rename = "tcs-cfge")]
+    pub tcs_cfge: Option<SimTcsCfge>,
 }
 
-/// The simulator file's `tcs-gui` section.
+/// The simulator file's `tcs-cfge` section.
 ///
 /// A component named here and nowhere else is a position left behind by a
 /// component somebody deleted: kept rather than refused, as a
@@ -1527,7 +1527,7 @@ pub struct SimConfigFile {
 /// name.
 #[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct SimTcsGui {
+pub struct SimTcsCfge {
     /// Where each component was drawn, by name, written as a
     /// configuration's nodes are: `- { node: zone, x: -160, y: 34 }`.
     #[serde(default, deserialize_with = "crate::graph::grouped::layout")]
@@ -1537,7 +1537,7 @@ pub struct SimTcsGui {
     /// under none is drawn on the top page.
     ///
     /// A list beside `nodes` rather than a key in each of its entries, whose
-    /// shape is a configuration's own `tcs-gui` section's and read by the one
+    /// shape is a configuration's own `tcs-cfge` section's and read by the one
     /// reader of both: a page is something only a component has.
     #[serde(default)]
     pub pages: std::collections::BTreeMap<String, Vec<String>>,
@@ -4754,45 +4754,45 @@ physics:
     }
 
     /// Which subdiagram's page each component is drawn on is read from the
-    /// `tcs-gui` section, by page; none is no page.
+    /// `tcs-cfge` section, by page; none is no page.
     #[test]
-    fn the_physics_pages_are_read_from_the_tcs_gui_section() {
+    fn the_physics_pages_are_read_from_the_tcs_cfge_section() {
         let file = parse(
-            "tcs-gui:\n  nodes:\n    - { node: zone, x: -160, y: 34 }\n  \
+            "tcs-cfge:\n  nodes:\n    - { node: zone, x: -160, y: 34 }\n  \
              pages:\n    thermostat-common: [zone, heater_1]\n",
         );
-        let pages = file.tcs_gui.expect("a tcs-gui section").pages;
+        let pages = file.tcs_cfge.expect("a tcs-cfge section").pages;
         assert_eq!(pages["thermostat-common"], ["zone", "heater_1"]);
-        let file = parse("tcs-gui:\n  nodes: []\n");
-        assert!(file.tcs_gui.expect("a tcs-gui section").pages.is_empty());
+        let file = parse("tcs-cfge:\n  nodes: []\n");
+        assert!(file.tcs_cfge.expect("a tcs-cfge section").pages.is_empty());
     }
 
     /// Where the editor drew each physics component is read from the
-    /// `tcs-gui` section, a position for a component the world has not is
+    /// `tcs-cfge` section, a position for a component the world has not is
     /// kept, and a position that is not two whole numbers is refused, named.
     #[test]
-    fn the_physics_positions_are_read_from_the_tcs_gui_section() {
+    fn the_physics_positions_are_read_from_the_tcs_cfge_section() {
         let file = parse(
-            "tcs-gui:\n  nodes:\n    - { node: zone, x: -160, y: 34 }\n    \
+            "tcs-cfge:\n  nodes:\n    - { node: zone, x: -160, y: 34 }\n    \
              - { node: gone, x: -160, y: 98 }\n",
         );
-        let placed = file.tcs_gui.expect("a tcs-gui section").nodes;
+        let placed = file.tcs_cfge.expect("a tcs-cfge section").nodes;
         assert_eq!(placed.len(), 2);
         assert_eq!(
             (placed[0].name.as_str(), placed[0].x, placed[0].y),
             ("zone", -160, 34)
         );
-        assert!(parse("description: none\n").tcs_gui.is_none());
+        assert!(parse("description: none\n").tcs_cfge.is_none());
 
         let why = SimConfigFile::parse(
-            "tcs-gui:\n  nodes:\n    - { node: zone, x: left, y: 34 }\n",
+            "tcs-cfge:\n  nodes:\n    - { node: zone, x: left, y: 34 }\n",
             ConfigFormat::Yaml,
         )
         .expect_err("not a number")
         .to_string();
         assert!(why.contains("zone") && why.contains("left"), "{why}");
         let why = SimConfigFile::parse(
-            "tcs-gui:\n  places: []\n",
+            "tcs-cfge:\n  places: []\n",
             ConfigFormat::Yaml,
         )
         .expect_err("not a key the section has")

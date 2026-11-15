@@ -148,9 +148,9 @@ fn the_python_counts_payload_telemetry_apids_as_the_rust_does() {
         \x20           </payload>\n\
         \x20       </type>\n\
         \x20   </payloads>\n\
-        \x20   <tcs-gui>";
-    assert_eq!(text.matches("    <tcs-gui>").count(), 1, "one tcs-gui");
-    let text = text.replace("    <tcs-gui>", payloads);
+        \x20   <tcs-cfge>";
+    assert_eq!(text.matches("    <tcs-cfge>").count(), 1, "one tcs-cfge");
+    let text = text.replace("    <tcs-cfge>", payloads);
     // In a directory of its own, with the file it includes beside it, as in
     // `examples`.
     let dir = tempfile::tempdir().expect("a directory");

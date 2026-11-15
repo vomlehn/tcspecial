@@ -1,4 +1,4 @@
-//! What tcs-gui remembers between sessions, and writing it down.
+//! What tcs-cfge remembers between sessions, and writing it down.
 //!
 //! What the settings are and how the file is read are tcs-diagram's, which
 //! tcspecial's visual window reads the same file with -- see
@@ -21,7 +21,7 @@ pub fn directory() -> Option<std::path::PathBuf> {
     let directory = home()?;
     if let Err(why) = std::fs::create_dir_all(&directory) {
         eprintln!(
-            "tcs-gui: {} cannot be made, so settings will not be kept: {why}",
+            "tcs-cfge: {} cannot be made, so settings will not be kept: {why}",
             directory.display()
         );
         return None;
@@ -86,7 +86,7 @@ pub fn save(settings: Settings) {
     if let Err(why) =
         crate::save::write_atomically(&path, written(&kept).as_bytes())
     {
-        eprintln!("tcs-gui: {} cannot be written: {why}", path.display());
+        eprintln!("tcs-cfge: {} cannot be written: {why}", path.display());
     }
 }
 
@@ -104,11 +104,11 @@ mod tests {
         std::env::set_var("HOME", where_.path());
 
         let path = path().expect("a settings path");
-        assert_eq!(path, where_.path().join(".tcs-gui/preferences.xml"));
+        assert_eq!(path, where_.path().join(".tcs-cfge/preferences.xml"));
         // Made on the way in, before anything is written.
         directory();
         assert!(
-            where_.path().join(".tcs-gui").is_dir(),
+            where_.path().join(".tcs-cfge").is_dir(),
             "the directory should be made automatically"
         );
 
@@ -140,7 +140,7 @@ mod tests {
         // already arranged: with only the old name there, the old name is
         // read and the new one is written from it.
         std::fs::remove_file(&path).expect("the file goes");
-        let older = where_.path().join(".tcs-gui/config.xml");
+        let older = where_.path().join(".tcs-cfge/config.xml");
         std::fs::write(
             &older,
             concat!(

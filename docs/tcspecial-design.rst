@@ -84,7 +84,7 @@ Everything else is code a mission never depends on while it operates,
 used on a desk or a test bench. It is of five kinds, by what it is for:
 
 * **Software tools** make or check what operational code is built from or
-  loads: tcs-gui, the configuration editor; tcs-verify, the configuration
+  loads: tcs-cfge, the configuration editor; tcs-verify, the configuration
   checker as a program; the tcs-xtce compiler; tcs-xtcee, the XTCE editor;
   and the pieces they are drawn with, tcs-diagram and tcs-ui.
 * **Verification tools** are used only for testing: tcs-sim, the payload
@@ -101,7 +101,7 @@ Requirement
     name starts with it, ``tcs`` otherwise -- and look at what follows. A
     letter, or nothing, names operational code: ``tcspecial``, ``tcsmoc``,
     ``tcsprotocol``, ``tcslog``, ``tcslogc``. A hyphen or an underscore
-    names code that is not operational: ``tcs-gui``, ``tcs-verify``,
+    names code that is not operational: ``tcs-cfge``, ``tcs-verify``,
     ``tcs_xtce``, ``tcslog-tools``. A name says nothing of whether
     operational code is vehicle code or MOC code, nor which of the other
     five kinds the rest is; this document does, and each project's
@@ -1274,7 +1274,7 @@ sized from the configuration they read; every shipped configuration that
 says ``string`` or ``bytes`` given its most, in both spellings, and every
 digest written down from them made again -- each one changes, which the
 release's new minor version says, so nothing older is expected to load them;
-tcs-gui; the manual's and the node-types guide's 4,096; and tests: a string
+tcs-cfge; the manual's and the node-types guide's 4,096; and tests: a string
 at its most, at the gateway's most and one past it, over IPv4 and IPv6, a
 lock refused under each configuration a start may load, with and without
 simulation, a datum from the ground too long for its terminal, ``string``
@@ -2991,7 +2991,7 @@ with the rest of the software, cannot fail to start, and cost nothing to call.
 
 The ``thermostat`` was called ``hysteresis``, after how it switches rather
 than what it is for, and ``thermostat`` is the word a reader looks for in
-tcs-gui's list. It is the same computation wherever it switches: the battery
+tcs-cfge's list. It is the same computation wherever it switches: the battery
 example's ``shedding`` is a thermostat on the charge.
 
 Requirement
@@ -3494,7 +3494,7 @@ To build it, in order:
    segment files, and tcslog-tools likewise; tcs-moc's rows; the F´ model's
    channels and the bridge that writes them; each input in the
    configuration's own XTCE as the parameter it is now; ``tcs-verify
-   --summary``, with each input also linked to a gateway; and tcs-gui, which
+   --summary``, with each input also linked to a gateway; and tcs-cfge, which
    draws it and edits its attributes and ``max_consolidator_inputs``.
 4. The node-types guide, an example in both spellings, and tests: an input
    that never arrives; one that arrives twice between sends; inputs arriving
@@ -3535,7 +3535,7 @@ ground may set. Each consolidator's layout is worked out once, with the
 routing (``Routes::consolidation_of``). ``runtime::system``'s tests drive
 one through passes -- every input new, nothing new, the interval with one
 new and one held, a boolean refused -- and hold a running one to allocating
-nothing; tcs-gui describes it.
+nothing; tcs-cfge describes it.
 
 **Built** (2026-11-15), the counters: ``QUERY_CONSOLIDATOR``, opcode
 ``0x36`` on the node link (``commands::ConsolidatorCommand``,
@@ -5164,8 +5164,8 @@ a configuration that breaks it is refused before it flies.
 ``tcsprotocol::graph::Graph::load`` is the reader, and the Python ground
 reader, ``python/tcsprotocol/configuration.py``, follows includes by the
 same rules, so that the two count a node's device id among the same names. How
-tcs-gui opens and writes an included file is in the `tcs-gui design
-<tcs-gui-design.html#subdiagrams>`__.
+tcs-cfge opens and writes an included file is in the `tcs-cfge design
+<tcs-cfge-design.html#subdiagrams>`__.
 
 A small vehicle needs no split and should not have one. Where a split earns its
 place, the useful seam is who owns a file and how often it changes, not what
@@ -5191,9 +5191,9 @@ performs them again aboard. One command, on one file:
 .. code-block:: console
 
    $ tcs-verify tests/manual/thermostat.ytcs
-   $ make verify TCS_GUI_FILE=tests/manual/thermostat.ytcs
+   $ make verify TCS_CFGE_FILE=tests/manual/thermostat.ytcs
 
-``TCS_GUI_FILE`` is the same variable the editor takes, so checking what was
+``TCS_CFGE_FILE`` is the same variable the editor takes, so checking what was
 just edited is the same name in both commands: ``make runguiy`` and ``make
 runguix`` open it as YAML and as XML, one target per spelling as the
 ``runmocy`` and ``runmocx`` pair is, and ``make verify`` checks the file the
@@ -5223,7 +5223,7 @@ These are the checks:
   for exactly what the flight software would refuse it for -- and refused on a
   desk rather than when the vehicle tries to open it. This is also what lets
   the editor be lazy about what has been filled in: see `The editor is lazy
-  <tcs-gui-design.html#the-editor-is-lazy>`__.
+  <tcs-cfge-design.html#the-editor-is-lazy>`__.
 * the configuration says what tcspecial itself is configured with. The
   ``tcspecial`` section -- where commands are taken, where beacons go, where
   the telemetry log is written -- is required of every configuration, and
@@ -5266,9 +5266,9 @@ These are the checks:
   of them. A source whose record length the configuration does not state --
   every computation -- can feed a variable-length log and not a fixed one.
 
-How tcs-gui holds a configuration to these rules while it is being drawn --
+How tcs-cfge holds a configuration to these rules while it is being drawn --
 what it reads, writes and checks, and why it asks for nothing to be entered
--- is in the `tcs-gui design <tcs-gui-design.html>`__.
+-- is in the `tcs-cfge design <tcs-cfge-design.html>`__.
 
 Example: a zone thermostat
 ---------------------------
@@ -8544,7 +8544,7 @@ Requirement
     A feature includes or leaves out that type's module in
     ``tcspecial::node::payload`` and nothing else. The rules for the type in
     ``tcsprotocol::node`` are built whatever tcspecial is built with:
-    tcs-verify and tcs-gui run on the ground and check configurations for any
+    tcs-verify and tcs-cfge run on the ground and check configurations for any
     vehicle, so what a configuration may say about a type cannot depend on how
     one vehicle's tcspecial was built. Tcs-sim is built with every type, since
     it runs on a development host and not on the target.
@@ -8783,7 +8783,7 @@ where each row comes from.
 
 The Visual Window
 -----------------
-A configuration is a drawing in tcs-gui and a running process in tcspecial, and
+A configuration is a drawing in tcs-cfge and a running process in tcspecial, and
 nothing showed the one as the other: what a vehicle on a desk was doing could
 be read only from its logs and from the ground station's panels. The visual
 window draws the running graph as the editor draws the configuration and lights
@@ -8810,10 +8810,10 @@ Requirement
     depend on how the binary was built.
 
 Requirement
-    The window shows the three working panes as tcs-gui shows them, with every
-    node of the top file where tcs-gui would place it and every link along the
-    route tcs-gui gives it. Where the panes are divided is the person's own
-    tcs-gui setting, read and never written, and the nodes are settled into
+    The window shows the three working panes as tcs-cfge shows them, with every
+    node of the top file where tcs-cfge would place it and every link along the
+    route tcs-cfge gives it. Where the panes are divided is the person's own
+    tcs-cfge setting, read and never written, and the nodes are settled into
     their panes by the rule the editor settles a file it opens with. Each
     file the top file includes is drawn on the top page as the editor draws
     it, a subdiagram's box saying how many nodes it holds and how many lines
@@ -8821,7 +8821,7 @@ Requirement
 
 Requirement
     Each subdiagram has a window of its own, open from the start beside the
-    top file's and drawn as tcs-gui draws the subdiagram's page: its nodes,
+    top file's and drawn as tcs-cfge draws the subdiagram's page: its nodes,
     its edge in a margin either side with the terminals a line from another
     file crosses by, a node outside it drawn at that edge, and the Physics
     pane holding the components the editor put on that page. Its links are
@@ -8832,7 +8832,7 @@ Requirement
     the shapes, the routes, the colours, the panes -- is the crate
     ``tcs-diagram``, Rust that produces paths, sizes and colours and the
     markup ``tcs-diagram/ui/diagram.slint`` that paints them, and both
-    tcs-gui and tcspecial draw with it. Two copies of the drawing would be two
+    tcs-cfge and tcspecial draw with it. Two copies of the drawing would be two
     answers to where a node is.
 
 Requirement
@@ -8842,7 +8842,7 @@ Requirement
     colour still says which way the data is travelling -- and the wide line is
     taken away ``LINE_BLINK`` after the datum was sent: 0.25 seconds,
     ``tcspecial::visual::LINE_BLINK``. The ordinary line is drawn whether or
-    not the wide one is, on top of it, exactly as tcs-gui draws it.
+    not the wide one is, on top of it, exactly as tcs-cfge draws it.
 
 Requirement
     The window takes no press: a node is not dragged, a terminal draws no
@@ -8864,7 +8864,7 @@ Requirement
     ``LINE_BLINK``. A delivery says which line of the drawing it travelled by
     the line's place among the configuration's links counted one per
     destination, by the node each leaves and then by where it goes, which is
-    the order tcs-gui draws them in.
+    the order tcs-cfge draws them in.
 
 tcsmoc
 ----------
@@ -11329,17 +11329,17 @@ Other names and the naming rule
     things stand, and could be brought in later:
 
     * **Installed directories and data files**: ``/opt/tcs/share/tcspecial``,
-      ``/etc/opt/tcs/tcspecial``, tcs-gui's data under ``/opt/tcs/share``,
+      ``/etc/opt/tcs/tcspecial``, tcs-cfge's data under ``/opt/tcs/share``,
       and the directories the programs keep their state in. Most are named
       after their project or program now.
-    * **Configuration sections and keys**: ``tcs-gui:`` and ``tcs-sim:`` in
+    * **Configuration sections and keys**: ``tcs-cfge:`` and ``tcs-sim:`` in
       a simulator file, which are named after the programs that read them.
-    * **Environment variables**: ``TCS_GUI_FILE``, ``TCS_TCSPECIAL_LOG``,
+    * **Environment variables**: ``TCS_CFGE_FILE``, ``TCS_TCSPECIAL_LOG``,
       ``TCS_CFS_CONFIGURATION`` and the rest, which, being upper case and
       joined by underscores, cannot show a hyphen at all, so the rule could
       only reach them through another spelling of its own.
     * **systemd units**: ``tcspecial.service``.
-    * **Documents**: ``docs/tcs-gui.rst``, ``docs/tcspecial-design.rst`` and
+    * **Documents**: ``docs/tcs-cfge.rst``, ``docs/tcspecial-design.rst`` and
       the rest, named after the program or project each describes.
 
     Each would want to say, as the rule does for a library, whether what it

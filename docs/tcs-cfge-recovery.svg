@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-labelledby="title desc">
-  <title id="title">How tcs-gui recovers an earlier session</title>
-  <desc id="desc">As tcs-gui opens a configuration it looks for the undo history of an earlier session on it, which is there only when that session did not end cleanly. With no history, the session starts with an empty one. With one, every file of the configuration is held to the digest the history keeps for it. If every file matches, the history becomes this session's, so Undo reaches back past the crash, and every edit the files do not have is put back at once and written if Autosave is on; the bar says how many edits were put back. If any file has been changed by something else, or the history keeps no digests, the history is discarded and the bar says so; the files are left as they are.</desc>
+  <title id="title">How tcs-cfge recovers an earlier session</title>
+  <desc id="desc">As tcs-cfge opens a configuration it looks for the undo history of an earlier session on it, which is there only when that session did not end cleanly. With no history, the session starts with an empty one. With one, every file of the configuration is held to the digest the history keeps for it. If every file matches, the history becomes this session's, so Undo reaches back past the crash, and every edit the files do not have is put back at once and written if Autosave is on; the bar says how many edits were put back. If any file has been changed by something else, or the history keeps no digests, the history is discarded and the bar says so; the files are left as they are.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; font-size: 13px; fill: #111827; }
@@ -18,7 +18,7 @@
 
   <!-- Start -->
   <rect class="step" x="230" y="16" width="300" height="44" rx="22"/>
-  <text x="380" y="43" text-anchor="middle">tcs-gui opens a configuration</text>
+  <text x="380" y="43" text-anchor="middle">tcs-cfge opens a configuration</text>
   <path class="flow" d="M380,60 L380,88"/>
 
   <!-- First question -->

@@ -123,7 +123,7 @@
             </payload>
         </type>
     </payloads>
-    <tcs-gui>
+    <tcs-cfge>
         <nodes>
             <node name="hull_kelvin_1" x="299" y="336"/>
             <node name="hull_kelvin_2" x="299" y="412"/>
@@ -133,5 +133,5 @@
             <node name="hull_temp_2" x="34" y="412"/>
             <node name="hull_temp_3" x="34" y="488"/>
         </nodes>
-    </tcs-gui>
+    </tcs-cfge>
 </configuration>

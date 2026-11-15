@@ -892,7 +892,7 @@ values:
     /// would put it, then edited, is written once.
     ///
     /// What the thermostat example's file did: its subdiagram's box was
-    /// first in the `tcs-gui` section, where a name that began with `../`
+    /// first in the `tcs-cfge` section, where a name that began with `../`
     /// had sorted it, and the editor puts it last, by the name it has now.
     /// The merge took the author's line, which the edit had not touched,
     /// and the edit's line, and wrote the box's place twice, which no
@@ -901,9 +901,9 @@ values:
     fn an_entry_the_author_put_elsewhere_is_written_once() {
         let xml = |first: &str, last: &str| {
             format!(
-                "<configuration>\n    <tcs-gui>\n        <nodes>\n\
+                "<configuration>\n    <tcs-cfge>\n        <nodes>\n\
                  {first}            <node name=\"gateway\" x=\"790\" \
-                 y=\"34\"/>\n{last}        </nodes>\n    </tcs-gui>\n\
+                 y=\"34\"/>\n{last}        </nodes>\n    </tcs-cfge>\n\
                  </configuration>\n"
             )
         };
@@ -928,7 +928,7 @@ values:
 
         let yaml = |first: &str, last: &str| {
             format!(
-                "tcs-gui:\n  nodes:\n{first}    - {{ node: gateway, x: 790, \
+                "tcs-cfge:\n  nodes:\n{first}    - {{ node: gateway, x: 790, \
                  y: 34 }}\n{last}"
             )
         };

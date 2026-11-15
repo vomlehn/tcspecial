@@ -32,11 +32,11 @@ about what it adds.
 
 .. figure:: shots/vehicle-stage-09.png
    :width: 100%
-   :alt: tcs-gui showing the finished deck: the top file, with two subsystem
+   :alt: tcs-cfge showing the finished deck: the top file, with two subsystem
          boxes, science and thermal, the camera, and the gateway node, joined
          by lines to the gateway.
 
-   Where the guide ends: the deck of stage 9 as tcs-gui draws it, its two
+   Where the guide ends: the deck of stage 9 as tcs-cfge draws it, its two
    subsystems collapsed into boxes, the camera beside them, and every line
    ending at the gateway node.
 
@@ -94,7 +94,7 @@ science computer that sends each reading over UDP of its own accord.
 .. include:: building-a-vehicle/stage-01/deck.ytcs
    :literal:
    :start-after: payloads:
-   :end-before: tcs-gui:
+   :end-before: tcs-cfge:
 
 Nothing is drawn from the seismometer to anywhere, so tcspecial sends what it
 reads straight to the ground over the ``tcspecial`` section's
@@ -105,10 +105,10 @@ and the ground hears it on 127.0.0.1:6100.
 
 .. figure:: shots/vehicle-stage-01.png
    :width: 100%
-   :alt: tcs-gui showing one network payload, seismometer, in the Payloads
+   :alt: tcs-cfge showing one network payload, seismometer, in the Payloads
          column, with no lines.
 
-   Stage 1 in tcs-gui: one payload, nothing drawn from it.
+   Stage 1 in tcs-cfge: one payload, nothing drawn from it.
 
 Check it, then run it:
 
@@ -131,7 +131,7 @@ It is asked once a second, by its own ``trigger_interval``.
 .. include:: building-a-vehicle/stage-02/deck.ytcs
    :literal:
    :start-after:   - type serial:
-   :end-before: tcs-gui:
+   :end-before: tcs-cfge:
 
 The simulator file gains a device for it too, a pseudo-terminal at
 ``/tmp/tcs-deck-regolith`` that answers when asked.
@@ -154,7 +154,7 @@ vehicle`_) lists every port a configuration uses.
 
 .. figure:: shots/vehicle-stage-02.png
    :width: 100%
-   :alt: tcs-gui showing two payloads, seismometer and regolith_thermometer,
+   :alt: tcs-cfge showing two payloads, seismometer and regolith_thermometer,
          with no lines.
 
    Stage 2: two payloads, each still reporting straight to the ground.
@@ -205,7 +205,7 @@ one place to receive everything from:
 
 .. figure:: shots/vehicle-stage-03.png
    :width: 100%
-   :alt: tcs-gui showing the thermometer feeding regolith_kelvin, and
+   :alt: tcs-cfge showing the thermometer feeding regolith_kelvin, and
          regolith_kelvin and the seismometer feeding the gateway node.
 
    Stage 3: the first computation, and the gateway node on the right.
@@ -238,16 +238,16 @@ the vehicle runs:
 .. include:: building-a-vehicle/stage-04/deck.ytcs
    :literal:
    :start-after:           - regolith_kelvin.regolith_thermometer
-   :end-before: tcs-gui:
+   :end-before: tcs-cfge:
 
 .. figure:: shots/vehicle-stage-04.png
    :width: 100%
-   :alt: tcs-gui showing probe_thermostat fed by regolith_kelvin, with a line
+   :alt: tcs-cfge showing probe_thermostat fed by regolith_kelvin, with a line
          from its lower left back to probe_heater.
 
    Stage 4: the thermostat's decision travelling back to the heater.
 
-From here on tcs-gui's toolbar says *2 concerns*. A concern is a shape that
+From here on tcs-cfge's toolbar says *2 concerns*. A concern is a shape that
 may be a mistake and may be meant, never something that stops the
 configuration being read or flown, and these two are meant:
 
@@ -319,7 +319,7 @@ the failed sensor's own reading goes astray.
 
 .. figure:: shots/vehicle-stage-06.png
    :width: 100%
-   :alt: tcs-gui showing three hull_temp payloads, each feeding a hull_kelvin
+   :alt: tcs-cfge showing three hull_temp payloads, each feeding a hull_kelvin
          conversion, the three conversions feeding hull_temp, and everything
          reaching the gateway.
 
@@ -353,10 +353,10 @@ node is known by its name in every file.
 
 .. figure:: shots/vehicle-stage-07.png
    :width: 100%
-   :alt: tcs-gui showing two subdiagram boxes, science and thermal, each with
+   :alt: tcs-cfge showing two subdiagram boxes, science and thermal, each with
          several lines to the gateway node.
 
-   Stage 7: the same graph as stage 6, drawn as tcs-gui draws included
+   Stage 7: the same graph as stage 6, drawn as tcs-cfge draws included
    files: a box each, whose corners are its exports.
 
 Two vehicles may include one file, as the thermostat examples share
@@ -403,7 +403,7 @@ other node:
 .. include:: building-a-vehicle/stage-09/deck.ytcs
    :literal:
    :start-after:   - type app_pl:
-   :end-before: tcs-gui:
+   :end-before: tcs-cfge:
 
 The program is joined to tcspecial by three file interfaces it inherits, so
 a program in any language that can read its standard input can take part:
@@ -425,12 +425,12 @@ checks its own.
 
 .. figure:: shots/vehicle-stage-09.png
    :width: 100%
-   :alt: tcs-gui showing the science and thermal boxes and the camera, all
+   :alt: tcs-cfge showing the science and thermal boxes and the camera, all
          reaching the gateway.
 
    Stage 9: the whole deck.
 
-tcs-gui draws each included file as a box, which is the right size for
+tcs-cfge draws each included file as a box, which is the right size for
 editing and the wrong one for seeing what reaches what. Opened, the deck is
 this:
 
@@ -578,7 +578,7 @@ Where to go next
 * The `tcspecial manual <tcspecial.html>`__, for every payload type and
   attribute.
 * `Writing node types <node-types.html>`__, for what no shipped type does.
-* The `tcs-gui manual <tcs-gui.html>`__, for drawing and editing the
+* The `tcs-cfge manual <tcs-cfge.html>`__, for drawing and editing the
   configuration.
 * The `examples <../examples/README.html>`__, which the stages drew on.
 
@@ -590,7 +590,7 @@ How this guide is kept true
   simulator file, holds the two spellings to each other, and checks each
   names the interface of the build; ``make set-interfaces`` and ``make
   comparespellings`` take in the stages with the examples.
-* The tcs-gui drawings are made by ``docs/building-a-vehicle/screenshots.sh``,
-  which opens each stage in tcs-gui on an X display of its own and captures
+* The tcs-cfge drawings are made by ``docs/building-a-vehicle/screenshots.sh``,
+  which opens each stage in tcs-cfge on an X display of its own and captures
   it. The other figures are SVG drawn by hand, their colours the Okabe-Ito
   palette's, each paired with a label, a shape or a line style.

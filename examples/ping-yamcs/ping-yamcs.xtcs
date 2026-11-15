@@ -80,10 +80,10 @@
             </gateway>
         </type>
     </gateways>
-    <tcs-gui>
+    <tcs-cfge>
         <nodes>
             <node name="ping-common" x="34" y="34"/>
             <node name="gateway" x="469" y="34"/>
         </nodes>
-    </tcs-gui>
+    </tcs-cfge>
 </configuration>

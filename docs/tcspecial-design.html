@@ -660,7 +660,7 @@ vehicle and in the MOC alike.</p>
 used on a desk or a test bench. It is of five kinds, by what it is for:</p>
 <ul class="simple">
 <li><strong>Software tools</strong> make or check what operational code is built from or
-loads: tcs-gui, the configuration editor; tcs-verify, the configuration
+loads: tcs-cfge, the configuration editor; tcs-verify, the configuration
 checker as a program; the tcs-xtce compiler; tcs-xtcee, the XTCE editor;
 and the pieces they are drawn with, tcs-diagram and tcs-ui.</li>
 <li><strong>Verification tools</strong> are used only for testing: tcs-sim, the payload
@@ -678,7 +678,7 @@ documents.</li>
 name starts with it, <tt class="docutils literal">tcs</tt> otherwise -- and look at what follows. A
 letter, or nothing, names operational code: <tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal">tcsmoc</tt>,
 <tt class="docutils literal">tcsprotocol</tt>, <tt class="docutils literal">tcslog</tt>, <tt class="docutils literal">tcslogc</tt>. A hyphen or an underscore
-names code that is not operational: <tt class="docutils literal"><span class="pre">tcs-gui</span></tt>, <tt class="docutils literal"><span class="pre">tcs-verify</span></tt>,
+names code that is not operational: <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt>, <tt class="docutils literal"><span class="pre">tcs-verify</span></tt>,
 <tt class="docutils literal">tcs_xtce</tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>. A name says nothing of whether
 operational code is vehicle code or MOC code, nor which of the other
 five kinds the rest is; this document does, and each project's
@@ -1778,7 +1778,7 @@ sized from the configuration they read; every shipped configuration that
 says <tt class="docutils literal">string</tt> or <tt class="docutils literal">bytes</tt> given its most, in both spellings, and every
 digest written down from them made again -- each one changes, which the
 release's new minor version says, so nothing older is expected to load them;
-tcs-gui; the manual's and the node-types guide's 4,096; and tests: a string
+tcs-cfge; the manual's and the node-types guide's 4,096; and tests: a string
 at its most, at the gateway's most and one past it, over IPv4 and IPv6, a
 lock refused under each configuration a start may load, with and without
 simulation, a datum from the ground too long for its terminal, <tt class="docutils literal">string</tt>
@@ -3442,7 +3442,7 @@ flights need it. These are the ones to prefer. They are written in Rust, tested
 with the rest of the software, cannot fail to start, and cost nothing to call.</p>
 <p>The <tt class="docutils literal">thermostat</tt> was called <tt class="docutils literal">hysteresis</tt>, after how it switches rather
 than what it is for, and <tt class="docutils literal">thermostat</tt> is the word a reader looks for in
-tcs-gui's list. It is the same computation wherever it switches: the battery
+tcs-cfge's list. It is the same computation wherever it switches: the battery
 example's <tt class="docutils literal">shedding</tt> is a thermostat on the charge.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
@@ -3903,7 +3903,7 @@ unpack a datum into its inputs and their states, live and from a log's
 segment files, and tcslog-tools likewise; tcs-moc's rows; the F´ model's
 channels and the bridge that writes them; each input in the
 configuration's own XTCE as the parameter it is now; <tt class="docutils literal"><span class="pre">tcs-verify</span>
-<span class="pre">--summary</span></tt>, with each input also linked to a gateway; and tcs-gui, which
+<span class="pre">--summary</span></tt>, with each input also linked to a gateway; and tcs-cfge, which
 draws it and edits its attributes and <tt class="docutils literal">max_consolidator_inputs</tt>.</li>
 <li>The node-types guide, an example in both spellings, and tests: an input
 that never arrives; one that arrives twice between sends; inputs arriving
@@ -3943,7 +3943,7 @@ ground may set. Each consolidator's layout is worked out once, with the
 routing (<tt class="docutils literal"><span class="pre">Routes::consolidation_of</span></tt>). <tt class="docutils literal"><span class="pre">runtime::system</span></tt>'s tests drive
 one through passes -- every input new, nothing new, the interval with one
 new and one held, a boolean refused -- and hold a running one to allocating
-nothing; tcs-gui describes it.</p>
+nothing; tcs-cfge describes it.</p>
 <p><strong>Built</strong> (2026-11-15), the counters: <tt class="docutils literal">QUERY_CONSOLIDATOR</tt>, opcode
 <tt class="docutils literal">0x36</tt> on the node link (<tt class="docutils literal"><span class="pre">commands::ConsolidatorCommand</span></tt>,
 <tt class="docutils literal"><span class="pre">telemetry::QueryConsolidatorTelemetry</span></tt>, the counts in
@@ -5402,7 +5402,7 @@ a configuration that breaks it is refused before it flies.</p>
 <p><tt class="docutils literal"><span class="pre">tcsprotocol::graph::Graph::load</span></tt> is the reader, and the Python ground
 reader, <tt class="docutils literal">python/tcsprotocol/configuration.py</tt>, follows includes by the
 same rules, so that the two count a node's device id among the same names. How
-tcs-gui opens and writes an included file is in the <a class="reference external" href="tcs-gui-design.html#subdiagrams">tcs-gui design</a>.</p>
+tcs-cfge opens and writes an included file is in the <a class="reference external" href="tcs-cfge-design.html#subdiagrams">tcs-cfge design</a>.</p>
 <p>A small vehicle needs no split and should not have one. Where a split earns its
 place, the useful seam is who owns a file and how often it changes, not what
 type of data is in it:</p>
@@ -5422,9 +5422,9 @@ tuning.ytcs     setpoints, intervals, thresholds: the values the MOC may
 performs them again aboard. One command, on one file:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>tcs-verify<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
-</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>verify<span class="whitespace"> </span><span class="name variable">TCS_GUI_FILE</span><span class="operator">=</span>tests/manual/thermostat.ytcs
+</span><span class="generic prompt">$ </span>make<span class="whitespace"> </span>verify<span class="whitespace"> </span><span class="name variable">TCS_CFGE_FILE</span><span class="operator">=</span>tests/manual/thermostat.ytcs
 </pre>
-<p><tt class="docutils literal">TCS_GUI_FILE</tt> is the same variable the editor takes, so checking what was
+<p><tt class="docutils literal">TCS_CFGE_FILE</tt> is the same variable the editor takes, so checking what was
 just edited is the same name in both commands: <tt class="docutils literal">make runguiy</tt> and <tt class="docutils literal">make
 runguix</tt> open it as YAML and as XML, one target per spelling as the
 <tt class="docutils literal">runmocy</tt> and <tt class="docutils literal">runmocx</tt> pair is, and <tt class="docutils literal">make verify</tt> checks the file the
@@ -5451,7 +5451,7 @@ lines the chip and the lines. The rules are the ones that have been tested
 against real buses, reached rather than restated, so a node is refused here
 for exactly what the flight software would refuse it for -- and refused on a
 desk rather than when the vehicle tries to open it. This is also what lets
-the editor be lazy about what has been filled in: see <a class="reference external" href="tcs-gui-design.html#the-editor-is-lazy">The editor is lazy</a>.</li>
+the editor be lazy about what has been filled in: see <a class="reference external" href="tcs-cfge-design.html#the-editor-is-lazy">The editor is lazy</a>.</li>
 <li>the configuration says what tcspecial itself is configured with. The
 <tt class="docutils literal">tcspecial</tt> section -- where commands are taken, where beacons go, where
 the telemetry log is written -- is required of every configuration, and
@@ -5494,9 +5494,9 @@ that one is found when the configuration is loaded aboard.</li>
 of them. A source whose record length the configuration does not state --
 every computation -- can feed a variable-length log and not a fixed one.</li>
 </ul>
-<p>How tcs-gui holds a configuration to these rules while it is being drawn --
+<p>How tcs-cfge holds a configuration to these rules while it is being drawn --
 what it reads, writes and checks, and why it asks for nothing to be entered
--- is in the <a class="reference external" href="tcs-gui-design.html">tcs-gui design</a>.</p>
+-- is in the <a class="reference external" href="tcs-cfge-design.html">tcs-cfge design</a>.</p>
 </div>
 <div class="section" id="example-a-zone-thermostat">
 <h2><a class="toc-backref" href="#toc-entry-53">Example: a zone thermostat</a></h2>
@@ -8839,7 +8839,7 @@ and a test holds the features in <tt class="docutils literal">Cargo.toml</tt> to
 <dd>A feature includes or leaves out that type's module in
 <tt class="docutils literal"><span class="pre">tcspecial::node::payload</span></tt> and nothing else. The rules for the type in
 <tt class="docutils literal"><span class="pre">tcsprotocol::node</span></tt> are built whatever tcspecial is built with:
-tcs-verify and tcs-gui run on the ground and check configurations for any
+tcs-verify and tcs-cfge run on the ground and check configurations for any
 vehicle, so what a configuration may say about a type cannot depend on how
 one vehicle's tcspecial was built. Tcs-sim is built with every type, since
 it runs on a development host and not on the target.</dd>
@@ -9104,7 +9104,7 @@ where each row comes from.</p>
 </div>
 <div class="section" id="the-visual-window">
 <h2><a class="toc-backref" href="#toc-entry-108">The Visual Window</a></h2>
-<p>A configuration is a drawing in tcs-gui and a running process in tcspecial, and
+<p>A configuration is a drawing in tcs-cfge and a running process in tcspecial, and
 nothing showed the one as the other: what a vehicle on a desk was doing could
 be read only from its logs and from the ground station's panels. The visual
 window draws the running graph as the editor draws the configuration and lights
@@ -9129,17 +9129,17 @@ devices that is not flight is a mistake about which run it is. The refusal
 comes before the build's own, so that what a flight launch meets does not
 depend on how the binary was built.</dd>
 <dt>Requirement</dt>
-<dd>The window shows the three working panes as tcs-gui shows them, with every
-node of the top file where tcs-gui would place it and every link along the
-route tcs-gui gives it. Where the panes are divided is the person's own
-tcs-gui setting, read and never written, and the nodes are settled into
+<dd>The window shows the three working panes as tcs-cfge shows them, with every
+node of the top file where tcs-cfge would place it and every link along the
+route tcs-cfge gives it. Where the panes are divided is the person's own
+tcs-cfge setting, read and never written, and the nodes are settled into
 their panes by the rule the editor settles a file it opens with. Each
 file the top file includes is drawn on the top page as the editor draws
 it, a subdiagram's box saying how many nodes it holds and how many lines
 cross its edge, and a line to a node inside it is drawn to the box.</dd>
 <dt>Requirement</dt>
 <dd>Each subdiagram has a window of its own, open from the start beside the
-top file's and drawn as tcs-gui draws the subdiagram's page: its nodes,
+top file's and drawn as tcs-cfge draws the subdiagram's page: its nodes,
 its edge in a margin either side with the terminals a line from another
 file crosses by, a node outside it drawn at that edge, and the Physics
 pane holding the components the editor put on that page. Its links are
@@ -9149,7 +9149,7 @@ lit as the top page's are, a line crossing the edge on both pages.</dd>
 the shapes, the routes, the colours, the panes -- is the crate
 <tt class="docutils literal"><span class="pre">tcs-diagram</span></tt>, Rust that produces paths, sizes and colours and the
 markup <tt class="docutils literal"><span class="pre">tcs-diagram/ui/diagram.slint</span></tt> that paints them, and both
-tcs-gui and tcspecial draw with it. Two copies of the drawing would be two
+tcs-cfge and tcspecial draw with it. Two copies of the drawing would be two
 answers to where a node is.</dd>
 <dt>Requirement</dt>
 <dd>A link is lit while data crosses it. Each datum sent over a link draws,
@@ -9158,7 +9158,7 @@ shade lighter than the ordinary line's colour -- half way to white, so the
 colour still says which way the data is travelling -- and the wide line is
 taken away <tt class="docutils literal">LINE_BLINK</tt> after the datum was sent: 0.25 seconds,
 <tt class="docutils literal"><span class="pre">tcspecial::visual::LINE_BLINK</span></tt>. The ordinary line is drawn whether or
-not the wide one is, on top of it, exactly as tcs-gui draws it.</dd>
+not the wide one is, on top of it, exactly as tcs-cfge draws it.</dd>
 <dt>Requirement</dt>
 <dd>The window takes no press: a node is not dragged, a terminal draws no
 link, a menu does not open. It keeps what the window manager gives every
@@ -9178,7 +9178,7 @@ window looks at the table every 40 milliseconds, well inside
 <tt class="docutils literal">LINE_BLINK</tt>. A delivery says which line of the drawing it travelled by
 the line's place among the configuration's links counted one per
 destination, by the node each leaves and then by where it goes, which is
-the order tcs-gui draws them in.</dd>
+the order tcs-cfge draws them in.</dd>
 </dl>
 </div>
 <div class="section" id="tcsmoc">
@@ -11577,17 +11577,17 @@ files. Several other kinds of name are TCS's, are left out of it as
 things stand, and could be brought in later:</p>
 <ul class="simple">
 <li><strong>Installed directories and data files</strong>: <tt class="docutils literal">/opt/tcs/share/tcspecial</tt>,
-<tt class="docutils literal">/etc/opt/tcs/tcspecial</tt>, tcs-gui's data under <tt class="docutils literal">/opt/tcs/share</tt>,
+<tt class="docutils literal">/etc/opt/tcs/tcspecial</tt>, tcs-cfge's data under <tt class="docutils literal">/opt/tcs/share</tt>,
 and the directories the programs keep their state in. Most are named
 after their project or program now.</li>
-<li><strong>Configuration sections and keys</strong>: <tt class="docutils literal"><span class="pre">tcs-gui:</span></tt> and <tt class="docutils literal"><span class="pre">tcs-sim:</span></tt> in
+<li><strong>Configuration sections and keys</strong>: <tt class="docutils literal"><span class="pre">tcs-cfge:</span></tt> and <tt class="docutils literal"><span class="pre">tcs-sim:</span></tt> in
 a simulator file, which are named after the programs that read them.</li>
-<li><strong>Environment variables</strong>: <tt class="docutils literal">TCS_GUI_FILE</tt>, <tt class="docutils literal">TCS_TCSPECIAL_LOG</tt>,
+<li><strong>Environment variables</strong>: <tt class="docutils literal">TCS_CFGE_FILE</tt>, <tt class="docutils literal">TCS_TCSPECIAL_LOG</tt>,
 <tt class="docutils literal">TCS_CFS_CONFIGURATION</tt> and the rest, which, being upper case and
 joined by underscores, cannot show a hyphen at all, so the rule could
 only reach them through another spelling of its own.</li>
 <li><strong>systemd units</strong>: <tt class="docutils literal">tcspecial.service</tt>.</li>
-<li><strong>Documents</strong>: <tt class="docutils literal"><span class="pre">docs/tcs-gui.rst</span></tt>, <tt class="docutils literal"><span class="pre">docs/tcspecial-design.rst</span></tt> and
+<li><strong>Documents</strong>: <tt class="docutils literal"><span class="pre">docs/tcs-cfge.rst</span></tt>, <tt class="docutils literal"><span class="pre">docs/tcspecial-design.rst</span></tt> and
 the rest, named after the program or project each describes.</li>
 </ul>
 <p>Each would want to say, as the rule does for a library, whether what it

@@ -1,14 +1,14 @@
-==============
-tcs-gui Design
-==============
+===============
+tcs-cfge Design
+===============
 
 .. contents:: Contents
    :depth: 3
    :local:
 
-How tcs-gui, the configuration editor, works and why.
+How tcs-cfge, the configuration editor, works and why.
 
-tcs-gui draws a configuration as the graph it is -- nodes, and the links that
+tcs-cfge draws a configuration as the graph it is -- nodes, and the links that
 join them -- lets somebody change it by drawing, and writes the result back to
 the files it came from. What it reads and writes is the configuration, in
 either spelling -- XML in a ``.xtcs`` file, YAML in a ``.ytcs`` one -- with
@@ -31,8 +31,8 @@ Reading and Writing a Configuration
 The editor reads what it writes
 -------------------------------
 
-The editor reads what it writes. A configuration opened in tcs-gui comes up on
-the canvas -- nodes where its ``tcs-gui`` section put them (see `What the file
+The editor reads what it writes. A configuration opened in tcs-cfge comes up on
+the canvas -- nodes where its ``tcs-cfge`` section put them (see `What the file
 keeps for the editor`_), links between them, groups and command bindings held
 and written back -- and the comments come with it: a comment is written as a
 comment rather than as a field, so the editor reads the run of comment lines
@@ -109,7 +109,7 @@ Requirement
     difference the edit made into the file as it was read; the merged file is
     then read again and held to what the edit should have made it say, and
     where it says anything else the editor's own text is written instead.
-    See ``tcs_gui::faithful``. A comment is written as it was given, never
+    See ``tcs_cfge::faithful``. A comment is written as it was given, never
     broken again to a width; the one change is XML's, which cannot hold two
     hyphens in a row inside a comment.
 
@@ -132,7 +132,7 @@ Every edit is written as it is made, so saving is not something to remember,
 while the File menu's Autosave is on, as it is until somebody turns it off.
 Off, an edit is written by Save, and by the way out of the program, and not
 before: for somebody who wants to try a change and keep it only if it works.
-Which it is is a setting, ``<autosave>`` in ``$HOME/.tcs-gui/preferences.xml``,
+Which it is is a setting, ``<autosave>`` in ``$HOME/.tcs-cfge/preferences.xml``,
 and on where the file does not say; the File menu shows it as a tick beside
 **Autosave**. Turning it on writes at once whatever was waiting. Autosave on
 or off, the undo history is written after every edit: see `Crash recovery`_.
@@ -260,7 +260,7 @@ Read-only sessions
 Requirement
     ``-r``, ``--read-only`` or ``--readonly``, anywhere on the command line,
     starts a session that shows the configuration and changes nothing:
-    ``tcs-gui --read-only thermostat.ytcs``. The window is the editor's, with
+    ``tcs-cfge --read-only thermostat.ytcs``. The window is the editor's, with
     the controls that would change something greyed rather than hidden -- Edit
     and Delete on a node and in the window about the file's problems,
     renaming, Undo, Redo, Save, arranging, placing a node, drawing a line,
@@ -284,11 +284,11 @@ Where a node is drawn is kept in the configuration, unlike how the canvas is
 divided, which is a preference of the person at the keyboard (see `The working
 panes`_). A node's position is in the configuration because it is part of the
 diagram -- two people reading one configuration should see one drawing -- in a
-``tcs-gui`` section at the end of the file rather than on the node it is about:
+``tcs-cfge`` section at the end of the file rather than on the node it is about:
 
 .. code-block:: yaml
 
-   tcs-gui:
+   tcs-cfge:
      nodes:
        - { node: gateway, x: 784, y: 40 }
        - { node: payload, x: 40, y: 160 }
@@ -303,7 +303,7 @@ has gone.
 
 The same section holds the concerns somebody has set aside (see `Concerns`_),
 for the same reason: a decision about the drawing is one the next reader of it
-should not have to make again. The simulator's file keeps a ``tcs-gui`` section
+should not have to make again. The simulator's file keeps a ``tcs-cfge`` section
 of its own for where its physics components are drawn: see `The Physics
 pane`_.
 
@@ -312,7 +312,7 @@ The Undo History
 
 Undo reaches back to the start of the session, and past a crash: the history
 is the list of the edits made, in order, with how far along it the document
-stands, and it is written to a file after every edit (``tcs_gui::journal``).
+stands, and it is written to a file after every edit (``tcs_cfge::journal``).
 With Autosave on every edit is on the disk already, and what the history buys
 is the ability to undo past a crash. With Autosave off it buys the edits the
 files do not have yet too, which the next start puts back: see `Crash
@@ -320,13 +320,13 @@ recovery`_. Either way it is a convenience for the person who was working
 rather than a record anybody else reads, which is what decides where it lives
 and how long for.
 
-It lives in the user's own state directory: ``$XDG_STATE_HOME/tcs-gui``, or
-``~/.local/state/tcs-gui`` where that is not set. The specification names this
+It lives in the user's own state directory: ``$XDG_STATE_HOME/tcs-cfge``, or
+``~/.local/state/tcs-cfge`` where that is not set. The specification names this
 exact case -- state that should persist between restarts but is not important
 enough to be data, with history given as an example -- and it is deliberately
 not the cache directory, a cache being something a program can regenerate.
 
-It used to sit beside the configuration, as ``<name>.tcs-gui-history``, on the
+It used to sit beside the configuration, as ``<name>.tcs-cfge-history``, on the
 argument that a configuration copied to another machine should take its history
 with it. That argument was worth less than it cost: a configuration lives in a
 directory under version control, so the file turned up in ``git status``, in
@@ -356,7 +356,7 @@ And it is pruned at startup, two ways: a history older than a week, and one
 whose configuration is no longer where it was. The first is the ordinary bound
 -- a crash a fortnight ago is not an undo anybody is waiting for -- and the
 second is tidiness nothing else would do, a configuration being free to be
-deleted or renamed by anything at all. A file in that directory that tcs-gui
+deleted or renamed by anything at all. A file in that directory that tcs-cfge
 does not understand is left alone: it is not the prune's place to decide that
 somebody else's file is rubbish.
 
@@ -364,7 +364,7 @@ Crash recovery
 --------------
 
 The undo history is written after every edit, Autosave on or off, to the
-user's state directory (``tcs_gui::history``), and with it how far into it the
+user's state directory (``tcs_cfge::history``), and with it how far into it the
 files go and an MD5 digest of each file of the session -- the configuration's
 files and the simulator's -- as the editor last wrote or read it. That is crash
 recovery. When the editor opens a configuration whose history is there --
@@ -451,7 +451,7 @@ undoable. A line that stops where it would orphan something says what it is
 doing while it does it. A node already on the wrong side holds nothing, so one
 such node cannot freeze the control.
 
-Where the dividers sit is kept in ``$HOME/.tcs-gui/preferences.xml``, as the
+Where the dividers sit is kept in ``$HOME/.tcs-cfge/preferences.xml``, as the
 percentages of the working pane the gateway and vehicle working panes take, the
 payload pane taking what is left. Each is kept by the pane it is about rather
 than by its place on the screen, so a file written when the gateway pane was the
@@ -527,7 +527,7 @@ gesture always places something where it can be seen. Let go anywhere but
 over the sheet, it places nothing. The two are told apart by how far the
 press moved, four pixels, and not by how long it lasted, as a node's click and
 drag are. Both are one edit, and one Undo takes the node away; and both go
-through ``tcs_gui::add_node`` (``add_physics`` for a physics component), so
+through ``tcs_cfge::add_node`` (``add_physics`` for a physics component), so
 that a node clicked into being and one carried there are the same node.
 
 Each of the three lists is as tall as its own share of the column, with a line
@@ -538,7 +538,7 @@ neighbours and leaves the third alone, which is what a person dragging it
 expects: the list above grows by what the list below gives up. The upper line
 is between the payload list and the vehicle's, the lower one between the
 vehicle's and the gateway's. The arithmetic
-is ``tcs_gui::list_shares_after``, in Rust where it can be tested, and the
+is ``tcs_cfge::list_shares_after``, in Rust where it can be tested, and the
 markup reports a drag as how far it went and how tall the column is -- what a
 share is depends on what it is a share of.
 
@@ -584,12 +584,12 @@ physics components -- and not anything of the configuration's. It is drawn
 beside the working width rather than in it, at negative positions in the
 coordinates the configuration holds, so that adding it moved nothing a file
 had placed. A component is drawn where it was put, which the simulator file
-keeps in a ``tcs-gui`` section of its own, last in the file as a
+keeps in a ``tcs-cfge`` section of its own, last in the file as a
 configuration's is:
 
 .. code-block:: yaml
 
-   tcs-gui:
+   tcs-cfge:
      nodes:
        - { node: zone, x: -193, y: 280 }
 
@@ -1217,7 +1217,7 @@ bundle have their longest runs side by side, so their labels would be written
 over each other. A label that would cover one already written moves along its
 own run instead, its length at a time, to the first place that is clear.
 
-tcs-gui writes neither a line's label nor its comment on the sheet. Moved clear
+tcs-cfge writes neither a line's label nor its comment on the sheet. Moved clear
 of each other, labels still ran over the next bundle and over nodes, and a
 comment a paragraph long, the thermostat's over its two switches, was drawn
 across the log. A pointer resting on a line is shown a tip instead, over
@@ -1467,7 +1467,7 @@ corners.
 Subdiagrams
 -----------
 
-tcs-gui opens each included file as a subdiagram under its name, keeps its
+tcs-cfge opens each included file as a subdiagram under its name, keeps its
 path as the box's ``path`` attribute, and writes each node, group and command
 binding back to the file it was read from. A subdiagram is renamed as a node
 is, its box being its name: its nodes, the lines to them and its exports go
@@ -1500,7 +1500,7 @@ the simulator file's -- but it is drawn against the payloads it joins, and put
 past the edge a line from a sensor to the zone it reads would cross the edge
 without leaving the page. A line from outside runs from the left margin across
 the Physics pane to its node, its end at the Physics pane's left edge
-(``tcs_gui::inside_of``).
+(``tcs_cfge::inside_of``).
 
 The same three clicks join across the edge. Clicking a subdiagram's box with a
 line in hand offers a line to each node its file exports at that terminal, by
@@ -1536,7 +1536,7 @@ its counts and the same menus and edits: what can be done on one page can be
 done on every page, because there is nothing a second kind of window could
 leave out. The world is one, the simulator file's, and each of its components
 is drawn on one page: the page it was placed from, which the simulator file's
-``tcs-gui`` section records under ``pages`` -- ``thermostat-common: [zone]`` --
+``tcs-cfge`` section records under ``pages`` -- ``thermostat-common: [zone]`` --
 and the top page for one it names under none. A component belongs with the
 payloads it stands beside, and a zone made for a subdiagram's sensors drawn on
 every page would be a box on the top page that nothing there is joined to. A
@@ -1667,7 +1667,7 @@ the shape of the whole graph. A log is the exception by having no data source at
 all: it is where a stream stops on purpose.
 
 Setting one aside is an edit, so undo takes it back, and it is written in the
-file's own ``tcs-gui`` section beside where the nodes were drawn: two people
+file's own ``tcs-cfge`` section beside where the nodes were drawn: two people
 editing one configuration should not each have to decide again that a payload
 nobody reads yet is on purpose. It is remembered by node and kind, so a concern
 that stops applying leaves both lists by itself and comes back if the line it
@@ -1980,7 +1980,7 @@ The simulator's file
 --------------------
 
 The simulator's own configuration is edited from the menu too, where the editor
-was given one: tcs-gui takes a second file name, and **Edit simulated payload
+was given one: tcs-cfge takes a second file name, and **Edit simulated payload
 groups**, in the File menu, opens the groups of settings it declares. The entry
 is greyed when there is no second file rather than hidden -- a menu whose
 entries come and go is a menu nobody learns.
@@ -2049,7 +2049,7 @@ last edit touched. Every setting is optional -- what a payload does not state
 it takes from the group it names -- so nothing in either place is marked.
 
 ``make runsimguiy`` and ``make runsimguix`` open a configuration and the
-simulator file beside it, in YAML and in XML; ``TCS_GUI_SIM`` names the second
+simulator file beside it, in YAML and in XML; ``TCS_CFGE_SIM`` names the second
 file and defaults to the first's stem with ``sim`` on the end, which is what
 the shipped sets are called. The simulator file is YAML whichever spelling the
 configuration is in, that being the one spelling it has.
@@ -2093,13 +2093,13 @@ The Description Tree
 ====================
 
 What node types there are is data rather than code in the editor. A node type
-arrives as two files: Rust in tcspecial, and a description tcs-gui reads
-(``tcs_gui::nodes``). The shipped descriptions are under
-``tcs-gui/share/nodes``:
+arrives as two files: Rust in tcspecial, and a description tcs-cfge reads
+(``tcs_cfge::nodes``). The shipped descriptions are under
+``tcs-cfge/share/nodes``:
 
 .. code-block:: text
 
-   tcs-gui/share/nodes/
+   tcs-cfge/share/nodes/
      gateway_cfs.yaml  gateway_fprime.yaml  gateway_radio.yaml
      gateway_yamcs.yaml
      payload/          app_all_pl.yaml  app_pl.yaml  can.yaml ...
@@ -2121,8 +2121,8 @@ is the vehicle's end of the link to what it answers to rather than part of the
 vehicle, and the code that serves one is the network payload's.
 
 The correspondence is checked both ways by
-``tcs_gui::nodes::tests::every_description_has_its_rust``: a description with no
-Rust is a node the editor offers and the vehicle cannot run, and a node type
+``tcs_cfge::nodes::tests::every_description_has_its_rust``: a description with
+no Rust is a node the editor offers and the vehicle cannot run, and a node type
 implemented and not described is one nobody can place. The second direction is
 asked of the directories the descriptions cover, so that once a family has one
 description in it, every file in that family needs one -- which is what keeps a
@@ -2151,7 +2151,7 @@ cares which a given node used -- one of the shipped ones is XML for exactly
 that reason, ``vehicle/compute/process.xml``. One file per node, in one
 spelling, which
 ``every_node_is_described_once_and_in_one_spelling``, in
-``tcs-gui/tests/schema.rs``, says: a node described
+``tcs-cfge/tests/schema.rs``, says: a node described
 twice is two statements of what its terminals are. What it says:
 
 .. code-block:: yaml
@@ -2183,9 +2183,9 @@ is ``text``; ``process.xml`` states a ``path``, an ``interval`` and a
 ``boolean``.
 
 The shape of one of those files has two schemas of its own, ``node.xsd`` and
-``node.schema.json``, in ``tcs-gui/share/schema`` and installed with the tree;
+``node.schema.json``, in ``tcs-cfge/share/schema`` and installed with the tree;
 they are held against each other and against the reader by
-``tcs-gui/tests/schema.rs``.
+``tcs-cfge/tests/schema.rs``.
 
 ``sets`` is what turns one node type into several things to place. ``compute``
 is one type, and the tree makes it five entries -- ``process``,
@@ -2230,13 +2230,13 @@ twice is two descriptions of one name, refused as above.
 Schemas Beside the Tree
 =======================
 
-``tcsprotocol/schema`` holds a schema for each file tcs-gui edits, in each
+``tcsprotocol/schema`` holds a schema for each file tcs-cfge edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
 tcsprotocol's rather than this editor's, because every program that reads a
 configuration reads those formats; they are installed under
 ``$(PREFIX)/share/tcspecial/schema``. The schemas of the editor's own node
-descriptions stay with it, in ``tcs-gui/share/schema``.
+descriptions stay with it, in ``tcs-cfge/share/schema``.
 
 What they are for is the one thing an editor cannot do for a file somebody is
 writing by hand or with another tool: tell them, in their own editor, that
@@ -2264,7 +2264,7 @@ file is read instead, and so is a type written twice in a section. A node's
 name is an attribute of its element, which the XSD does require exactly once.
 The same holds for a configuration's sections: ``include``, ``payload_groups``
 and ``commands`` are lists, repeated, so the ``tcspecial``, node and
-``tcs-gui`` sections written twice are refused where the file is read. The
+``tcs-cfge`` sections written twice are refused where the file is read. The
 ``description`` is held to once by the XSD as well, through an identity
 constraint, which can count a section that is a value and not one of child
 elements. A simulator file has no list among its sections, so its XSD is an
@@ -2303,11 +2303,11 @@ XSD, the editor writing that file in YAML and nothing else -- the XML spelling
 of that schema is shipped for a file written by hand.
 
 Nothing aboard reads any of these references. They are for the person editing
-the file, in the same way the ``tcs-gui`` section is.
+the file, in the same way the ``tcs-cfge`` section is.
 
 A schema nothing is checked against is worse than no schema: it refuses files
 the software accepts, or accepts what the software refuses, and either way the
-person believes the schema. So ``tcs-gui/tests/schema.rs`` holds each against
+person believes the schema. So ``tcs-cfge/tests/schema.rs`` holds each against
 the lists the software itself reads from -- the section's parameters from
 ``graph::parameters::ATTRIBUTES``, the simulator's settings from
 ``sim_config::SETTINGS`` -- rather than against a copy written out there, which
@@ -2327,22 +2327,22 @@ rather than merely different. The writer now folds a run of hyphens to one in
 an XML comment, which is a thing the XML spelling does not preserve.
 
 Where the tree is -- the first of these that exists, the schemas being found
-in the same place: ``$TCS_GUI_DATA``, then
-``$XDG_DATA_HOME/tcs-gui`` (or ``~/.local/share/tcs-gui``), then
-``share/tcs-gui`` one level up from the directory the editor's own executable
-is in, then ``/usr/local/share/tcs-gui``, then ``/usr/share/tcs-gui``, then
-``tcs-gui/share`` and ``share`` under the working directory. The user's own
+in the same place: ``$TCS_CFGE_DATA``, then
+``$XDG_DATA_HOME/tcs-cfge`` (or ``~/.local/share/tcs-cfge``), then
+``share/tcs-cfge`` one level up from the directory the editor's own executable
+is in, then ``/usr/local/share/tcs-cfge``, then ``/usr/share/tcs-cfge``, then
+``tcs-cfge/share`` and ``share`` under the working directory. The user's own
 directory before the installed one, because that is where edited
 descriptions belong and where a person's own node goes; the install the
 editor is part of before any other, found from the program rather than
-named, so that ``/opt/tcs/bin/tcs-gui`` reads ``/opt/tcs/share/tcs-gui`` and
+named, so that ``/opt/tcs/bin/tcs-cfge`` reads ``/opt/tcs/share/tcs-cfge`` and
 an install under another prefix reads its own; the working directory last,
 so that running the editor out of a checkout finds the checkout's own.
 ``make install-data``, which ``make install-files`` runs, puts them under
-``$(PREFIX)/share/tcs-gui``, ``/opt/tcs/share/tcs-gui`` by default:
+``$(PREFIX)/share/tcs-cfge``, ``/opt/tcs/share/tcs-cfge`` by default:
 architecture-independent data belonging to one package, which is where the
-filesystem hierarchy standard puts it. ``/usr/local/share/tcs-gui`` and
-``/usr/share/tcs-gui`` are where installing put them before everything went
+filesystem hierarchy standard puts it. ``/usr/local/share/tcs-cfge`` and
+``/usr/share/tcs-cfge`` are where installing put them before everything went
 under one prefix, and are still read.
 
 See Also
@@ -2355,5 +2355,5 @@ See Also
     The flight software and what the programs share: the node architecture,
     the configuration file, the link, fault resiliency and the requirements.
 
-`The tcs-gui manual <tcs-gui.html>`__
-    Using tcs-gui.
+`The tcs-cfge manual <tcs-cfge.html>`__
+    Using tcs-cfge.

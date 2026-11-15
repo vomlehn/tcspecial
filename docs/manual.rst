@@ -106,7 +106,7 @@ tcs-sim answers on a physics model of the payloads. A configuration can be
 developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.
 
-A configuration is written with **tcs-gui**, which draws it as a diagram of
+A configuration is written with **tcs-cfge**, which draws it as a diagram of
 nodes and links, and checked with **tcs-verify**, which says what is wrong
 with it without running any of it. Both read it through **tcsprotocol**, the
 library the vehicle and the ground share, so the error a person sees on the
@@ -168,8 +168,8 @@ The TCSpecial libraries
 Software tools
 --------------
 
-`The tcs-gui manual <tcs-gui.html>`__
-    The editor. tcs-gui draws a configuration and its simulator
+`The tcs-cfge manual <tcs-cfge.html>`__
+    The editor. tcs-cfge draws a configuration and its simulator
     configuration as diagrams of nodes and links, checks them as they are
     edited, and writes them back.
 
@@ -242,7 +242,7 @@ Operational code
 Software tools
 --------------
 
-`The tcs-gui design <tcs-gui-design.html>`__
+`The tcs-cfge design <tcs-cfge-design.html>`__
     The editor: how it draws, reads and writes a configuration, its undo
     history, autosave and recovery.
 
@@ -305,7 +305,7 @@ one of six categories, and says which in a ``categories.toml`` at its top:
 **Software tools**
     What makes or checks what operational code is built from or loads:
     the tcs-xtce compiler, which generates the link's packet code;
-    tcs-gui and tcs-xtcee, which write configurations and XTCE; tcs-verify,
+    tcs-cfge and tcs-xtcee, which write configurations and XTCE; tcs-verify,
     which checks them; and tcs-diagram and tcs-ui, which they draw with.
     They take the most care of all but operational code, since a mistake
     in what they make or pass reaches a vehicle with no fault in the
@@ -329,7 +329,7 @@ every tool, verification tools among them, and here they are the others.
 
 A name says whether code is operational: a letter, or nothing, straight
 after ``tcs`` or ``tcslog`` (tcspecial, tcsmoc, tcslog) is operational
-code's, and a hyphen or an underscore there (tcs-gui, tcs-sim,
+code's, and a hyphen or an underscore there (tcs-cfge, tcs-sim,
 tcslog-tools) is any other category's. Each project's ``make
 operational-names`` holds its names and its ``categories.toml`` to each
 other. See `Operational code and its names

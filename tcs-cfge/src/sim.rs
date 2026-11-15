@@ -103,13 +103,13 @@ pub struct World {
     /// a model is in an order that means anything.
     pub connections: std::collections::BTreeSet<(String, String)>,
     /// Where each component was put in the Physics pane, by name, as the
-    /// file's `tcs-gui` section says: a component named nowhere here is laid
+    /// file's `tcs-cfge` section says: a component named nowhere here is laid
     /// out by name. Kept for a component removed, so that undo puts it back
     /// where it was.
     #[serde(default)]
     pub placed: BTreeMap<String, (i32, i32)>,
     /// The subdiagram whose page each component is drawn on, by component,
-    /// as the file's `tcs-gui` section says; one named here under none is the
+    /// as the file's `tcs-cfge` section says; one named here under none is the
     /// top page's. Kept for a component removed, as `placed` is.
     #[serde(default)]
     pub pages: BTreeMap<String, String>,
@@ -136,7 +136,7 @@ impl World {
     ///
     /// # Returns
     ///
-    /// Whether the `tcs-gui` section puts it there; one it puts nowhere is
+    /// Whether the `tcs-cfge` section puts it there; one it puts nowhere is
     /// the top page's.
     pub fn on_page(&self, name: &str, page: Option<&str>) -> bool {
         self.pages.get(name).map(String::as_str) == page
@@ -454,8 +454,8 @@ struct File {
     simulated_payloads: Vec<Entry>,
     /// Where the editor drew each physics component, read as every program
     /// reads it.
-    #[serde(default, rename = "tcs-gui")]
-    tcs_gui: Option<tcsprotocol::sim_config::SimTcsGui>,
+    #[serde(default, rename = "tcs-cfge")]
+    tcs_cfge: Option<tcsprotocol::sim_config::SimTcsCfge>,
 }
 
 /// The `world` section, as it parses: permissive, as [`File`] is.
@@ -682,13 +682,13 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
         simulator.world = world_of(world).map_err(Trouble::Unusable)?;
     }
     // Where each component was drawn: see World::placed.
-    if let Some(tcs_gui) = &file.tcs_gui {
-        simulator.world.placed = tcs_gui
+    if let Some(tcs_cfge) = &file.tcs_cfge {
+        simulator.world.placed = tcs_cfge
             .nodes
             .iter()
             .map(|placed| (placed.name.clone(), (placed.x, placed.y)))
             .collect();
-        simulator.world.pages = tcs_gui
+        simulator.world.pages = tcs_cfge
             .pages
             .iter()
             .flat_map(|(page, components)| {
@@ -885,7 +885,7 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
     }
 
     // Where each component was drawn, last, as a configuration's own
-    // tcs-gui section is: about a screen and not the vehicle. Only the
+    // tcs-cfge section is: about a screen and not the vehicle. Only the
     // components the world has, as a configuration writes its nodes'
     // positions from the nodes it has: a position left behind by one
     // removed is kept for undo, and goes from the file.
@@ -904,7 +904,7 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
         }
     }
     if !placed.is_empty() || !pages.is_empty() {
-        out.push_str("\ntcs-gui:\n");
+        out.push_str("\ntcs-cfge:\n");
     }
     if !placed.is_empty() {
         out.push_str("  nodes:\n");
@@ -1293,7 +1293,7 @@ mod tests {
             &path,
             "world:\n  physics:\n    components:\n      \
              - type thermal_mass:\n          - component: zone\n          \
-             - component: hall\n\ntcs-gui:\n  pages:\n    \
+             - component: hall\n\ntcs-cfge:\n  pages:\n    \
              thermostat-common: [zone]\n",
         )
         .expect("written");

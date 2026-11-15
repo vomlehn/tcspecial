@@ -184,7 +184,7 @@ fn points(size: &str) -> Option<f32> {
 /// No text in any window is set smaller than the one size.
 ///
 /// Every `font-size` in every `.slint` file is `Fonts.window`, a length of
-/// at least that, or one of tcs-gui's `Type` names -- whose definitions are
+/// at least that, or one of tcs-cfge's `Type` names -- whose definitions are
 /// held to the same rule here. The exceptions are a node's two labels on
 /// the canvas: its name, whose size is one of the ways node types are told
 /// apart, and its type, written between two terminals where there is less

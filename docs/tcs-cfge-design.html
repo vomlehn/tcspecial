@@ -4,7 +4,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
-<title>tcs-gui Design</title>
+<title>tcs-cfge Design</title>
 <style type="text/css">
 
 /*
@@ -361,8 +361,8 @@ ul.auto-toc {
 </style>
 </head>
 <body>
-<div class="document" id="tcs-gui-design">
-<h1 class="title">tcs-gui Design</h1>
+<div class="document" id="tcs-cfge-design">
+<h1 class="title">tcs-cfge Design</h1>
 
 <div class="contents local topic" id="contents">
 <p class="topic-title"><a class="reference internal" href="#top">Contents</a></p>
@@ -429,8 +429,8 @@ ul.auto-toc {
 <li><a class="reference internal" href="#see-also" id="toc-entry-46">See Also</a></li>
 </ul>
 </div>
-<p>How tcs-gui, the configuration editor, works and why.</p>
-<p>tcs-gui draws a configuration as the graph it is -- nodes, and the links that
+<p>How tcs-cfge, the configuration editor, works and why.</p>
+<p>tcs-cfge draws a configuration as the graph it is -- nodes, and the links that
 join them -- lets somebody change it by drawing, and writes the result back to
 the files it came from. What it reads and writes is the configuration, in
 either spelling -- XML in a <tt class="docutils literal">.xtcs</tt> file, YAML in a <tt class="docutils literal">.ytcs</tt> one -- with
@@ -448,8 +448,8 @@ configuration is edited in.</p>
 <h1><a class="toc-backref" href="#toc-entry-1">Reading and Writing a Configuration</a></h1>
 <div class="section" id="the-editor-reads-what-it-writes">
 <h2><a class="toc-backref" href="#toc-entry-2">The editor reads what it writes</a></h2>
-<p>The editor reads what it writes. A configuration opened in tcs-gui comes up on
-the canvas -- nodes where its <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section put them (see <a class="reference internal" href="#what-the-file-keeps-for-the-editor">What the file
+<p>The editor reads what it writes. A configuration opened in tcs-cfge comes up on
+the canvas -- nodes where its <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section put them (see <a class="reference internal" href="#what-the-file-keeps-for-the-editor">What the file
 keeps for the editor</a>), links between them, groups and command bindings held
 and written back -- and the comments come with it: a comment is written as a
 comment rather than as a field, so the editor reads the run of comment lines
@@ -521,7 +521,7 @@ it was. The editor writes its model out as it always did and merges the
 difference the edit made into the file as it was read; the merged file is
 then read again and held to what the edit should have made it say, and
 where it says anything else the editor's own text is written instead.
-See <tt class="docutils literal"><span class="pre">tcs_gui::faithful</span></tt>. A comment is written as it was given, never
+See <tt class="docutils literal"><span class="pre">tcs_cfge::faithful</span></tt>. A comment is written as it was given, never
 broken again to a width; the one change is XML's, which cannot hold two
 hyphens in a row inside a comment.</dd>
 </dl>
@@ -543,7 +543,7 @@ them.</p>
 while the File menu's Autosave is on, as it is until somebody turns it off.
 Off, an edit is written by Save, and by the way out of the program, and not
 before: for somebody who wants to try a change and keep it only if it works.
-Which it is is a setting, <tt class="docutils literal">&lt;autosave&gt;</tt> in <tt class="docutils literal"><span class="pre">$HOME/.tcs-gui/preferences.xml</span></tt>,
+Which it is is a setting, <tt class="docutils literal">&lt;autosave&gt;</tt> in <tt class="docutils literal"><span class="pre">$HOME/.tcs-cfge/preferences.xml</span></tt>,
 and on where the file does not say; the File menu shows it as a tick beside
 <strong>Autosave</strong>. Turning it on writes at once whatever was waiting. Autosave on
 or off, the undo history is written after every edit: see <a class="reference internal" href="#crash-recovery">Crash recovery</a>.</p>
@@ -659,7 +659,7 @@ else that makes a new section agree about it.</p>
 <dt>Requirement</dt>
 <dd><p class="first"><tt class="docutils literal"><span class="pre">-r</span></tt>, <tt class="docutils literal"><span class="pre">--read-only</span></tt> or <tt class="docutils literal"><span class="pre">--readonly</span></tt>, anywhere on the command line,
 starts a session that shows the configuration and changes nothing:
-<tt class="docutils literal"><span class="pre">tcs-gui</span> <span class="pre">--read-only</span> thermostat.ytcs</tt>. The window is the editor's, with
+<tt class="docutils literal"><span class="pre">tcs-cfge</span> <span class="pre">--read-only</span> thermostat.ytcs</tt>. The window is the editor's, with
 the controls that would change something greyed rather than hidden -- Edit
 and Delete on a node and in the window about the file's problems,
 renaming, Undo, Redo, Save, arranging, placing a node, drawing a line,
@@ -683,9 +683,9 @@ name of a configuration to create.</p>
 divided, which is a preference of the person at the keyboard (see <a class="reference internal" href="#the-working-panes">The working
 panes</a>). A node's position is in the configuration because it is part of the
 diagram -- two people reading one configuration should see one drawing -- in a
-<tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section at the end of the file rather than on the node it is about:</p>
+<tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section at the end of the file rather than on the node it is about:</p>
 <pre class="code yaml literal-block">
-<span class="name tag">tcs-gui</span><span class="punctuation">:</span><span class="whitespace">
+<span class="name tag">tcs-cfge</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">gateway</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">784</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="whitespace"> </span><span class="punctuation indicator">}</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">payload</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">40</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">160</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
@@ -699,7 +699,7 @@ position written on the node is refused where the file is read, saying where it
 has gone.</p>
 <p>The same section holds the concerns somebody has set aside (see <a class="reference internal" href="#concerns">Concerns</a>),
 for the same reason: a decision about the drawing is one the next reader of it
-should not have to make again. The simulator's file keeps a <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section
+should not have to make again. The simulator's file keeps a <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section
 of its own for where its physics components are drawn: see <a class="reference internal" href="#the-physics-pane">The Physics
 pane</a>.</p>
 </div>
@@ -708,19 +708,19 @@ pane</a>.</p>
 <h1><a class="toc-backref" href="#toc-entry-10">The Undo History</a></h1>
 <p>Undo reaches back to the start of the session, and past a crash: the history
 is the list of the edits made, in order, with how far along it the document
-stands, and it is written to a file after every edit (<tt class="docutils literal"><span class="pre">tcs_gui::journal</span></tt>).
+stands, and it is written to a file after every edit (<tt class="docutils literal"><span class="pre">tcs_cfge::journal</span></tt>).
 With Autosave on every edit is on the disk already, and what the history buys
 is the ability to undo past a crash. With Autosave off it buys the edits the
 files do not have yet too, which the next start puts back: see <a class="reference internal" href="#crash-recovery">Crash
 recovery</a>. Either way it is a convenience for the person who was working
 rather than a record anybody else reads, which is what decides where it lives
 and how long for.</p>
-<p>It lives in the user's own state directory: <tt class="docutils literal"><span class="pre">$XDG_STATE_HOME/tcs-gui</span></tt>, or
-<tt class="docutils literal"><span class="pre">~/.local/state/tcs-gui</span></tt> where that is not set. The specification names this
+<p>It lives in the user's own state directory: <tt class="docutils literal"><span class="pre">$XDG_STATE_HOME/tcs-cfge</span></tt>, or
+<tt class="docutils literal"><span class="pre">~/.local/state/tcs-cfge</span></tt> where that is not set. The specification names this
 exact case -- state that should persist between restarts but is not important
 enough to be data, with history given as an example -- and it is deliberately
 not the cache directory, a cache being something a program can regenerate.</p>
-<p>It used to sit beside the configuration, as <tt class="docutils literal"><span class="pre">&lt;name&gt;.tcs-gui-history</span></tt>, on the
+<p>It used to sit beside the configuration, as <tt class="docutils literal"><span class="pre">&lt;name&gt;.tcs-cfge-history</span></tt>, on the
 argument that a configuration copied to another machine should take its history
 with it. That argument was worth less than it cost: a configuration lives in a
 directory under version control, so the file turned up in <tt class="docutils literal">git status</tt>, in
@@ -747,13 +747,13 @@ writes none and deletes none.</p>
 whose configuration is no longer where it was. The first is the ordinary bound
 -- a crash a fortnight ago is not an undo anybody is waiting for -- and the
 second is tidiness nothing else would do, a configuration being free to be
-deleted or renamed by anything at all. A file in that directory that tcs-gui
+deleted or renamed by anything at all. A file in that directory that tcs-cfge
 does not understand is left alone: it is not the prune's place to decide that
 somebody else's file is rubbish.</p>
 <div class="section" id="crash-recovery">
 <h2><a class="toc-backref" href="#toc-entry-11">Crash recovery</a></h2>
 <p>The undo history is written after every edit, Autosave on or off, to the
-user's state directory (<tt class="docutils literal"><span class="pre">tcs_gui::history</span></tt>), and with it how far into it the
+user's state directory (<tt class="docutils literal"><span class="pre">tcs_cfge::history</span></tt>), and with it how far into it the
 files go and an MD5 digest of each file of the session -- the configuration's
 files and the simulator's -- as the editor last wrote or read it. That is crash
 recovery. When the editor opens a configuration whose history is there --
@@ -833,7 +833,7 @@ one that would have to carry every node it moved through the history to be
 undoable. A line that stops where it would orphan something says what it is
 doing while it does it. A node already on the wrong side holds nothing, so one
 such node cannot freeze the control.</p>
-<p>Where the dividers sit is kept in <tt class="docutils literal"><span class="pre">$HOME/.tcs-gui/preferences.xml</span></tt>, as the
+<p>Where the dividers sit is kept in <tt class="docutils literal"><span class="pre">$HOME/.tcs-cfge/preferences.xml</span></tt>, as the
 percentages of the working pane the gateway and vehicle working panes take, the
 payload pane taking what is left. Each is kept by the pane it is about rather
 than by its place on the screen, so a file written when the gateway pane was the
@@ -903,7 +903,7 @@ gesture always places something where it can be seen. Let go anywhere but
 over the sheet, it places nothing. The two are told apart by how far the
 press moved, four pixels, and not by how long it lasted, as a node's click and
 drag are. Both are one edit, and one Undo takes the node away; and both go
-through <tt class="docutils literal"><span class="pre">tcs_gui::add_node</span></tt> (<tt class="docutils literal">add_physics</tt> for a physics component), so
+through <tt class="docutils literal"><span class="pre">tcs_cfge::add_node</span></tt> (<tt class="docutils literal">add_physics</tt> for a physics component), so
 that a node clicked into being and one carried there are the same node.</p>
 <p>Each of the three lists is as tall as its own share of the column, with a line
 between each pair that can be dragged to change the two it is between -- the
@@ -913,7 +913,7 @@ neighbours and leaves the third alone, which is what a person dragging it
 expects: the list above grows by what the list below gives up. The upper line
 is between the payload list and the vehicle's, the lower one between the
 vehicle's and the gateway's. The arithmetic
-is <tt class="docutils literal"><span class="pre">tcs_gui::list_shares_after</span></tt>, in Rust where it can be tested, and the
+is <tt class="docutils literal"><span class="pre">tcs_cfge::list_shares_after</span></tt>, in Rust where it can be tested, and the
 markup reports a drag as how far it went and how tall the column is -- what a
 share is depends on what it is a share of.</p>
 <p>No list may be squeezed below a tenth of the column, so a line dragged to
@@ -954,10 +954,10 @@ physics components -- and not anything of the configuration's. It is drawn
 beside the working width rather than in it, at negative positions in the
 coordinates the configuration holds, so that adding it moved nothing a file
 had placed. A component is drawn where it was put, which the simulator file
-keeps in a <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section of its own, last in the file as a
+keeps in a <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section of its own, last in the file as a
 configuration's is:</p>
 <pre class="code yaml literal-block">
-<span class="name tag">tcs-gui</span><span class="punctuation">:</span><span class="whitespace">
+<span class="name tag">tcs-cfge</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">nodes</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="punctuation indicator">{</span><span class="name tag"> node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">zone</span><span class="punctuation indicator">,</span><span class="name tag"> x</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">-193</span><span class="punctuation indicator">,</span><span class="name tag"> y</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="name variable">280</span><span class="whitespace"> </span><span class="punctuation indicator">}</span>
 </pre>
@@ -1527,7 +1527,7 @@ bends, then distance.</p>
 bundle have their longest runs side by side, so their labels would be written
 over each other. A label that would cover one already written moves along its
 own run instead, its length at a time, to the first place that is clear.</p>
-<p>tcs-gui writes neither a line's label nor its comment on the sheet. Moved clear
+<p>tcs-cfge writes neither a line's label nor its comment on the sheet. Moved clear
 of each other, labels still ran over the next bundle and over nodes, and a
 comment a paragraph long, the thermostat's over its two switches, was drawn
 across the log. A pointer resting on a line is shown a tip instead, over
@@ -1752,7 +1752,7 @@ corners.</p>
 </div>
 <div class="section" id="subdiagrams">
 <h2><a class="toc-backref" href="#toc-entry-30">Subdiagrams</a></h2>
-<p>tcs-gui opens each included file as a subdiagram under its name, keeps its
+<p>tcs-cfge opens each included file as a subdiagram under its name, keeps its
 path as the box's <tt class="docutils literal">path</tt> attribute, and writes each node, group and command
 binding back to the file it was read from. A subdiagram is renamed as a node
 is, its box being its name: its nodes, the lines to them and its exports go
@@ -1782,7 +1782,7 @@ the simulator file's -- but it is drawn against the payloads it joins, and put
 past the edge a line from a sensor to the zone it reads would cross the edge
 without leaving the page. A line from outside runs from the left margin across
 the Physics pane to its node, its end at the Physics pane's left edge
-(<tt class="docutils literal"><span class="pre">tcs_gui::inside_of</span></tt>).</p>
+(<tt class="docutils literal"><span class="pre">tcs_cfge::inside_of</span></tt>).</p>
 <p>The same three clicks join across the edge. Clicking a subdiagram's box with a
 line in hand offers a line to each node its file exports at that terminal, by
 name, greyed as any offer is greyed where it cannot be made; and a line taken
@@ -1815,7 +1815,7 @@ its counts and the same menus and edits: what can be done on one page can be
 done on every page, because there is nothing a second kind of window could
 leave out. The world is one, the simulator file's, and each of its components
 is drawn on one page: the page it was placed from, which the simulator file's
-<tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section records under <tt class="docutils literal">pages</tt> -- <tt class="docutils literal"><span class="pre">thermostat-common:</span> [zone]</tt> --
+<tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section records under <tt class="docutils literal">pages</tt> -- <tt class="docutils literal"><span class="pre">thermostat-common:</span> [zone]</tt> --
 and the top page for one it names under none. A component belongs with the
 payloads it stands beside, and a zone made for a subdiagram's sensors drawn on
 every page would be a box on the top page that nothing there is joined to. A
@@ -1933,7 +1933,7 @@ vehicle node is that a stream passing through it comes out somewhere, which is
 the shape of the whole graph. A log is the exception by having no data source at
 all: it is where a stream stops on purpose.</p>
 <p>Setting one aside is an edit, so undo takes it back, and it is written in the
-file's own <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section beside where the nodes were drawn: two people
+file's own <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section beside where the nodes were drawn: two people
 editing one configuration should not each have to decide again that a payload
 nobody reads yet is on purpose. It is remembered by node and kind, so a concern
 that stops applying leaves both lists by itself and comes back if the line it
@@ -2217,7 +2217,7 @@ not written, and a file the editor begins names each payload and nothing more.</
 <div class="section" id="the-simulator-s-file">
 <h2><a class="toc-backref" href="#toc-entry-42">The simulator's file</a></h2>
 <p>The simulator's own configuration is edited from the menu too, where the editor
-was given one: tcs-gui takes a second file name, and <strong>Edit simulated payload
+was given one: tcs-cfge takes a second file name, and <strong>Edit simulated payload
 groups</strong>, in the File menu, opens the groups of settings it declares. The entry
 is greyed when there is no second file rather than hidden -- a menu whose
 entries come and go is a menu nobody learns.</p>
@@ -2280,7 +2280,7 @@ agree, so one Save writes both and one Undo takes back whichever of them the
 last edit touched. Every setting is optional -- what a payload does not state
 it takes from the group it names -- so nothing in either place is marked.</p>
 <p><tt class="docutils literal">make runsimguiy</tt> and <tt class="docutils literal">make runsimguix</tt> open a configuration and the
-simulator file beside it, in YAML and in XML; <tt class="docutils literal">TCS_GUI_SIM</tt> names the second
+simulator file beside it, in YAML and in XML; <tt class="docutils literal">TCS_CFGE_SIM</tt> names the second
 file and defaults to the first's stem with <tt class="docutils literal">sim</tt> on the end, which is what
 the shipped sets are called. The simulator file is YAML whichever spelling the
 configuration is in, that being the one spelling it has.</p>
@@ -2320,11 +2320,11 @@ vehicle tried to open it.</p>
 <div class="section" id="the-description-tree">
 <h1><a class="toc-backref" href="#toc-entry-44">The Description Tree</a></h1>
 <p>What node types there are is data rather than code in the editor. A node type
-arrives as two files: Rust in tcspecial, and a description tcs-gui reads
-(<tt class="docutils literal"><span class="pre">tcs_gui::nodes</span></tt>). The shipped descriptions are under
-<tt class="docutils literal"><span class="pre">tcs-gui/share/nodes</span></tt>:</p>
+arrives as two files: Rust in tcspecial, and a description tcs-cfge reads
+(<tt class="docutils literal"><span class="pre">tcs_cfge::nodes</span></tt>). The shipped descriptions are under
+<tt class="docutils literal"><span class="pre">tcs-cfge/share/nodes</span></tt>:</p>
 <pre class="code text literal-block">
-tcs-gui/share/nodes/
+tcs-cfge/share/nodes/
   gateway_cfs.yaml  gateway_fprime.yaml  gateway_radio.yaml
   gateway_yamcs.yaml
   payload/          app_all_pl.yaml  app_pl.yaml  can.yaml ...
@@ -2345,8 +2345,8 @@ sit at the root of the tree because a gateway node has no Rust of its own: it
 is the vehicle's end of the link to what it answers to rather than part of the
 vehicle, and the code that serves one is the network payload's.</p>
 <p>The correspondence is checked both ways by
-<tt class="docutils literal"><span class="pre">tcs_gui::nodes::tests::every_description_has_its_rust</span></tt>: a description with no
-Rust is a node the editor offers and the vehicle cannot run, and a node type
+<tt class="docutils literal"><span class="pre">tcs_cfge::nodes::tests::every_description_has_its_rust</span></tt>: a description with
+no Rust is a node the editor offers and the vehicle cannot run, and a node type
 implemented and not described is one nobody can place. The second direction is
 asked of the directories the descriptions cover, so that once a family has one
 description in it, every file in that family needs one -- which is what keeps a
@@ -2372,7 +2372,7 @@ cares which a given node used -- one of the shipped ones is XML for exactly
 that reason, <tt class="docutils literal">vehicle/compute/process.xml</tt>. One file per node, in one
 spelling, which
 <tt class="docutils literal">every_node_is_described_once_and_in_one_spelling</tt>, in
-<tt class="docutils literal"><span class="pre">tcs-gui/tests/schema.rs</span></tt>, says: a node described
+<tt class="docutils literal"><span class="pre">tcs-cfge/tests/schema.rs</span></tt>, says: a node described
 twice is two statements of what its terminals are. What it says:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">node</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">vote</span><span class="whitespace">                 </span><span class="comment single"># what the palette shows, and the name a placed</span><span class="whitespace">
@@ -2401,9 +2401,9 @@ two states, and <tt class="docutils literal">text</tt>, <tt class="docutils lite
 is <tt class="docutils literal">text</tt>; <tt class="docutils literal">process.xml</tt> states a <tt class="docutils literal">path</tt>, an <tt class="docutils literal">interval</tt> and a
 <tt class="docutils literal">boolean</tt>.</p>
 <p>The shape of one of those files has two schemas of its own, <tt class="docutils literal">node.xsd</tt> and
-<tt class="docutils literal">node.schema.json</tt>, in <tt class="docutils literal"><span class="pre">tcs-gui/share/schema</span></tt> and installed with the tree;
+<tt class="docutils literal">node.schema.json</tt>, in <tt class="docutils literal"><span class="pre">tcs-cfge/share/schema</span></tt> and installed with the tree;
 they are held against each other and against the reader by
-<tt class="docutils literal"><span class="pre">tcs-gui/tests/schema.rs</span></tt>.</p>
+<tt class="docutils literal"><span class="pre">tcs-cfge/tests/schema.rs</span></tt>.</p>
 <p><tt class="docutils literal">sets</tt> is what turns one node type into several things to place. <tt class="docutils literal">compute</tt>
 is one type, and the tree makes it five entries -- <tt class="docutils literal">process</tt>,
 <tt class="docutils literal">thermostat</tt>, <tt class="docutils literal">to_kelvin</tt>, <tt class="docutils literal">to_value</tt> and <tt class="docutils literal">vote</tt> -- each a compute
@@ -2442,13 +2442,13 @@ twice is two descriptions of one name, refused as above.</p>
 </div>
 <div class="section" id="schemas-beside-the-tree">
 <h1><a class="toc-backref" href="#toc-entry-45">Schemas Beside the Tree</a></h1>
-<p><tt class="docutils literal">tcsprotocol/schema</tt> holds a schema for each file tcs-gui edits, in each
+<p><tt class="docutils literal">tcsprotocol/schema</tt> holds a schema for each file tcs-cfge edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
 tcsprotocol's rather than this editor's, because every program that reads a
 configuration reads those formats; they are installed under
 <tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcspecial/schema</span></tt>. The schemas of the editor's own node
-descriptions stay with it, in <tt class="docutils literal"><span class="pre">tcs-gui/share/schema</span></tt>.</p>
+descriptions stay with it, in <tt class="docutils literal"><span class="pre">tcs-cfge/share/schema</span></tt>.</p>
 <p>What they are for is the one thing an editor cannot do for a file somebody is
 writing by hand or with another tool: tell them, in their own editor, that
 <tt class="docutils literal">payloads</tt> is a section and <tt class="docutils literal">payload</tt> is not. A JSON Schema is what an
@@ -2473,7 +2473,7 @@ file is read instead, and so is a type written twice in a section. A node's
 name is an attribute of its element, which the XSD does require exactly once.
 The same holds for a configuration's sections: <tt class="docutils literal">include</tt>, <tt class="docutils literal">payload_groups</tt>
 and <tt class="docutils literal">commands</tt> are lists, repeated, so the <tt class="docutils literal">tcspecial</tt>, node and
-<tt class="docutils literal"><span class="pre">tcs-gui</span></tt> sections written twice are refused where the file is read. The
+<tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> sections written twice are refused where the file is read. The
 <tt class="docutils literal">description</tt> is held to once by the XSD as well, through an identity
 constraint, which can count a section that is a value and not one of child
 elements. A simulator file has no list among its sections, so its XSD is an
@@ -2508,10 +2508,10 @@ written by <tt class="docutils literal"><span class="pre">sim::to_yaml</span></t
 XSD, the editor writing that file in YAML and nothing else -- the XML spelling
 of that schema is shipped for a file written by hand.</p>
 <p>Nothing aboard reads any of these references. They are for the person editing
-the file, in the same way the <tt class="docutils literal"><span class="pre">tcs-gui</span></tt> section is.</p>
+the file, in the same way the <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section is.</p>
 <p>A schema nothing is checked against is worse than no schema: it refuses files
 the software accepts, or accepts what the software refuses, and either way the
-person believes the schema. So <tt class="docutils literal"><span class="pre">tcs-gui/tests/schema.rs</span></tt> holds each against
+person believes the schema. So <tt class="docutils literal"><span class="pre">tcs-cfge/tests/schema.rs</span></tt> holds each against
 the lists the software itself reads from -- the section's parameters from
 <tt class="docutils literal"><span class="pre">graph::parameters::ATTRIBUTES</span></tt>, the simulator's settings from
 <tt class="docutils literal"><span class="pre">sim_config::SETTINGS</span></tt> -- rather than against a copy written out there, which
@@ -2529,22 +2529,22 @@ everywhere -- so a note somebody typed in the editor made the file unreadable
 rather than merely different. The writer now folds a run of hyphens to one in
 an XML comment, which is a thing the XML spelling does not preserve.</p>
 <p>Where the tree is -- the first of these that exists, the schemas being found
-in the same place: <tt class="docutils literal">$TCS_GUI_DATA</tt>, then
-<tt class="docutils literal"><span class="pre">$XDG_DATA_HOME/tcs-gui</span></tt> (or <tt class="docutils literal"><span class="pre">~/.local/share/tcs-gui</span></tt>), then
-<tt class="docutils literal"><span class="pre">share/tcs-gui</span></tt> one level up from the directory the editor's own executable
-is in, then <tt class="docutils literal"><span class="pre">/usr/local/share/tcs-gui</span></tt>, then <tt class="docutils literal"><span class="pre">/usr/share/tcs-gui</span></tt>, then
-<tt class="docutils literal"><span class="pre">tcs-gui/share</span></tt> and <tt class="docutils literal">share</tt> under the working directory. The user's own
+in the same place: <tt class="docutils literal">$TCS_CFGE_DATA</tt>, then
+<tt class="docutils literal"><span class="pre">$XDG_DATA_HOME/tcs-cfge</span></tt> (or <tt class="docutils literal"><span class="pre">~/.local/share/tcs-cfge</span></tt>), then
+<tt class="docutils literal"><span class="pre">share/tcs-cfge</span></tt> one level up from the directory the editor's own executable
+is in, then <tt class="docutils literal"><span class="pre">/usr/local/share/tcs-cfge</span></tt>, then <tt class="docutils literal"><span class="pre">/usr/share/tcs-cfge</span></tt>, then
+<tt class="docutils literal"><span class="pre">tcs-cfge/share</span></tt> and <tt class="docutils literal">share</tt> under the working directory. The user's own
 directory before the installed one, because that is where edited
 descriptions belong and where a person's own node goes; the install the
 editor is part of before any other, found from the program rather than
-named, so that <tt class="docutils literal"><span class="pre">/opt/tcs/bin/tcs-gui</span></tt> reads <tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-gui</span></tt> and
+named, so that <tt class="docutils literal"><span class="pre">/opt/tcs/bin/tcs-cfge</span></tt> reads <tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-cfge</span></tt> and
 an install under another prefix reads its own; the working directory last,
 so that running the editor out of a checkout finds the checkout's own.
 <tt class="docutils literal">make <span class="pre">install-data</span></tt>, which <tt class="docutils literal">make <span class="pre">install-files</span></tt> runs, puts them under
-<tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcs-gui</span></tt>, <tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-gui</span></tt> by default:
+<tt class="docutils literal"><span class="pre">$(PREFIX)/share/tcs-cfge</span></tt>, <tt class="docutils literal"><span class="pre">/opt/tcs/share/tcs-cfge</span></tt> by default:
 architecture-independent data belonging to one package, which is where the
-filesystem hierarchy standard puts it. <tt class="docutils literal"><span class="pre">/usr/local/share/tcs-gui</span></tt> and
-<tt class="docutils literal"><span class="pre">/usr/share/tcs-gui</span></tt> are where installing put them before everything went
+filesystem hierarchy standard puts it. <tt class="docutils literal"><span class="pre">/usr/local/share/tcs-cfge</span></tt> and
+<tt class="docutils literal"><span class="pre">/usr/share/tcs-cfge</span></tt> are where installing put them before everything went
 under one prefix, and are still read.</p>
 </div>
 <div class="section" id="see-also">
@@ -2555,8 +2555,8 @@ under one prefix, and are still read.</p>
 <dt><a class="reference external" href="tcspecial-design.html">The tcspecial design</a></dt>
 <dd>The flight software and what the programs share: the node architecture,
 the configuration file, the link, fault resiliency and the requirements.</dd>
-<dt><a class="reference external" href="tcs-gui.html">The tcs-gui manual</a></dt>
-<dd>Using tcs-gui.</dd>
+<dt><a class="reference external" href="tcs-cfge.html">The tcs-cfge manual</a></dt>
+<dd>Using tcs-cfge.</dd>
 </dl>
 </div>
 </div>

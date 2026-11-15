@@ -65,7 +65,7 @@ SINKS = ("world-in", "moc-in")
 #: a line's ``terminators`` and a consolidator's ``send``.
 LISTED = ("terminators", "send")
 
-#: Where the schemas are: a link to tcs-gui's ``share/schema``, the one copy,
+#: Where the schemas are: a link to tcs-cfge's ``share/schema``, the one copy,
 #: beside this module so that an installed package has them too, as the
 #: XTCE documents are (see :mod:`tcsprotocol.interface`).
 SCHEMAS = Path(__file__).resolve().parent / "schema"
@@ -1369,7 +1369,7 @@ def _with_includes(path):
 
 def node_types(section):
     """The node types a section may hold, as a file spells them: the
-    schema's list, which tcs-gui's schema tests hold to
+    schema's list, which tcs-cfge's schema tests hold to
     ``tcsprotocol::graph::types_in``.
 
     Args:
@@ -1595,7 +1595,7 @@ def _xml_old(reader, root):
            "vehicle": ("vehicle", "compute"),
            "payloads": ("payloads", "payload")}
     for element in root.children:
-        if element.tag == "tcs-gui":
+        if element.tag == "tcs-cfge":
             for child in element.children:
                 if child.tag == "nodes":
                     stale = child.find("name") is not None
@@ -1607,8 +1607,8 @@ def _xml_old(reader, root):
                     stale = False
                 if stale:
                     raise reader.refuse(child.line,
-                                        f"<{child.tag}> in the tcs-gui section "
-                                        "is written as it was before the "
+                                        f"<{child.tag}> in the tcs-cfge "
+                                        "section is written as it was before the "
                                         "editor's section named nodes as the "
                                         "sections do; " + CONVERTER)
             continue
@@ -1913,11 +1913,11 @@ def _load_xml(path):
                                 "arrives on, <from>, and what it sets, <sets>")
         reader.commands.append((came.text.strip(), sets.text.strip()))
 
-    layout = root.find("tcs-gui")
+    layout = root.find("tcs-cfge")
     for part in layout.children if layout is not None else []:
         if part.tag not in ("nodes", "set-aside"):
             raise reader.refuse(part.line,
-                                f"the tcs-gui section has no <{part.tag}>")
+                                f"the tcs-cfge section has no <{part.tag}>")
         seen = set()
         for entry in part.children:
             if entry.tag != "node":
@@ -2013,7 +2013,7 @@ def _yaml_old(reader, root):
     for key_node, value in root.value:
         key = str(key_node.value)
         items = value.value if isinstance(value, yaml.SequenceNode) else []
-        if key == "tcs-gui" and isinstance(value, yaml.MappingNode):
+        if key == "tcs-cfge" and isinstance(value, yaml.MappingNode):
             for part, placed in value.value:
                 if (part.value != "nodes"
                         or not isinstance(placed, yaml.SequenceNode)):
@@ -2250,11 +2250,11 @@ def _load_yaml(path):
                                     _scalar(binding["sets"]).strip()))
 
     for key, value, at in sections:
-        if key != "tcs-gui":
+        if key != "tcs-cfge":
             continue
-        for part, entries, line in _yaml_mapping(reader, value, "tcs-gui"):
+        for part, entries, line in _yaml_mapping(reader, value, "tcs-cfge"):
             if part not in ("nodes", "set-aside"):
-                raise reader.refuse(line, f"the tcs-gui section has no {part}")
+                raise reader.refuse(line, f"the tcs-cfge section has no {part}")
             seen = set()
             for entry in _yaml_list(reader, entries, part):
                 said = {

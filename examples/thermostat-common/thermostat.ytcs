@@ -160,7 +160,7 @@ commands:
   # the zone temperature the heaters are held at, in kelvin
   - { from: gateway, sets: thermostat.setpoint }
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: consensus_temp, x: 525, y: 204 }
     - { node: gpio-out-tmass1, x: 34, y: 393 }

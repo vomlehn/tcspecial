@@ -94,12 +94,12 @@
             </compute>
         </type>
     </vehicle>
-    <tcs-gui>
+    <tcs-cfge>
         <nodes>
             <node name="gateway" x="34" y="34"/>
             <node name="ping1" x="469" y="34"/>
             <node name="ping2" x="469" y="200"/>
             <node name="ping3" x="469" y="366"/>
         </nodes>
-    </tcs-gui>
+    </tcs-cfge>
 </configuration>

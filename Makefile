@@ -4,7 +4,7 @@
 PROJECT_NAME := tcspecial
 MOC_NAME := tcs-moc
 SIM_NAME := tcs-sim
-GUI_NAME := tcs-gui
+GUI_NAME := tcs-cfge
 DOCS_DIR := docs
 
 DESIGN=$(DOCS_DIR)/design.rst
@@ -35,7 +35,7 @@ RUST = .
 #   lib/         libtcsmoc-c, its pkg-config file, and the Python packages,
 #                in lib/python3/site-packages, which names no minor version
 #   include/     tcsmoc-c.h
-#   share/       tcs-gui's data, the documents and the example configurations
+#   share/       tcs-cfge's data, the documents and the example configurations
 #
 # HOOKS=1 also installs what makes /opt/tcs usable without being told: a
 # profile.d script per package that puts bin/ on PATH, an ld.so.conf.d file
@@ -73,9 +73,9 @@ DATADIR = $(PREFIX)/share
 DOCDIR = $(DATADIR)/doc
 EXAMPLEDIR = $(DATADIR)/examples/$(PROJECT_NAME)
 PYTHONDIR = $(LIBDIR)/python3/site-packages
-TCS_GUI_DATA = $(DESTDIR)$(DATADIR)/$(GUI_NAME)
+TCS_CFGE_DATA = $(DESTDIR)$(DATADIR)/$(GUI_NAME)
 # The XTCS, YTCS and simulator schemas, tcsprotocol/schema: tcspecial's and
-# not tcs-gui's, since they define the formats every program reads.
+# not tcs-cfge's, since they define the formats every program reads.
 SCHEMADIR = $(DATADIR)/tcspecial/schema
 
 # Where the hooks go. Debian's places; the RPM writes its .pth file when
@@ -156,18 +156,18 @@ help:
 	@echo "  make build       - Build tcspecial"
 	@echo "  make buildmoc    - Build tcs-moc"
 	@echo "  make buildsim    - Build tcs-sim"
-	@echo "  make buildgui    - Build tcs-gui"
+	@echo "  make buildgui    - Build tcs-cfge"
 	@echo "  make test        - Run all tests"
 	@echo "  make run         - Run tcspecial"
 	@echo "  make runmocy     - Run tcs-moc, which starts tcspecial and" \
 		"tcs-sim"
 	@echo "  make runmocx     - As runmocy, on the XML configuration"
 	@echo "  make runsim      - Run tcs-sim alone"
-	@echo "  make runguiy     - Run tcs-gui on the YAML configuration"
-	@echo "  make runguix     - Run tcs-gui on the XML configuration"
-	@echo "  make runsimguiy  - Run tcs-gui on the YAML configuration and" \
-		"the simulator's"
-	@echo "  make runsimguix  - Run tcs-gui on the XML configuration and" \
+	@echo "  make runguiy     - Run tcs-cfge on the YAML configuration"
+	@echo "  make runguix     - Run tcs-cfge on the XML configuration"
+	@echo "  make runsimguiy  - Run tcs-cfge on the YAML configuration" \
+		"and the simulator's"
+	@echo "  make runsimguix  - Run tcs-cfge on the XML configuration and" \
 		"the simulator's"
 	@echo "  make runverifyy  - Check the payload set, reading its YAML"
 	@echo "  make runverifyx  - Check the payload set, reading its XML"
@@ -240,7 +240,7 @@ help:
 		"install-tcspecial-examples"
 	@echo "                   - Copy one package's files from a build" \
 		"already made"
-	@echo "  make install-data - Install tcs-gui's descriptions"
+	@echo "  make install-data - Install tcs-cfge's descriptions"
 	@echo "  make install-schemas - Install the configuration schemas"
 	@echo "  make uninstall-files - Take away what install-files put in" \
 		"place"
@@ -300,7 +300,7 @@ buildgui:
 	( \
 		set -eu; \
 		echo "Building the project..."; \
-		cd $(RUST) && cargo build $(RELEASE) --bin tcs-gui; \
+		cd $(RUST) && cargo build $(RELEASE) --bin tcs-cfge; \
 		echo "✓ Build complete" \
 	) 2>&1 | tee build.out
 
@@ -673,14 +673,15 @@ rmstubs:
 # beside it -- how a node is simulated is the node's own business -- so this
 # names the file itself rather than a stem the way the runverify targets do.
 #
-# The same TCS_GUI_FILE the editor takes, so that checking what was just edited
+# The same TCS_CFGE_FILE the editor takes, so that checking what was just edited
 # is the same name in both commands.
 .PHONY: verify
 verify:
 	( \
 		set -eu; \
-		echo "Checking $(TCS_GUI_FILE)..."; \
-		cd $(RUST) && cargo run -q --bin tcs-verify -- $(TCS_GUI_FILE) \
+		echo "Checking $(TCS_CFGE_FILE)..."; \
+		cd $(RUST) && cargo run -q --bin tcs-verify -- \
+			$(TCS_CFGE_FILE) \
 	)
 
 # The configuration to edit, and to check.
@@ -690,57 +691,57 @@ verify:
 # configuration and a simulator file either side of it -- where this is one
 # configuration, which has no simulator file beside it.
 #
-# It need not exist yet: tcs-gui writes it as edits are made and keeps its
+# It need not exist yet: tcs-cfge writes it as edits are made and keeps its
 # history beside it, so starting on a name that is not there is how a new
 # configuration is begun.
 #
 # The default is the shipped example, which is what somebody opening the
 # editor to see what it does wants to be looking at. It does get rewritten --
-# tcs-gui saves every edit as it is made, that being the point of it -- and
+# tcs-cfge saves every edit as it is made, that being the point of it -- and
 # that is a thing the example can survive where a scratch file could not: it
 # is in the repository, so a stray edit shows up in `git status` and comes
 # back with `git checkout example.ytcs`, where an editor opened on a name
 # nobody keeps leaves its work somewhere nobody looks.
 #
 #   make runguiy
-#   make runguiy TCS_GUI_FILE=tests/manual/thermostat
-#   make verify  TCS_GUI_FILE=example.ytcs
-TCS_GUI_FILE = example.ytcs
+#   make runguiy TCS_CFGE_FILE=tests/manual/thermostat
+#   make verify  TCS_CFGE_FILE=example.ytcs
+TCS_CFGE_FILE = example.ytcs
 
 # The simulator's own configuration, for the runsimgui targets.
 #
-# Named by its stem, like TCS_GUI_FILE, and defaulting to the configuration's
+# Named by its stem, like TCS_CFGE_FILE, and defaulting to the configuration's
 # stem with `sim` on the end -- which is what the shipped sets are called, and
 # is the one convention there is. The runguiy and runguix targets ignore it: a
 # session given no simulator file edits the configuration alone, and the menu
 # entry that would edit the simulator's groups is greyed.
 #
 #   make runsimguiy
-#   make runsimguiy TCS_GUI_FILE=vehicle TCS_GUI_SIM=othersim
-TCS_GUI_SIM = $(basename $(TCS_GUI_FILE))sim
+#   make runsimguiy TCS_CFGE_FILE=vehicle TCS_CFGE_SIM=othersim
+TCS_CFGE_SIM = $(basename $(TCS_CFGE_FILE))sim
 
-# Running tcs-gui on one spelling of a configuration.
+# Running tcs-cfge on one spelling of a configuration.
 #
 # $(1) is that spelling -- ytcs or xtcs -- as runmoc_on takes it, and for the
 # same reason: a configuration may be written in either, the two describe the
 # same graph, and the extension is what says which to write. An editor that
 # only ever opened the YAML would leave the XML to be written by hand.
 #
-# The spelling comes from the target and not from TCS_GUI_FILE, so whatever
+# The spelling comes from the target and not from TCS_CFGE_FILE, so whatever
 # extension that variable carries is replaced -- exactly as runmoc_on replaces
 # the one on a payload set's stem.
 define rungui_on
 	( \
 		set -eu; \
-		mkdir -p $(dir $(TCS_GUI_FILE)); \
+		mkdir -p $(dir $(TCS_CFGE_FILE)); \
 		echo "Running $(GUI_NAME) on" \
-			"$(basename $(TCS_GUI_FILE)).$(1)..."; \
-		cd $(RUST) && cargo run -q --bin tcs-gui -- \
-			$(basename $(TCS_GUI_FILE)).$(1) \
+			"$(basename $(TCS_CFGE_FILE)).$(1)..."; \
+		cd $(RUST) && cargo run -q --bin tcs-cfge -- \
+			$(basename $(TCS_CFGE_FILE)).$(1) \
 	)
 endef
 
-# Running tcs-gui on one spelling of a configuration and a simulator
+# Running tcs-cfge on one spelling of a configuration and a simulator
 # configuration beside it.
 #
 # $(1) is the configuration's spelling, as rungui_on takes it. $(2) is the
@@ -748,18 +749,19 @@ endef
 #
 # The simulator file is YAML whichever spelling the configuration is in, and
 # that is not an oversight: a simulator configuration is a YAML file, and
-# tcs-gui refuses a second argument whose name does not say so. A session
+# tcs-cfge refuses a second argument whose name does not say so. A session
 # editing the XML spelling of a graph is still editing the one simulator file
 # beside it.
 define tcs_simgui_on
 	( \
 		set -eu; \
-		mkdir -p $(dir $(TCS_GUI_FILE)) $(dir $(2)); \
+		mkdir -p $(dir $(TCS_CFGE_FILE)) $(dir $(2)); \
 		echo "Running $(GUI_NAME) on" \
-			"$(basename $(TCS_GUI_FILE)).$(1) and" \
+			"$(basename $(TCS_CFGE_FILE)).$(1) and" \
 			"$(basename $(2)).yaml..."; \
-		cd $(RUST) && cargo run -q --bin tcs-gui -- \
-			$(basename $(TCS_GUI_FILE)).$(1) $(basename $(2)).yaml \
+		cd $(RUST) && cargo run -q --bin tcs-cfge -- \
+			$(basename $(TCS_CFGE_FILE)).$(1) \
+			$(basename $(2)).yaml \
 	)
 endef
 
@@ -781,11 +783,11 @@ runguix:
 # the simulator's groups.
 .PHONY: runsimguiy
 runsimguiy:
-	$(call tcs_simgui_on,ytcs,$(TCS_GUI_SIM))
+	$(call tcs_simgui_on,ytcs,$(TCS_CFGE_SIM))
 
 .PHONY: runsimguix
 runsimguix:
-	$(call tcs_simgui_on,xtcs,$(TCS_GUI_SIM))
+	$(call tcs_simgui_on,xtcs,$(TCS_CFGE_SIM))
 
 # Clean build artifacts
 .PHONY: clean
@@ -826,7 +828,7 @@ distclean: clean
 #   tcspecial       operational code: what flies, the flight executive
 #   tcsmoc          operational code: what a ground station is built on,
 #                   libtcsmoc-c and the Python tcsprotocol and tcsmoc
-#   tcs-tools       software tools: tcs-gui and tcs-verify, which write and
+#   tcs-tools       software tools: tcs-cfge and tcs-verify, which write and
 #                   check configurations, and tcs_ui
 #   tcspecial-test  verification tools: tcs-moc, tcs-sim, the test segsend
 #                   and the five test apps
@@ -856,7 +858,7 @@ distclean: clean
 # the file or overwrites it on an upgrade. The test one goes in the same
 # bin, beside tcspecial, which is where tcspecial looks for it.
 FLIGHT_BIN := tcspecial
-TOOLS_BIN := tcs-gui tcs-verify tcs-conflict
+TOOLS_BIN := tcs-cfge tcs-verify tcs-conflict
 TEST_BIN := tcs-moc tcs-sim segsend
 TEST_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
 EXAMPLES_BIN := beacon lorem_gateway
@@ -872,7 +874,7 @@ RELEASE_ATTRIBUTION := slint
 EXAMPLES_CRATES := beacon_example simple_app
 
 # The crates those come from, built together by install-build.
-INSTALL_CRATES := tcspecial tcs-verify tcs-conflict tcs-gui tcsmoc-c \
+INSTALL_CRATES := tcspecial tcs-verify tcs-conflict tcs-cfge tcsmoc-c \
 		  tcs-moc tcs-sim \
 		  $(TEST_LIBEXEC) $(EXAMPLES_CRATES)
 
@@ -883,7 +885,7 @@ INSTALL_CRATES := tcspecial tcs-verify tcs-conflict tcs-gui tcsmoc-c \
 # crate's.
 FLIGHT_CRATES := tcspecial
 MOC_CRATES := tcsmoc-c
-TOOLS_CRATES := tcs-gui tcs-verify tcs-conflict
+TOOLS_CRATES := tcs-cfge tcs-verify tcs-conflict
 TEST_CRATES := tcs-moc tcs-sim tcspecial $(TEST_LIBEXEC)
 
 # Where cargo puts a release build.
@@ -1143,7 +1145,7 @@ install-tcsmoc: install-schemas tcs-helpers tcs-xtce
 			"$(LIBTCS_SONAME)."; \
 	fi
 
-# The software tools: tcs-gui, the configuration editor, with its data;
+# The software tools: tcs-cfge, the configuration editor, with its data;
 # tcs-verify, the configuration checker; and tcs_ui, the Python window
 # pieces, whose distribution, tcs-ui, is pip's to install from a copy of
 # tcs-ui/python, as tcsmoc's is, and which has a .pth file of its own.
@@ -1275,29 +1277,29 @@ install-tcspecial-test: tcs-helpers
 		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-test.sh; \
 	fi
 
-# Install tcs-gui's data -- the description tree and its schemas -- for
+# Install tcs-cfge's data -- the description tree and its schemas -- for
 # tcs-tools.
 #
-# The whole of tcs-gui/share, with its structure: the description tree's shape
+# The whole of tcs-cfge/share, with its structure: the description tree's shape
 # is part of what it means -- a description at vehicle/compute/vote.yaml is
 # about the Rust at node/vehicle/compute/vote.rs -- so a flat copy would lose
 # half of it.
 #
-# Into share/tcs-gui under the prefix, which is where an installed tcs-gui
-# looks: one level up from its own bin. See `tcs_gui::nodes::data_dir` for
+# Into share/tcs-cfge under the prefix, which is where an installed tcs-cfge
+# looks: one level up from its own bin. See `tcs_cfge::nodes::data_dir` for
 # where the editor looks and in what order.
 #
 # Mode 644 and directories 755: these are read by everybody and written by
 # whoever installed them. A person's own descriptions belong in
-# $XDG_DATA_HOME/tcs-gui, which the editor looks in first, rather than in a
+# $XDG_DATA_HOME/tcs-cfge, which the editor looks in first, rather than in a
 # directory that an upgrade overwrites.
 .PHONY: install-data
 install-data:
-	@echo "Installing $(GUI_NAME) data into $(TCS_GUI_DATA)..."
+	@echo "Installing $(GUI_NAME) data into $(TCS_CFGE_DATA)..."
 	@cd $(GUI_NAME)/share && find . -type d \
-		-exec install -d -m 755 $(TCS_GUI_DATA)/{} \;
+		-exec install -d -m 755 $(TCS_CFGE_DATA)/{} \;
 	@cd $(GUI_NAME)/share && find . -type f \
-		-exec install -m 644 {} $(TCS_GUI_DATA)/{} \;
+		-exec install -m 644 {} $(TCS_CFGE_DATA)/{} \;
 	@echo "✓ $(GUI_NAME) data installed"
 
 # Install the XTCS, YTCS and simulator schemas of tcsprotocol/schema under
@@ -1339,7 +1341,7 @@ uninstall-files:
 	rm -f $(DESTDIR)$(LIBDIR)/pkgconfig/tcsmoc-c.pc
 	rm -rf $(addprefix $(DESTDIR)$(PYTHONDIR)/,tcsprotocol tcsmoc \
 		tcs_ui tcspecial_moc-*.dist-info tcs_ui-*.dist-info)
-	rm -rf $(TCS_GUI_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
+	rm -rf $(TCS_CFGE_DATA) $(DESTDIR)$(DATADIR)/tcspecial \
 		$(DESTDIR)$(EXAMPLEDIR) \
 		$(addprefix $(DESTDIR)$(DOCDIR)/,$(PACKAGES))
 	if [ "$(HOOKS)" = 1 ]; then \
@@ -1546,17 +1548,17 @@ screenshots-tcs-sim:
 	cd $(RUST) && cargo test -p tcs-sim --bin tcs-sim -- --ignored --exact \
 		shots::screenshots
 
-# Make the tcs-gui manual's screenshots, docs/shots/tcs-gui-*.png, again: its
+# Make the tcs-cfge manual's screenshots, docs/shots/tcs-cfge-*.png, again: its
 # windows, opened by its own code on copies of the battery example, driven
 # through the presses and callbacks a person's gestures reach, and drawn in
 # memory by Slint's software renderer, so that no window opens and nothing
 # under examples is written. An ignored test, run alone because Slint takes
 # one platform per process; never part of make test, make check or make
 # html-check, the fonts differing between machines.
-.PHONY: screenshots-tcs-gui
-screenshots-tcs-gui:
-	cd $(RUST) && cargo test -p tcs-gui --bin tcs-gui -- --ignored --exact \
-		shots::screenshots
+.PHONY: screenshots-tcs-cfge
+screenshots-tcs-cfge:
+	cd $(RUST) && cargo test -p tcs-cfge --bin tcs-cfge -- --ignored \
+		--exact shots::screenshots
 
 # Make the tcs-moc manual's screenshots, docs/shots/tcs-moc-*.png, again: its
 # windows, on the thermostat and ping examples, wired as it wires them, fed
@@ -1576,7 +1578,7 @@ screenshots-tcs-moc:
 # a process of its own; the pages that show them are made again by the
 # pre-commit hook when they are committed.
 .PHONY: screenshots
-screenshots: screenshots-tcs-gui screenshots-tcs-moc screenshots-tcs-sim
+screenshots: screenshots-tcs-cfge screenshots-tcs-moc screenshots-tcs-sim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.

@@ -1,0 +1,11 @@
+Schemas for tcs-cfge's own node descriptions, the files under share/nodes that
+say what each node type asks for and how tcs-cfge draws it.
+
+    node.xsd             a description, written in XML
+    node.schema.json     the same, written in YAML
+
+The schemas of the configurations tcs-cfge edits -- XTCS and YTCS -- are not
+here: they are tcsprotocol's, in tcsprotocol/schema, since every program
+reads those formats.
+
+Installed by `make install-data` under $(PREFIX)/share/tcs-cfge/schema.

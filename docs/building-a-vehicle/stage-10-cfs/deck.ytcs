@@ -122,7 +122,7 @@ payloads:
         world-out:
           - gateway.camera
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: camera, x: 34, y: 600 }
     - { node: gateway, x: 790, y: 34 }

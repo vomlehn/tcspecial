@@ -8,7 +8,7 @@
 //! worse rather than information, for a program that starts tcspecial to
 //! show something else. What stops a start is said either way.
 //!
-//! `--visual` opens a window showing the graph as tcs-gui draws it, each link
+//! `--visual` opens a window showing the graph as tcs-cfge draws it, each link
 //! lit as data crosses it, in a tcspecial built with the `visual` feature;
 //! one built without it says so and exits. Never in flight: see
 //! `tcspecial::visual`. It is refused under `--simulate=none`, the flight
@@ -282,7 +282,7 @@ fn main() {
 /// Asked before anything else is read from it and said in tcs-verify's own
 /// words: every problem at once, each with its file and line, rather than
 /// whichever of them a loader happened to meet first. The same lines
-/// tcs-moc, tcs-sim and tcs-gui show as they start.
+/// tcs-moc, tcs-sim and tcs-cfge show as they start.
 ///
 /// Refused on a warning as well: a node whose attributes are not all in is
 /// a node that cannot be opened, so aboard it is not a question of degree

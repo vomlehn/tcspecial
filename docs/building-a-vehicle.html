@@ -408,8 +408,8 @@ their own to describe.</li>
 manual's &quot;Installing&quot;), and the reader has run the minimal example once.</li>
 </ul>
 <div class="figure">
-<img alt="tcs-gui showing the finished deck: the top file, with two subsystem boxes, science and thermal, the camera, and the gateway node, joined by lines to the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
-<p class="caption">Where the guide ends: the deck of stage 9 as tcs-gui draws it, its two
+<img alt="tcs-cfge showing the finished deck: the top file, with two subsystem boxes, science and thermal, the camera, and the gateway node, joined by lines to the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
+<p class="caption">Where the guide ends: the deck of stage 9 as tcs-cfge draws it, its two
 subsystems collapsed into boxes, the camera beside them, and every line
 ending at the gateway node.</p>
 </div>
@@ -508,8 +508,8 @@ reads straight to the ground over the <tt class="docutils literal">tcspecial</tt
 sorted, counting from nought. The seismometer is the only node, so it is 0,
 and the ground hears it on 127.0.0.1:6100.</p>
 <div class="figure">
-<img alt="tcs-gui showing one network payload, seismometer, in the Payloads column, with no lines." src="shots/vehicle-stage-01.png" style="width: 100%;" />
-<p class="caption">Stage 1 in tcs-gui: one payload, nothing drawn from it.</p>
+<img alt="tcs-cfge showing one network payload, seismometer, in the Payloads column, with no lines." src="shots/vehicle-stage-01.png" style="width: 100%;" />
+<p class="caption">Stage 1 in tcs-cfge: one payload, nothing drawn from it.</p>
 </div>
 <p>Check it, then run it:</p>
 <pre class="code console literal-block">
@@ -583,7 +583,7 @@ the configuration -- tcsmoc's and tcs-moc's do -- rather than from a list
 written beside it, and why <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt> (<a class="reference internal" href="#checking-the-whole-vehicle">Checking the whole
 vehicle</a>) lists every port a configuration uses.</p>
 <div class="figure">
-<img alt="tcs-gui showing two payloads, seismometer and regolith_thermometer, with no lines." src="shots/vehicle-stage-02.png" style="width: 100%;" />
+<img alt="tcs-cfge showing two payloads, seismometer and regolith_thermometer, with no lines." src="shots/vehicle-stage-02.png" style="width: 100%;" />
 <p class="caption">Stage 2: two payloads, each still reporting straight to the ground.</p>
 </div>
 <p><em>See:</em> &quot;A Serial Payload&quot; in the tcspecial manual.</p>
@@ -651,7 +651,7 @@ one place to receive everything from:</p>
 
 </pre>
 <div class="figure">
-<img alt="tcs-gui showing the thermometer feeding regolith_kelvin, and regolith_kelvin and the seismometer feeding the gateway node." src="shots/vehicle-stage-03.png" style="width: 100%;" />
+<img alt="tcs-cfge showing the thermometer feeding regolith_kelvin, and regolith_kelvin and the seismometer feeding the gateway node." src="shots/vehicle-stage-03.png" style="width: 100%;" />
 <p class="caption">Stage 3: the first computation, and the gateway node on the right.</p>
 </div>
 <p><em>See:</em> &quot;The vocabulary&quot; and the computations in the tcspecial manual.</p>
@@ -701,10 +701,10 @@ commands:
 
 </pre>
 <div class="figure">
-<img alt="tcs-gui showing probe_thermostat fed by regolith_kelvin, with a line from its lower left back to probe_heater." src="shots/vehicle-stage-04.png" style="width: 100%;" />
+<img alt="tcs-cfge showing probe_thermostat fed by regolith_kelvin, with a line from its lower left back to probe_heater." src="shots/vehicle-stage-04.png" style="width: 100%;" />
 <p class="caption">Stage 4: the thermostat's decision travelling back to the heater.</p>
 </div>
-<p>From here on tcs-gui's toolbar says <em>2 concerns</em>. A concern is a shape that
+<p>From here on tcs-cfge's toolbar says <em>2 concerns</em>. A concern is a shape that
 may be a mistake and may be meant, never something that stops the
 configuration being read or flown, and these two are meant:</p>
 <ul class="simple">
@@ -844,7 +844,7 @@ sensor that stops reporting does not stop the deck from knowing its
 temperature. In tcs-sim, fail one sensor and watch <tt class="docutils literal">hull_temp</tt> hold while
 the failed sensor's own reading goes astray.</p>
 <div class="figure">
-<img alt="tcs-gui showing three hull_temp payloads, each feeding a hull_kelvin conversion, the three conversions feeding hull_temp, and everything reaching the gateway." src="shots/vehicle-stage-06.png" style="width: 100%;" />
+<img alt="tcs-cfge showing three hull_temp payloads, each feeding a hull_kelvin conversion, the three conversions feeding hull_temp, and everything reaching the gateway." src="shots/vehicle-stage-06.png" style="width: 100%;" />
 <p class="caption">Stage 6: the deck in one file, at the size where one file stops being
 comfortable.</p>
 </div>
@@ -876,8 +876,8 @@ says which of its nodes a line from another file may reach, in its
 which list to add the node to. Device ids, and so ports, do not change: a
 node is known by its name in every file.</p>
 <div class="figure">
-<img alt="tcs-gui showing two subdiagram boxes, science and thermal, each with several lines to the gateway node." src="shots/vehicle-stage-07.png" style="width: 100%;" />
-<p class="caption">Stage 7: the same graph as stage 6, drawn as tcs-gui draws included
+<img alt="tcs-cfge showing two subdiagram boxes, science and thermal, each with several lines to the gateway node." src="shots/vehicle-stage-07.png" style="width: 100%;" />
+<p class="caption">Stage 7: the same graph as stage 6, drawn as tcs-cfge draws included
 files: a box each, whose corners are its exports.</p>
 </div>
 <p>Two vehicles may include one file, as the thermostat examples share
@@ -958,10 +958,10 @@ for a camera, sending a numbered frame every ten seconds.</p>
 rebuilding the flight software; write a node type (see <a class="reference external" href="node-types.html">Writing node types</a>) for what many vehicles will need, checked as tcspecial
 checks its own.</p>
 <div class="figure">
-<img alt="tcs-gui showing the science and thermal boxes and the camera, all reaching the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
+<img alt="tcs-cfge showing the science and thermal boxes and the camera, all reaching the gateway." src="shots/vehicle-stage-09.png" style="width: 100%;" />
 <p class="caption">Stage 9: the whole deck.</p>
 </div>
-<p>tcs-gui draws each included file as a box, which is the right size for
+<p>tcs-cfge draws each included file as a box, which is the right size for
 editing and the wrong one for seeing what reaches what. Opened, the deck is
 this:</p>
 <div class="figure">
@@ -1160,7 +1160,7 @@ ground's agreeing to the configuration.</p>
 <li>The <a class="reference external" href="tcspecial.html">tcspecial manual</a>, for every payload type and
 attribute.</li>
 <li><a class="reference external" href="node-types.html">Writing node types</a>, for what no shipped type does.</li>
-<li>The <a class="reference external" href="tcs-gui.html">tcs-gui manual</a>, for drawing and editing the
+<li>The <a class="reference external" href="tcs-cfge.html">tcs-cfge manual</a>, for drawing and editing the
 configuration.</li>
 <li>The <a class="reference external" href="../examples/README.html">examples</a>, which the stages drew on.</li>
 </ul>
@@ -1174,8 +1174,8 @@ they cannot say other than the files do.</li>
 simulator file, holds the two spellings to each other, and checks each
 names the interface of the build; <tt class="docutils literal">make <span class="pre">set-interfaces</span></tt> and <tt class="docutils literal">make
 comparespellings</tt> take in the stages with the examples.</li>
-<li>The tcs-gui drawings are made by <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/screenshots.sh</span></tt>,
-which opens each stage in tcs-gui on an X display of its own and captures
+<li>The tcs-cfge drawings are made by <tt class="docutils literal"><span class="pre">docs/building-a-vehicle/screenshots.sh</span></tt>,
+which opens each stage in tcs-cfge on an X display of its own and captures
 it. The other figures are SVG drawn by hand, their colours the Okabe-Ito
 palette's, each paired with a label, a shape or a line style.</li>
 </ul>

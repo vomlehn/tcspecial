@@ -175,7 +175,7 @@
         <from>gateway</from>
         <sets>thermostat.setpoint</sets>
     </commands>
-    <tcs-gui>
+    <tcs-cfge>
         <nodes>
             <node name="consensus_temp" x="525" y="204"/>
             <node name="gpio-out-tmass1" x="34" y="393"/>
@@ -188,5 +188,5 @@
             <node name="to_k2" x="299" y="242"/>
             <node name="to_k3" x="299" y="317"/>
         </nodes>
-    </tcs-gui>
+    </tcs-cfge>
 </configuration>

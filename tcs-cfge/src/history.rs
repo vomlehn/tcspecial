@@ -7,15 +7,15 @@
 //!
 //! # Where
 //!
-//! In the user's state directory: `$XDG_STATE_HOME/tcs-gui`, or
-//! `~/.local/state/tcs-gui` where that is not set. The specification names this
-//! exact case -- "state that should persist between restarts but is not
+//! In the user's state directory: `$XDG_STATE_HOME/tcs-cfge`, or
+//! `~/.local/state/tcs-cfge` where that is not set. The specification names
+//! this exact case -- "state that should persist between restarts but is not
 //! important enough for data", with history and layout given as the examples
 //! -- and it is not the cache directory, because a cache is something a
 //! program can regenerate and this is not.
 //!
-//! It used to sit beside the configuration, as `<name>.tcs-gui-history`, on the
-//! argument that a configuration copied to another machine should take its
+//! It used to sit beside the configuration, as `<name>.tcs-gui-history`, on
+//! the argument that a configuration copied to another machine should take its
 //! history with it. That argument was worth less than it cost. The
 //! configuration lives in a directory under version control, so the file
 //! turned up in `git status`, in review and in release tarballs -- and nobody
@@ -159,7 +159,7 @@ pub fn digest_of(bytes: &[u8]) -> String {
     format!("{:x}", md5::compute(bytes))
 }
 
-/// Where tcs-gui keeps what it remembers between sessions.
+/// Where tcs-cfge keeps what it remembers between sessions.
 ///
 /// `None` where neither `XDG_STATE_HOME` nor `HOME` says: an editor with
 /// nowhere to put a history still edits, and what is lost is undo across a
@@ -183,7 +183,7 @@ pub fn state_dir() -> Option<PathBuf> {
     said_by(std::env::var_os("XDG_STATE_HOME"), std::env::var_os("HOME"))
 }
 
-/// The state directory of a test process: `tcs-gui-tests-<pid>` in the
+/// The state directory of a test process: `tcs-cfge-tests-<pid>` in the
 /// temporary directory, the same one for every test in the process, because
 /// the editor's tests reopen a history one editor wrote in another.
 ///
@@ -215,7 +215,7 @@ fn tests_state_dir() -> &'static PathBuf {
         unsafe {
             libc::atexit(remove_at_exit);
         }
-        temp.join(format!("tcs-gui-tests-{}", std::process::id()))
+        temp.join(format!("tcs-cfge-tests-{}", std::process::id()))
     })
 }
 
@@ -235,7 +235,7 @@ fn remove_abandoned(temp: &Path, procs: &Path) {
         let name = entry.file_name();
         let Some(pid) = name
             .to_str()
-            .and_then(|name| name.strip_prefix("tcs-gui-tests-"))
+            .and_then(|name| name.strip_prefix("tcs-cfge-tests-"))
             .and_then(|pid| pid.parse::<u32>().ok())
         else {
             continue;
@@ -271,10 +271,10 @@ fn said_by(
     if let Some(said) = xdg {
         let said = PathBuf::from(said);
         if said.is_absolute() {
-            return Some(said.join("tcs-gui"));
+            return Some(said.join("tcs-cfge"));
         }
     }
-    home.map(|home| PathBuf::from(home).join(".local/state/tcs-gui"))
+    home.map(|home| PathBuf::from(home).join(".local/state/tcs-cfge"))
 }
 
 /// The file this configuration's history goes in.
@@ -625,10 +625,10 @@ mod tests {
         std::fs::create_dir(procs.path().join(running.to_string()))
             .expect("a process");
         for name in [
-            "tcs-gui-tests-4241".to_string(),
-            format!("tcs-gui-tests-{running}"),
-            format!("tcs-gui-tests-{}", std::process::id()),
-            "tcs-gui-tests-notapid".to_string(),
+            "tcs-cfge-tests-4241".to_string(),
+            format!("tcs-cfge-tests-{running}"),
+            format!("tcs-cfge-tests-{}", std::process::id()),
+            "tcs-cfge-tests-notapid".to_string(),
             "other".to_string(),
         ] {
             std::fs::create_dir(temp.path().join(name)).expect("made");
@@ -643,9 +643,9 @@ mod tests {
         left.sort();
         let mut expected = vec![
             "other".to_string(),
-            format!("tcs-gui-tests-{}", std::process::id()),
-            format!("tcs-gui-tests-{running}"),
-            "tcs-gui-tests-notapid".to_string(),
+            format!("tcs-cfge-tests-{}", std::process::id()),
+            format!("tcs-cfge-tests-{running}"),
+            "tcs-cfge-tests-notapid".to_string(),
         ];
         expected.sort();
         assert_eq!(left, expected, "only the one whose process is gone goes");
@@ -778,12 +778,12 @@ mod tests {
         // What the specification names, where it is set.
         assert_eq!(
             said_by(Some(OsString::from("/home/a/.local/state")), None),
-            Some(PathBuf::from("/home/a/.local/state/tcs-gui"))
+            Some(PathBuf::from("/home/a/.local/state/tcs-cfge"))
         );
         // And where it is not: the default the specification gives.
         assert_eq!(
             said_by(None, Some(OsString::from("/home/a"))),
-            Some(PathBuf::from("/home/a/.local/state/tcs-gui"))
+            Some(PathBuf::from("/home/a/.local/state/tcs-cfge"))
         );
         // A relative one is ignored rather than resolved, which is what the
         // specification says to do with it.
@@ -792,7 +792,7 @@ mod tests {
                 Some(OsString::from("state")),
                 Some(OsString::from("/home/a"))
             ),
-            Some(PathBuf::from("/home/a/.local/state/tcs-gui"))
+            Some(PathBuf::from("/home/a/.local/state/tcs-cfge"))
         );
         // And neither: nowhere to keep a history. The editor still edits, and
         // what is lost is undo across a crash.

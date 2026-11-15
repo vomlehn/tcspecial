@@ -11,7 +11,7 @@ Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial
 Description: tcspecial's configuration editor and checker
- The software tools that write and check tcspecial's configurations: tcs-gui,
+ The software tools that write and check tcspecial's configurations: tcs-cfge,
  the graphical configuration editor, with its node descriptions; tcs-verify,
  which says what is wrong with a configuration without running any of it;
  tcs-conflict, which says whether two configurations can be run at once;

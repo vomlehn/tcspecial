@@ -1,6 +1,6 @@
 //! The screenshots in the manual, taken of the editor's own windows.
 //!
-//! Each picture in `docs/tcs-gui.rst` is a window of this program, opened
+//! Each picture in `docs/tcs-cfge.rst` is a window of this program, opened
 //! by [`open_main`] as a person's is, driven into the state shown through
 //! the presses and callbacks a person's gestures reach, and drawn into
 //! memory by Slint's software renderer. Nothing is opened on a screen: the
@@ -8,7 +8,7 @@
 //!
 //! An ignored test, so that `cargo test` never runs it: the fonts differ
 //! from one machine to the next, and so would the pictures. `make
-//! screenshots-tcs-gui` runs it and writes `docs/shots/tcs-gui-*.png`.
+//! screenshots-tcs-cfge` runs it and writes `docs/shots/tcs-cfge-*.png`.
 //!
 //! The configurations are copies of the shipped examples, made in a
 //! directory of their own under the system's temporary directory and
@@ -200,7 +200,7 @@ fn write_png(path: &Path, pixels: &[u8], width: u32) {
 /// One picture: what window, how large, which part of it, and the markers
 /// over it.
 struct Shot<'a> {
-    /// The file's name, between `tcs-gui-` and `.png`.
+    /// The file's name, between `tcs-cfge-` and `.png`.
     name: &'a str,
     /// The window drawn.
     window: &'a slint::Window,
@@ -221,7 +221,7 @@ impl Shot<'_> {
     fn take(&self, out: &Path) {
         let mut pixels = drawn(self.window, self.size);
         mark(&mut pixels, self.size.0, &self.markers);
-        let path = out.join(format!("tcs-gui-{}.png", self.name));
+        let path = out.join(format!("tcs-cfge-{}.png", self.name));
         match self.part {
             None => write_png(&path, &pixels, self.size.0),
             Some(part) => {
@@ -878,9 +878,9 @@ fn recovering(out: &Path, work: &Path) {
     session.close();
 }
 
-/// Takes the manual's screenshots, writing `docs/shots/tcs-gui-*.png`.
+/// Takes the manual's screenshots, writing `docs/shots/tcs-cfge-*.png`.
 #[test]
-#[ignore = "takes the manual's screenshots: make screenshots-tcs-gui"]
+#[ignore = "takes the manual's screenshots: make screenshots-tcs-cfge"]
 fn screenshots() {
     slint::platform::set_platform(Box::new(Headless))
         .expect("no other platform in this run");
@@ -888,7 +888,7 @@ fn screenshots() {
     std::fs::create_dir_all(&out).expect("the directory");
 
     // A name short and the same every run, since the windows show it.
-    let work = std::env::temp_dir().join("tcs-gui-shots");
+    let work = std::env::temp_dir().join("tcs-cfge-shots");
     if work.exists() {
         std::fs::remove_dir_all(&work).expect("the last run's files go");
     }

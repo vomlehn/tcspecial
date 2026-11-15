@@ -144,7 +144,7 @@ pub use verify::*;
 #[doc(hidden)]
 pub const MANUALS: [&str; 5] = [
     "tcspecial.rst",
-    "tcs-gui.rst",
+    "tcs-cfge.rst",
     "tcs-moc.rst",
     "tcs-sim.rst",
     "tcs-verify.rst",
@@ -156,7 +156,7 @@ pub const MANUALS: [&str; 5] = [
 #[doc(hidden)]
 pub const DESIGNS: [&str; 5] = [
     "tcspecial-design.rst",
-    "tcs-gui-design.rst",
+    "tcs-cfge-design.rst",
     "tcs-moc-design.rst",
     "tcs-sim-design.rst",
     "tcs-verify-design.rst",

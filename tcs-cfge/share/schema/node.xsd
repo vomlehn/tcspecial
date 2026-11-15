@@ -11,7 +11,7 @@
 
   The other half of it is `node.schema.json`, the same shape for the YAML
   spelling. The two are held against each other by a test, and both are held
-  against the software's own reader: see `tcs-gui/tests/schema.rs`.
+  against the software's own reader: see `tcs-cfge/tests/schema.rs`.
 
   What this checks is shape. Whether a type's terminals are the ones the flight
   software believes in is a question about meaning, and the answer is a test

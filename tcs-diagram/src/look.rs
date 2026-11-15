@@ -1,7 +1,7 @@
 //! The colours a configuration is drawn in.
 //!
 //! Written down rather than computed: the palette was searched for offline and
-//! the arithmetic that holds it to its rules is tcs-gui's, in its test-only
+//! the arithmetic that holds it to its rules is tcs-cfge's, in its test-only
 //! `sight.rs`, whose tests read these. Here so that the editor and tcspecial's
 //! visual window paint a node and a line alike.
 //!
@@ -140,7 +140,7 @@ pub const PHYSICS_LINE: &str = "#b5679a";
 /// and by the type written along each one's top.
 ///
 /// What this gave up is the twelve units between *neighbours* in one panel. A
-/// ramp of ten in one hue family cannot keep it -- see `tcs-gui-design.rst` --
+/// ramp of ten in one hue family cannot keep it -- see `tcs-cfge-design.rst` --
 /// so within a panel the steps are three to five units, which is "a shade
 /// darker", and across panels the closest pair is 30.9. The ramp is the
 /// information: a node's place in its panel is its colour's place in the ramp.

@@ -352,7 +352,7 @@ See Also
     The flight software, its configuration files, the examples, installing and
     running the programs.
 
-`The tcs-gui manual <tcs-gui.html>`__
+`The tcs-cfge manual <tcs-cfge.html>`__
     The editor, which checks a configuration as it is edited.
 
 `The TCSpecial design <design.html>`__

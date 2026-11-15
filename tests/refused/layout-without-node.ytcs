@@ -1,4 +1,4 @@
 # Refused: a position that names no node.
-tcs-gui:
+tcs-cfge:
   nodes:
     - { x: 1, y: 2 }

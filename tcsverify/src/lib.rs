@@ -14,7 +14,7 @@
 //! It is a library of its own, apart from the `tcs-verify` program, because
 //! tcspecial asks it of the configuration it is to fly before it opens
 //! anything, and what flies is built from libraries, never from a tool.
-//! tcs-verify, tcs-moc, tcs-sim and tcs-gui ask it too, so all of them agree
+//! tcs-verify, tcs-moc, tcs-sim and tcs-cfge ask it too, so all of them agree
 //! about what is wrong.
 //!
 //! A configuration is a graph of nodes, and this checks:
@@ -117,7 +117,7 @@ pub struct Finding {
     /// [`tcsprotocol::graph::Graph::check`].
     ///
     /// Kept for a program that has rules of its own about the same thing and
-    /// has to tell which of these it has already said: tcs-gui marks faults on
+    /// has to tell which of these it has already said: tcs-cfge marks faults on
     /// the nodes as somebody draws, and lists beside them what this finds that
     /// it does not. Not printed: the message is what it says.
     pub problem: Option<tcsprotocol::graph::check::Problem>,
@@ -2692,7 +2692,7 @@ payloads:
     fn every_shipped_graph_verifies() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         // The worked example, which is the shipped configuration nobody edits
-        // by hand. `example.*` is what tcs-gui opens by default, so it holds
+        // by hand. `example.*` is what tcs-cfge opens by default, so it holds
         // whatever was last drawn in it -- including, while somebody is
         // drawing, a line they have not finished moving. What is asked of that
         // one is that it can be read at all: an error in it is somebody's work

@@ -1,19 +1,19 @@
 O = ../OUT
 
 # manual.rst is the short page that says what each manual covers;
-# tcspecial.rst, tcs-gui.rst, tcs-moc.rst, tcs-sim.rst, tcs-verify.rst and
+# tcspecial.rst, tcs-cfge.rst, tcs-moc.rst, tcs-sim.rst, tcs-verify.rst and
 # tcs-conflict.rst are the programs' manuals. The pages are committed beside
 # their sources: the
 # pre-commit hook remakes the page of each document a commit changes and adds
 # it to the commit, and make html-check in the top directory fails where one
 # is behind (see make hooks there).
-MANUALS = manual.html tcspecial.html tcs-gui.html tcs-moc.html tcs-sim.html \
+MANUALS = manual.html tcspecial.html tcs-cfge.html tcs-moc.html tcs-sim.html \
 	tcs-verify.html tcs-conflict.html
 
 # design.rst says the same of the design documents, one per program as the
 # manuals are. tcspecial-design.html, which draws the restart figures, has a
 # rule of its own.
-DESIGNS = design.html tcs-gui-design.html tcs-moc-design.html \
+DESIGNS = design.html tcs-cfge-design.html tcs-moc-design.html \
 	tcs-sim-design.html tcs-verify-design.html tcs-conflict-design.html
 
 .PHONY: all
@@ -48,10 +48,10 @@ manual.html: tcs-flight.svg tcs-desktop.svg
 # directory makes again.
 tcs-sim.html: tcs-sim-between.svg $(wildcard shots/tcs-sim-*.png)
 
-# The figures of the tcs-gui manual: how a crash is recovered from, drawn by
-# hand, and the screenshots of its windows, which make screenshots-tcs-gui in
+# The figures of the tcs-cfge manual: how a crash is recovered from, drawn by
+# hand, and the screenshots of its windows, which make screenshots-tcs-cfge in
 # the top directory makes again.
-tcs-gui.html: tcs-gui-recovery.svg $(wildcard shots/tcs-gui-*.png)
+tcs-cfge.html: tcs-cfge-recovery.svg $(wildcard shots/tcs-cfge-*.png)
 
 # The figures of the tcs-moc manual: its message flows, the restart's from
 # the design, and the screenshots of its windows, which make
@@ -66,7 +66,7 @@ node-types.html: node-types.rst
 
 # The guide from the examples to a whole vehicle. Its excerpts are read from
 # the stage files as the page is made, so a stage changed is a page made
-# again; its figures are tcs-gui's drawings of the stages, which
+# again; its figures are tcs-cfge's drawings of the stages, which
 # building-a-vehicle/screenshots.sh makes again, and the vehicle-*.svg
 # figures drawn by hand.
 building-a-vehicle.html: building-a-vehicle.rst \

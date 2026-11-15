@@ -114,7 +114,7 @@ commands:
   # attribute no binding names is refused.
   - { from: gateway, sets: probe_thermostat.setpoint }
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: probe_heater, x: 34, y: 224 }
     - { node: probe_thermostat, x: 525, y: 224 }

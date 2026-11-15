@@ -63,7 +63,7 @@ simulated_payloads:
         noise: 0.02 K
         offset: -0.3 K
 
-tcs-gui:
+tcs-cfge:
   nodes:
     - { node: zone, x: -94, y: 185 }
   pages:

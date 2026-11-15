@@ -19,7 +19,7 @@ Operational code
 Software tools
 ==============
 
-`The tcs-gui design <tcs-gui-design.html>`__
+`The tcs-cfge design <tcs-cfge-design.html>`__
     The editor: how it draws, reads and writes a configuration, its
     descriptions of the node types, its undo history, autosave and
     recovery.

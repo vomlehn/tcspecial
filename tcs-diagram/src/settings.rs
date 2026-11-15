@@ -1,5 +1,5 @@
-//! What tcs-gui remembers between sessions, in
-//! `$HOME/.tcs-gui/preferences.xml`.
+//! What tcs-cfge remembers between sessions, in
+//! `$HOME/.tcs-cfge/preferences.xml`.
 //!
 //! The panes' and the lists' shares, and whether the editor writes the
 //! configuration after every edit -- `autosave` -- which is the editor's
@@ -17,7 +17,7 @@
 //! Here rather than in the configuration, which is the distinction worth
 //! stating. A node's position is in the configuration because it is part of the
 //! diagram -- two people reading one configuration should see one drawing, and
-//! `tcs-gui-design.rst` says why. How the canvas is divided is not part of the
+//! `tcs-cfge-design.rst` says why. How the canvas is divided is not part of the
 //! diagram: it is a working preference of the person at the keyboard, and
 //! writing it into the configuration would make resizing a pane a change to a
 //! file that flies.
@@ -29,7 +29,7 @@
 //! Read here and written by the editor: this is shared with tcspecial's
 //! visual window, which divides its panes where the person's editor does so
 //! that a node is drawn where the editor would draw it, and which writes
-//! nothing. Making the directory and writing the file are tcs-gui's own.
+//! nothing. Making the directory and writing the file are tcs-cfge's own.
 //!
 //! Nothing here can stop the editor. A settings file that cannot be read, or a
 //! directory that cannot be made, leaves the default in place and says so on
@@ -223,17 +223,17 @@ pub fn list_shares(
 ///
 /// Not made here, because this is read by tcspecial's visual window as well,
 /// which has no business leaving a directory in somebody's home: the editor
-/// makes it on the way in. See tcs-gui's own settings.
+/// makes it on the way in. See tcs-cfge's own settings.
 ///
 /// # Returns
 ///
-/// `$HOME/.tcs-gui`, or `None` if `HOME` is unset or empty.
+/// `$HOME/.tcs-cfge`, or `None` if `HOME` is unset or empty.
 pub fn home() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     if home.is_empty() {
         return None;
     }
-    Some(PathBuf::from(home).join(".tcs-gui"))
+    Some(PathBuf::from(home).join(".tcs-cfge"))
 }
 
 /// The settings file itself.
@@ -297,7 +297,7 @@ pub fn read() -> Read {
             missing: true,
         },
         Err(why) => {
-            eprintln!("tcs-gui: {} cannot be read: {why}", path.display());
+            eprintln!("tcs-cfge: {} cannot be read: {why}", path.display());
             read(Settings::default())
         }
     }
@@ -406,7 +406,7 @@ fn yes_or_no_in(text: &str, whose: &str, name: &str, default: bool) -> bool {
         Some("false") => false,
         Some(said) => {
             eprintln!(
-                "tcs-gui: {whose} says {name} is \"{said}\", which is neither \
+                "tcs-cfge: {whose} says {name} is \"{said}\", which is neither \
                  true nor false; using {default}"
             );
             default
@@ -434,7 +434,7 @@ fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
         Some(percent) if (LEAST..=MOST).contains(&percent) => percent,
         Some(percent) => {
             eprintln!(
-                "tcs-gui: {whose} asks for a {name} of {percent}%, which is \
+                "tcs-cfge: {whose} asks for a {name} of {percent}%, which is \
                  outside {LEAST}% to {MOST}%; using {default}%"
             );
             default
@@ -442,7 +442,7 @@ fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
         None => {
             if said.is_some() {
                 eprintln!(
-                    "tcs-gui: {whose} does not say a number of percent for \
+                    "tcs-cfge: {whose} does not say a number of percent for \
                      {name}; using {default}%"
                 );
             }
@@ -478,7 +478,7 @@ pub fn written(settings: &Settings) -> String {
     format!(
         "\
 <?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<!-- tcs-gui's own settings. Written by the editor as they are changed, and
+<!-- tcs-cfge's own settings. Written by the editor as they are changed, and
      read when it starts.
 
      This is not a configuration: nothing here flies. It is where the editor
@@ -811,7 +811,7 @@ mod tests {
         let found = read();
         assert_eq!(found.settings, Settings::default());
         assert!(found.missing, "there is no file yet");
-        assert!(!where_.join(".tcs-gui").exists(), "nothing is made");
+        assert!(!where_.join(".tcs-cfge").exists(), "nothing is made");
 
         match was {
             Some(was) => std::env::set_var("HOME", was),

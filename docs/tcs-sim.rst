@@ -47,7 +47,7 @@ simulating, and does without it if it is not there.
 
 Every setting but ``simulate`` is optional, and **a setting written empty is a
 setting not stated**: ``packet_interval: ""`` and no ``packet_interval`` at all mean
-the same thing, so a file somebody has half filled in still loads. tcs-gui
+the same thing, so a file somebody has half filled in still loads. tcs-cfge
 writes only the settings that hold a value, and a file it begins names each
 payload under its type and nothing else. A value that is there and wrong is
 still refused, naming it.
@@ -279,18 +279,18 @@ zone stating its own ``environment``, which is the world's ``ambient_temp``;
 a component with ``name:`` and ``type:`` of its own; and a simulator file
 still declaring masses itself.
 
-Where tcs-gui drew each component is kept last in the simulator file, in a
-``tcs-gui`` section of its own, as a configuration keeps its nodes' places:
+Where tcs-cfge drew each component is kept last in the simulator file, in a
+``tcs-cfge`` section of its own, as a configuration keeps its nodes' places:
 
 .. code-block:: yaml
 
-   tcs-gui:
+   tcs-cfge:
      nodes:
        - { node: zone, x: -193, y: 280 }
      pages:
        thermostat-common: [zone]
 
-tcs-sim ignores it. A component it does not name is laid out down tcs-gui's
+tcs-sim ignores it. A component it does not name is laid out down tcs-cfge's
 Physics pane by name, so the section is never needed, and it is written as
 components are moved there. Each component is drawn on the page it was placed
 from: one placed on a subdiagram's page is listed under that subdiagram's name
@@ -298,7 +298,7 @@ in ``pages``, and one listed nowhere is drawn on the top page. A component
 is placed from the physics list
 as a node is from its own list: click its type, and it is put down the
 pane where the others are, or drag the type onto the Physics pane, and it
-is put where it is let go. In tcs-gui a component is moved, edited, deleted
+is put where it is let go. In tcs-cfge a component is moved, edited, deleted
 and joined as a node is: drag it, right click it for Edit and Delete, and
 draw a line from its output or input terminal to another component, for a
 connection, or to a payload, to set that payload's ``connects``. A line
@@ -307,7 +307,7 @@ from a ``moc`` terminal, what drives the payload, it offers the component's
 inputs -- a heater's ``on``, a zone's ``heater_1`` -- and from a ``world``
 terminal, what it reports, the component's outputs -- a zone's
 ``temperature``. Where a line could mean more than one terminal -- a
-heater's heat, current and heating, to a sensor -- tcs-gui asks which.
+heater's heat, current and heating, to a sensor -- tcs-cfge asks which.
 
 Each component is one simple part, of one of these types:
 
@@ -1052,7 +1052,7 @@ See Also
     The simulated operations center, which starts tcs-sim and shows what it
     simulates.
 
-`The tcs-gui manual <tcs-gui.html>`__
+`The tcs-cfge manual <tcs-cfge.html>`__
     The editor, which draws and edits a simulator configuration's components.
 
 `The TCSpecial design <design.html>`__

@@ -13,7 +13,7 @@ members = [
     "tcs-verify",
     # Whether two configurations can run at once. See tcs-conflict.
     "tcs-conflict",
-    "tcs-gui",
+    "tcs-cfge",
     # The window pieces the ground programs share: the panels, and what to
     # show on them. See tcs-ui.
     "tcs-ui",

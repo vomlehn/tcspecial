@@ -72,7 +72,7 @@ crates:
 ``tcsprotocol::node``
     Its attributes, and every rule about what a configuration may say about it.
     tcsprotocol is shared by the ground and the vehicle, so a rule written
-    here is the one tcspecial, tcs-sim, tcs-moc, tcs-gui and tcs-verify all
+    here is the one tcspecial, tcs-sim, tcs-moc, tcs-cfge and tcs-verify all
     apply, and they all report it alike. A rule about what a configuration may
     say belongs here and nowhere else.
 
@@ -327,8 +327,8 @@ which types it takes, as ``process`` takes only types with a text form
 (``tcsprotocol/src/link_text.rs``), refuses the others in ``params_of``,
 naming the attribute and the types it may be.
 
-tcs-gui offers a function as a node of its own, from
-``tcs-gui/share/nodes/vehicle/compute/<function>.yaml`` with
+tcs-cfge offers a function as a node of its own, from
+``tcs-cfge/share/nodes/vehicle/compute/<function>.yaml`` with
 ``sets: {function: <function>}``. The Python ground needs nothing for it:
 how it shows what a node sends follows from the type, in ``form.py``.
 
@@ -340,19 +340,19 @@ its ground decodes what it is sent by XTCE, as Yamcs does, the count before a
 string or bytes must be XTCE's, so ``Telemetered::count`` must give it
 ``Count::Xtce``. The Python ground lists gateway types by hand, in
 ``GATEWAY_BASES`` and ``ON_BUS`` in ``python/tcsprotocol/configuration.py``.
-Its description in tcs-gui is at the top of ``tcs-gui/share/nodes/``, and since
-it has no node module, it is one of the exemptions in
-``every_description_has_its_rust`` in ``tcs-gui/src/nodes.rs``.
+Its description in tcs-cfge is at the top of ``tcs-cfge/share/nodes/``, and
+since it has no node module, it is one of the exemptions in
+``every_description_has_its_rust`` in ``tcs-cfge/src/nodes.rs``.
 
 The Editor and the Schemas
 ==========================
-A node type is offered in tcs-gui's palette from a description,
-``tcs-gui/share/nodes/<family>/<type>.yaml``: its ``node`` and ``type``, an
+A node type is offered in tcs-cfge's palette from a description,
+``tcs-cfge/share/nodes/<family>/<type>.yaml``: its ``node`` and ``type``, an
 ``about`` sentence, which terminals it has, and its ``attributes``, each with
 ``name``, ``required``, an optional ``kind`` and its own ``about``. The
 terminal flags are still spelled by their old names, ``payload-sink``,
 ``payload-source``, ``gateway-sink`` and ``gateway-source``, which
-``tcs-gui/src/nodes.rs`` reads as ``world-in``, ``world-out``, ``moc-in``
+``tcs-cfge/src/nodes.rs`` reads as ``world-in``, ``world-out``, ``moc-in``
 and ``moc-out``. Attributes that state a terminal's type, such as
 ``world-out-type``, are listed as any other attribute is. The description
 is checked against ``share/schema/node.schema.json`` and ``node.xsd``, and
@@ -409,9 +409,9 @@ Each module has its tests beside it, in all three crates. A test for a fix
 should fail without the fix: check that it does.
 
 Many tests enumerate every type, and a new type that was missed somewhere
-fails one of them: the schema tests in ``tcs-gui/tests/schema.rs``, which
+fails one of them: the schema tests in ``tcs-cfge/tests/schema.rs``, which
 hold the schemas to ``types_in`` and ``DHType::ALL``; the description tests
-in ``tcs-gui/src/nodes.rs``; the drawing tests in ``tcs-diagram``;
+in ``tcs-cfge/src/nodes.rs``; the drawing tests in ``tcs-diagram``;
 ``the_features_are_the_optional_types`` and ``tcspecial/tests/types.rs``;
 and ``tcs-verify/tests/examples.rs``. No test holds ``NodeType::ALL`` to
 ``types_in``, so a type missing from the drawing is caught only through the
@@ -447,7 +447,7 @@ For a payload type ``foo``:
    ``endpoint.rs``, every one gated by the feature.
 6. tcs-sim: ``run_foo_node``, ``PayloadProtocol`` and ``run_kind``, and
    ``endpoint.rs``.
-7. tcs-gui: the description, its place in the list of descriptions, both
+7. tcs-cfge: the description, its place in the list of descriptions, both
    configuration schemas and both simulator schemas.
 8. tcs-diagram: ``NodeType`` and its ``appearance``, two ways unlike every
    other type that are not colour.

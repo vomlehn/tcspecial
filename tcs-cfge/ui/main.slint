@@ -66,7 +66,7 @@ export struct PaletteEntry {
     // What makes one node type into several things to place: `compute` is one
     // type, and `process`, `thermostat`, `to_kelvin`, `to_value` and `vote` are
     // five entries, each a compute node with its `function` already answered.
-    // The pairs come from the description tree -- see tcs-gui/share/nodes --
+    // The pairs come from the description tree -- see tcs-cfge/share/nodes --
     // and travel as text because a callback's arguments do.
     sets: string,
 }
@@ -106,7 +106,7 @@ export struct FieldView {
     // with: "boolean" is a control with two states, and everything else is a
     // box to write in.
     //
-    // From the description tree -- see `tcs_gui::nodes::KINDS`, which is the
+    // From the description tree -- see `tcs_cfge::nodes::KINDS`, which is the
     // list of the words -- because what an attribute takes is a property of
     // the node type and is written down beside the node type. An empty kind
     // is text, which is what a field whose description says nothing is and
@@ -135,7 +135,7 @@ export struct GroupFieldView {
 component SelectionPane inherits Rectangle {
     // How large a shape is drawn here, against its size on the canvas. In
     // the markup because it is a property of the list and not of the shape;
-    // tcs-gui's tests read it from here. See NodeShape's transform below.
+    // tcs-cfge's tests read it from here. See NodeShape's transform below.
     property <float> shrink: 0.75;
     in property <string> heading: "";
     in property <[PaletteEntry]> palette: [];
@@ -424,7 +424,7 @@ component NameField inherits HorizontalLayout {
 // It reports the whole column's height along with the distance, because what a
 // share is depends on what it is a share of, and the arithmetic that turns the
 // two into a percentage belongs in Rust where it can be tested: see
-// tcs_gui::drag_list_divider.
+// tcs_cfge::drag_list_divider.
 component ListDivider inherits Rectangle {
     callback moved(length, length);
 
@@ -750,11 +750,11 @@ component Surface inherits Rectangle {
     // boundary would be a name to keep in step in two files.
     // How the selection column is divided, as the gateway and vehicle lists'
     // shares of it, the payload list taking what is left. From Rust, where the
-    // settings file keeps them: see tcs_gui::Views::lists.
+    // settings file keeps them: see tcs_cfge::Views::lists.
     in property <int> gateway-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     // And the two lines between the lists, dragged: how far it went and how
-    // tall the whole column is. See tcs_gui::drag_list_divider.
+    // tall the whole column is. See tcs_cfge::drag_list_divider.
     callback payload-list-divider-moved(length, length);
     callback vehicle-list-divider-moved(length, length);
     callback payload-divider-moved(length);
@@ -770,7 +770,7 @@ component Surface inherits Rectangle {
     // what was carried, its type and what its entry sets, or a physics
     // component by its type; with where its top left corner goes, in the
     // coordinates of the whole sheet, whose nought is the Physics pane's
-    // left edge. Kept to its own pane by tcs-gui, as a node dragged is.
+    // left edge. Kept to its own pane by tcs-cfge, as a node dragged is.
     callback drop-node(string, string, string, length, length);
     callback drop-physics(string, length, length);
 
@@ -1907,7 +1907,7 @@ export component MainWindow inherits Window {
     // Saying in the title bar when this session changes nothing, and which
     // file it is editing, which is where somebody looks to see what a window
     // is. The path is shortened to the window's width in Rust -- see
-    // tcs_gui::title -- so a narrow window still names the file.
+    // tcs_cfge::title -- so a narrow window still names the file.
     title: root.titled(
         (Session.read-only
             ? "TCSpecial Configuration (read-only)"
@@ -2079,11 +2079,11 @@ export component MainWindow inherits Window {
     // boundary would be a name to keep in step in two files.
     // How the selection column is divided, as the gateway and vehicle lists'
     // shares of it, the payload list taking what is left. From Rust, where the
-    // settings file keeps them: see tcs_gui::Views::lists.
+    // settings file keeps them: see tcs_cfge::Views::lists.
     in property <int> gateway-list-percent: 20;
     in property <int> vehicle-list-percent: 35;
     // And the two lines between the lists, dragged: how far it went and how
-    // tall the whole column is. See tcs_gui::drag_list_divider.
+    // tall the whole column is. See tcs_cfge::drag_list_divider.
     callback payload-list-divider-moved(length, length);
     callback vehicle-list-divider-moved(length, length);
     callback payload-divider-moved(length);
@@ -2781,7 +2781,7 @@ export component SimWindow inherits Window {
         }
     }
 
-    // How tall what it holds wants to be, which tcs-gui grows the window to
+    // How tall what it holds wants to be, which tcs-cfge grows the window to
     // when what is shown changes: a window sized for the settings it opened
     // on would cut off those of a component that has more.
     out property <length> wanted-height: whole.preferred-height;
@@ -2997,7 +2997,7 @@ export component NodeWindow inherits Window {
 
     // Takes what has been typed and not yet taken; nothing, where nothing
     // has. Public so that the window closed by the window system takes it
-    // too: see tcs-gui's show_node.
+    // too: see tcs-cfge's show_node.
     public function take() {
         if (root.draft-field != "") {
             if (root.draft-simulated) {
@@ -3019,7 +3019,7 @@ export component NodeWindow inherits Window {
     callback renamed(string);
     callback closed();
 
-    // How large what it holds wants to be, which tcs-gui grows the window to
+    // How large what it holds wants to be, which tcs-cfge grows the window to
     // when what is shown grows: see SimWindow. The width its narrowest, the
     // layout's preferred one being the description at the foot on one line.
     out property <length> wanted-height: whole.preferred-height;
@@ -3245,7 +3245,7 @@ export component NodeWindow inherits Window {
 // the same session.
 export component AlertWindow inherits Window {
     default-font-size: Fonts.window;
-    title: "tcs-gui";
+    title: "tcs-cfge";
     background: Colors.window;
     min-width: 360px;
     min-height: 140px;
@@ -3285,7 +3285,7 @@ export component AlertWindow inherits Window {
 /// the same thing would be two windows to keep in step.
 export component ConcernsWindow inherits Window {
     default-font-size: Fonts.window;
-    title: "tcs-gui";
+    title: "tcs-cfge";
     background: Colors.window;
     min-width: 420px;
     min-height: 200px;
@@ -3503,7 +3503,7 @@ export component ReplaceWindow inherits Window {
 
 export component LeaveWindow inherits Window {
     default-font-size: Fonts.window;
-    title: "Leave tcs-gui";
+    title: "Leave tcs-cfge";
     background: Colors.window;
     min-width: 360px;
     min-height: 160px;

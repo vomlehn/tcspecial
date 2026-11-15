@@ -36,7 +36,7 @@ use crate::verify::About;
 /// it is not a question of degree aboard. What the split is for is the person:
 /// a graph halfway through being drawn should not bury the mistakes in it under
 /// the things they have not typed yet. `tcs-verify` says which is which and
-/// exits nought where only warnings were found; tcs-gui refuses to generate
+/// exits nought where only warnings were found; tcs-cfge refuses to generate
 /// code while any remain, warnings included, because code generated from an
 /// unfinished configuration would not compile into anything that flies.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,7 +72,7 @@ pub enum Problem {
     /// A group nothing is in, which reads nothing on its interval.
     ///
     /// What a group whose name a node misspelled looks like from the group's
-    /// end. tcs-gui marked this as a fault long before anything aboard refused
+    /// end. tcs-cfge marked this as a fault long before anything aboard refused
     /// it, which made the editor and the flight software disagree about the one
     /// file.
     EmptyGroup { group: String },
@@ -2388,7 +2388,7 @@ pub(crate) fn claim_text(claim: &Claim) -> String {
 /// and so must state one: every payload but a program, asked by what
 /// arrives on its interface, and a set of discrete lines, which is driven by
 /// what arrives or asked by it for a report. See the rule in `Graph::check`
-/// this is the one statement of, which tcs-gui marks a drawing by too.
+/// this is the one statement of, which tcs-cfge marks a drawing by too.
 ///
 /// # Arguments
 ///
@@ -3373,8 +3373,8 @@ mod tests {
 
     /// Every node that is opened says what opening it takes.
     ///
-    /// The check the editor's laziness rests on. tcs-gui requires nothing to be
-    /// entered -- an editor that did would fight a person working out what
+    /// The check the editor's laziness rests on. tcs-cfge requires nothing to
+    /// be entered -- an editor that did would fight a person working out what
     /// they are describing -- so this is where a configuration is held to
     /// saying it all, and it says which node and what to add. A sensor with no
     /// address used to be found when the vehicle tried to open it.
@@ -4369,7 +4369,7 @@ mod tests {
             .any(|p| matches!(p, Problem::BadInterval { .. })));
     }
 
-    /// A group nothing is in is refused, as tcs-gui has always marked it.
+    /// A group nothing is in is refused, as tcs-cfge has always marked it.
     #[test]
     fn a_group_with_nothing_in_it_is_refused() {
         let mut g = graph(

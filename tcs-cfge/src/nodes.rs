@@ -627,24 +627,24 @@ pub fn matching<'a>(
         .max_by_key(|one| one.sets.len())
 }
 
-/// Where tcs-gui's own data is: the description tree, and the schemas beside
+/// Where tcs-cfge's own data is: the description tree, and the schemas beside
 /// it.
 ///
 /// The first of these that exists, which is a search and not one path because
 /// the same program is run from three places. In order:
 ///
-/// * `$TCS_GUI_DATA`, for a copy somebody is working on;
-/// * `$XDG_DATA_HOME/tcs-gui`, or `~/.local/share/tcs-gui`, which is where a
+/// * `$TCS_CFGE_DATA`, for a copy somebody is working on;
+/// * `$XDG_DATA_HOME/tcs-cfge`, or `~/.local/share/tcs-cfge`, which is where a
 ///   person's own descriptions belong and where edited ones will be written;
-/// * `share/tcs-gui` beside the directory this program is in -- so
-///   `/opt/tcs/share/tcs-gui` for an editor installed as
-///   `/opt/tcs/bin/tcs-gui`, which is where `make install` and the packages put
-///   them -- found from the program rather than named, so that an install under
-///   any `PREFIX` finds its own data and not another install's;
-/// * `/usr/local/share/tcs-gui` and `/usr/share/tcs-gui`, which is where
+/// * `share/tcs-cfge` beside the directory this program is in -- so
+///   `/opt/tcs/share/tcs-cfge` for an editor installed as
+///   `/opt/tcs/bin/tcs-cfge`, which is where `make install` and the packages
+///   put them -- found from the program rather than named, so that an install
+///   under any `PREFIX` finds its own data and not another install's;
+/// * `/usr/local/share/tcs-cfge` and `/usr/share/tcs-cfge`, which is where
 ///   installing put them before it put everything under one prefix, and
 ///   where a copy installed by hand may still be;
-/// * `tcs-gui/share` and `share` under the working directory, which is the
+/// * `tcs-cfge/share` and `share` under the working directory, which is the
 ///   source tree: running the editor out of a checkout should find the
 ///   checkout's own descriptions.
 ///
@@ -658,31 +658,31 @@ pub fn matching<'a>(
 pub fn data_dir() -> Option<PathBuf> {
     let mut tried: Vec<PathBuf> = Vec::new();
 
-    if let Some(said) = std::env::var_os("TCS_GUI_DATA") {
+    if let Some(said) = std::env::var_os("TCS_CFGE_DATA") {
         tried.push(PathBuf::from(said));
     }
     if let Some(home) = std::env::var_os("XDG_DATA_HOME") {
-        tried.push(PathBuf::from(home).join("tcs-gui"));
+        tried.push(PathBuf::from(home).join("tcs-cfge"));
     } else if let Some(home) = std::env::var_os("HOME") {
-        tried.push(PathBuf::from(home).join(".local/share/tcs-gui"));
+        tried.push(PathBuf::from(home).join(".local/share/tcs-cfge"));
     }
     if let Some(installed) = beside_this_program() {
         tried.push(installed);
     }
-    tried.push(PathBuf::from("/usr/local/share/tcs-gui"));
-    tried.push(PathBuf::from("/usr/share/tcs-gui"));
-    tried.push(PathBuf::from("tcs-gui/share"));
+    tried.push(PathBuf::from("/usr/local/share/tcs-cfge"));
+    tried.push(PathBuf::from("/usr/share/tcs-cfge"));
+    tried.push(PathBuf::from("tcs-cfge/share"));
     tried.push(PathBuf::from("share"));
 
     tried.into_iter().find(|where_| where_.is_dir())
 }
 
-/// Where an installed tcs-gui's data is: `../share/tcs-gui` from the directory
-/// its executable is in.
+/// Where an installed tcs-cfge's data is: `../share/tcs-cfge` from the
+/// directory its executable is in.
 ///
 /// Through the executable's own path with its links resolved, so that a link
-/// to the program from somewhere else -- `/usr/local/bin/tcs-gui`, say -- still
-/// finds the data of the install it links to.
+/// to the program from somewhere else -- `/usr/local/bin/tcs-cfge`, say --
+/// still finds the data of the install it links to.
 ///
 /// # Returns
 ///
@@ -690,7 +690,7 @@ pub fn data_dir() -> Option<PathBuf> {
 /// path cannot be found or is at the root of the filesystem.
 fn beside_this_program() -> Option<PathBuf> {
     let program = std::env::current_exe().ok()?.canonicalize().ok()?;
-    Some(program.parent()?.parent()?.join("share/tcs-gui"))
+    Some(program.parent()?.parent()?.join("share/tcs-cfge"))
 }
 
 /// Where an installed tcspecial's XTCS and YTCS schemas are, and its
@@ -824,9 +824,9 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("share/nodes")
     }
 
-    /// An installed editor looks for its data in `share/tcs-gui` one level up
+    /// An installed editor looks for its data in `share/tcs-cfge` one level up
     /// from the directory it is in, which is where `make install` puts it:
-    /// `/opt/tcs/share/tcs-gui` for `/opt/tcs/bin/tcs-gui`.
+    /// `/opt/tcs/share/tcs-cfge` for `/opt/tcs/bin/tcs-cfge`.
     #[test]
     fn an_installed_editor_looks_beside_its_own_directory() {
         let program = std::env::current_exe()
@@ -837,7 +837,7 @@ mod tests {
             .parent()
             .and_then(Path::parent)
             .expect("a directory above this test's");
-        assert_eq!(beside_this_program(), Some(prefix.join("share/tcs-gui")));
+        assert_eq!(beside_this_program(), Some(prefix.join("share/tcs-cfge")));
     }
 
     /// The shipped tree reads, and says what it is expected to say.

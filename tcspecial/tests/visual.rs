@@ -23,6 +23,7 @@ use std::process::Command;
 fn tcspecial(args: &[&str]) -> (bool, String) {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .args(args)
+        .arg("--no-memlock")
         .env_remove("RUST_LOG")
         .output()
         .expect("tcspecial runs");

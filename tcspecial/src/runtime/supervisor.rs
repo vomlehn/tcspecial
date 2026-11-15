@@ -59,6 +59,11 @@ pub const BAD: i32 = 1;
 pub const FATAL: i32 = 2;
 /// The child took a RESTART, and the state file's top is what it named.
 pub const RESTART: i32 = 3;
+/// The child ran out of memory once its memory was locked, in flight: as
+/// [`BAD`] for every configuration but the command line's, whose next child
+/// is started unlocked, there being none beneath it to need less. See
+/// `runtime::memory`.
+pub const SHORT: i32 = 4;
 
 /// The environment variable that tells tcspecial it is a supervisor's child,
 /// holding the supervisor's process id.
@@ -188,6 +193,11 @@ struct Spawning {
     _env: Vec<CString>,
     /// The arguments, as `posix_spawn` takes them, ending in a null.
     argv: Vec<*mut libc::c_char>,
+    /// `--no-memlock`, held for `unlocked` to point into.
+    _no_memlock: CString,
+    /// The arguments with `--no-memlock` after the program's name, for a
+    /// child that is to run unlocked.
+    unlocked: Vec<*mut libc::c_char>,
     /// The environment, as `posix_spawn` takes it, ending in a null.
     envp: Vec<*mut libc::c_char>,
 }
@@ -233,10 +243,15 @@ impl Spawning {
                 .chain(std::iter::once(std::ptr::null_mut()))
                 .collect::<Vec<_>>()
         };
+        let no_memlock = c(b"--no-memlock")?;
+        let mut unlocked = pointers(&args);
+        unlocked.insert(1.min(args.len()), no_memlock.as_ptr() as *mut _);
         Ok(Spawning {
             program: c(program.as_os_str().as_bytes())?,
             argv: pointers(&args),
             envp: pointers(&env),
+            _no_memlock: no_memlock,
+            unlocked,
             _args: args,
             _env: env,
         })
@@ -246,6 +261,10 @@ impl Spawning {
     /// here, so that one sent before its signal thread runs is taken by
     /// that thread rather than ending it, and SIGCHLD not.
     ///
+    /// # Arguments
+    ///
+    /// * `unlocked` - Whether the child is to run with `--no-memlock`.
+    ///
     /// # Returns
     ///
     /// The child's process id.
@@ -253,7 +272,8 @@ impl Spawning {
     /// # Errors
     ///
     /// What `posix_spawn` failed with.
-    fn start(&self) -> std::io::Result<libc::pid_t> {
+    fn start(&self, unlocked: bool) -> std::io::Result<libc::pid_t> {
+        let argv = if unlocked { &self.unlocked } else { &self.argv };
         let mask = signals(false);
         let mut pid: libc::pid_t = 0;
         // SAFETY: the attributes are made, used and destroyed here; the
@@ -274,7 +294,7 @@ impl Spawning {
                 self.program.as_ptr(),
                 std::ptr::null(),
                 &attr,
-                self.argv.as_ptr(),
+                argv.as_ptr(),
                 self.envp.as_ptr(),
             );
             libc::posix_spawnattr_destroy(&mut attr);
@@ -424,6 +444,10 @@ pub fn run(path: &str, mode: Mode) -> i32 {
     };
 
     let mut delay = FIRST_DELAY;
+    // Whether the next child is to run unlocked: once the command line's
+    // configuration has run out of memory with it locked, until a RESTART
+    // brings another.
+    let mut unlocked = false;
     loop {
         if let Some(state_file) = &boot.state_file {
             if let Some(Some(why)) = changed(state_file, |state| {
@@ -434,7 +458,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
         }
 
         let started = Instant::now();
-        let pid = match spawning.start() {
+        let pid = match spawning.start(unlocked) {
             Ok(pid) => pid,
             Err(e) => {
                 error!("supervisor: no child can be started: {e}");
@@ -461,6 +485,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
             Ended::Exited(RESTART) => {
                 info!("supervisor: child {pid} took a RESTART");
                 delay = FIRST_DELAY;
+                unlocked = false;
                 continue;
             }
             Ended::Exited(FATAL) => {
@@ -477,6 +502,17 @@ pub fn run(path: &str, mode: Mode) -> i32 {
                     .and_then(|state_file| changed(state_file, after_bad))
                     .flatten();
                 match popped {
+                    // The bottom has nothing beneath it that needs less, so
+                    // it is run unlocked rather than not at all.
+                    None if ended == Ended::Exited(SHORT) && !unlocked => {
+                        warn!(
+                            "supervisor: child {pid} ran out of memory on the \
+                             command line's configuration, which has nothing \
+                             beneath it: starting it again unlocked"
+                        );
+                        unlocked = true;
+                        delay = FIRST_DELAY;
+                    }
                     Some(popped) => {
                         warn!(
                             "supervisor: child {pid} failed ({ended:?}), so \

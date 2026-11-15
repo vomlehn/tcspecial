@@ -408,8 +408,10 @@ def main():
             return 1
 
         print(f"tcspecial, on {configuration}...")
+        # Unlocked, since a desk may not let it lock its memory: see the
+        # manual's "Locking memory".
         flight = start(started, run, "tcspecial.log", f"{debug}/tcspecial",
-                       "--simulate=all", configuration)
+                       "--simulate=all", "--no-memlock", configuration)
 
         said = subprocess.run([f"{debug}/tcs-verify", "--digest",
                                configuration], capture_output=True,

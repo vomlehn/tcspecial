@@ -1107,7 +1107,15 @@ Requirement
     loads a configuration, so that every buffer is real once it is made: a
     shortage is then a failure to load, not a process killed mid-pass when
     a buffer is first written. On another kernel, its own call for this
-    does the same. The supervisor locks nothing.
+    does the same. The supervisor locks nothing. ``--no-memlock`` asks for
+    no lock, under any ``--simulate``, and the startup summary says so;
+    without it the memory is always locked.
+
+    **Built** (2026-11-15): ``runtime::memory::lock``, called by the child
+    before it reads the configuration, and said in the summary as
+    ``memory:``. tcspecial's own tests, and the scripts that run it on a
+    desk, give ``--no-memlock``, since the desks they run on may not let it
+    lock.
 
 A lock can fail at two moments, and only the second depends on the
 configuration. The call itself locks everything the process has mapped
@@ -1131,11 +1139,21 @@ Requirement
     configuration up and starts a fresh child on the next (see `The
     supervisor and the configuration stack`_). A fresh process, because
     what the failed load took is not reliably handed back to the system
-    and stays locked. So every allocation a load makes is one that can
-    fail and say so, rather than ending the process, and a node whose
-    thread cannot start fails the load rather than running on the main
-    thread. The configuration at the bottom of the stack has none to fall
+    and stays locked. An allocation that fails ends the child at once,
+    saying how many bytes it could not have, with a status of its own,
+    ``supervisor::SHORT``, which the supervisor takes as it takes a bad
+    one; and a node whose thread cannot start does the same, rather than
+    running on the main thread. Ending the child is the load failing: a
+    load that returned its failure would end the child with a bad status
+    all the same, and every allocation that could fail would be a path to
+    get wrong. The configuration at the bottom of the stack has none to fall
     back to: its child is started again unlocked, and says so.
+
+    **Built** (2026-11-15): ``runtime::memory::Allocator``, the global
+    allocator, and ``runtime::memory::ran_out``; the supervisor starts the
+    bottom's next child with ``--no-memlock`` after a ``SHORT``, until a
+    RESTART. Untested here, since a lock that succeeds takes a larger limit
+    than the desks the tests run on have.
 
 Requirement
     Under ``--simulate=some`` or ``all`` -- a desk, a test bench -- a lock
@@ -1146,11 +1164,17 @@ Requirement
     expected, and may be the first sign of a failure a vehicle would meet;
     a start that carried on would hide it.
 
+    **Built** (2026-11-15), and ``tests/memlock.rs`` holds a run to both
+    this and the flight setting's, with a limit of 1 MiB.
+
 Requirement
     The manual says how a system lets tcspecial lock what it needs --
     ``LimitMEMLOCK=infinity`` in a systemd unit, ``ulimit -l`` under another
     supervisor -- for a vehicle and a desk alike, and the systemd unit
     shipped with tcspecial sets it.
+
+    **Built** (2026-11-15): "Locking memory" in ``docs/tcspecial.rst``, and
+    ``LimitMEMLOCK=infinity`` in ``packaging/hooks/tcspecial.service.in``.
 
 Requirement
     Each of tcspecial's threads is given a small stack rather than the 2
@@ -1170,8 +1194,7 @@ Requirement
     changing what this one means.
 
     **Built** (2026-11-15): ``thread_stack`` for nodes' threads, said in
-    the startup summary, and the fixed stack for tcspecial's own. The lock
-    itself is not built yet.
+    the startup summary, and the fixed stack for tcspecial's own.
 
 Requirement
     How deep each thread has been into its stack is measured aboard and
@@ -1201,7 +1224,10 @@ Requirement
     space for it: memory never touched, but counted, since a lock of
     everything mapped is refused when that is more than the limit on what
     may be locked. tcspecial allocates while it loads a configuration and
-    not in its loop, so its threads have little to contend for in one.
+    not in its loop, so its threads have little to contend for in one. Not
+    under ``--visual``: the window's memory has no counterpart in flight,
+    so a run with it is no measure of what a vehicle maps, and its threads
+    are given the arenas glibc gives them.
 
     **Built** (2026-11-14): ``runtime::thread::one_arena``. With no nodes,
     a release build maps about 8.9 MiB, where it mapped 200 MiB; each ping

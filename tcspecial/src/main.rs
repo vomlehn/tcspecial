@@ -19,6 +19,12 @@
 //! simulated device before anything is opened, and a run whose payloads the
 //! mode does not allow is refused: see `tcspecial::runtime::start`.
 //!
+//! `--no-memlock` runs the vehicle without locking its memory into RAM,
+//! under any `--simulate`. Without it the vehicle's memory is always locked,
+//! and a lock that fails is said and run without in flight, and stops
+//! tcspecial under `--simulate=some` or `all`: see
+//! `tcspecial::runtime::memory`.
+//!
 //! `--types` prints the payload types this build contains, separated by
 //! commas, and exits: what `tcs-verify --types=` takes, so that a
 //! configuration can be checked on the ground against the binary that will
@@ -32,6 +38,12 @@ use log::warn;
 use log::{debug, error, trace};
 use tcspecial::runtime;
 use tcsprotocol::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
+
+/// The allocator, which ends the vehicle with a status that says so when
+/// memory runs out, rather than aborting as though it had crashed: see
+/// `tcspecial::runtime::memory`.
+#[global_allocator]
+static ALLOCATOR: runtime::memory::Allocator = runtime::memory::Allocator;
 
 /// Runs tcspecial as the command line asks, as the module documentation
 /// says, and exits with the run's status; 1 for a command line,
@@ -49,8 +61,13 @@ fn main() {
         runtime::supervisor::child_follows_supervisor();
 
         // Before any thread is made, so that each allocates from the main
-        // thread's malloc arena rather than reserving its own.
-        runtime::thread::one_arena();
+        // thread's malloc arena rather than reserving its own. Not with the
+        // window, whose memory has no counterpart in flight, so that there
+        // is nothing to make like flight: its threads have arenas of their
+        // own, as glibc gives them.
+        if !env::args().skip(1).any(|arg| arg == "--visual") {
+            runtime::thread::one_arena();
+        }
 
         // And before any thread is made, so that every thread inherits the
         // block on SIGINT and SIGTERM and one thread of their own takes
@@ -77,6 +94,9 @@ fn main() {
     let (visual, args): (Vec<String>, Vec<String>) =
         args.into_iter().partition(|arg| arg == "--visual");
     let visual = !visual.is_empty();
+    let (no_memlock, args): (Vec<String>, Vec<String>) =
+        args.into_iter().partition(|arg| arg == "--no-memlock");
+    let memlock = no_memlock.is_empty();
     let (simulate, args) = match tcsprotocol::simulate::take_mode(args) {
         Ok(taken) => taken,
         Err(e) => {
@@ -187,6 +207,29 @@ fn main() {
             process::exit(runtime::supervisor::BAD);
         }
         process::exit(runtime::supervisor::run(&payload_path, simulate));
+    }
+
+    // Locked before the configuration is read, so that everything a load
+    // makes is locked as it is made: see `runtime::memory`.
+    match runtime::memory::lock(memlock, simulate) {
+        Ok(runtime::memory::Locked::Locked) => {
+            runtime::start::summary("memory: locked");
+        }
+        Ok(runtime::memory::Locked::NotAsked) => {
+            runtime::start::summary("memory: not locked, as --no-memlock asks");
+        }
+        Ok(runtime::memory::Locked::Unlocked(why)) => {
+            error!("running unlocked: {why}");
+            runtime::start::summary(format!("memory: not locked: {why}"));
+        }
+        Err(why) => {
+            eprintln!(
+                "tcspecial: {why}. Under --simulate={simulate} a lock that \
+                 fails stops tcspecial, since aboard it would mean a \
+                 vehicle whose memory is not held"
+            );
+            process::exit(runtime::supervisor::FATAL);
+        }
     }
 
     if refused(&payload_path, built) {

@@ -31,7 +31,9 @@
 //!   the vehicle, waits for it, and from how it ended pops or pushes
 //!   nothing, pops the top of the configuration stack, or starts again.
 //! * [`thread`] is how each of tcspecial's threads is made, with a small
-//!   stack.
+//!   stack, and measured.
+//! * [`memory`] is the lock that holds the vehicle's memory in RAM, and
+//!   what a shortage of memory does.
 //! * [`matched`] is whether the ground has matched this start's
 //!   configuration, which the beacons, the commands and every link to the
 //!   ground ask.
@@ -48,6 +50,7 @@ pub mod fabric;
 pub mod frame;
 pub mod held;
 pub mod matched;
+pub mod memory;
 pub mod node_state;
 pub mod port;
 pub mod restart;

@@ -157,6 +157,7 @@ fn a_tee_sends_each_datum_both_ways() {
             .arg(&configuration)
             .arg("--quiet")
             .arg("--simulate=all")
+            .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
             .stderr(Stdio::null())

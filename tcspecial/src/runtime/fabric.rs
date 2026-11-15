@@ -663,10 +663,6 @@ struct Worker {
     mail: Mutex<Mail>,
     /// What the thread waits on for a job.
     wake: Condvar,
-    /// Whether there is a thread at all. A thread the system would not start
-    /// leaves the node's work to the conductor, done in turn rather than at
-    /// once: slower, and still the vehicle's work done.
-    threaded: bool,
 }
 
 /// What passes between the conductor and one node's thread.
@@ -866,9 +862,11 @@ impl Fabric {
 
     /// Makes a node's thread, and what it shares with the conductor.
     ///
-    /// A thread that will not start -- the system is out of them -- is said
-    /// once and leaves the node to the conductor, rather than refusing a
-    /// vehicle whose every node opened.
+    /// A thread that will not start -- the system is out of memory for its
+    /// stack, or out of threads -- ends the child, as memory that cannot be
+    /// had does, so that the supervisor gives this configuration up for the
+    /// one beneath rather than running a node on another's thread: see
+    /// [`crate::runtime::memory::ran_out`].
     ///
     /// # Arguments
     ///
@@ -876,8 +874,7 @@ impl Fabric {
     ///
     /// # Returns
     ///
-    /// The node's worker, holding no port yet; `threaded` is false if no
-    /// thread could be started for it.
+    /// The node's worker, holding no port yet.
     fn start(&mut self, name: &str) -> Arc<Worker> {
         let size = self
             .shared
@@ -894,7 +891,6 @@ impl Fabric {
             size,
             mail: Mutex::new(Mail::default()),
             wake: Condvar::new(),
-            threaded: true,
         };
         // Room for an arrival on every link into it, which is the most a
         // wave gives a node in a graph where no node produces twice in one.
@@ -933,18 +929,8 @@ impl Fabric {
                 handed
             }
             Err(e) => {
-                log::error!(
-                    "\"{name}\": no thread can be started for it ({e}), so its \
-                     reads and deliveries are made in turn with the \
-                     conductor's own"
-                );
-                worker = Arc::try_unwrap(handed).unwrap_or_else(|_| {
-                    unreachable!(
-                        "the thread that would have held a copy never started"
-                    )
-                });
-                worker.threaded = false;
-                Arc::new(worker)
+                log::error!("\"{name}\": no thread can be started for it: {e}");
+                crate::runtime::memory::ran_out(crate::runtime::thread::stack())
             }
         }
     }
@@ -1291,29 +1277,13 @@ impl Fabric {
         let threaded = self
             .busy
             .iter()
-            .filter(|&&at| {
-                workers[at].as_ref().is_some_and(|worker| worker.threaded)
-            })
+            .filter(|&&at| workers[at].is_some())
             .count();
 
         *locked(&shared.remaining) = threaded;
         for &at in &self.busy {
             if let Some(worker) = &workers[at] {
-                if worker.threaded {
-                    worker.wake.notify_one();
-                }
-            }
-        }
-        // A node with no thread of its own is the conductor's to do, while
-        // the threads do theirs.
-        for &at in &self.busy {
-            if let Some(worker) = &workers[at] {
-                if !worker.threaded {
-                    let mut mail = locked(&worker.mail);
-                    if let Some(job) = mail.job.take() {
-                        perform(worker, &shared, &mut mail, job);
-                    }
-                }
+                worker.wake.notify_one();
             }
         }
 

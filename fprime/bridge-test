@@ -88,8 +88,10 @@ start "$run" "$run/tcs-sim.log" "$top/target/debug/tcs-sim" \
 	"$configuration"
 
 echo "tcspecial, on $configuration..."
+# Unlocked, since a desk may not let it lock its memory: see the manual's
+# "Locking memory".
 start "$run" "$run/tcspecial.log" "$top/target/debug/tcspecial" \
-	--simulate=all "$configuration"
+	--simulate=all --no-memlock "$configuration"
 
 # From BridgeTest/, whose fprime-gds.yml says how BridgeTest frames what it
 # sends, as the tests that read it there do.

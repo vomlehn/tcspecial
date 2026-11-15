@@ -32,6 +32,10 @@ Restart=always
 # Long enough that a start that fails at once does not spin a processor,
 # short enough to be nothing next to the link's own latency.
 RestartSec=1
+# tcspecial locks its memory into RAM, and a lock larger than the limit is
+# refused: without this it runs unlocked, and says so. See "Locking memory"
+# in the manual.
+LimitMEMLOCK=infinity
 
 [Install]
 WantedBy=multi-user.target

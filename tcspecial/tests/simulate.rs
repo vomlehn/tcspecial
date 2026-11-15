@@ -225,6 +225,9 @@ fn run(args: &[&str], payloads: &str) -> String {
     stderr_of(
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .args(args)
+            // This desk cannot lock tcspecial's memory: see the manual's
+            // "Locking memory".
+            .arg("--no-memlock")
             .arg(&path),
     )
 }
@@ -323,6 +326,7 @@ payloads:
         stderr_of(
             Command::new(env!("CARGO_BIN_EXE_tcspecial"))
                 .arg(mode)
+                .arg("--no-memlock")
                 .arg(&path),
         )
     };

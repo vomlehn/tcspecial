@@ -107,8 +107,10 @@ echo "cFS, in $exe..."
 start "$exe" "$run/cfs.log" ./core-cpu1 -R PO
 
 echo "tcspecial, on $configuration..."
+# Unlocked, since a desk may not let it lock its memory: see the manual's
+# "Locking memory".
 start "$run" "$run/tcspecial.log" "$top/target/debug/tcspecial" \
-	--simulate=all "$configuration"
+	--simulate=all --no-memlock "$configuration"
 
 echo "The test, as the cFS's ground..."
 (cd "$top" && TCS_CFS_CONFIGURATION=$configuration \

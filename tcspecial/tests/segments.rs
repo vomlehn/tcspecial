@@ -80,6 +80,7 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
             .arg(&configuration)
             .arg("--quiet")
             .arg("--simulate=all")
+            .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
             .spawn()

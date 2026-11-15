@@ -1613,13 +1613,21 @@ and the Python spelling read the configuration and call the same
 function, so a station's buffer for a source is that source's largest
 datum, and the vehicle and the ground cannot disagree about it.</dd>
 <dt>Requirement</dt>
-<dd>The tcspecial that runs the nodes -- the child of <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and
+<dd><p class="first">The tcspecial that runs the nodes -- the child of <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The supervisor and
 the configuration stack</a> -- locks its memory into RAM when it starts,
 with <tt class="docutils literal">mlockall</tt> for what it has and what it will have, before it
 loads a configuration, so that every buffer is real once it is made: a
 shortage is then a failure to load, not a process killed mid-pass when
 a buffer is first written. On another kernel, its own call for this
-does the same. The supervisor locks nothing.</dd>
+does the same. The supervisor locks nothing. <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> asks for
+no lock, under any <tt class="docutils literal"><span class="pre">--simulate</span></tt>, and the startup summary says so;
+without it the memory is always locked.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal"><span class="pre">runtime::memory::lock</span></tt>, called by the child
+before it reads the configuration, and said in the summary as
+<tt class="docutils literal">memory:</tt>. tcspecial's own tests, and the scripts that run it on a
+desk, give <tt class="docutils literal"><span class="pre">--no-memlock</span></tt>, since the desks they run on may not let it
+lock.</p>
+</dd>
 </dl>
 <p>A lock can fail at two moments, and only the second depends on the
 configuration. The call itself locks everything the process has mapped
@@ -1636,30 +1644,46 @@ its startup summary and runs the configuration it chose unlocked: a
 vehicle that would not start for want of a lock would be lost for want
 of a setting, and no other configuration would lock either.</dd>
 <dt>Requirement</dt>
-<dd>Memory that cannot be had once the lock has succeeded -- a buffer, a
+<dd><p class="first">Memory that cannot be had once the lock has succeeded -- a buffer, a
 node's thread, its stack -- fails the configuration's load, which the
 child ends with a bad status, so that the supervisor gives that
 configuration up and starts a fresh child on the next (see <a class="reference internal" href="#the-supervisor-and-the-configuration-stack">The
 supervisor and the configuration stack</a>). A fresh process, because
 what the failed load took is not reliably handed back to the system
-and stays locked. So every allocation a load makes is one that can
-fail and say so, rather than ending the process, and a node whose
-thread cannot start fails the load rather than running on the main
-thread. The configuration at the bottom of the stack has none to fall
-back to: its child is started again unlocked, and says so.</dd>
+and stays locked. An allocation that fails ends the child at once,
+saying how many bytes it could not have, with a status of its own,
+<tt class="docutils literal"><span class="pre">supervisor::SHORT</span></tt>, which the supervisor takes as it takes a bad
+one; and a node whose thread cannot start does the same, rather than
+running on the main thread. Ending the child is the load failing: a
+load that returned its failure would end the child with a bad status
+all the same, and every allocation that could fail would be a path to
+get wrong. The configuration at the bottom of the stack has none to fall
+back to: its child is started again unlocked, and says so.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal"><span class="pre">runtime::memory::Allocator</span></tt>, the global
+allocator, and <tt class="docutils literal"><span class="pre">runtime::memory::ran_out</span></tt>; the supervisor starts the
+bottom's next child with <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> after a <tt class="docutils literal">SHORT</tt>, until a
+RESTART. Untested here, since a lock that succeeds takes a larger limit
+than the desks the tests run on have.</p>
+</dd>
 <dt>Requirement</dt>
-<dd>Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt> -- a desk, a test bench -- a lock
+<dd><p class="first">Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt> -- a desk, a test bench -- a lock
 that fails, at either moment, stops tcspecial at once, saying why on
 its error output: the child exits with the fatal status, the
 supervisor stops, nothing falls back and nothing runs unlocked. A desk
 is set up to lock, as a vehicle is, so a lock that fails there is not
 expected, and may be the first sign of a failure a vehicle would meet;
-a start that carried on would hide it.</dd>
+a start that carried on would hide it.</p>
+<p class="last"><strong>Built</strong> (2026-11-15), and <tt class="docutils literal">tests/memlock.rs</tt> holds a run to both
+this and the flight setting's, with a limit of 1 MiB.</p>
+</dd>
 <dt>Requirement</dt>
-<dd>The manual says how a system lets tcspecial lock what it needs --
+<dd><p class="first">The manual says how a system lets tcspecial lock what it needs --
 <tt class="docutils literal">LimitMEMLOCK=infinity</tt> in a systemd unit, <tt class="docutils literal">ulimit <span class="pre">-l</span></tt> under another
 supervisor -- for a vehicle and a desk alike, and the systemd unit
-shipped with tcspecial sets it.</dd>
+shipped with tcspecial sets it.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): &quot;Locking memory&quot; in <tt class="docutils literal">docs/tcspecial.rst</tt>, and
+<tt class="docutils literal">LimitMEMLOCK=infinity</tt> in <tt class="docutils literal">packaging/hooks/tcspecial.service.in</tt>.</p>
+</dd>
 <dt>Requirement</dt>
 <dd><p class="first">Each of tcspecial's threads is given a small stack rather than the 2
 MiB a Rust thread has, so that what is locked is mostly what tcspecial
@@ -1677,8 +1701,7 @@ takes the standard library's default by being made elsewhere. One
 setting for every node: a node's own may be added later without
 changing what this one means.</p>
 <p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal">thread_stack</tt> for nodes' threads, said in
-the startup summary, and the fixed stack for tcspecial's own. The lock
-itself is not built yet.</p>
+the startup summary, and the fixed stack for tcspecial's own.</p>
 </dd>
 <dt>Requirement</dt>
 <dd><p class="first">How deep each thread has been into its stack is measured aboard and
@@ -1707,7 +1730,10 @@ thread that allocates an arena of its own, reserving 64 MiB of address
 space for it: memory never touched, but counted, since a lock of
 everything mapped is refused when that is more than the limit on what
 may be locked. tcspecial allocates while it loads a configuration and
-not in its loop, so its threads have little to contend for in one.</p>
+not in its loop, so its threads have little to contend for in one. Not
+under <tt class="docutils literal"><span class="pre">--visual</span></tt>: the window's memory has no counterpart in flight,
+so a run with it is no measure of what a vehicle maps, and its threads
+are given the arenas glibc gives them.</p>
 <p class="last"><strong>Built</strong> (2026-11-14): <tt class="docutils literal"><span class="pre">runtime::thread::one_arena</span></tt>. With no nodes,
 a release build maps about 8.9 MiB, where it mapped 200 MiB; each ping
 node, two threads of 64 KiB, adds about 0.3 MiB, where it added 128

@@ -99,6 +99,7 @@ fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
             .arg(&configuration)
             .arg("--quiet")
             .arg("--simulate=all")
+            .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
             .stderr(Stdio::null())

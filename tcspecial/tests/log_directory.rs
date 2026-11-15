@@ -63,6 +63,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
         .arg(&configuration)
         .arg("--quiet")
         .arg("--simulate=all")
+        .arg("--no-memlock")
         .env_remove("RUST_LOG")
         .output()
         .expect("tcspecial runs");

@@ -23,6 +23,7 @@ use std::process::Command;
 fn said(args: &[&str]) -> String {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .args(args)
+        .arg("--no-memlock")
         // The default, so that what is tested is the flag and not whatever
         // the environment this runs in asks for.
         .env_remove("RUST_LOG")

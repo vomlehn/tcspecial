@@ -175,6 +175,7 @@ impl Flying {
         let child = Process::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(configuration)
             .arg("--simulate=all")
+            .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
             .stderr(out)

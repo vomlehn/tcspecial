@@ -4283,6 +4283,96 @@ Set ``thread_stack`` from the deepest node thread a vehicle has reported
 after it has run through what it does in flight, with room to spare: twice
 is what the default leaves over what the tests reach.
 
+Locking memory
+--------------
+
+tcspecial locks its memory into RAM: everything it has when it starts and
+everything it makes after, with ``mlockall``. A buffer is then real from
+the moment it is made, so a vehicle short of memory finds out while it
+loads a configuration, not partway through a pass, when a buffer is first
+written and the kernel has no page to give it. Only the tcspecial that runs
+the nodes locks; its supervisor, the process that was started, does not.
+
+The limit
+^^^^^^^^^
+
+Linux refuses a lock of more than the process's limit on locked memory, and
+the lock covers everything the process has mapped -- its code, its
+libraries, its threads' stacks -- not only what it has touched. A release
+build with no nodes maps about 9 MiB, and each node adds a little more than
+its threads' stacks, about 0.3 MiB for a ping node; a debug build maps about
+17 MiB before it has a node. The limit many desktop systems give is 8 MiB,
+which is too little for either.
+
+Under systemd, the unit that starts tcspecial sets it; the one shipped with
+tcspecial does:
+
+.. code-block:: ini
+
+   [Service]
+   LimitMEMLOCK=infinity
+
+Started from a shell, raise it in that shell before tcspecial starts:
+
+.. code-block:: sh
+
+   ulimit -l unlimited
+
+A user who may not raise their own hard limit is given a larger one in
+``/etc/security/limits.conf``, which takes effect at the next login:
+
+.. code-block:: text
+
+   youruser  -  memlock  unlimited
+
+A figure smaller than ``unlimited`` will do, so long as it is more than
+tcspecial maps: ``memory:`` in the startup summary says what the lock came
+to, and a refused lock says both the limit and how much was mapped.
+
+When the lock fails
+^^^^^^^^^^^^^^^^^^^
+
+What happens depends on ``--simulate``:
+
+* In flight -- ``--simulate=none``, or no ``--simulate`` at all -- the
+  failure is logged and said in the startup summary as ``memory: not
+  locked:`` and the reason, and the vehicle runs unlocked. A vehicle that
+  would not start for want of a setting would be lost for want of it.
+
+* Under ``--simulate=some`` or ``all`` it stops tcspecial with the fatal
+  status, saying why on its error output; the supervisor stops too. A desk
+  is meant to be set up as a vehicle is, and a vehicle that cannot have its
+  memory on a desk would not have it in flight either.
+
+Once the lock has succeeded, everything made later is locked as it is
+made, and memory that cannot be had -- a buffer a configuration needs, the
+stack of a node's thread -- ends tcspecial at once, saying how many bytes it
+could not have. In flight it ends with the bad status, and the supervisor
+gives up that configuration for the one beneath it on the configuration
+stack, which probably has fewer nodes and needs less, in a fresh process,
+since what the failed one locked is not reliably given back. Under
+``--simulate`` it ends with the fatal status.
+
+``--no-memlock``
+^^^^^^^^^^^^^^^^
+
+``--no-memlock`` runs tcspecial without the lock, under any ``--simulate``;
+the startup summary says ``memory: not locked, as --no-memlock asks``.
+Without it the memory is always locked. It is for a desk that cannot be
+given the limit, and is what tcspecial's own tests give: memory that runs
+out is then found when a page is first written, if at all, and is no test
+of whether a vehicle has enough.
+
+``--visual``
+^^^^^^^^^^^^
+
+tcspecial keeps every thread's allocations in one malloc arena, so that the
+reservation glibc makes for each thread's own -- 64 MiB of address space
+each, untouched but counted against the limit -- is not made. Built with
+the window and run with ``--visual``, it does not: the window's memory has
+no counterpart in flight, so a run with it is no measure of what a vehicle
+maps, and its threads are given the arenas glibc gives them.
+
 Which interface it is written for
 ---------------------------------
 

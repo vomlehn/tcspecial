@@ -1124,6 +1124,142 @@ fn query_every_node(
     ask_nodes(ui, link, agreed, model, None);
 }
 
+/// Asks the vehicle QUERY_THREADS, as often as it takes to have every
+/// thread, and shows the answer in the Threads popup: the memory the whole
+/// of tcspecial has, and how deep each thread has been into its stack.
+///
+/// Nothing is asked where the window is not matched for commanding, or the
+/// vehicle has not agreed which configuration it is flying, since the node
+/// ids the answer names are that configuration's; Last Response says so,
+/// or what was found.
+///
+/// # Arguments
+///
+/// * `ui`     - The window, whose popup and Last Response show the answer.
+/// * `link`   - The link the questions go on.
+/// * `agreed` - Whether the vehicle has agreed which configuration it is
+///              flying.
+/// * `model`  - The panels, which name each node by its id.
+///
+/// # Panics
+///
+/// If the lock on the link is poisoned.
+fn query_threads(
+    ui: &MainWindow,
+    link: &Arc<Mutex<CiLink>>,
+    agreed: &Agreed,
+    model: &impl Model<Data = DHInfo>,
+) {
+    if refused_unmatched(ui, link, tcsprotocol::CommandType::QueryThreads) {
+        return;
+    }
+    if !may_command_nodes(agreed) {
+        ui.set_last_response(SharedString::from(NOT_AGREED));
+        return;
+    }
+    let answer = link.lock().unwrap().client().map(|client| client.threads());
+    match answer {
+        Some(Ok((threads, memory))) => {
+            let names: Vec<(u32, String)> = (0..model.row_count())
+                .filter_map(|row| model.row_data(row))
+                .filter_map(|info| {
+                    Some((u32::try_from(info.dev_id).ok()?, info.name.into()))
+                })
+                .collect();
+            ui.set_threads_report(SharedString::from(threads_report(
+                &memory, &threads, &names,
+            )));
+            ui.set_last_response(SharedString::from(format!(
+                "QUERY_THREADS: {} threads, {} mapped, {} locked",
+                threads.len(),
+                bytes_shown(memory.mapped),
+                bytes_shown(memory.locked)
+            )));
+            ui.invoke_show_threads();
+        }
+        Some(Err(e)) => ui.set_last_response(SharedString::from(format!(
+            "QUERY_THREADS failed: {e}"
+        ))),
+        None => ui.set_last_response(SharedString::from(
+            crate::ci_link::NOT_CONNECTED,
+        )),
+    }
+}
+
+/// A size as an operator reads one: in KiB, in MiB from ten of those, or
+/// "unlimited".
+///
+/// # Arguments
+///
+/// * `bytes` - The size, or [`tcsprotocol::UNLIMITED`].
+///
+/// # Returns
+///
+/// The size, with its unit.
+fn bytes_shown(bytes: u64) -> String {
+    if bytes == tcsprotocol::UNLIMITED {
+        return "unlimited".to_string();
+    }
+    let kib = bytes / 1024;
+    if kib >= 10 * 1024 {
+        format!("{:.1} MiB", kib as f64 / 1024.0)
+    } else {
+        format!("{kib} KiB")
+    }
+}
+
+/// What the vehicle answered QUERY_THREADS with, as the Threads popup
+/// shows it: the process's memory, then a line for each thread -- what it
+/// is for, its node by name, and the most of its stack it has used of the
+/// stack it was given.
+///
+/// # Arguments
+///
+/// * `memory`  - The memory the whole of tcspecial has.
+/// * `threads` - Every thread, in the order they started.
+/// * `names`   - Each panel's node id and name, to name a thread's node by.
+///
+/// # Returns
+///
+/// The lines, in columns for a font of one width.
+fn threads_report(
+    memory: &tcsprotocol::ProcessMemory,
+    threads: &[tcsprotocol::ThreadStack],
+    names: &[(u32, String)],
+) -> String {
+    let mut lines = vec![
+        format!("mapped     {}", bytes_shown(memory.mapped)),
+        format!("resident   {}", bytes_shown(memory.resident)),
+        format!("locked     {}", bytes_shown(memory.locked)),
+        format!("lock limit {}", bytes_shown(memory.lock_limit)),
+        String::new(),
+        format!(
+            "{:<28} {:>10} {:>10} {:>5}",
+            "thread", "deepest", "stack", ""
+        ),
+    ];
+    for thread in threads {
+        let mut what = thread.role.to_string();
+        if thread.role.has_node() {
+            match names.iter().find(|(id, _)| *id == thread.node.0) {
+                Some((_, name)) => what = format!("{what} {name}"),
+                None => what = format!("{what} {}", thread.node),
+            }
+        }
+        let share = if thread.stack == 0 {
+            0
+        } else {
+            u64::from(thread.deepest) * 100 / u64::from(thread.stack)
+        };
+        lines.push(format!(
+            "{what:<28} {:>10} {:>10} {share:>4}%",
+            bytes_shown(u64::from(thread.deepest)),
+            bytes_shown(u64::from(thread.stack)),
+        ));
+    }
+    lines.join("\n")
+}
+
 /// One node to ask about: its panel, and what the question names it by.
 #[derive(Debug, Clone)]
 struct Asked {
@@ -2177,6 +2313,9 @@ pub(crate) fn command_buttons(
                 MenuAction::Query => {
                     query_every_node(&ui, &link, &agreed, &model)
                 }
+                MenuAction::Threads => {
+                    query_threads(&ui, &link, &agreed, &model)
+                }
                 MenuAction::Ping => {
                     if refused_unmatched(
                         &ui,
@@ -3185,6 +3324,52 @@ mod screenshots;
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    /// What QUERY_THREADS answered is shown with the process's memory first
+    /// and a line for each thread, its node named by the panel's name where
+    /// there is a panel for it, and by its id where there is not.
+    #[test]
+    fn the_threads_are_shown_with_their_nodes_named() {
+        use tcsprotocol::{
+            NodeId, ProcessMemory, ThreadRole, ThreadStack, NO_NODE, UNLIMITED,
+        };
+        let memory = ProcessMemory {
+            mapped: 18 * 1024 * 1024,
+            resident: 7 * 1024 * 1024,
+            locked: 0,
+            lock_limit: UNLIMITED,
+        };
+        let threads = [
+            ThreadStack {
+                role: ThreadRole::Commands,
+                node: NO_NODE,
+                stack: 262_144,
+                deepest: 36_864,
+            },
+            ThreadStack {
+                role: ThreadRole::Node,
+                node: NodeId(1),
+                stack: 65_536,
+                deepest: 8_192,
+            },
+            ThreadStack {
+                role: ThreadRole::GroundLink,
+                node: NodeId(7),
+                stack: 65_536,
+                deepest: 4_096,
+            },
+        ];
+        let names = [(1, "ping".to_string())];
+        let shown = threads_report(&memory, &threads, &names);
+        let lines: Vec<&str> = shown.lines().collect();
+        assert_eq!(lines[0], "mapped     18.0 MiB");
+        assert_eq!(lines[3], "lock limit unlimited");
+        assert!(lines[6].starts_with("commands "), "{shown}");
+        assert!(lines[6].ends_with("  14%"), "{shown}");
+        assert!(lines[7].starts_with("node ping "), "{shown}");
+        assert!(lines[8].starts_with("ground link #7 "), "{shown}");
+        assert_eq!(bytes_shown(4_096), "4 KiB");
+    }
 
     /// A datum as tcspecial sends it the ground from a source of a string
     /// or bytes: after the count of its bytes, in groups of seven bits.

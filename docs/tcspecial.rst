@@ -3200,8 +3200,9 @@ two ``gateway_fprime`` nodes whose F´ IDs overlap. The bridge's own channels
 follow every device id: ``BeaconStage``, ``RestartFlag``,
 ``ListeningMatched``, ``CommandingMatched``, ``PacketsReceived``,
 ``PacketsProcessed``, ``PacketsMalformed``, ``PacketsMismatched``,
-``DataCutShort``, ``DataNotValues``, ``DataNotDecisions`` and
-``DataNotWholes``.
+``DataCutShort``, ``DataNotValues``, ``DataNotDecisions``,
+``DataNotWholes``, and ``MemoryMapped``, ``MemoryResident``,
+``MemoryLocked`` and ``MemoryLockLimit``, which ``QUERY_THREADS`` fills.
 
 The bridge is built for that configuration and runs on no other: given
 another, it says so in a ``ModelDiffers`` event and does nothing. It sends
@@ -3214,7 +3215,13 @@ said. ``RESTART_ARM`` and ``RESTART`` take a key and a target, the checksum
 of the configuration to restart onto as tcs-verify prints it, or nothing for
 this one's; the vehicle's answer is a ``RestartAnswered`` event, and after a
 restart the bridge connects to the start that comes back by itself, saying
-``Matched`` again. ``SEND_DATA`` sends its text up to the gateway node, which leaves it
+``Matched`` again. ``QUERY_THREADS`` asks how much memory tcspecial has and
+how deep each of its threads has been into its stack: the memory goes to the
+four ``Memory`` channels and a ``MemoryQueried`` event, and the thread that
+has used the most of its stack, as a share of what it was given, to a
+``FullestThread`` event. One event rather than one for each thread, so that a
+vehicle of many threads does not fill the deployment's event queue; every
+thread is seen from tcs-moc or the memusage example. ``SEND_DATA`` sends its text up to the gateway node, which leaves it
 by its ``moc-out`` links -- ``SEND_DATA 1`` turns the example's heater on,
 and ``SEND_DATA 0`` off -- and is said in a ``DataSent`` event; it goes only
 while the bridge is matched for commanding, and is refused before, as every

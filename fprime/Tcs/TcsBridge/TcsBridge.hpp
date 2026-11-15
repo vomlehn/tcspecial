@@ -89,6 +89,8 @@ private:
 				  const Fw::CmdStringArg &node) override;
 	void QUERY_NODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 				   const Fw::CmdStringArg &node) override;
+	void QUERY_THREADS_cmdHandler(FwOpcodeType opCode,
+				      U32 cmdSeq) override;
 	void SEND_DATA_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 				  const Fw::CmdStringArg &data) override;
 	void RESTART_ARM_cmdHandler(FwOpcodeType opCode, U32 cmdSeq, U64 key,

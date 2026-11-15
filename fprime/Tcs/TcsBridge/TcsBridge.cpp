@@ -501,6 +501,87 @@ void TcsBridge::QUERY_NODE_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
 	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
+/**
+ * Sends QUERY_THREADS as often as it takes to have every thread: the
+ * process's memory goes to the Memory channels and a MemoryQueried event,
+ * and the thread that has used the most of its stack, as a share of what
+ * it was given, to a FullestThread event.
+ *
+ * @param opCode  The command's opcode, which its response carries.
+ * @param cmdSeq  Its sequence, likewise.
+ */
+void TcsBridge::QUERY_THREADS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq)
+{
+	if (!this->open("QUERY_THREADS", opCode, cmdSeq)) {
+		return;
+	}
+	tcs_thread threads[TCS_THREADS_PER_ANSWER];
+	tcs_thread fullest{};
+	bool any = false;
+	U32 first = 0;
+	U32 total = 0;
+	bool told = false;
+	do {
+		tcs_status status = TCS_STATUS_FAILURE;
+		tcs_memory memory{};
+		size_t count = 0;
+		if (tcs_client_query_threads(m_client, first, &status, &memory,
+					     &total, threads, &count) != 0) {
+			this->log_WARNING_LO_CommandFailed(
+				Fw::String("QUERY_THREADS"),
+				Fw::String(tcs_last_error()));
+			this->cmdResponse_out(opCode, cmdSeq,
+					      Fw::CmdResponse::EXECUTION_ERROR);
+			return;
+		}
+		if (status != TCS_STATUS_SUCCESS) {
+			// Refused: what tcspecial answered is why.
+			this->log_WARNING_LO_CommandFailed(
+				Fw::String("QUERY_THREADS"),
+				Fw::String(tcs_status_name(status)));
+			this->cmdResponse_out(opCode, cmdSeq,
+					      Fw::CmdResponse::EXECUTION_ERROR);
+			return;
+		}
+		// The memory once, from the first answer: what the process had
+		// when it was first asked.
+		if (!told) {
+			this->tlmWrite_MemoryMapped(memory.mapped);
+			this->tlmWrite_MemoryResident(memory.resident);
+			this->tlmWrite_MemoryLocked(memory.locked);
+			this->tlmWrite_MemoryLockLimit(memory.lock_limit);
+			this->log_ACTIVITY_HI_MemoryQueried(
+				memory.mapped, memory.resident, memory.locked,
+				memory.lock_limit, total);
+			told = true;
+		}
+		// The fullest by share, compared without dividing: a/b > c/d
+		// where a*d > c*b.
+		for (size_t at = 0; at < count; at++) {
+			const tcs_thread &thread = threads[at];
+			if (!any ||
+			    static_cast<U64>(thread.deepest) * fullest.stack >
+				    static_cast<U64>(fullest.deepest) *
+					    thread.stack) {
+				fullest = thread;
+				any = true;
+			}
+		}
+		// An answer that tells of none ends it: the threads a vehicle has
+		// can change between two questions.
+		if (count == 0) {
+			break;
+		}
+		first += static_cast<U32>(count);
+	} while (first < total);
+	if (any) {
+		this->log_ACTIVITY_HI_FullestThread(
+			Fw::String(tcs_thread_role_name(fullest.role)),
+			fullest.node, fullest.deepest, fullest.stack);
+	}
+	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
 void TcsBridge::restartCommand(const char *command,
 			       int (*send)(tcs_client *, uint64_t,
 					   const char *, tcs_status *),

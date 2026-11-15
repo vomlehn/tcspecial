@@ -97,6 +97,15 @@ module Tcs {
       $target: string size 32 @< The checksum it carried, or empty for this configuration's
     ) opcode 6
 
+    @ Ask how much memory the whole of tcspecial has, and how deep each
+    @ of its threads has been into its stack: the memory goes to the
+    @ Memory channels and a MemoryQueried event, and the thread that has
+    @ used the most of its stack to a FullestThread event. One event, not
+    @ one for each thread, so that a vehicle of many threads does not fill
+    @ the deployment's event queue; a ground station that wants every
+    @ thread asks tcspecial itself, as tcs-moc and memusage do
+    async command QUERY_THREADS opcode 7
+
     @ Send a datum up to the gateway node, which leaves it by its
     @ moc-out links for the nodes they reach: 1 or 0 to a heater, say.
     @ Sent only while the bridge is matched for commanding
@@ -248,6 +257,26 @@ module Tcs {
       status: string size 32 @< What tcspecial answered
     ) severity activity high id 18 \
       format "{}: {}"
+
+    @ tcspecial said how much memory the whole of it has, in bytes
+    event MemoryQueried(
+      mapped: U64 @< Everything mapped, which a lock is held to the limit by
+      resident: U64 @< What is in RAM
+      locked: U64 @< What is locked into RAM
+      lockLimit: U64 @< The limit on what may be locked, all ones for none
+      threads: U32 @< How many threads it runs
+    ) severity activity high id 21 \
+      format "tcspecial has {} bytes mapped, {} resident, {} locked of a limit of {}, on {} threads"
+
+    @ Of tcspecial's threads, the one that has used the most of its stack,
+    @ as a share of what it was given: the one nearest to overflowing
+    event FullestThread(
+      role: string size 16 @< What the thread is for: main, node, commands and so on
+      node: U32 @< The node it belongs to, all ones where it belongs to none
+      deepest: U32 @< The most of its stack it has used, in bytes
+      given: U32 @< The stack it was given, in bytes
+    ) severity activity high id 22 \
+      format "Fullest thread: {} of node {}, {} of {} stack bytes used"
 
     @ A datum went up to the gateway node
     event DataSent(

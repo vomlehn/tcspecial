@@ -3426,8 +3426,9 @@ two <tt class="docutils literal">gateway_fprime</tt> nodes whose F´ IDs overlap
 follow every device id: <tt class="docutils literal">BeaconStage</tt>, <tt class="docutils literal">RestartFlag</tt>,
 <tt class="docutils literal">ListeningMatched</tt>, <tt class="docutils literal">CommandingMatched</tt>, <tt class="docutils literal">PacketsReceived</tt>,
 <tt class="docutils literal">PacketsProcessed</tt>, <tt class="docutils literal">PacketsMalformed</tt>, <tt class="docutils literal">PacketsMismatched</tt>,
-<tt class="docutils literal">DataCutShort</tt>, <tt class="docutils literal">DataNotValues</tt>, <tt class="docutils literal">DataNotDecisions</tt> and
-<tt class="docutils literal">DataNotWholes</tt>.</p>
+<tt class="docutils literal">DataCutShort</tt>, <tt class="docutils literal">DataNotValues</tt>, <tt class="docutils literal">DataNotDecisions</tt>,
+<tt class="docutils literal">DataNotWholes</tt>, and <tt class="docutils literal">MemoryMapped</tt>, <tt class="docutils literal">MemoryResident</tt>,
+<tt class="docutils literal">MemoryLocked</tt> and <tt class="docutils literal">MemoryLockLimit</tt>, which <tt class="docutils literal">QUERY_THREADS</tt> fills.</p>
 <p>The bridge is built for that configuration and runs on no other: given
 another, it says so in a <tt class="docutils literal">ModelDiffers</tt> event and does nothing. It sends
 CONNECT itself, once for each beacon heard while it is unmatched, and says
@@ -3439,7 +3440,13 @@ said. <tt class="docutils literal">RESTART_ARM</tt> and <tt class="docutils lite
 of the configuration to restart onto as tcs-verify prints it, or nothing for
 this one's; the vehicle's answer is a <tt class="docutils literal">RestartAnswered</tt> event, and after a
 restart the bridge connects to the start that comes back by itself, saying
-<tt class="docutils literal">Matched</tt> again. <tt class="docutils literal">SEND_DATA</tt> sends its text up to the gateway node, which leaves it
+<tt class="docutils literal">Matched</tt> again. <tt class="docutils literal">QUERY_THREADS</tt> asks how much memory tcspecial has and
+how deep each of its threads has been into its stack: the memory goes to the
+four <tt class="docutils literal">Memory</tt> channels and a <tt class="docutils literal">MemoryQueried</tt> event, and the thread that
+has used the most of its stack, as a share of what it was given, to a
+<tt class="docutils literal">FullestThread</tt> event. One event rather than one for each thread, so that a
+vehicle of many threads does not fill the deployment's event queue; every
+thread is seen from tcs-moc or the memusage example. <tt class="docutils literal">SEND_DATA</tt> sends its text up to the gateway node, which leaves it
 by its <tt class="docutils literal"><span class="pre">moc-out</span></tt> links -- <tt class="docutils literal">SEND_DATA 1</tt> turns the example's heater on,
 and <tt class="docutils literal">SEND_DATA 0</tt> off -- and is said in a <tt class="docutils literal">DataSent</tt> event; it goes only
 while the bridge is matched for commanding, and is refused before, as every

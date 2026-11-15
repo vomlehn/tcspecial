@@ -599,6 +599,46 @@ fn answer(command: &Command, aboard: &mut Aboard) -> Telemetry {
                 },
             ))
         }
+        // A vehicle of a few nodes, as tcspecial measures one: its own
+        // threads, and one for each of the first three nodes.
+        Command::QueryThreads(cmd) => {
+            let mut answer = tcsprotocol::QueryThreadsTelemetry::new(
+                seq,
+                CommandStatus::Success,
+                cmd.first,
+            );
+            answer.memory = tcsprotocol::ProcessMemory {
+                mapped: 9_437_184,
+                resident: 7_340_032,
+                locked: 9_437_184,
+                lock_limit: tcsprotocol::UNLIMITED,
+            };
+            let own = |role, stack, deepest| tcsprotocol::ThreadStack {
+                role,
+                node: tcsprotocol::NO_NODE,
+                stack,
+                deepest,
+            };
+            let node = |id, deepest| tcsprotocol::ThreadStack {
+                role: tcsprotocol::ThreadRole::Node,
+                node: tcsprotocol::NodeId(id),
+                stack: 65_536,
+                deepest,
+            };
+            let all = [
+                own(tcsprotocol::ThreadRole::Main, 8_380_416, 45_056),
+                own(tcsprotocol::ThreadRole::Signals, 262_144, 7_040),
+                node(0, 10_488),
+                node(1, 7_168),
+                node(2, 12_648),
+                own(tcsprotocol::ThreadRole::Beacons, 262_144, 15_360),
+                own(tcsprotocol::ThreadRole::Commands, 262_144, 36_864),
+            ];
+            let from = (cmd.first as usize).min(all.len());
+            let told = all.len() - from;
+            answer.threads[..told].copy_from_slice(&all[from..]);
+            Telemetry::QueryThreads(answer.tell(all.len(), told))
+        }
         Command::StopNode(cmd) => {
             aboard.running.insert(cmd.node.0, false);
             Telemetry::StopNode(NodeTelemetry::stopped(
@@ -1276,12 +1316,12 @@ fn thermostat() {
     station.beacon(4, false);
     press(ui, "Command");
     settle();
-    // The menu is 220 high, 50 below the top of the row its button is in:
+    // The menu is 250 high, 50 below the top of the row its button is in:
     // see the PopupWindow in the markup.
     let button = ElementHandle::find_by_accessible_label(ui, "Command")
         .next()
         .expect("the Command button");
-    let foot = button.absolute_position().y + 50.0 + 220.0 + 12.0;
+    let foot = button.absolute_position().y + 50.0 + 250.0 + 12.0;
     shoot(
         ui.window(),
         Some(Region::top(width_of(ui.window()), foot)),
@@ -1312,6 +1352,26 @@ fn thermostat() {
             ..around
         }),
         "configuration",
+    );
+    click_outside(ui);
+
+    // Threads, from the Command menu: the vehicle's memory and every
+    // thread's stack, in a pop-up sized to the answer.
+    press(ui, "Command");
+    settle();
+    press(ui, "Threads");
+    station.refresh();
+    settle();
+    let threads =
+        ElementHandle::find_by_element_id(ui, "MainWindow::threads-layout")
+            .next()
+            .expect("the Threads pop-up");
+    let foot =
+        button.absolute_position().y + 4.0 + threads.size().height + 16.0;
+    shoot(
+        ui.window(),
+        Some(Region::top(width_of(ui.window()), foot)),
+        "threads",
     );
     click_outside(ui);
 

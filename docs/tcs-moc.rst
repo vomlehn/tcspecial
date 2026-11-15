@@ -317,12 +317,12 @@ Commanding a node
 
 1. The ``Command`` button opens the menu of the commands that are not about
    one node: see `Commands`_. ``Query`` asks the vehicle about every
-   panel's node at once.
+   panel's node at once, and ``Threads`` about its memory and threads.
 
    .. figure:: shots/tcs-moc-command-menu.png
       :alt: The Command menu open below the Command button, listing Ping,
-            ARM Restart, Initiate restart, Query, Query DH, Start DH and
-            Stop DH.
+            ARM Restart, Initiate restart, Query, Threads, Query DH, Start DH
+            and Stop DH.
 
       The ``Command`` menu.
 
@@ -787,9 +787,9 @@ outage, and ``Disconnect`` and then ``Connect`` otherwise.
 
 Commands
 ========
-From the ``Command`` menu, whose seven items are ``Ping``, ``ARM Restart``,
-``Initiate restart``, ``Query``, ``Query DH``, ``Start DH`` and ``Stop DH``.
-The first four send a command; the restart target, in the row under the
+From the ``Command`` menu, whose eight items are ``Ping``, ``ARM Restart``,
+``Initiate restart``, ``Query``, ``Threads``, ``Query DH``, ``Start DH`` and
+``Stop DH``. The first five send a command; the restart target, in the row under the
 ``Command`` button, says what the two restarts restart onto.
 
 Ping
@@ -931,6 +931,27 @@ Query
   what the node has moved; ``Last Response`` lists the answers. Refused
   unsent, as the others are, while the window is not matched for
   commanding.
+
+Threads
+  Sends ``QUERY_THREADS``, as often as it takes to have every thread, and
+  opens a pop-up of the answer: how much memory the whole of tcspecial has
+  mapped, resident and locked, and the limit on what it may lock; then a
+  line for each thread -- what it is for, the node it belongs to by its
+  panel's name, the most of its stack it has used and the stack it was
+  given, and the share that is. ``Last Response`` says how many threads
+  there are and what is mapped and locked. The pop-up is copied as the
+  ``Configuration`` pop-up is, and closed by a press outside it. See "How
+  deep each thread has been" and "Locking memory" in `the tcspecial manual
+  <tcspecial.html>`__.
+
+  .. figure:: shots/tcs-moc-threads.png
+     :alt: The Threads pop-up over the window: the memory mapped, resident
+           and locked and the lock limit, then a line for each thread with
+           its role, its node by name, the most of its stack it has used,
+           its stack and the share that is.
+
+     What ``Threads`` shows. A node with no panel of its own is named by
+     its id.
 
 The remaining three -- ``Query DH``, ``Start DH`` and ``Stop DH`` -- send
 nothing, and ``Last Response`` says why: a graph has nodes, which each

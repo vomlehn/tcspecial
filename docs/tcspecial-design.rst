@@ -2175,12 +2175,23 @@ Requirement
 
 The commands are one for each tcspecial command the bridge sends: ``PING``;
 ``START_NODE``, ``STOP_NODE`` and ``QUERY_NODE``, each naming a node by its
-name, which the model turns into the device id; and ``RESTART_ARM`` and
-``RESTART``. CONNECT is not a command: the bridge sends one for each
+name, which the model turns into the device id; ``QUERY_THREADS``; and
+``RESTART_ARM`` and ``RESTART``. CONNECT is not a command: the bridge sends one for each
 beacon heard while it is not matched for commanding, because nothing comes down until one is answered and a flight
 computer has nobody at it to press a button. A node command naming a node
 the configuration lacks is refused unsent. What tcspecial answers is the
 command's response and an event.
+
+``QUERY_THREADS`` writes the process's memory to four channels of the
+bridge's own, ``MemoryMapped``, ``MemoryResident``, ``MemoryLocked`` and
+``MemoryLockLimit``, and says it in a ``MemoryQueried`` event; of the threads,
+it says only the one that has used the most of its stack, as a share of what
+it was given, in a ``FullestThread`` event. An event for every thread is what
+a ground station that shows them would want, but a deployment's event queue
+is sized for the events its components send in the ordinary run of things, and
+a vehicle of a few dozen threads overflows it, losing the command's own
+completion with the rest; the thread nearest to overflowing its stack is what
+a flight computer acts on.
 
 ``SEND_DATA`` is the one command that is not tcspecial's: it sends its text up
 to the gateway node, as one datum, by tcsmoc-c's ``tcs_uplink``, and the

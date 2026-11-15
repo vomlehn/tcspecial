@@ -123,6 +123,32 @@ pub const OWN_CHANNELS: &[Own] = &[
         about: "Data from a node that sends whole numbers that were not one \
                 of its type's width, and went to no channel",
     },
+    Own {
+        name: "MemoryMapped",
+        fpp_type: "U64",
+        about: "Bytes the whole of tcspecial has mapped, as its last answer \
+                to QUERY_THREADS said: what a lock of its memory is held to \
+                the limit by",
+    },
+    Own {
+        name: "MemoryResident",
+        fpp_type: "U64",
+        about: "Bytes of tcspecial's that are in RAM, as its last answer to \
+                QUERY_THREADS said",
+    },
+    Own {
+        name: "MemoryLocked",
+        fpp_type: "U64",
+        about: "Bytes of tcspecial's that are locked into RAM, as its last \
+                answer to QUERY_THREADS said",
+    },
+    Own {
+        name: "MemoryLockLimit",
+        fpp_type: "U64",
+        about: "The limit on what tcspecial may lock, in bytes, all ones \
+                where there is none, as its last answer to QUERY_THREADS \
+                said",
+    },
 ];
 
 /// What a source's channel holds: what the configuration says the source's
@@ -1002,7 +1028,8 @@ mod tests {
             "{}",
             refused.why
         );
-        assert!(of(&based_at("0xffffffef"), "fsw").is_ok());
+        assert!(of(&based_at("0xffffffeb"), "fsw").is_ok());
+        assert!(of(&based_at("0xffffffec"), "fsw").is_err());
     }
 
     /// Two bridges whose IDs overlap are refused, naming both and their

@@ -650,9 +650,9 @@ what comes back.</p>
 <ol class="arabic">
 <li><p class="first">The <tt class="docutils literal">Command</tt> button opens the menu of the commands that are not about
 one node: see <a class="reference internal" href="#commands">Commands</a>. <tt class="docutils literal">Query</tt> asks the vehicle about every
-panel's node at once.</p>
+panel's node at once, and <tt class="docutils literal">Threads</tt> about its memory and threads.</p>
 <div class="figure">
-<img alt="The Command menu open below the Command button, listing Ping, ARM Restart, Initiate restart, Query, Query DH, Start DH and Stop DH." src="shots/tcs-moc-command-menu.png" />
+<img alt="The Command menu open below the Command button, listing Ping, ARM Restart, Initiate restart, Query, Threads, Query DH, Start DH and Stop DH." src="shots/tcs-moc-command-menu.png" />
 <p class="caption">The <tt class="docutils literal">Command</tt> menu.</p>
 </div>
 </li>
@@ -1038,9 +1038,9 @@ outage, and <tt class="docutils literal">Disconnect</tt> and then <tt class="doc
 </div>
 <div class="section" id="commands">
 <h1><a class="toc-backref" href="#toc-entry-13">Commands</a></h1>
-<p>From the <tt class="docutils literal">Command</tt> menu, whose seven items are <tt class="docutils literal">Ping</tt>, <tt class="docutils literal">ARM Restart</tt>,
-<tt class="docutils literal">Initiate restart</tt>, <tt class="docutils literal">Query</tt>, <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and <tt class="docutils literal">Stop DH</tt>.
-The first four send a command; the restart target, in the row under the
+<p>From the <tt class="docutils literal">Command</tt> menu, whose eight items are <tt class="docutils literal">Ping</tt>, <tt class="docutils literal">ARM Restart</tt>,
+<tt class="docutils literal">Initiate restart</tt>, <tt class="docutils literal">Query</tt>, <tt class="docutils literal">Threads</tt>, <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and
+<tt class="docutils literal">Stop DH</tt>. The first five send a command; the restart target, in the row under the
 <tt class="docutils literal">Command</tt> button, says what the two restarts restart onto.</p>
 <dl class="docutils">
 <dt>Ping</dt>
@@ -1172,6 +1172,22 @@ node the vehicle has not got -- and its <tt class="docutils literal">Configurati
 what the node has moved; <tt class="docutils literal">Last Response</tt> lists the answers. Refused
 unsent, as the others are, while the window is not matched for
 commanding.</dd>
+<dt>Threads</dt>
+<dd><p class="first">Sends <tt class="docutils literal">QUERY_THREADS</tt>, as often as it takes to have every thread, and
+opens a pop-up of the answer: how much memory the whole of tcspecial has
+mapped, resident and locked, and the limit on what it may lock; then a
+line for each thread -- what it is for, the node it belongs to by its
+panel's name, the most of its stack it has used and the stack it was
+given, and the share that is. <tt class="docutils literal">Last Response</tt> says how many threads
+there are and what is mapped and locked. The pop-up is copied as the
+<tt class="docutils literal">Configuration</tt> pop-up is, and closed by a press outside it. See &quot;How
+deep each thread has been&quot; and &quot;Locking memory&quot; in <a class="reference external" href="tcspecial.html">the tcspecial manual</a>.</p>
+<div class="last figure">
+<img alt="The Threads pop-up over the window: the memory mapped, resident and locked and the lock limit, then a line for each thread with its role, its node by name, the most of its stack it has used, its stack and the share that is." src="shots/tcs-moc-threads.png" />
+<p class="caption">What <tt class="docutils literal">Threads</tt> shows. A node with no panel of its own is named by
+its id.</p>
+</div>
+</dd>
 </dl>
 <p>The remaining three -- <tt class="docutils literal">Query DH</tt>, <tt class="docutils literal">Start DH</tt> and <tt class="docutils literal">Stop DH</tt> -- send
 nothing, and <tt class="docutils literal">Last Response</tt> says why: a graph has nodes, which each

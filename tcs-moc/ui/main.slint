@@ -365,7 +365,7 @@ component DHPanel inherits Rectangle {
 }
 
 export enum MenuAction {
-    ping, arm-restart, restart, query, query-dh, start-dh, stop-dh
+    ping, arm-restart, restart, query, threads, query-dh, start-dh, stop-dh
 }
 
 // Asked when tcspecial announces a configuration other than the one this MOC
@@ -567,6 +567,15 @@ export component MainWindow inherits Window {
     in-out property <string> ci-status: "Disconnected";
     in-out property <string> ci-address: "127.0.0.1:4000";
     in-out property <string> last-response: "";
+    // What the vehicle last answered QUERY_THREADS with, as the Threads
+    // popup shows it: the memory the whole of tcspecial has, then a line
+    // for each thread.
+    in-out property <string> threads-report: "";
+    // Opens the Threads popup, once Rust has put the answer in
+    // threads-report.
+    public function show-threads() {
+        threads-popup.show();
+    }
     // The configuration ARM Restart and Initiate restart restart onto: what
     // the operator typed -- nothing, for this window's own; a configuration
     // file; or a checksum of 32 lower-case hex digits -- and what Rust made
@@ -841,7 +850,7 @@ export component MainWindow inherits Window {
                         x: 50px;
                         y: 50px;
                         width: 150px;
-                        height: 220px;
+                        height: 250px;
 
                         Rectangle {
                             background: white;
@@ -878,6 +887,16 @@ export component MainWindow inherits Window {
                                         popup.close();
                                     } 
                                 }
+                                // QUERY_THREADS: the memory tcspecial has,
+                                // and how deep each thread has been into
+                                // its stack, in the popup below.
+                                Button {
+                                    text: "Threads";
+                                    clicked => {
+                                        menu-action(MenuAction.threads);
+                                        popup.close();
+                                    }
+                                }
                                 Button { 
                                     text: "Query DH"; 
                                     clicked => {
@@ -898,6 +917,56 @@ export component MainWindow inherits Window {
                                         menu-action(MenuAction.stop-dh);
                                         popup.close();
                                     } 
+                                }
+                            }
+                        }
+                    }
+
+                    // What the Command menu's Threads found: sized to it, no
+                    // larger than the window, scrolled past that, and closed
+                    // by a press outside it, as a panel's Configuration is.
+                    threads-popup := PopupWindow {
+                        x: 4px;
+                        y: 4px;
+                        width: max(300px,
+                                   threads-text.preferred-width
+                                   + 2 * threads-layout.padding + 24px);
+                        height: threads-layout.preferred-height;
+                        close-policy: close-on-click-outside;
+
+                        Rectangle {
+                            background: white;
+                            border-color: #808080;
+                            border-width: 1px;
+
+                            threads-layout := VerticalLayout {
+                                padding: 6px;
+                                spacing: 4px;
+
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    Copyable {
+                                        text: "tcspecial's memory and threads";
+                                        font-weight: 700;
+                                        font-size: Fonts.window;
+                                    }
+                                    CopyButton {
+                                        said: threads-report;
+                                    }
+                                }
+                                ScrollView {
+                                    preferred-width: threads-text.preferred-width;
+                                    preferred-height: threads-text.preferred-height;
+                                    threads-text := Copyable {
+                                        width: self.preferred-width;
+                                        height: self.preferred-height;
+                                        // Columns, which line up only in a
+                                        // font of one width, unwrapped.
+                                        font-family: Fonts.mono;
+                                        font-size: Fonts.window;
+                                        wrap: no-wrap;
+                                        text: threads-report;
+                                    }
                                 }
                             }
                         }

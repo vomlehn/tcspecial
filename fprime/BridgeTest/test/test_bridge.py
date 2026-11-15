@@ -153,6 +153,27 @@ def test_a_ping_is_sent_and_answered(fprime_test_api):
     )
 
 
+def test_the_vehicles_memory_and_threads_are_told(fprime_test_api):
+    fprime_test_api.send_and_assert_command(
+        of_bridge("QUERY_THREADS"), timeout=ANSWERING, commander=COMMANDER
+    )
+    fprime_test_api.assert_event(
+        of_bridge("MemoryQueried"), timeout=ANSWERING
+    )
+    # The process has some memory mapped, and of its threads one has used
+    # the most of its stack, which is some of it and no more than all.
+    fprime_test_api.assert_telemetry(
+        of_bridge("MemoryMapped"),
+        value=predicates.greater_than(0),
+        timeout=ANSWERING,
+    )
+    fullest = fprime_test_api.assert_event(
+        of_bridge("FullestThread"), timeout=ANSWERING
+    )
+    deepest, given = (arg.val for arg in fullest.get_args()[2:4])
+    assert 0 < deepest <= given, (deepest, given)
+
+
 def test_a_node_is_stopped_and_started_again(fprime_test_api):
     node_command(fprime_test_api, "QUERY_NODE", "thermometer")
     fprime_test_api.assert_event(

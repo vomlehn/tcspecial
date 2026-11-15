@@ -655,6 +655,93 @@ pub struct VoteParams {
     pub age: Option<Duration>,
 }
 
+/// Several readings of different things sent as one datum, a
+/// consolidation: see "Compute elements" in the design.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsolidatorParams {
+    /// The inputs it consolidates, in the order its `world-in` lists them,
+    /// which is the order their states and their bit strings take in the
+    /// datum.
+    pub inputs: Vec<String>,
+    /// When it sends.
+    pub send: Triggers,
+    /// How often it sends where `send` names `interval`; `None` where it
+    /// does not.
+    pub interval: Option<Duration>,
+}
+
+/// When a consolidator sends: its `send`, a list of any of three triggers,
+/// at least one of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Triggers {
+    /// `all_new`: as soon as every input is new.
+    pub all_new: bool,
+    /// `interval`: every `interval`, where an input is new.
+    pub interval: bool,
+    /// `moc`: when anything arrives at its `moc-in`, new or not.
+    pub moc: bool,
+}
+
+impl Triggers {
+    /// The triggers, as `send` lists them.
+    pub const NAMES: [&'static str; 3] = ["all_new", "interval", "moc"];
+
+    /// Reads `send`.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - What `send` says: the triggers, separated by commas.
+    ///
+    /// # Returns
+    ///
+    /// The triggers.
+    ///
+    /// # Errors
+    ///
+    /// A sentence naming a trigger that is not one, one named twice, a list
+    /// of none, or `all_new` alone, which one input that stops would stop for
+    /// good.
+    pub fn of(said: &str) -> Result<Triggers, String> {
+        let mut triggers = Triggers::default();
+        let mut any = false;
+        for name in said.split(',').map(str::trim).filter(|n| !n.is_empty()) {
+            let slot = match name {
+                "all_new" => &mut triggers.all_new,
+                "interval" => &mut triggers.interval,
+                "moc" => &mut triggers.moc,
+                other => {
+                    return Err(format!(
+                        "send: there is no trigger called \"{other}\": it is \
+                         a list of any of {}",
+                        Triggers::NAMES.join(", ")
+                    ))
+                }
+            };
+            if *slot {
+                return Err(format!("send: {name} is named twice"));
+            }
+            *slot = true;
+            any = true;
+        }
+        if !any {
+            return Err(format!(
+                "send names no trigger: it is a list of any of {}, at least \
+                 one of them",
+                Triggers::NAMES.join(", ")
+            ));
+        }
+        if triggers.all_new && !triggers.interval && !triggers.moc {
+            return Err(
+                "send is all_new alone, and one input that stops would stop \
+                 the datum for good: give interval, moc or both with it, \
+                 which send what there is when not every input is new"
+                    .to_string(),
+            );
+        }
+        Ok(triggers)
+    }
+}
+
 /// How a vote turns several readings of one thing into the value to use.
 ///
 /// Both of these reject an outlier, which is the whole point: the readings
@@ -753,6 +840,7 @@ pub enum Computation {
     ToKelvin(ToValueParams),
     ToValue(ToValueParams),
     Vote(VoteParams),
+    Consolidator(ConsolidatorParams),
     Thermostat(ThermostatParams),
     Process(ProcessParams),
 }
@@ -768,15 +856,31 @@ impl Computation {
             Computation::ToKelvin(_) => "to_kelvin",
             Computation::ToValue(_) => "to_value",
             Computation::Vote(_) => "vote",
+            Computation::Consolidator(_) => "consolidator",
             Computation::Thermostat(_) => "thermostat",
             Computation::Process(_) => "process",
         }
     }
 }
 
+/// Tells whether a computation names its inputs, each linked to a name its
+/// `world-in` lists: a vote and a consolidator. The one place this is said,
+/// which the reader and the matching of links to names ask.
+///
+/// # Arguments
+///
+/// * `function` - The computation's `function`.
+///
+/// # Returns
+///
+/// `true` for `vote` and `consolidator`.
+pub fn names_its_inputs(function: &str) -> bool {
+    matches!(function, "vote" | "consolidator")
+}
+
 /// Every function there is, for an error to list.
 pub fn functions() -> &'static str {
-    "to_kelvin, to_value, vote, thermostat, or process"
+    "to_kelvin, to_value, vote, consolidator, thermostat, or process"
 }
 
 /// Lists what a computation is told, by name.
@@ -805,6 +909,7 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
             Some(&["function", "type-in", "scale", "offset", "type-out"])
         }
         "vote" => Some(&["function", "inputs", "algorithm", "age", "carries"]),
+        "consolidator" => Some(&["function", "inputs", "send", "interval"]),
         "thermostat" => {
             Some(&["function", "setpoint", "half_band", "type-in", "type-out"])
         }
@@ -1014,6 +1119,79 @@ pub fn params_of(
                 inputs,
                 algorithm,
                 age,
+            }))
+        }
+        "consolidator" => {
+            let inputs = attributes.get("inputs").ok_or_else(|| {
+                named(
+                    "its world-in lists no inputs: a consolidator names the \
+                     inputs it puts together, as `world-in: [temp, valve]`, \
+                     which is the order they take in its datum"
+                        .to_string(),
+                )
+            })?;
+            let inputs: Vec<String> = inputs
+                .as_str()
+                .split([',', ' '])
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_string)
+                .collect();
+            if inputs.len() < 2 {
+                return Err(named(format!(
+                    "a consolidator puts at least two inputs together, and \
+                     this says {}: one reading needs nothing put with it",
+                    inputs.len()
+                )));
+            }
+            let mut once = inputs.clone();
+            once.sort();
+            once.dedup();
+            if once.len() != inputs.len() {
+                return Err(named(
+                    "an input is named twice: each input has one place in \
+                     the datum"
+                        .to_string(),
+                ));
+            }
+
+            let send = attributes
+                .get("send")
+                .ok_or_else(|| {
+                    named(format!(
+                        "send is not set: a consolidator says when it sends, \
+                         a list of any of {}",
+                        Triggers::NAMES.join(", ")
+                    ))
+                })
+                .and_then(|said| Triggers::of(said.as_str()).map_err(named))?;
+
+            // Given with the trigger, and only with it: an interval nothing
+            // sends on is a figure somebody believes is in force.
+            let interval =
+                match (attributes.get("interval"), send.interval) {
+                    (Some(said), true) => Some(
+                        crate::graph::parse_interval(said.as_str())
+                            .map_err(|why| named(format!("interval: {why}")))?,
+                    ),
+                    (None, true) => return Err(named(
+                        "send names interval, and no interval is given: say \
+                         how often it sends, as `interval: 1 s`"
+                            .to_string(),
+                    )),
+                    (Some(_), false) => return Err(named(
+                        "interval is given, and send does not name interval, \
+                         so nothing would send on it: add interval to send, \
+                         or take interval out"
+                            .to_string(),
+                    )),
+                    (None, false) => None,
+                };
+
+            Ok(Computation::Consolidator(ConsolidatorParams {
+                inputs,
+                send,
+                interval,
             }))
         }
         "thermostat" => {

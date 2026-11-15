@@ -26,7 +26,7 @@
             <send>0.0.0.0:5550</send>
         </beacon>
         <gateway>radio</gateway>
-        <interface>a28fbfe632aca562d9d9ac8d37ba5476</interface>
+        <interface>2de4e4035e84c174e51c66b0c402e9ca</interface>
         <log>
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>

@@ -248,10 +248,12 @@ fn meaning(node: &Node, sink: &str, name: &str) -> String {
         }
         Some(_) => node.name.clone(),
         None => {
-            let votes = node
-                .attributes
-                .get("function")
-                .is_some_and(|function| function.as_str() == "vote");
+            let votes =
+                node.attributes.get("function").is_some_and(|function| {
+                    crate::node::vehicle::compute::names_its_inputs(
+                        function.as_str(),
+                    )
+                });
             if votes && sink == "world-in" {
                 format!("{}.{name}", node.name)
             } else {
@@ -293,7 +295,7 @@ mod tests {
             format!(
                 "tcspecial:
   gateway: radio
-  interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
+  interface: \"2de4e4035e84c174e51c66b0c402e9ca\"
   state_file: /tmp/tcspecial-test.state
   max_consolidator_inputs: 32
   tcs_cmd:

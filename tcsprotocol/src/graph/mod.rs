@@ -514,7 +514,10 @@ pub fn is_node_type(node_type: &str) -> bool {
 /// [`entries`] takes apart again for a writer. Its entries are runs of bytes,
 /// whose commas are inside quotes where there are any, so the join is exact.
 /// The one list: the reader and both of the editor's writers ask it.
-pub const LISTED: &[&str] = &["terminators"];
+///
+/// `terminators`, a line's alternatives, and `send`, a consolidator's
+/// triggers.
+pub const LISTED: &[&str] = &["terminators", "send"];
 
 /// Splits a listed attribute, as the model holds it, into its entries: see
 /// [`LISTED`].
@@ -2385,7 +2388,7 @@ mod tests {
     path: zone
 tcspecial:
   gateway: radio
-  interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
+  interface: \"2de4e4035e84c174e51c66b0c402e9ca\"
   tcs_cmd:
     \
              recv: 0.0.0.0:4000

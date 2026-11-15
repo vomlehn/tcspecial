@@ -339,6 +339,14 @@ pub fn make(
 
             Ok(Box::new(vote::Vote::of(params.clone(), reads()?)))
         }
+        // Checked on the ground and in the configuration, and not yet run
+        // aboard: refused here, by name, rather than built as something it
+        // is not. See "Compute elements" in the design.
+        Computation::Consolidator(_) => Err(format!(
+            "\"{}\" (consolidator): this tcspecial cannot run a \
+             consolidator yet; fly a configuration without it",
+            node.name
+        )),
         Computation::Thermostat(params) => {
             Ok(Box::new(thermostat::Thermostat::of(*params, reads()?)))
         }

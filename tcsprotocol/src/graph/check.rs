@@ -1689,6 +1689,18 @@ impl Graph {
                     });
                 }
             }
+            if let crate::node::vehicle::compute::Computation::Consolidator(
+                consolidator,
+            ) = &what
+            {
+                for why in self.consolidator_problems(&node.name, consolidator)
+                {
+                    problems.push(Problem::BadCompute {
+                        node: node.name.clone(),
+                        why,
+                    });
+                }
+            }
         }
 
         // What units the values reaching each computation are in: one unit,
@@ -2011,6 +2023,111 @@ impl Graph {
     ///
     /// The inputs links name on it, terminals left out, in the links' order and
     /// once for each link that names one.
+    /// What is wrong with a consolidator's place in the graph, which its
+    /// node alone cannot say: its inputs and the links that bind them, how
+    /// many there are, where its datum goes, and what asks it for one. See
+    /// "Compute elements" in the design.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`         - The consolidator's name.
+    /// * `consolidator` - What it says it is.
+    ///
+    /// # Returns
+    ///
+    /// Each problem, as a sentence about the node.
+    fn consolidator_problems(
+        &self,
+        node: &str,
+        consolidator: &crate::node::vehicle::compute::ConsolidatorParams,
+    ) -> Vec<String> {
+        let mut problems = Vec::new();
+
+        // Each input linked once, as a vote's is: an input nothing reaches
+        // would be none in every datum, which looks like a payload that has
+        // never spoken.
+        let mut bound = self.inputs_bound_at(node);
+        let mut declared = consolidator.inputs.clone();
+        bound.sort();
+        declared.sort();
+        if bound != declared {
+            problems.push(format!(
+                "its world-in lists {declared:?}, and the links bind \
+                 {bound:?}: link each input it lists, once, and list each \
+                 that is linked"
+            ));
+        }
+
+        // No more inputs than the configuration lets one have. A section
+        // that does not read is said where the section is checked.
+        if let Some(most) = self.tcspecial.as_ref().and_then(|section| {
+            crate::graph::parameters::ci_config_of(
+                &crate::graph::parameters::flatten(section),
+            )
+            .and_then(|json| json.to_ci_config())
+            .ok()
+            .map(|ci| ci.max_consolidator_inputs)
+        }) {
+            if consolidator.inputs.len() > most as usize {
+                problems.push(format!(
+                    "it has {} inputs, and max_consolidator_inputs is {most}: \
+                     put the rest in a second consolidator, or raise \
+                     max_consolidator_inputs",
+                    consolidator.inputs.len()
+                ));
+            }
+        }
+
+        for link in &self.links {
+            let origin = link.origin();
+            for destination in link.to.each() {
+                let Destination { node: to, input } =
+                    Destination::parse(destination);
+
+                // What arrives at it other than an input asks for a datum,
+                // and is the ground's to send.
+                let is_input = input
+                    .as_deref()
+                    .is_some_and(|name| terminals::stream_of(name).is_none());
+                if to == node && !is_input {
+                    let from_gateway =
+                        self.node(&origin.node).is_some_and(|n| {
+                            crate::gateway::is_gateway(&n.node_type)
+                        });
+                    if !from_gateway {
+                        problems.push(format!(
+                            "\"{}\" reaches it other than as an input, which \
+                             asks it for a datum, and only a gateway may: \
+                             link it to an input its world-in lists, or link \
+                             a gateway's moc-out to it",
+                            link.from
+                        ));
+                    }
+                }
+
+                // What it sends goes to a gateway, a log or a tee: none of
+                // them reads it, and anything else would have to take it
+                // apart.
+                if origin.node == node {
+                    let takes = self.node(&to).is_some_and(|n| {
+                        crate::gateway::is_gateway(&n.node_type)
+                            || n.node_type == "log"
+                            || n.node_type.starts_with("tee-")
+                    });
+                    if !takes {
+                        problems.push(format!(
+                            "\"{}\" to \"{destination}\": what a consolidator \
+                             sends goes to a gateway, a log or a tee, which \
+                             take it whole, and to nothing else",
+                            link.from
+                        ));
+                    }
+                }
+            }
+        }
+        problems
+    }
+
     fn inputs_bound_at(&self, node: &str) -> Vec<String> {
         let mut inputs = Vec::new();
         for link in &self.links {
@@ -2078,10 +2195,34 @@ impl Graph {
     ///
     /// # Returns
     ///
-    /// Its `read_size`, or `None` for a node not there, a compute or log node,
-    /// or one that states no `read_size` or one that is not a number.
+    /// Its `read_size`; a consolidator's width, which the configuration
+    /// does say, from its inputs' types, where every one is of a fixed
+    /// width; or `None` for a node not there, any other compute node, a log
+    /// node, or one that states no `read_size` or one that is not a number.
     fn record_bytes_of(&self, node: &str) -> Option<u32> {
         let node = self.node(node)?;
+        // A consolidator whose every input is of a fixed width sends datums
+        // of one width, which its layout says; one with a string or bytes
+        // among them does not.
+        if node.node_type == "compute" {
+            if let Ok(
+                crate::node::vehicle::compute::Computation::Consolidator(
+                    params,
+                ),
+            ) = crate::node::vehicle::compute::params_of(
+                &node.name,
+                &node.attributes,
+            ) {
+                return crate::consolidation::Layout::of(
+                    self,
+                    &node.name,
+                    &params.inputs,
+                )
+                .ok()?
+                .fixed_bytes()
+                .and_then(|bytes| u32::try_from(bytes).ok());
+            }
+        }
         if node.node_type == "compute" || node.node_type == "log" {
             return None;
         }
@@ -2288,7 +2429,7 @@ mod tests {
         crate::graph::parameters::nest(
             &[
                 ("gateway", "radio"),
-                ("interface", "a28fbfe632aca562d9d9ac8d37ba5476"),
+                ("interface", "2de4e4035e84c174e51c66b0c402e9ca"),
                 ("tcs_cmd.recv", "0.0.0.0:4000"),
                 ("tcs_cmd.send", "127.0.0.1:4100"),
                 ("payload_telemetry.source_base", "0.0.0.0:6000"),

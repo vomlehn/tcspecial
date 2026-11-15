@@ -860,6 +860,95 @@ impl fmt::Display for BooleanPacket {
     }
 }
 
+/// Sequence container `/TcsTypes/boolean_bit_packet`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct BooleanBitPacket {
+    /// `/TcsTypes/boolean_bit_datum` (/TcsTypes/boolean_bit)
+    pub boolean_bit_datum: bool,
+}
+
+impl BooleanBitPacket {
+    /// The number of fields with an alarm.
+    pub const ALARMS: usize = 0;
+
+    /// Evaluates the alarms of this `/TcsTypes/boolean_bit_packet` packet's
+    /// fields. Alarms that depend on earlier samples count only this one (see
+    /// `monitor`).
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn alarms(&self) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// Evaluates the alarms of this `/TcsTypes/boolean_bit_packet` packet's
+    /// fields like `alarms()`, counting the earlier samples for change ranges,
+    /// minViolations and minConformance.
+    ///
+    /// # Arguments
+    ///
+    /// * `m` - The state of the alarms that depend on earlier samples, which
+    ///         the method reads and updates.
+    /// * `t` - This sample's time, in seconds.
+    ///
+    /// # Returns
+    ///
+    /// The alarm level of each field with an alarm, `None` when the field is
+    /// absent.
+    pub fn monitor(&self, m: &mut AlarmMonitor, t: f64) -> pk::Alarms<0> {
+        let mut a = pk::Alarms::new();
+        a
+    }
+
+    /// The number of MathAlgorithms this packet triggers.
+    pub const ALGORITHMS: usize = 0;
+
+    /// Evaluates the MathAlgorithms that a `/TcsTypes/boolean_bit_packet`
+    /// packet triggers, from this one's values.
+    ///
+    /// # Returns
+    ///
+    /// The output of each, `None` when an input is absent or a custom
+    /// algorithm's function isn't set or fails.
+    pub fn algorithms(&self) -> pk::Outputs<0> {
+        let mut o = pk::Outputs::new();
+        o
+    }
+}
+
+impl Packet for BooleanBitPacket {
+    const NAME: &'static str = "/TcsTypes/boolean_bit_packet";
+    const MAX_BYTES: usize = 1;
+
+    fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
+        let mut r = BitReader::new(data);
+        let v10 = r.uint_order(1, false, "boolean_bit_datum")? != 0;
+        Ok((
+            BooleanBitPacket {
+                boolean_bit_datum: v10,
+            },
+            r.used(),
+        ))
+    }
+
+    fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
+        w.uint_order(1, false, self.boolean_bit_datum as u64);
+        Ok(())
+    }
+}
+
+impl fmt::Display for BooleanBitPacket {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("BooleanBitPacket{")?;
+        f.write_str("boolean_bit_datum=")?;
+        write!(f, "{}", self.boolean_bit_datum)?;
+        f.write_char('}')
+    }
+}
+
 /// Sequence container `/TcsTypes/kelvin_packet`.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct KelvinPacket {
@@ -925,7 +1014,7 @@ impl Packet for KelvinPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v10 = pk::polynomial(
+        let v11 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "kelvin_datum")?,
                 32,
@@ -933,7 +1022,7 @@ impl Packet for KelvinPacket {
             ),
             &[(1e-06, 1)],
         );
-        Ok((KelvinPacket { kelvin_datum: v10 }, r.used()))
+        Ok((KelvinPacket { kelvin_datum: v11 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1025,7 +1114,7 @@ impl Packet for VoltPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v11 = pk::polynomial(
+        let v12 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "volt_datum")?,
                 32,
@@ -1033,7 +1122,7 @@ impl Packet for VoltPacket {
             ),
             &[(1e-06, 1)],
         );
-        Ok((VoltPacket { volt_datum: v11 }, r.used()))
+        Ok((VoltPacket { volt_datum: v12 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1125,7 +1214,7 @@ impl Packet for AmperePacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v12 = pk::polynomial(
+        let v13 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "ampere_datum")?,
                 32,
@@ -1133,7 +1222,7 @@ impl Packet for AmperePacket {
             ),
             &[(1e-06, 1)],
         );
-        Ok((AmperePacket { ampere_datum: v12 }, r.used()))
+        Ok((AmperePacket { ampere_datum: v13 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1225,7 +1314,7 @@ impl Packet for WattPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v13 = pk::polynomial(
+        let v14 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "watt_datum")?,
                 32,
@@ -1233,7 +1322,7 @@ impl Packet for WattPacket {
             ),
             &[(0.001, 1)],
         );
-        Ok((WattPacket { watt_datum: v13 }, r.used()))
+        Ok((WattPacket { watt_datum: v14 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1325,7 +1414,7 @@ impl Packet for MetrePacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v14 = pk::polynomial(
+        let v15 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "metre_datum")?,
                 32,
@@ -1333,7 +1422,7 @@ impl Packet for MetrePacket {
             ),
             &[(0.001, 1)],
         );
-        Ok((MetrePacket { metre_datum: v14 }, r.used()))
+        Ok((MetrePacket { metre_datum: v15 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1425,7 +1514,7 @@ impl Packet for MetrePerSecondPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v15 = pk::polynomial(
+        let v16 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "metre_per_second_datum")?,
                 32,
@@ -1435,7 +1524,7 @@ impl Packet for MetrePerSecondPacket {
         );
         Ok((
             MetrePerSecondPacket {
-                metre_per_second_datum: v15,
+                metre_per_second_datum: v16,
             },
             r.used(),
         ))
@@ -1530,7 +1619,7 @@ impl Packet for NewtonPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v16 = pk::polynomial(
+        let v17 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "newton_datum")?,
                 32,
@@ -1538,7 +1627,7 @@ impl Packet for NewtonPacket {
             ),
             &[(0.001, 1)],
         );
-        Ok((NewtonPacket { newton_datum: v16 }, r.used()))
+        Ok((NewtonPacket { newton_datum: v17 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1631,7 +1720,7 @@ impl Packet for KilogramPerSecondPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v17 = pk::polynomial(
+        let v18 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "kilogram_per_second_datum")?,
                 32,
@@ -1641,7 +1730,7 @@ impl Packet for KilogramPerSecondPacket {
         );
         Ok((
             KilogramPerSecondPacket {
-                kilogram_per_second_datum: v17,
+                kilogram_per_second_datum: v18,
             },
             r.used(),
         ))
@@ -1740,7 +1829,7 @@ impl Packet for RatioPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v18 = pk::polynomial(
+        let v19 = pk::polynomial(
             pk::int_to_f64(
                 r.uint_order(32, false, "ratio_datum")?,
                 32,
@@ -1748,7 +1837,7 @@ impl Packet for RatioPacket {
             ),
             &[(1e-06, 1)],
         );
-        Ok((RatioPacket { ratio_datum: v18 }, r.used()))
+        Ok((RatioPacket { ratio_datum: v19 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1840,7 +1929,7 @@ impl Packet for StringPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v19 = pk::read_fixed_string::<4096, 4100>(
+        let v20 = pk::read_fixed_string::<4096, 4100>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -1851,7 +1940,7 @@ impl Packet for StringPacket {
             },
             "string_datum",
         )?;
-        Ok((StringPacket { string_datum: v19 }, r.used()))
+        Ok((StringPacket { string_datum: v20 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
@@ -1948,16 +2037,16 @@ impl Packet for BytesPacket {
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
-        let v20 = r.uint_order(32, false, "bytes_length")? as u32;
-        let v21 = r.fixed_bytes::<4096>(
-            pk::dynamic_size(v20 as f64, 8.0, 0.0, 8, 4096, "bytes_datum")?,
+        let v21 = r.uint_order(32, false, "bytes_length")? as u32;
+        let v22 = r.fixed_bytes::<4096>(
+            pk::dynamic_size(v21 as f64, 8.0, 0.0, 8, 4096, "bytes_datum")?,
             "bytes_datum",
         )?;
-        Ok((BytesPacket { bytes_datum: v21 }, r.used()))
+        Ok((BytesPacket { bytes_datum: v22 }, r.used()))
     }
 
     fn encode_into(&self, w: &mut BitWriter<'_>) -> Result<()> {
-        let d20 = u32::try_from(pk::size_source(
+        let d21 = u32::try_from(pk::size_source(
             self.bytes_datum.len(),
             8.0,
             0.0,
@@ -1971,11 +2060,11 @@ impl Packet for BytesPacket {
         w.uint_order(
             32,
             false,
-            pk::from_unsigned(d20 as u64, 32, "bytes_length")?,
+            pk::from_unsigned(d21 as u64, 32, "bytes_length")?,
         );
         {
             let n =
-                pk::dynamic_size(d20 as f64, 8.0, 0.0, 8, 4096, "bytes_datum")?;
+                pk::dynamic_size(d21 as f64, 8.0, 0.0, 8, 4096, "bytes_datum")?;
             if self.bytes_datum.len() != n {
                 return Err(PacketError::BadSize {
                     field: "bytes_datum",

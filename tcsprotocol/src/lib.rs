@@ -24,6 +24,9 @@ pub mod cfs;
 pub mod commands;
 pub mod config;
 pub mod config_digest;
+/// What a consolidator sends: several readings as one datum, laid out,
+/// packed and taken apart.
+pub mod consolidation;
 /// The CRC every packet ends with, for what is not a packet.
 pub mod crc;
 pub mod display;

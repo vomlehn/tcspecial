@@ -212,6 +212,27 @@ fn largest_of(
         bytes,
         bounded: true,
     };
+    // A consolidator: the sum, over its inputs, of each one's bit string at
+    // its most, with its length and two bits of state, in whole bytes. Its
+    // sources are asked as the layout is made; the graph has no cycle a
+    // consolidator could be on without a node breaking it.
+    if node.node_type == "compute" {
+        if let Ok(crate::node::vehicle::compute::Computation::Consolidator(
+            params,
+        )) = crate::node::vehicle::compute::params_of(
+            &node.name,
+            &node.attributes,
+        ) {
+            return match crate::consolidation::Layout::of(
+                graph,
+                &node.name,
+                &params.inputs,
+            ) {
+                Ok(layout) => bounded(layout.largest_bytes()),
+                Err(_) => unbounded,
+            };
+        }
+    }
     let Ok(Carries::Only(kind)) = carries(node, "world-out") else {
         return unbounded;
     };

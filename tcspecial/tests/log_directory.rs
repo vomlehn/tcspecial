@@ -37,7 +37,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"a28fbfe632aca562d9d9ac8d37ba5476\"
+  interface: \"2de4e4035e84c174e51c66b0c402e9ca\"
   beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", \
   recv: \"{}\", send: \"{}\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}

@@ -215,6 +215,12 @@ pub fn carries(node: &Node, terminal: &str) -> Result<Carries, String> {
             .unwrap_or_default();
         return match (function.as_str(), sink) {
             ("vote", _) => only(required(node, "carries")?),
+            // Each input is of its own source's type, whatever that is; what
+            // arrives at its moc-in asks for a datum, whatever it is; and
+            // what it sends is a consolidation, of a type of its own, which
+            // goes only to a gateway, a log or a tee, each of which takes
+            // anything: see `Graph::consolidator_problems`.
+            ("consolidator", _) => Ok(Carries::Any),
             ("to_kelvin", false) => {
                 only(LinkType::Basic(Basic::Value(Unit::Kelvin)))
             }

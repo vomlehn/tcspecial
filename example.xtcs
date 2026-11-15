@@ -11,7 +11,7 @@
             <send>0.0.0.0:5550</send>
         </beacon>
         <gateway>radio</gateway>
-        <interface>a28fbfe632aca562d9d9ac8d37ba5476</interface>
+        <interface>2de4e4035e84c174e51c66b0c402e9ca</interface>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
             <dest_base>0.0.0.0:4200</dest_base>

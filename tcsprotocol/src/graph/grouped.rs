@@ -776,13 +776,14 @@ impl<'de> Visitor<'de> for NodeSeed {
             attributes.insert(attribute, Scalar::of(each.join(", ")));
         }
 
-        // A vote is over the inputs its world-in names, which is what its
-        // computation reads them from: one list, in the file, and the model's
-        // `inputs` made from it here and nowhere else. See
+        // A vote is over the inputs its world-in names, and a consolidator
+        // puts them together, which is what each computation reads them
+        // from: one list, in the file, and the model's `inputs` made from it
+        // here and nowhere else. See
         // `crate::node::vehicle::compute::params_of`.
-        let votes = attributes
-            .get("function")
-            .is_some_and(|function| function.as_str() == "vote");
+        let votes = attributes.get("function").is_some_and(|function| {
+            crate::node::vehicle::compute::names_its_inputs(function.as_str())
+        });
         if self.node_type == "compute" && votes && !world_in.is_empty() {
             attributes
                 .insert("inputs".to_string(), Scalar::of(world_in.join(",")));

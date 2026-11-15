@@ -129,7 +129,8 @@ Requirement
     they install. tcspecial's are split so that none holds both --
     ``tcspecial``, the flight executive, and ``tcsmoc``, what a station is
     built on, hold operational code and nothing else; ``tcs-tools``,
-    ``tcspecial-test`` and ``tcspecial-doc`` hold the rest -- but the names
+    ``tcspecial-test``, ``tcspecial-doc`` and ``tcspecial-examples`` hold
+    the rest -- but the names
     are not held to the rule: ``tcspecial-test`` is no operational code. Nor pkg-config files, which
     tell a compiler how to build with a library: managing the compiler is
     outside how TCS manages its versions. Nor any other kind of name:
@@ -1073,7 +1074,8 @@ Requirement
     their size. Each buffer is sized by its node's largest datum, the
     fabric's, a tee's and the ground's (``Routes::largest_of``,
     ``GatewayReceiver::datum_bytes``), and ``DATUM_BYTES`` is gone. A
-    consolidator's sum waits for the consolidator.
+    consolidator's sum is its layout's (``consolidation::Layout``), built
+    2026-11-15.
 
 Requirement
     What a node takes at its ``moc-in`` is sized by that terminal's type, as
@@ -1388,7 +1390,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "a28fbfe632aca562d9d9ac8d37ba5476"
+     interface: "2de4e4035e84c174e51c66b0c402e9ca"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100
@@ -3433,6 +3435,22 @@ To build it, in order:
    input at its most, and one empty; and the checks refusing what they
    refuse, a consolidator with too many inputs and one whose datum could be
    larger than a datum may be among them.
+
+**Built** (2026-11-15), step 1, in tcsprotocol: ``max_consolidator_inputs``;
+``function: consolidator``, with ``send`` -- a listed attribute, as
+``terminators`` is -- and ``interval``, and the checks of each
+(``compute::ConsolidatorParams``, ``compute::Triggers``); its inputs' names
+kept as a vote's are (``compute::names_its_inputs``); the checks of its
+place in the graph -- each input linked once, no more inputs than
+``max_consolidator_inputs``, what it sends going only to a gateway, a log or a
+tee, and its ``moc-in`` fed only by a gateway
+(``Graph::consolidator_problems``); a fixed-length log taking one whose every
+input is of a fixed width, at its width; the datum's layout, packing and
+unpacking (``tcsprotocol::consolidation``), and its largest datum from it;
+and the one-bit boolean, ``boolean_bit`` in ``types.xtce``, which the
+interface digest covers. ``tests/consolidator.rs`` holds a configuration to
+the checks, and the module's own tests the bits. tcspecial refuses a
+consolidator by name until step 2 builds it aboard.
 
 App nodes
 ---------
@@ -11162,7 +11180,8 @@ Package names and the naming rule
 
     The packages TCS installs with are left out of the rule too: the
     ``.deb`` and ``.rpm`` packages (``tcspecial``, ``tcsmoc``,
-    ``tcs-tools``, ``tcspecial-test``, ``tcspecial-doc``, ``tcslog``,
+    ``tcs-tools``, ``tcspecial-test``, ``tcspecial-doc``,
+    ``tcspecial-examples``, ``tcslog``,
     ``tcslog-gen``, ``tcslog-tools``, ``tcsxtce``, ``tcs-xtce``) and the
     Python distributions pip builds (``tcspecial-moc``, ``tcs-ui`` and
     ``tcs-xtce`` among them). Every project's are split, so that a vehicle
@@ -11170,7 +11189,8 @@ Package names and the naming rule
     ``tcspecial`` holds the flight executive, ``tcsmoc`` what a station is
     built on, ``tcs-tools`` the editor and the checker, ``tcspecial-test``
     the test station, the simulator and the test apps, and
-    ``tcspecial-doc`` the manuals and the examples.
+    ``tcspecial-doc`` the manuals, and ``tcspecial-examples`` the
+    examples.
 
     Bringing the names in would mean naming each package by the rule, so
     that a package's name alone says what it is being given --

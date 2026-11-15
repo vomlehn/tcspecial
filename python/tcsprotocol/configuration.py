@@ -59,8 +59,9 @@ LINKS = ("world-out", "moc-out")
 #: A node's data sinks, each listing the names a line may arrive by.
 SINKS = ("world-in", "moc-in")
 
-#: The attributes a node writes as a list: ``tcsprotocol::graph::LISTED``.
-LISTED = ("terminators",)
+#: The attributes a node writes as a list: ``tcsprotocol::graph::LISTED``,
+#: a line's ``terminators`` and a consolidator's ``send``.
+LISTED = ("terminators", "send")
 
 #: Where the schemas are: a link to tcs-gui's ``share/schema``, the one copy,
 #: beside this module so that an installed package has them too, as the

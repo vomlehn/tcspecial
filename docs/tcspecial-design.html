@@ -706,7 +706,8 @@ a project installs with, which are named for the project and for what
 they install. tcspecial's are split so that none holds both --
 <tt class="docutils literal">tcspecial</tt>, the flight executive, and <tt class="docutils literal">tcsmoc</tt>, what a station is
 built on, hold operational code and nothing else; <tt class="docutils literal"><span class="pre">tcs-tools</span></tt>,
-<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> and <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt> hold the rest -- but the names
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt> and <tt class="docutils literal"><span class="pre">tcspecial-examples</span></tt> hold
+the rest -- but the names
 are not held to the rule: <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> is no operational code. Nor pkg-config files, which
 tell a compiler how to build with a library: managing the compiler is
 outside how TCS manages its versions. Nor any other kind of name:
@@ -1590,7 +1591,8 @@ them (<tt class="docutils literal"><span class="pre">Problem::Unsized</span></tt
 their size. Each buffer is sized by its node's largest datum, the
 fabric's, a tee's and the ground's (<tt class="docutils literal"><span class="pre">Routes::largest_of</span></tt>,
 <tt class="docutils literal"><span class="pre">GatewayReceiver::datum_bytes</span></tt>), and <tt class="docutils literal">DATUM_BYTES</tt> is gone. A
-consolidator's sum waits for the consolidator.</p>
+consolidator's sum is its layout's (<tt class="docutils literal"><span class="pre">consolidation::Layout</span></tt>), built
+2026-11-15.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>What a node takes at its <tt class="docutils literal"><span class="pre">moc-in</span></tt> is sized by that terminal's type, as
@@ -1882,7 +1884,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;a28fbfe632aca562d9d9ac8d37ba5476&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2de4e4035e84c174e51c66b0c402e9ca&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">
@@ -3846,6 +3848,21 @@ input at its most, and one empty; and the checks refusing what they
 refuse, a consolidator with too many inputs and one whose datum could be
 larger than a datum may be among them.</li>
 </ol>
+<p><strong>Built</strong> (2026-11-15), step 1, in tcsprotocol: <tt class="docutils literal">max_consolidator_inputs</tt>;
+<tt class="docutils literal">function: consolidator</tt>, with <tt class="docutils literal">send</tt> -- a listed attribute, as
+<tt class="docutils literal">terminators</tt> is -- and <tt class="docutils literal">interval</tt>, and the checks of each
+(<tt class="docutils literal"><span class="pre">compute::ConsolidatorParams</span></tt>, <tt class="docutils literal"><span class="pre">compute::Triggers</span></tt>); its inputs' names
+kept as a vote's are (<tt class="docutils literal"><span class="pre">compute::names_its_inputs</span></tt>); the checks of its
+place in the graph -- each input linked once, no more inputs than
+<tt class="docutils literal">max_consolidator_inputs</tt>, what it sends going only to a gateway, a log or a
+tee, and its <tt class="docutils literal"><span class="pre">moc-in</span></tt> fed only by a gateway
+(<tt class="docutils literal"><span class="pre">Graph::consolidator_problems</span></tt>); a fixed-length log taking one whose every
+input is of a fixed width, at its width; the datum's layout, packing and
+unpacking (<tt class="docutils literal"><span class="pre">tcsprotocol::consolidation</span></tt>), and its largest datum from it;
+and the one-bit boolean, <tt class="docutils literal">boolean_bit</tt> in <tt class="docutils literal">types.xtce</tt>, which the
+interface digest covers. <tt class="docutils literal">tests/consolidator.rs</tt> holds a configuration to
+the checks, and the module's own tests the bits. tcspecial refuses a
+consolidator by name until step 2 builds it aboard.</p>
 </div>
 <div class="section" id="app-nodes">
 <h2><a class="toc-backref" href="#toc-entry-34">App nodes</a></h2>
@@ -11417,7 +11434,8 @@ files, should TCS install any, would raise the same question.</p>
 <blockquote>
 <p>The packages TCS installs with are left out of the rule too: the
 <tt class="docutils literal">.deb</tt> and <tt class="docutils literal">.rpm</tt> packages (<tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal">tcsmoc</tt>,
-<tt class="docutils literal"><span class="pre">tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt>, <tt class="docutils literal">tcslog</tt>,
+<tt class="docutils literal"><span class="pre">tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt>,
+<tt class="docutils literal"><span class="pre">tcspecial-examples</span></tt>, <tt class="docutils literal">tcslog</tt>,
 <tt class="docutils literal"><span class="pre">tcslog-gen</span></tt>, <tt class="docutils literal"><span class="pre">tcslog-tools</span></tt>, <tt class="docutils literal">tcsxtce</tt>, <tt class="docutils literal"><span class="pre">tcs-xtce</span></tt>) and the
 Python distributions pip builds (<tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>, <tt class="docutils literal"><span class="pre">tcs-ui</span></tt> and
 <tt class="docutils literal"><span class="pre">tcs-xtce</span></tt> among them). Every project's are split, so that a vehicle
@@ -11425,7 +11443,8 @@ or a station can be given its operational code and nothing else:
 <tt class="docutils literal">tcspecial</tt> holds the flight executive, <tt class="docutils literal">tcsmoc</tt> what a station is
 built on, <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> the editor and the checker, <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>
 the test station, the simulator and the test apps, and
-<tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt> the manuals and the examples.</p>
+<tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt> the manuals, and <tt class="docutils literal"><span class="pre">tcspecial-examples</span></tt> the
+examples.</p>
 <p>Bringing the names in would mean naming each package by the rule, so
 that a package's name alone says what it is being given --
 <tt class="docutils literal"><span class="pre">tcspecial-test</span></tt> reads as operational code and holds none -- and

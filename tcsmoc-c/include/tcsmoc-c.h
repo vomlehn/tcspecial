@@ -795,6 +795,51 @@ int tcs_client_query_threads(tcs_client *client, uint32_t first,
 			     uint32_t *total, tcs_thread *threads,
 			     size_t *told);
 
+/* How many inputs one answer to QUERY_CONSOLIDATOR tells of. */
+#define TCS_INPUTS_PER_ANSWER 32
+
+/* What a consolidator has sent since the vehicle started. A datum sent in a
+ * pass in which two triggers fired is one datum, counted once in sent and
+ * once under each trigger, so the three may add up to more than sent. */
+typedef struct tcs_consolidator_counts {
+	uint64_t sent;          /* the datums it has sent */
+	uint64_t sent_all_new;  /* those sent with every input new */
+	uint64_t sent_interval; /* those sent as its interval came round */
+	uint64_t sent_moc;      /* those sent for what came to its moc-in */
+	uint64_t refused;       /* readings refused for not being of their
+	                           input's type */
+} tcs_consolidator_counts;
+
+/* How often one input of a consolidator went into a datum held or none;
+ * how often it went in new is sent less the two. */
+typedef struct tcs_input_counts {
+	uint64_t held; /* the datums it went into held: the reading before */
+	uint64_t none; /* those it went into none: nothing had arrived */
+} tcs_input_counts;
+
+/** Sends QUERY_CONSOLIDATOR, to ask what a consolidator has sent, by
+ * trigger, and how often each of its inputs, from the one at position first
+ * in its world-in, went into a datum held or none. One answer tells of up to
+ * TCS_INPUTS_PER_ANSWER; ask again from first plus told until first reaches
+ * total for the rest. A node that is not a consolidator is answered
+ * TCS_STATUS_INVALID_PARAMETER. Asking changes nothing aboard.
+ *
+ * @param client  The client.
+ * @param node    The consolidator's node id.
+ * @param first   The position of the first input to tell of.
+ * @param status  Where what the vehicle answered is written.
+ * @param counts  Where what it has sent is written.
+ * @param total   Where how many inputs it has is written.
+ * @param inputs  Where the inputs' counts are written: room for
+ *                TCS_INPUTS_PER_ANSWER.
+ * @param told    Where how many of inputs were written is written.
+ * @return        0, or -1 on an error. */
+int tcs_client_query_consolidator(tcs_client *client, uint32_t node,
+				  uint32_t first, tcs_status *status,
+				  tcs_consolidator_counts *counts,
+				  uint32_t *total, tcs_input_counts *inputs,
+				  size_t *told);
+
 /** Closes the command links and frees the client.
  *
  * @param client  The client, or NULL to do nothing. */

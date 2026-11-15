@@ -13,6 +13,10 @@
 //! * each source drawn into the node is the channel at `fprime_id_base` plus
 //!   its device id, named after the source, and of the type the
 //!   configuration says its data are (see [`Form`]);
+//! * a consolidator drawn into it has no channel, since the bridge's receive
+//!   takes its datum apart and hands out each new input as though its
+//!   source had sent it: each of its inputs' sources has the channel it
+//!   would have were it drawn in, and a held input is written to none;
 //! * the bridge's own channels -- what it has heard of the beacon, whether it
 //!   is matched, what it has counted -- follow every device id the
 //!   configuration has, so that adding a link never moves one;
@@ -33,6 +37,7 @@ use std::fmt::Write as _;
 
 use super::telemetry::{self, Via};
 use super::Graph;
+use crate::consolidation::Layout;
 use crate::gateway::GatewayKind;
 use crate::graph::link_types::{self, Carries};
 use crate::link_type::{Basic, LinkType};
@@ -300,7 +305,9 @@ pub struct Model {
     /// The node's `fprime_id_base`: the component instance's base ID.
     pub id_base: u32,
     /// A channel for each source drawn into the node, in the order the
-    /// links are drawn.
+    /// links are drawn, but for a consolidator, which has none: in its
+    /// place a channel for each of its inputs' sources not drawn in
+    /// themselves, by device id.
     pub data: Vec<Source>,
     /// The bridge's own channels, in [`OWN_CHANNELS`]' order.
     pub own: Vec<Channel>,
@@ -428,39 +435,81 @@ pub fn of(graph: &Graph, gateway: &str) -> Result<Model, Refused> {
             })
     };
 
-    let mut data = Vec::new();
-    for link in links
+    // The sources whose readings reach the bridge, each once: those drawn
+    // into the node, but a consolidator, which is not -- the bridge's
+    // receive takes its datum apart, and hands each new input out as
+    // though its source had sent it -- and in its place each of its
+    // inputs' sources, named by the consolidator it comes in.
+    let ids = telemetry::ids(graph);
+    let drawn: Vec<&telemetry::Telemetered> = links
         .iter()
         .filter(|l| l.via == Via::Gateway(gateway.to_string()))
-    {
-        if !is_fprime_name(&link.source) {
+        .collect();
+    let mut sources: Vec<(String, usize, Option<String>)> = Vec::new();
+    for link in &drawn {
+        let laid = graph
+            .node(&link.source)
+            .and_then(|node| Layout::of_node(graph, node));
+        let Some(laid) = laid else {
+            if !sources.iter().any(|(name, ..)| *name == link.source) {
+                sources.push((link.source.clone(), link.id, None));
+            }
+            continue;
+        };
+        // One that does not lay out is the check's to say.
+        let Ok((_, layout)) = laid else {
+            continue;
+        };
+        let mut inputs: Vec<&str> =
+            layout.inputs.iter().map(|i| i.source.as_str()).collect();
+        inputs.sort_by_key(|source| ids.get(*source));
+        for input in inputs {
+            if drawn.iter().any(|l| l.source == input)
+                || sources.iter().any(|(name, ..)| name == input)
+            {
+                continue;
+            }
+            let Some(&id) = ids.get(input) else {
+                continue;
+            };
+            sources.push((input.to_string(), id, Some(link.source.clone())));
+        }
+    }
+
+    let mut data = Vec::new();
+    for (source, id, by) in &sources {
+        let reaches = match by {
+            None => format!("is drawn into \"{gateway}\""),
+            Some(by) => {
+                format!("reaches \"{gateway}\" in \"{by}\"'s datum")
+            }
+        };
+        if !is_fprime_name(source) {
             return Err(Refused {
-                node: link.source.clone(),
+                node: source.clone(),
                 why: format!(
-                    "\"{}\" is drawn into \"{gateway}\", and the F´ bridge \
-                     names a channel after it, which F´ cannot do with that \
-                     name: rename the node with letters, digits and \
-                     underscores, starting with a letter",
-                    link.source
+                    "\"{source}\" {reaches}, and the F´ bridge names a \
+                     channel after it, which F´ cannot do with that name: \
+                     rename the node with letters, digits and underscores, \
+                     starting with a letter"
                 ),
             });
         }
-        if let Some(own) = OWN_CHANNELS.iter().find(|o| o.name == link.source) {
+        if let Some(own) = OWN_CHANNELS.iter().find(|o| o.name == *source) {
             return Err(Refused {
-                node: link.source.clone(),
+                node: source.clone(),
                 why: format!(
-                    "\"{}\" is drawn into \"{gateway}\", and the F´ bridge \
-                     names a channel after it, but {} is the bridge's own \
-                     channel saying {}: rename the node",
-                    link.source,
+                    "\"{source}\" {reaches}, and the F´ bridge names a \
+                     channel after it, but {} is the bridge's own channel \
+                     saying {}: rename the node",
                     own.name,
                     own.about.to_lowercase()
                 ),
             });
         }
         data.push(Source {
-            channel: at(&link.source, link.id)?,
-            form: Form::of(graph, &link.source),
+            channel: at(source, *id)?,
+            form: Form::of(graph, source),
         });
     }
     let own = OWN_CHANNELS
@@ -852,6 +901,47 @@ mod tests {
             .attributes
             .insert("fprime_id_base".to_string(), crate::Scalar::of(base));
         graph
+    }
+
+    /// A consolidator drawn into the node has no channel: in its place each
+    /// of its inputs' sources has one, at its own device id, of the type it
+    /// sends, as the bridge's receive hands each new input out as though
+    /// that source had sent it. An input drawn in itself too has its one
+    /// channel.
+    #[test]
+    fn a_consolidators_inputs_are_channels_of_their_own() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let text =
+            std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
+                .expect("it reads")
+                .replace("gateway: \"yamcs\"", "gateway: \"fprime\"")
+                .replace("type gateway_yamcs", "type gateway_fprime")
+                .replace(
+                    "ground_base: \"127.0.0.1:26700\"",
+                    "bridge_base: \"127.0.0.1:26700\"\n        \
+                     fprime_id_base: \"0x3000\"",
+                )
+                .lines()
+                .filter(|line| !line.contains("apid"))
+                .map(|line| format!("{line}\n"))
+                .collect::<String>();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("fprime.ytcs");
+        std::fs::write(&path, text).expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let model = of(&graph, "gateway").expect("a model");
+        assert_eq!(
+            model
+                .data
+                .iter()
+                .map(|s| (s.channel.name.as_str(), s.channel.id, s.form))
+                .collect::<Vec<_>>(),
+            vec![
+                ("label", 0x3001, Form::Datum),
+                ("temp", 0x3003, Form::Whole(Basic::U16)),
+                ("valve", 0x3004, Form::Decision),
+            ]
+        );
     }
 
     /// heater_wanted, device id 2, a thermostat, is the channel 0x3002,

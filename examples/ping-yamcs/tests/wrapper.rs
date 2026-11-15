@@ -216,6 +216,33 @@ fn connect_encodes_as_the_vehicle_reads_it() {
     }
 }
 
+/// QUERY_CONSOLIDATOR, as Yamcs sends it by the wrapper, is unframed by the
+/// vehicle under `tcs_cmd.apid` and read as the command `link.xtce` lays
+/// out: the template states it again, and this holds the two to one layout.
+#[test]
+fn query_consolidator_encodes_as_the_vehicle_reads_it() {
+    let xtce = wrapper();
+    let packet = encode(
+        &xtce,
+        "QueryConsolidator",
+        &[
+            ("Sequence", Given::Integer(11)),
+            ("Node", Given::Integer(4)),
+            ("First", Given::Integer(32)),
+        ],
+    );
+    let body = read_header(&packet, PacketType::Telecommand, apid("cmd_apid"))
+        .expect("the vehicle takes its header");
+    match Command::read(body).expect("the vehicle reads it") {
+        Command::QueryConsolidator(query) => {
+            assert_eq!(query.header.sequence, 11);
+            assert_eq!(query.node, tcsprotocol::NodeId(4));
+            assert_eq!(query.first, 32);
+        }
+        other => panic!("QUERY_CONSOLIDATOR was read as {other:?}"),
+    }
+}
+
 /// A ping, as Yamcs sends it by the wrapper as the ping node's document's
 /// command, its fields as text, is unframed by the vehicle under the gateway
 /// node's `apid_base` and read as the ping `tcsprotocol` writes; and the

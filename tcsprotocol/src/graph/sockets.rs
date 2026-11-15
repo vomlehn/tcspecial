@@ -245,7 +245,9 @@ pub fn of(graph: &Graph) -> Vec<Socket> {
 
     // Each source's link to the ground, gathered by where it goes and in
     // device id order there, so that a gateway node's ports read upwards.
-    let mut links = telemetry::of(graph).unwrap_or_default();
+    // And those the ground relays a consolidator's inputs on, which the
+    // ground station binds as it binds the rest.
+    let mut links = telemetry::every(graph).unwrap_or_default();
     links.sort_by(|a, b| {
         let via = |link: &telemetry::Telemetered| match &link.via {
             Via::Gateway(name) => (0, name.clone()),
@@ -275,10 +277,17 @@ pub fn of(graph: &Graph) -> Vec<Socket> {
             protocol: NetworkProtocol::Udp,
             bound_by: BoundBy::Ground,
             kind: Kind::GroundLink,
-            what: format!(
-                "{attribute} plus device id {}: what \"{}\" sends",
-                link.id, link.source
-            ),
+            what: match &link.relayed_by {
+                None => format!(
+                    "{attribute} plus device id {}: what \"{}\" sends",
+                    link.id, link.source
+                ),
+                Some(by) => format!(
+                    "{attribute} plus device id {}: \"{}\"'s readings, \
+                     relayed from \"{by}\" by the ground",
+                    link.id, link.source
+                ),
+            },
             node: Some(link.source.clone()),
         });
         // A link into a gateway node is sent from whatever port the system

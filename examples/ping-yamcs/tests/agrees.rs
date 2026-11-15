@@ -333,6 +333,7 @@ fn rust_apids(path: &Path) -> BTreeSet<(String, u16)> {
                 "AnswerPacket".to_string(),
                 "Connect".to_string(),
                 "QueryThreads".to_string(),
+                "QueryConsolidator".to_string(),
             ],
             ApidCarries::Uplink(gateway) => {
                 vec![uplink_command(&graph, gateway)]

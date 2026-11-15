@@ -98,10 +98,14 @@ XTCE_NAME = re.compile(r"[^./:\[\] ]+")
 RESTRICTED = {"beacon": "BeaconPacket", "commands": "AnswerPacket"}
 
 #: The template's commands the command links' APID is assigned to: CONNECT,
-#: on the spacecraft command link, and QUERY_THREADS, on the node command
-#: link, which tcspecial frames with the same APID.
+#: on the spacecraft command link, and QUERY_THREADS and QUERY_CONSOLIDATOR,
+#: on the node command link, which tcspecial frames with the same APID.
 CONNECT = "Connect"
 QUERY_THREADS = "QueryThreads"
+QUERY_CONSOLIDATOR = "QueryConsolidator"
+
+#: The node command link's commands, which its stream routes there.
+NODE_COMMANDS = (QUERY_THREADS, QUERY_CONSOLIDATOR)
 
 #: The binary parameter type a node's data is read as where it is a
 #: structure: what follows the header, whole.
@@ -1057,7 +1061,7 @@ def mdb(config, template=TEMPLATE, world=False):
                               "/x:BaseContainer", f"{container} bases")
             _restrict(base, use.apid)
         if use.carries == "commands":
-            for command in (CONNECT, QUERY_THREADS):
+            for command in (CONNECT, *NODE_COMMANDS):
                 base = _one(root, f".//x:MetaCommand[@name='{command}']"
                                   "/x:BaseMetaCommand", f"{command} bases")
                 _assign(base, use.apid)
@@ -1297,7 +1301,8 @@ def data_links(config):
 
 def command_streams(config):
     """The command streams that route each command to its link: CONNECT to
-    the spacecraft command link, QUERY_THREADS to the node command link, each
+    the spacecraft command link, QUERY_THREADS and QUERY_CONSOLIDATOR to the
+    node command link, each
     gateway node's command to its uplink, where it binds aboard.
 
     Args:
@@ -1313,7 +1318,8 @@ def command_streams(config):
                 "tcPatterns": [qualified(CONNECT)]}]
     if config.node_command_link() is not None:
         streams.append({"name": NODE_COMMAND_STREAM, "processor": "realtime",
-                        "tcPatterns": [qualified(QUERY_THREADS)]})
+                        "tcPatterns": [qualified(command)
+                                       for command in NODE_COMMANDS]})
     for uplink in uplinks(config):
         if uplink.vehicle is None:
             continue

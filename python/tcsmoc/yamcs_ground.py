@@ -17,7 +17,9 @@ station and the vehicle share -- ping-yamcs and thermostat-yamcs:
 * :class:`YamcsBeacons` reads each beacon Yamcs receives as
   :class:`tcsmoc.beacon.Beacons` reads one from its own socket;
 * :func:`query_threads` has it send QUERY_THREADS and reads the answer:
-  the memory the whole of tcspecial has, and each thread's stack.
+  the memory the whole of tcspecial has, and each thread's stack;
+  :func:`query_consolidator`, QUERY_CONSOLIDATOR: what a consolidator has
+  sent and how often each of its inputs went in held or none.
 
 Only the standard library is used, but for PyYAML, with which the
 instance's configuration is written.
@@ -633,6 +635,64 @@ def query_threads(yamcs, sequence, first=0, timeout=5.0):
                          "stack": thread["StackBytes"],
                          "deepest": thread["DeepestBytes"]}
                         for thread in values["/TcsLink/Threads"] or []],
+                }
+        time.sleep(0.05)
+    return None
+
+
+#: The parameters of an answer to QUERY_CONSOLIDATOR, in tcsprotocol's
+#: ``link.xtce``: the sequence of the command it answers, what the
+#: consolidator has sent, and its inputs' counts.
+CONSOLIDATOR_PARAMETERS = ("/TcsLink/Sequence", "/TcsLink/Status",
+                           "/TcsLink/Sent", "/TcsLink/SentAllNew",
+                           "/TcsLink/SentInterval", "/TcsLink/SentMoc",
+                           "/TcsLink/Refused", "/TcsLink/FirstInput",
+                           "/TcsLink/InputTotal", "/TcsLink/Inputs")
+
+
+def query_consolidator(yamcs, sequence, node, first=0, timeout=5.0):
+    """Has Yamcs send QUERY_CONSOLIDATOR, and reads the answer it receives:
+    what a consolidator has sent, by trigger, and how often each of its
+    inputs went into a datum held or none.
+
+    Args:
+        yamcs:    The :class:`Yamcs` instance of the tcspecial to ask.
+        sequence: The command's sequence number: past every command this
+                  start of tcspecial has taken, or it is answered Stale.
+        node:     The consolidator's node id.
+        first:    The position of the first input to tell of, in the order
+                  of its ``world-in``.
+        timeout:  How long to wait for the answer, in seconds.
+
+    Returns:
+        A dictionary: ``status``, the answer's status as Yamcs names it --
+        ``InvalidParameter`` for a node that is not a consolidator;
+        ``sent``, ``sent_all_new``, ``sent_interval``, ``sent_moc`` and
+        ``refused``; ``first`` and ``total``, the first input told of and
+        how many there are; and ``inputs``, each a dictionary of ``held``
+        and ``none``. ``None`` where no answer to this command arrives.
+    """
+    yamcs.issue(generated.qualified(generated.QUERY_CONSOLIDATOR),
+                {"Sequence": sequence, "Node": node, "First": first})
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        said = yamcs.parameters(list(CONSOLIDATOR_PARAMETERS))
+        if said is not None:
+            values, _ = said
+            if values["/TcsLink/Sequence"] == sequence:
+                return {
+                    "status": values["/TcsLink/Status"],
+                    "sent": values["/TcsLink/Sent"],
+                    "sent_all_new": values["/TcsLink/SentAllNew"],
+                    "sent_interval": values["/TcsLink/SentInterval"],
+                    "sent_moc": values["/TcsLink/SentMoc"],
+                    "refused": values["/TcsLink/Refused"],
+                    "first": values["/TcsLink/FirstInput"],
+                    "total": values["/TcsLink/InputTotal"],
+                    "inputs": [
+                        {"held": counts["TimesHeld"],
+                         "none": counts["TimesNone"]}
+                        for counts in values["/TcsLink/Inputs"] or []],
                 }
         time.sleep(0.05)
     return None

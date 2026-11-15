@@ -52,6 +52,7 @@ use tcsmoc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcsmoc::relay::Relay;
 use tcsmoc::{command_links_of, CommandStatus, TcsClient};
 use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
+use tcsprotocol::consolidation::INPUTS_PER_ANSWER;
 use tcsprotocol::graph::link_table::LinkTable;
 use tcsprotocol::graph::parameters::beacon_interval_of;
 use tcsprotocol::graph::units;
@@ -2452,6 +2453,99 @@ pub unsafe extern "C" fn tcs_client_query_threads(
     })
 }
 
+/// What the header's `tcs_consolidator_counts` is.
+#[repr(C)]
+pub struct tcs_consolidator_counts {
+    sent: u64,
+    sent_all_new: u64,
+    sent_interval: u64,
+    sent_moc: u64,
+    refused: u64,
+}
+
+/// What the header's `tcs_input_counts` is.
+#[repr(C)]
+pub struct tcs_input_counts {
+    held: u64,
+    none: u64,
+}
+
+/// Sends QUERY_CONSOLIDATOR, to ask what a consolidator has sent and how
+/// often each of its inputs went into a datum held or none.
+///
+/// # Arguments
+///
+/// * `client` - The client.
+/// * `node`   - The consolidator's node id.
+/// * `first`  - The position of the first input to tell of.
+/// * `status` - Where what the vehicle answered is written.
+/// * `counts` - Where what it has sent is written.
+/// * `total`  - Where how many inputs it has is written.
+/// * `inputs` - Where the inputs' counts are written: room for
+///              `TCS_INPUTS_PER_ANSWER`.
+/// * `told`   - Where how many of `inputs` were written is written.
+///
+/// # Returns
+///
+/// 0, or -1 on an error.
+///
+/// # Safety
+///
+/// As [`tcs_client_connect`]; `status`, `counts`, `total` and `told` NULL
+/// or writable, and `inputs` NULL or room for `TCS_INPUTS_PER_ANSWER`.
+//
+// Eight, as tcs_client_query_threads has seven: what is asked, and where
+// each part of the answer goes.
+#[allow(clippy::too_many_arguments)]
+#[no_mangle]
+pub unsafe extern "C" fn tcs_client_query_consolidator(
+    client: *mut tcs_client,
+    node: u32,
+    first: u32,
+    status: *mut c_int,
+    counts: *mut tcs_consolidator_counts,
+    total: *mut u32,
+    inputs: *mut tcs_input_counts,
+    told: *mut usize,
+) -> c_int {
+    guard(-1, || {
+        let link = handle_of_mut(client, "the client")?;
+        let status_out = out_of(status, "the status")?;
+        let counts_out = out_of(counts, "the counts")?;
+        let total_out = out_of(total, "the total")?;
+        let told_out = out_of(told, "told")?;
+        if inputs.is_null() {
+            return Err(fail("the inputs is NULL"));
+        }
+        let (answered, has, all, them) = link
+            .client
+            .query_consolidator(NodeId(node), first)
+            .map_err(|e| {
+                fail(format_args!("QUERY_CONSOLIDATOR {node} {first}: {e}"))
+            })?;
+        // SAFETY: the caller gives room for TCS_INPUTS_PER_ANSWER, and an
+        // answer tells of no more.
+        let room = std::slice::from_raw_parts_mut(inputs, INPUTS_PER_ANSWER);
+        for (slot, input) in room.iter_mut().zip(them.iter()) {
+            *slot = tcs_input_counts {
+                held: input.held,
+                none: input.none,
+            };
+        }
+        *status_out = status_number(answered);
+        *counts_out = tcs_consolidator_counts {
+            sent: has.sent,
+            sent_all_new: has.sent_all_new,
+            sent_interval: has.sent_interval,
+            sent_moc: has.sent_moc,
+            refused: has.refused,
+        };
+        *total_out = all;
+        *told_out = them.len().min(INPUTS_PER_ANSWER);
+        Ok(0)
+    })
+}
+
 // ---- Pinging a ping node ----------------------------------------------------
 
 /// What the header's `tcs_exchange` is.
@@ -3222,6 +3316,7 @@ mod tests {
             ("TCS_ATTRIBUTE_BYTES", tcsprotocol::ATTRIBUTE_BYTES),
             ("TCS_VALUE_BYTES", tcsprotocol::VALUE_BYTES),
             ("TCS_THREADS_PER_ANSWER", THREADS_PER_ANSWER),
+            ("TCS_INPUTS_PER_ANSWER", INPUTS_PER_ANSWER),
         ] {
             let line = format!("#define {name} {size}");
             assert!(header.contains(&line), "the header has no \"{line}\"");

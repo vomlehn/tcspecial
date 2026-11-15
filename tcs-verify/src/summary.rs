@@ -1,11 +1,13 @@
 //! What a configuration uses of what must not clash or overflow, in one
 //! place, for `--summary`: every address and port, every device id, every
-//! message ID and APID, and how much it sends the ground.
+//! message ID and APID, how much it sends the ground, and how each
+//! consolidator lays out its datum.
 //!
 //! Nothing here is a rule. Each list is `tcsprotocol`'s -- the sockets
 //! [`tcsprotocol::graph::sockets::of`], the ids [`telemetry::ids`], the
 //! message IDs [`telemetry::msgids`], the APIDs [`telemetry::apids`], the rates
-//! [`tcsprotocol::graph::rates::of`] -- and the checks that hold them apart
+//! [`tcsprotocol::graph::rates::of`], the consolidations
+//! [`Layout::of_node`] -- and the checks that hold them apart
 //! are `Graph::check`'s, which the run has printed above. This lays them out:
 //! plain text in aligned columns, each list in the order it is made in, so that
 //! two summaries can be compared with `diff`.
@@ -13,6 +15,7 @@
 use std::fmt::Write;
 use std::path::Path;
 
+use tcsprotocol::consolidation::{Layout, Shape};
 use tcsprotocol::graph::sockets::Socket;
 use tcsprotocol::graph::telemetry::{self, Telemetered};
 use tcsprotocol::graph::Graph;
@@ -298,6 +301,92 @@ fn rates(out: &mut String, graph: &Graph) {
     table(out, &[false, true, true, true, false], &rows);
 }
 
+/// Writes each consolidator: the gateway nodes it is drawn into, the most a
+/// datum of it may be, and each input in the order of its `world-in`, with
+/// its source, its type and the bits it takes in the datum. An input whose
+/// source is drawn into one of those gateway nodes itself reaches the
+/// ground twice, once in the datum and once alone, which costs the link
+/// what the consolidator was there to save: it is said beside the input.
+///
+/// # Arguments
+///
+/// * `out`   - Where it is written.
+/// * `graph` - The configuration.
+fn consolidators(out: &mut String, graph: &Graph) {
+    out.push_str("Consolidators\n");
+    let links = telemetry::of(graph).unwrap_or_default();
+    // The gateway nodes a node is drawn into itself.
+    let into = |source: &str| -> Vec<String> {
+        links
+            .iter()
+            .filter(|link| link.source == source)
+            .filter_map(|link| match &link.via {
+                telemetry::Via::Gateway(gateway) => Some(gateway.clone()),
+                telemetry::Via::PayloadTelemetry => None,
+            })
+            .collect()
+    };
+    let mut any = false;
+    for node in &graph.nodes {
+        // One that does not lay out is the check's to say, above.
+        let Some(Ok((_, layout))) = Layout::of_node(graph, node) else {
+            continue;
+        };
+        any = true;
+        let to = into(&node.name);
+        let _ = writeln!(
+            out,
+            "  \"{}\": {} inputs, at most {} bytes a datum, to {}",
+            node.name,
+            layout.inputs.len(),
+            layout.largest_bytes(),
+            if to.is_empty() {
+                "no gateway node".to_string()
+            } else {
+                to.iter()
+                    .map(|gateway| format!("\"{gateway}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            }
+        );
+        let mut rows = vec![vec![
+            "input".to_string(),
+            "source".to_string(),
+            "type".to_string(),
+            "bits".to_string(),
+            "note".to_string(),
+        ]];
+        for input in &layout.inputs {
+            let bits = match &input.shape {
+                Shape::Fixed(fields) => {
+                    fields.iter().map(|f| f.bits()).sum::<usize>().to_string()
+                }
+                Shape::Counted { most, length_bits } => {
+                    format!("{length_bits} + 8 x up to {most}")
+                }
+            };
+            let twice: Vec<String> = into(&input.source)
+                .into_iter()
+                .filter(|gateway| to.contains(gateway))
+                .map(|gateway| {
+                    format!("drawn into \"{gateway}\" itself too: sent twice")
+                })
+                .collect();
+            rows.push(vec![
+                input.name.clone(),
+                input.source.clone(),
+                input.kind.to_string(),
+                bits,
+                twice.join("; "),
+            ]);
+        }
+        table(out, &[false, false, false, true, false], &rows);
+    }
+    if !any {
+        out.push_str("  none\n");
+    }
+}
+
 /// Lays out what a configuration uses of what must not clash or overflow.
 ///
 /// # Arguments
@@ -306,8 +395,9 @@ fn rates(out: &mut String, graph: &Graph) {
 ///
 /// # Returns
 ///
-/// The summary: addresses and ports, device ids, message IDs, APIDs and
-/// rates, each under its heading, a blank line between them.
+/// The summary: addresses and ports, device ids, message IDs, APIDs,
+/// rates and consolidators, each under its heading, a blank line between
+/// them.
 pub fn written(graph: &Graph) -> String {
     let mut out = String::new();
     addresses(&mut out, &tcsprotocol::graph::sockets::of(graph));
@@ -319,6 +409,8 @@ pub fn written(graph: &Graph) -> String {
     apids(&mut out, graph);
     out.push('\n');
     rates(&mut out, graph);
+    out.push('\n');
+    consolidators(&mut out, graph);
     out
 }
 

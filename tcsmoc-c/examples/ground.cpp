@@ -341,6 +341,28 @@ int main(int argc, char **argv)
 				    static_cast<unsigned>(thread.deepest),
 				    static_cast<unsigned>(thread.stack));
 		}
+
+		// What a consolidator has sent, and how often each input went
+		// into a datum held or none. Asked of a node that is not one,
+		// it is refused, which is what this shows of a ping node.
+		tcs_consolidator_counts counts{};
+		tcs_input_counts inputs[TCS_INPUTS_PER_ANSWER];
+		std::uint32_t inputs_total = 0;
+		std::size_t inputs_told = 0;
+		if (tcs_client_query_consolidator(client.get(), node, 0, &status,
+						  &counts, &inputs_total,
+						  inputs, &inputs_told) != 0) {
+			return fail("consolidator");
+		}
+		std::printf("consolidator %s: %s", node_name.c_str(),
+			    tcs_status_name(status));
+		if (status == TCS_STATUS_SUCCESS) {
+			std::printf(", %llu sent, %u of %u inputs",
+				    static_cast<unsigned long long>(counts.sent),
+				    static_cast<unsigned>(inputs_told),
+				    static_cast<unsigned>(inputs_total));
+		}
+		std::printf("\n");
 	}
 
 	if (restart) {

@@ -30,9 +30,10 @@ use tcsprotocol::node::vehicle::ping;
 use tcsprotocol::Command as LinkCommand;
 use tcsprotocol::{
     Beacon, CommandStatus, ConnectTelemetry, DHSample, NodeCounts, NodeId,
-    PingTelemetry, QueryNodeSampleTelemetry, QueryNodeTelemetry,
-    QueryThreadsTelemetry, Reason, RestartArmTelemetry, RestartTelemetry,
-    SetNodeTelemetry, Telemetry, ThreadRole, ThreadStack, Timestamp, NO_NODE,
+    PingTelemetry, QueryConsolidatorTelemetry, QueryNodeSampleTelemetry,
+    QueryNodeTelemetry, QueryThreadsTelemetry, Reason, RestartArmTelemetry,
+    RestartTelemetry, SetNodeTelemetry, Telemetry, ThreadRole, ThreadStack,
+    Timestamp, NO_NODE,
 };
 
 fn here() -> PathBuf {
@@ -395,6 +396,19 @@ vehicle:
                             };
                             Telemetry::QueryThreads(answer.tell(3, 3))
                         }
+                        // The ping node is no consolidator, and is refused
+                        // as tcspecial refuses it.
+                        LinkCommand::QueryConsolidator(cmd) => {
+                            assert_eq!(cmd.node, NodeId(1), "the ping node");
+                            Telemetry::QueryConsolidator(
+                                QueryConsolidatorTelemetry::new(
+                                    seq,
+                                    CommandStatus::InvalidParameter,
+                                    cmd.node,
+                                    cmd.first,
+                                ),
+                            )
+                        }
                         // Onto the configuration the station read, which is
                         // what a NULL target says.
                         LinkCommand::RestartArm(cmd) => {
@@ -461,6 +475,7 @@ vehicle:
             tcsprotocol::CommandType::SetNode,
             tcsprotocol::CommandType::QueryNodeSample,
             tcsprotocol::CommandType::QueryThreads,
+            tcsprotocol::CommandType::QueryConsolidator,
             tcsprotocol::CommandType::RestartArm,
             tcsprotocol::CommandType::Restart,
         ],
@@ -499,16 +514,17 @@ vehicle:
         "thread main: 40960 of 8388608 bytes".to_string(),
         "thread commands: 12288 of 262144 bytes".to_string(),
         "thread node (node 1): 8192 of 65536 bytes".to_string(),
+        "consolidator ping: InvalidParameter".to_string(),
         "restart: armed done, restarted done".to_string(),
         "ping ping through gateway: sent".to_string(),
         "data from ping: hello from ping".to_string(),
         "ping ping: answered, round trip timed, up and down summing to it \
         yes"
         .to_string(),
-        // Eight answers and two data, every one read: the vehicle beacons
+        // Nine answers and two data, every one read: the vehicle beacons
         // clear and with this configuration's checksum, so nothing it sends
         // is dropped.
-        "packets: 10 received = 10 processed + 0 malformed + 0 mismatched"
+        "packets: 11 received = 11 processed + 0 malformed + 0 mismatched"
             .to_string(),
     ];
     let lines: Vec<&str> = printed.lines().collect();

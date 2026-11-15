@@ -666,6 +666,39 @@ fn the_summary_lists_the_gateway_ports_by_source() {
     assert_eq!(status, 2);
 }
 
+/// `--summary` lists each consolidator: its inputs and the bits each takes,
+/// an input whose source is drawn into the gateway node itself too being
+/// said to be sent twice; and the ports and APIDs its inputs are relayed
+/// on, naming the consolidator.
+#[test]
+fn the_summary_lists_a_consolidators_inputs() {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../tests/consolidator/yamcs.ytcs");
+    let (lines, status) = run(&["--summary", fixture.to_str().expect("path")]);
+    assert_eq!(status, 0, "{lines:?}");
+    let has = |want: &[&str]| {
+        lines
+            .iter()
+            .any(|line| want.iter().all(|part| line.contains(part)))
+    };
+    assert!(lines.iter().any(|l| l == "Consolidators"), "{lines:?}");
+    assert!(has(&["\"pack\": 3 inputs", "to \"gateway\""]), "{lines:?}");
+    assert!(has(&["temp", "u16", "16"]), "{lines:?}");
+    assert!(has(&["valve", "boolean", " 1"]), "{lines:?}");
+    assert!(
+        has(&["name", "label", "4 + 8 x up to 8", "sent twice"]),
+        "{lines:?}"
+    );
+    assert!(
+        has(&[
+            "127.0.0.1:26703",
+            "\"temp\"'s readings, relayed from \"pack\""
+        ]),
+        "{lines:?}"
+    );
+    assert!(has(&["0x204", "relayed under from \"pack\""]), "{lines:?}");
+}
+
 /// The cfs example's summary lists its message IDs, inside its allotment:
 /// the gateway node's cmd_msgid and what the thermometer sends to it.
 #[test]

@@ -483,8 +483,8 @@ pub fn of(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
 }
 
 /// Every link a consolidator's input would reach the ground on, were its
-/// source drawn into the gateway node the consolidator is: one for each
-/// source and gateway node, where the source is not drawn into it itself.
+/// source drawn into the `gateway_yamcs` node the consolidator is: one for
+/// each source and such node, where the source is not drawn into it itself.
 ///
 /// A consolidator packs its inputs into one datum only for the link from
 /// the vehicle, where bandwidth is short. The ground takes the datum apart
@@ -549,12 +549,19 @@ pub(crate) fn every(graph: &Graph) -> Result<Vec<Telemetered>, Refused> {
     }
 
     // Each consolidator's inputs, through the gateway nodes it is drawn
-    // into, where their sources are not drawn in themselves.
+    // into, where their sources are not drawn in themselves. Only where its
+    // packets carry an APID, through a gateway_yamcs node: there the ground
+    // station reads the node's ports itself and is relayed the inputs. A
+    // station built on tcsmoc takes a consolidation apart as it receives
+    // it, and binds no port for an input.
     let mut relayed = Vec::new();
     for drawn in &links {
         let Via::Gateway(to) = &drawn.via else {
             continue;
         };
+        if drawn.apid.is_none() {
+            continue;
+        }
         let Some(Ok((_, layout))) = graph
             .node(&drawn.source)
             .and_then(|node| Layout::of_node(graph, node))
@@ -1021,11 +1028,19 @@ pub fn apids(graph: &Graph) -> Result<Vec<ApidUse>, Refused> {
         used.push(match &link.via {
             Via::Gateway(gateway) => ApidUse {
                 apid,
-                what: format!(
-                    "the APID of what \"{}\" sends to \"{gateway}\", its \
-                     apid_base plus the device id {}",
-                    link.source, link.id
-                ),
+                what: match &link.relayed_by {
+                    None => format!(
+                        "the APID of what \"{}\" sends to \"{gateway}\", its \
+                         apid_base plus the device id {}",
+                        link.source, link.id
+                    ),
+                    Some(by) => format!(
+                        "the APID \"{}\"'s readings are relayed under from \
+                         \"{by}\" to \"{gateway}\", its apid_base plus the \
+                         device id {}",
+                        link.source, link.id
+                    ),
+                },
                 change: format!("the apid_base of \"{gateway}\""),
                 node: Some(gateway.clone()),
                 carries: ApidCarries::Downlink {
@@ -1249,6 +1264,29 @@ mod tests {
             .map(|u| u.apid)
             .collect();
         assert!(used.contains(&0x203) && used.contains(&0x204), "{used:x?}");
+    }
+
+    /// Through a radio's gateway node nothing is relayed: a ground station
+    /// built on tcsmoc takes the consolidation apart as it receives it, and
+    /// binds no port for an input.
+    #[test]
+    fn nothing_is_relayed_through_a_radio() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let text =
+            std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
+                .expect("it reads")
+                .replace("gateway: \"yamcs\"", "gateway: \"radio\"")
+                .replace("type gateway_yamcs", "type gateway_radio")
+                .lines()
+                .filter(|line| !line.contains("apid"))
+                .map(|line| format!("{line}\n"))
+                .collect::<String>();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("radio.ytcs");
+        std::fs::write(&path, text).expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        assert_eq!(relayed(&graph).expect("it works out"), vec![]);
+        assert_eq!(of(&graph).expect("it works out").len(), 2);
     }
 
     /// A payload nothing touches reports over the section's payload_telemetry.

@@ -84,7 +84,11 @@ peer (see "A vehicle on a cFS software bus" in
   configuration states. `tcs_client_connect` says whether the vehicle is
   flying this configuration; then ping; start, stop or query a node by its
   id, set one of its attributes, or ask for the last datum it moved each way;
-  and arm a restart and restart the vehicle. Until the station is matched
+  ask how deep each thread has been into its stack
+  (`tcs_client_query_threads`), or what a consolidator has sent and how
+  often each of its inputs went into a datum held or none
+  (`tcs_client_query_consolidator`, `TCS_INPUTS_PER_ANSWER` inputs to an
+  answer); and arm a restart and restart the vehicle. Until the station is matched
   for commanding, every command but connect, arm and restart fails, unsent,
   saying the configurations are not yet matched; the vehicle itself answers
   any other command that reaches it before a match `TCS_STATUS_UNMATCHED`,

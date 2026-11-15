@@ -284,6 +284,28 @@
           <BaseContainer containerRef="CcsdsTcContainer"/>
         </CommandContainer>
       </MetaCommand>
+      <!-- QUERY_CONSOLIDATOR, as QUERY_THREADS is: the command of
+           tcsprotocol/xtce/link.xtce, opcode 54, behind the header, on
+           tcs_cmd.apid and the node command link. Its answer is read by
+           LinkAnswerPacket. -->
+      <MetaCommand name="QueryConsolidator">
+        <BaseMetaCommand metaCommandRef="CcsdsTc"/>
+        <ArgumentList>
+          <Argument name="Opcode" argumentTypeRef="U8Arg" initialValue="54"/>
+          <Argument name="Sequence" argumentTypeRef="U32Arg"/>
+          <Argument name="Node" argumentTypeRef="U32Arg"/>
+          <Argument name="First" argumentTypeRef="U32Arg"/>
+        </ArgumentList>
+        <CommandContainer name="QueryConsolidatorPacket">
+          <EntryList>
+            <ArgumentRefEntry argumentRef="Opcode"/>
+            <ArgumentRefEntry argumentRef="Sequence"/>
+            <ArgumentRefEntry argumentRef="Node"/>
+            <ArgumentRefEntry argumentRef="First"/>
+          </EntryList>
+          <BaseContainer containerRef="CcsdsTcContainer"/>
+        </CommandContainer>
+      </MetaCommand>
     </MetaCommandSet>
   </CommandMetaData>
 </SpaceSystem>

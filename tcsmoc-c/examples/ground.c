@@ -312,6 +312,27 @@ int main(int argc, char **argv)
 			printf(": %u of %u bytes\n", (unsigned)thread->deepest,
 			       (unsigned)thread->stack);
 		}
+
+		/* What a consolidator has sent, and how often each input went
+		 * into a datum held or none. Asked of a node that is not one,
+		 * it is refused, which is what this shows of a ping node. */
+		tcs_consolidator_counts counts;
+		tcs_input_counts inputs[TCS_INPUTS_PER_ANSWER];
+		uint32_t inputs_total = 0;
+		size_t inputs_told = 0;
+		if (tcs_client_query_consolidator(client, node, 0, &status,
+						  &counts, &inputs_total,
+						  inputs, &inputs_told) != 0) {
+			return fail("consolidator");
+		}
+		printf("consolidator %s: %s", node_name,
+		       tcs_status_name(status));
+		if (status == TCS_STATUS_SUCCESS) {
+			printf(", %llu sent, %u of %u inputs",
+			       (unsigned long long)counts.sent,
+			       (unsigned)inputs_told, (unsigned)inputs_total);
+		}
+		printf("\n");
 	}
 
 	if (restart) {

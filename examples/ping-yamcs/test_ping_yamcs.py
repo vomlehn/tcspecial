@@ -88,6 +88,7 @@ class WriteYamcsTest(unittest.TestCase):
         self.assertEqual(wrapper_apids(self.run / "tcs-ccsds.xtce"),
                          {("BeaconPacket", 0x100), ("AnswerPacket", 0x101),
                           ("Connect", 0x101), ("QueryThreads", 0x101),
+                          ("QueryConsolidator", 0x101),
                           ("Ping", 0x200),
                           ("pingPacket", 0x201)})
         self.assertEqual(setup.ping_command, PING_COMMAND)
@@ -108,7 +109,9 @@ class WriteYamcsTest(unittest.TestCase):
         self.assertEqual([(stream["name"], stream["tcPatterns"])
                           for stream in instance["streamConfig"]["tc"]],
                          [("tc_commands", ["/TcsYamcs/Connect"]),
-                          ("tc_node_commands", ["/TcsYamcs/QueryThreads"]),
+                          ("tc_node_commands",
+                           ["/TcsYamcs/QueryThreads",
+                            "/TcsYamcs/QueryConsolidator"]),
                           ("tc_gateway", ["/TcsYamcs/Ping"])])
         self.assertIn('streams: ["tc_commands", "tc_node_commands", '
                       '"tc_gateway"]',
@@ -125,6 +128,7 @@ class WriteYamcsTest(unittest.TestCase):
         self.assertEqual(wrapper_apids(self.run / "tcs-ccsds.xtce"),
                          {("BeaconPacket", 0x100), ("AnswerPacket", 0x101),
                           ("Connect", 0x101), ("QueryThreads", 0x101),
+                          ("QueryConsolidator", 0x101),
                           ("Ping", 0x200),
                           ("pingPacket", 0x201), ("pongPacket", 0x202),
                           ("sensorPacket", 0x303), ("tankPacket", 0x304)})

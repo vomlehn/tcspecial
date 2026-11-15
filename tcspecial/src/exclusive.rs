@@ -93,6 +93,40 @@ fn one_byte(file: &File, at: u16) -> Taken {
     taken(said)
 }
 
+/// Tries `take` until it is not held elsewhere, for a moment at most.
+///
+/// A process that starts a program holds a copy of every descriptor of the
+/// one that started it until the program runs, so a device this process has
+/// just closed may be held by its own child for that moment: segsend's,
+/// an app node's, or, in a test, another test's. Another tcspecial holds it
+/// for as long as it runs, so a lock still held after [`HELD_FOR`] is held
+/// by one.
+///
+/// # Arguments
+///
+/// * `take` - The lock call.
+///
+/// # Returns
+///
+/// What the last try said.
+fn retried(take: impl Fn() -> Taken) -> Taken {
+    let tries = HELD_FOR.as_millis() / TRY_EVERY.as_millis();
+    for _ in 1..tries {
+        match take() {
+            Taken::Elsewhere => std::thread::sleep(TRY_EVERY),
+            said => return said,
+        }
+    }
+    take()
+}
+
+/// How long a lock found held is tried again before it is taken to be
+/// another tcspecial's: see [`retried`].
+const HELD_FOR: std::time::Duration = std::time::Duration::from_millis(500);
+
+/// How often it is tried in that time.
+const TRY_EVERY: std::time::Duration = std::time::Duration::from_millis(10);
+
 /// What a lock call's result says.
 ///
 /// # Arguments
@@ -179,7 +213,7 @@ pub fn device(what: &str, path: &str, file: &File) -> TcsResult<()> {
 /// `TcsError::Endpoint`, naming the node and the file, if another
 /// process holds it.
 fn held(what: &str, path: &str, file: &File) -> TcsResult<()> {
-    match whole(file) {
+    match retried(|| whole(file)) {
         Taken::Yes => Ok(()),
         Taken::Elsewhere => Err(held_elsewhere(what, path)),
         Taken::Cannot(e) => {
@@ -217,7 +251,7 @@ pub fn on_bus(
     file: &File,
 ) -> TcsResult<()> {
     let whose = || format!("the address {address:#04X} on {bus}");
-    match one_byte(file, address) {
+    match retried(|| one_byte(file, address)) {
         Taken::Yes => Ok(()),
         Taken::Elsewhere => Err(held_elsewhere(what, &whose())),
         Taken::Cannot(e) => {
@@ -289,7 +323,7 @@ pub fn state_file(path: &Path) -> Result<(), String> {
                 lock.display()
             )
         })?;
-    match whole(&file) {
+    match retried(|| whole(&file)) {
         Taken::Yes => {
             *held = Some((path.to_path_buf(), file));
             Ok(())

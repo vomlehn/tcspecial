@@ -3582,8 +3582,8 @@ under ``build/stage``. Then, as root:
 
 .. code-block:: console
 
-   # apt install ./build/packages/tcspecial_0.1.1-1_amd64.deb
-   # dnf install ./build/packages/tcspecial-0.1.1-1.x86_64.rpm
+   # apt install ./build/packages/tcspecial_0.2.0-1_amd64.deb
+   # dnf install ./build/packages/tcspecial-0.2.0-1.x86_64.rpm
 
 A package also installs what makes ``/opt/tcs`` usable without being told
 of it, each file named after the package so that no two own one:

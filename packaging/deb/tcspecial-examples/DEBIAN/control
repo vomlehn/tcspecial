@@ -4,7 +4,8 @@ Architecture: @ARCH@
 Maintainer: David VomLehn <dvomlehn@gmail.com>
 Installed-Size: @SIZE@
 Depends: @SHLIBS@, tcspecial-test (= @VERSION@), tcs-tools (= @VERSION@), tcsmoc (= @VERSION@), python3, python3-tk, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libxcursor1, libxi6, libxrender1, libegl1, libgl1, libwayland-client0, libwayland-egl1
-Replaces: tcspecial-doc (<< 0.1.2)
+Replaces: tcspecial-doc (<< 0.2.0)
+Breaks: tcspecial-doc (<< 0.2.0)
 Section: misc
 Priority: optional
 Homepage: https://github.com/vomlehn/tcspecial

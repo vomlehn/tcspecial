@@ -25,9 +25,11 @@ SIMULATE = all
 NO_MEMLOCK =
 MEMLOCK_FLAG = $(if $(NO_MEMLOCK),--no-memlock)
 
-# Where the examples' logs are written. The examples' configurations name
-# the same directory, so a change here is a change there as well.
-TELEMETRY = /tmp/telemetry
+# Where cargo puts the debug build the run targets run, as an absolute
+# path, since tcsx runs from a directory of its own.
+TARGET_DIR = $(or $(CARGO_TARGET_DIR),target)
+DEBUG_DIR = $(strip $(if $(filter /%,$(TARGET_DIR)),$(TARGET_DIR), \
+	$(abspath $(ROOT)/$(TARGET_DIR))))/debug
 
 all:	docs
 
@@ -78,6 +80,24 @@ help:
 	@echo "  make check-tkinter   - Check for the tkinter the ping" \
 		"example's window needs"
 
+# Running an example: tcsx, examples/tcsx, runs it from these examples and
+# the programs of this tree's debug build, as it does an installed one from
+# what tcspecial-examples installs, so how each example is run is said
+# once, there. tcsx makes /tmp/telemetry, where the examples log, afresh
+# for each run, so that what is in it afterwards is that run's alone.
+#
+# $(1) is the example, $(2) the programs built for it first, and $(3) what
+# tcsx gives its ground station. tcspecial gives each filled log segment to
+# the segsend built beside it, and refuses to start without one, so
+# segsend is built with the rest. YAMCS_HOME, where a Yamcs release is
+# unpacked, is for the examples through Yamcs.
+define tcsx
+	cd $(ROOT) && cargo build -q $(addprefix --bin ,$(2))
+	cd $(ROOT) && RUST_LOG=$(RUST_LOG) YAMCS_HOME="$(YAMCS_HOME)" \
+		TCSX_EXAMPLES=examples TCSX_BIN=$(DEBUG_DIR) \
+		examples/tcsx --simulate=$(SIMULATE) $(MEMLOCK_FLAG) $(1) $(3)
+endef
+
 # Running tcs-moc on one of the examples.
 #
 # $(1) is the example's directory, whose configuration is named for it. tcs-moc
@@ -88,27 +108,8 @@ help:
 # top-level directory makes dummy devices for I2C, GPIO, IIO and CAN where
 # there is no hardware; the kernel has no dummy for SPI, so the thermostat's SPI
 # sensor needs a real /dev/spidev0.0.
-#
-# tcspecial gives each filled log segment to the segsend built beside it, and
-# refuses to start without one, so segsend is built with the rest.
-#
-# The examples log to $(TELEMETRY), which is deleted before each run so that
-# what is in it afterwards is that run's alone. It is made again because a log
-# node does not make its own directory: a mistyped path is meant to be
-# refused, not to become a log nobody is looking in.
 define runexample_on
-	( \
-		set -eu; \
-		echo "Running tcs-moc on examples/$(1)/$(1).ytcs..."; \
-		cd $(ROOT); \
-		rm -rf $(TELEMETRY); \
-		mkdir $(TELEMETRY); \
-		cargo build -q --bin tcspecial --bin tcs-sim --bin tcs-moc \
-			--bin segsend; \
-		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcs-moc -- \
-			--simulate=$(SIMULATE) $(MEMLOCK_FLAG) \
-			examples/$(1)/$(1).ytcs \
-	)
+	$(call tcsx,$(1),tcspecial tcs-sim tcs-moc segsend)
 endef
 
 # Run tcs-moc on the minimal example: one payload, simulated by tcs-sim, its
@@ -183,43 +184,18 @@ run-iio:
 # Run tcspecial on the simple-app example: a payload that is a program,
 # sending a line of text a word at a time.
 #
-# Both ends are run here. The vehicle goes in the background, and the ground
-# station, lorem_gateway, in the foreground: it is what prints the line, and it
-# stops at the end of it. Then the vehicle is stopped. The payload,
-# lorem_pl.py, is the `executable` the configuration names, a Python 3 script
-# beside it, and tcspecial starts it -- so Python 3 is checked for first.
-#
-# The binaries are run directly rather than through `cargo run`, so that $$!
-# is tcspecial itself and its children can be found. Those are stopped first:
-# tcspecial does not yet end an app node's program when it stops, and a
-# lorem_pl.py left behind would sit there until somebody killed it. The ground
-# is given $(SIMPLE_APP_WAITS) seconds, which is several times what the line
-# takes, so a vehicle that never answers is a failed run and not a hang. The
-# vehicle is --quiet, so that what the run prints is the line; what stops it
-# starting it says either way.
-SIMPLE_APP_WAITS = 30
+# Both ends are run, by tcsx. The vehicle goes in the background, and the
+# ground station, lorem_gateway, in the foreground: it is what prints the
+# line, and it stops at the end of it, or after a time several times what
+# the line takes, so that a vehicle that never answers is a failed run and
+# not a hang. Then the vehicle is stopped, with the payload it started. The
+# payload, lorem_pl.py, is the `executable` the configuration names, a
+# Python 3 script beside it, and tcspecial starts it -- so Python 3 is
+# checked for first.
 
 .PHONY: run-simple-app
 run-simple-app: check-python3
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin segsend \
-		--bin lorem_gateway
-	( \
-		set -eu; \
-		echo "Running $(PROJECT_NAME) on" \
-			"examples/simple-app/simple-app.ytcs..."; \
-		cd $(ROOT); \
-		rm -rf $(TELEMETRY); \
-		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/tcspecial --quiet \
-			--simulate=$(SIMULATE) $(MEMLOCK_FLAG) \
-			examples/simple-app/simple-app.ytcs & \
-		vehicle=$$!; \
-		trap 'pkill -P $$vehicle || true; \
-			kill -INT $$vehicle 2>/dev/null || true; \
-			wait $$vehicle || true' EXIT; \
-		trap 'exit 130' INT TERM; \
-		timeout $(SIMPLE_APP_WAITS) target/debug/lorem_gateway \
-	)
+	$(call tcsx,simple-app,tcspecial segsend lorem_gateway)
 
 # Run the beacon example: a window watching the beacon, with a button that
 # starts tcspecial and stops it.
@@ -237,18 +213,7 @@ run-simple-app: check-python3
 # around: what the window shows is what the example is.
 .PHONY: run-beacon
 run-beacon:
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin segsend \
-		--bin beacon
-	( \
-		set -eu; \
-		echo "Watching $(PROJECT_NAME)'s beacon from" \
-			"examples/beacon/beacon.ytcs..."; \
-		cd $(ROOT); \
-		rm -rf $(TELEMETRY); \
-		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) target/debug/beacon $(MEMLOCK_FLAG) \
-			examples/beacon/beacon.ytcs \
-	)
+	$(call tcsx,beacon,tcspecial segsend beacon)
 
 # Run the ping example: tcspecial answering pings, and a window sending them.
 #
@@ -267,17 +232,7 @@ run-beacon:
 # and stops the vehicle.
 .PHONY: run-ping
 run-ping: check-tkinter
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
-		--bin segsend
-	( \
-		set -eu; \
-		echo "Running $(PROJECT_NAME) on examples/ping/ping.xtcs..."; \
-		cd $(ROOT); \
-		rm -rf $(TELEMETRY); \
-		mkdir $(TELEMETRY); \
-		RUST_LOG=$(RUST_LOG) python3 examples/ping/ping_gateway.py \
-			$(MEMLOCK_FLAG) examples/ping/ping.xtcs \
-	)
+	$(call tcsx,ping,tcspecial tcs-verify segsend)
 
 # The ping example with Yamcs between the ground station and the vehicle.
 # YAMCS_HOME is where a Yamcs release is unpacked; ping_yamcs.py starts Yamcs
@@ -287,16 +242,7 @@ run-ping: check-tkinter
 # pings three times, prints each answer and its times, and stops them.
 .PHONY: run-ping-yamcs
 run-ping-yamcs: check-tkinter
-	@test -x "$(YAMCS_HOME)/bin/yamcsd" || { \
-		echo "say where Yamcs is unpacked: make run-ping-yamcs" \
-			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
-		exit 1; \
-	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
-		--bin segsend
-	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
-		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)" \
-		$(MEMLOCK_FLAG)
+	$(call tcsx,ping-yamcs,tcspecial tcs-verify segsend)
 
 # The memusage example: tcspecial's memory, and each of its threads'
 # stacks, watched through Yamcs. YAMCS_HOME is where a Yamcs release is
@@ -312,17 +258,7 @@ MEMUSAGE = examples/memusage/memusage.xtcs
 
 .PHONY: run-memusage
 run-memusage:
-	@test -x "$(YAMCS_HOME)/bin/yamcsd" || { \
-		echo "say where Yamcs is unpacked: make run-memusage" \
-			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
-		exit 1; \
-	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
-		--bin segsend
-	mkdir -p $(TELEMETRY)
-	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
-		examples/memusage/memusage.py --yamcs "$(YAMCS_HOME)" \
-		$(MEMLOCK_FLAG) $(MEMUSAGE)
+	$(call tcsx,memusage,tcspecial tcs-verify segsend,$(MEMUSAGE))
 
 # The thermostat example with Yamcs between the ground station and the
 # vehicle. YAMCS_HOME is where a Yamcs release is unpacked;
@@ -337,18 +273,8 @@ run-memusage:
 # switched, and stops them.
 .PHONY: run-thermostat-yamcs
 run-thermostat-yamcs: check-tkinter
-	@test -x "$(YAMCS_HOME)/bin/yamcsd" || { \
-		echo "say where Yamcs is unpacked: make run-thermostat-yamcs" \
-			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
-		exit 1; \
-	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-sim \
-		--bin tcs-verify --bin segsend
-	rm -rf $(TELEMETRY)
-	mkdir $(TELEMETRY)
-	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
-		examples/thermostat-yamcs/thermostat_yamcs.py \
-		--yamcs "$(YAMCS_HOME)" $(MEMLOCK_FLAG)
+	$(call tcsx,thermostat-yamcs,tcspecial tcs-sim tcs-verify \
+		segsend)
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
 #

@@ -9,6 +9,8 @@ Requires:       tcs-tools = %{version}-%{release}
 Requires:       tcsmoc = %{version}-%{release}
 Requires:       python3
 Requires:       python3-tkinter
+# The examples were tcspecial-doc's before 0.2.0.
+Conflicts:      tcspecial-doc < 0.2.0
 # The windows open through libraries loaded when beacon runs, which RPM
 # cannot see that it needs: the keyboard, X11 or Wayland, EGL and
 # OpenGL. The .deb names the same ones.

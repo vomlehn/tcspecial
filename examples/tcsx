@@ -7,7 +7,8 @@
 # installed. With one it runs it as its make run target in the examples'
 # Makefile does in a checkout: most by tcs-moc, which starts tcs-sim and
 # tcspecial on its configuration, and the rest by their own ground station,
-# which starts tcspecial itself. ARGUMENTs go to that ground station.
+# which starts tcspecial itself. ARGUMENTs go to that ground station; for
+# memusage, configurations among them are watched in place of its own.
 #
 #   --no-memlock     tcspecial does not lock its memory into RAM, as a desk
 #                    whose limit on locked memory is too small needs
@@ -109,7 +110,10 @@ while [ $# -gt 0 ]; do
 	shift
 done
 [ -d "$examples" ] || die "no examples in $examples"
+[ -d "$bin" ] || die "no programs in $bin"
+# Both are named from where tcsx is started, and it runs from elsewhere.
 examples=$(cd "$examples" && pwd)
+bin=$(cd "$bin" && pwd)
 if [ $# -eq 0 ]; then
 	list
 	exit 0
@@ -173,9 +177,17 @@ thermostat-yamcs)
 		--yamcs "$YAMCS_HOME" $memlock "$@"
 	;;
 memusage)
+	# Its own configuration, unless the ARGUMENTs name others, each
+	# a tcspecial memusage starts and watches.
+	mine=examples/memusage/memusage.xtcs
+	for argument in "$@"; do
+		case $argument in
+		*.xtcs | *.ytcs) mine= ;;
+		esac
+	done
 	# shellcheck disable=SC2086
 	python3 examples/memusage/memusage.py --yamcs "$YAMCS_HOME" \
-		$memlock "$@" examples/memusage/memusage.xtcs
+		$memlock "$@" $mine
 	;;
 *)
 	# shellcheck disable=SC2086

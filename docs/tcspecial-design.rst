@@ -3262,17 +3262,26 @@ Requirement
     `How large a datum may be`_ asks of every one.
 
 Requirement
-    The ground is not asked to unpack a datum: TCS does. tcsmoc, and
-    tcsmoc-c and the Python spelling built on it, take a consolidator's
-    datum apart into its inputs, each with its state, and a ground station
-    built on them -- Yamcs among them -- is given the inputs and never sees
-    the datum. A held input is passed on only where its state goes with it:
-    passed as a plain reading it would look like a new one, so where the
-    station is given readings and nothing more, only new inputs reach it,
-    and a held one is left out as a none is. That is what lets the bit
-    strings go unpadded: Yamcs decodes a number at any bit, but not a string
-    or bytes that starts partway through a byte, and with the unpacking
-    TCS's own, nothing on the ground has to.
+    The ground is not asked to unpack a datum: TCS does. tcsmoc's
+    ``GatewayReceiver``, and tcsmoc-c and the Python spelling built on it,
+    take a consolidator's datum apart as it arrives and queue its new
+    inputs, and each receive after hands one out as though its source had
+    sent it the ground itself: named by that source, as it arrived on the
+    vehicle. A station built on them reads an input as it reads any
+    reading, and never sees the datum. The queue is in buffers made when
+    the gateway node is opened, as large as the configuration says its
+    consolidators may send, so nothing is allocated as it is filled. A held
+    input is passed on only where its state goes with it: passed as a plain
+    reading it would look like a new one, so where the station is given
+    readings and nothing more, as a receive gives them, only new inputs
+    reach it, and a held one is left out as a none is. That is what lets
+    the bit strings go unpadded: Yamcs decodes a number at any bit, but not
+    a string or bytes that starts partway through a byte, and with the
+    unpacking TCS's own, nothing on the ground has to. How Yamcs, which
+    reads the gateway's ports itself, is given the inputs is not settled.
+
+    **Built** (2026-11-15): the queue, in tcsmoc's ``GatewayReceiver``,
+    which tcsmoc-c's ``tcs_gateway_receive`` hands on as it stands.
 
 Requirement
     A log that takes a consolidation keeps it packed, as it was sent, the

@@ -3687,17 +3687,26 @@ most, so the vehicle and the ground know each field's width. This asks
 that a string or bytes type state its most, as <tt class="docutils literal">string(64)</tt>, which
 <a class="reference internal" href="#how-large-a-datum-may-be">How large a datum may be</a> asks of every one.</dd>
 <dt>Requirement</dt>
-<dd>The ground is not asked to unpack a datum: TCS does. tcsmoc, and
-tcsmoc-c and the Python spelling built on it, take a consolidator's
-datum apart into its inputs, each with its state, and a ground station
-built on them -- Yamcs among them -- is given the inputs and never sees
-the datum. A held input is passed on only where its state goes with it:
-passed as a plain reading it would look like a new one, so where the
-station is given readings and nothing more, only new inputs reach it,
-and a held one is left out as a none is. That is what lets the bit
-strings go unpadded: Yamcs decodes a number at any bit, but not a string
-or bytes that starts partway through a byte, and with the unpacking
-TCS's own, nothing on the ground has to.</dd>
+<dd><p class="first">The ground is not asked to unpack a datum: TCS does. tcsmoc's
+<tt class="docutils literal">GatewayReceiver</tt>, and tcsmoc-c and the Python spelling built on it,
+take a consolidator's datum apart as it arrives and queue its new
+inputs, and each receive after hands one out as though its source had
+sent it the ground itself: named by that source, as it arrived on the
+vehicle. A station built on them reads an input as it reads any
+reading, and never sees the datum. The queue is in buffers made when
+the gateway node is opened, as large as the configuration says its
+consolidators may send, so nothing is allocated as it is filled. A held
+input is passed on only where its state goes with it: passed as a plain
+reading it would look like a new one, so where the station is given
+readings and nothing more, as a receive gives them, only new inputs
+reach it, and a held one is left out as a none is. That is what lets
+the bit strings go unpadded: Yamcs decodes a number at any bit, but not
+a string or bytes that starts partway through a byte, and with the
+unpacking TCS's own, nothing on the ground has to. How Yamcs, which
+reads the gateway's ports itself, is given the inputs is not settled.</p>
+<p class="last"><strong>Built</strong> (2026-11-15): the queue, in tcsmoc's <tt class="docutils literal">GatewayReceiver</tt>,
+which tcsmoc-c's <tt class="docutils literal">tcs_gateway_receive</tt> hands on as it stands.</p>
+</dd>
 <dt>Requirement</dt>
 <dd>A log that takes a consolidation keeps it packed, as it was sent, the
 smaller for it. What reads a log's segment files on the ground --

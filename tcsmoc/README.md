@@ -20,6 +20,9 @@ part for each:
   `receive` returns one datum along with the name of the node that produced it.
   The ports the data arrive on are worked out from the configuration, the same
   way tcspecial works them out, so the two ends cannot disagree about them.
+  A consolidator's datum is taken apart as it arrives, and each receive after
+  hands out one of its new inputs, named by the node whose reading it is, as
+  though that node had sent it; held inputs, sent before, are left out.
 - **Sending it data.** `ping::Uplink` sends a datum up to a gateway node, to
   the address and port it binds aboard, from which it leaves by the node's
   `moc-out` links: a ping to a ping node, or a command to a heater. Gated

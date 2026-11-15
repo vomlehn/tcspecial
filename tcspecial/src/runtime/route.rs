@@ -35,9 +35,7 @@ use tcsprotocol::graph::terminals::{self, Stream};
 use tcsprotocol::graph::units;
 use tcsprotocol::graph::{Destination, Graph, Link};
 use tcsprotocol::link_type::LinkType;
-use tcsprotocol::node::vehicle::compute::{
-    self, Computation, ConsolidatorParams,
-};
+use tcsprotocol::node::vehicle::compute::ConsolidatorParams;
 use tcsprotocol::unit::Unit;
 
 /// What a command from the ground sets.
@@ -381,17 +379,10 @@ impl Routes {
 
         // Each consolidator's layout, which its port packs by: one that does
         // not work out is a configuration the check has refused.
-        for node in graph.nodes.iter().filter(|n| n.node_type == "compute") {
-            let Ok(Computation::Consolidator(params)) =
-                compute::params_of(&node.name, &node.attributes)
-            else {
-                continue;
-            };
-            if let Ok(layout) = tcsprotocol::consolidation::Layout::of(
-                graph,
-                &node.name,
-                &params.inputs,
-            ) {
+        for node in &graph.nodes {
+            if let Some(Ok((params, layout))) =
+                tcsprotocol::consolidation::Layout::of_node(graph, node)
+            {
                 routes.consolidations.insert(
                     node.name.clone(),
                     Consolidating { params, layout },

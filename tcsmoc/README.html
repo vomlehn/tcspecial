@@ -191,7 +191,10 @@ node in a configuration. Name the node, open it, and each call to
 <code>receive</code> returns one datum along with the name of the node
 that produced it. The ports the data arrive on are worked out from the
 configuration, the same way tcspecial works them out, so the two ends
-cannot disagree about them.</p></li>
+cannot disagree about them. A consolidator’s datum is taken apart as it
+arrives, and each receive after hands out one of its new inputs, named
+by the node whose reading it is, as though that node had sent it; held
+inputs, sent before, are left out.</p></li>
 <li><p><strong>Sending it data.</strong> <code>ping::Uplink</code> sends
 a datum up to a gateway node, to the address and port it binds aboard,
 from which it leaves by the node’s <code>moc-out</code> links: a ping to

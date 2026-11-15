@@ -2234,7 +2234,13 @@ from the same configuration and says which node each datum came from. A loop
 that does not keep each datum takes it with ``GatewayReceiver::receive_into``,
 into a buffer of ``tcsmoc::gateway::DATUM_BYTES`` it made before it started,
 and allocates nothing. What it does with the data then -- process it, display
-it, log it -- is its own business. A gateway node that the ground sends commands
+it, log it -- is its own business. A consolidator's datum is never handed out
+as it arrived: the receive takes it apart, and it and the receives after it
+hand out each new input, one at a time, named by the node whose reading it
+is, as though that node had sent it the ground itself; an input held, sent
+before and sent again, is left out, as is one from which nothing has yet
+arrived. So the nodes a gateway node's data comes from include the sources of
+its consolidators' inputs. A gateway node that the ground sends commands
 or other data through also states the ``address`` tcspecial binds to receive
 them, its host and port together, as ``127.0.0.1:5000``.
 

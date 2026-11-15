@@ -14,12 +14,25 @@
 //! it, log it -- is the caller's. One function between the configuration and
 //! the data means one place that counts ports, and it is the same counting the
 //! vehicle does.
+//!
+//! A consolidator's datum is several readings packed as one, and the ground
+//! is not asked to take it apart: a receive does, as it arrives, by the
+//! layout the configuration gives (`tcsprotocol::consolidation`), which is
+//! the one the vehicle packed by. Its new inputs are queued, and each
+//! receive after hands one out as if its source had sent it the ground
+//! itself, so a station reads them as it reads any reading, and every
+//! input's source is among [`GatewayReceiver::sources`]. A held input is a
+//! reading sent before, sent again, and one whose state is none has no
+//! reading: neither is handed out, or a station, given readings with no
+//! state beside them, would take a repeat for a reading taken again.
 
 use std::net::UdpSocket;
+use std::ops::Range;
 use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use tcsprotocol::consolidation::{Layout, State};
 use tcsprotocol::graph::telemetry::{self, Telemetered, Via};
 use tcsprotocol::graph::Graph;
 use tcsprotocol::link_type::{uncounted, Count};
@@ -45,6 +58,36 @@ pub struct Received {
     pub data: Vec<u8>,
 }
 
+/// A consolidator drawn into a gateway node: how its datum is laid out,
+/// and which of the node's sources each of its inputs is.
+#[derive(Debug)]
+struct Consolidation {
+    /// How its datum is laid out.
+    layout: Layout,
+    /// Each input's source, as its place in [`GatewayReceiver::sources`],
+    /// in the order of the inputs.
+    sources: Vec<usize>,
+}
+
+/// The inputs of the last consolidation received, taken apart into
+/// buffers made when the node was opened, and how many have been handed
+/// out.
+#[derive(Debug)]
+struct Queue {
+    /// Each input's reading, end to end: room for the largest any
+    /// consolidator drawn into the node can send.
+    readings: Vec<u8>,
+    /// Each input's state and where its reading is in `readings`: room for
+    /// as many inputs as any consolidator drawn into the node has.
+    spans: Vec<(State, Range<usize>)>,
+    /// The port whose consolidation is queued.
+    from: usize,
+    /// The next input to look at.
+    next: usize,
+    /// How many inputs it has: `next` reaching it empties the queue.
+    count: usize,
+}
+
 /// Where [`GatewayReceiver::receive_into`] put a datum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Arrival {
@@ -65,6 +108,15 @@ pub struct GatewayReceiver {
     /// How each source's datum is counted, in the same order: `None` for
     /// one of a type with a width of its own, which is sent with no count.
     counts: Vec<Option<Count>>,
+    /// Each source's consolidation, in the same order: how its datum is
+    /// laid out where it is a consolidator, and `None` where it is not.
+    consolidations: Vec<Option<Consolidation>>,
+    /// The sources of consolidators' inputs that are not drawn into the
+    /// node themselves, after the ports in [`GatewayReceiver::sources`].
+    relayed: Vec<String>,
+    /// The inputs of the last consolidation received still to be handed
+    /// out.
+    queue: Queue,
     /// What a receive waits on, one for each port and in the same order:
     /// made once, when the node is opened.
     fds: Vec<libc::pollfd>,
@@ -77,7 +129,8 @@ pub struct GatewayReceiver {
     /// The largest datagram any of its sources can send: the largest datum
     /// each can produce, as the configuration says, and the count before it
     /// where it is counted. The vehicle sizes its buffers by the same
-    /// figures (`tcsprotocol::graph::largest`).
+    /// figures (`tcsprotocol::graph::largest`). It is also room for any
+    /// consolidator's input, handed out as its source sent it.
     datum_bytes: usize,
 }
 
@@ -214,9 +267,21 @@ impl GatewayReceiver {
     ) -> Result<GatewayReceiver, String> {
         let mut ports = Vec::new();
         let mut counts = Vec::new();
+        let mut layouts = Vec::new();
         let mut datum_bytes = 0;
         for link in links {
             counts.push(link.count());
+            let layout = graph
+                .node(&link.source)
+                .and_then(|node| Layout::of_node(graph, node))
+                .transpose()
+                .map_err(|why| {
+                    format!(
+                        "\"{name}\": \"{}\" (consolidator): {why}",
+                        link.source
+                    )
+                })?;
+            layouts.push(layout.map(|(_, layout)| layout));
             let count = match link.count() {
                 Some(_) => tcsprotocol::link_type::COUNT_BYTES,
                 None => 0,
@@ -249,6 +314,48 @@ impl GatewayReceiver {
             })?;
             ports.push((link.source, socket));
         }
+        // Each input's source is a source of the node's: the port it is
+        // drawn in by, where it is drawn in too, and otherwise a place after
+        // the ports, one for each node however many inputs it is.
+        let mut relayed: Vec<String> = Vec::new();
+        let mut consolidations = Vec::new();
+        let mut readings = 0;
+        let mut spans = 0;
+        for layout in layouts {
+            let Some(layout) = layout else {
+                consolidations.push(None);
+                continue;
+            };
+            let mut sources = Vec::new();
+            for input in &layout.inputs {
+                let at =
+                    match ports.iter().position(|(s, _)| *s == input.source) {
+                        Some(at) => at,
+                        None => {
+                            let at = relayed
+                                .iter()
+                                .position(|s| *s == input.source)
+                                .unwrap_or_else(|| {
+                                    relayed.push(input.source.clone());
+                                    relayed.len() - 1
+                                });
+                            ports.len() + at
+                        }
+                    };
+                sources.push(at);
+                datum_bytes = datum_bytes.max(input.largest_link_bytes());
+            }
+            readings = readings.max(layout.largest_link_bytes());
+            spans = spans.max(layout.inputs.len());
+            consolidations.push(Some(Consolidation { layout, sources }));
+        }
+        let queue = Queue {
+            readings: vec![0; readings],
+            spans: vec![(State::None, 0..0); spans],
+            from: 0,
+            next: 0,
+            count: 0,
+        };
         let fds = ports
             .iter()
             .map(|(_, socket)| libc::pollfd {
@@ -261,6 +368,9 @@ impl GatewayReceiver {
             name: name.to_string(),
             ports,
             counts,
+            consolidations,
+            relayed,
+            queue,
             fds,
             next: 0,
             gate: None,
@@ -308,7 +418,10 @@ impl GatewayReceiver {
         &self.name
     }
 
-    /// Lists the nodes whose data arrives here, in the order they are drawn.
+    /// Lists the nodes whose data arrives here: those drawn into it, in the
+    /// order they are drawn, and then the sources of consolidators' inputs
+    /// not drawn into it themselves, in the order the consolidators list
+    /// them.
     ///
     /// # Returns
     ///
@@ -317,13 +430,20 @@ impl GatewayReceiver {
         self.ports
             .iter()
             .map(|(source, _)| source.as_str())
+            .chain(self.relayed.iter().map(String::as_str))
             .collect()
     }
 
     /// The source at this place in [`GatewayReceiver::sources`], which is what
     /// an [`Arrival`] names.
     pub fn source(&self, index: usize) -> Option<&str> {
-        self.ports.get(index).map(|(source, _)| source.as_str())
+        match self.ports.get(index) {
+            Some((source, _)) => Some(source.as_str()),
+            None => self
+                .relayed
+                .get(index - self.ports.len())
+                .map(String::as_str),
+        }
     }
 
     /// The next datum to arrive from any source, and which source it is from.
@@ -357,7 +477,7 @@ impl GatewayReceiver {
         };
         datum.truncate(arrival.length);
         Ok(Some(Received {
-            source: self.ports[arrival.source].0.clone(),
+            source: self.source(arrival.source).unwrap_or_default().to_string(),
             data: datum,
         }))
     }
@@ -374,14 +494,17 @@ impl GatewayReceiver {
     ///
     /// Which source sent the datum, how long it is and whether it is held,
     /// or `None` where the wait ran out with nothing arrived. A string or
-    /// bytes is put without the count it was sent after.
+    /// bytes is put without the count it was sent after. A consolidator's
+    /// datum is not put: its new inputs are, one at each receive, each
+    /// named by its own source.
     ///
     /// # Errors
     ///
     /// A message where waiting or reading fails. A datum longer than `out`
     /// is refused, saying how long it was, rather than cut short: a buffer
     /// of [`DATUM_BYTES`] holds any. So is a string or bytes whose count
-    /// does not say how long it is.
+    /// does not say how long it is, and a consolidator's datum its layout
+    /// cannot have made, naming the consolidator.
     pub fn receive_into(
         &mut self,
         wait: Option<Duration>,
@@ -389,6 +512,9 @@ impl GatewayReceiver {
     ) -> Result<Option<Arrival>, String> {
         let deadline = wait.map(|wait| Instant::now() + wait);
         loop {
+            if let Some(arrival) = self.queued(out)? {
+                return Ok(Some(arrival));
+            }
             let left = deadline.map(|deadline| {
                 deadline.saturating_duration_since(Instant::now())
             });
@@ -403,15 +529,125 @@ impl GatewayReceiver {
                     continue;
                 }
             }
-            let read = self.read_out(arrival, out);
+            let read = self
+                .read_out(arrival, out)
+                .and_then(|arrival| self.enqueue(arrival, out));
             if let Some(matched) = self.gate.as_ref() {
                 match read {
                     Ok(_) => matched.processed(),
                     Err(_) => matched.malformed(),
                 }
             }
-            return read.map(Some);
+            // A consolidation is queued, and handed out from the queue as
+            // the loop goes round.
+            if let Some(arrival) = read? {
+                return Ok(Some(arrival));
+            }
         }
+    }
+
+    /// Takes a consolidator's datum apart into the queue, where it is one.
+    ///
+    /// # Arguments
+    ///
+    /// * `arrival` - Where the datum is, after its count.
+    /// * `out`     - The datum, from its start.
+    ///
+    /// # Returns
+    ///
+    /// The arrival as it stands where its source is not a consolidator, and
+    /// `None` where it is, and its inputs are queued.
+    ///
+    /// # Errors
+    ///
+    /// A sentence, naming the consolidator, where the datum is not one its
+    /// layout can have made: too short, too long, a state no state is, or a
+    /// length past an input's most.
+    fn enqueue(
+        &mut self,
+        arrival: Arrival,
+        out: &[u8],
+    ) -> Result<Option<Arrival>, String> {
+        let Some(consolidation) = self.consolidations[arrival.source].as_ref()
+        else {
+            return Ok(Some(arrival));
+        };
+        let queue = &mut self.queue;
+        consolidation
+            .layout
+            .unpack_into(
+                &out[..arrival.length],
+                &mut queue.readings,
+                &mut queue.spans,
+            )
+            .map_err(|why| {
+                format!(
+                    "\"{}\": \"{}\" (consolidator): {why}",
+                    self.name, self.ports[arrival.source].0
+                )
+            })?;
+        queue.from = arrival.source;
+        queue.next = 0;
+        queue.count = consolidation.layout.inputs.len();
+        Ok(None)
+    }
+
+    /// Hands out the next new input of the consolidation queued, into
+    /// `out`, as its source sent it on the vehicle, passing over the held
+    /// and the none. The queue is emptied, and nothing handed out, while
+    /// the station is not matched with the vehicle.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where the reading is put, from its start.
+    ///
+    /// # Returns
+    ///
+    /// The input's source and the reading's length, or `None` where no new
+    /// input is left.
+    ///
+    /// # Errors
+    ///
+    /// A message where `out` is too short for the reading.
+    fn queued(&mut self, out: &mut [u8]) -> Result<Option<Arrival>, String> {
+        if self
+            .gate
+            .as_ref()
+            .is_some_and(|matched| !matched.for_listening())
+        {
+            self.queue.next = self.queue.count;
+        }
+        let queue = &mut self.queue;
+        while queue.next < queue.count {
+            let at = queue.next;
+            queue.next += 1;
+            let (state, span) = queue.spans[at].clone();
+            if state != State::New {
+                continue;
+            }
+            let Some(consolidation) = self.consolidations[queue.from].as_ref()
+            else {
+                break;
+            };
+            let length = span.len();
+            if length > out.len() {
+                return Err(format!(
+                    "\"{}\": an input of \"{}\" is {length} bytes, which \
+                     is more than the {} there was room for: receive into a \
+                     buffer of datum_bytes(), the most its sources can send",
+                    self.name,
+                    self.ports[queue.from].0,
+                    out.len()
+                ));
+            }
+            out[..length].copy_from_slice(&queue.readings[span]);
+            return Ok(Some(Arrival {
+                source: consolidation.sources[at],
+                length,
+            }));
+        }
+        queue.next = queue.count;
+        Ok(None)
     }
 
     /// Takes a datagram as its source sent it to the datum it carries: the
@@ -694,6 +930,117 @@ payloads:
                 ("b".to_string(), b"from b".to_vec())
             ]
         );
+    }
+
+    /// A consolidator's datum is taken apart as it arrives, and each new
+    /// input is handed out by a receive of its own, named by its source, as
+    /// if that source had sent it: a number and a string, with a length
+    /// before it on the vehicle and no count on the ground. A held input and
+    /// one whose state is none are not handed out. The inputs' sources are
+    /// among the node's, once each, and a damaged datum is refused, naming
+    /// the consolidator.
+    #[test]
+    fn a_consolidators_new_inputs_arrive_one_by_one() {
+        let port = a_free_port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("vehicle.ytcs");
+        std::fs::write(
+            &path,
+            format!(
+                "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{port}\"
+        world-in: [pack, label]
+payloads:
+  - type network:
+      - payload: temp
+        address: \"127.0.0.1:7001\"
+        protocol: udp
+        world-out-type: \"u16\"
+        world-out: [pack.temp]
+      - payload: valve
+        address: \"127.0.0.1:7002\"
+        protocol: udp
+        world-out-type: \"boolean\"
+        world-out: [pack.valve]
+      - payload: label
+        address: \"127.0.0.1:7003\"
+        protocol: udp
+        world-out-type: \"string(8)\"
+        world-out: [pack.name, ground.label]
+vehicle:
+  - type compute:
+      - compute: pack
+        function: consolidator
+        send: [all_new, moc]
+        world-in: [temp, valve, name]
+        world-out: [ground.pack]
+"
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let mut gateway =
+            GatewayReceiver::open(&graph, "ground").expect("it opens");
+        let pack = gateway
+            .sources()
+            .iter()
+            .position(|source| *source == "pack")
+            .expect("the consolidator is a source");
+        let mut drawn = gateway.sources()[..2].to_vec();
+        drawn.sort();
+        assert_eq!(drawn, vec!["label", "pack"]);
+        assert_eq!(gateway.sources()[2..], ["temp", "valve"]);
+
+        let vehicle =
+            UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
+        let at = gateway.ports[pack].1.local_addr().expect("its address");
+        let layout = &gateway.consolidations[pack]
+            .as_ref()
+            .expect("a consolidation")
+            .layout;
+        let datagram = |datum: &[u8]| {
+            let mut datagram = Vec::new();
+            match gateway.counts[pack] {
+                Some(count) => {
+                    tcsprotocol::link_type::counted(datum, count, &mut datagram)
+                        .expect("counted")
+                }
+                None => datagram.extend_from_slice(datum),
+            }
+            datagram
+        };
+        let send = |readings: &[(State, &[u8])]| {
+            let mut datum = [0u8; 64];
+            let used = layout.pack(readings, &mut datum).expect("it packs");
+            vehicle
+                .send_to(&datagram(&datum[..used]), at)
+                .expect("sent");
+        };
+        // The temperature new, the valve held, the name none; then the
+        // name new and the others held.
+        send(&[
+            (State::New, &[0x12, 0x34]),
+            (State::Held, &[1]),
+            (State::None, &[]),
+        ]);
+        send(&[
+            (State::Held, &[0x12, 0x34]),
+            (State::Held, &[1]),
+            (State::New, b"hot"),
+        ]);
+        vehicle.send_to(&datagram(&[0xff]), at).expect("sent");
+
+        let mut next = || {
+            gateway
+                .receive(Some(Duration::from_secs(5)))
+                .map(|received| received.map(|r| (r.source, r.data)))
+        };
+        assert_eq!(next(), Ok(Some(("temp".to_string(), vec![0x12, 0x34]))));
+        assert_eq!(next(), Ok(Some(("label".to_string(), b"hot".to_vec()))));
+        let why = next().expect_err("a byte is too short, and 11 is no state");
+        assert!(why.contains("\"pack\" (consolidator)"), "{why}");
     }
 
     /// An F´ gateway is opened as a ground link is, and what is drawn into

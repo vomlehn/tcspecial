@@ -21,6 +21,7 @@
 use crate::graph::link_types::{carries, Carries};
 use crate::graph::{Destination, Graph};
 use crate::link_type::{Basic, LinkType};
+use crate::node::vehicle::compute::{self, Computation, ConsolidatorParams};
 
 /// How many bits a boolean is in a consolidation: one, where it is a byte
 /// on a link. `types.xtce` states it, as `boolean_bit`, beside the byte.
@@ -194,6 +195,17 @@ impl Input {
         }
     }
 
+    /// The most bytes a reading of it is, as it arrived on its link and
+    /// without the count a string or bytes is sent after.
+    pub fn largest_link_bytes(&self) -> usize {
+        match &self.shape {
+            Shape::Fixed(fields) => {
+                fields.iter().map(|f| f.0.link_bytes()).sum()
+            }
+            Shape::Counted { most, .. } => *most,
+        }
+    }
+
     /// How many bytes a reading of it is on the link, where every reading
     /// is as long as every other.
     pub fn fixed_link_bytes(&self) -> Option<usize> {
@@ -301,6 +313,38 @@ impl Layout {
             });
         }
         Ok(Layout { inputs: laid })
+    }
+
+    /// Lays out the datum of a node of the configuration where it is a
+    /// consolidator: what the vehicle packs by and the ground takes apart
+    /// by, so both find a consolidator, and its layout, alike.
+    ///
+    /// # Arguments
+    ///
+    /// * `graph` - The configuration.
+    /// * `node`  - The node.
+    ///
+    /// # Returns
+    ///
+    /// `None` for a node that is not a consolidator; otherwise what its
+    /// node says and its layout, or a sentence where it does not work out,
+    /// which the check has refused.
+    pub fn of_node(
+        graph: &Graph,
+        node: &crate::graph::Node,
+    ) -> Option<Result<(ConsolidatorParams, Layout), String>> {
+        if node.node_type != "compute" {
+            return None;
+        }
+        let Ok(Computation::Consolidator(params)) =
+            compute::params_of(&node.name, &node.attributes)
+        else {
+            return None;
+        };
+        Some(
+            Layout::of(graph, &node.name, &params.inputs)
+                .map(|layout| (params, layout)),
+        )
     }
 
     /// The most bits a datum may be: the states and every input at its
@@ -443,7 +487,8 @@ impl Layout {
 
     /// Takes a datum apart into each input's state and reading, each
     /// reading as it arrived on its link, so that what reads a datum of the
-    /// source's type reads it.
+    /// source's type reads it: [`Layout::unpack_into`], into storage of its
+    /// own, for the ground, which may allocate.
     ///
     /// # Arguments
     ///
@@ -456,44 +501,92 @@ impl Layout {
     ///
     /// # Errors
     ///
-    /// A sentence where the datum is shorter than it says it is, says a
-    /// state no state is, has a length more than its input's most, or has
-    /// bits left over past a byte's padding.
+    /// As [`Layout::unpack_into`].
     pub fn unpack(
         &self,
         datum: &[u8],
     ) -> Result<Vec<(State, Vec<u8>)>, String> {
+        let mut out = vec![0u8; self.largest_link_bytes()];
+        let mut each = vec![(State::None, 0..0); self.inputs.len()];
+        self.unpack_into(datum, &mut out, &mut each)?;
+        Ok(each
+            .into_iter()
+            .map(|(state, span)| (state, out[span].to_vec()))
+            .collect())
+    }
+
+    /// The most bytes every input's reading together may be, as each
+    /// arrived on its link: room for what [`Layout::unpack_into`] puts.
+    pub fn largest_link_bytes(&self) -> usize {
+        self.inputs.iter().map(Input::largest_link_bytes).sum()
+    }
+
+    /// Takes a datum apart into each input's state and reading, allocating
+    /// nothing where the datum is sound: the readings are put end to end
+    /// in `out`, each as it arrived on its link, and `each` says where.
+    ///
+    /// # Arguments
+    ///
+    /// * `datum` - The datum.
+    /// * `out`   - Where the readings are put: at least
+    ///             [`Layout::largest_link_bytes`] long.
+    /// * `each`  - Where each input's state and the span of `out` its
+    ///             reading is are put, in the order of the inputs: at least
+    ///             as long as there are inputs. The span of an input whose
+    ///             state is none is empty.
+    ///
+    /// # Errors
+    ///
+    /// A sentence where the datum is shorter than it says it is, says a
+    /// state no state is, has a length more than its input's most, or has
+    /// bits left over past a byte's padding; or where `out` or `each` is
+    /// too short.
+    pub fn unpack_into(
+        &self,
+        datum: &[u8],
+        out: &mut [u8],
+        each: &mut [(State, std::ops::Range<usize>)],
+    ) -> Result<(), String> {
+        if each.len() < self.inputs.len() {
+            return Err(format!(
+                "room for {} inputs, and the consolidation has {}",
+                each.len(),
+                self.inputs.len()
+            ));
+        }
         let mut bits = Bits::reader(datum);
         let short = |_| format!("a datum of {} bytes ends early", datum.len());
-        let mut states = Vec::with_capacity(self.inputs.len());
-        for input in &self.inputs {
+        for (input, slot) in self.inputs.iter().zip(each.iter_mut()) {
             let said = bits.take(STATE_BITS).map_err(short)? as u8;
-            states.push(State::of(said).ok_or_else(|| {
+            slot.0 = State::of(said).ok_or_else(|| {
                 format!(
                     "input \"{}\" has the state 11, which no state is: the \
                      datum is damaged",
                     input.name
                 )
-            })?);
+            })?;
         }
-        let mut readings = Vec::with_capacity(self.inputs.len());
-        for (input, state) in self.inputs.iter().zip(&states) {
-            let mut reading = Vec::new();
+        let room = out.len();
+        let no_room =
+            || format!("room for {room} bytes of readings, and they need more");
+        let mut at = 0;
+        for (input, slot) in self.inputs.iter().zip(each.iter_mut()) {
+            let from = at;
+            let mut put = |byte: u64| -> Result<(), String> {
+                *out.get_mut(at).ok_or_else(no_room)? = byte as u8;
+                at += 1;
+                Ok(())
+            };
             match &input.shape {
                 Shape::Fixed(fields) => {
                     for field in fields {
                         match field.0 {
                             Field::Boolean => {
-                                reading.push(
-                                    bits.take(BOOLEAN_BITS).map_err(short)?
-                                        as u8,
-                                );
+                                put(bits.take(BOOLEAN_BITS).map_err(short)?)?;
                             }
                             Field::Bits(width) => {
                                 for _ in 0..width / 8 {
-                                    reading.push(
-                                        bits.take(8).map_err(short)? as u8
-                                    );
+                                    put(bits.take(8).map_err(short)?)?;
                                 }
                             }
                         }
@@ -504,20 +597,20 @@ impl Layout {
                         bits.take(*length_bits).map_err(short)? as usize;
                     if length > *most {
                         return Err(format!(
-                            "input \"{}\" says {length} bytes, and it holds at \
-                             most {most}",
+                            "input \"{}\" says {length} bytes, and it holds \
+                             at most {most}",
                             input.name
                         ));
                     }
                     for _ in 0..length {
-                        reading.push(bits.take(8).map_err(short)? as u8);
+                        put(bits.take(8).map_err(short)?)?;
                     }
                 }
             }
-            if *state == State::None {
-                reading.clear();
+            if slot.0 == State::None {
+                at = from;
             }
-            readings.push((*state, reading));
+            slot.1 = from..at;
         }
         if bits.bytes() != datum.len() {
             return Err(format!(
@@ -527,7 +620,7 @@ impl Layout {
                 bits.bytes()
             ));
         }
-        Ok(readings)
+        Ok(())
     }
 }
 

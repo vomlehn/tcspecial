@@ -77,6 +77,9 @@ help:
 # there is no hardware; the kernel has no dummy for SPI, so the thermostat's SPI
 # sensor needs a real /dev/spidev0.0.
 #
+# tcspecial gives each filled log segment to the segsend built beside it, and
+# refuses to start without one, so segsend is built with the rest.
+#
 # The examples log to $(TELEMETRY), which is deleted before each run so that
 # what is in it afterwards is that run's alone. It is made again because a log
 # node does not make its own directory: a mistyped path is meant to be
@@ -88,7 +91,8 @@ define runexample_on
 		cd $(ROOT); \
 		rm -rf $(TELEMETRY); \
 		mkdir $(TELEMETRY); \
-		cargo build -q --bin tcspecial --bin tcs-sim --bin tcs-moc; \
+		cargo build -q --bin tcspecial --bin tcs-sim --bin tcs-moc \
+			--bin segsend; \
 		RUST_LOG=$(RUST_LOG) cargo run -q --bin tcs-moc -- \
 			--simulate=$(SIMULATE) examples/$(1)/$(1).ytcs \
 	)
@@ -184,7 +188,8 @@ SIMPLE_APP_WAITS = 30
 
 .PHONY: run-simple-app
 run-simple-app: check-python3
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin lorem_gateway
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin segsend \
+		--bin lorem_gateway
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME) on" \
@@ -219,7 +224,8 @@ run-simple-app: check-python3
 # around: what the window shows is what the example is.
 .PHONY: run-beacon
 run-beacon:
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin beacon
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin segsend \
+		--bin beacon
 	( \
 		set -eu; \
 		echo "Watching $(PROJECT_NAME)'s beacon from" \
@@ -248,7 +254,8 @@ run-beacon:
 # and stops the vehicle.
 .PHONY: run-ping
 run-ping: check-tkinter
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify --bin segsend
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
+		--bin segsend
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME) on examples/ping/ping.xtcs..."; \
@@ -272,7 +279,8 @@ run-ping-yamcs: check-tkinter
 			"YAMCS_HOME=<the directory holding bin/yamcsd>" >&2; \
 		exit 1; \
 	}
-	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify --bin segsend
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-verify \
+		--bin segsend
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) python3 \
 		examples/ping-yamcs/ping_yamcs.py --yamcs "$(YAMCS_HOME)"
 

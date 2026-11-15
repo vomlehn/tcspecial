@@ -340,7 +340,9 @@ run:
 	( \
 		set -eu; \
 		echo "Running $(PROJECT_NAME)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
+		cd $(RUST); \
+		cargo build -q --bin segsend; \
+		RUST_LOG=$(RUST_LOG) \
 			cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) \
 			$(TCSPECIAL_CONFIG_FILE).ytcs \
 	)
@@ -355,12 +357,18 @@ run:
 # Only the suffix is given here. The stem comes from TCSPECIAL_CONFIG_FILE, so
 # a payload set is still chosen the way every other target chooses it, and the
 # simulator file is untouched: it is tcs-sim's, and tcs-moc only passes it on.
+#
+# tcs-moc starts the tcspecial and tcs-sim built beside it, and tcspecial the
+# segsend beside it, so all three are built first: in a checkout never built,
+# they would not be there, and in one built before they could be stale.
 define runmoc_on
 	( \
 		set -eu; \
 		echo "Running $(MOC_NAME) on" \
 			"$(basename $(TCSPECIAL_CONFIG_FILE)).$(1)..."; \
-		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
+		cd $(RUST); \
+		cargo build -q --bin tcspecial --bin tcs-sim --bin segsend; \
+		RUST_LOG=$(RUST_LOG) \
 			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
 			cargo run -q --bin tcs-moc -- --simulate=$(SIMULATE) \
 			$(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \

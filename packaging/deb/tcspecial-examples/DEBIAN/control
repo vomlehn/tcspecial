@@ -1,0 +1,22 @@
+Package: tcspecial-examples
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: David VomLehn <dvomlehn@gmail.com>
+Installed-Size: @SIZE@
+Depends: @SHLIBS@, tcspecial-test (= @VERSION@), tcs-tools (= @VERSION@), tcsmoc (= @VERSION@), python3, python3-tk, libxkbcommon0, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libxcursor1, libxi6, libxrender1, libegl1, libgl1, libwayland-client0, libwayland-egl1
+Replaces: tcspecial-doc (<< 0.1.2)
+Section: misc
+Priority: optional
+Homepage: https://github.com/vomlehn/tcspecial
+Description: tcspecial's examples, and tcsx, which runs them
+ Every tcspecial example, under /opt/tcs/share/examples/tcspecial, laid out
+ as in the source tree: its configurations, in both spellings with their
+ XTCE, simulator files and diagrams, and the programs it runs -- payloads,
+ compute nodes and ground stations. With them the examples' Rust ground
+ stations, beacon and lorem_gateway, and tcsx: tcsx lists the examples,
+ and tcsx NAME runs one, by tcs-moc or by its own ground station.
+ Examples, never flown.
+ Everything is under /opt/tcs. /etc/profile.d/tcspecial-examples.sh puts
+ /opt/tcs/bin on a login shell's search path, and
+ /opt/tcs/sbin/tcspecial-examples-links links tcsx into /usr/local/bin
+ for everything else.

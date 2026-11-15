@@ -3758,11 +3758,21 @@ away, and because a package that owned <tt class="docutils literal">/opt/tcs/bin
 overwrite a mission's own on every upgrade.</dd>
 <dt><tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt></dt>
 <dd>The manuals and designs, as HTML with their figures and screenshots, in
-<tt class="docutils literal"><span class="pre">share/doc/tcspecial-doc/docs</span></tt>, and the example configurations, in
-both spellings with their simulator files and diagrams, in
-<tt class="docutils literal">share/examples/tcspecial</tt>, which the manuals' figures come from.
-Documentation alone, for whoever writes or reads configurations: no
-vehicle or station needs it to run.</dd>
+<tt class="docutils literal"><span class="pre">share/doc/tcspecial-doc/docs</span></tt>. Documentation alone, for whoever
+writes or reads configurations: no vehicle or station needs it to run.
+The manuals' figures are the examples' diagrams, so it depends on
+<tt class="docutils literal"><span class="pre">tcspecial-examples</span></tt>.</dd>
+<dt><tt class="docutils literal"><span class="pre">tcspecial-examples</span></tt></dt>
+<dd>The examples, in <tt class="docutils literal">share/examples/tcspecial</tt>: each one's
+configurations, in both spellings with their XTCE, simulator files and
+diagrams, and the programs it runs, laid out as in <tt class="docutils literal">examples/</tt>; the
+examples' Rust ground stations, <tt class="docutils literal">bin/beacon</tt> and
+<tt class="docutils literal">bin/lorem_gateway</tt>; and <tt class="docutils literal">bin/tcsx</tt>, which runs an example from
+them. <tt class="docutils literal">tcsx</tt> lists the examples, and <tt class="docutils literal">tcsx NAME</tt> runs one, as its
+<tt class="docutils literal">make run-</tt> target does in a checkout; <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> runs it on a
+desk that cannot lock tcspecial's memory. It depends on
+<tt class="docutils literal"><span class="pre">tcspecial-test</span></tt>, <tt class="docutils literal"><span class="pre">tcs-tools</span></tt> and <tt class="docutils literal">tcsmoc</tt>, whose programs and
+Python the examples run.</dd>
 </dl>
 <p>Each takes the place of what was in an earlier package, so an upgrade
 from 0.1.0, when there were three -- <tt class="docutils literal">tcspecial</tt>, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt> and
@@ -3856,8 +3866,9 @@ same way, leaving the configuration and the state, which are the mission's.</p>
 in front of every path, for staging, and is not part of any path a program
 looks in. <tt class="docutils literal">HOOKS=1</tt> installs the files outside the prefix as well, which
 a developer's copy leaves alone unless asked. <tt class="docutils literal">make <span class="pre">install-tcspecial</span></tt>,
-<tt class="docutils literal"><span class="pre">install-tcsmoc</span></tt>, <tt class="docutils literal"><span class="pre">install-tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt> and
-<tt class="docutils literal"><span class="pre">install-tcspecial-doc</span></tt> copy one package. <tt class="docutils literal">make <span class="pre">uninstall-files</span></tt>, with the same variables, takes away what
+<tt class="docutils literal"><span class="pre">install-tcsmoc</span></tt>, <tt class="docutils literal"><span class="pre">install-tcs-tools</span></tt>, <tt class="docutils literal"><span class="pre">install-tcspecial-test</span></tt>,
+<tt class="docutils literal"><span class="pre">install-tcspecial-doc</span></tt> and <tt class="docutils literal"><span class="pre">install-tcspecial-examples</span></tt> copy one
+package. <tt class="docutils literal">make <span class="pre">uninstall-files</span></tt>, with the same variables, takes away what
 was copied.</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>install<span class="whitespace"> </span><span class="name variable">DRY_RUN</span><span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
@@ -4657,7 +4668,7 @@ several vehicles is not supported.</p>
 for, and every configuration states it:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;a28fbfe632aca562d9d9ac8d37ba5476&quot;</span>
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;2de4e4035e84c174e51c66b0c402e9ca&quot;</span>
 </pre>
 <p>It is the digest of the <tt class="docutils literal">tcsprotocol/xtce/link.xtce</tt> a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4669,7 +4680,7 @@ command happened to mean to it.</p>
 <p>To find the value, ask the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcs-verify --interface-digest
-a28fbfe632aca562d9d9ac8d37ba5476
+2de4e4035e84c174e51c66b0c402e9ca
 </pre>
 <p>The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.</p>
@@ -4677,8 +4688,8 @@ sends, so a person with only a packet capture can read it there too.</p>
 configuration to the build that is to fly it:</p>
 <pre class="code text literal-block">
 $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-vehicle.ytcs: interface set to a28fbfe632aca562d9d9ac8d37ba5476, from 0123...
-vehicle.xtcs: interface is a28fbfe632aca562d9d9ac8d37ba5476 already
+vehicle.ytcs: interface set to 2de4e4035e84c174e51c66b0c402e9ca, from 0123...
+vehicle.xtcs: interface is 2de4e4035e84c174e51c66b0c402e9ca already
 </pre>
 <p>It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

@@ -236,7 +236,8 @@ help:
 	@echo "  make install-files - Copy a build already made under PREFIX" \
 		"(/opt/tcs)"
 	@echo "  make install-tcspecial, install-tcsmoc, install-tcs-tools," \
-		"install-tcspecial-test, install-tcspecial-doc"
+		"install-tcspecial-test, install-tcspecial-doc," \
+		"install-tcspecial-examples"
 	@echo "                   - Copy one package's files from a build" \
 		"already made"
 	@echo "  make install-data - Install tcs-gui's descriptions"
@@ -826,8 +827,10 @@ distclean: clean
 #                   check configurations, and tcs_ui
 #   tcspecial-test  verification tools: tcs-moc, tcs-sim, the test segsend
 #                   and the five test apps
-#   tcspecial-doc   the manuals and designs, and the example configurations
-#                   their figures come from
+#   tcspecial-doc   the manuals and designs
+#   tcspecial-examples
+#                   examples: every example, its configurations and the
+#                   programs it runs, and tcsx, which runs one
 #
 # Each install-<package> target below installs one, so the lists here are
 # the whole account of which file is in which package, for `make install`,
@@ -837,8 +840,11 @@ distclean: clean
 # are run by tcspecial rather than by a person, so they go in libexec: a
 # configuration names one as `executable: /opt/tcs/libexec/app_pl`. A
 # mission's own app is its own program, installed wherever its node's
-# `executable` says. tcsapp's stray_app and the examples' programs are tests
-# and are not installed.
+# `executable` says. tcsapp's stray_app is a test and is not installed.
+#
+# The examples' Rust ground stations, beacon and lorem_gateway, go in bin
+# beside tcspecial, where beacon looks for the tcspecial it starts; only
+# tcsx, which runs them, is linked onto everybody's path.
 #
 # segsend is in the test package rather than the flight one: the segsend
 # this tree builds deletes each segment it is given, which is for testing,
@@ -850,17 +856,22 @@ FLIGHT_BIN := tcspecial
 TOOLS_BIN := tcs-gui tcs-verify tcs-conflict
 TEST_BIN := tcs-moc tcs-sim segsend
 TEST_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
-PACKAGES := tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-doc
+EXAMPLES_BIN := beacon lorem_gateway
+PACKAGES := tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-doc \
+	    tcspecial-examples
 # Its programs with windows are built with Slint, whose royalty-free
 # licence asks for its badge where they are downloaded: make
 # publish-release adds it to the notes of every release (see tcs-helpers'
 # README).
 RELEASE_ATTRIBUTION := slint
 
+# The crates the examples' ground stations come from.
+EXAMPLES_CRATES := beacon_example simple_app
+
 # The crates those come from, built together by install-build.
 INSTALL_CRATES := tcspecial tcs-verify tcs-conflict tcs-gui tcsmoc-c \
 		  tcs-moc tcs-sim \
-		  $(TEST_LIBEXEC)
+		  $(TEST_LIBEXEC) $(EXAMPLES_CRATES)
 
 # The crates each package's programs and libraries are built from, whose
 # dependencies its THIRD-PARTY-NOTICES lists: every crate compiled into a
@@ -891,22 +902,21 @@ LIBTCS_VERSION := $(shell sed -n 's/^version *= *"\(.*\)"/\1/p' \
 LIBTCS_ABI := $(shell cat tcsmoc-c/abi-version)
 LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 
-# The example configurations, in both spellings, with their simulator files
-# and diagrams; the manual's figures are the diagrams, so it is given them as
-# well. Taken from git, so that a scratch file left in examples/ is not
-# shipped. A simulator file two examples share is a link in each to the one
-# in their -common directory, and is installed as the same link.
-#
-# With them, the programs that battery's and descent's process nodes run,
-# so that those two run from what is installed, as the rest that need no
-# program of their own do: each configuration names its program at its path
-# in the checkout, examples/NAME/..., which is its path here too. A
-# program's #!/usr/bin/env python3 is installed as #!/usr/bin/python3, where
-# Debian and Fedora both put it and as both want an installed script to say.
-EXAMPLE_PROGRAMS = examples/battery/charge.py examples/descent/guidance.py
-EXAMPLE_FILES = examples/README.html $(EXAMPLE_PROGRAMS) $(shell git ls-files \
-		'examples/*/*.ytcs' 'examples/*/*.xtcs' \
-		'examples/*/*-sim.yaml' 'examples/*/*.svg')
+# The examples, for tcspecial-examples: their configurations, in both
+# spellings, with their XTCE, simulator files and diagrams, and the Python
+# programs they run -- payloads, compute nodes and ground stations, with
+# what ping-common's two share -- each at its path in the checkout,
+# examples/NAME/..., which is how each configuration names its programs and
+# how each ground station finds its neighbours. Taken from git, so that a
+# scratch file left in examples/ is not shipped, and without the tests. A
+# simulator file two examples share is a link in each to the one in their
+# -common directory, and is installed as the same link. A program's
+# #!/usr/bin/env python3 is installed as #!/usr/bin/python3, where Debian
+# and Fedora both put it and as both want an installed script to say.
+EXAMPLE_FILES = examples/README.html $(shell git ls-files \
+		'examples/*/*.ytcs' 'examples/*/*.xtcs' 'examples/*/*.xtce' \
+		'examples/*/*-sim.yaml' 'examples/*/*.svg' 'examples/*/*.py' \
+		| grep -v '/test_[^/]*\.py$$')
 
 # Whether what is installed is stripped: 1, the default, or 0.
 #
@@ -988,7 +998,7 @@ install-tools:
 	bin/install-tools $(if $(filter 1,$(DRY_RUN)),--dry-run) \
 		$(if $(filter 0,$(PACKAGING)),--no-packaging)
 
-# Copy all five packages' files into place from a build already made,
+# Copy every package's files into place from a build already made,
 # under PREFIX and DESTDIR: what `make install` once did, kept for
 # development and for `make stage`, which cuts the packages from it; `make
 # install` installs the packages. The build is cargo's release build of the
@@ -1173,12 +1183,10 @@ install-tcs-tools: install-data tcs-helpers
 			$(DESTDIR)$(PTHDIR)/tcs-tools.pth; \
 	fi
 
-# The documents: the manuals and designs, and the example configurations,
-# which the manuals' figures come from. The manuals find them at ../examples,
-# as they do in the source tree, so share/doc/tcspecial-doc/examples links
-# to the installed examples, which have the diagrams beside the
-# configurations. An example that starts with "#!" is a script to run, so it
-# would be installed executable and the rest are not; none of today's does.
+# The documents: the manuals and designs. Their figures are the examples'
+# diagrams, which they find at ../examples, as in the source tree, so
+# share/doc/tcspecial-doc/examples links to the examples tcspecial-examples
+# installs, which tcspecial-doc depends on.
 .PHONY: install-tcspecial-doc
 install-tcspecial-doc: tcs-helpers
 	@echo "Installing tcspecial-doc under $(DESTDIR)$(PREFIX)..."
@@ -1191,6 +1199,33 @@ install-tcspecial-doc: tcs-helpers
 		$(DESTDIR)$(DOCDIR)/tcspecial-doc/docs/shots
 	ln -sfn ../../examples/$(PROJECT_NAME) \
 		$(DESTDIR)$(DOCDIR)/tcspecial-doc/examples
+
+# The examples, the ground stations built for them and tcsx, which runs one
+# from them: see examples/tcsx. An example file that starts with "#!" is a
+# program to run, so it is installed executable and the rest are not.
+.PHONY: install-tcspecial-examples
+install-tcspecial-examples: tcs-helpers
+	@echo "Installing tcspecial-examples under $(DESTDIR)$(PREFIX)..."
+	install -d -m 755 $(DESTDIR)$(BINDIR) \
+		$(DESTDIR)$(DOCDIR)/tcspecial-examples
+	install -m 755 $(addprefix $(RELEASE_DIR)/,$(EXAMPLES_BIN)) \
+		examples/tcsx $(DESTDIR)$(BINDIR)
+	$(call strip_installed, \
+		$(addprefix $(DESTDIR)$(BINDIR)/,$(EXAMPLES_BIN)),)
+	$(call install_links,tcspecial-examples,tcsx)
+	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
+		$(DESTDIR)$(DOCDIR)/tcspecial-examples
+	$(THIRD_PARTY_NOTICES) . \
+		$(DESTDIR)$(DOCDIR)/tcspecial-examples/THIRD-PARTY-NOTICES \
+		tcspecial-examples $(EXAMPLES_CRATES)
+	if [ "$(HOOKS)" = 1 ]; then \
+		set -e; \
+		install -d -m 755 $(DESTDIR)$(PROFILEDIR); \
+		$(SUBST) -e 's|@PACKAGE@|tcspecial-examples|g' \
+			packaging/hooks/profile.sh.in \
+			> $(DESTDIR)$(PROFILEDIR)/tcspecial-examples.sh; \
+		chmod 644 $(DESTDIR)$(PROFILEDIR)/tcspecial-examples.sh; \
+	fi
 	for file in $(EXAMPLE_FILES); do \
 		to=$(DESTDIR)$(EXAMPLEDIR)/$${file#examples/}; \
 		if [ -L $$file ]; then \

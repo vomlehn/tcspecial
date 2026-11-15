@@ -1,7 +1,7 @@
 # What rpmlint is to accept in the tcspecial, tcsmoc, tcs-tools,
-# tcspecial-test and tcspecial-doc RPMs, read by `make lint-packages` and
-# never shipped. Each filter is a finding that is intended, with why;
-# anything else rpmlint reports is to be fixed.
+# tcspecial-test, tcspecial-doc and tcspecial-examples RPMs, read by
+# `make lint-packages` and never shipped. Each filter is a finding that
+# is intended, with why; anything else rpmlint reports is to be fixed.
 
 # Debian's rpmlint, unlike Fedora's, comes with no list of licences it
 # knows, and so calls every one invalid. rpmlint splits the SPDX expression
@@ -28,6 +28,8 @@ Filters = [
 	" spelling-error \\('(libtcsmoc|gui|moc|config|pc|schemas|ui)',",
 	" spelling-error \\(\"tcspecial's\",",
 	" spelling-error \\('(tcspecial|licences)',",
+	# lorem_gateway is named for the lorem ipsum it prints.
+	" spelling-error \\('lorem',",
 	# tcsmoc was tcspecial-moc, and before that tcspecial-ground, and
 	# obsoletes both so that an upgrade takes the old package out. Nothing
 	# requires the old names, so they are not provided: providing one at
@@ -53,8 +55,16 @@ Filters = [
 	# tcs-tools' tcs_ui imports tcsmoc and shows what its beacon code works
 	# out, so it needs exactly the tcsmoc built with it.
 	'^tcs-tools\.[^:]+: [EW]: requires-on-release tcsmoc = ',
-	# tcspecial-doc is documentation and examples, and nothing else.
+	# tcspecial-doc is documentation, and nothing else.
 	'^tcspecial-doc\.[^:]+: E: (no-binary|package-with-huge-docs)',
+	# tcspecial-doc's manuals find their figures, the examples' diagrams,
+	# at ../examples, a link into what tcspecial-examples installs, which
+	# it requires.
+	'^tcspecial-doc\.[^:]+: E: dangling-relative-symlink .*/examples ',
+	# tcspecial-examples runs the examples by tcs-moc and tcs-sim, with
+	# tcs-verify and tcsmoc's Python, so it needs exactly those built with
+	# it, and tcspecial-doc exactly the examples its manuals show.
+	'^tcspecial-(doc|examples)\.[^:]+: [EW]: requires-on-release tcs',
 	# tcs_ui's distribution requires tcspecial-moc's, the Python
 	# distribution the tcsmoc package installs, which tcs-tools requires.
 	'^tcs-tools\.[^:]+: E: python-missing-require tcspecial-moc$',

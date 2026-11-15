@@ -1,0 +1,185 @@
+#!/bin/sh
+# tcsx: run one of tcspecial's examples, or list them.
+#
+#   tcsx [--no-memlock] [--simulate=MODE] [NAME [ARGUMENT...]]
+#
+# With no NAME it lists the examples, saying what each needs beyond what is
+# installed. With one it runs it as its make run target in the examples'
+# Makefile does in a checkout: most by tcs-moc, which starts tcs-sim and
+# tcspecial on its configuration, and the rest by their own ground station,
+# which starts tcspecial itself. ARGUMENTs go to that ground station.
+#
+#   --no-memlock     tcspecial does not lock its memory into RAM, as a desk
+#                    whose limit on locked memory is too small needs
+#   --simulate=MODE  the simulation mode every program is given: all, the
+#                    default, as on a desk with no hardware, some or none
+#
+# The examples are those tcspecial-examples installs, in
+# ../share/examples/tcspecial from the directory tcsx is in, and the
+# programs those in its own directory; TCSX_EXAMPLES and TCSX_BIN name
+# others, such as a checkout's examples/ and its target/debug. An example
+# is run from a directory where examples/ names them, as a checkout's root
+# does, since each configuration names the programs it runs at their paths
+# from there. /tmp/telemetry, where the examples' logs go, is made afresh
+# first, so that what is in it afterwards is that run's alone.
+#
+# The examples through Yamcs need a Yamcs release unpacked: YAMCS_HOME
+# says where. can, gpio and iio need the kernel's dummy devices, which
+# tcspecial's bin/mk-kernel-dummies makes as root.
+
+set -eu
+
+# Prints how to call this command.
+usage() {
+	echo "usage: tcsx [--no-memlock] [--simulate=MODE] [NAME [ARGUMENT...]]"
+}
+
+# Says what is wrong and stops.
+#
+# Arguments:
+#   $@  What to say.
+die() {
+	echo "tcsx: $*" >&2
+	exit 1
+}
+
+# The examples run by their own ground station rather than by tcs-moc.
+OWN_GROUND="simple-app beacon ping ping-yamcs thermostat-yamcs memusage"
+
+# The examples whose ground station goes through Yamcs.
+YAMCS="ping-yamcs thermostat-yamcs memusage"
+
+# The examples whose payloads are the kernel's dummy devices.
+KERNEL_DUMMIES="can gpio iio"
+
+# How long simple-app's ground station is given to print its line, several
+# times what it takes, so that a vehicle that never answers fails the run
+# rather than hanging it.
+SIMPLE_APP_WAITS=30
+
+# Says whether a word is in a list.
+#
+# Arguments:
+#   $1  The word.
+#   $2  The list, words separated by spaces.
+#
+# Returns:
+#   0 if it is, 1 if not.
+among() {
+	case " $2 " in
+	*" $1 "*) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+# Lists the examples, one a line, with what each needs.
+list() {
+	for dir in "$examples"/*/; do
+		name=$(basename "$dir")
+		[ -f "$dir/$name.ytcs" ] || continue
+		if among "$name" "$YAMCS"; then
+			echo "$name (needs Yamcs: YAMCS_HOME)"
+		elif among "$name" "$KERNEL_DUMMIES"; then
+			echo "$name (needs the kernel's dummy devices)"
+		else
+			echo "$name"
+		fi
+	done
+}
+
+here=$(cd "$(dirname "$0")" && pwd)
+bin=${TCSX_BIN:-$here}
+examples=${TCSX_EXAMPLES:-$here/../share/examples/tcspecial}
+memlock=
+simulate=all
+while [ $# -gt 0 ]; do
+	case $1 in
+	--no-memlock) memlock=--no-memlock ;;
+	--simulate=*) simulate=${1#--simulate=} ;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	-*)
+		usage >&2
+		exit 2
+		;;
+	*) break ;;
+	esac
+	shift
+done
+[ -d "$examples" ] || die "no examples in $examples"
+examples=$(cd "$examples" && pwd)
+if [ $# -eq 0 ]; then
+	list
+	exit 0
+fi
+name=$1
+shift
+[ -f "$examples/$name/$name.ytcs" ] \
+	|| die "no example $name: tcsx lists them"
+if among "$name" "$YAMCS"; then
+	[ -x "${YAMCS_HOME:-}/bin/yamcsd" ] \
+		|| die "$name needs Yamcs: set YAMCS_HOME to the directory" \
+			"holding bin/yamcsd"
+fi
+if ! among "$name" "$OWN_GROUND"; then
+	[ $# -eq 0 ] || die "$name is run by tcs-moc, which takes no ARGUMENTs"
+fi
+
+# The programs are this tcsx's, first on the path, as the Python ground
+# stations look for tcspecial and tcs-verify there.
+PATH=$bin:$PATH
+export PATH
+top=$(mktemp -d)
+trap 'rm -rf "$top"' EXIT
+ln -s "$examples" "$top/examples"
+cd "$top"
+rm -rf /tmp/telemetry
+mkdir /tmp/telemetry
+
+# $memlock is one word or none, so it is left unquoted throughout.
+case $name in
+simple-app)
+	# The vehicle in the background, and the ground station, which prints
+	# the line and stops at its end, in the foreground; then the vehicle
+	# is stopped, with the payload program it started.
+	# shellcheck disable=SC2086
+	"$bin/tcspecial" --quiet --simulate="$simulate" $memlock \
+		examples/simple-app/simple-app.ytcs &
+	vehicle=$!
+	trap 'pkill -P $vehicle || :; kill -INT $vehicle 2> /dev/null || :
+		wait $vehicle || :; rm -rf "$top"' EXIT
+	trap 'exit 130' INT TERM
+	timeout "$SIMPLE_APP_WAITS" "$bin/lorem_gateway" "$@"
+	;;
+beacon)
+	# shellcheck disable=SC2086
+	"$bin/beacon" $memlock "$@" examples/beacon/beacon.ytcs
+	;;
+ping)
+	# shellcheck disable=SC2086
+	python3 examples/ping/ping_gateway.py $memlock "$@" \
+		examples/ping/ping.xtcs
+	;;
+ping-yamcs)
+	# shellcheck disable=SC2086
+	python3 examples/ping-yamcs/ping_yamcs.py --yamcs "$YAMCS_HOME" \
+		$memlock "$@"
+	;;
+thermostat-yamcs)
+	# shellcheck disable=SC2086
+	python3 examples/thermostat-yamcs/thermostat_yamcs.py \
+		--yamcs "$YAMCS_HOME" $memlock "$@"
+	;;
+memusage)
+	# shellcheck disable=SC2086
+	python3 examples/memusage/memusage.py --yamcs "$YAMCS_HOME" \
+		$memlock "$@" examples/memusage/memusage.xtcs
+	;;
+*)
+	# shellcheck disable=SC2086
+	"$bin/tcs-moc" --simulate="$simulate" $memlock \
+		"examples/$name/$name.ytcs"
+	;;
+esac

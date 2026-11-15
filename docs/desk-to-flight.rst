@@ -104,12 +104,13 @@ checks.
 7. Install the flight package, and only it
 ==========================================
 *Do:* install the ``tcspecial`` package on the vehicle; ``tcsmoc`` on the
-ground station; ``tcs-tools``, ``tcspecial-test`` and ``tcspecial-doc`` on
-neither.
+ground station; ``tcs-tools``, ``tcspecial-test``, ``tcspecial-doc`` and
+``tcspecial-examples`` on neither.
 
 *Why:* ``tcspecial`` and ``tcsmoc`` are operational code and hold nothing
 else. ``tcs-tools`` holds the configuration editor and checker, which never
-fly, ``tcspecial-doc`` the manuals and examples, and ``tcspecial-test``
+fly, ``tcspecial-doc`` the manuals, ``tcspecial-examples`` the examples,
+and ``tcspecial-test``
 holds tcs-moc and tcs-sim, the test apps, and the
 test ``segsend``, which deletes each segment it is given: a vehicle that flew
 it would throw its telemetry away. A vehicle that keeps a log puts its own

@@ -53,7 +53,7 @@ each for viewing.
 
 # Installing
 
-Everything installs under `/opt/tcs`, as five packages, each built as a
+Everything installs under `/opt/tcs`, as six packages, each built as a
 .deb and as an RPM. A package with operational code holds nothing else:
 
 * `tcspecial`, operational code, what flies: `bin/tcspecial`, with its
@@ -71,8 +71,12 @@ Everything installs under `/opt/tcs`, as five packages, each built as a
   which deletes each telemetry log segment; and the five test app programs
   in `libexec/`. A vehicle that keeps a log puts its own segsend in
   `/opt/tcs/bin` instead.
-* `tcspecial-doc`, the manuals and designs, and the example
-  configurations, which the manuals' figures come from.
+* `tcspecial-doc`, the manuals and designs.
+* `tcspecial-examples`, the examples: every one's configurations and the
+  programs it runs, its own ground stations among them, in
+  `share/examples/tcspecial`, and `bin/tcsx`, which runs one: `tcsx`
+  lists them, and `tcsx thermostat` runs one. The manuals' figures are
+  the examples' diagrams, so `tcspecial-doc` depends on it.
 
 Building them needs checkouts of
 [tcs-helpers](https://github.com/vomlehn/tcs-helpers) and

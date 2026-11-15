@@ -88,6 +88,28 @@ list in the tests to update:
 at the top of their row, markdown having no way to say so. `make help` lists
 the targets, including the ones that run tcspecial on each example.
 
+## Installed: tcsx
+
+The `tcspecial-examples` package installs every example under
+`/opt/tcs/share/examples/tcspecial`, laid out as here, with the programs
+each runs, the Rust ground stations `beacon` and `lorem_gateway` among
+them, and `tcsx`, which runs an example from there as its `make run-*`
+target does from here:
+
+```sh
+tcsx                        # list the examples, and what any needs
+tcsx thermostat             # run one, by tcs-moc
+tcsx --no-memlock ping -v   # one whose ground station is its own
+```
+
+`--no-memlock` is for a desk whose limit on locked memory is too small for
+tcspecial to lock its memory into RAM, and `--simulate=MODE` gives another
+simulation mode than `all`. Arguments after the name go to the example's
+own ground station. The examples through Yamcs need `YAMCS_HOME` set to
+where a Yamcs release is unpacked. `TCSX_EXAMPLES` and `TCSX_BIN` point
+`tcsx` at other examples and programs, such as these and a build's
+`target/debug`.
+
 ## Simple examples
 
 Each shows one thing at its simplest: a payload's data reaching the ground,

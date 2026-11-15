@@ -3555,11 +3555,21 @@ software <manual.html#the-categories-of-tcs-software>`__):
    overwrite a mission's own on every upgrade.
 ``tcspecial-doc``
    The manuals and designs, as HTML with their figures and screenshots, in
-   ``share/doc/tcspecial-doc/docs``, and the example configurations, in
-   both spellings with their simulator files and diagrams, in
-   ``share/examples/tcspecial``, which the manuals' figures come from.
-   Documentation alone, for whoever writes or reads configurations: no
-   vehicle or station needs it to run.
+   ``share/doc/tcspecial-doc/docs``. Documentation alone, for whoever
+   writes or reads configurations: no vehicle or station needs it to run.
+   The manuals' figures are the examples' diagrams, so it depends on
+   ``tcspecial-examples``.
+``tcspecial-examples``
+   The examples, in ``share/examples/tcspecial``: each one's
+   configurations, in both spellings with their XTCE, simulator files and
+   diagrams, and the programs it runs, laid out as in ``examples/``; the
+   examples' Rust ground stations, ``bin/beacon`` and
+   ``bin/lorem_gateway``; and ``bin/tcsx``, which runs an example from
+   them. ``tcsx`` lists the examples, and ``tcsx NAME`` runs one, as its
+   ``make run-`` target does in a checkout; ``--no-memlock`` runs it on a
+   desk that cannot lock tcspecial's memory. It depends on
+   ``tcspecial-test``, ``tcs-tools`` and ``tcsmoc``, whose programs and
+   Python the examples run.
 
 Each takes the place of what was in an earlier package, so an upgrade
 from 0.1.0, when there were three -- ``tcspecial``, ``tcspecial-moc`` and
@@ -3665,8 +3675,9 @@ install-build`` made, so that nothing is built as root. ``DESTDIR`` is put
 in front of every path, for staging, and is not part of any path a program
 looks in. ``HOOKS=1`` installs the files outside the prefix as well, which
 a developer's copy leaves alone unless asked. ``make install-tcspecial``,
-``install-tcsmoc``, ``install-tcs-tools``, ``install-tcspecial-test`` and
-``install-tcspecial-doc`` copy one package. ``make uninstall-files``, with the same variables, takes away what
+``install-tcsmoc``, ``install-tcs-tools``, ``install-tcspecial-test``,
+``install-tcspecial-doc`` and ``install-tcspecial-examples`` copy one
+package. ``make uninstall-files``, with the same variables, takes away what
 was copied.
 
 .. code-block:: console
@@ -4579,7 +4590,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "a28fbfe632aca562d9d9ac8d37ba5476"
+     interface: "2de4e4035e84c174e51c66b0c402e9ca"
 
 It is the digest of the ``tcsprotocol/xtce/link.xtce`` a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4594,7 +4605,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --interface-digest
-   a28fbfe632aca562d9d9ac8d37ba5476
+   2de4e4035e84c174e51c66b0c402e9ca
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -4605,8 +4616,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to a28fbfe632aca562d9d9ac8d37ba5476, from 0123...
-   vehicle.xtcs: interface is a28fbfe632aca562d9d9ac8d37ba5476 already
+   vehicle.ytcs: interface set to 2de4e4035e84c174e51c66b0c402e9ca, from 0123...
+   vehicle.xtcs: interface is 2de4e4035e84c174e51c66b0c402e9ca already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

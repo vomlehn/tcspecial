@@ -3576,7 +3576,11 @@ Yamcs stations ask through Yamcs, by the template's ``QueryConsolidator``
 (``tcsmoc.yamcs_ground.query_consolidator``). tcs-moc asks each
 consolidator's panel ``QUERY_CONSOLIDATOR`` with ``QUERY_NODE``, showing the
 counts by input in its ``Configuration``, and gives a panel to each input's
-source that is drawn into no gateway node itself. Not yet: the F´ bridge.
+source that is drawn into no gateway node itself. The F´ bridge has a
+``QUERY_CONSOLIDATOR`` command, naming the consolidator, which says the
+counts in a ``ConsolidatorQueried`` event and the input held most often in
+a ``QuietestInput`` event, as its ``QUERY_THREADS`` says the fullest
+thread.
 
 App nodes
 ---------

@@ -582,6 +582,77 @@ void TcsBridge::QUERY_THREADS_cmdHandler(FwOpcodeType opCode, U32 cmdSeq)
 	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
 }
 
+/**
+ * Sends QUERY_CONSOLIDATOR as often as it takes to have every input: the
+ * counts go to a ConsolidatorQueried event, and the input that went into a
+ * datum held the most often to a QuietestInput event.
+ *
+ * @param opCode  The command's opcode, which its response carries.
+ * @param cmdSeq  Its sequence, likewise.
+ * @param node    The consolidator's name.
+ */
+void TcsBridge::QUERY_CONSOLIDATOR_cmdHandler(FwOpcodeType opCode, U32 cmdSeq,
+					      const Fw::CmdStringArg &node)
+{
+	U32 id = 0;
+	if (!this->open("QUERY_CONSOLIDATOR", opCode, cmdSeq) ||
+	    !this->found("QUERY_CONSOLIDATOR", opCode, cmdSeq, node, id)) {
+		return;
+	}
+	tcs_input_counts inputs[TCS_INPUTS_PER_ANSWER];
+	tcs_consolidator_counts counts{};
+	tcs_input_counts quietest{};
+	U32 quietest_at = 0;
+	bool any = false;
+	U32 first = 0;
+	U32 total = 0;
+	do {
+		tcs_status status = TCS_STATUS_FAILURE;
+		size_t told = 0;
+		if (tcs_client_query_consolidator(m_client, id, first, &status,
+						  &counts, &total, inputs,
+						  &told) != 0) {
+			this->log_WARNING_LO_CommandFailed(
+				Fw::String("QUERY_CONSOLIDATOR"),
+				Fw::String(tcs_last_error()));
+			this->cmdResponse_out(opCode, cmdSeq,
+					      Fw::CmdResponse::EXECUTION_ERROR);
+			return;
+		}
+		if (status != TCS_STATUS_SUCCESS) {
+			// Refused, as a node that is no consolidator is: what
+			// tcspecial answered is why.
+			this->log_ACTIVITY_HI_NodeAnswered(
+				Fw::String("QUERY_CONSOLIDATOR"), node,
+				Fw::String(tcs_status_name(status)));
+			this->cmdResponse_out(opCode, cmdSeq,
+					      Fw::CmdResponse::EXECUTION_ERROR);
+			return;
+		}
+		for (size_t at = 0; at < told; at++) {
+			if (!any || inputs[at].held > quietest.held) {
+				quietest = inputs[at];
+				quietest_at = first + static_cast<U32>(at);
+				any = true;
+			}
+		}
+		// An answer that tells of none ends it.
+		if (told == 0) {
+			break;
+		}
+		first += static_cast<U32>(told);
+	} while (first < total);
+	this->log_ACTIVITY_HI_ConsolidatorQueried(
+		node, counts.sent, counts.sent_all_new, counts.sent_interval,
+		counts.sent_moc, counts.refused, total);
+	if (any) {
+		this->log_ACTIVITY_HI_QuietestInput(node, quietest_at,
+						    quietest.held,
+						    quietest.none);
+	}
+	this->cmdResponse_out(opCode, cmdSeq, Fw::CmdResponse::OK);
+}
+
 void TcsBridge::restartCommand(const char *command,
 			       int (*send)(tcs_client *, uint64_t,
 					   const char *, tcs_status *),

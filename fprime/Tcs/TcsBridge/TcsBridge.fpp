@@ -106,6 +106,15 @@ module Tcs {
     @ thread asks tcspecial itself, as tcs-moc and memusage do
     async command QUERY_THREADS opcode 7
 
+    @ Ask what a consolidator has sent, by trigger, and how often each of
+    @ its inputs went into a datum held or none: the counts go to a
+    @ ConsolidatorQueried event, and the input held most often -- the
+    @ payload likeliest to have gone quiet -- to a QuietestInput event. One
+    @ event each, not one for each input, as QUERY_THREADS's are
+    async command QUERY_CONSOLIDATOR(
+      node: string size NODE_NAME_BYTES @< The consolidator's name
+    ) opcode 8
+
     @ Send a datum up to the gateway node, which leaves it by its
     @ moc-out links for the nodes they reach: 1 or 0 to a heater, say.
     @ Sent only while the bridge is matched for commanding
@@ -178,21 +187,21 @@ module Tcs {
 
     @ A command was not sent, or not answered
     event CommandFailed(
-      cmd: string size 16 @< The command
+      cmd: string size 32 @< The command
       why: string size 256 @< What tcsmoc-c said
     ) severity warning low id 8 \
       format "{}: {}"
 
     @ A node command named a node the configuration does not have
     event NoSuchNode(
-      cmd: string size 16 @< The command
+      cmd: string size 32 @< The command
       node: string size NODE_NAME_BYTES @< The name given
     ) severity warning low id 9 \
       format "{}: the configuration has no node called {}"
 
     @ tcspecial answered a node command
     event NodeAnswered(
-      cmd: string size 16 @< The command
+      cmd: string size 32 @< The command
       node: string size NODE_NAME_BYTES @< The node
       status: string size 32 @< What tcspecial answered
     ) severity activity high id 10 \
@@ -253,7 +262,7 @@ module Tcs {
 
     @ tcspecial answered RESTART_ARM or RESTART
     event RestartAnswered(
-      cmd: string size 16 @< The command
+      cmd: string size 32 @< The command
       status: string size 32 @< What tcspecial answered
     ) severity activity high id 18 \
       format "{}: {}"
@@ -277,6 +286,28 @@ module Tcs {
       given: U32 @< The stack it was given, in bytes
     ) severity activity high id 22 \
       format "Fullest thread: {} of node {}, {} of {} stack bytes used"
+
+    @ tcspecial said what a consolidator has sent since the vehicle started
+    event ConsolidatorQueried(
+      node: string size NODE_NAME_BYTES @< The consolidator
+      sent: U64 @< The datums it has sent
+      allNew: U64 @< Those sent with every input new
+      interval: U64 @< Those sent as its interval came round
+      moc: U64 @< Those sent for what came to its moc-in
+      refused: U64 @< Readings refused for not being of their input's type
+      inputs: U32 @< How many inputs it has
+    ) severity activity high id 23 \
+      format "{} has sent {} datums, {} all new, {} by interval, {} for the ground; {} readings refused; {} inputs"
+
+    @ Of a consolidator's inputs, the one that went into a datum held the
+    @ most often: the payload likeliest to have gone quiet
+    event QuietestInput(
+      node: string size NODE_NAME_BYTES @< The consolidator
+      position: U32 @< The input's position in its world-in, from nought
+      timesHeld: U64 @< The datums it went into held
+      timesNone: U64 @< Those it went into none
+    ) severity activity high id 24 \
+      format "{}'s input {} went into {} datums held and {} none"
 
     @ A datum went up to the gateway node
     event DataSent(

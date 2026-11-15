@@ -174,6 +174,18 @@ def test_the_vehicles_memory_and_threads_are_told(fprime_test_api):
     assert 0 < deepest <= given, (deepest, given)
 
 
+def test_a_node_that_is_no_consolidator_is_refused_its_counts(fprime_test_api):
+    # zone_temp is a conversion, and tcspecial answers QUERY_CONSOLIDATOR
+    # of it InvalidParameter, which the bridge says, failing the command.
+    fprime_test_api.send_command(of_bridge("QUERY_CONSOLIDATOR"),
+                                 ["zone_temp"])
+    fprime_test_api.assert_event(
+        of_bridge("NodeAnswered"),
+        ["QUERY_CONSOLIDATOR", "zone_temp", "InvalidParameter"],
+        timeout=ANSWERING,
+    )
+
+
 def test_a_node_is_stopped_and_started_again(fprime_test_api):
     node_command(fprime_test_api, "QUERY_NODE", "thermometer")
     fprime_test_api.assert_event(

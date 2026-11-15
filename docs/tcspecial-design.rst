@@ -1171,6 +1171,19 @@ Requirement
     summary. The lock itself is not built yet.
 
 Requirement
+    Every thread of the child allocates from one malloc arena, the main
+    thread's, set before any thread is made. glibc otherwise gives each
+    thread that allocates an arena of its own, reserving 64 MiB of address
+    space for it: memory never touched, but counted, since a lock of
+    everything mapped is refused when that is more than the limit on what
+    may be locked. tcspecial allocates while it loads a configuration and
+    not in its loop, so its threads have little to contend for in one.
+
+    **Built** (2026-11-14): ``runtime::thread::one_arena``. With no nodes,
+    a release build maps about 8.7 MiB, where it mapped 200 MiB; each ping
+    node, two threads, adds about 0.7 MiB, where it added 128 MiB.
+
+Requirement
     Whether there is memory enough is not tcspecial's to judge. A total of
     its buffers would leave out its stacks and its code, and what a Linux
     system holds for itself -- its file buffers above all -- follows what

@@ -45,6 +45,10 @@ fn main() {
     if child {
         runtime::supervisor::child_follows_supervisor();
 
+        // Before any thread is made, so that each allocates from the main
+        // thread's malloc arena rather than reserving its own.
+        runtime::thread::one_arena();
+
         // And before any thread is made, so that every thread inherits the
         // block on SIGINT and SIGTERM and one thread of their own takes
         // them: a stop that arrives as a RESTART is under way is then not

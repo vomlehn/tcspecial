@@ -592,6 +592,26 @@
             "null"
           ]
         },
+        "send": {
+          "description": "For a `consolidator`: when it sends its datum, a list of any of all_new, as soon as every input is new; interval, every interval where an input is new; and moc, when anything arrives at its moc-in from a gateway. all_new alone is refused, since one input that stops would stop it for good.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "interval": {
+          "description": "For a `consolidator` whose send names interval: how often it sends, as a length of time: `1 s`. Given with that trigger and only with it. The ground may set it.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
         "unit": {
           "description": "No longer read: a `to_value` conversion and a `process` computation state their `type-out` instead.",
           "type": [
@@ -1238,6 +1258,26 @@
         },
         "age": {
           "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "send": {
+          "description": "For a `consolidator`: when it sends its datum, a list of any of all_new, as soon as every input is new; interval, every interval where an input is new; and moc, when anything arrives at its moc-in from a gateway. all_new alone is refused, since one input that stops would stop it for good.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "interval": {
+          "description": "For a `consolidator` whose send names interval: how often it sends, as a length of time: `1 s`. Given with that trigger and only with it. The ground may set it.",
           "type": [
             "string",
             "number",
@@ -1915,6 +1955,26 @@
         },
         "age": {
           "description": "For a `vote`: how old a reading may be and still be voted on, as a length of time: `2 s`. Older ones are left out. Unstated, a reading stands until it is replaced.",
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        "send": {
+          "description": "For a `consolidator`: when it sends its datum, a list of any of all_new, as soon as every input is new; interval, every interval where an input is new; and moc, when anything arrives at its moc-in from a gateway. all_new alone is refused, since one input that stops would stop it for good.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "interval": {
+          "description": "For a `consolidator` whose send names interval: how often it sends, as a length of time: `1 s`. Given with that trigger and only with it. The ground may set it.",
           "type": [
             "string",
             "number",

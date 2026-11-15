@@ -468,6 +468,7 @@ SPELLINGS = \
 	tests/manual/thermostat:tests/manual/thermostat-sim.yaml \
 	tests/consolidator/yamcs:tests/consolidator/yamcs-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
+	examples/consolidator/consolidator:examples/consolidator/consolidator-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
 	$(THERMOSTAT_YAMCS):$(THERMOSTAT_YAMCS)-sim.yaml \
 	examples/simple-app/simple-app:examples/simple-app/simple-app-sim.yaml \

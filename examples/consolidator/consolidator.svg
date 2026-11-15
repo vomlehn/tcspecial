@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470" role="img" aria-labelledby="title desc">
+  <title id="title">The consolidator example</title>
+  <desc id="desc">Three payloads, UDP sockets: sun, a u16, at 127.0.0.1:5001, every second; wheel, an i32, at 5002, four times a second; and battery, a u8, at 5003, every five seconds. Each sends its readings to housekeeping, a consolidator aboard tcspecial, at its inputs sun, wheel and battery. housekeeping sends one datum, a consolidation, when all three are new or every two seconds: a state for each input, new, held or none, and the readings packed to the bit, at most 8 bytes. It goes down through the gateway node, gateway, to 127.0.0.1:5102: ground_base, 5100, plus housekeeping's device id, 2. On the ground, the receive takes the datum apart and hands out each new reading as though sun, wheel or battery had sent it, so the MOC shows each in a panel of its own; a held reading is not handed out.</desc>
+  <defs>
+    <style>
+      text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
+      .name { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: bold; }
+      .kind { font-size: 12.5px; fill: #374151; }
+      .detail { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: 11.5px; fill: #4b5563; }
+      .heading { font-size: 13px; font-weight: bold; fill: #475569; letter-spacing: 0.06em; }
+      .label { font-size: 12px; fill: #1f2937; }
+      .note { font-size: 12px; fill: #4b5563; }
+      .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
+      .compute { fill: #fff7e6; stroke: #b7791f; stroke-width: 1.6; }
+      .gateway { fill: #ecfdf5; stroke: #047857; stroke-width: 1.6; }
+      .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
+      .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .groundward { fill: none; stroke: #2563eb; stroke-width: 2; }
+      .packed { fill: none; stroke: #2563eb; stroke-width: 4; }
+      .unpacked { fill: none; stroke: #2563eb; stroke-width: 2; stroke-dasharray: 8 5; }
+    </style>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+    <!-- The thick line's head, sized in the drawing's units so that the
+         line's width does not swell it. -->
+    <marker id="arrow-thick" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="16" markerHeight="16" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <rect width="900" height="470" fill="#ffffff"/>
+
+  <!-- Column headings -->
+  <text class="heading" x="30" y="40">PAYLOADS</text>
+  <text class="heading" x="700" y="40">MOC</text>
+
+  <!-- tcspecial, the vehicle -->
+  <rect class="boundary" x="215" y="54" width="450" height="270" rx="14"/>
+  <text class="heading" x="233" y="80">TCSPECIAL (VEHICLE)</text>
+
+  <!-- The three sensors -->
+  <rect class="payload" x="30" y="70" width="160" height="66" rx="10"/>
+  <text class="name" x="44" y="94">sun</text>
+  <text class="kind" x="44" y="112">u16, every 1 s</text>
+  <text class="detail" x="44" y="128">127.0.0.1:5001</text>
+
+  <rect class="payload" x="30" y="156" width="160" height="66" rx="10"/>
+  <text class="name" x="44" y="180">wheel</text>
+  <text class="kind" x="44" y="198">i32, every 250 ms</text>
+  <text class="detail" x="44" y="214">127.0.0.1:5002</text>
+
+  <rect class="payload" x="30" y="242" width="160" height="66" rx="10"/>
+  <text class="name" x="44" y="266">battery</text>
+  <text class="kind" x="44" y="284">u8, every 5 s</text>
+  <text class="detail" x="44" y="300">127.0.0.1:5003</text>
+
+  <!-- housekeeping, the consolidator -->
+  <rect class="compute" x="300" y="130" width="190" height="112" rx="10"/>
+  <text class="name" x="316" y="156">housekeeping</text>
+  <text class="kind" x="316" y="176">consolidator</text>
+  <text class="detail" x="316" y="196">all_new, or every 2 s</text>
+  <text class="detail" x="316" y="214">new / held / none</text>
+  <text class="detail" x="316" y="232">at most 8 bytes</text>
+
+  <!-- gateway -->
+  <rect class="gateway" x="525" y="150" width="120" height="72" rx="10"/>
+  <text class="name" x="539" y="176">gateway</text>
+  <text class="kind" x="539" y="196">gateway_radio</text>
+  <text class="detail" x="539" y="212">device id 2</text>
+
+  <!-- The ground station -->
+  <rect class="ground" x="700" y="120" width="180" height="132" rx="10"/>
+  <text class="name" x="714" y="146">MOC</text>
+  <text class="kind" x="714" y="166">receives 127.0.0.1:5102</text>
+  <text class="kind" x="714" y="186">and hands out each new</text>
+  <text class="kind" x="714" y="204">reading as its sensor's:</text>
+  <text class="detail" x="714" y="226">sun   wheel   battery</text>
+
+  <!-- Links into housekeeping, each named by its input -->
+  <path class="groundward" d="M190,103 C250,103 250,158 296,158" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="232" y="112">sun</text>
+  <path class="groundward" d="M190,189 L296,189" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="228" y="182">wheel</text>
+  <path class="groundward" d="M190,275 C250,275 250,220 296,220" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="226" y="254">battery</text>
+
+  <!-- The one datum down, and the readings it is taken apart into -->
+  <path class="packed" d="M490,186 L521,186" marker-end="url(#arrow-thick)"/>
+  <path class="packed" d="M645,186 L696,186" marker-end="url(#arrow-thick)"/>
+  <text class="label" x="652" y="174">datum</text>
+
+  <text class="note" x="233" y="282">One datum where there were three packets: the readings</text>
+  <text class="note" x="233" y="298">packed to the bit, each with its state. A held reading,</text>
+  <text class="note" x="233" y="314">the one before sent again, is not handed out on the ground.</text>
+
+  <!-- Legend -->
+  <line x1="30" y1="350" x2="870" y2="350" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="groundward" d="M30,382 L80,382" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="90" y="386">a reading, to an input</text>
+  <path class="packed" d="M270,382 L320,382" marker-end="url(#arrow-thick)"/>
+  <text class="label" x="330" y="386">the consolidation: one datum, thick line</text>
+  <rect class="payload" x="30" y="410" width="22" height="16" rx="4"/>
+  <text class="label" x="60" y="423">payload</text>
+  <rect class="compute" x="150" y="410" width="22" height="16" rx="4"/>
+  <text class="label" x="180" y="423">computation</text>
+  <rect class="gateway" x="300" y="410" width="22" height="16" rx="4"/>
+  <text class="label" x="330" y="423">gateway node</text>
+  <rect class="ground" x="460" y="410" width="22" height="16" rx="4"/>
+  <text class="label" x="490" y="423">MOC program</text>
+</svg>

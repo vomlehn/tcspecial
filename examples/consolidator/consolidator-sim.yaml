@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial-sim.schema.json
+
+description: Simulator settings for the sensors of consolidator.ytcs, each
+  reporting at its own pace
+
+tcs-sim:
+  ready: "127.0.0.1:7932"
+
+simulated_payloads:
+  - type network:
+      - payload: sun
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true
+      - payload: wheel
+        packet_interval: 250 ms
+        protocol: udp
+        simulate: true
+      - payload: battery
+        packet_interval: 5 s
+        protocol: udp
+        simulate: true

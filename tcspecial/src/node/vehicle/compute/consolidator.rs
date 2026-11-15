@@ -281,7 +281,7 @@ pub const MOST_INPUTS: usize = 256;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcsprotocol::consolidation::Input;
+    use tcsprotocol::consolidation::{Input, InputCounts};
     use tcsprotocol::link_type::{Basic, LinkType};
 
     /// A consolidator of two `u8`s, sending as `send` says, every second
@@ -323,6 +323,92 @@ mod tests {
         assert_eq!(&out[..3], &[0, 0, 0]);
         // Asked once, sent once.
         assert_eq!(pack.end_of_pass(now, &mut out), Ok(0));
+    }
+
+    /// A reading arriving at the input it names.
+    fn at(input: &str) -> Arriving<'_> {
+        Arriving {
+            input: Some(input),
+            stream: None,
+        }
+    }
+
+    /// An input from which nothing arrives goes in none, its bits nought,
+    /// and all_new waits for it for ever: the interval sends without it.
+    #[test]
+    fn an_input_that_never_arrives_is_none() {
+        let now = Instant::now();
+        let mut pack = port("all_new, interval", now);
+        let mut out = [0u8; 8];
+        pack.give(at("a"), &[5]).expect("taken");
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(0), "b never came");
+        let later = now + Duration::from_secs(1);
+        // 10 00 | 0000_0101 | 0000_0000 -> 80 50 00.
+        assert_eq!(pack.end_of_pass(later, &mut out), Ok(3));
+        assert_eq!(&out[..3], &[0x80, 0x50, 0x00]);
+    }
+
+    /// A reading that arrives twice before the datum goes is sent once, the
+    /// later; and readings arriving at different times in one pass make one
+    /// datum at its end, which is not sent again with nothing new.
+    #[test]
+    fn readings_through_a_pass_make_one_datum() {
+        let now = Instant::now();
+        let mut pack = port("all_new, interval", now);
+        let mut out = [0u8; 8];
+        pack.give(at("a"), &[1]).expect("taken");
+        pack.give(at("a"), &[2]).expect("taken");
+        pack.give(at("b"), &[3]).expect("taken");
+        // 10 10 | 0000_0010 | 0000_0011 -> a0 20 30.
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
+        assert_eq!(&out[..3], &[0xa0, 0x20, 0x30]);
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(0), "nothing new");
+        let mut held = [InputCounts::default(); 2];
+        assert_eq!(pack.counters.counts().sent, 1);
+        assert_eq!(pack.counters.inputs(0, &mut held), (2, 2));
+        assert_eq!(held, [InputCounts::default(); 2], "both new");
+    }
+
+    /// The interval alone sends where something is new as it comes round,
+    /// and nothing where nothing is; all_new alone is no trigger at all.
+    #[test]
+    fn the_interval_sends_only_what_is_new() {
+        let now = Instant::now();
+        let mut pack = port("interval", now);
+        let mut out = [0u8; 8];
+        pack.give(at("a"), &[7]).expect("taken");
+        pack.give(at("b"), &[8]).expect("taken");
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(0), "not yet round");
+        let round = now + Duration::from_secs(1);
+        assert_eq!(pack.end_of_pass(round, &mut out), Ok(3));
+        let again = now + Duration::from_secs(2);
+        assert_eq!(
+            pack.end_of_pass(again, &mut out),
+            Ok(0),
+            "round again, and nothing new"
+        );
+        assert!(Triggers::of("all_new").is_err());
+    }
+
+    /// Triggers together: all_new sends as soon as both are new, and a
+    /// datum asked for sends what is held, both held.
+    #[test]
+    fn triggers_send_together() {
+        let now = Instant::now();
+        let mut pack = port("all_new, moc", now);
+        let mut out = [0u8; 8];
+        pack.give(at("a"), &[1]).expect("taken");
+        pack.give(at("b"), &[2]).expect("taken");
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
+        pack.give(Arriving::ANYWHERE, b"now").expect("asked");
+        // 01 01 | 0000_0001 | 0000_0010 -> 50 10 20.
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
+        assert_eq!(&out[..3], &[0x50, 0x10, 0x20]);
+        let counts = pack.counters.counts();
+        assert_eq!(
+            (counts.sent, counts.sent_all_new, counts.sent_moc),
+            (2, 1, 1)
+        );
     }
 
     /// The ground may set the interval, and nothing else; and not where

@@ -537,6 +537,17 @@ one that is not refused, counted and said. So a node may rely on what it is
 given being its type, and needs no check of its own for that. A device's
 own bytes are not a type's encoding; <tt class="docutils literal">format</tt> says how to read them, and
 the node at the edge turns them into the type it sends.</p>
+<p>The one node whose datum is not one type's encoding is a <tt class="docutils literal">consolidator</tt>: it
+sends several readings as one datum, a <em>consolidation</em>, each input's state and
+then their bit strings packed end to end, laid out by
+<tt class="docutils literal">tcsprotocol/src/consolidation.rs</tt> from the configuration alone. Nothing
+aboard takes one apart, so a consolidator may send only to a gateway, a log
+or a tee, which take it whole; on the ground, tcsmoc's receive takes it apart
+and hands out each new input as though its source had sent it, so no ground
+station reads a consolidation either. A new node does not make another such
+datum without the same three things: its layout worked out once, in
+tcsprotocol, from nothing but the configuration; the ground's unpacking, in
+tcsmoc; and its place in the link table (see <a class="reference internal" href="#adding-a-compute-function">Adding a Compute Function</a>).</p>
 <p>Only towards the ground is anything added: a string or bytes, which has no width
 of its own, is sent the ground after a count of its bytes, chosen for each
 source by <tt class="docutils literal"><span class="pre">Telemetered::count</span></tt> in <tt class="docutils literal">tcsprotocol/src/graph/telemetry.rs</tt>
@@ -682,9 +693,23 @@ of its own as <tt class="docutils literal">vote</tt> and <tt class="docutils lit
 which types it takes, as <tt class="docutils literal">process</tt> takes only types with a text form
 (<tt class="docutils literal">tcsprotocol/src/link_text.rs</tt>), refuses the others in <tt class="docutils literal">params_of</tt>,
 naming the attribute and the types it may be.</p>
+<p>A function whose datum's layout is worked out of the configuration, as a
+consolidator's is, is worked out in tcsprotocol once, for both ends to read,
+and goes in <tt class="docutils literal">LinkTable</tt> in <tt class="docutils literal">tcsprotocol/src/graph/link_table.rs</tt>: what is
+derived rather than written has to be in the link digest every beacon
+carries, or a vehicle and a ground station built from different versions of
+the rule would read one file and lay out its data differently without a
+word. The same goes for anything new a function makes the ground count -- a
+port, an APID, a message ID. A function the ground asks something of, as
+QUERY_CONSOLIDATOR asks a consolidator, is asked from tcsmoc, tcsmoc-c,
+Python through Yamcs, tcs-moc and the F´ bridge alike.</p>
 <p>tcs-cfge offers a function as a node of its own, from
 <tt class="docutils literal"><span class="pre">tcs-cfge/share/nodes/vehicle/compute/&lt;function&gt;.yaml</span></tt> with
-<tt class="docutils literal">sets: {function: &lt;function&gt;}</tt>. The Python ground needs nothing for it:
+<tt class="docutils literal">sets: {function: &lt;function&gt;}</tt>, and its attributes are in both
+configuration schemas, <tt class="docutils literal">tcsprotocol/schema/tcspecial.xsd</tt> and
+<tt class="docutils literal">tcspecial.schema.json</tt>, where every shipped file is held to them: a
+function no shipped configuration uses has attributes nothing checks there,
+so it wants an example. The Python ground needs nothing for it:
 how it shows what a node sends follows from the type, in <tt class="docutils literal">form.py</tt>.</p>
 </div>
 <div class="section" id="adding-a-gateway-type">
@@ -807,6 +832,10 @@ other type that are not colour.</li>
 <p>For a vehicle type, leave out the device, the feature, the endpoint, the
 judgement and the simulator, and add its <tt class="docutils literal">VEHICLE_TYPES</tt> entry, its
 <tt class="docutils literal">carries</tt> branch, its <tt class="docutils literal">Port</tt> and its arms in <tt class="docutils literal">runtime/system.rs</tt>.</p>
+<p>For anything whose datum or links the configuration only implies -- a layout
+worked out of it, a port or APID counted -- add what is worked out to
+<tt class="docutils literal"><span class="pre">graph::link_table</span></tt>, so the link digest covers it, and give the ground its
+side in tcsmoc rather than in each station.</p>
 </div>
 </div>
 </body>

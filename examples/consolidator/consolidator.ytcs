@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
+
+# Three sensors' readings, put together aboard as one datum -- a
+# consolidation -- and taken apart again on the ground.
+#
+# The sun sensor reports every second, the reaction wheel's speed four times
+# a second and the battery every five. housekeeping, a consolidator, takes
+# all three and sends one datum to the ground when every input has
+# something new, or every two seconds whatever has arrived: each input
+# marked new, held -- the reading before, sent again -- or none. The datum is
+# packed to the bit, which is what a thin link to the ground wants.
+#
+# The ground station's receive takes the datum apart and hands out each new
+# reading as though its sensor had sent it the ground itself, so tcs-moc
+# shows the three in panels of their own, and housekeeping's Configuration,
+# after a Query, how often each went in new, held and none. The battery,
+# slowest, is the one most often held.
+
+description: "Three sensors' readings sent to the ground as one datum, a
+  consolidation, and taken apart again there"
+
+tcspecial:
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.1:5650"
+    reset_interval: "1 s"
+    send: "0.0.0.0:5550"
+  gateway: "radio"
+  interface: "5684f9b97e87a4e3294258ba473c2e79"
+  log:
+    directory: "/tmp/telemetry"
+    segment_size: "65536"
+  max_consolidator_inputs: "32"
+  payload_command:
+    dest_base: "0.0.0.0:4200"
+    source_base: "127.0.0.1:4300"
+  payload_telemetry:
+    dest_base: "127.0.0.1:6100"
+    source_base: "0.0.0.0:6000"
+  state_file: "/tmp/tcspecial-consolidator.state"
+  tcs_cmd:
+    recv: "0.0.0.0:4000"
+    send: "127.0.0.1:4100"
+
+gateways:
+  - type gateway_radio:
+      # Each node drawn in arrives at ground_base plus its device id:
+      # housekeeping, device id 2, at 5102. Its inputs reach the ground only
+      # in its datum.
+      - gateway: gateway
+        ground_base: "127.0.0.1:5100"
+        world-in: [housekeeping]
+
+payloads:
+  - type network:
+      # A sun sensor's angle, a whole number of two bytes.
+      - payload: sun
+        address: "127.0.0.1:5001"
+        protocol: "udp"
+        world-out-type: "u16"
+        world-out: [housekeeping.sun]
+      # The reaction wheel's speed, signed: it turns either way.
+      - payload: wheel
+        address: "127.0.0.1:5002"
+        protocol: "udp"
+        world-out-type: "i32"
+        world-out: [housekeeping.wheel]
+      # The battery's charge, a byte.
+      - payload: battery
+        address: "127.0.0.1:5003"
+        protocol: "udp"
+        world-out-type: "u8"
+        world-out: [housekeeping.battery]
+
+vehicle:
+  - type compute:
+      # Sends when all three are new, and every two seconds otherwise:
+      # all_new alone is refused, since one sensor that stopped would stop
+      # it for good.
+      - compute: housekeeping
+        function: consolidator
+        interval: "2 s"
+        send: [all_new, interval]
+        world-out: [gateway.housekeeping]
+        world-in: [sun, wheel, battery]
+
+tcs-cfge:
+  nodes:
+    - { node: sun, x: 34, y: 34 }
+    - { node: wheel, x: 34, y: 134 }
+    - { node: battery, x: 34, y: 234 }
+    - { node: housekeeping, x: 242, y: 134 }
+    - { node: gateway, x: 469, y: 134 }

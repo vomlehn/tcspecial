@@ -168,6 +168,18 @@ given being its type, and needs no check of its own for that. A device's
 own bytes are not a type's encoding; ``format`` says how to read them, and
 the node at the edge turns them into the type it sends.
 
+The one node whose datum is not one type's encoding is a ``consolidator``: it
+sends several readings as one datum, a *consolidation*, each input's state and
+then their bit strings packed end to end, laid out by
+``tcsprotocol/src/consolidation.rs`` from the configuration alone. Nothing
+aboard takes one apart, so a consolidator may send only to a gateway, a log
+or a tee, which take it whole; on the ground, tcsmoc's receive takes it apart
+and hands out each new input as though its source had sent it, so no ground
+station reads a consolidation either. A new node does not make another such
+datum without the same three things: its layout worked out once, in
+tcsprotocol, from nothing but the configuration; the ground's unpacking, in
+tcsmoc; and its place in the link table (see `Adding a Compute Function`_).
+
 Only towards the ground is anything added: a string or bytes, which has no width
 of its own, is sent the ground after a count of its bytes, chosen for each
 source by ``Telemetered::count`` in ``tcsprotocol/src/graph/telemetry.rs``
@@ -327,9 +339,24 @@ which types it takes, as ``process`` takes only types with a text form
 (``tcsprotocol/src/link_text.rs``), refuses the others in ``params_of``,
 naming the attribute and the types it may be.
 
+A function whose datum's layout is worked out of the configuration, as a
+consolidator's is, is worked out in tcsprotocol once, for both ends to read,
+and goes in ``LinkTable`` in ``tcsprotocol/src/graph/link_table.rs``: what is
+derived rather than written has to be in the link digest every beacon
+carries, or a vehicle and a ground station built from different versions of
+the rule would read one file and lay out its data differently without a
+word. The same goes for anything new a function makes the ground count -- a
+port, an APID, a message ID. A function the ground asks something of, as
+QUERY_CONSOLIDATOR asks a consolidator, is asked from tcsmoc, tcsmoc-c,
+Python through Yamcs, tcs-moc and the F´ bridge alike.
+
 tcs-cfge offers a function as a node of its own, from
 ``tcs-cfge/share/nodes/vehicle/compute/<function>.yaml`` with
-``sets: {function: <function>}``. The Python ground needs nothing for it:
+``sets: {function: <function>}``, and its attributes are in both
+configuration schemas, ``tcsprotocol/schema/tcspecial.xsd`` and
+``tcspecial.schema.json``, where every shipped file is held to them: a
+function no shipped configuration uses has attributes nothing checks there,
+so it wants an example. The Python ground needs nothing for it:
 how it shows what a node sends follows from the type, in ``form.py``.
 
 Adding a Gateway Type
@@ -457,3 +484,8 @@ For a payload type ``foo``:
 For a vehicle type, leave out the device, the feature, the endpoint, the
 judgement and the simulator, and add its ``VEHICLE_TYPES`` entry, its
 ``carries`` branch, its ``Port`` and its arms in ``runtime/system.rs``.
+
+For anything whose datum or links the configuration only implies -- a layout
+worked out of it, a port or APID counted -- add what is worked out to
+``graph::link_table``, so the link digest covers it, and give the ground its
+side in tcsmoc rather than in each station.

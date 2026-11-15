@@ -96,6 +96,34 @@ fn a_consolidator_is_sound_and_sized_by_its_inputs() {
     assert!(largest.bounded);
 }
 
+/// A consolidator whose datum could be larger than a datagram of its
+/// gateway's link carries is refused, though each input alone would fit:
+/// its largest datum is the sum of its inputs' with their lengths and
+/// states.
+#[test]
+fn a_datum_that_could_be_too_large_is_refused() {
+    let (graph, said) = checked(&[
+        (
+            "world-out-type: \"u32\"",
+            "world-out-type: \"bytes(40000)\"",
+        ),
+        (
+            "world-out-type: \"boolean\"",
+            "world-out-type: \"bytes(40000)\"",
+        ),
+    ]);
+    let pack = graph.node("pack").expect("the consolidator");
+    assert!(
+        tcsprotocol::graph::largest::largest_datum(&graph, pack).bytes > 80_000
+    );
+    assert!(
+        said.iter()
+            .any(|s| s.contains("\"pack\" can send")
+                && s.contains("bytes at once")),
+        "{said:?}"
+    );
+}
+
 /// More inputs than max_consolidator_inputs is refused, naming it.
 #[test]
 fn too_many_inputs_are_refused() {

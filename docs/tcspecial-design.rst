@@ -3582,6 +3582,26 @@ counts in a ``ConsolidatorQueried`` event and the input held most often in
 a ``QuietestInput`` event, as its ``QUERY_THREADS`` says the fullest
 thread.
 
+**Built** (2026-11-15), step 3: tcsmoc's receive takes a datum apart and
+hands out each new input as its source's, and tcsmoc-c and the Python
+stations through libtcsmoc-c with it; the relay for Yamcs; each input's
+source in the configuration's own XTCE; the F´ model's channels; tcs-moc's
+panels; ``tcs-verify --summary``'s Consolidators; and tcs-cfge, which
+draws a consolidator and edits its attributes from its description, and
+``max_consolidator_inputs`` with the section's other fields. Reading a
+consolidation from a log's segment files is tcslog-tools', a project of its
+own, and not here.
+
+**Built** (2026-11-15), step 4: "A consolidator's datum" and the link table
+in the node-types guide; ``examples/consolidator``, in both spellings, which
+``tcspecial/tests/consolidator.rs`` flies, the ground hearing each new reading
+as its sensor's and a held one not at all; the consolidator's ``send`` and
+``interval`` in both configuration schemas, which no shipped file had held
+them to before; and tests of an input that never arrives, one that arrives
+twice between sends, readings arriving through a pass, each trigger alone
+and together, length fields of different widths with inputs at their most
+and empty, and a consolidator whose datum could be larger than a datagram.
+
 App nodes
 ---------
 

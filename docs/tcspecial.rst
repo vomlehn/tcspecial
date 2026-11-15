@@ -3107,6 +3107,50 @@ moved to ports nothing holds: a command sent up reaches the heater and comes
 back down, and a reading reaches the ground. Every port the example uses is in
 the eight thousands, which no other example uses.
 
+The consolidator example
+------------------------
+.. figure:: ../examples/consolidator/consolidator.svg
+   :alt: The consolidator example: sun, a u16 every second, wheel, an i32
+         four times a second, and battery, a u8 every five seconds, each send
+         to housekeeping, a consolidator, which sends one datum when all three
+         are new or every two seconds, each input new, held or none, at most
+         eight bytes, down through gateway to 127.0.0.1:5102; on the ground the
+         receive hands out each new reading as its sensor's.
+   :width: 100%
+
+   ``examples/consolidator``: three sensors' readings sent down as one datum,
+   and taken apart again on the ground.
+
+Three sensors, each reporting at its own pace and in its own type: ``sun``, a
+``u16``, every second; ``wheel``, an ``i32``, four times a second; and
+``battery``, a ``u8``, every five seconds. ``housekeeping``, a
+``consolidator`` computation, takes all three at its inputs, named in its
+``world-in``, and sends one datum -- a *consolidation* -- when every input
+has something new (``all_new``) or every two seconds whatever has arrived
+(``interval``). The datum is a two-bit state for each input -- new, held (the
+reading before, sent again) or none -- and then the readings, packed to the
+bit: at most eight bytes where three packets would each carry their own.
+Only ``housekeeping`` is drawn into the gateway node; it arrives at
+``ground_base`` plus its device id, ``127.0.0.1:5102``.
+
+On the ground nothing has to take the datum apart: tcsmoc's receive does, as it
+arrives, and hands out each new reading as though its sensor had sent it the
+ground itself. tcs-moc so shows ``sun``, ``wheel`` and ``battery`` in panels of
+their own, which say they arrive in ``housekeeping``'s datum; a held reading
+is not handed out, so a slow sensor's ``Last recv`` simply ages between its
+readings. A ``Query`` asks ``housekeeping`` ``QUERY_CONSOLIDATOR`` too, and its
+``Configuration`` then says how many datums it has sent, by trigger, and how
+often each input went in new, held and none -- the battery, slowest, most
+often held. ``tcs-verify --summary`` lists the layout: sixteen bits for the
+sun, thirty-two for the wheel and eight for the battery.
+
+``make -C examples run-consolidator`` runs tcs-moc on the example, which starts
+tcspecial and tcs-sim, tcs-sim playing the sensors.
+``tcspecial/tests/consolidator.rs`` flies it, with its sockets moved to ports
+nothing holds:
+the three readings reach the ground each as its sensor's, and a later datum in
+which only the sun is new brings the sun's reading down and nothing else.
+
 The fprime example
 ------------------
 .. figure:: ../examples/fprime/fprime.svg

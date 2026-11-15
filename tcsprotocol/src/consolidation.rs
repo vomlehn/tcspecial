@@ -865,6 +865,41 @@ mod tests {
         );
     }
 
+    /// Each string or bytes has a length field just wide enough for its
+    /// own most, so two of different mosts have fields of different
+    /// widths; one at its most and one empty are each read back as they
+    /// were, and the datum ends partway through a byte, padded.
+    #[test]
+    fn lengths_are_each_as_wide_as_their_most() {
+        let laid = layout(&[
+            ("short", LinkType::Basic(Basic::String(Some(8))), Some(8)),
+            ("long", LinkType::Basic(Basic::Bytes(Some(300))), Some(300)),
+        ]);
+        // States 4; short: a 4-bit length and up to 64; long: 9 and 2400.
+        assert_eq!(laid.largest_bits(), 4 + 4 + 64 + 9 + 300 * 8);
+        let mut out = [0xffu8; 400];
+        let used = laid
+            .pack(&[(State::New, b"abcdefgh"), (State::New, b"")], &mut out)
+            .expect("it packs");
+        // 4 + 4 + 64 + 9 = 81 bits: eleven bytes, the last seven bits pad.
+        assert_eq!(used, 11);
+        let got: String = out[..used]
+            .iter()
+            .map(|byte| format!("{byte:08b}"))
+            .collect();
+        assert!(got.starts_with("1010"), "{got}");
+        assert_eq!(&got[4..8], "1000", "eight, in four bits");
+        assert_eq!(&got[72..81], "000000000", "nought, in nine bits");
+        assert!(got[81..].bytes().all(|b| b == b'0'), "{got}");
+        let back = laid.unpack(&out[..used]).expect("it unpacks");
+        assert_eq!(
+            back,
+            vec![(State::New, b"abcdefgh".to_vec()), (State::New, vec![])]
+        );
+        // Past its most, a reading is not taken.
+        assert!(!laid.accepts(0, b"abcdefghi"));
+    }
+
     /// An input that has never arrived is zeros of its width, or an empty
     /// string, and is read back as nothing; a datum of zeros is every input
     /// none.

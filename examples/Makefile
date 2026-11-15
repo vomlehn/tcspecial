@@ -65,6 +65,8 @@ help:
 		"packets (YAMCS_HOME=<yamcs>)"
 	@echo "  make run-tees        - Run tcs-moc on the tees example: tees" \
 		"and null nodes"
+	@echo "  make run-consolidator - Run tcs-moc on the consolidator" \
+		"example: three sensors sent down as one datum"
 	@echo "  make run-fprime      - Run tcs-moc on the fprime example," \
 		"playing the F´ bridge"
 	@echo "  make run-cfs         - Run tcs-moc on the cfs example," \
@@ -149,6 +151,12 @@ run-descent:
 .PHONY: run-tees
 run-tees:
 	$(call runexample_on,tees)
+
+# Run tcs-moc on the consolidator example: three sensors' readings sent down
+# as one datum, and shown on the ground each in its sensor's panel.
+.PHONY: run-consolidator
+run-consolidator:
+	$(call runexample_on,consolidator)
 
 # Run tcs-moc on the fprime example: a vehicle that answers to an F´ flight
 # computer, tcs-moc playing the bridge component's part.

@@ -431,6 +431,19 @@ and on aboard, and a <code>null-gateway</code> and a
 <code>tcspecial/tests/tees.rs</code> flies it.</td>
 </tr>
 <tr>
+<td><code>consolidator</code></td>
+<td>Three sensors’ readings – a <code>u16</code>, an <code>i32</code>
+and a <code>u8</code>, each at its own pace – put together by a
+<code>consolidator</code> computation into one datum, packed to the bit
+with each input marked new, held or none, and sent down when all three
+are new or every two seconds. The ground’s receive takes the datum apart
+and hands out each new reading as its sensor’s, so tcs-moc shows each
+sensor in its own panel, and the consolidator’s
+<code>Configuration</code>, after a Query, how often each input went in
+held. <code>make run-consolidator</code> runs it;
+<code>tcspecial/tests/consolidator.rs</code> flies it.</td>
+</tr>
+<tr>
 <td><code>fprime</code></td>
 <td>A vehicle that answers to an F´ flight computer rather than to the
 ground: a <code>gateway_fprime</code> node sends each reading, the

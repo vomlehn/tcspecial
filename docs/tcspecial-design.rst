@@ -6875,11 +6875,12 @@ A restart on the same configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. figure:: restart-crash.svg
-   :alt: A sequence diagram of a crash. The vehicle runs A and the station
-         is matched. A datum tagged A sent before the crash arrives before
-         the new start's first beacon and is read with A. The vehicle
-         crashes, the supervisor starts it again, and it loads A with the
-         restart flag set. A START_NODE tagged A that the station sent
+   :alt: A sequence diagram of a crash. The vehicle runs A, the command
+         line's configuration, and the station is matched. A datum tagged A
+         sent before the crash arrives before the new start's first beacon
+         and is read with A. The vehicle crashes, the supervisor starts it
+         again, and, since the command line's configuration is never
+         popped, it loads A with the restart flag set. A START_NODE tagged A that the station sent
          before hearing of the restart reaches the new start, which is not
          matched, so it is not acted on, and its refusal is dropped and
          counted. The flagged beacon ends the match. CONNECT with A matches
@@ -6887,7 +6888,15 @@ A restart on the same configuration
          A with A.
    :width: 100%
 
-   A crash, and a start that loads the same configuration.
+   A crash of the command line's configuration, and a start that loads
+   it again.
+
+The figure shows the command line's configuration, the one crash after
+which the same configuration is loaded again. A crash of a configuration
+above it on the configuration stack pops that configuration, and the new
+start loads the one beneath: to the ground it is a restart on another
+configuration, as in the commanded restart above, except that no RESTART
+was sent and the beacon is the first word of it.
 
 A crash changes no configuration, but it is handled as every start is: the
 restart flag is set, nothing but beacons goes down, and a command that

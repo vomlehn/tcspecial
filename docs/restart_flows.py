@@ -263,13 +263,14 @@ COMMANDED = [
 ]
 
 CRASH = [
-    note("vehicle", 0, "Running A, restart flag clear"),
+    note("vehicle", 0, "Running A, the command line's configuration; "
+         "restart flag clear"),
     note("moc", 0, "Using A, matched"),
     msg("down", "A", "datum", 1, 2, "read with A"),
     msg("down", "A", "datum", 3, 5, "read with A: sent before the new "
         "start's first beacon"),
-    note("vehicle", 4, "Crashes; the supervisor starts it again; it loads "
-         "A; restart flag set"),
+    note("vehicle", 4, "Crashes; the supervisor starts it again; A is "
+         "never popped, so it loads A; restart flag set"),
     msg("down", "any", "beacon A, restart", 6, 7.5, "no longer matched; "
         "unsent [A] commands thrown away"),
     msg("up", "A", "START_NODE", 5.8, 7, "not acted on: not matched; "
@@ -484,7 +485,9 @@ if __name__ == "__main__":
          "and commands with B.",
          COMMANDED)
     draw("restart-crash", "A crash and restart on the same configuration",
-         "The vehicle runs A and crashes. A datum sent before the crash "
+         "The vehicle runs A, the command line's configuration, which is "
+         "at the bottom of the configuration stack and is never popped, "
+         "and crashes. A datum sent before the crash "
          "arrives before the new start's first beacon and is read with A. "
          "A command the station sent before hearing of the restart reaches "
          "the new start, which is not matched, so it is not acted on, and "

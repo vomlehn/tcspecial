@@ -7108,18 +7108,26 @@ Every datum it reads from then on was made with B.</p>
 <div class="section" id="a-restart-on-the-same-configuration">
 <h3><a class="toc-backref" href="#toc-entry-85">A restart on the same configuration</a></h3>
 <div class="figure">
-<object data="restart-crash.svg" style="width: 100%;" type="image/svg+xml">A sequence diagram of a crash. The vehicle runs A and the station
-is matched. A datum tagged A sent before the crash arrives before
-the new start's first beacon and is read with A. The vehicle
-crashes, the supervisor starts it again, and it loads A with the
-restart flag set. A START_NODE tagged A that the station sent
+<object data="restart-crash.svg" style="width: 100%;" type="image/svg+xml">A sequence diagram of a crash. The vehicle runs A, the command
+line's configuration, and the station is matched. A datum tagged A
+sent before the crash arrives before the new start's first beacon
+and is read with A. The vehicle crashes, the supervisor starts it
+again, and, since the command line's configuration is never
+popped, it loads A with the restart flag set. A START_NODE tagged A that the station sent
 before hearing of the restart reaches the new start, which is not
 matched, so it is not acted on, and its refusal is dropped and
 counted. The flagged beacon ends the match. CONNECT with A matches
 again; the station drops anything queued and reads a datum tagged
 A with A.</object>
-<p class="caption">A crash, and a start that loads the same configuration.</p>
+<p class="caption">A crash of the command line's configuration, and a start that loads
+it again.</p>
 </div>
+<p>The figure shows the command line's configuration, the one crash after
+which the same configuration is loaded again. A crash of a configuration
+above it on the configuration stack pops that configuration, and the new
+start loads the one beneath: to the ground it is a restart on another
+configuration, as in the commanded restart above, except that no RESTART
+was sent and the beacon is the first word of it.</p>
 <p>A crash changes no configuration, but it is handled as every start is: the
 restart flag is set, nothing but beacons goes down, and a command that
 arrives is not acted on until a CONNECT matches. A command sent to the old

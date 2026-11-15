@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="940" height="720" viewBox="0 0 940 720" role="img" aria-labelledby="title desc">
 <title id="title">A crash and restart on the same configuration</title>
-<desc id="desc">The vehicle runs A and crashes. A datum sent before the crash arrives before the new start&#x27;s first beacon and is read with A. A command the station sent before hearing of the restart reaches the new start, which is not matched, so it is not acted on, and its refusal is dropped and counted. The flagged beacon ends the match. CONNECT with A matches again; the station drops anything queued and reads and commands with A.</desc>
+<desc id="desc">The vehicle runs A, the command line&#x27;s configuration, which is at the bottom of the configuration stack and is never popped, and crashes. A datum sent before the crash arrives before the new start&#x27;s first beacon and is read with A. A command the station sent before hearing of the restart reaches the new start, which is not matched, so it is not acted on, and its refusal is dropped and counted. The flagged beacon ends the match. CONNECT with A matches again; the station drops anything queued and reads and commands with A.</desc>
 <rect width="940" height="720" fill="#ffffff"/>
 <text x="40" y="24" style="font-family: Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold">A crash and restart on the same configuration</text>
 <line x1="40" y1="46" x2="110" y2="46" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
@@ -12,7 +12,7 @@
 <line x1="300" y1="138" x2="300" y2="710" stroke="#000000" stroke-width="1.5"/>
 <text x="640" y="128" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 13px; font-weight: bold">MOC (ground station)</text>
 <line x1="640" y1="138" x2="640" y2="710" stroke="#000000" stroke-width="1.5"/>
-<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, restart flag clear</tspan></text>
+<text x="288" y="154" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Running A, the command line&#x27;s</tspan><tspan x="288" dy="14">configuration; restart flag clear</tspan></text>
 <text x="652" y="154" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="652" dy="0">Using A, matched</tspan></text>
 <line x1="300" y1="180" x2="626" y2="210" stroke="#0072B2" stroke-width="2.5" stroke-dasharray=""/>
 <polygon points="640,210 630,205 630,215" fill="#0072B2"/>
@@ -22,7 +22,7 @@
 <polygon points="640,300 630,295 630,305" fill="#0072B2"/>
 <text x="408.8" y="253.2" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[A] datum</text>
 <text x="652" y="304" text-anchor="start" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000"><tspan x="652" dy="0">read with A: sent before the new</tspan><tspan x="652" dy="14">start&#x27;s first beacon</tspan></text>
-<text x="288" y="274" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Crashes; the supervisor starts it</tspan><tspan x="288" dy="14">again; it loads A; restart flag set</tspan></text>
+<text x="288" y="274" text-anchor="end" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; font-style: italic; fill: #000000"><tspan x="288" dy="0">Crashes; the supervisor starts it</tspan><tspan x="288" dy="14">again; A is never popped, so it</tspan><tspan x="288" dy="14">loads A; restart flag set</tspan></text>
 <line x1="300" y1="330" x2="626" y2="375" stroke="#555555" stroke-width="2.5" stroke-dasharray="2 4"/>
 <polygon points="640,375 630,370 630,380" fill="#555555"/>
 <text x="408.8" y="338.4" text-anchor="middle" style="font-family: Helvetica, Arial, sans-serif; font-size: 12px; fill: #000000; paint-order: stroke; stroke: #ffffff; stroke-width: 4px">[any] beacon A, restart</text>

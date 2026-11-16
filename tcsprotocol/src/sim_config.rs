@@ -1853,7 +1853,10 @@ impl SimConfigFile {
     pub fn for_configuration(&self, name: &str) -> SimConfigFile {
         let mut file = self.clone();
         file.simulated_payloads.retain(|payload| {
-            payload.configuration.as_deref().is_none_or(|said| said == name)
+            payload
+                .configuration
+                .as_deref()
+                .is_none_or(|said| said == name)
         });
         file
     }
@@ -3359,9 +3362,7 @@ simulated_payloads:
             ))
         };
         let packet = sensor.packet_size;
-        assert!(with(packet)
-            .resolve(std::slice::from_ref(&sensor))
-            .is_ok());
+        assert!(with(packet).resolve(std::slice::from_ref(&sensor)).is_ok());
         let error = with(packet + 1)
             .resolve(std::slice::from_ref(&sensor))
             .expect_err("a segment larger than its packet");

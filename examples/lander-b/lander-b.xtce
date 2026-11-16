@@ -106,29 +106,18 @@
     </ParameterTypeSet>
     <ParameterSet>
       <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
-      <Parameter name="acceleration_y"
-          parameterTypeRef="metre_per_second_squared"/>
       <Parameter name="crashed" parameterTypeRef="bytes"/>
-      <Parameter name="joystick_y" parameterTypeRef="ratio"/>
       <Parameter name="landed" parameterTypeRef="bytes"/>
-      <Parameter name="velocity_y" parameterTypeRef="metre_per_second"/>
-      <Parameter name="y" parameterTypeRef="metre"/>
+      <Parameter name="to_accel_y" parameterTypeRef="metre_per_second_squared"/>
+      <Parameter name="to_joystick_y" parameterTypeRef="ratio"/>
+      <Parameter name="to_velocity_y" parameterTypeRef="metre_per_second"/>
+      <Parameter name="to_y" parameterTypeRef="metre"/>
     </ParameterSet>
     <ContainerSet>
-      <SequenceContainer name="acceleration_y_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="acceleration_y"/>
-        </EntryList>
-      </SequenceContainer>
       <SequenceContainer name="crashed_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="bytes_length"/>
           <ParameterRefEntry parameterRef="crashed"/>
-        </EntryList>
-      </SequenceContainer>
-      <SequenceContainer name="joystick_y_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="joystick_y"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="landed_packet">
@@ -137,14 +126,24 @@
           <ParameterRefEntry parameterRef="landed"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="velocity_y_packet">
+      <SequenceContainer name="to_accel_y_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="velocity_y"/>
+          <ParameterRefEntry parameterRef="to_accel_y"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="y_packet">
+      <SequenceContainer name="to_joystick_y_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="y"/>
+          <ParameterRefEntry parameterRef="to_joystick_y"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="to_velocity_y_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="to_velocity_y"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="to_y_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="to_y"/>
         </EntryList>
       </SequenceContainer>
     </ContainerSet>

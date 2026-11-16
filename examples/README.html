@@ -1270,9 +1270,9 @@ Earth through <a href="https://yamcs.org">Yamcs</a>: the example of two
 tcspecials sharing one simulated world, and of a link with the Moon’s
 delay in it.</p>
 <p><code>lander-a</code> flies the X axis and <code>lander-b</code> the
-Y axis. Each reads its axis of the joystick in tcs-sim’s lander window
-and drives that axis’s thruster with it, the pilot in the loop and
-nothing aboard working out a thrust; and each sends its axis’s position,
+Y axis. Each reads its axis of the joystick in tcs-sim’s window and
+drives that axis’s thruster with it, the pilot in the loop and nothing
+aboard working out a thrust; and each sends its axis’s position,
 velocity and acceleration, and the joystick’s value, down through its
 <code>gateway_yamcs</code> node. <code>lander-a</code> sends the fuel
 left too, and <code>lander-b</code> whether the lander has landed or
@@ -1299,13 +1299,20 @@ tcs-sim with both configurations and both tcspecials; and has each
 vehicle answer CONNECT, through the delay. Its window, the MOC’s, shows
 the landscape and the lander where it was said to be, the values, the
 fuel, the joystick as it was held, and whether it has landed or crashed,
-all 1.3 s behind tcs-sim’s. Closing tcs-sim’s lander window, or the
-MOC’s, stops everything. Yamcs’s web interface is at <a
+all 1.3 s behind tcs-sim’s. Closing tcs-sim’s window, or the MOC’s,
+stops everything. Yamcs’s web interface is at <a
 href="http://localhost:19090"
 class="uri">http://localhost:19090</a>.</p>
 <pre><code>make run-lander YAMCS_HOME=&lt;yamcs&gt;</code></pre>
 <p>Fly it from tcs-sim’s window: hold the button down in the joystick’s
 middle square and drag along an arm; letting go centres it.</p>
+<p>tcs-sim’s window has the lander’s pane at its left and two columns of
+payload panels beside it, so that the MOC’s window fits beside it on a
+screen about 1600 logical pixels wide. Where the two open is the window
+manager’s to say: on Wayland a program cannot place its own window. On
+KDE Plasma, <code>lander/lander-windows.kwinrule</code>, imported in
+System Settings, Window Management, Window Rules, opens tcs-sim’s window
+at the top left and the MOC’s to its right.</p>
 <p>Languages:</p>
 <ul>
 <li>MOC: Python 3 – <code>lander_yamcs.py</code>, its window and its

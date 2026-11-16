@@ -49,63 +49,63 @@
                 <address>127.0.0.1:20600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:20700</ground_base>
-                <world-in>acceleration_y</world-in>
                 <world-in>crashed</world-in>
-                <world-in>joystick_y</world-in>
                 <world-in>landed</world-in>
-                <world-in>velocity_y</world-in>
-                <world-in>y</world-in>
+                <world-in>to_accel_y</world-in>
+                <world-in>to_joystick_y</world-in>
+                <world-in>to_velocity_y</world-in>
+                <world-in>to_y</world-in>
             </gateway>
         </type>
     </gateways>
     <vehicle>
         <type name="compute">
-            <compute name="acceleration_y">
+            <compute name="to_accel_y">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.001</scale>
                 <type-in>i16</type-in>
                 <type-out>metre_per_second_squared</type-out>
-                <world-out>gateway.acceleration_y</world-out>
-                <world-in>acceleration_y_sensor</world-in>
+                <world-out>gateway.to_accel_y</world-out>
+                <world-in>accel_y</world-in>
             </compute>
-            <compute name="joystick_y">
+            <compute name="to_joystick_y">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.0001</scale>
                 <type-in>i16</type-in>
                 <type-out>ratio</type-out>
-                <moc-out>thruster_y.joystick_y</moc-out>
-                <world-out>gateway.joystick_y</world-out>
-                <world-in>joystick_y_sensor</world-in>
+                <moc-out>thruster_y.to_joystick_y</moc-out>
+                <world-out>gateway.to_joystick_y</world-out>
+                <world-in>joystick_y</world-in>
             </compute>
-            <compute name="velocity_y">
+            <compute name="to_velocity_y">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.01</scale>
                 <type-in>i16</type-in>
                 <type-out>metre_per_second</type-out>
-                <world-out>gateway.velocity_y</world-out>
-                <world-in>velocity_y_sensor</world-in>
+                <world-out>gateway.to_velocity_y</world-out>
+                <world-in>velocity_y</world-in>
             </compute>
-            <compute name="y">
+            <compute name="to_y">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.1</scale>
                 <type-in>i16</type-in>
                 <type-out>metre</type-out>
-                <world-out>gateway.y</world-out>
-                <world-in>y_sensor</world-in>
+                <world-out>gateway.to_y</world-out>
+                <world-in>y</world-in>
             </compute>
         </type>
     </vehicle>
     <payloads>
         <type name="network">
-            <payload name="acceleration_y_sensor">
+            <payload name="accel_y">
                 <address>127.0.0.1:20803</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>acceleration_y.acceleration_y_sensor</world-out>
+                <world-out>to_accel_y.accel_y</world-out>
             </payload>
             <payload name="crashed">
                 <read_size>16</read_size>
@@ -113,11 +113,11 @@
                 <protocol>udp</protocol>
                 <world-out>gateway.crashed</world-out>
             </payload>
-            <payload name="joystick_y_sensor">
+            <payload name="joystick_y">
                 <address>127.0.0.1:20804</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>joystick_y.joystick_y_sensor</world-out>
+                <world-out>to_joystick_y.joystick_y</world-out>
             </payload>
             <payload name="landed">
                 <read_size>16</read_size>
@@ -129,19 +129,19 @@
                 <address>127.0.0.1:20805</address>
                 <moc-in-type>ratio</moc-in-type>
                 <protocol>udp</protocol>
-                <moc-in>joystick_y</moc-in>
+                <moc-in>to_joystick_y</moc-in>
             </payload>
-            <payload name="velocity_y_sensor">
+            <payload name="velocity_y">
                 <address>127.0.0.1:20802</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>velocity_y.velocity_y_sensor</world-out>
+                <world-out>to_velocity_y.velocity_y</world-out>
             </payload>
-            <payload name="y_sensor">
+            <payload name="y">
                 <address>127.0.0.1:20801</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>y.y_sensor</world-out>
+                <world-out>to_y.y</world-out>
             </payload>
         </type>
     </payloads>

@@ -4,7 +4,7 @@ watched through Yamcs from the Earth.
 
 The vehicles are ``lander-a``, which flies the X axis, and ``lander-b``,
 which flies the Y axis: each reads its axis of the joystick in tcs-sim's
-lander window and drives that axis's thrust with it, and sends its axis's
+lander pane and drives that axis's thrust with it, and sends its axis's
 position, velocity and acceleration down through Yamcs. One tcs-sim
 simulates the payloads of both, in one world, from the simulator file they
 share. See docs/lander-design.rst.
@@ -128,6 +128,11 @@ NOTHING_YET = "--"
 #: milliseconds.
 REFRESH_MS = 100
 
+#: How long after it opens the window puts itself under tcs-sim's, in
+#: milliseconds: long enough for it to have been shown, which it must be
+#: for the request to mean anything.
+LOWER_AFTER_MS = 500
+
 #: How often the reading loop asks Yamcs, in seconds.
 READ_EVERY = 0.1
 
@@ -136,7 +141,7 @@ READ_EVERY = 0.1
 SCALE = 0.5
 
 #: The joystick's square's side, which is each arm's thickness, and how far
-#: each arm reaches beyond it, in pixels: as tcs-sim's lander window draws
+#: each arm reaches beyond it, in pixels: as tcs-sim's lander pane draws
 #: it.
 SQUARE = 25.2
 ARM = 70
@@ -145,14 +150,23 @@ ARM = 70
 STARS = 140
 
 #: How long each group of stars takes to brighten and dim again, in
-#: seconds: a group each, as tcs-sim's lander window has them.
+#: seconds: a group each, as tcs-sim's lander pane has them.
 TWINKLE_PERIODS = (1.3, 1.9, 2.6, 3.4)
 
 #: How far above the ground a star is at least, as a fraction of the
 #: display's height.
 STAR_CLEARANCE = 0.02
 
-#: The ground's fill: grey with a little brown, as tcs-sim's lander window
+#: How tall each end mark of the pad is, as a fraction of the display's
+#: height, and the radius of the light on top of it, in metres: as tcs-sim's
+#: lander pane draws them.
+PAD_MARK = 1 / 50
+PAD_LIGHT = 6.0
+
+#: How long the pad's lights take to flash on and off again, in seconds.
+PAD_FLASH = 1.0
+
+#: The ground's fill: grey with a little brown, as tcs-sim's lander pane
 #: has it.
 GROUND = "#aaa197"
 
@@ -827,16 +841,16 @@ class Readings:
             Each as ``name value``, then the state.
         """
         parts = [f"{node} {self.text(node)}" for node in ROWS_FLAT]
-        parts.append(f"fuel {self.text('fuel', 4)}")
+        parts.append(f"fuel {self.text('to_fuel', 4)}")
         return ", ".join(parts) + f"; {self.state()}"
 
 
 #: The rows of values the window shows: a name, a unit, and the X node and
 #: the Y node.
-ROWS = (("Position", "m", "x", "y"),
-        ("Velocity", "m/s", "velocity_x", "velocity_y"),
-        ("Acceleration", "m/s²", "acceleration_x", "acceleration_y"),
-        ("Joystick", "", "joystick_x", "joystick_y"))
+ROWS = (("Position", "m", "to_x", "to_y"),
+        ("Velocity", "m/s", "to_velocity_x", "to_velocity_y"),
+        ("Acceleration", "m/s²", "to_accel_x", "to_accel_y"),
+        ("Joystick", "", "to_joystick_x", "to_joystick_y"))
 
 #: Every node of :data:`ROWS`, in order.
 ROWS_FLAT = tuple(node for _, _, x, y in ROWS for node in (x, y))
@@ -893,6 +907,30 @@ def twinkle(seconds):
     """
     return [0.6 + 0.4 * math.sin(math.tau * seconds / period + number)
             for number, period in enumerate(TWINKLE_PERIODS)]
+
+
+def display_scale():
+    """How much larger than at 96 dots an inch the display wants this
+    window drawn.
+
+    The window is an X11 one, through XWayland where the session is
+    Wayland, and is drawn in the display's own pixels, which on a scaled
+    display makes it small. KDE Plasma says the scale to X11 programs as
+    the resource ``Xft.dpi`` -- 216 at a scale of 2.25 -- which
+    ``xrdb -query`` reads.
+
+    Returns:
+        ``Xft.dpi`` over 96; one where there is none, or no ``xrdb``.
+    """
+    try:
+        said = subprocess.run(["xrdb", "-query"], capture_output=True,
+                              text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError):
+        return 1.0
+    found = re.search(r"^Xft\.dpi:\s*([0-9.]+)\s*$", said, re.MULTILINE)
+    if not found or float(found.group(1)) <= 0:
+        return 1.0
+    return float(found.group(1)) / 96
 
 
 def stick_offset(axis):
@@ -977,14 +1015,20 @@ def run_the_window(readings, lander, seed, delay, stopped):
             time.sleep(READ_EVERY)
 
     window = tk.Tk()
+    # As large as the display's scale asks: the type, in points, through
+    # Tk's own scaling, before the fonts are made; everything given in
+    # pixels by multiplying it by zoom.
+    zoom = display_scale()
+    window.tk.call("tk", "scaling", zoom * 96 / 72)
     fonts.use_in(window)
     theme.use_in(window)
     window.title("TCS Lander MOC")
     window.configure(background="#ffffff")
     window.resizable(False, False)
-    between = theme.BETWEEN
+    between = round(theme.BETWEEN * zoom)
+    scale = SCALE * zoom
 
-    wide, high = lander.width * SCALE, lander.height * SCALE
+    wide, high = lander.width * scale, lander.height * scale
 
     def at(x, y):
         """A point of the world, in the scene's pixels.
@@ -996,7 +1040,7 @@ def run_the_window(readings, lander, seed, delay, stopped):
         Returns:
             ``(x, y)`` in pixels, down from the top.
         """
-        return x * SCALE, high - y * SCALE
+        return x * scale, high - y * scale
 
     # A black sky with twinkling stars over grey ground, as tcs-sim's lander
     # window draws it.
@@ -1008,60 +1052,96 @@ def run_the_window(readings, lander, seed, delay, stopped):
     for x, y, group in star_places(lander, seed):
         cx, cy = at(x, y)
         stars[group].append(scene.create_rectangle(
-            cx - 0.5, cy - 0.5, cx + 0.5, cy + 0.5, fill="#ffffff",
+            cx - zoom / 2, cy - zoom / 2, cx + zoom / 2, cy + zoom / 2,
+            fill="#ffffff",
             outline=""))
     flat = [c for x, y in lander.ground for c in at(x, y)]
     scene.create_polygon(*at(0, 0), *flat, *at(lander.width, 0),
                          fill=GROUND, outline="")
-    scene.create_line(*flat, fill="#3b3127", width=1.5)
+    scene.create_line(*flat, fill="#3b3127", width=1.5 * zoom)
     # The pad, white with a thin black edge, and an upright mark at each
     # end, so that it is told by its shape and not by its colour.
     (px0, py0), (px1, py1) = lander.pad
     pad_lines = [(at(px0, py0), at(px1, py1))]
-    pad_lines += [(at(x, py0), at(x, py0 + 8)) for x in (px0, px1)]
+    mark = PAD_MARK * lander.height
+    pad_lines += [(at(x, py0), at(x, py0 + mark)) for x in (px0, px1)]
     for colour, width in (("#000000", 4), ("#ffffff", 2.5)):
         for start, end in pad_lines:
-            scene.create_line(*start, *end, fill=colour, width=width)
-    state = scene.create_text(8, 6, anchor="nw", text="Flying",
+            scene.create_line(*start, *end, fill=colour,
+                              width=width * zoom)
+    # A light on top of each mark, flashing: bright while lit and dim
+    # between, so that they are seen even then.
+    lights = []
+    for x in (px0, px1):
+        cx, cy = at(x, py0 + mark + PAD_LIGHT)
+        r = PAD_LIGHT * scale
+        lights.append(scene.create_oval(cx - r, cy - r, cx + r, cy + r,
+                                        fill="#E69F00", outline="#000000",
+                                        width=zoom))
+    state = scene.create_text(8 * zoom, 6 * zoom, anchor="nw",
+                              text="Flying",
                               fill="#ffffff",
                               font=("TkDefaultFont", 14, "bold"))
     drawn = []
     opened = time.monotonic()
 
-    panel = ttk.Frame(window, padding=theme.INSIDE)
-    panel.pack(fill="x", padx=between)
-    ttk.Label(panel, text="X").grid(row=0, column=1, sticky="e")
-    ttk.Label(panel, text="Y").grid(row=0, column=2, sticky="e")
+    # Below the landscape, the values and the joystick side by side, and
+    # the note under them, so that the window is no wider than the
+    # landscape. In the type tcs-sim's window is set in, two points under
+    # the theme's.
+    ttk.Style(window).configure("Lander.TLabel",
+                                font=("TkDefaultFont", fonts.POINTS - 2))
+    below = ttk.Frame(window)
+    below.pack(fill="x", padx=between)
+    panel = ttk.Frame(below, padding=round(theme.INSIDE * zoom))
+    panel.pack(side="left", anchor="n")
+
+    def label(**options):
+        """A label in the lander window's type.
+
+        Args:
+            options: What ``ttk.Label`` is given besides its parent.
+
+        Returns:
+            The label.
+        """
+        return ttk.Label(panel, style="Lander.TLabel", **options)
+
+    label(text="X").grid(row=0, column=1, sticky="e")
+    label(text="Y").grid(row=0, column=2, sticky="e")
     shown = []
     for number, (name, unit, x_node, y_node) in enumerate(ROWS, start=1):
-        label = f"{name} ({unit})" if unit else name
-        ttk.Label(panel, text=label).grid(row=number, column=0, sticky="w")
+        said = f"{name} ({unit})" if unit else name
+        label(text=said).grid(row=number, column=0, sticky="w")
         for column, node in ((1, x_node), (2, y_node)):
-            value = ttk.Label(panel, width=10, anchor="e")
+            value = label(width=8, anchor="e")
             value.grid(row=number, column=column, sticky="e",
-                       padx=(between, 0))
+                       padx=(between // 2, 0))
             shown.append((value, node))
-    fuel = ttk.Label(panel, text="Fuel --")
+    fuel = label(text="Fuel --")
     fuel.grid(row=len(ROWS) + 1, column=0, sticky="w")
-    note = ttk.Label(panel, text=f"Seed {seed}; everything here is "
-                                 f"{delay:g} s behind the lander")
-    note.grid(row=len(ROWS) + 2, column=0, columnspan=3, sticky="w",
-              pady=(between // 2, 0))
+    note = ttk.Label(window, style="Lander.TLabel", wraplength=wide,
+                     text=f"Seed {seed}; everything here is {delay:g} s "
+                          "behind the lander")
+    note.pack(fill="x", padx=between, pady=(0, between))
 
     # The joystick, as it was held: the pointer does nothing here.
-    reach = SQUARE / 2 + ARM
-    thick = SQUARE
-    stick = tk.Canvas(window, width=2 * reach, height=2 * reach,
+    square, arm, spot = SQUARE * zoom, ARM * zoom, 7 * zoom
+    reach = square / 2 + arm
+    thick = square
+    stick = tk.Canvas(below, width=2 * reach, height=2 * reach,
                       background="#ffffff", highlightthickness=0)
-    stick.pack(pady=(between // 2, between))
+    stick.pack(side="right", padx=(between, 0), pady=between // 2)
     stick.create_rectangle(0, reach - thick / 2, 2 * reach, reach + thick / 2,
                            fill="#e5e7eb", outline="#6b7280")
     stick.create_rectangle(reach - thick / 2, 0, reach + thick / 2, 2 * reach,
                            fill="#e5e7eb", outline="#6b7280")
-    stick.create_rectangle(ARM, ARM, ARM + SQUARE, ARM + SQUARE,
-                           fill="#f3f4f6", outline="#374151", width=2)
-    dot = stick.create_oval(reach - 7, reach - 7, reach + 7, reach + 7,
-                            fill="#0072B2", outline="#000000")
+    stick.create_rectangle(arm, arm, arm + square, arm + square,
+                           fill="#f3f4f6", outline="#374151",
+                           width=2 * zoom)
+    dot = stick.create_oval(reach - spot, reach - spot, reach + spot,
+                            reach + spot, fill="#0072B2",
+                            outline="#000000")
 
     def take_in():
         """Shows what the loop has read, and comes back in
@@ -1072,16 +1152,16 @@ def run_the_window(readings, lander, seed, delay, stopped):
             return
         for value, node in shown:
             value.configure(text=readings.text(node))
-        left = readings.number("fuel")
+        left = readings.number("to_fuel")
         fuel.configure(text="Fuel --" if left is None
                        else f"Fuel {round(left * 100)}%")
         scene.itemconfigure(state, text=readings.state())
         for item in drawn:
             scene.delete(item)
         drawn.clear()
-        x, y = readings.number("x"), readings.number("y")
+        x, y = readings.number("to_x"), readings.number("to_y")
         if x is not None and y is not None:
-            # As tcs-sim's lander window draws it: its single lines --
+            # As tcs-sim's lander pane draws it: its single lines --
             # struts, legs, the antenna -- first, each a black line a little
             # wider than the white one over it; then its shapes over their
             # ends, filled white, each with its own thin black line, so that
@@ -1092,25 +1172,35 @@ def run_the_window(readings, lander, seed, delay, stopped):
             for colour, width in (("#000000", 2.5), ("#ffffff", 1.5)):
                 for flat in single:
                     drawn.append(scene.create_line(*flat, fill=colour,
-                                                   width=width))
+                                                   width=width * zoom))
             for flat in lines:
                 if len(flat) > 4:
                     drawn.append(scene.create_polygon(
                         *flat, fill="#ffffff", outline="#000000",
-                        width=0.75))
-        for group, bright in zip(stars, twinkle(time.monotonic() - opened)):
+                        width=0.75 * zoom))
+        since = time.monotonic() - opened
+        lit = since % PAD_FLASH < PAD_FLASH / 2
+        for light in lights:
+            scene.itemconfigure(light, fill="#E69F00" if lit else "#5c4000")
+        for group, bright in zip(stars, twinkle(since)):
             level = round(255 * bright)
             for star in group:
                 scene.itemconfigure(star, fill=f"#{level:02x}{level:02x}"
                                                f"{level:02x}")
-        sx = readings.number("joystick_x") or 0.0
-        sy = readings.number("joystick_y") or 0.0
-        cx, cy = reach + stick_offset(sx), reach - stick_offset(sy)
-        stick.coords(dot, cx - 7, cy - 7, cx + 7, cy + 7)
+        sx = readings.number("to_joystick_x") or 0.0
+        sy = readings.number("to_joystick_y") or 0.0
+        cx = reach + stick_offset(sx) * zoom
+        cy = reach - stick_offset(sy) * zoom
+        stick.coords(dot, cx - spot, cy - spot, cx + spot, cy + spot)
         window.after(REFRESH_MS, take_in)
 
     threading.Thread(target=reading_loop, daemon=True).start()
     window.after(REFRESH_MS, take_in)
+    # Under tcs-sim's window, which the lander is flown from and which is to
+    # be on top where the two overlap: this one opens after it, and so over
+    # it. A request, which the window manager may refuse; the lander
+    # example's KWin rule keeps it below in any case.
+    window.after(LOWER_AFTER_MS, window.lower)
     window.mainloop()
     return 0
 

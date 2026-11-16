@@ -973,24 +973,27 @@ tcs-moc's panels show the same transfers as the spacecraft reported them. Two
 panels disagreeing about one transfer is worth knowing about, which is why
 both are shown the same way.
 
-The lander's window
--------------------
-Where the world has a ``lander``, tcs-sim opens a second window, *TCS
-Lander*, beside its panels. From the top:
+The lander's pane
+-----------------
+Where the world has a ``lander``, tcs-sim's window has a pane for it at the
+left of the payload panels, the window opening wide and tall enough for
+both. From the top:
 
 * The landscape, drawn to scale with positive X to the right and positive Y
   up: a black sky with twinkling stars, the same for one landscape each
   time; the ground, filled grey with a little brown below its line; the
-  pad, a level white line with an upright mark at each end; and the lander
+  pad, a level white line with an upright mark at each end and a light
+  flashing on top of each mark; and the lander
   where it is, in white with thin black lines, so that it shows against
   the sky and the ground alike. What it is doing is said in its top
   corner, *Flying*, *Landed* or *Crashed*, and on a landing a smiling face
   is drawn over it until it starts again.
 * The fuel left, as a percentage and as a bar.
 * The lander's X and Y position, velocity and acceleration, each with its
-  unit.
+  unit, and beside them:
 * The joystick, where the world has one: a square with a rectangle, as
-  thick as the square is wide, joined to each side. Press in the square and drag: each axis reads on its own,
+  thick as the square is wide, joined to each side. Press in the square and
+  drag: each axis reads on its own,
   nought while the pointer is within the square's span along it, rising in a
   straight line to one across a rectangle, positive to the right and up, and
   held at one beyond it, so that a drag on a diagonal moves both. A dot
@@ -1000,13 +1003,28 @@ Lander*, beside its panels. From the top:
   give out, for the vehicle to read through the simulated payloads joined to
   them.
 
-The window watches the world without starting it: until a simulated payload
-first asks the world anything, which is when its run begins, the window
-shows the lander where it starts, and the joystick, moved, is held where it
-is put.
+At the foot of the pane are two buttons:
 
-Closing the window ends tcs-sim, as its Quit button does: the lander is
-flown from here, and a run with no way left to fly it is over.
+``Pause`` and ``Resume``
+  Halt the simulated world, and set it going again from where it stood: the
+  lander hangs where it is, its fuel and speeds unchanged, and the payloads
+  go on reporting it there. The time spent paused is left out of the
+  world's time.
+
+``Autoland`` and ``Stop Autoland``
+  Have tcs-sim try to land the lander, flying it through the joystick as a
+  pilot would -- so through the vehicles, as a pilot's commands go: up to a
+  height clear of the ground between it and the pad, across to above the
+  pad, and down onto it, slowing to a metre a second at touchdown. A
+  landing is not certain: the fuel can run out. The joystick's dot shows
+  where it holds the stick; taking hold of the joystick hands it back to
+  you, and a landing or a crash stops it. Greyed out where the world has
+  no joystick.
+
+The pane watches the world without starting it: until a simulated payload
+first asks the world anything, which is when its run begins, the pane shows
+the lander where it starts, and the joystick, moved, is held where it is
+put.
 
 Step by step
 ------------

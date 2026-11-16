@@ -23,9 +23,28 @@
 //! rather than an `Instant` because an advance between two events is
 //! arithmetic on it, and because a world running at another rate has
 //! moments that are no moment of the wall clock's at all.
+//!
+//! It can be paused, from tcs-sim's window, and resumed: simulated time stands
+//! still while it is paused, and goes on from there, the time spent paused
+//! left out of it.
 
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
+
+/// How soon a thread waiting for a simulated moment is told to look again
+/// while the clock is paused: the moment is no moment of the wall clock's
+/// until the clock goes on.
+const PAUSED_LOOK_AGAIN: Duration = Duration::from_millis(100);
+
+/// Whether a clock is paused, and how long it has been.
+#[derive(Debug, Default)]
+struct Pause {
+    /// When it was paused, while it is.
+    since: Option<Instant>,
+    /// The wall clock's time spent paused before, which simulated time
+    /// leaves out.
+    held: Duration,
+}
 
 /// How the wall clock maps to simulated time.
 #[derive(Debug, Clone)]
@@ -34,6 +53,9 @@ pub struct Clock {
     start: OnceLock<Instant>,
     /// Simulated seconds for each second of the wall clock.
     rate: f64,
+    /// Whether it is paused, and for how long it has been: shared by its
+    /// copies, which are one clock.
+    pause: Arc<Mutex<Pause>>,
 }
 
 impl Clock {
@@ -80,6 +102,7 @@ impl Clock {
         Clock {
             start: OnceLock::new(),
             rate,
+            pause: Arc::default(),
         }
     }
 
@@ -119,9 +142,63 @@ impl Clock {
     ///
     /// Simulated seconds since the start, or `None` before it.
     pub fn started_at(&self, now: Instant) -> Option<f64> {
-        self.start.get().map(|start| {
-            now.saturating_duration_since(*start).as_secs_f64() * self.rate
-        })
+        self.start
+            .get()
+            .map(|start| self.running(*start, now).as_secs_f64() * self.rate)
+    }
+
+    /// How long the clock has run, from its start to a moment of the wall
+    /// clock, leaving out the time it has been paused.
+    ///
+    /// # Arguments
+    ///
+    /// * `start` - Its start.
+    /// * `now`   - The moment.
+    ///
+    /// # Returns
+    ///
+    /// The time it has run, on the wall clock.
+    fn running(&self, start: Instant, now: Instant) -> Duration {
+        let pause = self.pause.lock().unwrap();
+        let until = pause.since.map_or(now, |since| since.min(now));
+        until
+            .saturating_duration_since(start)
+            .saturating_sub(pause.held)
+    }
+
+    /// Pauses it: simulated time stands still from `now` until it is
+    /// resumed. Pausing a paused clock does nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The moment it is paused at.
+    pub fn pause(&self, now: Instant) {
+        let mut pause = self.pause.lock().unwrap();
+        if pause.since.is_none() {
+            pause.since = Some(now);
+        }
+    }
+
+    /// Resumes it: simulated time goes on from where it stood. Resuming a
+    /// clock that is not paused does nothing.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The moment it is resumed at.
+    pub fn resume(&self, now: Instant) {
+        let mut pause = self.pause.lock().unwrap();
+        if let Some(since) = pause.since.take() {
+            pause.held += now.saturating_duration_since(since);
+        }
+    }
+
+    /// Says whether it is paused.
+    ///
+    /// # Returns
+    ///
+    /// True between a pause and the resume after it.
+    pub fn paused(&self) -> bool {
+        self.pause.lock().unwrap().since.is_some()
     }
 
     /// Says what simulated time a moment of the wall clock is.
@@ -134,7 +211,7 @@ impl Clock {
     ///
     /// Simulated seconds since the start; nought for a moment before it.
     pub fn at(&self, now: Instant) -> f64 {
-        now.saturating_duration_since(self.start(now)).as_secs_f64() * self.rate
+        self.running(self.start(now), now).as_secs_f64() * self.rate
     }
 
     /// Says what moment of the wall clock a simulated time is: when a thread
@@ -147,15 +224,24 @@ impl Clock {
     /// # Returns
     ///
     /// The moment; the start for a time before it, and a day after now for
-    /// one beyond anything a wait could mean, which is no time at all.
+    /// one beyond anything a wait could mean, which is no time at all. While
+    /// the clock is paused, a moment a little after now, for the waiting
+    /// thread to look again.
     pub fn instant_of(&self, seconds: f64) -> Instant {
         let wall = (seconds / self.rate).max(0.0);
         let now = Instant::now();
         let day = now + Duration::from_secs(86_400);
+        let held = {
+            let pause = self.pause.lock().unwrap();
+            if pause.since.is_some() {
+                return now + PAUSED_LOOK_AGAIN;
+            }
+            pause.held
+        };
         match Duration::try_from_secs_f64(wall) {
             Ok(after) => self
                 .start(now)
-                .checked_add(after)
+                .checked_add(after + held)
                 .map_or(day, |at| at.min(day)),
             Err(_) => day,
         }
@@ -198,5 +284,29 @@ mod tests {
     #[should_panic(expected = "rate")]
     fn a_clock_that_does_not_run_is_refused() {
         Clock::new(Instant::now(), 0.0);
+    }
+
+    /// Paused, simulated time stands still; resumed, it goes on from where
+    /// it stood, the pause left out.
+    #[test]
+    fn a_paused_clock_stands_still_and_goes_on() {
+        let start = Instant::now();
+        let clock = Clock::keeping_pace(start);
+        let at = |ms| start + Duration::from_millis(ms);
+        assert!(!clock.paused());
+        clock.pause(at(1000));
+        assert!(clock.paused());
+        assert_eq!(clock.at(at(1000)), 1.0);
+        assert_eq!(clock.at(at(4000)), 1.0);
+        assert_eq!(clock.started_at(at(4000)), Some(1.0));
+        clock.resume(at(4000));
+        assert!(!clock.paused());
+        assert_eq!(clock.at(at(4500)), 1.5);
+        // A copy is the same clock.
+        let copy = clock.clone();
+        copy.pause(at(5000));
+        assert!(clock.paused());
+        copy.resume(at(5000));
+        assert_eq!(clock.at(at(6000)), 3.0);
     }
 }

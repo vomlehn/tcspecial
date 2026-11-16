@@ -1,7 +1,8 @@
-// The lander's window: the landscape and the lander flying over it, what it
+// The lander's pane: the landscape and the lander flying over it, what it
 // is doing, the X and Y values of its flight, and the joystick it is flown
-// with. tcs-sim opens it beside its payload panels when the world it
-// simulates has a lander: see lander_view.rs, which draws the pictures as
+// with. tcs-sim shows it at the left of its window, beside its payload
+// panels, when the world it simulates has a lander: see lander_view.rs,
+// which draws the pictures as
 // path commands, reads the world, and turns the joystick's pointer into the
 // two axes.
 //
@@ -12,7 +13,8 @@
 // whether the lander has landed or crashed is said in words, with a smiling
 // face drawn over it on a landing.
 
-import { Fonts } from "../../tcs-ui/ui/fonts.slint";
+import { Button } from "std-widgets.slint";
+import { SimFonts } from "sim-fonts.slint";
 import { Colors } from "../../tcs-ui/ui/colors.slint";
 
 // The joystick: a square, the neutral part, with a rectangle joined to each
@@ -111,95 +113,125 @@ component Values inherits HorizontalLayout {
     in property <string> unit;
     in property <string> first;
     in property <string> second;
-    spacing: 12px;
+    spacing: 6px;
     alignment: start;
     Text {
         text: root.unit == "" ? root.name : root.name + " (" + root.unit + ")";
-        min-width: 170px;
+        min-width: 120px;
         vertical-alignment: center;
     }
     Text {
         text: root.first;
-        min-width: 90px;
+        min-width: 60px;
         horizontal-alignment: right;
         vertical-alignment: center;
     }
     Text {
         text: root.second;
-        min-width: 90px;
+        min-width: 60px;
         horizontal-alignment: right;
         vertical-alignment: center;
     }
 }
 
-export component LanderWindow inherits Window {
-    default-font-size: Fonts.window;
-    title: "TCS Lander";
-    background: Colors.window;
-
+// What tcs-sim shows of a world that has a lander, and what the joystick
+// says: set and handled by Rust, read by LanderPane. A global, so that
+// the pane can be put in any window without each passing it all on.
+export global LanderScene {
     // The display's size, in metres: what the pictures' commands are in, Y
     // counted down from the top as a picture's is.
-    in property <float> world-width: 1000;
-    in property <float> world-height: 600;
+    in-out property <float> world-width: 1000;
+    in-out property <float> world-height: 600;
     // The pictures, as path commands in metres: the ground filled, its
     // line, the pad with its end marks, the lander's single lines -- its
     // struts, legs and antenna -- and its shapes, and the face drawn over it
     // on a landing, empty otherwise.
-    in property <string> ground-fill;
-    in property <string> ground-line;
-    in property <string> pad;
-    in property <string> lander-lines;
-    in property <string> lander-shapes;
-    in property <string> face;
+    in-out property <string> ground-fill;
+    in-out property <string> ground-line;
+    in-out property <string> pad;
+    // The round lights on top of the pad's end marks, and whether they are
+    // lit now: set by Rust, which flashes them.
+    in-out property <string> pad-lights;
+    in-out property <bool> pad-lit: true;
+    in-out property <string> lander-lines;
+    in-out property <string> lander-shapes;
+    in-out property <string> face;
     // The stars, in four groups, and how bright each group is now, from
     // nought to one: set by Rust, which makes them twinkle.
-    in property <string> stars-0;
-    in property <string> stars-1;
-    in property <string> stars-2;
-    in property <string> stars-3;
-    in property <float> twinkle-0: 1;
-    in property <float> twinkle-1: 1;
-    in property <float> twinkle-2: 1;
-    in property <float> twinkle-3: 1;
+    in-out property <string> stars-0;
+    in-out property <string> stars-1;
+    in-out property <string> stars-2;
+    in-out property <string> stars-3;
+    in-out property <float> twinkle-0: 1;
+    in-out property <float> twinkle-1: 1;
+    in-out property <float> twinkle-2: 1;
+    in-out property <float> twinkle-3: 1;
     // What it is doing, in words: "Flying", "Landed" or "Crashed".
-    in property <string> state: "Flying";
+    in-out property <string> state: "Flying";
     // The fraction of a full tank left.
-    in property <float> fuel: 1;
+    in-out property <float> fuel: 1;
     // The values, each written as it is to be shown.
-    in property <string> position-x;
-    in property <string> position-y;
-    in property <string> velocity-x;
-    in property <string> velocity-y;
-    in property <string> acceleration-x: "-";
-    in property <string> acceleration-y: "-";
+    in-out property <string> position-x;
+    in-out property <string> position-y;
+    in-out property <string> velocity-x;
+    in-out property <string> velocity-y;
+    in-out property <string> acceleration-x: "-";
+    in-out property <string> acceleration-y: "-";
     // Where the joystick's dot is: set by Rust.
-    in property <length> dot-x;
-    in property <length> dot-y;
+    in-out property <length> dot-x;
+    in-out property <length> dot-y;
     callback stick-moved(length, length);
     callback stick-released();
+    // Whether the world is paused, and whether the autopilot is flying the
+    // lander: set by Rust, which the two buttons ask to change them.
+    in-out property <bool> paused: false;
+    in-out property <bool> autoland: false;
+    // Whether there is a joystick for the autopilot to fly through.
+    in-out property <bool> has-joystick: true;
+    callback pause-clicked();
+    callback autoland-clicked();
 
+}
+
+// The lander's pane: the landscape and the lander over it, what it is
+// doing, the fuel left, its X and Y values, and the joystick it is flown
+// with. tcs-sim puts it at the left of its window when the world it
+// simulates has a lander.
+export component LanderPane inherits Rectangle {
     VerticalLayout {
-        padding: 8px;
-        spacing: 8px;
+        padding: 2px;
+        spacing: 2px;
         alignment: start;
 
         // The landscape, drawn to scale.
         scene := Rectangle {
-            width: 800px;
-            height: 800px * root.world-height / root.world-width;
+            width: 600px;
+            height: 600px * LanderScene.world-height / LanderScene.world-width;
             background: #000000;
             border-width: 1px;
             border-color: #6b7280;
             for group in [
-                { commands: root.stars-0, bright: root.twinkle-0 },
-                { commands: root.stars-1, bright: root.twinkle-1 },
-                { commands: root.stars-2, bright: root.twinkle-2 },
-                { commands: root.stars-3, bright: root.twinkle-3 },
+                {
+                    commands: LanderScene.stars-0,
+                    bright: LanderScene.twinkle-0,
+                },
+                {
+                    commands: LanderScene.stars-1,
+                    bright: LanderScene.twinkle-1,
+                },
+                {
+                    commands: LanderScene.stars-2,
+                    bright: LanderScene.twinkle-2,
+                },
+                {
+                    commands: LanderScene.stars-3,
+                    bright: LanderScene.twinkle-3,
+                },
             ]: Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
                 commands: group.commands;
                 fill: #ffffff;
                 opacity: group.bright;
@@ -207,37 +239,49 @@ export component LanderWindow inherits Window {
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.ground-fill;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.ground-fill;
                 fill: #aaa197;
             }
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.ground-line;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.ground-line;
                 stroke: #3b3127;
                 stroke-width: 1.5px;
             }
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.pad;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.pad;
                 stroke: #000000;
                 stroke-width: 4px;
             }
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.pad;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.pad;
                 stroke: #ffffff;
                 stroke-width: 2.5px;
+            }
+            // The pad's lights, flashing: bright while lit and dim between,
+            // so that they are seen even then.
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.pad-lights;
+                fill: LanderScene.pad-lit ? #E69F00 : #5c4000;
+                stroke: #000000;
+                stroke-width: 1px;
             }
             // The lander, white so that it shows against the sky, and edged
             // with a very thin black line so that it shows against the
@@ -248,37 +292,37 @@ export component LanderWindow inherits Window {
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.lander-lines;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.lander-lines;
                 stroke: #000000;
                 stroke-width: 2.5px;
             }
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.lander-lines;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.lander-lines;
                 stroke: #ffffff;
                 stroke-width: 1.5px;
             }
             Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.lander-shapes;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.lander-shapes;
                 fill: #ffffff;
                 stroke: #000000;
                 stroke-width: 0.75px;
             }
-            if root.face != "": Path {
+            if LanderScene.face != "": Path {
                 width: 100%;
                 height: 100%;
-                viewbox-width: root.world-width;
-                viewbox-height: root.world-height;
-                commands: root.face;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: LanderScene.face;
                 fill: #F0E442;
                 stroke: #000000;
                 stroke-width: 1.5px;
@@ -286,8 +330,8 @@ export component LanderWindow inherits Window {
             Text {
                 x: 8px;
                 y: 6px;
-                text: root.state;
-                font-size: 18px;
+                text: LanderScene.state;
+                font-size: SimFonts.heading;
                 font-weight: 700;
                 color: #ffffff;
             }
@@ -295,10 +339,10 @@ export component LanderWindow inherits Window {
 
         // The fuel left, in words and as a bar.
         HorizontalLayout {
-            spacing: 8px;
+            spacing: 4px;
             Text {
-                text: "Fuel " + Math.round(root.fuel * 100) + "%";
-                min-width: 90px;
+                text: "Fuel " + Math.round(LanderScene.fuel * 100) + "%";
+                min-width: 60px;
                 vertical-alignment: center;
             }
             Rectangle {
@@ -307,50 +351,75 @@ export component LanderWindow inherits Window {
                 border-color: #374151;
                 Rectangle {
                     x: 0;
-                    width: parent.width * Math.max(0, Math.min(1, root.fuel));
+                    width: parent.width
+                        * Math.max(0, Math.min(1, LanderScene.fuel));
                     height: parent.height;
                     background: #009E73;
                 }
             }
         }
 
-        // The X and Y values, under a line naming the axes.
-        VerticalLayout {
-            spacing: 2px;
-            Values {
-                name: "";
-                unit: "";
-                first: "X";
-                second: "Y";
+        // The values, and the joystick beside them, so that the pane is
+        // no taller than it need be.
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            // The X and Y values, under a line naming the axes, level with
+            // the joystick's middle.
+            VerticalLayout {
+                spacing: 2px;
+                alignment: center;
+                Values {
+                    name: "";
+                    unit: "";
+                    first: "X";
+                    second: "Y";
+                }
+                Values {
+                    name: "Position";
+                    unit: "m";
+                    first: LanderScene.position-x;
+                    second: LanderScene.position-y;
+                }
+                Values {
+                    name: "Velocity";
+                    unit: "m/s";
+                    first: LanderScene.velocity-x;
+                    second: LanderScene.velocity-y;
+                }
+                Values {
+                    name: "Acceleration";
+                    unit: "m/s²";
+                    first: LanderScene.acceleration-x;
+                    second: LanderScene.acceleration-y;
+                }
             }
-            Values {
-                name: "Position";
-                unit: "m";
-                first: root.position-x;
-                second: root.position-y;
-            }
-            Values {
-                name: "Velocity";
-                unit: "m/s";
-                first: root.velocity-x;
-                second: root.velocity-y;
-            }
-            Values {
-                name: "Acceleration";
-                unit: "m/s²";
-                first: root.acceleration-x;
-                second: root.acceleration-y;
+
+            // The joystick, beside them.
+            HorizontalLayout {
+                alignment: center;
+                Joystick {
+                    dot-x: LanderScene.dot-x;
+                    dot-y: LanderScene.dot-y;
+                    moved(px, py) => { LanderScene.stick-moved(px, py); }
+                    released => { LanderScene.stick-released(); }
+                }
             }
         }
 
-        // The joystick, in the middle.
+        // The world paused and resumed, and the autopilot started and
+        // stopped, each button saying what a press of it does.
         HorizontalLayout {
-            alignment: center;
-            Joystick {
-                dot-x: root.dot-x;
-                dot-y: root.dot-y;
-                moved(px, py) => { root.stick-moved(px, py); }
-                released => { root.stick-released(); }
+            spacing: 4px;
+            alignment: start;
+            Button {
+                text: LanderScene.paused ? "Resume" : "Pause";
+                clicked => { LanderScene.pause-clicked(); }
+            }
+            Button {
+                text: LanderScene.autoland ? "Stop Autoland" : "Autoland";
+                enabled: LanderScene.has-joystick;
+                clicked => { LanderScene.autoland-clicked(); }
             }
         }
     }

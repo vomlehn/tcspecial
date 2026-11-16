@@ -1,0 +1,39 @@
+# Window rules for KDE Plasma's KWin, placing the lander example's two
+# windows side by side when they open: tcs-sim's at the top left, and the
+# MOC's to its right. On Wayland a program cannot place its own window, and
+# KWin's rules are what can.
+#
+# Import it in System Settings, Window Management, Window Rules, Import.
+# The positions are in the display's logical pixels -- its pixels divided
+# by its scale -- and want one at least 1600 wide: a 3840x2400 display at a
+# scale of 2.25 is 1707. tcs-sim's window is about 1150 wide beside the
+# lander, and the MOC's goes to its right. Each rule applies only as a
+# window opens, so either can be moved after.
+#
+# Where the two overlap, as on a narrower screen, tcs-sim's window is the
+# one on top: the MOC's opens with "Keep below other windows" set, which
+# its window menu turns off.
+#
+# The first rule places tcs-sim's window wherever it opens, with or without
+# a lander; leave it out where tcs-sim runs beside tcs-moc and the two are
+# to be placed some other way.
+
+[TCS Payload Simulator]
+Description=TCS Payload Simulator at the top left
+position=0,0
+positionrule=3
+title=TCS Payload Simulator
+titlematch=1
+types=1
+wmclassmatch=0
+
+[TCS Lander MOC]
+Description=TCS Lander MOC beside the TCS Payload Simulator, and below it
+position=1160,0
+positionrule=3
+below=true
+belowrule=3
+title=TCS Lander MOC
+titlematch=1
+types=1
+wmclassmatch=0

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1110" height="686" viewBox="0 0 1110 686" role="img" aria-labelledby="title desc">
   <title id="title">The lander example: lander-a, the X axis</title>
-  <desc id="desc">lander-a, one of the lander example's two tcspecials, flying the X axis. Each payload at the left is a UDP socket tcs-sim simulates, joined to the lander or the joystick in tcs-sim's world; each reading is made a value by a to_value node and sent to the gateway, which takes it down through Yamcs. joystick_x also drives thruster_x, the dashed line, so the pilot's joystick is the thrust on the X axis.</desc>
+  <desc id="desc">lander-a, one of the lander example's two tcspecials, flying the X axis. Each payload at the left is a UDP socket tcs-sim simulates, joined to the lander or the joystick in tcs-sim's world; each reading is made a value by a to_value node and sent to the gateway, which takes it down through Yamcs. to_joystick_x also drives thruster_x, the dashed line, so the pilot's joystick is the thrust on the X axis.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -23,15 +23,15 @@
   <text class="heading" x="820" y="40">GATEWAY, TO YAMCS</text>
   <text class="kind" x="420" y="62">solid: data; dashed: the joystick driving the thrust</text>
   <rect class="payload" x="40" y="90" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="112">acceleration_x_sensor</text>
+  <text class="name" x="52" y="112">accel_x</text>
   <text class="kind" x="52" y="130">payload, network</text>
   <text class="detail" x="52" y="146">127.0.0.1:19803</text>
   <rect class="payload" x="40" y="176" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="198">fuel_sensor</text>
+  <text class="name" x="52" y="198">fuel</text>
   <text class="kind" x="52" y="216">payload, network</text>
   <text class="detail" x="52" y="232">127.0.0.1:19804</text>
   <rect class="payload" x="40" y="262" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="284">joystick_x_sensor</text>
+  <text class="name" x="52" y="284">joystick_x</text>
   <text class="kind" x="52" y="302">payload, network</text>
   <text class="detail" x="52" y="318">127.0.0.1:19805</text>
   <rect class="payload" x="40" y="348" width="250" height="64" rx="8"/>
@@ -39,31 +39,31 @@
   <text class="kind" x="52" y="388">payload, network</text>
   <text class="detail" x="52" y="404">127.0.0.1:19806</text>
   <rect class="payload" x="40" y="434" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="456">velocity_x_sensor</text>
+  <text class="name" x="52" y="456">velocity_x</text>
   <text class="kind" x="52" y="474">payload, network</text>
   <text class="detail" x="52" y="490">127.0.0.1:19802</text>
   <rect class="payload" x="40" y="520" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="542">x_sensor</text>
+  <text class="name" x="52" y="542">x</text>
   <text class="kind" x="52" y="560">payload, network</text>
   <text class="detail" x="52" y="576">127.0.0.1:19801</text>
   <rect class="vehicle" x="420" y="90" width="250" height="64" rx="8"/>
-  <text class="name" x="432" y="112">acceleration_x</text>
+  <text class="name" x="432" y="112">to_accel_x</text>
   <text class="kind" x="432" y="130">compute</text>
   <text class="detail" x="432" y="146">to_value, metre_per_second_squared</text>
   <rect class="vehicle" x="420" y="176" width="250" height="64" rx="8"/>
-  <text class="name" x="432" y="198">fuel</text>
+  <text class="name" x="432" y="198">to_fuel</text>
   <text class="kind" x="432" y="216">compute</text>
   <text class="detail" x="432" y="232">to_value, ratio</text>
   <rect class="vehicle" x="420" y="262" width="250" height="64" rx="8"/>
-  <text class="name" x="432" y="284">joystick_x</text>
+  <text class="name" x="432" y="284">to_joystick_x</text>
   <text class="kind" x="432" y="302">compute</text>
   <text class="detail" x="432" y="318">to_value, ratio</text>
   <rect class="vehicle" x="420" y="348" width="250" height="64" rx="8"/>
-  <text class="name" x="432" y="370">velocity_x</text>
+  <text class="name" x="432" y="370">to_velocity_x</text>
   <text class="kind" x="432" y="388">compute</text>
   <text class="detail" x="432" y="404">to_value, metre_per_second</text>
   <rect class="vehicle" x="420" y="434" width="250" height="64" rx="8"/>
-  <text class="name" x="432" y="456">x</text>
+  <text class="name" x="432" y="456">to_x</text>
   <text class="kind" x="432" y="474">compute</text>
   <text class="detail" x="432" y="490">to_value, metre</text>
   <rect class="gateway" x="820" y="305.0" width="250" height="64" rx="8"/>

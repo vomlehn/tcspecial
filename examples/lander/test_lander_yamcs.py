@@ -215,6 +215,21 @@ class Shown(unittest.TestCase):
         self.assertEqual(lander_yamcs.stick_offset(-1), -reach)
         self.assertEqual(lander_yamcs.stick_offset(5), reach)
 
+    def test_the_scale_is_what_x11_is_told(self):
+        """Xft.dpi over 96, and one where xrdb says none or is missing."""
+        from unittest import mock
+        ran = mock.Mock(stdout="Xft.antialias:\t1\nXft.dpi:\t216\n")
+        with mock.patch.object(lander_yamcs.subprocess, "run",
+                               return_value=ran):
+            self.assertEqual(lander_yamcs.display_scale(), 2.25)
+        ran = mock.Mock(stdout="Xft.antialias:\t1\n")
+        with mock.patch.object(lander_yamcs.subprocess, "run",
+                               return_value=ran):
+            self.assertEqual(lander_yamcs.display_scale(), 1.0)
+        with mock.patch.object(lander_yamcs.subprocess, "run",
+                               side_effect=OSError("no xrdb")):
+            self.assertEqual(lander_yamcs.display_scale(), 1.0)
+
     def test_a_signal_says_yes_with_a_one(self):
         """The landed and crashed signals are the text 1 or 0."""
         readings = lander_yamcs.Readings([])

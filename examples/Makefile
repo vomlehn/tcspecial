@@ -296,7 +296,7 @@ run-thermostat-yamcs: check-tkinter
 # window's joystick. YAMCS_HOME is where a Yamcs release is unpacked;
 # lander_yamcs.py makes a landscape from a seed, starts Yamcs with a relay
 # holding everything 1.3 s each way, tcs-sim and both tcspecials, and opens
-# the MOC's window, read from Yamcs. Closing tcs-sim's lander window, or the
+# the MOC's window, read from Yamcs. Closing tcs-sim's window, or the
 # MOC's, stops them all. With no window of the program's own,
 #   python3 examples/lander/lander_yamcs.py --yamcs <yamcs> --seconds 60
 # prints what arrives for a minute; --seed N has a landscape again.

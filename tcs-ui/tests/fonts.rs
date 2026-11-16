@@ -5,6 +5,25 @@
 //! and look like it belonged to another program. Read from the files rather
 //! than from a list here, so that a new window is held to it without anyone
 //! naming it; and the Python windows' figure is held to the same one.
+//!
+//! But for one window, by request: tcs-sim's, which sets its type two points
+//! smaller, in `tcs-sim/ui/sim-fonts.slint`'s `SimFonts`, so that its payload
+//! panels and the lander's pane fit a screen beside the lander example's MOC
+//! window, whose labels are two points smaller for the same reason.
+
+/// Whether a `.slint` file is tcs-sim's, whose window may be set in
+/// `SimFonts` rather than `Fonts`: see the module comment.
+///
+/// # Arguments
+///
+/// * `file` - The file.
+///
+/// # Returns
+///
+/// True for a file of tcs-sim's own windows.
+fn is_tcs_sims(file: &Path) -> bool {
+    file.components().any(|part| part.as_os_str() == "tcs-sim")
+}
 
 use std::path::{Path, PathBuf};
 
@@ -60,9 +79,11 @@ fn every_window_is_set_in_the_one_default_size() {
         for (at, line) in lines.iter().enumerate() {
             if line.contains(" inherits Window {") {
                 windows += 1;
-                assert_eq!(
-                    lines.get(at + 1).map(|next| next.trim()),
-                    Some("default-font-size: Fonts.window;"),
+                let next = lines.get(at + 1).map(|next| next.trim());
+                let theirs = is_tcs_sims(file)
+                    && next == Some("default-font-size: SimFonts.window;");
+                assert!(
+                    theirs || next == Some("default-font-size: Fonts.window;"),
                     "{}:{}: a window that is not set in Fonts.window",
                     file.display(),
                     at + 1
@@ -220,6 +241,8 @@ fn no_text_is_set_smaller_than_the_one_size() {
             };
             let size = size.trim().trim_end_matches(';').trim();
             let allowed = size == "Fonts.window"
+                || (is_tcs_sims(file)
+                    && ["SimFonts.window", "SimFonts.heading"].contains(&size))
                 || size.starts_with("Type.")
                 || size == "node.label-size"
                 || size == "node.type-size"

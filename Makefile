@@ -913,7 +913,8 @@ LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 # The examples, for tcspecial-examples: their configurations, in both
 # spellings, with their XTCE, simulator files and diagrams, and the Python
 # programs they run -- payloads, compute nodes and ground stations, with
-# what ping-common's two share -- each at its path in the checkout,
+# what ping-common's two share -- and the KWin window rules the lander's
+# windows are placed by, each at its path in the checkout,
 # examples/NAME/..., which is how each configuration names its programs and
 # how each ground station finds its neighbours. Taken from git, so that a
 # scratch file left in examples/ is not shipped, and without the tests. A
@@ -924,6 +925,7 @@ LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 		'examples/*/*.ytcs' 'examples/*/*.xtcs' 'examples/*/*.xtce' \
 		'examples/*/*-sim.yaml' 'examples/*/*.svg' 'examples/*/*.py' \
+		'examples/*/*.kwinrule' \
 		| grep -v '/test_[^/]*\.py$$')
 
 # Whether what is installed is stripped: 1, the default, or 0.

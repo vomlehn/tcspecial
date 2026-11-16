@@ -45,92 +45,92 @@ gateways:
         address: "127.0.0.1:19600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:19700"
-        world-in: [acceleration_x, fuel, joystick_x, velocity_x, x]
+        world-in: [to_accel_x, to_fuel, to_joystick_x, to_velocity_x, to_x]
 
 vehicle:
   - type compute:
-      - compute: acceleration_x
+      - compute: to_accel_x
         function: "to_value"
         offset: "0"
         scale: "0.001"
         type-in: "i16"
         type-out: "metre_per_second_squared"
         world-out:
-          - gateway.acceleration_x
-        world-in: [acceleration_x_sensor]
-      - compute: fuel
+          - gateway.to_accel_x
+        world-in: [accel_x]
+      - compute: to_fuel
         function: "to_value"
         offset: "0"
         scale: "0.0001"
         type-in: "i16"
         type-out: "ratio"
         world-out:
-          - gateway.fuel
-        world-in: [fuel_sensor]
-      - compute: joystick_x
+          - gateway.to_fuel
+        world-in: [fuel]
+      - compute: to_joystick_x
         function: "to_value"
         offset: "0"
         scale: "0.0001"
         type-in: "i16"
         type-out: "ratio"
         moc-out:
-          - thruster_x.joystick_x
+          - thruster_x.to_joystick_x
         world-out:
-          - gateway.joystick_x
-        world-in: [joystick_x_sensor]
-      - compute: velocity_x
+          - gateway.to_joystick_x
+        world-in: [joystick_x]
+      - compute: to_velocity_x
         function: "to_value"
         offset: "0"
         scale: "0.01"
         type-in: "i16"
         type-out: "metre_per_second"
         world-out:
-          - gateway.velocity_x
-        world-in: [velocity_x_sensor]
-      - compute: x
+          - gateway.to_velocity_x
+        world-in: [velocity_x]
+      - compute: to_x
         function: "to_value"
         offset: "0"
         scale: "0.1"
         type-in: "i16"
         type-out: "metre"
         world-out:
-          - gateway.x
-        world-in: [x_sensor]
+          - gateway.to_x
+        world-in: [x]
 
 payloads:
   - type network:
-      - payload: acceleration_x_sensor
+      - payload: accel_x
         address: "127.0.0.1:19803"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - acceleration_x.acceleration_x_sensor
-      - payload: fuel_sensor
+          - to_accel_x.accel_x
+      - payload: fuel
         address: "127.0.0.1:19804"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - fuel.fuel_sensor
-      - payload: joystick_x_sensor
+          - to_fuel.fuel
+      - payload: joystick_x
         address: "127.0.0.1:19805"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - joystick_x.joystick_x_sensor
+          - to_joystick_x.joystick_x
       - payload: thruster_x
         address: "127.0.0.1:19806"
         moc-in-type: "ratio"
         protocol: "udp"
-        moc-in: [joystick_x]
-      - payload: velocity_x_sensor
+        moc-in: [to_joystick_x]
+      - payload: velocity_x
         address: "127.0.0.1:19802"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - velocity_x.velocity_x_sensor
-      - payload: x_sensor
+          - to_velocity_x.velocity_x
+      - payload: x
         address: "127.0.0.1:19801"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - x.x_sensor
+          - to_x.x

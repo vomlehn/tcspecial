@@ -45,69 +45,69 @@ gateways:
         address: "127.0.0.1:20600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:20700"
-        world-in: [acceleration_y, crashed, joystick_y, landed, velocity_y, y]
+        world-in: [crashed, landed, to_accel_y, to_joystick_y, to_velocity_y, to_y]
 
 vehicle:
   - type compute:
-      - compute: acceleration_y
+      - compute: to_accel_y
         function: "to_value"
         offset: "0"
         scale: "0.001"
         type-in: "i16"
         type-out: "metre_per_second_squared"
         world-out:
-          - gateway.acceleration_y
-        world-in: [acceleration_y_sensor]
-      - compute: joystick_y
+          - gateway.to_accel_y
+        world-in: [accel_y]
+      - compute: to_joystick_y
         function: "to_value"
         offset: "0"
         scale: "0.0001"
         type-in: "i16"
         type-out: "ratio"
         moc-out:
-          - thruster_y.joystick_y
+          - thruster_y.to_joystick_y
         world-out:
-          - gateway.joystick_y
-        world-in: [joystick_y_sensor]
-      - compute: velocity_y
+          - gateway.to_joystick_y
+        world-in: [joystick_y]
+      - compute: to_velocity_y
         function: "to_value"
         offset: "0"
         scale: "0.01"
         type-in: "i16"
         type-out: "metre_per_second"
         world-out:
-          - gateway.velocity_y
-        world-in: [velocity_y_sensor]
-      - compute: y
+          - gateway.to_velocity_y
+        world-in: [velocity_y]
+      - compute: to_y
         function: "to_value"
         offset: "0"
         scale: "0.1"
         type-in: "i16"
         type-out: "metre"
         world-out:
-          - gateway.y
-        world-in: [y_sensor]
+          - gateway.to_y
+        world-in: [y]
 
 payloads:
   - type network:
-      - payload: acceleration_y_sensor
+      - payload: accel_y
         address: "127.0.0.1:20803"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - acceleration_y.acceleration_y_sensor
+          - to_accel_y.accel_y
       - payload: crashed
         read_size: "16"
         address: "127.0.0.1:20807"
         protocol: "udp"
         world-out:
           - gateway.crashed
-      - payload: joystick_y_sensor
+      - payload: joystick_y
         address: "127.0.0.1:20804"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - joystick_y.joystick_y_sensor
+          - to_joystick_y.joystick_y
       - payload: landed
         read_size: "16"
         address: "127.0.0.1:20806"
@@ -118,16 +118,16 @@ payloads:
         address: "127.0.0.1:20805"
         moc-in-type: "ratio"
         protocol: "udp"
-        moc-in: [joystick_y]
-      - payload: velocity_y_sensor
+        moc-in: [to_joystick_y]
+      - payload: velocity_y
         address: "127.0.0.1:20802"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - velocity_y.velocity_y_sensor
-      - payload: y_sensor
+          - to_velocity_y.velocity_y
+      - payload: y
         address: "127.0.0.1:20801"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - y.y_sensor
+          - to_y.y

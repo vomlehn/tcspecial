@@ -82,7 +82,7 @@ Flying it
 The joystick
 ------------
 
-The joystick, in tcs-sim's window below the X and Y values, is a plus: a
+The joystick, in tcs-sim's window beside the X and Y values, is a plus: a
 square, the neutral part, with a rectangle joined to each of its four
 sides. A press in the square, dragged out of it, moves the axes; each axis
 reads on its own, from the pointer's place along it, so a drag outward on a
@@ -189,7 +189,8 @@ The windows
 tcs-sim's window
 ----------------
 
-For a world that has a two-dimensional body, tcs-sim's window shows:
+For a world that has a two-dimensional body, tcs-sim's window shows, in a
+pane at the left of its payload panels:
 
 * the landscape and the lander, drawn to scale, positive X to the right and
   positive Y upward, under a black sky with twinkling stars, the lander
@@ -199,7 +200,13 @@ For a world that has a two-dimensional body, tcs-sim's window shows:
   bar;
 * below them, the X and Y position, velocity and acceleration, each named
   and with its unit;
-* below those, the joystick.
+* beside those, the joystick;
+* below them, Pause, which halts the simulated world and resumes it, and
+  Autoland, which tries to land the lander by flying it through the
+  joystick, a landing not being certain.
+
+The pad has a flashing light on top of each of its end marks, in both
+tcs-sim's window and the ground's.
 
 The ground's window
 -------------------

@@ -49,101 +49,101 @@
                 <address>127.0.0.1:19600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:19700</ground_base>
-                <world-in>acceleration_x</world-in>
-                <world-in>fuel</world-in>
-                <world-in>joystick_x</world-in>
-                <world-in>velocity_x</world-in>
-                <world-in>x</world-in>
+                <world-in>to_accel_x</world-in>
+                <world-in>to_fuel</world-in>
+                <world-in>to_joystick_x</world-in>
+                <world-in>to_velocity_x</world-in>
+                <world-in>to_x</world-in>
             </gateway>
         </type>
     </gateways>
     <vehicle>
         <type name="compute">
-            <compute name="acceleration_x">
+            <compute name="to_accel_x">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.001</scale>
                 <type-in>i16</type-in>
                 <type-out>metre_per_second_squared</type-out>
-                <world-out>gateway.acceleration_x</world-out>
-                <world-in>acceleration_x_sensor</world-in>
+                <world-out>gateway.to_accel_x</world-out>
+                <world-in>accel_x</world-in>
             </compute>
-            <compute name="fuel">
+            <compute name="to_fuel">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.0001</scale>
                 <type-in>i16</type-in>
                 <type-out>ratio</type-out>
-                <world-out>gateway.fuel</world-out>
-                <world-in>fuel_sensor</world-in>
+                <world-out>gateway.to_fuel</world-out>
+                <world-in>fuel</world-in>
             </compute>
-            <compute name="joystick_x">
+            <compute name="to_joystick_x">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.0001</scale>
                 <type-in>i16</type-in>
                 <type-out>ratio</type-out>
-                <moc-out>thruster_x.joystick_x</moc-out>
-                <world-out>gateway.joystick_x</world-out>
-                <world-in>joystick_x_sensor</world-in>
+                <moc-out>thruster_x.to_joystick_x</moc-out>
+                <world-out>gateway.to_joystick_x</world-out>
+                <world-in>joystick_x</world-in>
             </compute>
-            <compute name="velocity_x">
+            <compute name="to_velocity_x">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.01</scale>
                 <type-in>i16</type-in>
                 <type-out>metre_per_second</type-out>
-                <world-out>gateway.velocity_x</world-out>
-                <world-in>velocity_x_sensor</world-in>
+                <world-out>gateway.to_velocity_x</world-out>
+                <world-in>velocity_x</world-in>
             </compute>
-            <compute name="x">
+            <compute name="to_x">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.1</scale>
                 <type-in>i16</type-in>
                 <type-out>metre</type-out>
-                <world-out>gateway.x</world-out>
-                <world-in>x_sensor</world-in>
+                <world-out>gateway.to_x</world-out>
+                <world-in>x</world-in>
             </compute>
         </type>
     </vehicle>
     <payloads>
         <type name="network">
-            <payload name="acceleration_x_sensor">
+            <payload name="accel_x">
                 <address>127.0.0.1:19803</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>acceleration_x.acceleration_x_sensor</world-out>
+                <world-out>to_accel_x.accel_x</world-out>
             </payload>
-            <payload name="fuel_sensor">
+            <payload name="fuel">
                 <address>127.0.0.1:19804</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>fuel.fuel_sensor</world-out>
+                <world-out>to_fuel.fuel</world-out>
             </payload>
-            <payload name="joystick_x_sensor">
+            <payload name="joystick_x">
                 <address>127.0.0.1:19805</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>joystick_x.joystick_x_sensor</world-out>
+                <world-out>to_joystick_x.joystick_x</world-out>
             </payload>
             <payload name="thruster_x">
                 <address>127.0.0.1:19806</address>
                 <moc-in-type>ratio</moc-in-type>
                 <protocol>udp</protocol>
-                <moc-in>joystick_x</moc-in>
+                <moc-in>to_joystick_x</moc-in>
             </payload>
-            <payload name="velocity_x_sensor">
+            <payload name="velocity_x">
                 <address>127.0.0.1:19802</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>velocity_x.velocity_x_sensor</world-out>
+                <world-out>to_velocity_x.velocity_x</world-out>
             </payload>
-            <payload name="x_sensor">
+            <payload name="x">
                 <address>127.0.0.1:19801</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>x.x_sensor</world-out>
+                <world-out>to_x.x</world-out>
             </payload>
         </type>
     </payloads>

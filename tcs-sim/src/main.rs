@@ -803,12 +803,11 @@ fn shared_out(
         }
         match (payload_of.as_slice(), node_of) {
             ([path], _) => {
-                let name =
-                    tcsprotocol::sim_config::configuration_name(Path::new(path));
-                if let Some(said) = entry
-                    .configuration
-                    .as_deref()
-                    .filter(|said| **said != name)
+                let name = tcsprotocol::sim_config::configuration_name(
+                    Path::new(path),
+                );
+                if let Some(said) =
+                    entry.configuration.as_deref().filter(|said| **said != name)
                 {
                     return Err(format!(
                         "\"{}\" is simulated as a payload of {said}, and it \
@@ -1473,6 +1472,11 @@ fn main() {
     }
 
     let ui = MainWindow::new().unwrap();
+    // Room for the lander's pane, where the world has a lander, before the
+    // window is measured: its chrome counts the pane.
+    if lander.is_some() {
+        lander_view::make_room(&ui);
+    }
     let sizes = grid::settle(&ui);
     let ui_weak = ui.as_weak();
 
@@ -1489,14 +1493,25 @@ fn main() {
 
     // What the markup says a panel and the chrome come to, asked for rather
     // than written down here as well: see grid::Sizes.
-    let shape = grid::grid_shape(&sizes, configs.len());
+    // Fewer across beside a lander's pane, so that the lander example's MOC
+    // window has room beside this one.
+    let most = if lander.is_some() {
+        grid::COLUMNS_BESIDE_A_LANDER
+    } else {
+        grid::MAX_COLUMNS
+    };
+    let shape = grid::grid_shape_within(&sizes, configs.len(), most);
     // Taller than the grid asks for where there is a third row to look
     // ahead for, and no taller than the payloads on hand need otherwise. It
     // is also why the window can open taller than it is wide, which the shape
     // itself never is: the shape rule chooses the grid, and the room rule
     // says how much of the window to give it.
-    ui.window()
-        .set_size(grid::window_size(&sizes, &shape, configs.len()));
+    // And at least as tall as the lander's pane, where there is one.
+    let size = grid::window_size(&sizes, &shape, configs.len());
+    ui.window().set_size(slint::LogicalSize::new(
+        size.width,
+        size.height.max(ui.get_least_height()),
+    ));
 
     // Before any payload is simulated, so that nothing is left behind by a
     // signal.
@@ -1562,7 +1577,7 @@ fn main() {
         let quit = quit.clone();
         ui.on_quit_clicked(move || quit());
     }
-    quit_when_signalled(signalled.clone(), quit.clone());
+    quit_when_signalled(signalled.clone(), quit);
 
     // Periodic update timer
     {
@@ -1582,9 +1597,9 @@ fn main() {
     // Against the bottom of the display, tcs-moc having asked for the top.
     ask_for_the_edge(&ui, Edge::Bottom);
 
-    // Kept while tcs-sim runs: the window, and the timer that keeps it up
-    // to the world.
-    let _lander = lander.and_then(|scene| lander_view::open(scene, quit));
+    // Kept while tcs-sim runs: the timer that keeps the lander's pane up to
+    // the world.
+    let _lander = lander.map(|scene| lander_view::attach(&ui, scene));
 
     ui.run().unwrap();
 
@@ -2257,9 +2272,10 @@ mod tests {
         // panel and chrome sizes are right.
         let mut cases: Vec<(String, Vec<PayloadInfo>)> = Vec::new();
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = shipped_sim(&payload_path, &sim_path).unwrap_or_else(|e| {
-                panic!("{} failed to load: {e}", sim_path.display())
-            });
+            let sim_file = shipped_sim(&payload_path, &sim_path)
+                .unwrap_or_else(|e| {
+                    panic!("{} failed to load: {e}", sim_path.display())
+                });
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
             let sims = sim_file.resolve(&dh_configs).unwrap_or_else(|e| {
                 panic!("{} does not fit: {e}", sim_path.display())
@@ -2625,8 +2641,7 @@ mod tests {
         configuration: &std::path::Path,
         sim_path: &std::path::Path,
     ) -> Result<SimConfigFile, String> {
-        let file =
-            SimConfigFile::load(sim_path).map_err(|e| e.to_string())?;
+        let file = SimConfigFile::load(sim_path).map_err(|e| e.to_string())?;
         Ok(file.for_configuration(
             &tcsprotocol::sim_config::configuration_name(configuration),
         ))
@@ -2823,9 +2838,10 @@ mod tests {
     #[test]
     fn the_shipped_files_become_simulator_configs() {
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = shipped_sim(&payload_path, &sim_path).unwrap_or_else(|e| {
-                panic!("{} failed to load: {e}", sim_path.display())
-            });
+            let sim_file = shipped_sim(&payload_path, &sim_path)
+                .unwrap_or_else(|e| {
+                    panic!("{} failed to load: {e}", sim_path.display())
+                });
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
 
             let sims = sim_file.resolve(&dh_configs).unwrap_or_else(|e| {

@@ -1,0 +1,12 @@
+// The type sizes of tcs-sim's window: two points under the TCS windows'
+// own, so that the payload panels and the lander's pane take less room.
+
+import { Fonts } from "../../tcs-ui/ui/fonts.slint";
+
+// Text in tcs-sim's window: its ordinary size, and its headings'.
+export global SimFonts {
+    // The size of everything but the headings.
+    out property <length> window: Fonts.window - 2pt;
+    // The size of the window's heading and the lander's state.
+    out property <length> heading: 18px - 2pt;
+}

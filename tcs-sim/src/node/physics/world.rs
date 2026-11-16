@@ -223,6 +223,36 @@ impl World {
         self.clock.at(now)
     }
 
+    /// Pauses the world, from tcs-sim's window: its time stands still until
+    /// it is resumed.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The moment it is paused at.
+    pub fn pause(&self, now: Instant) {
+        self.clock.pause(now);
+    }
+
+    /// Resumes a paused world, its time going on from where it stood, and
+    /// wakes whatever was waiting on it, whose moments have moved.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The moment it is resumed at.
+    pub fn resume(&self, now: Instant) {
+        self.clock.resume(now);
+        self.driven.notify_all();
+    }
+
+    /// Says whether the world is paused.
+    ///
+    /// # Returns
+    ///
+    /// True between a pause and the resume after it.
+    pub fn paused(&self) -> bool {
+        self.clock.paused()
+    }
+
     /// Says what a terminal is called.
     ///
     /// # Arguments

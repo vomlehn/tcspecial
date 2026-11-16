@@ -41,9 +41,8 @@ use tcsprotocol::Timestamp;
 
 use crate::payload::{PayloadConfig, SimulatedPayload};
 use crate::{
-    grid, handle_transfer_button, load,
-    payload_info_from, show_progress, update_row, MainWindow, PayloadInfo,
-    RUNNING_STATUS,
+    grid, handle_transfer_button, load, payload_info_from, show_progress,
+    update_row, MainWindow, PayloadInfo, RUNNING_STATUS,
 };
 
 /// Where the pictures go, from the crate's directory.

@@ -1,4 +1,5 @@
-//! The lander's window: what tcs-sim shows of a world that has a lander.
+//! The lander's pane: what tcs-sim shows of a world that has a lander, at
+//! the left of its window.
 //!
 //! The landscape and the lander flying over it, drawn to scale, positive X
 //! to the right and positive Y up; what it is doing, in words, with a
@@ -16,9 +17,8 @@
 //! would start it as soon as it opened. So it reads the world as it stands
 //! until then, and the joystick drives it the same way: see
 //! `World::glance_component` and `World::drive_by_hand`.
-//!
-//! Closing the window ends tcs-sim, as closing its payload panels' does.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -30,7 +30,7 @@ use tcsprotocol::sim_config::SimConfigFile;
 
 use crate::node::physics::world::World;
 use crate::payload::PayloadConfig;
-use crate::LanderWindow;
+use crate::{LanderProbe, LanderScene, MainWindow};
 
 /// The lander's outputs' places, in
 /// `tcsprotocol::node::physics::lander::TERMINALS`'s order.
@@ -187,7 +187,7 @@ pub fn ground_line(f: &Resolved) -> String {
 /// The picture's commands.
 pub fn pad(f: &Resolved) -> String {
     let ((x0, y), (x1, _)) = f.pad_ends();
-    let mark = f.height / 50.0;
+    let mark = PAD_MARK * f.height;
     format!(
         "M {} L {} M {} L {} M {} L {}",
         at(f, (x0, y)),
@@ -197,6 +197,179 @@ pub fn pad(f: &Resolved) -> String {
         at(f, (x1, y)),
         at(f, (x1, y + mark)),
     )
+}
+
+/// How tall each end mark of the pad is, as a fraction of the display's
+/// height.
+const PAD_MARK: f64 = 1.0 / 50.0;
+
+/// The radius of the light on top of each end mark of the pad, in metres.
+const PAD_LIGHT: f64 = 6.0;
+
+/// How long the pad's lights take to flash on and off again, in seconds.
+const PAD_FLASH: f64 = 1.0;
+
+/// The lights on top of the pad's two end marks: a round light on each.
+///
+/// # Arguments
+///
+/// * `f` - The lander's figures.
+///
+/// # Returns
+///
+/// The picture's commands.
+pub fn pad_lights(f: &Resolved) -> String {
+    let ((x0, y), (x1, _)) = f.pad_ends();
+    let top = y + PAD_MARK * f.height + PAD_LIGHT;
+    format!(
+        "{} {}",
+        circle(f, (x0, top), PAD_LIGHT),
+        circle(f, (x1, top), PAD_LIGHT)
+    )
+}
+
+/// Whether the pad's lights are lit at a moment: half of each flash.
+///
+/// # Arguments
+///
+/// * `seconds` - The time since the window opened, in seconds.
+///
+/// # Returns
+///
+/// True while they are lit.
+pub fn pad_lit(seconds: f64) -> bool {
+    seconds.rem_euclid(PAD_FLASH) < PAD_FLASH / 2.0
+}
+
+/// How far above the highest ground on its way the autopilot keeps the
+/// lander's feet, in metres.
+const CLEARANCE: f64 = 40.0;
+
+/// The fastest the autopilot takes the lander across, in metres a second.
+const CRUISE: f64 = 12.0;
+
+/// How near the pad's middle, across, the lander is to be before the
+/// autopilot brings it down, in metres; and how far it may drift once it is
+/// coming down before it is taken up and across again.
+const OVER_THE_PAD: f64 = 5.0;
+const OFF_THE_PAD: f64 = 12.0;
+
+/// How fast across the lander may still be moving when the autopilot starts
+/// to bring it down, in metres a second.
+const STILL_ENOUGH: f64 = 1.0;
+
+/// The fastest the autopilot brings the lander down, and the speed it
+/// touches down at, in metres a second: well within the landing limits.
+const DESCENT: f64 = 8.0;
+const TOUCHDOWN: f64 = 1.0;
+
+/// How quickly the autopilot closes on the velocity it wants, each second:
+/// gentle, since what it asks reaches the thrusters through the vehicles.
+const RESPONSE: f64 = 1.0;
+
+/// The autopilot that tries to land the lander, flying it through the
+/// joystick as a pilot would: across to above the pad at a safe height, and
+/// down onto it. Nothing makes a landing certain: the fuel can run out.
+#[derive(Debug, Default)]
+pub struct Autopilot {
+    /// Whether it has begun to bring the lander down onto the pad.
+    descending: bool,
+}
+
+impl Autopilot {
+    /// What the joystick is to be held at now.
+    ///
+    /// # Arguments
+    ///
+    /// * `f`   - The lander's figures.
+    /// * `out` - Its terminals' values now, in its type's order.
+    ///
+    /// # Returns
+    ///
+    /// The X and Y axes, each from minus one to one.
+    pub fn steer(&mut self, f: &Resolved, out: &[f64]) -> (f64, f64) {
+        let (x, y) = (out[X], out[Y]);
+        let (vx, vy) = (out[VELOCITY_X], out[VELOCITY_Y]);
+        let mass = f.dry_mass + out[FUEL].clamp(0.0, 1.0) * f.fuel;
+        let across = f.thrust_x / mass;
+        let up = f.thrust_y / mass;
+        let ((x0, pad), (x1, _)) = f.pad_ends();
+        let middle = (x0 + x1) / 2.0;
+        let (left, right, _, top) = f.extent();
+
+        // Across: towards the pad's middle, no faster than half the thrust
+        // across could stop it in the distance left.
+        let to_go = middle - x;
+        let speed = (across * to_go.abs())
+            .sqrt()
+            .min(0.4 * to_go.abs())
+            .min(CRUISE);
+        let want_vx = speed.copysign(to_go);
+        let throttle_x = RESPONSE * (want_vx - vx) / across;
+
+        // Up and down: over the pad and nearly still across, down onto it;
+        // anywhere else, up to a height clear of the ground between here
+        // and the pad.
+        if self.descending {
+            self.descending = to_go.abs() < OFF_THE_PAD;
+        } else {
+            self.descending =
+                to_go.abs() < OVER_THE_PAD && vx.abs() < STILL_ENOUGH;
+        }
+        let want_vy = if self.descending {
+            let height = (y - pad).max(0.0);
+            let can_stop =
+                (2.0 * 0.5 * (up - f.gravity).max(0.0) * height).sqrt();
+            -(0.25 * height)
+                .clamp(TOUCHDOWN, DESCENT)
+                .min(can_stop.max(TOUCHDOWN))
+        } else {
+            let lowest = x.min(middle) + left - OFF_THE_PAD;
+            let highest = x.max(middle) + right + OFF_THE_PAD;
+            let safe = (highest_ground(f, lowest, highest) + CLEARANCE)
+                .min(f.height - top);
+            (0.4 * (safe - y)).clamp(-DESCENT, DESCENT)
+        };
+        let throttle_y = (RESPONSE * (want_vy - vy) + f.gravity) / up;
+        (throttle_x.clamp(-1.0, 1.0), throttle_y.clamp(-1.0, 1.0))
+    }
+}
+
+/// The highest the ground is between two places across the display.
+///
+/// # Arguments
+///
+/// * `f`    - The lander's figures.
+/// * `from` - The leftmost place, in metres.
+/// * `to`   - The rightmost.
+///
+/// # Returns
+///
+/// The height, in metres.
+fn highest_ground(f: &Resolved, from: f64, to: f64) -> f64 {
+    f.ground
+        .iter()
+        .filter(|(x, _)| (from..=to).contains(x))
+        .map(|&(_, y)| y)
+        .fold(ground_at(f, from).max(ground_at(f, to)), f64::max)
+}
+
+/// Where the joystick's dot is drawn for an axis, from the square's middle,
+/// in logical pixels: the inverse of [`axes`] along one axis.
+///
+/// # Arguments
+///
+/// * `axis` - The axis's value, minus one to one.
+///
+/// # Returns
+///
+/// The offset: nought for nought, and the arm's end for one.
+pub fn dot_of(axis: f64) -> f32 {
+    if axis == 0.0 {
+        return 0.0;
+    }
+    let along = SQUARE / 2.0 + (axis.abs().min(1.0) as f32) * ARM;
+    along.copysign(axis as f32)
 }
 
 /// A line of points, moved by an offset.
@@ -428,31 +601,108 @@ pub fn axes(dx: f32, dy: f32) -> (f64, f64, f32, f32) {
     )
 }
 
-/// Opens the lander's window, kept up to the world, its joystick driving the
-/// world's.
+/// Holds the joystick at two axes, as a pilot holding it would, and puts its
+/// dot where they say.
 ///
 /// # Arguments
 ///
+/// * `ui`    - tcs-sim's window.
+/// * `scene` - The world's lander, whose joystick it is.
+/// * `stick` - The joystick's place among the world's components.
+/// * `axes`  - The X and Y axes, each from minus one to one.
+fn hold_stick(ui: &MainWindow, scene: &Scene, stick: usize, axes: (f64, f64)) {
+    let now = Instant::now();
+    for (terminal, value) in [(SET_X, axes.0), (SET_Y, axes.1)] {
+        scene.world.drive_by_hand(
+            Place {
+                component: stick,
+                terminal,
+            },
+            value,
+            now,
+        );
+    }
+    let pane = ui.global::<LanderScene>();
+    pane.set_dot_x(dot_of(axes.0));
+    pane.set_dot_y(-dot_of(axes.1));
+}
+
+/// Makes room in tcs-sim's window for the lander's pane, at the left of its
+/// payload panels: the pane measured, as a panel is, and the window told.
+/// Before the window is measured itself, so that its chrome counts the pane.
+///
+/// # Arguments
+///
+/// * `ui` - tcs-sim's window.
+pub fn make_room(ui: &MainWindow) {
+    if let Ok(probe) = LanderProbe::new() {
+        ui.set_lander_width(probe.get_pane_width());
+        ui.set_lander_height(probe.get_pane_height());
+    }
+}
+
+/// Shows the lander in tcs-sim's window, kept up to the world, its joystick
+/// driving the world's.
+///
+/// # Arguments
+///
+/// * `ui`    - tcs-sim's window, given room for the pane by [`make_room`].
 /// * `scene` - The world's lander.
-/// * `quit`  - What tcs-sim's Quit button does, done when the window is
-///             closed.
 ///
 /// # Returns
 ///
-/// The window and the timer that keeps it up to the world, both to be kept
-/// while tcs-sim runs; `None` if the window cannot be made.
-pub fn open(
-    scene: Scene,
-    quit: Rc<dyn Fn()>,
-) -> Option<(LanderWindow, slint::Timer)> {
-    let window = LanderWindow::new().ok()?;
-    draw_landscape(&window, &scene.figures);
+/// The timer that keeps the pane up to the world, to be kept while tcs-sim
+/// runs.
+pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
+    let pane = ui.global::<LanderScene>();
+    draw_landscape(&pane, &scene.figures);
 
     let scene = Rc::new(scene);
+    // The autopilot, while it flies the lander: see `Autopilot`.
+    let pilot: Rc<RefCell<Option<Autopilot>>> = Rc::default();
+    pane.set_has_joystick(scene.joystick.is_some());
+    {
+        let held = Rc::clone(&scene);
+        let weak = ui.as_weak();
+        pane.on_pause_clicked(move || {
+            let now = Instant::now();
+            if held.world.paused() {
+                held.world.resume(now);
+            } else {
+                held.world.pause(now);
+            }
+            if let Some(ui) = weak.upgrade() {
+                ui.global::<LanderScene>().set_paused(held.world.paused());
+            }
+        });
+    }
     if let Some(stick) = scene.joystick {
         let held = Rc::clone(&scene);
-        let weak = window.as_weak();
-        window.on_stick_moved(move |dx, dy| {
+        let flying = Rc::clone(&pilot);
+        let weak = ui.as_weak();
+        pane.on_autoland_clicked(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            let mut flying = flying.borrow_mut();
+            if flying.take().is_some() {
+                // Let go of, as a pilot letting go would.
+                hold_stick(&ui, &held, stick, (0.0, 0.0));
+            } else {
+                *flying = Some(Autopilot::default());
+            }
+            ui.global::<LanderScene>().set_autoland(flying.is_some());
+        });
+    }
+    if let Some(stick) = scene.joystick {
+        let held = Rc::clone(&scene);
+        let flying = Rc::clone(&pilot);
+        let weak = ui.as_weak();
+        pane.on_stick_moved(move |dx, dy| {
+            // The pilot takes over from the autopilot.
+            if flying.borrow_mut().take().is_some() {
+                if let Some(ui) = weak.upgrade() {
+                    ui.global::<LanderScene>().set_autoland(false);
+                }
+            }
             let (x, y, dot_x, dot_y) = axes(dx, dy);
             let now = Instant::now();
             let drive = |terminal, value| {
@@ -467,14 +717,15 @@ pub fn open(
             };
             drive(SET_X, x);
             drive(SET_Y, y);
-            if let Some(window) = weak.upgrade() {
-                window.set_dot_x(dot_x);
-                window.set_dot_y(dot_y);
+            if let Some(ui) = weak.upgrade() {
+                let pane = ui.global::<LanderScene>();
+                pane.set_dot_x(dot_x);
+                pane.set_dot_y(dot_y);
             }
         });
         let held = Rc::clone(&scene);
-        let weak = window.as_weak();
-        window.on_stick_released(move || {
+        let weak = ui.as_weak();
+        pane.on_stick_released(move || {
             let now = Instant::now();
             for terminal in [SET_X, SET_Y] {
                 held.world.drive_by_hand(
@@ -486,33 +737,60 @@ pub fn open(
                     now,
                 );
             }
-            if let Some(window) = weak.upgrade() {
-                window.set_dot_x(0.0);
-                window.set_dot_y(0.0);
+            if let Some(ui) = weak.upgrade() {
+                let pane = ui.global::<LanderScene>();
+                pane.set_dot_x(0.0);
+                pane.set_dot_y(0.0);
             }
         });
     }
 
     let opened = Instant::now();
-    show(&window, &scene, 0.0);
+    show(&pane, &scene, 0.0);
     let timer = slint::Timer::default();
     {
-        let weak = window.as_weak();
+        let weak = ui.as_weak();
         let scene = Rc::clone(&scene);
         timer.start(slint::TimerMode::Repeated, REFRESH, move || {
-            if let Some(window) = weak.upgrade() {
-                show(&window, &scene, opened.elapsed().as_secs_f64());
-            }
+            let Some(ui) = weak.upgrade() else { return };
+            show(
+                &ui.global::<LanderScene>(),
+                &scene,
+                opened.elapsed().as_secs_f64(),
+            );
+            fly(&ui, &scene, &pilot);
         });
     }
-    // Closing it ends tcs-sim, its payload panels with it: the lander is
-    // flown here, and a run with no way left to fly it is over.
-    window.window().on_close_requested(move || {
-        quit();
-        slint::CloseRequestResponse::HideWindow
-    });
-    window.show().ok()?;
-    Some((window, timer))
+    timer
+}
+
+/// Has the autopilot, while it flies the lander, hold the joystick where it
+/// wants it; and lets go, and stops it, once the lander has landed or
+/// crashed. Nothing while the world is paused.
+///
+/// # Arguments
+///
+/// * `ui`    - tcs-sim's window.
+/// * `scene` - The world's lander.
+/// * `pilot` - The autopilot, while it flies.
+fn fly(ui: &MainWindow, scene: &Scene, pilot: &RefCell<Option<Autopilot>>) {
+    let Some(stick) = scene.joystick else { return };
+    let mut flying = pilot.borrow_mut();
+    let Some(autopilot) = flying.as_mut() else {
+        return;
+    };
+    if scene.world.paused() {
+        return;
+    }
+    let out = scene.world.glance_component(scene.lander, Instant::now());
+    if out[LANDED] > 0.5 || out[CRASHED] > 0.5 {
+        *flying = None;
+        hold_stick(ui, scene, stick, (0.0, 0.0));
+        ui.global::<LanderScene>().set_autoland(false);
+        return;
+    }
+    let axes = autopilot.steer(&scene.figures, &out);
+    hold_stick(ui, scene, stick, axes);
 }
 
 /// Draws what does not move: the display's size, the ground, the pad and
@@ -520,19 +798,20 @@ pub fn open(
 ///
 /// # Arguments
 ///
-/// * `window` - The lander's window.
+/// * `pane`   - The lander's pane, in tcs-sim's window.
 /// * `f`      - The lander's figures.
-fn draw_landscape(window: &LanderWindow, f: &Resolved) {
-    window.set_world_width(f.width as f32);
-    window.set_world_height(f.height as f32);
-    window.set_ground_fill(ground_fill(f).into());
-    window.set_ground_line(ground_line(f).into());
-    window.set_pad(pad(f).into());
+fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
+    pane.set_world_width(f.width as f32);
+    pane.set_world_height(f.height as f32);
+    pane.set_ground_fill(ground_fill(f).into());
+    pane.set_ground_line(ground_line(f).into());
+    pane.set_pad(pad(f).into());
+    pane.set_pad_lights(pad_lights(f).into());
     let [s0, s1, s2, s3] = stars(f);
-    window.set_stars_0(s0.into());
-    window.set_stars_1(s1.into());
-    window.set_stars_2(s2.into());
-    window.set_stars_3(s3.into());
+    pane.set_stars_0(s0.into());
+    pane.set_stars_1(s1.into());
+    pane.set_stars_2(s2.into());
+    pane.set_stars_3(s3.into());
 }
 
 /// Brings the window up to the world, and the stars to how bright they are
@@ -540,37 +819,38 @@ fn draw_landscape(window: &LanderWindow, f: &Resolved) {
 ///
 /// # Arguments
 ///
-/// * `window`  - The lander's window.
+/// * `pane`    - The lander's pane, in tcs-sim's window.
 /// * `scene`   - The world's lander.
 /// * `seconds` - The time since the window opened, in seconds.
-fn show(window: &LanderWindow, scene: &Scene, seconds: f64) {
+fn show(pane: &LanderScene<'_>, scene: &Scene, seconds: f64) {
     let out = scene.world.glance_component(scene.lander, Instant::now());
-    paint(window, &scene.figures, &out);
+    paint(pane, &scene.figures, &out);
+    pane.set_pad_lit(pad_lit(seconds));
     let [t0, t1, t2, t3] = twinkle(seconds);
-    window.set_twinkle_0(t0);
-    window.set_twinkle_1(t1);
-    window.set_twinkle_2(t2);
-    window.set_twinkle_3(t3);
+    pane.set_twinkle_0(t0);
+    pane.set_twinkle_1(t1);
+    pane.set_twinkle_2(t2);
+    pane.set_twinkle_3(t3);
 }
 
 /// Shows the lander as its outputs say it is.
 ///
 /// # Arguments
 ///
-/// * `window` - The lander's window.
+/// * `pane`   - The lander's pane, in tcs-sim's window.
 /// * `f`      - The lander's figures.
 /// * `out`    - Its terminals' values, in its type's order.
-fn paint(window: &LanderWindow, f: &Resolved, out: &[f64]) {
+fn paint(pane: &LanderScene<'_>, f: &Resolved, out: &[f64]) {
     let place = (out[X], out[Y]);
-    window.set_lander_lines(lander(f, place, false).into());
-    window.set_lander_shapes(lander(f, place, true).into());
+    pane.set_lander_lines(lander(f, place, false).into());
+    pane.set_lander_shapes(lander(f, place, true).into());
     let landed = out[LANDED] > 0.5;
-    window.set_face(if landed {
+    pane.set_face(if landed {
         face(f, place).into()
     } else {
         "".into()
     });
-    window.set_state(
+    pane.set_state(
         if landed {
             "Landed"
         } else if out[CRASHED] > 0.5 {
@@ -580,13 +860,13 @@ fn paint(window: &LanderWindow, f: &Resolved, out: &[f64]) {
         }
         .into(),
     );
-    window.set_fuel(out[FUEL] as f32);
-    window.set_position_x(format!("{:.1}", out[X]).into());
-    window.set_position_y(format!("{:.1}", out[Y]).into());
-    window.set_velocity_x(format!("{:.2}", out[VELOCITY_X]).into());
-    window.set_velocity_y(format!("{:.2}", out[VELOCITY_Y]).into());
-    window.set_acceleration_x(format!("{:.3}", out[ACCELERATION_X]).into());
-    window.set_acceleration_y(format!("{:.3}", out[ACCELERATION_Y]).into());
+    pane.set_fuel(out[FUEL] as f32);
+    pane.set_position_x(format!("{:.1}", out[X]).into());
+    pane.set_position_y(format!("{:.1}", out[Y]).into());
+    pane.set_velocity_x(format!("{:.2}", out[VELOCITY_X]).into());
+    pane.set_velocity_y(format!("{:.2}", out[VELOCITY_Y]).into());
+    pane.set_acceleration_x(format!("{:.3}", out[ACCELERATION_X]).into());
+    pane.set_acceleration_y(format!("{:.3}", out[ACCELERATION_Y]).into());
 }
 
 #[cfg(test)]
@@ -670,7 +950,7 @@ mod tests {
         );
     }
 
-    /// Draws the lander's window, landed on a pad over a varied ground,
+    /// Draws the lander's pane, landed on a pad over a varied ground,
     /// into a picture, to be looked at: run by hand, with the picture's path
     /// in `LANDER_SHOT`.
     #[test]
@@ -725,15 +1005,24 @@ mod tests {
             fuel: 2000.0,
             ..Resolved::default()
         };
-        let window = LanderWindow::new().expect("a window");
-        draw_landscape(&window, &f);
+        // The pane measured first: this platform has one window to draw
+        // into, and the probe made after the window would take it over.
+        let (width, height) = {
+            let probe = LanderProbe::new().expect("a probe");
+            (probe.get_pane_width(), probe.get_pane_height())
+        };
+        let window = MainWindow::new().expect("a window");
+        window.set_lander_width(width);
+        window.set_lander_height(height);
+        let pane = window.global::<LanderScene>();
+        draw_landscape(&pane, &f);
         let [t0, t1, t2, t3] = twinkle(0.7);
-        window.set_twinkle_0(t0);
-        window.set_twinkle_1(t1);
-        window.set_twinkle_2(t2);
-        window.set_twinkle_3(t3);
+        pane.set_twinkle_0(t0);
+        pane.set_twinkle_1(t1);
+        pane.set_twinkle_2(t2);
+        pane.set_twinkle_3(t3);
         paint(
-            &window,
+            &pane,
             &f,
             &[
                 0.0,
@@ -750,10 +1039,13 @@ mod tests {
             ],
         );
         let (_, _, dot_x, dot_y) = axes(70.0, -40.0);
-        window.set_dot_x(dot_x);
-        window.set_dot_y(dot_y);
+        pane.set_dot_x(dot_x);
+        pane.set_dot_y(dot_y);
         window.show().expect("shown");
-        window.window().set_size(slint::PhysicalSize::new(816, 900));
+        window.window().set_size(slint::PhysicalSize::new(
+            window.get_lander_width() as u32 + 16,
+            window.get_least_height() as u32,
+        ));
         let size = window.window().size();
         let picture = window.window().take_snapshot().expect("drawn");
         let path = std::env::var("LANDER_SHOT").expect("LANDER_SHOT");
@@ -800,6 +1092,138 @@ mod tests {
         );
         assert_eq!(pad(&f).matches('M').count(), 3);
         assert!(pad(&f).contains("M 470.00 540.00 L 470.00 528.00"));
+    }
+
+    /// Flies a lander by the autopilot against its own physics, each
+    /// command held back a tenth of a second as the vehicles hold it back.
+    ///
+    /// # Arguments
+    ///
+    /// * `ground` - The ground's points.
+    /// * `pad`    - Where the pad's left end is among them.
+    /// * `start`  - Where the lander starts.
+    ///
+    /// # Returns
+    ///
+    /// Whether it landed, true, or crashed, false, and when, in simulated
+    /// seconds; `None` where it did neither in five minutes.
+    fn autoland(
+        ground: Vec<Point>,
+        pad: usize,
+        start: Point,
+    ) -> Option<(bool, f64)> {
+        use crate::node::physics::component::Component;
+        use crate::node::physics::lander::Lander;
+        let outline =
+            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+                .expect("the outline reads");
+        let f = Resolved {
+            dry_mass: 5500.0,
+            fuel: 500.0,
+            isp: Duration::from_secs(311),
+            thrust_x: 12000.0,
+            thrust_y: 24000.0,
+            gravity: 1.62,
+            start,
+            width: 1000.0,
+            height: 600.0,
+            ground,
+            pad,
+            outline,
+            landing_speed: 3.05,
+            landing_drift: 1.22,
+            pause: Duration::from_secs(3),
+        };
+        let mut lander = Lander::new(f.clone());
+        let terminals = tcsprotocol::node::physics::lander::TERMINALS.len();
+        let mut pilot = Autopilot::default();
+        let step = 0.05;
+        // What the vehicles have yet to pass on: two steps' worth.
+        let mut on_the_way =
+            std::collections::VecDeque::from([(0.0, 0.0), (0.0, 0.0)]);
+        let mut now = 0.0;
+        while now < 300.0 {
+            let out: Vec<f64> =
+                (0..terminals).map(|t| lander.output(t)).collect();
+            if out[LANDED] > 0.5 {
+                return Some((true, now));
+            }
+            if out[CRASHED] > 0.5 {
+                return Some((false, now));
+            }
+            on_the_way.push_back(pilot.steer(&f, &out));
+            let (x, y) = on_the_way.pop_front().expect("two steps held");
+            let mut inputs = vec![0.0; terminals];
+            inputs[0] = x;
+            inputs[1] = y;
+            lander.hold(&inputs);
+            let to = now + step;
+            let mut at = now;
+            while let Some(event) =
+                lander.next_event(at).filter(|event| *event <= to)
+            {
+                lander.advance(at, event);
+                lander.event(event);
+                at = event;
+            }
+            lander.advance(at, to);
+            now = to;
+        }
+        None
+    }
+
+    /// The autopilot lands the lander on the shipped landscape, from the
+    /// shipped start, and on one with high ground between the start and a
+    /// pad at the far side, within the time the fuel lasts.
+    #[test]
+    fn the_autopilot_lands() {
+        let shipped = vec![
+            (0.0, 210.0),
+            (90.0, 300.0),
+            (180.0, 170.0),
+            (300.0, 240.0),
+            (420.0, 80.0),
+            (480.0, 80.0),
+            (600.0, 190.0),
+            (720.0, 120.0),
+            (850.0, 330.0),
+            (1000.0, 200.0),
+        ];
+        let said = autoland(shipped, 4, (60.0, 540.0));
+        assert!(matches!(said, Some((true, _))), "{said:?}");
+
+        let high = vec![
+            (0.0, 100.0),
+            (200.0, 350.0),
+            (400.0, 50.0),
+            (600.0, 250.0),
+            (700.0, 30.0),
+            (760.0, 30.0),
+            (900.0, 200.0),
+            (1000.0, 150.0),
+        ];
+        let said = autoland(high, 4, (60.0, 540.0));
+        assert!(matches!(said, Some((true, _))), "{said:?}");
+    }
+
+    /// A light sits on top of each end mark of the pad, and the lights are
+    /// lit for half of each flash.
+    #[test]
+    fn the_pads_lights_are_on_its_end_marks_and_flash() {
+        let f = figures();
+        let ((x0, y), (x1, _)) = f.pad_ends();
+        let lights = pad_lights(&f);
+        // Two circles, each begun at its left and closed.
+        assert_eq!(lights.matches('M').count(), 2, "{lights}");
+        assert_eq!(lights.matches('Z').count(), 2, "{lights}");
+        let top = y + PAD_MARK * f.height + PAD_LIGHT;
+        for x in [x0, x1] {
+            let left = format!("M {}", at(&f, (x - PAD_LIGHT, top)));
+            assert!(lights.contains(&left), "{left} in {lights}");
+        }
+        assert!(pad_lit(0.0) && pad_lit(0.4));
+        assert!(!pad_lit(0.5) && !pad_lit(0.9));
+        assert!(pad_lit(1.2));
     }
 
     /// The lander is drawn where it is, its outline moved by its place.

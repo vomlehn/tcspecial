@@ -783,7 +783,7 @@ through [Yamcs](https://yamcs.org): the example of two tcspecials sharing
 one simulated world, and of a link with the Moon's delay in it.
 
 `lander-a` flies the X axis and `lander-b` the Y axis. Each reads its axis
-of the joystick in tcs-sim's lander window and drives that axis's thruster
+of the joystick in tcs-sim's window and drives that axis's thruster
 with it, the pilot in the loop and nothing aboard working out a thrust;
 and each sends its axis's position, velocity and acceleration, and the
 joystick's value, down through its `gateway_yamcs` node. `lander-a` sends
@@ -811,8 +811,8 @@ from the Moon, both ways; starts tcs-sim with both configurations and both
 tcspecials; and has each vehicle answer CONNECT, through the delay. Its
 window, the MOC's, shows the landscape and the lander where it was said to
 be, the values, the fuel, the joystick as it was held, and whether it has
-landed or crashed, all 1.3 s behind tcs-sim's. Closing tcs-sim's lander
-window, or the MOC's, stops everything. Yamcs's web interface is at
+landed or crashed, all 1.3 s behind tcs-sim's. Closing tcs-sim's window,
+or the MOC's, stops everything. Yamcs's web interface is at
 <http://localhost:19090>.
 
 ```
@@ -821,6 +821,14 @@ make run-lander YAMCS_HOME=<yamcs>
 
 Fly it from tcs-sim's window: hold the button down in the joystick's middle
 square and drag along an arm; letting go centres it.
+
+tcs-sim's window has the lander's pane at its left and two columns of
+payload panels beside it, so that the MOC's window fits beside it on a
+screen about 1600 logical pixels wide. Where the two open is the window
+manager's to say: on Wayland a program cannot place its own window. On KDE
+Plasma, `lander/lander-windows.kwinrule`, imported in System Settings,
+Window Management, Window Rules, opens tcs-sim's window at the top left and
+the MOC's to its right.
 
 Languages:
 

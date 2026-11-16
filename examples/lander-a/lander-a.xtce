@@ -90,37 +90,36 @@
       </FloatParameterType>
     </ParameterTypeSet>
     <ParameterSet>
-      <Parameter name="acceleration_x"
-          parameterTypeRef="metre_per_second_squared"/>
-      <Parameter name="fuel" parameterTypeRef="ratio"/>
-      <Parameter name="joystick_x" parameterTypeRef="ratio"/>
-      <Parameter name="velocity_x" parameterTypeRef="metre_per_second"/>
-      <Parameter name="x" parameterTypeRef="metre"/>
+      <Parameter name="to_accel_x" parameterTypeRef="metre_per_second_squared"/>
+      <Parameter name="to_fuel" parameterTypeRef="ratio"/>
+      <Parameter name="to_joystick_x" parameterTypeRef="ratio"/>
+      <Parameter name="to_velocity_x" parameterTypeRef="metre_per_second"/>
+      <Parameter name="to_x" parameterTypeRef="metre"/>
     </ParameterSet>
     <ContainerSet>
-      <SequenceContainer name="acceleration_x_packet">
+      <SequenceContainer name="to_accel_x_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="acceleration_x"/>
+          <ParameterRefEntry parameterRef="to_accel_x"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="fuel_packet">
+      <SequenceContainer name="to_fuel_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="fuel"/>
+          <ParameterRefEntry parameterRef="to_fuel"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="joystick_x_packet">
+      <SequenceContainer name="to_joystick_x_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="joystick_x"/>
+          <ParameterRefEntry parameterRef="to_joystick_x"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="velocity_x_packet">
+      <SequenceContainer name="to_velocity_x_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="velocity_x"/>
+          <ParameterRefEntry parameterRef="to_velocity_x"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="x_packet">
+      <SequenceContainer name="to_x_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="x"/>
+          <ParameterRefEntry parameterRef="to_x"/>
         </EntryList>
       </SequenceContainer>
     </ContainerSet>

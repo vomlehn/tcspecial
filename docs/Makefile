@@ -11,10 +11,12 @@ MANUALS = manual.html tcspecial.html tcs-cfge.html tcs-moc.html tcs-sim.html \
 	tcs-verify.html tcs-conflict.html
 
 # design.rst says the same of the design documents, one per program as the
-# manuals are. tcspecial-design.html, which draws the restart figures, has a
-# rule of its own.
+# manuals are, and one for the lander example, which is planned.
+# tcspecial-design.html, which draws the restart figures, has a rule of its
+# own.
 DESIGNS = design.html tcs-cfge-design.html tcs-moc-design.html \
-	tcs-sim-design.html tcs-verify-design.html tcs-conflict-design.html
+	tcs-sim-design.html tcs-verify-design.html tcs-conflict-design.html \
+	lander-design.html
 
 .PHONY: all
 all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \

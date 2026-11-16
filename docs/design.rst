@@ -45,6 +45,15 @@ Verification tools
     The simulated operations center: its window, what it reads, and where
     the addresses it talks to come from.
 
+Examples
+========
+
+`The lander example design <lander-design.html>`__
+    A plan, not yet built: a lunar landing in two dimensions, flown by hand
+    with a joystick in tcs-sim, its two axes flown by two tcspecials, and
+    shown again on the ground through Yamcs, a Moon-to-Earth light time
+    late.
+
 How to use each program is in its manual, and the categories of TCS
 software are said in `TCS Design and Documentation <manual.html>`__,
 which lists these, the manuals and the other TCS projects' documents.

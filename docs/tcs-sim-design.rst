@@ -342,7 +342,8 @@ Requirement
     ``physics``. Each entry of ``components`` is ``type`` and a type, ``- type
     heater:``, holding the components of that type, each named by ``component``.
     The types are ``heater``, ``thermal_mass``, ``sun``, ``solar_array``,
-    ``load``, ``bus``, ``battery``, ``engine`` and ``body``, and a type of any
+    ``load``, ``bus``, ``battery``, ``engine``, ``body``, ``lander`` and
+    ``joystick``, and a type of any
     other is refused; a ``thermal_zone``, which is what a ``thermal_mass`` was
     called before, is told the name it has now. A type is written once, with a
     component under it. Each type's settings, terminals and rules are stated
@@ -614,6 +615,55 @@ Requirement
     on the ground from above until within a micrometre. There it is set
     down, altitude and velocity nought and ``contact`` asserted, and stays
     until a force beating its weight lifts it.
+
+**A lander and a joystick**
+
+Requirement
+    A lander takes ``throttle_x`` and ``throttle_y``, ratios held within
+    minus one and one, positive pushing towards positive X, to the right,
+    or positive Y, up. Each axis's force is its throttle times that axis's
+    full thrust, and the fuel flows at the sum of the two forces' sizes
+    over the specific impulse ``isp`` times standard gravity, so that its
+    mass, ``dry_mass`` and the fuel left, falls as it flies. With the
+    throttles held each axis is the body's rocket equation, sharing the
+    mass, with ``gravity`` on Y alone; the tank running dry is a moment it
+    foresees, and from then on there is no thrust. It gives out ``x`` and
+    ``y``, the place between its feet; ``velocity_x`` and ``velocity_y``;
+    ``fuel``, the fraction of a full tank left; and ``landed`` and
+    ``crashed``, decisions asserted while it is down.
+
+Requirement
+    A lander's landscape is its display, ``width`` by ``height``; its
+    ``ground``, points from the left edge to the right, each further right
+    than the last, no steeper than 70 degrees between them, none below
+    nought nor higher than 60% of the height; and its ``pad``, two of those
+    points one after the other, level, twice the lander's width, its middle
+    within the middle half of the width and no higher than a fifth of the
+    height. It starts wholly within the display. A landscape breaking a rule
+    is refused as it is read, saying which, since a lander flown over one
+    is not the example it says it is.
+
+Requirement
+    The moment any of a lander's ``outline`` first meets the ground, or all
+    of it leaves the display, is found ahead of time: there is no closed
+    form for where a path meets a line of segments, so the path is looked
+    at every 20 ms for half a second ahead, a step short enough that no
+    landing a lander survives passes through a line of the ground between
+    two looks, and the interval it is found in is halved until it is within
+    0.1 ms. Where nothing is found, the end of the look is its next event,
+    where it looks again. At that moment it has landed if all of it is over
+    the pad, it meets nothing but the pad, and it is going no faster than
+    ``landing_speed`` down and ``landing_drift`` sideways; landed, it is set
+    down on the pad. Anything else is a crash. Down, it stays still for
+    ``pause``, and then starts again where it started, at rest, with a full
+    tank.
+
+Requirement
+    A joystick takes ``set_x`` and ``set_y``, which nothing in the model
+    drives: tcs-sim's window drives them as its joystick is moved, as a
+    simulated payload drives an input. It gives them out as ``x`` and
+    ``y``, each held within minus one and one, for simulated payloads
+    joined to them to report.
 
 **What the bytes are**
 

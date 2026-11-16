@@ -770,7 +770,8 @@ configuration has links: <tt class="docutils literal">components</tt> and <tt cl
 <tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type, <tt class="docutils literal">- type
 heater:</tt>, holding the components of that type, each named by <tt class="docutils literal">component</tt>.
 The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>,
-<tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt> and <tt class="docutils literal">body</tt>, and a type of any
+<tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt>, <tt class="docutils literal">body</tt>, <tt class="docutils literal">lander</tt> and
+<tt class="docutils literal">joystick</tt>, and a type of any
 other is refused; a <tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was
 called before, is told the name it has now. A type is written once, with a
 component under it. Each type's settings, terminals and rules are stated
@@ -1008,6 +1009,52 @@ would with that acceleration, and each step goes there. The steps close
 on the ground from above until within a micrometre. There it is set
 down, altitude and velocity nought and <tt class="docutils literal">contact</tt> asserted, and stays
 until a force beating its weight lifts it.</dd>
+</dl>
+<p><strong>A lander and a joystick</strong></p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A lander takes <tt class="docutils literal">throttle_x</tt> and <tt class="docutils literal">throttle_y</tt>, ratios held within
+minus one and one, positive pushing towards positive X, to the right,
+or positive Y, up. Each axis's force is its throttle times that axis's
+full thrust, and the fuel flows at the sum of the two forces' sizes
+over the specific impulse <tt class="docutils literal">isp</tt> times standard gravity, so that its
+mass, <tt class="docutils literal">dry_mass</tt> and the fuel left, falls as it flies. With the
+throttles held each axis is the body's rocket equation, sharing the
+mass, with <tt class="docutils literal">gravity</tt> on Y alone; the tank running dry is a moment it
+foresees, and from then on there is no thrust. It gives out <tt class="docutils literal">x</tt> and
+<tt class="docutils literal">y</tt>, the place between its feet; <tt class="docutils literal">velocity_x</tt> and <tt class="docutils literal">velocity_y</tt>;
+<tt class="docutils literal">fuel</tt>, the fraction of a full tank left; and <tt class="docutils literal">landed</tt> and
+<tt class="docutils literal">crashed</tt>, decisions asserted while it is down.</dd>
+<dt>Requirement</dt>
+<dd>A lander's landscape is its display, <tt class="docutils literal">width</tt> by <tt class="docutils literal">height</tt>; its
+<tt class="docutils literal">ground</tt>, points from the left edge to the right, each further right
+than the last, no steeper than 70 degrees between them, none below
+nought nor higher than 60% of the height; and its <tt class="docutils literal">pad</tt>, two of those
+points one after the other, level, twice the lander's width, its middle
+within the middle half of the width and no higher than a fifth of the
+height. It starts wholly within the display. A landscape breaking a rule
+is refused as it is read, saying which, since a lander flown over one
+is not the example it says it is.</dd>
+<dt>Requirement</dt>
+<dd>The moment any of a lander's <tt class="docutils literal">outline</tt> first meets the ground, or all
+of it leaves the display, is found ahead of time: there is no closed
+form for where a path meets a line of segments, so the path is looked
+at every 20 ms for half a second ahead, a step short enough that no
+landing a lander survives passes through a line of the ground between
+two looks, and the interval it is found in is halved until it is within
+0.1 ms. Where nothing is found, the end of the look is its next event,
+where it looks again. At that moment it has landed if all of it is over
+the pad, it meets nothing but the pad, and it is going no faster than
+<tt class="docutils literal">landing_speed</tt> down and <tt class="docutils literal">landing_drift</tt> sideways; landed, it is set
+down on the pad. Anything else is a crash. Down, it stays still for
+<tt class="docutils literal">pause</tt>, and then starts again where it started, at rest, with a full
+tank.</dd>
+<dt>Requirement</dt>
+<dd>A joystick takes <tt class="docutils literal">set_x</tt> and <tt class="docutils literal">set_y</tt>, which nothing in the model
+drives: tcs-sim's window drives them as its joystick is moved, as a
+simulated payload drives an input. It gives them out as <tt class="docutils literal">x</tt> and
+<tt class="docutils literal">y</tt>, each held within minus one and one, for simulated payloads
+joined to them to report.</dd>
 </dl>
 <p><strong>What the bytes are</strong></p>
 <p>A sensor has to send bytes the vehicle will read back as what it reports, and

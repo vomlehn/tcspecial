@@ -33,8 +33,8 @@ use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
 use super::{
-    battery, body, bus, engine, heater, load, solar_array, sun, thermal_mass,
-    Component, Moved, TYPES,
+    battery, body, bus, engine, heater, joystick, lander, load, solar_array,
+    sun, thermal_mass, Component, Moved, TYPES,
 };
 
 /// Reads the `components` of the world's `physics`.
@@ -266,6 +266,10 @@ impl<'de> DeserializeSeed<'de> for OneComponent<'_> {
             "battery" => Component::Battery(battery::Battery::deserialize(d)?),
             "engine" => Component::Engine(engine::Engine::deserialize(d)?),
             "body" => Component::Body(body::Body::deserialize(d)?),
+            "lander" => Component::Lander(lander::Lander::deserialize(d)?),
+            "joystick" => {
+                Component::Joystick(joystick::Joystick::deserialize(d)?)
+            }
             "thermal_zone" => Component::ThermalZone(Moved::deserialize(d)?),
             other => {
                 return Err(de::Error::custom(format!(

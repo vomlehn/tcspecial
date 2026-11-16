@@ -71,6 +71,8 @@ pub mod bus;
 pub mod engine;
 pub mod grouped;
 pub mod heater;
+pub mod joystick;
+pub mod lander;
 pub mod load;
 pub mod setting;
 pub mod solar_array;
@@ -102,6 +104,8 @@ pub const TYPES: &[&str] = &[
     "battery",
     "engine",
     "body",
+    "lander",
+    "joystick",
 ];
 
 /// The simulator file's `world` section, as it parses: the vehicle's
@@ -166,6 +170,10 @@ pub enum Component {
     Engine(engine::Engine),
     #[serde(rename = "body")]
     Body(body::Body),
+    #[serde(rename = "lander")]
+    Lander(lander::Lander),
+    #[serde(rename = "joystick")]
+    Joystick(joystick::Joystick),
     /// What a thermal mass was called before it was renamed. Read only to
     /// be refused, saying what it is now: see [`ZONE_IS_A_MASS`].
     #[serde(rename = "thermal_zone")]
@@ -221,6 +229,8 @@ impl Component {
             Component::Battery(e) => &e.name,
             Component::Engine(e) => &e.name,
             Component::Body(e) => &e.name,
+            Component::Lander(e) => &e.name,
+            Component::Joystick(e) => &e.name,
             Component::ThermalZone(e) => &e.name,
         }
     }
@@ -241,6 +251,8 @@ impl Component {
             Component::Battery(_) => "battery",
             Component::Engine(_) => "engine",
             Component::Body(_) => "body",
+            Component::Lander(_) => "lander",
+            Component::Joystick(_) => "joystick",
             Component::ThermalZone(_) => "thermal_zone",
         }
     }
@@ -268,6 +280,8 @@ pub fn settings_of(type_name: &str) -> Option<&'static [&'static str]> {
         "battery" => Some(battery::SETTINGS),
         "engine" => Some(engine::SETTINGS),
         "body" => Some(body::SETTINGS),
+        "lander" => Some(lander::SETTINGS),
+        "joystick" => Some(joystick::SETTINGS),
         _ => None,
     }
 }
@@ -292,6 +306,8 @@ pub fn terminals_of(type_name: &str) -> Option<&'static [Terminal]> {
         "battery" => Some(battery::TERMINALS),
         "engine" => Some(engine::TERMINALS),
         "body" => Some(body::TERMINALS),
+        "lander" => Some(lander::TERMINALS),
+        "joystick" => Some(joystick::TERMINALS),
         _ => None,
     }
 }
@@ -427,6 +443,9 @@ pub enum Resolution {
     Battery(battery::Resolved),
     Engine(engine::Resolved),
     Body(body::Resolved),
+    Lander(lander::Resolved),
+    /// A joystick has no figures: it is set by hand.
+    Joystick,
 }
 
 impl Resolution {
@@ -446,6 +465,8 @@ impl Resolution {
             Resolution::Battery(_) => "battery",
             Resolution::Engine(_) => "engine",
             Resolution::Body(_) => "body",
+            Resolution::Lander(_) => "lander",
+            Resolution::Joystick => "joystick",
         }
     }
 
@@ -483,6 +504,8 @@ impl Resolution {
             Resolution::Battery(_) => battery::TERMINALS,
             Resolution::Engine(_) => engine::TERMINALS,
             Resolution::Body(_) => body::TERMINALS,
+            Resolution::Lander(_) => lander::TERMINALS,
+            Resolution::Joystick => joystick::TERMINALS,
         }
     }
 }
@@ -728,6 +751,8 @@ impl WorldSection {
                 Component::Battery(e) => e.resolve().map(Resolution::Battery),
                 Component::Engine(e) => e.resolve().map(Resolution::Engine),
                 Component::Body(e) => e.resolve().map(Resolution::Body),
+                Component::Lander(e) => e.resolve().map(Resolution::Lander),
+                Component::Joystick(_) => Ok(Resolution::Joystick),
                 Component::ThermalZone(_) => Err(ZONE_IS_A_MASS.to_string()),
             };
             match what {

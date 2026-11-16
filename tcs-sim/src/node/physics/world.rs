@@ -55,6 +55,8 @@ use super::clock::Clock;
 use super::component::{Component, MOST_TERMINALS};
 use super::engine::Engine;
 use super::heater::Heater;
+use super::joystick::Joystick;
+use super::lander::Lander;
 use super::load::Load;
 use super::queue::Queue;
 use super::solar_array::SolarArray;
@@ -143,6 +145,10 @@ impl World {
                         Box::new(Engine::new(*figures))
                     }
                     Resolution::Body(figures) => Box::new(Body::new(*figures)),
+                    Resolution::Lander(figures) => {
+                        Box::new(Lander::new(figures.clone()))
+                    }
+                    Resolution::Joystick => Box::new(Joystick::default()),
                 };
                 (component.name.clone(), component.what.terminals(), made)
             })

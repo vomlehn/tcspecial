@@ -422,7 +422,7 @@ whole, the ground's smaller.</p>
 </div>
 <div class="section" id="the-landing-pad">
 <h2><a class="toc-backref" href="#toc-entry-4">The landing pad</a></h2>
-<p>The pad is a level line twice as wide as the lander, 20 m. Its centre is
+<p>The pad is a level line twice as wide as the lander, 60 m. Its centre is
 within the middle 50% of the display's width, and its height within the
 lowest 20% of the display's height. It is drawn as a level line with a
 short upright mark at each end, so that it is told from the terrain by its
@@ -446,8 +446,10 @@ vehicles do not need it.</p>
 </div>
 <div class="section" id="the-lander">
 <h2><a class="toc-backref" href="#toc-entry-6">The lander</a></h2>
-<p>The lander is a simple lunar-module figure, a body on two splayed legs with
-feet, 10 m wide; its outline is what meets the ground. It starts at the
+<p>The lander is a simple figure of a lunar lander, drawn for this example
+and copied from no other: a body on two splayed legs with feet, about a
+twentieth of the display's height, 30 m, and about as wide as it is tall;
+its outline is what meets the ground. It starts at the
 upper left of the display, wholly in view.</p>
 </div>
 </div>
@@ -479,12 +481,13 @@ square is dragged out of it.</p>
 <h2><a class="toc-backref" href="#toc-entry-9">Thrust, mass and fuel</a></h2>
 <p>Each axis's value, from -100 to 100, is a thrust along that axis, positive
 values pushing the lander towards positive X or Y and negative values
-towards negative X or Y:</p>
+towards negative X or Y. The vehicle reads the value as a ratio, from -1
+to 1, and drives the lander's throttle on that axis with it:</p>
 <pre class="code text literal-block">
-F = value / 100 * a_max * (full mass)
+F = throttle * (full thrust on that axis)
 </pre>
-<p>where <tt class="docutils literal">a_max</tt> is the acceleration, in metres per second squared, that a
-full push gives with a full tank; each axis has its own. The lander's mass
+<p>where each axis's full thrust is a setting, chosen as the acceleration a
+full push is to give with a full tank, times the full mass. The lander's mass
 is its dry mass and the fuel left, so the same push accelerates it more as
 the fuel burns. The fuel flows as</p>
 <pre class="code text literal-block">
@@ -575,20 +578,23 @@ configuration, and one simulator file whose payloads say which
 configuration each belongs to, with one world and one window for both.</li>
 <li><strong>Physics.</strong> In <tt class="docutils literal">tcsprotocol</tt> for the format and in tcs-sim for the
 simulation, as <tt class="docutils literal">body</tt> and <tt class="docutils literal">engine</tt> are:<ul>
-<li><tt class="docutils literal">body2d</tt>, the lander: dry mass, fuel, specific impulse, the Moon's
-gravity, its starting position, its outline and <tt class="docutils literal">a_max</tt> for each
-axis; the X and Y position, velocity and acceleration, the fuel left
-and the touchdown, &quot;flying&quot;, &quot;landed&quot; or &quot;crashed&quot;, as outputs; the X
-and Y thrust, from -100 to 100, as inputs. The thrust, mass and fuel
-are as described above, extending what <tt class="docutils literal">body</tt> and <tt class="docutils literal">engine</tt> already
-do on one axis.</li>
-<li><tt class="docutils literal">terrain</tt>: the display's size, the pad and the lines, and the
-touchdown and leaving the display as described above.</li>
-<li><tt class="docutils literal">joystick</tt>: its X and Y outputs, from -100 to 100, set from tcs-sim's
-window.</li>
+<li><tt class="docutils literal">lander</tt>, the craft and the ground it lands on in one component,
+since a component sees only what is held at its inputs and the ground
+has to see the lander move, and the tank has to be filled again when
+it starts again: dry mass, fuel, specific impulse, full thrust on each
+axis, the Moon's gravity, its start, the display's size, the ground,
+the pad, its outline, the touchdown limits and the pause, read and held
+to the landscape's rules; the throttle on each axis, from -1 to 1, as
+inputs; the X and Y position and velocity, the fuel left, and landed
+and crashed, as outputs. The thrust, mass and fuel are as described
+above, extending what <tt class="docutils literal">body</tt> and <tt class="docutils literal">engine</tt> do on one axis.</li>
+<li><tt class="docutils literal">joystick</tt>: two inputs, which tcs-sim's window drives as a simulated
+payload drives an input, and two outputs, X and Y from -1 to 1, which
+simulated payloads report.</li>
 <li>a unit, metres per second squared, for the acceleration: a type in
 <tt class="docutils literal">tcsprotocol/xtce/types.xtce</tt> and the unit table. It changes the
-interface digest every configuration states.</li>
+interface digest every configuration states, so it comes last, and
+with it the lander's two accelerations as outputs.</li>
 </ul>
 </li>
 <li><strong>tcs-sim's window</strong>, as described above.</li>

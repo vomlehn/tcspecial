@@ -42,7 +42,7 @@ whole, the ground's smaller.
 The landing pad
 ---------------
 
-The pad is a level line twice as wide as the lander, 20 m. Its centre is
+The pad is a level line twice as wide as the lander, 60 m. Its centre is
 within the middle 50% of the display's width, and its height within the
 lowest 20% of the display's height. It is drawn as a level line with a
 short upright mark at each end, so that it is told from the terrain by its
@@ -69,8 +69,10 @@ vehicles do not need it.
 The lander
 ----------
 
-The lander is a simple lunar-module figure, a body on two splayed legs with
-feet, 10 m wide; its outline is what meets the ground. It starts at the
+The lander is a simple figure of a lunar lander, drawn for this example
+and copied from no other: a body on two splayed legs with feet, about a
+twentieth of the display's height, 30 m, and about as wide as it is tall;
+its outline is what meets the ground. It starts at the
 upper left of the display, wholly in view.
 
 Flying it
@@ -104,14 +106,15 @@ Thrust, mass and fuel
 
 Each axis's value, from -100 to 100, is a thrust along that axis, positive
 values pushing the lander towards positive X or Y and negative values
-towards negative X or Y:
+towards negative X or Y. The vehicle reads the value as a ratio, from -1
+to 1, and drives the lander's throttle on that axis with it:
 
 .. code-block:: text
 
-   F = value / 100 * a_max * (full mass)
+   F = throttle * (full thrust on that axis)
 
-where ``a_max`` is the acceleration, in metres per second squared, that a
-full push gives with a full tank; each axis has its own. The lander's mass
+where each axis's full thrust is a setting, chosen as the acceleration a
+full push is to give with a full tank, times the full mass. The lander's mass
 is its dry mass and the fuel left, so the same push accelerates it more as
 the fuel burns. The fuel flows as
 
@@ -209,20 +212,23 @@ In this order, each stage checked before the next:
 2. **Physics.** In ``tcsprotocol`` for the format and in tcs-sim for the
    simulation, as ``body`` and ``engine`` are:
 
-   * ``body2d``, the lander: dry mass, fuel, specific impulse, the Moon's
-     gravity, its starting position, its outline and ``a_max`` for each
-     axis; the X and Y position, velocity and acceleration, the fuel left
-     and the touchdown, "flying", "landed" or "crashed", as outputs; the X
-     and Y thrust, from -100 to 100, as inputs. The thrust, mass and fuel
-     are as described above, extending what ``body`` and ``engine`` already
-     do on one axis.
-   * ``terrain``: the display's size, the pad and the lines, and the
-     touchdown and leaving the display as described above.
-   * ``joystick``: its X and Y outputs, from -100 to 100, set from tcs-sim's
-     window.
+   * ``lander``, the craft and the ground it lands on in one component,
+     since a component sees only what is held at its inputs and the ground
+     has to see the lander move, and the tank has to be filled again when
+     it starts again: dry mass, fuel, specific impulse, full thrust on each
+     axis, the Moon's gravity, its start, the display's size, the ground,
+     the pad, its outline, the touchdown limits and the pause, read and held
+     to the landscape's rules; the throttle on each axis, from -1 to 1, as
+     inputs; the X and Y position and velocity, the fuel left, and landed
+     and crashed, as outputs. The thrust, mass and fuel are as described
+     above, extending what ``body`` and ``engine`` do on one axis.
+   * ``joystick``: two inputs, which tcs-sim's window drives as a simulated
+     payload drives an input, and two outputs, X and Y from -1 to 1, which
+     simulated payloads report.
    * a unit, metres per second squared, for the acceleration: a type in
      ``tcsprotocol/xtce/types.xtce`` and the unit table. It changes the
-     interface digest every configuration states.
+     interface digest every configuration states, so it comes last, and
+     with it the lander's two accelerations as outputs.
 
 3. **tcs-sim's window**, as described above.
 4. **The vehicles**, ``lander-a`` and ``lander-b``, as described above.

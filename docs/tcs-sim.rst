@@ -387,6 +387,39 @@ Each component is one simple part, of one of these types:
      velocity             how fast it starts, up more than nought:
                           "-20 m/s"
 
+   lander                 a craft flown in two dimensions over a
+                          landscape, burning its fuel, landing or
+                          crashing, and starting again
+     component            the name connections and payloads use
+     dry_mass             its mass with an empty tank: "6000 kg"
+     fuel                 the fuel it starts with: "2000 kg"
+     isp                  its thrusters' specific impulse, as a length of
+                          time: "311 s"
+     thrust_x             its full thrust along X, either way: "12000 N"
+     thrust_y             its full thrust along Y, either way: "24000 N"
+     gravity              the gravity it falls in, towards negative Y:
+                          "1.62 m/s2"
+     x, y                 where it starts, the place between its feet:
+                          "60 m", "540 m"
+     width, height        the display, which is its world: "1000 m",
+                          "600 m"
+     ground               the ground, points from the left edge to the
+                          right, each x,y, then m: "0,200 ... 1000,150 m"
+     pad                  two points of the ground, level, then m:
+                          "470,90 530,90 m"
+     outline              its outline, lines of points about the place
+                          between its feet, parted by |, then m
+     landing_speed        the fastest down it may touch the pad and land:
+                          "3.05 m/s"
+     landing_drift        the fastest sideways it may touch the pad and
+                          land: "1.22 m/s"
+     pause                how long it stays down before it starts again:
+                          "3 s"
+
+   joystick               two axes set by hand from tcs-sim's window
+     component            the name connections, payloads and the window
+                          use
+
 Every figure is written with its unit, and one without it, or in another
 unit, is refused, saying what to write: a bare ``60`` could be watts or
 kelvin a second. A fraction, which has no unit, is written bare. A
@@ -429,6 +462,20 @@ output, carrying a value in one unit or a decision:
                   altitude      out   m
                   velocity      out   m/s, up more than nought
                   contact       out   a decision: asserted on the ground
+   lander         throttle_x    in    a ratio, held within minus one and one
+                  throttle_y    in    a ratio, held within minus one and one
+                  x, y          out   m, the place between its feet
+                  velocity_x    out   m/s
+                  velocity_y    out   m/s, up more than nought
+                  fuel          out   a ratio, the fraction of a full tank
+                  landed        out   a decision: asserted while it is down,
+                                      having landed
+                  crashed       out   a decision: asserted while it is down,
+                                      having crashed
+   joystick       set_x         in    a ratio, driven by tcs-sim's window
+                  set_y         in    a ratio, driven by tcs-sim's window
+                  x, y          out   a ratio each, held within minus one
+                                      and one
 
 A terminal is written as the component's name and its own, joined by a dot:
 ``zone.temperature``. A connection goes from an output to an input of the
@@ -447,13 +494,34 @@ times its full thrust, and it burns that over its specific impulse in fuel
 until there is none, when it stops. A body falls by the rocket equation with
 gravity, which has a closed form while its force and its flow are held, and is
 set down when it reaches the ground, a moment found ahead of time and met
-exactly; it stays down until a force beating its weight lifts it. A zone cools towards its surroundings with its time constant and
+exactly; it stays down until a force beating its weight lifts it. A zone
+cools towards its surroundings with its time constant and
 is warmed by the heat joined to it, its capacity turning watts into kelvin a
 second; with a fifty second constant, twenty joules a kelvin and a hundred
 and twenty watts, it would settle three hundred kelvin above its
 surroundings. It starts at the world's ambient temperature with the heaters off, because a
 vehicle coming up cold is the case a thermostat exists for, unless it states
 ``start``, and then there.
+
+A lander is flown along each axis by its throttle times that axis's full
+thrust, positive towards positive X, to the right, or positive Y, up, and
+burns ``(|Fx| + |Fy|) / (isp * 9.80665)`` of fuel a second, so that its mass,
+its dry mass and the fuel left, falls as it flies and the same push
+accelerates it more as the tank empties; each axis is the rocket equation a
+body falls by, with gravity on Y alone, until the tank is dry. Its landscape is
+held to rules as it is read: the ground runs from the left edge to the right,
+each point further right than the last, no steeper than 70 degrees and no
+higher than 60% of the height; the pad is two of its points, level, twice
+the lander's width, its middle within the middle half of the width and no
+higher than a fifth of the height; and the lander starts wholly within the
+display. The moment any of its outline first meets the ground is found ahead
+of time, by looking along its path; it has landed if all of it is over the
+pad, it meets nothing but the pad, and it is going no faster than
+``landing_speed`` down and ``landing_drift`` sideways, and has crashed
+otherwise, or if it leaves the display altogether. Down, it stays still for
+``pause``, and then starts again where it started, with a full tank. A
+joystick gives out what tcs-sim's window sets it to, each axis held within
+minus one and one.
 
 A simulated payload is joined to one terminal by a setting of its own, which
 like every other setting may be stated on a group instead:

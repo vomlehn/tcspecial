@@ -122,6 +122,20 @@
                     "items": {
                       "$ref": "#/$defs/body"
                     }
+                  },
+                  "type lander": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/$defs/lander"
+                    }
+                  },
+                  "type joystick": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "$ref": "#/$defs/joystick"
+                    }
                   }
                 },
                 "additionalProperties": false
@@ -947,6 +961,146 @@
         "gravity",
         "altitude",
         "velocity"
+      ],
+      "additionalProperties": false
+    },
+    "lander": {
+      "description": "A lander, flown in two dimensions over a landscape: its terminals are throttle_x and throttle_y, inputs taking ratios from -1 to 1; x and y, in m; velocity_x and velocity_y, in m/s; fuel, the fraction of a full tank left; and landed and crashed, decisions asserted while it is down. Touching the ground, leaving the display, running dry and starting again are events, found ahead of time.",
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string",
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
+        },
+        "dry_mass": {
+          "type": [
+            "string"
+          ],
+          "description": "Its mass with an empty tank, written with its unit: `6000 kg`."
+        },
+        "fuel": {
+          "type": [
+            "string"
+          ],
+          "description": "The fuel it starts with, written with its unit: `2000 kg`."
+        },
+        "isp": {
+          "type": [
+            "string"
+          ],
+          "description": "Its thrusters' specific impulse, as a length of time: `311 s`."
+        },
+        "thrust_x": {
+          "type": [
+            "string"
+          ],
+          "description": "Its full thrust along X, either way, written with its unit: `12000 N`."
+        },
+        "thrust_y": {
+          "type": [
+            "string"
+          ],
+          "description": "Its full thrust along Y, either way, written with its unit: `24000 N`."
+        },
+        "gravity": {
+          "type": [
+            "string"
+          ],
+          "description": "The gravity it falls in, towards negative Y, written with its unit: `1.62 m/s2`."
+        },
+        "x": {
+          "type": [
+            "string"
+          ],
+          "description": "Where it starts, the place between its feet, written with its unit: `60 m`."
+        },
+        "y": {
+          "type": [
+            "string"
+          ],
+          "description": "How high it starts, written with its unit: `540 m`."
+        },
+        "width": {
+          "type": [
+            "string"
+          ],
+          "description": "The display's width, written with its unit: `1000 m`."
+        },
+        "height": {
+          "type": [
+            "string"
+          ],
+          "description": "The display's height, written with its unit: `600 m`."
+        },
+        "ground": {
+          "type": [
+            "string"
+          ],
+          "description": "The ground: points from the left edge to the right, each x,y, the last followed by m. Each further right than the last, no steeper than 70 degrees between them, none below nought nor higher than 60% of the height."
+        },
+        "pad": {
+          "type": [
+            "string"
+          ],
+          "description": "The pad: two points of the ground, one after the other and level, followed by m. Twice as wide as the lander, its middle within the middle half of the width, no higher than a fifth of the height."
+        },
+        "outline": {
+          "type": [
+            "string"
+          ],
+          "description": "The lander's outline: lines of points about the place between its feet, each x,y, the lines parted by |, the last point followed by m."
+        },
+        "landing_speed": {
+          "type": [
+            "string"
+          ],
+          "description": "The fastest it may be going down as it touches the pad and still be landed, written with its unit: `3.05 m/s`."
+        },
+        "landing_drift": {
+          "type": [
+            "string"
+          ],
+          "description": "The fastest it may be going sideways as it touches the pad and still be landed, written with its unit: `1.22 m/s`."
+        },
+        "pause": {
+          "type": [
+            "string"
+          ],
+          "description": "How long it stays down before it starts again, as a length of time: `3 s`."
+        }
+      },
+      "required": [
+        "component",
+        "dry_mass",
+        "fuel",
+        "isp",
+        "thrust_x",
+        "thrust_y",
+        "gravity",
+        "x",
+        "y",
+        "width",
+        "height",
+        "ground",
+        "pad",
+        "outline",
+        "landing_speed",
+        "landing_drift",
+        "pause"
+      ],
+      "additionalProperties": false
+    },
+    "joystick": {
+      "description": "A joystick, set by hand from tcs-sim's window: its terminals are set_x and set_y, inputs taking ratios from -1 to 1, which the window drives, and x and y, which give them out for simulated payloads to report.",
+      "type": "object",
+      "properties": {
+        "component": {
+          "type": "string",
+          "description": "What it is called, which a connection or a simulated payload names it by: not empty, and with no dot in it."
+        }
+      },
+      "required": [
+        "component"
       ],
       "additionalProperties": false
     }

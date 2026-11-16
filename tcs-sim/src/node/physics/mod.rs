@@ -18,6 +18,8 @@ pub mod clock;
 pub mod component;
 pub mod engine;
 pub mod heater;
+pub mod joystick;
+pub mod lander;
 pub mod load;
 pub mod queue;
 pub mod random;

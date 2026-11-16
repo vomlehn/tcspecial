@@ -268,7 +268,11 @@ the configuration: <code>tcs_consolidation_unpack</code> gives each
 input’s name and value, a string or bytes back in its place from the
 datum’s end, and <code>tcs_consolidation_text</code> writes it as
 <code>input=value</code> text. <code>examples/consolidation.c</code>
-uses them, built as C and as C++.</li>
+uses them on a datum given on its command line, and
+<code>examples/consolidator-station.c</code> on each datum a
+consolidator sends as it comes down: tcspecial’s flown test of the
+consolidator example builds it as C and as C++ and is the ground with
+it.</li>
 <li><strong>Data up.</strong> <code>tcs_uplink_open</code> opens the way
 up to a gateway node that binds an address and port aboard, and each
 <code>tcs_uplink_send</code> sends one datum there, which leaves the

@@ -3228,7 +3228,10 @@ nothing holds, and runs ``battery_age.py`` with Python 3: a datum with only
 the sun reported carries the others' defaults, the age's among them, one
 with all three carries all three and an age of a second or two, and a later
 one in which only the sun is new carries the other two held, and an age
-that has grown.
+that has grown. A second test there is the ground in C instead:
+``tcsmoc-c/examples/consolidator-station.c``, built as C and as C++, hears
+the beacon, connects, and prints each datum as ``input=value`` text, which
+must carry the three readings and the age.
 
 The fprime example
 ------------------

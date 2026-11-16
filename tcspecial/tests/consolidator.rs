@@ -8,11 +8,15 @@
 //! to a directory of the test's. The test plays the three sensors, and is
 //! the ground through tcsmoc's `GatewayReceiver`, as tcs-moc is; the
 //! battery's age is the example's own program, `battery_age.py`, which needs
-//! Python 3.
+//! Python 3. A second test is the ground through tcsmoc-c instead, with the
+//! C ground station `tcsmoc-c/examples/consolidator-station.c` built as C
+//! and as C++.
 
 use std::net::SocketAddr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use tcsmoc::gateway::GatewayReceiver;
@@ -96,22 +100,43 @@ fn age_of(datum: &[u8]) -> u16 {
     u16::from_be_bytes([datum[7], datum[8]])
 }
 
-#[test]
-fn the_datum_carries_defaults_then_readings() {
+/// The consolidator example, moved so that it runs beside anything else.
+struct Example {
+    /// The moved configuration, in the test's directory.
+    configuration: PathBuf,
+    /// The port the sun's sensor is read at.
+    sun: u16,
+    /// The port the wheel's sensor is read at.
+    wheel: u16,
+    /// The port the battery's sensor is read at.
+    battery: u16,
+    /// The port tcspecial takes commands at.
+    take_at: u16,
+}
+
+/// Writes the consolidator example into `dir`, each of its sockets moved to
+/// a port nothing holds, and its log and state into `dir`.
+///
+/// # Arguments
+///
+/// * `dir`      - The test's directory.
+/// * `commands` - The port the ground sends its commands from.
+///
+/// # Returns
+///
+/// Where the configuration is, and the ports a test needs.
+fn example(dir: &Path, commands: u16) -> Example {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/consolidator/consolidator.ytcs");
-    let text = std::fs::read_to_string(&example).expect("the example reads");
-    let dir = tempfile::tempdir().expect("a directory");
+    let mut text =
+        std::fs::read_to_string(&example).expect("the example reads");
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
-    std::fs::create_dir(dir.path().join("telemetry"))
-        .expect("the log's directory");
+    std::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
 
     let (sun, wheel, battery, base) = (free(), free(), free(), free());
-    // The ground's command link: where tcs_cmd.send says it sends from,
-    // and where tcs_cmd.recv says tcspecial takes them.
-    let (commands, take_at) = (bound(), free());
-    let mut text = text;
+    // Where tcs_cmd.recv says tcspecial takes the ground's commands.
+    let take_at = free();
     for (was, now) in [
         (":5001\"", format!(":{sun}\"")),
         (":5002\"", format!(":{wheel}\"")),
@@ -124,14 +149,14 @@ fn the_datum_carries_defaults_then_readings() {
         ("127.0.0.1:6100", format!("127.0.0.1:{}", free())),
         ("0.0.0.0:6000", format!("127.0.0.1:{}", free())),
         ("0.0.0.0:4000", format!("127.0.0.1:{take_at}")),
-        ("127.0.0.1:4100", format!("127.0.0.1:{}", port(&commands))),
+        ("127.0.0.1:4100", format!("127.0.0.1:{commands}")),
         (
             "/tmp/telemetry",
-            dir.path().join("telemetry").display().to_string(),
+            dir.join("telemetry").display().to_string(),
         ),
         (
             "/tmp/tcspecial-consolidator.state",
-            dir.path().join("state").display().to_string(),
+            dir.join("state").display().to_string(),
         ),
         (
             "\"examples/consolidator/battery_age.py\"",
@@ -145,19 +170,30 @@ fn the_datum_carries_defaults_then_readings() {
     ] {
         text = moved(&text, was, &now);
     }
-    let configuration = dir.path().join("consolidator.ytcs");
+    let configuration = dir.join("consolidator.ytcs");
     std::fs::write(&configuration, &text).expect("written");
+    Example {
+        configuration,
+        sun,
+        wheel,
+        battery,
+        take_at,
+    }
+}
 
-    // The ground, as the example's is: the gateway node's one port, for
-    // housekeeping's datum, handed out whole.
-    let graph = Graph::load(&configuration).expect("it reads");
-    let mut ground =
-        GatewayReceiver::open(&graph, "gateway").expect("the ground opens");
-    assert_eq!(ground.sources(), ["housekeeping"]);
-
-    let _flying = common::Flying::quiet(
+/// Starts tcspecial on a configuration, quietly.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration it flies.
+///
+/// # Returns
+///
+/// tcspecial, stopped when this is dropped.
+fn flying(configuration: &Path) -> common::Flying {
+    common::Flying::quiet(
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
-            .arg(&configuration)
+            .arg(configuration)
             .arg("--quiet")
             .arg("--simulate=all")
             .arg("--no-memlock")
@@ -166,7 +202,30 @@ fn the_datum_carries_defaults_then_readings() {
             .stderr(Stdio::null())
             .spawn()
             .expect("tcspecial starts"),
-    );
+    )
+}
+
+#[test]
+fn the_datum_carries_defaults_then_readings() {
+    let dir = tempfile::tempdir().expect("a directory");
+    // The ground's command link: where tcs_cmd.send says it sends from.
+    let commands = bound();
+    let Example {
+        configuration,
+        sun,
+        wheel,
+        battery,
+        take_at,
+    } = example(dir.path(), port(&commands));
+
+    // The ground, as the example's is: the gateway node's one port, for
+    // housekeeping's datum, handed out whole.
+    let graph = Graph::load(&configuration).expect("it reads");
+    let mut ground =
+        GatewayReceiver::open(&graph, "gateway").expect("the ground opens");
+    assert_eq!(ground.sources(), ["housekeeping"]);
+
+    let _flying = flying(&configuration);
 
     // Nothing comes down until the ground has matched the start, with a
     // CONNECT carrying the configuration's checksum.
@@ -230,4 +289,210 @@ fn the_datum_carries_defaults_then_readings() {
             datum[7..].to_vec(),
         ])
     );
+}
+
+/// Builds `libtcsmoc_c.a` from the source as it is now, as tcsmoc-c's own
+/// tests do (`tcsmoc-c/tests/c_and_cpp.rs`), and says where it is.
+///
+/// # Returns
+///
+/// The library's path: in the directory above this test's own.
+///
+/// # Panics
+///
+/// If cargo cannot be run or the library does not build.
+fn tcsmoc_c_library() -> PathBuf {
+    let test = std::env::current_exe().expect("where this test is");
+    let target = test
+        .parent()
+        .and_then(Path::parent)
+        .expect("the target directory");
+    let mut build = Command::new(env!("CARGO"));
+    build.args(["build", "--quiet", "-p", "tcsmoc-c", "--lib"]);
+    if target.file_name().and_then(|name| name.to_str()) == Some("release") {
+        build.arg("--release");
+    }
+    let built = build.output().expect("cargo runs");
+    assert!(
+        built.status.success(),
+        "tcsmoc-c does not build:\n{}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    target.join("libtcsmoc_c.a")
+}
+
+/// Compiles the C ground station against `tcsmoc-c.h` and the library.
+///
+/// # Arguments
+///
+/// * `compiler` - "gcc" or "g++".
+/// * `standard` - The language standard's flag, such as "-std=c11".
+/// * `library`  - The `libtcsmoc_c.a` to link with.
+/// * `out`      - Where the program is written.
+///
+/// # Returns
+///
+/// The program's path, or `None` where there is no such compiler.
+///
+/// # Panics
+///
+/// If the compiler cannot be run for another reason, or fails.
+fn station(
+    compiler: &str,
+    standard: &str,
+    library: &Path,
+    out: &Path,
+) -> Option<PathBuf> {
+    let tcsmoc_c = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tcsmoc-c");
+    let ran = Command::new(compiler)
+        .args([standard, "-Wall", "-Wextra", "-Werror", "-pedantic"])
+        .arg(tcsmoc_c.join("examples/consolidator-station.c"))
+        .arg("-I")
+        .arg(tcsmoc_c.join("include"))
+        .arg(library)
+        .args(["-lpthread", "-ldl", "-lm", "-o"])
+        .arg(out)
+        .output();
+    let ran = match ran {
+        Ok(ran) => ran,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("there is no {compiler}, so the station is not built");
+            return None;
+        }
+        Err(e) => panic!("{compiler} could not be run: {e}"),
+    };
+    assert!(
+        ran.status.success(),
+        "{compiler}:\n{}",
+        String::from_utf8_lossy(&ran.stderr)
+    );
+    Some(out.to_path_buf())
+}
+
+/// Runs a program to its end, killing it if it has not ended in `most`.
+///
+/// # Arguments
+///
+/// * `command` - The program, its arguments given.
+/// * `most`    - How long it may take.
+///
+/// # Returns
+///
+/// What it printed, and how it ended.
+fn ran_within(command: &mut Command, most: Duration) -> std::process::Output {
+    let child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("it starts");
+    let pid = child.id() as libc::pid_t;
+    let ended = Arc::new(AtomicBool::new(false));
+    let watch = {
+        let ended = ended.clone();
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + most;
+            while Instant::now() < deadline {
+                if ended.load(Ordering::SeqCst) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            // SAFETY: a signal sent to the child this test started, which
+            // has not been waited for, so its id is still its own.
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+        })
+    };
+    let output = child.wait_with_output().expect("it is waited for");
+    ended.store(true, Ordering::SeqCst);
+    let _ = watch.join();
+    output
+}
+
+/// The C ground station, built as C and as C++, takes the consolidator's
+/// data as tcspecial sends it: it hears the beacon, connects, is matched,
+/// and takes each datum apart through tcsmoc-c.h into the three sensors'
+/// readings, in order, and the battery's age.
+#[test]
+fn a_c_ground_station_takes_the_datum_apart() {
+    let library = tcsmoc_c_library();
+    let dir = tempfile::tempdir().expect("a directory");
+    let Example {
+        configuration,
+        sun,
+        wheel,
+        battery,
+        ..
+    } = example(dir.path(), free());
+    let _flying = flying(&configuration);
+
+    // The three sensors, from a thread until the stations are done: the sun
+    // 0x0304, the wheel -7 and the battery 0x55.
+    let done = Arc::new(AtomicBool::new(false));
+    let sensors = {
+        let done = done.clone();
+        std::thread::spawn(move || {
+            let sensors = bound();
+            let at = |port: u16| -> SocketAddr {
+                format!("127.0.0.1:{port}").parse().expect("an address")
+            };
+            let readings: [(SocketAddr, &[u8]); 3] = [
+                (at(sun), &[0x03, 0x04]),
+                (at(wheel), &[0xff, 0xff, 0xff, 0xf9]),
+                (at(battery), &[0x55]),
+            ];
+            while !done.load(Ordering::SeqCst) {
+                for (at, reading) in &readings {
+                    sensors.send_to(reading, at).expect("sent");
+                }
+                std::thread::sleep(Duration::from_millis(200));
+            }
+        })
+    };
+
+    for (compiler, standard) in [("gcc", "-std=c11"), ("g++", "-std=c++17")] {
+        let Some(program) = station(
+            compiler,
+            standard,
+            &library,
+            &dir.path().join(format!("station_{compiler}")),
+        ) else {
+            continue;
+        };
+        let ran = ran_within(
+            Command::new(&program).arg(&configuration).args([
+                "gateway",
+                "housekeeping",
+                "6",
+            ]),
+            Duration::from_secs(60),
+        );
+        let said = String::from_utf8_lossy(&ran.stdout);
+        assert!(
+            ran.status.success(),
+            "{compiler}: {}\n{said}{}",
+            ran.status,
+            String::from_utf8_lossy(&ran.stderr)
+        );
+        let lines: Vec<&str> = said.lines().collect();
+        assert!(lines[0].starts_with("beacon: tcspecial v"), "{said}");
+        assert_eq!(lines[1..3], ["connect: agrees", "matched"], "{said}");
+        let datums = &lines[3..];
+        assert_eq!(datums.len(), 6, "{compiler}: {said}");
+        assert!(
+            datums.iter().all(|line| line.starts_with("datum: sun=")),
+            "{compiler}: every datum takes apart: {said}"
+        );
+        // Once the battery's age has come, every member is a reading.
+        assert!(
+            datums.iter().any(|line| {
+                line.strip_prefix(
+                    "datum: sun=772 wheel=-7 battery=85 battery_age=",
+                )
+                .is_some_and(|age| age != "65535")
+            }),
+            "{compiler}: {said}"
+        );
+    }
+    done.store(true, Ordering::SeqCst);
+    sensors.join().expect("the sensors end");
 }

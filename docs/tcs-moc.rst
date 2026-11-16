@@ -168,7 +168,10 @@ handler nobody can speak for.
   coming: see `When data last arrived`_.
 
 ``From payload``
-  What arrived, as the ground received it.
+  What arrived, as the ground received it: a value in its unit, or its
+  first bytes in hexadecimal -- and a consolidator's datum by its members,
+  ``sun=21509 wheel=-7 ...``, as many as the panel has room for, with all
+  of them in its ``Configuration``.
 
 ``Recv``
   How many packets have arrived from that payload, counted from the moment
@@ -348,7 +351,9 @@ Commanding a node
    it has refused, and each input's ``new``, ``held`` and ``default`` --
    how many datums it went in new, held, and with its default. The
    consolidator's datum arrives in its own panel, as any node's does; its
-   inputs have no panels of their own.
+   inputs have no panels of their own. Its ``Configuration`` begins with
+   its latest datum, under "latest datum", a member to a line, whether or
+   not a ``Query`` has been answered.
 
 3. ``Disable`` on ``to_k3``'s panel sends ``STOP_NODE`` for its device id.
    The vehicle answers ``Success``, ``Last Response`` says so, naming the

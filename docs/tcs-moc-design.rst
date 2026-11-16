@@ -227,6 +227,22 @@ Requirement
     never changes is worse than none.
 
 Requirement
+    A consolidator's datum is shown by its members, each ``input=value``,
+    as ``defaults`` writes a default, in the order of its ``world-in``: on
+    the panel's ``From payload`` line, cut short with an ellipsis where the
+    panel is too narrow for them, and whole, a member to a line, under
+    "latest datum" at the top of its ``Configuration``. Every other node's
+    datum is shown as before, a value in its unit or its first bytes in
+    hexadecimal. The layout the members are read by is the configuration's
+    (``consolidation::Layout``), worked out once as tcs-moc starts, and the
+    text is written as each datum is received, by
+    ``Layout::write_text``, into storage the receiving loop reuses.
+
+    A panel keeps the grid's one size rather than growing to the text: the
+    grid lays every panel out alike, and the popup, which scrolls, has the
+    room a consolidation of many inputs needs.
+
+Requirement
     Query still asks the spacecraft directly, and sets both the status and
     the counters from what it answers. It is the one path by which the
     spacecraft's own account of a handler -- its state, its byte counters,

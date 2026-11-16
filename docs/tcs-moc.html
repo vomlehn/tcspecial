@@ -527,7 +527,10 @@ handler nobody can speak for.</p>
 arrives at. The MOC's own clock, and read for whether anything is still
 coming: see <a class="reference internal" href="#when-data-last-arrived">When data last arrived</a>.</dd>
 <dt><tt class="docutils literal">From payload</tt></dt>
-<dd>What arrived, as the ground received it.</dd>
+<dd>What arrived, as the ground received it: a value in its unit, or its
+first bytes in hexadecimal -- and a consolidator's datum by its members,
+<tt class="docutils literal">sun=21509 <span class="pre">wheel=-7</span> ...</tt>, as many as the panel has room for, with all
+of them in its <tt class="docutils literal">Configuration</tt>.</dd>
 <dt><tt class="docutils literal">Recv</tt></dt>
 <dd>How many packets have arrived from that payload, counted from the moment
 the MOC started: <tt class="docutils literal">3 recv</tt>.</dd>
@@ -671,7 +674,9 @@ started&quot;, to the datums it has sent, in all and by trigger, the readings
 it has refused, and each input's <tt class="docutils literal">new</tt>, <tt class="docutils literal">held</tt> and <tt class="docutils literal">default</tt> --
 how many datums it went in new, held, and with its default. The
 consolidator's datum arrives in its own panel, as any node's does; its
-inputs have no panels of their own.</p>
+inputs have no panels of their own. Its <tt class="docutils literal">Configuration</tt> begins with
+its latest datum, under &quot;latest datum&quot;, a member to a line, whether or
+not a <tt class="docutils literal">Query</tt> has been answered.</p>
 </li>
 <li><p class="first"><tt class="docutils literal">Disable</tt> on <tt class="docutils literal">to_k3</tt>'s panel sends <tt class="docutils literal">STOP_NODE</tt> for its device id.
 The vehicle answers <tt class="docutils literal">Success</tt>, <tt class="docutils literal">Last Response</tt> says so, naming the

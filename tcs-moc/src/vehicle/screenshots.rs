@@ -801,6 +801,7 @@ impl Station {
                 })
                 .collect(),
         );
+        let consolidated = consolidated_of(&graph);
         let count = rows_in_order.len();
         let model = Rc::new(VecModel::from(rows_in_order));
         ui.set_dh_model(ModelRc::from(model.clone()));
@@ -939,7 +940,7 @@ impl Station {
             let plot = plot.clone();
             let feed = pings.map(|(_, feed)| feed);
             std::thread::spawn(move || {
-                serve(receiver, rows, units, arrivals, feed, plot)
+                serve(receiver, rows, units, consolidated, arrivals, feed, plot)
             });
         }
 

@@ -61,11 +61,25 @@ pub struct Arrival {
     /// number by anything that guessed from the width -- see
     /// `tcsprotocol::graph::units::unit_of`.
     pub unit: Option<Unit>,
+    /// What came from a consolidator, as text: each member `input=value`,
+    /// one to a line, as `tcsprotocol::consolidation::Layout::write_text`
+    /// writes it, and empty for any other node.
+    ///
+    /// Written as the datum is received, because only then is the whole of
+    /// it there: `data` keeps its head alone. Kept here, and written into
+    /// again by each arrival, so that the receiving loop allocates nothing
+    /// once its text has grown to the longest it has written.
+    pub members: String,
 }
 
 impl Arrival {
     /// The two strings a panel shows: when, and what.
     pub fn panel_lines(&self) -> (String, String) {
+        // A consolidation on the panel's one line, a space between its
+        // members; its Configuration shows it a member to a line.
+        if !self.members.is_empty() {
+            return (self.at.time_of_day(), self.members.replace('\n', " "));
+        }
         let (_, data) = self.data.panel_lines_of(self.unit);
         (self.at.time_of_day(), data)
     }
@@ -104,6 +118,7 @@ mod tests {
             data,
             packets: 1,
             unit: Some(Unit::Kelvin),
+            members: String::new(),
         };
         assert_eq!(
             arrival.panel_lines(),
@@ -116,6 +131,7 @@ mod tests {
             data,
             packets: 1,
             unit: None,
+            members: String::new(),
         };
         assert_eq!(
             arrival.panel_lines(),
@@ -140,6 +156,7 @@ mod tests {
             data,
             packets: 7,
             unit: None,
+            members: String::new(),
         };
 
         // The time is the ground's clock, as every time in the window is, and

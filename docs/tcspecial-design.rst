@@ -3417,8 +3417,9 @@ Requirement
     XTCE, each member a parameter named for the consolidator and the input;
     F´ has it as one channel, holding the datum as it holds any datum that
     is not a number, a value or a decision; and tcs-moc shows it in the
-    consolidator's panel as it shows any datum it does not decode. Its
-    inputs have no links, ports, APIDs, channels or panels of their own.
+    consolidator's panel by its members, each ``input=value``, as
+    ``consolidation::Layout::write_text`` writes them. Its inputs have no
+    links, ports, APIDs, channels or panels of their own.
     Nothing on the ground is written for consolidators alone.
 
 Requirement

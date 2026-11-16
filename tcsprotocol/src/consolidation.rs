@@ -23,6 +23,7 @@
 //! the same way. Packing allocates nothing, since the vehicle packs in its
 //! loop, and neither does taking a datum apart into buffers made before.
 
+use std::fmt::Write as _;
 use std::ops::Range;
 
 use crate::graph::link_types::{carries, Carries};
@@ -535,10 +536,10 @@ impl Layout {
                 out.len()
             ));
         }
-        self.walk(datum, |n, value| {
+        self.walk(datum, |n, found| {
             let slot = &mut each[n];
-            slot.end = slot.start + value.len();
-            out[slot.clone()].copy_from_slice(value);
+            slot.end = slot.start + found.len();
+            out[slot.clone()].copy_from_slice(&datum[found]);
         })
     }
 
@@ -557,16 +558,91 @@ impl Layout {
         self.walk(datum, |_, _| {})
     }
 
-    /// Finds each input's value in a datum, checking it as it goes: the
-    /// one statement of how a datum is read, which [`Layout::unpack_into`]
-    /// and [`Layout::check`] share.
+    /// Writes a datum as text, each member `input=value` in the order of the
+    /// inputs, `between` between them, as `defaults` writes a default: a
+    /// number in decimal, a value in its unit, a boolean `1` or `0`, a
+    /// structure's fields `name=value` in parentheses, a string in quotes
+    /// and bytes in hexadecimal in square brackets. For a ground station
+    /// that shows a consolidation to a person.
+    ///
+    /// # Arguments
+    ///
+    /// * `datum`   - The datum.
+    /// * `each`    - Room to find each input's value in: at least as long as
+    ///               there are inputs.
+    /// * `between` - What goes between one member and the next: a space,
+    ///               for a line, or a newline, for a member to a line.
+    /// * `out`     - Where the text goes, appended to; it allocates nothing
+    ///               where it has room.
+    ///
+    /// # Errors
+    ///
+    /// As [`Layout::unpack_into`], for the datum; nothing is written then.
+    pub fn write_text(
+        &self,
+        datum: &[u8],
+        each: &mut [Range<usize>],
+        between: &str,
+        out: &mut String,
+    ) -> Result<(), String> {
+        if each.len() < self.inputs.len() {
+            return Err(format!(
+                "room for {} inputs, and the consolidation has {}",
+                each.len(),
+                self.inputs.len()
+            ));
+        }
+        self.walk(datum, |n, found| each[n] = found)?;
+        for (n, (input, found)) in
+            self.inputs.iter().zip(each.iter()).enumerate()
+        {
+            let value = &datum[found.clone()];
+            if n > 0 {
+                out.push_str(between);
+            }
+            let _ = write!(out, "{}=", input.name);
+            match &input.kind {
+                LinkType::Basic(Basic::String(_)) => {
+                    // Checked as text as the datum was read.
+                    let _ = write!(
+                        out,
+                        "\"{}\"",
+                        std::str::from_utf8(value).unwrap_or_default()
+                    );
+                }
+                LinkType::Basic(Basic::Bytes(_)) => {
+                    out.push('[');
+                    for (k, byte) in value.iter().enumerate() {
+                        if k > 0 {
+                            out.push(' ');
+                        }
+                        let _ = write!(out, "{byte:02x}");
+                    }
+                    out.push(']');
+                }
+                LinkType::Structure(_) => {
+                    out.push('(');
+                    crate::link_text::write_text(&input.kind, value, out)?;
+                    out.push(')');
+                }
+                kind => crate::link_text::write_text(kind, value, out)?,
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds where each input's value is in a datum, checking it as it
+    /// goes, allocating nothing and copying nothing: the one statement of how
+    /// a datum is read, which [`Layout::unpack_into`], [`Layout::check`] and
+    /// [`Layout::write_text`] share.
     ///
     /// # Arguments
     ///
     /// * `datum` - The datum.
-    /// * `found` - Given each input's position and its value, the members
-    ///             of a fixed width first and then those that vary, each
-    ///             once and only where it is of its type.
+    /// * `found` - Given each input's position and where its value is in
+    ///             the datum, the members of a fixed width first and then
+    ///             those that vary, each once and only where it is of its
+    ///             type.
     ///
     /// # Errors
     ///
@@ -576,7 +652,7 @@ impl Layout {
     fn walk(
         &self,
         datum: &[u8],
-        mut found: impl FnMut(usize, &[u8]),
+        mut found: impl FnMut(usize, Range<usize>),
     ) -> Result<(), String> {
         let short = || format!("a datum of {} bytes ends early", datum.len());
         let damaged = |input: &Input| {
@@ -590,11 +666,11 @@ impl Layout {
         for (n, input) in self.inputs.iter().enumerate() {
             if let Shape::Fixed { bytes } = input.shape {
                 let value = datum.get(at..at + bytes).ok_or_else(short)?;
-                at += bytes;
                 if !input.accepts(value) {
                     return Err(damaged(input));
                 }
-                found(n, value);
+                found(n, at..at + bytes);
+                at += bytes;
             }
         }
         for (n, input) in self.inputs.iter().enumerate() {
@@ -613,11 +689,11 @@ impl Layout {
                     ));
                 }
                 let value = datum.get(at..at + length).ok_or_else(short)?;
-                at += length;
                 if !input.accepts(value) {
                     return Err(damaged(input));
                 }
-                found(n, value);
+                found(n, at..at + length);
+                at += length;
             }
         }
         if at != datum.len() {
@@ -831,6 +907,39 @@ mod tests {
         assert!(laid.unpack(&[1, 0, 0, 0, 0, 0, 0]).is_ok());
         assert!(laid.check(&[1, 0, 0, 0, 0, 0, 0]).is_ok());
         assert!(laid.check(&[2, 0, 0, 0, 0, 0, 0]).is_err());
+    }
+
+    /// A datum is written as text in the order of the inputs, each as its
+    /// default would be written: the string, which went at the end, back in
+    /// its place, and an empty string and bytes as "" and []. A damaged
+    /// datum is refused.
+    #[test]
+    fn a_datum_is_written_as_text_in_the_order_of_its_inputs() {
+        let laid = sample();
+        let mut out = [0u8; 400];
+        let values: [&[u8]; 5] =
+            [&[1], &[0x12, 0x34], b"hi", &[9, 0xab], &[0xfe]];
+        let used = laid.pack(&values, &mut out).expect("it packs");
+        let mut each = vec![0..0; 5];
+        let mut text = String::new();
+        laid.write_text(&out[..used], &mut each, " ", &mut text)
+            .expect("it is written");
+        assert_eq!(text, "flag=1 count=4660 name=\"hi\" data=[09 ab] level=-2");
+        let values: [&[u8]; 5] = [&[0], &[0, 0], b"", &[], &[0]];
+        let used = laid.pack(&values, &mut out).expect("it packs");
+        text.clear();
+        laid.write_text(&out[..used], &mut each, " ", &mut text)
+            .expect("it is written");
+        assert_eq!(text, "flag=0 count=0 name=\"\" data=[] level=0");
+        text.clear();
+        laid.write_text(&out[..used], &mut each, "\n", &mut text)
+            .expect("it is written");
+        assert_eq!(text, "flag=0\ncount=0\nname=\"\"\ndata=[]\nlevel=0");
+        text.clear();
+        assert!(laid
+            .write_text(&[2, 0, 0, 0, 0, 0, 0], &mut each, " ", &mut text)
+            .is_err());
+        assert!(text.is_empty());
     }
 
     /// A default is read as a value of its input's type is written, and one

@@ -571,6 +571,21 @@ when a decision changes, which may be hours apart -- so an indicator that
 judged it would be an indicator whose colour means nothing, and one that
 never changes is worse than none.</dd>
 <dt>Requirement</dt>
+<dd><p class="first">A consolidator's datum is shown by its members, each <tt class="docutils literal">input=value</tt>,
+as <tt class="docutils literal">defaults</tt> writes a default, in the order of its <tt class="docutils literal"><span class="pre">world-in</span></tt>: on
+the panel's <tt class="docutils literal">From payload</tt> line, cut short with an ellipsis where the
+panel is too narrow for them, and whole, a member to a line, under
+&quot;latest datum&quot; at the top of its <tt class="docutils literal">Configuration</tt>. Every other node's
+datum is shown as before, a value in its unit or its first bytes in
+hexadecimal. The layout the members are read by is the configuration's
+(<tt class="docutils literal"><span class="pre">consolidation::Layout</span></tt>), worked out once as tcs-moc starts, and the
+text is written as each datum is received, by
+<tt class="docutils literal"><span class="pre">Layout::write_text</span></tt>, into storage the receiving loop reuses.</p>
+<p class="last">A panel keeps the grid's one size rather than growing to the text: the
+grid lays every panel out alike, and the popup, which scrolls, has the
+room a consolidation of many inputs needs.</p>
+</dd>
+<dt>Requirement</dt>
 <dd>Query still asks the spacecraft directly, and sets both the status and
 the counters from what it answers. It is the one path by which the
 spacecraft's own account of a handler -- its state, its byte counters,

@@ -51,6 +51,7 @@ use tcsmoc::gateway::DATUM_BYTES;
 use tcsmoc::matched::Matched;
 use tcsmoc::ping::{Pinger, Uplink};
 use tcsmoc::simulator;
+use tcsprotocol::consolidation::Layout;
 use tcsprotocol::graph::reach::reach_of;
 use tcsprotocol::graph::telemetry::{self, Reaches, Telemetered, Via};
 use tcsprotocol::graph::Graph;
@@ -791,6 +792,8 @@ pub fn panels(
                         })
                         .unwrap_or_default(),
                 ),
+                // Filled as each datum arrives: see `show_arrivals`.
+                members: SharedString::new(),
             }
         })
         .collect();
@@ -810,14 +813,33 @@ pub fn panels(
 ///
 /// The layout, or `None` for a node that is not a consolidator or whose
 /// layout does not work out, which the check says.
-fn layout_of(
-    graph: &Graph,
-    source: &str,
-) -> Option<tcsprotocol::consolidation::Layout> {
+fn layout_of(graph: &Graph, source: &str) -> Option<Layout> {
     let node = graph.node(source)?;
-    let (_, layout) =
-        tcsprotocol::consolidation::Layout::of_node(graph, node)?.ok()?;
+    let (_, layout) = Layout::of_node(graph, node)?.ok()?;
     Some(layout)
+}
+
+/// Which nodes are consolidators, and how each one's datum is laid out,
+/// worked out once, before anything is received: a panel then shows a
+/// consolidation member by member, by the layout the vehicle packed it by.
+///
+/// # Arguments
+///
+/// * `graph` - The configuration.
+///
+/// # Returns
+///
+/// Each consolidator's layout, by its name.
+pub(crate) fn consolidated_of(graph: &Graph) -> Arc<BTreeMap<String, Layout>> {
+    Arc::new(
+        graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                Some((node.name.clone(), layout_of(graph, &node.name)?))
+            })
+            .collect(),
+    )
 }
 
 /// Whether the simulator file names any payload to simulate, so that tcs-sim
@@ -2839,6 +2861,8 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
 /// * `rows`         - Each source's panel row, by the source's name.
 /// * `units`        - The sources that send values, and in what unit, shown
 ///                    as readings rather than as bytes.
+/// * `consolidated` - The consolidators, and how each one's datum is laid
+///                    out, shown member by member rather than as bytes.
 /// * `arrivals`     - Where the last arrival for each panel is left, by row.
 /// * `pings`        - The pinger to hand the ping node's answers to, where
 ///                    they come down through this gateway node.
@@ -2848,6 +2872,7 @@ fn serve(
     mut gateway: GatewayReceiver,
     rows: Arc<BTreeMap<String, usize>>,
     units: Arc<BTreeMap<String, Unit>>,
+    consolidated: Arc<BTreeMap<String, Layout>>,
     arrivals: Arrivals,
     pings: Option<PingFeed>,
     plot: Option<Arc<Mutex<Plot>>>,
@@ -2865,6 +2890,9 @@ fn serve(
         plotted: Option<Plotted>,
         /// How many have arrived from it since the MOC started.
         packets: u64,
+        /// How its datum is laid out, where it is a consolidator, and room
+        /// to find each input's value in: made here, before the loop.
+        layout: Option<(Layout, Vec<std::ops::Range<usize>>)>,
     }
     let mut sources: Vec<Source> = gateway
         .sources()
@@ -2877,9 +2905,15 @@ fn serve(
                 .as_ref()
                 .and_then(|plot| plot.lock().ok()?.plotted(source)),
             packets: 0,
+            layout: consolidated.get(source).map(|layout| {
+                (layout.clone(), vec![0..0; layout.inputs.len()])
+            }),
         })
         .collect();
     let mut datum = vec![0u8; DATUM_BYTES];
+    // A consolidation as text, written again for each datum: its capacity
+    // grows to the longest written and is then reused.
+    let mut members = String::new();
     loop {
         let arrival = match gateway.receive_into(None, &mut datum) {
             Ok(Some(arrival)) => arrival,
@@ -2908,14 +2942,38 @@ fn serve(
         source.packets += 1;
         let mut sample = DHSample::new();
         sample.record(data);
+        members.clear();
+        if let Some((layout, each)) = source.layout.as_mut() {
+            // The receive checked it against this layout already; one that
+            // could not be written is shown as bytes, as any other datum.
+            if layout.write_text(data, each, "\n", &mut members).is_err() {
+                members.clear();
+            }
+        }
         if let Ok(mut slots) = arrivals.lock() {
             if let Some(slot) = slots.get_mut(row) {
-                *slot = Some(Arrival {
-                    at: Timestamp::now(),
-                    data: sample,
-                    packets: source.packets,
-                    unit: source.unit,
-                });
+                match slot {
+                    // Written into the arrival there, whose text keeps its
+                    // capacity from the last.
+                    Some(arrival) => {
+                        arrival.at = Timestamp::now();
+                        arrival.data = sample;
+                        arrival.packets = source.packets;
+                        arrival.unit = source.unit;
+                        arrival.members.clear();
+                        arrival.members.push_str(&members);
+                    }
+                    // The first from this source: its arrival is made once.
+                    None => {
+                        *slot = Some(Arrival {
+                            at: Timestamp::now(),
+                            data: sample,
+                            packets: source.packets,
+                            unit: source.unit,
+                            members: members.clone(),
+                        })
+                    }
+                }
             }
         }
     }
@@ -3093,6 +3151,7 @@ pub fn run(
             })
             .collect(),
     );
+    let consolidated = consolidated_of(&graph);
 
     let count = rows_in_order.len();
     let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(rows_in_order));
@@ -3344,6 +3403,7 @@ pub fn run(
         );
         let rows = rows.clone();
         let units = units.clone();
+        let consolidated = consolidated.clone();
         let arrivals = arrivals.clone();
         let plot = plot.clone();
         let feed = pings
@@ -3351,7 +3411,7 @@ pub fn run(
             .filter(|(through, _)| through == gateway.name())
             .map(|(_, feed)| feed.clone());
         thread::spawn(move || {
-            serve(gateway, rows, units, arrivals, feed, plot)
+            serve(gateway, rows, units, consolidated, arrivals, feed, plot)
         });
     }
 
@@ -4099,6 +4159,7 @@ vehicle:
                 gateway,
                 rows,
                 Arc::new(BTreeMap::new()),
+                Arc::new(BTreeMap::new()),
                 arrivals,
                 Some(feed),
                 None,
@@ -4177,7 +4238,15 @@ payloads:
         {
             let arrivals = arrivals.clone();
             thread::spawn(move || {
-                serve(gateway, rows, units, arrivals, None, None)
+                serve(
+                    gateway,
+                    rows,
+                    units,
+                    Arc::new(BTreeMap::new()),
+                    arrivals,
+                    None,
+                    None,
+                )
             });
         }
 
@@ -4216,6 +4285,119 @@ payloads:
                 "b's two data did not reach its panel"
             );
             thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    /// A consolidator's datum is shown in its panel member by member, in
+    /// the order of its inputs, the string from the datum's end back in its
+    /// place; and the next datum's members replace the last's.
+    #[test]
+    fn a_consolidation_is_shown_by_member() {
+        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+            .and_then(|socket| socket.local_addr())
+            .expect("a free port")
+            .port();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("vehicle.ytcs");
+        std::fs::write(
+            &path,
+            format!(
+                "gateways:
+  - type gateway_radio:
+      - gateway: ground
+        ground_base: \"127.0.0.1:{port}\"
+        world-in: [pack]
+payloads:
+  - type network:
+      - payload: label
+        address: \"127.0.0.1:7003\"
+        protocol: udp
+        world-out-type: \"string(8)\"
+        world-out: [pack.name]
+      - payload: temp
+        address: \"127.0.0.1:7001\"
+        protocol: udp
+        world-out-type: \"u16\"
+        world-out: [pack.temp]
+      - payload: valve
+        address: \"127.0.0.1:7002\"
+        protocol: udp
+        world-out-type: \"boolean\"
+        world-out: [pack.valve]
+vehicle:
+  - type compute:
+      - compute: pack
+        function: consolidator
+        send: [all_new, moc]
+        defaults: [name=\"\", temp=0, valve=0]
+        world-in: [name, temp, valve]
+        world-out: [ground.pack]
+"
+            ),
+        )
+        .expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let Ok(gateway) = GatewayReceiver::open(&graph, "ground") else {
+            // The port was taken between being chosen and being bound.
+            return;
+        };
+        let consolidated = consolidated_of(&graph);
+        let layout = consolidated["pack"].clone();
+        // The consolidator's port: ground_base plus its device id.
+        let at = port
+            + u16::try_from(tcsprotocol::graph::telemetry::ids(&graph)["pack"])
+                .expect("a device id");
+
+        let rows = Arc::new(BTreeMap::from([("pack".to_string(), 0)]));
+        let arrivals: Arrivals = Arc::new(Mutex::new(vec![None]));
+        {
+            let arrivals = arrivals.clone();
+            thread::spawn(move || {
+                serve(
+                    gateway,
+                    rows,
+                    Arc::new(BTreeMap::new()),
+                    consolidated,
+                    arrivals,
+                    None,
+                    None,
+                )
+            });
+        }
+
+        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("the vehicle's socket");
+        let shown = |packets: u64| {
+            let deadline =
+                std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                if let Some(arrival) = &arrivals.lock().expect("the slots")[0] {
+                    if arrival.packets == packets {
+                        return arrival.panel_lines().1;
+                    }
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "datum {packets} did not reach the panel"
+                );
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+        };
+        let mut datum = [0u8; 32];
+        for (n, (name, wanted)) in [
+            (&b"hot"[..], "name=\"hot\" temp=4660 valve=1"),
+            (&b""[..], "name=\"\" temp=4660 valve=1"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let used = layout
+                .pack(&[name, &[0x12, 0x34], &[1]], &mut datum)
+                .expect("it packs");
+            vehicle
+                .send_to(&as_sent(&datum[..used]), ("127.0.0.1", at))
+                .expect("sent");
+            assert_eq!(shown(n as u64 + 1), wanted);
         }
     }
 

@@ -65,6 +65,10 @@ export struct DHInfo {
     // each: what its QUERY_CONSOLIDATOR counts are shown against. Empty for
     // a node that is not a consolidator, which is not asked one.
     inputs: string,
+    // A consolidator's latest datum, a member to a line, each input=value:
+    // shown whole in its Configuration, where the panel's one line has room
+    // for only the first of them. Empty for any other node.
+    members: string,
 }
 
 component DHPanel inherits Rectangle {
@@ -77,7 +81,15 @@ component DHPanel inherits Rectangle {
     in property <string> oc-data: "";
     in property <int> packets-recv: 0;
     in property <string> parameters: "";
+    in property <string> members: "";
     in property <string> settable: "";
+    // What its Configuration shows: a consolidator's latest datum, a member
+    // to a line, above its parameters, and for any other node its
+    // parameters alone.
+    private property <string> shown: members == ""
+        ? parameters
+        : "latest datum\n" + members
+            + (parameters == "" ? "" : "\n\n" + parameters);
     in property <string> setting: "";
 
     callback enable-clicked();
@@ -215,7 +227,7 @@ component DHPanel inherits Rectangle {
                             font-size: Fonts.window;
                         }
                         CopyButton {
-                            said: dh-name + " parameters\n" + parameters;
+                            said: dh-name + " parameters\n" + shown;
                         }
                     }
 
@@ -241,7 +253,7 @@ component DHPanel inherits Rectangle {
                             font-family: Fonts.mono;
                             font-size: Fonts.window;
                             wrap: no-wrap;
-                            text: parameters;
+                            text: shown;
                         }
                     }
 
@@ -345,10 +357,16 @@ component DHPanel inherits Rectangle {
                 font-size: Fonts.window;
                 vertical-alignment: center;
             }
+            // Cut short with an ellipsis where it is wider than the panel,
+            // as a consolidator's members on one line may be: the panel
+            // keeps the grid's width, and Configuration shows them whole.
             Text {
                 text: oc-data;
                 font-size: Fonts.window;
                 vertical-alignment: center;
+                overflow: elide;
+                horizontal-stretch: 1;
+                min-width: 0px;
             }
         }
 
@@ -1089,6 +1107,7 @@ export component MainWindow inherits Window {
                             oc-data: dh.oc-data;
                             packets-recv: dh.packets-recv;
                             parameters: dh.parameters;
+                            members: dh.members;
                             settable: dh.settable;
                             setting: dh.setting;
                             enable-clicked => { enable-dh(i); }

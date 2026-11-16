@@ -3153,7 +3153,10 @@ comes. Only ``housekeeping`` is drawn into the gateway node; it arrives at
 
 On the ground the datum is ``housekeeping``'s, as any node's datum is its
 own: the configuration's own XTCE describes it, member by member, and tcs-moc
-shows it in ``housekeeping``'s panel. A ``Query`` asks ``housekeeping``
+shows it in ``housekeeping``'s panel the same way, ``sun=21509 wheel=-7
+battery=85 battery_age=1``, as many as the panel has room for, and all of
+them, a member to a line, in its ``Configuration``. A ``Query`` asks
+``housekeeping``
 ``QUERY_CONSOLIDATOR`` too, and its ``Configuration`` then says how many
 datums it has sent, by trigger, and how often each input went in new, held
 and with its default -- the battery, slowest, most often held.

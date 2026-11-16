@@ -3400,7 +3400,10 @@ comes. Only <tt class="docutils literal">housekeeping</tt> is drawn into the gat
 <tt class="docutils literal">ground_base</tt> plus its device id, <tt class="docutils literal">127.0.0.1:5102</tt>.</p>
 <p>On the ground the datum is <tt class="docutils literal">housekeeping</tt>'s, as any node's datum is its
 own: the configuration's own XTCE describes it, member by member, and tcs-moc
-shows it in <tt class="docutils literal">housekeeping</tt>'s panel. A <tt class="docutils literal">Query</tt> asks <tt class="docutils literal">housekeeping</tt>
+shows it in <tt class="docutils literal">housekeeping</tt>'s panel the same way, <tt class="docutils literal">sun=21509 <span class="pre">wheel=-7</span>
+battery=85 battery_age=1</tt>, as many as the panel has room for, and all of
+them, a member to a line, in its <tt class="docutils literal">Configuration</tt>. A <tt class="docutils literal">Query</tt> asks
+<tt class="docutils literal">housekeeping</tt>
 <tt class="docutils literal">QUERY_CONSOLIDATOR</tt> too, and its <tt class="docutils literal">Configuration</tt> then says how many
 datums it has sent, by trigger, and how often each input went in new, held
 and with its default -- the battery, slowest, most often held.

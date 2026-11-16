@@ -498,6 +498,7 @@ fn show_arrivals(dh_model: &Rc<VecModel<DHInfo>>, arrivals: &Arrivals) {
         update_row(dh_model, row, |info| {
             info.oc_time = SharedString::from(time.clone());
             info.oc_data = SharedString::from(data.clone());
+            info.members = SharedString::from(arrival.members.as_str());
             info.packets_recv = packets;
         });
     }
@@ -1272,6 +1273,7 @@ mod tests {
             settable: SharedString::new(),
             setting: SharedString::new(),
             inputs: SharedString::new(),
+            members: SharedString::new(),
         }
     }
 
@@ -2351,6 +2353,7 @@ mod tests {
             data,
             packets: 5,
             unit: None,
+            members: String::new(),
         };
         let arrivals: Arrivals =
             Arc::new(Mutex::new(vec![None, Some(arrival)]));

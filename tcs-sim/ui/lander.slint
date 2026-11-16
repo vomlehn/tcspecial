@@ -1,0 +1,292 @@
+// The lander's window: the landscape and the lander flying over it, what it
+// is doing, the X and Y values of its flight, and the joystick it is flown
+// with. tcs-sim opens it beside its payload panels when the world it
+// simulates has a lander: see lander_view.rs, which draws the pictures as
+// path commands, reads the world, and turns the joystick's pointer into the
+// two axes.
+//
+// Colour says nothing alone here. The ground is grey with a little brown,
+// the pad is marked by an upright line at each end as well as by being level,
+// and whether the lander has landed or crashed is said in words, with a
+// smiling face drawn over it on a landing.
+
+import { Fonts } from "../../tcs-ui/ui/fonts.slint";
+import { Colors } from "../../tcs-ui/ui/colors.slint";
+
+// The joystick: a square, the neutral part, with a rectangle joined to each
+// of its sides, and a dot showing where it is held.
+//
+// A press in the square, dragged, is said to Rust as where the pointer is
+// from the square's middle, as long as the button is held; Rust works out the
+// axes and where the dot goes, which it keeps within the rectangle that
+// encloses the plus. Letting go is said too, and the dot goes back to the
+// middle. A press anywhere else does nothing.
+component Joystick inherits Rectangle {
+    // The square's side, and how far each rectangle reaches beyond it.
+    in property <length> square: 56px;
+    in property <length> arm: 56px;
+    // Where the dot is, from the square's middle: set by Rust.
+    in property <length> dot-x: 0px;
+    in property <length> dot-y: 0px;
+    // The pointer, held, is this far from the square's middle.
+    callback moved(length, length);
+    // The button was let go.
+    callback released();
+
+    property <length> reach: root.square / 2 + root.arm;
+    property <length> thick: root.square * 0.6;
+    property <bool> held: false;
+
+    width: 2 * root.reach;
+    height: 2 * root.reach;
+
+    // The four rectangles, then the square over them.
+    Rectangle {
+        x: 0;
+        y: (parent.height - root.thick) / 2;
+        width: parent.width;
+        height: root.thick;
+        background: #e5e7eb;
+        border-width: 1px;
+        border-color: #6b7280;
+    }
+    Rectangle {
+        x: (parent.width - root.thick) / 2;
+        y: 0;
+        width: root.thick;
+        height: parent.height;
+        background: #e5e7eb;
+        border-width: 1px;
+        border-color: #6b7280;
+    }
+    Rectangle {
+        x: root.arm;
+        y: root.arm;
+        width: root.square;
+        height: root.square;
+        background: #f3f4f6;
+        border-width: 2px;
+        border-color: #374151;
+    }
+    // The dot.
+    Rectangle {
+        x: root.reach + root.dot-x - 7px;
+        y: root.reach + root.dot-y - 7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        background: #0072B2;
+        border-width: 1px;
+        border-color: #000000;
+    }
+    TouchArea {
+        pointer-event(e) => {
+            if (e.kind == PointerEventKind.down
+                    && e.button == PointerEventButton.left
+                    && abs(self.mouse-x - root.reach) <= root.square / 2
+                    && abs(self.mouse-y - root.reach) <= root.square / 2) {
+                root.held = true;
+                root.moved(self.mouse-x - root.reach,
+                           self.mouse-y - root.reach);
+            } else if (e.kind == PointerEventKind.up && root.held) {
+                root.held = false;
+                root.released();
+            }
+        }
+        moved => {
+            if (root.held) {
+                root.moved(self.mouse-x - root.reach,
+                           self.mouse-y - root.reach);
+            }
+        }
+    }
+}
+
+// One of the X and Y values: a name, a unit, and the two figures.
+component Values inherits HorizontalLayout {
+    in property <string> name;
+    in property <string> unit;
+    in property <string> first;
+    in property <string> second;
+    spacing: 12px;
+    alignment: start;
+    Text {
+        text: root.unit == "" ? root.name : root.name + " (" + root.unit + ")";
+        min-width: 170px;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.first;
+        min-width: 90px;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+    Text {
+        text: root.second;
+        min-width: 90px;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+export component LanderWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "TCS Lander";
+    background: Colors.window;
+
+    // The display's size, in metres: what the pictures' commands are in, Y
+    // counted down from the top as a picture's is.
+    in property <float> world-width: 1000;
+    in property <float> world-height: 600;
+    // The pictures, as path commands in metres: the ground filled, its
+    // line, the pad with its end marks, the lander, and the face drawn over
+    // it on a landing, empty otherwise.
+    in property <string> ground-fill;
+    in property <string> ground-line;
+    in property <string> pad;
+    in property <string> lander;
+    in property <string> face;
+    // What it is doing, in words: "Flying", "Landed" or "Crashed".
+    in property <string> state: "Flying";
+    // The fraction of a full tank left.
+    in property <float> fuel: 1;
+    // The values, each written as it is to be shown.
+    in property <string> position-x;
+    in property <string> position-y;
+    in property <string> velocity-x;
+    in property <string> velocity-y;
+    in property <string> acceleration-x: "-";
+    in property <string> acceleration-y: "-";
+    // Where the joystick's dot is: set by Rust.
+    in property <length> dot-x;
+    in property <length> dot-y;
+    callback stick-moved(length, length);
+    callback stick-released();
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+        alignment: start;
+
+        // The landscape, drawn to scale.
+        scene := Rectangle {
+            width: 800px;
+            height: 800px * root.world-height / root.world-width;
+            border-width: 1px;
+            border-color: #6b7280;
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.ground-fill;
+                fill: #857a6c;
+            }
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.ground-line;
+                stroke: #3b3127;
+                stroke-width: 1.5px;
+            }
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.pad;
+                stroke: #000000;
+                stroke-width: 3px;
+            }
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.lander;
+                stroke: #000000;
+                stroke-width: 1.5px;
+            }
+            if root.face != "": Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.face;
+                fill: #F0E442;
+                stroke: #000000;
+                stroke-width: 1.5px;
+            }
+            Text {
+                x: 8px;
+                y: 6px;
+                text: root.state;
+                font-size: 18px;
+                font-weight: 700;
+            }
+        }
+
+        // The fuel left, in words and as a bar.
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: "Fuel " + Math.round(root.fuel * 100) + "%";
+                min-width: 90px;
+                vertical-alignment: center;
+            }
+            Rectangle {
+                height: 14px;
+                border-width: 1px;
+                border-color: #374151;
+                Rectangle {
+                    x: 0;
+                    width: parent.width * Math.max(0, Math.min(1, root.fuel));
+                    height: parent.height;
+                    background: #009E73;
+                }
+            }
+        }
+
+        // The X and Y values, under a line naming the axes.
+        VerticalLayout {
+            spacing: 2px;
+            Values {
+                name: "";
+                unit: "";
+                first: "X";
+                second: "Y";
+            }
+            Values {
+                name: "Position";
+                unit: "m";
+                first: root.position-x;
+                second: root.position-y;
+            }
+            Values {
+                name: "Velocity";
+                unit: "m/s";
+                first: root.velocity-x;
+                second: root.velocity-y;
+            }
+            Values {
+                name: "Acceleration";
+                unit: "m/s²";
+                first: root.acceleration-x;
+                second: root.acceleration-y;
+            }
+        }
+
+        // The joystick, in the middle.
+        HorizontalLayout {
+            alignment: center;
+            Joystick {
+                dot-x: root.dot-x;
+                dot-y: root.dot-y;
+                moved(px, py) => { root.stick-moved(px, py); }
+                released => { root.stick-released(); }
+            }
+        }
+    }
+}

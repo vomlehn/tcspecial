@@ -370,10 +370,11 @@ ul.auto-toc {
 <li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a></li>
 <li><a class="reference internal" href="#the-simulator-configuration" id="toc-entry-2">The Simulator Configuration</a></li>
 <li><a class="reference internal" href="#the-tcs-sim-window" id="toc-entry-3">The tcs-sim window</a><ul>
-<li><a class="reference internal" href="#step-by-step" id="toc-entry-4">Step by step</a></li>
+<li><a class="reference internal" href="#the-lander-s-window" id="toc-entry-4">The lander's window</a></li>
+<li><a class="reference internal" href="#step-by-step" id="toc-entry-5">Step by step</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-5">See Also</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-6">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -1253,8 +1254,38 @@ what the vehicle sends it is counted, but not shown.</dd>
 tcs-moc's panels show the same transfers as the spacecraft reported them. Two
 panels disagreeing about one transfer is worth knowing about, which is why
 both are shown the same way.</p>
+<div class="section" id="the-lander-s-window">
+<h2><a class="toc-backref" href="#toc-entry-4">The lander's window</a></h2>
+<p>Where the world has a <tt class="docutils literal">lander</tt>, tcs-sim opens a second window, <em>TCS
+Lander</em>, beside its panels. From the top:</p>
+<ul class="simple">
+<li>The landscape, drawn to scale with positive X to the right and positive Y
+up: the ground, filled grey with a little brown below its line; the pad,
+a level line with an upright mark at each end; and the lander, its outline,
+where it is. What it is doing is said in its top corner, <em>Flying</em>,
+<em>Landed</em> or <em>Crashed</em>, and on a landing a smiling face is drawn over it
+until it starts again.</li>
+<li>The fuel left, as a percentage and as a bar.</li>
+<li>The lander's X and Y position, velocity and acceleration, each with its
+unit.</li>
+<li>The joystick, where the world has one: a square with a rectangle joined
+to each side. Press in the square and drag: each axis reads on its own,
+nought while the pointer is within the square's span along it, rising in a
+straight line to one across a rectangle, positive to the right and up, and
+held at one beyond it, so that a drag on a diagonal moves both. A dot
+follows the pointer within the rectangle enclosing the plus, and when the
+button is let go it goes back to the middle and both axes read nought. The
+joystick's two axes, from minus one to one, are what its <tt class="docutils literal">x</tt> and <tt class="docutils literal">y</tt>
+give out, for the vehicle to read through the simulated payloads joined to
+them.</li>
+</ul>
+<p>The window watches the world without starting it: until a simulated payload
+first asks the world anything, which is when its run begins, the window
+shows the lander where it starts, and the joystick, moved, is held where it
+is put.</p>
+</div>
 <div class="section" id="step-by-step">
-<h2><a class="toc-backref" href="#toc-entry-4">Step by step</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-5">Step by step</a></h2>
 <p>What the window shows as the commonest things are done with it, on the
 thermostat example (<tt class="docutils literal">examples/thermostat</tt>), whose five panels are the
 three temperature sensors and the two heater switches of the figure in the
@@ -1387,7 +1418,7 @@ is longer than the popup, and scrolls.</p>
 </div>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-5">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-6">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="manual.html">TCS Design and Documentation</a></dt>
 <dd>Every TCS manual and design document, divided by the category of

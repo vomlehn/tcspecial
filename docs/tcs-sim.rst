@@ -970,6 +970,36 @@ tcs-moc's panels show the same transfers as the spacecraft reported them. Two
 panels disagreeing about one transfer is worth knowing about, which is why
 both are shown the same way.
 
+The lander's window
+-------------------
+Where the world has a ``lander``, tcs-sim opens a second window, *TCS
+Lander*, beside its panels. From the top:
+
+* The landscape, drawn to scale with positive X to the right and positive Y
+  up: the ground, filled grey with a little brown below its line; the pad,
+  a level line with an upright mark at each end; and the lander, its outline,
+  where it is. What it is doing is said in its top corner, *Flying*,
+  *Landed* or *Crashed*, and on a landing a smiling face is drawn over it
+  until it starts again.
+* The fuel left, as a percentage and as a bar.
+* The lander's X and Y position, velocity and acceleration, each with its
+  unit.
+* The joystick, where the world has one: a square with a rectangle joined
+  to each side. Press in the square and drag: each axis reads on its own,
+  nought while the pointer is within the square's span along it, rising in a
+  straight line to one across a rectangle, positive to the right and up, and
+  held at one beyond it, so that a drag on a diagonal moves both. A dot
+  follows the pointer within the rectangle enclosing the plus, and when the
+  button is let go it goes back to the middle and both axes read nought. The
+  joystick's two axes, from minus one to one, are what its ``x`` and ``y``
+  give out, for the vehicle to read through the simulated payloads joined to
+  them.
+
+The window watches the world without starting it: until a simulated payload
+first asks the world anything, which is when its run begins, the window
+shows the lander where it starts, and the joystick, moved, is held where it
+is put.
+
 Step by step
 ------------
 What the window shows as the commonest things are done with it, on the

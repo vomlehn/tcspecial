@@ -173,6 +173,21 @@ impl Power {
 }
 
 impl Attachment {
+    /// The world it is joined to, which every attachment of one simulator
+    /// shares.
+    ///
+    /// # Returns
+    ///
+    /// The world.
+    pub fn world(&self) -> &Arc<world::World> {
+        match self {
+            Attachment::Reports { world, .. }
+            | Attachment::Signals { world, .. }
+            | Attachment::Drives { world, .. }
+            | Attachment::Pulls { world, .. } => world,
+        }
+    }
+
     /// Takes what the vehicle sent a driven part, at a simulated time: it is
     /// kept as the latest, and the world's input is driven to it if the
     /// part is enabled. Nothing for any other attachment.

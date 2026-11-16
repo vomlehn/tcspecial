@@ -104,6 +104,26 @@ impl Clock {
         Clock::new(start, 1.0)
     }
 
+    /// Says what simulated time a moment of the wall clock is, if the clock
+    /// has started, without starting it.
+    ///
+    /// What a window watching the world asks: a window looking is not a
+    /// payload asking, and a world started by being looked at would run on
+    /// before anything was joined to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `now` - The moment.
+    ///
+    /// # Returns
+    ///
+    /// Simulated seconds since the start, or `None` before it.
+    pub fn started_at(&self, now: Instant) -> Option<f64> {
+        self.start.get().map(|start| {
+            now.saturating_duration_since(*start).as_secs_f64() * self.rate
+        })
+    }
+
     /// Says what simulated time a moment of the wall clock is.
     ///
     /// # Arguments

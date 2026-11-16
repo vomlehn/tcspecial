@@ -63,6 +63,7 @@ use crate::node::vehicle::thermostat::Thermostat;
 
 mod endpoint;
 mod grid;
+mod lander_view;
 mod node;
 mod payload;
 mod pty;
@@ -1498,6 +1499,10 @@ fn main() {
     else {
         process::exit(1);
     };
+    // A world with a lander is shown in a window of its own, beside the
+    // panels: see `lander_view`. Found now, while the payloads, which reach
+    // the world, are still to hand.
+    let lander = lander_view::scene(&sim_file, &configs);
 
     // Where this simulator says whether it is ready, bound before any
     // payload is simulated: a harness asking while it starts is told so, and
@@ -1671,6 +1676,10 @@ fn main() {
 
     // Against the bottom of the display, tcs-moc having asked for the top.
     ask_for_the_edge(&ui, Edge::Bottom);
+
+    // Kept while tcs-sim runs: the window, and the timer that keeps it up
+    // to the world.
+    let _lander = lander.and_then(lander_view::open);
 
     ui.run().unwrap();
 

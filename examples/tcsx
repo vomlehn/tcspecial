@@ -20,9 +20,9 @@
 # ../share/examples/tcspecial from the directory tcsx is in, and the
 # programs those in its own directory; TCSX_EXAMPLES and TCSX_BIN name
 # others, such as a checkout's examples/ and its target/debug. An example
-# is run from a directory where examples/ names them, as a checkout's root
-# does, since each configuration names the programs it runs at their paths
-# from there. /tmp/telemetry, where the examples' logs go, is made afresh
+# is run from a directory where examples/ names them -- a checkout's own
+# root, where it has one -- since each configuration names the programs it
+# runs at their paths from there. /tmp/telemetry, where the examples' logs go, is made afresh
 # first, so that what is in it afterwards is that run's alone.
 #
 # The examples through Yamcs need a Yamcs release unpacked: YAMCS_HOME
@@ -139,10 +139,22 @@ fi
 # stations look for tcspecial and tcs-verify there.
 PATH=$bin:$PATH
 export PATH
-top=$(mktemp -d)
-trap 'rm -rf "$top"' EXIT
-ln -s "$examples" "$top/examples"
-cd "$top"
+# A checkout's examples are run from the checkout's root, where examples/
+# names them already: a tcs-moc built there starts its children with cargo
+# run, which needs the tree -- its Cargo.toml to find them by, and its
+# .cargo/config.toml, whose settings a build started from anywhere else
+# leaves out. An installed set is run from a directory of tcsx's own, in
+# which examples/ is made to name them; $top is that directory, or empty.
+top=
+root=$(dirname "$examples")
+if [ "$(basename "$examples")" = examples ] && [ -f "$root/Cargo.toml" ]; then
+	cd "$root"
+else
+	top=$(mktemp -d)
+	trap 'rm -rf "$top"' EXIT
+	ln -s "$examples" "$top/examples"
+	cd "$top"
+fi
 rm -rf /tmp/telemetry
 mkdir /tmp/telemetry
 
@@ -157,7 +169,7 @@ simple-app)
 		examples/simple-app/simple-app.ytcs &
 	vehicle=$!
 	trap 'pkill -P $vehicle || :; kill -INT $vehicle 2> /dev/null || :
-		wait $vehicle || :; rm -rf "$top"' EXIT
+		wait $vehicle || :; [ -z "$top" ] || rm -rf "$top"' EXIT
 	trap 'exit 130' INT TERM
 	timeout "$SIMPLE_APP_WAITS" "$bin/lorem_gateway" "$@"
 	;;

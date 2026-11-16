@@ -6,17 +6,23 @@ description: Simulator settings for the sensors of consolidator.ytcs, each
 tcs-sim:
   ready: "127.0.0.1:7932"
 
+# Each sensor sends from the start, enabled as though Enable had been
+# pressed in tcs-sim's window: the example is about what the consolidator
+# sends, and a sensor held back would show only its default.
 simulated_payloads:
   - type network:
       - payload: sun
         packet_interval: 1 s
         protocol: udp
         simulate: true
+        enable: true
       - payload: wheel
         packet_interval: 250 ms
         protocol: udp
         simulate: true
+        enable: true
       - payload: battery
         packet_interval: 5 s
         protocol: udp
         simulate: true
+        enable: true

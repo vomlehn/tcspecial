@@ -169,7 +169,23 @@
   </style>
 </head>
 <body>
-<h1 id="tcsprotocol">tcsprotocol</h1>
+<header id="title-block-header">
+<h1 class="title">tcsprotocol</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Table of Contents</h2>
+<ul>
+<li><a href="#what-is-in-it" id="toc-what-is-in-it">What is in
+it</a></li>
+<li><a href="#what-tcsprotocol-is-not"
+id="toc-what-tcsprotocol-is-not">What tcsprotocol is not</a></li>
+<li><a href="#who-uses-it" id="toc-who-uses-it">Who uses it</a></li>
+<li><a href="#building-and-testing"
+id="toc-building-and-testing">Building and testing</a></li>
+<li><a href="#see-also" id="toc-see-also">See also</a></li>
+<li><a href="#license" id="toc-license">License</a></li>
+</ul>
+</nav>
 <p><strong>tcsprotocol, TCS Link Support, is what the ground software
 and the vehicle software share.</strong> Anything both ends of the link
 have to agree on is written here, once, and both ends use it: the
@@ -194,7 +210,7 @@ that opens one reads it through this crate:</p>
 <p>So no program reads a file in a way of its own, and the error a
 person sees in the editor is the one the vehicle would have refused the
 file with.</p>
-<h2 id="what-is-in-it">What is in it</h2>
+<h1 id="what-is-in-it">What is in it</h1>
 <ul>
 <li><code>commands</code>, <code>telemetry</code>,
 <code>protocol</code>: the command and telemetry protocol.</li>
@@ -265,22 +281,22 @@ windows, tcs-moc and tcs-sim, show about a payload, and where on the
 screen each window goes.</li>
 <li><code>error</code>: the errors all of the above return.</li>
 </ul>
-<h2 id="what-tcsprotocol-is-not">What tcsprotocol is not</h2>
+<h1 id="what-tcsprotocol-is-not">What tcsprotocol is not</h1>
 <p>It has no network code for the ground. Opening a link to the vehicle,
 sending a command, receiving data and listening for beacons are all in
 <code>tcsmoc</code>, which builds on this crate and re-exports it. The
 flight software itself is <code>tcspecial</code>.</p>
-<h2 id="who-uses-it">Who uses it</h2>
+<h1 id="who-uses-it">Who uses it</h1>
 <p>Every crate in the workspace that has anything to do with the link or
 a configuration: tcspecial, tcsmoc, tcs-moc, tcs-sim, tcs-cfge and
 tcs-verify, and <code>examples/beacon</code>.</p>
-<h2 id="building-and-testing">Building and testing</h2>
+<h1 id="building-and-testing">Building and testing</h1>
 <pre><code>cargo build -p tcsprotocol
 cargo test -p tcsprotocol
 cargo doc -p tcsprotocol --open</code></pre>
 <p><code>make</code> in this directory builds <code>README.html</code>
 from this file, and <code>make clean</code> removes it.</p>
-<h2 id="see-also">See also</h2>
+<h1 id="see-also">See also</h1>
 <ul>
 <li><a
 href="https://vomlehn.github.io/tcspecial/tcsprotocol/README.html">This
@@ -295,7 +311,7 @@ href="https://vomlehn.github.io/tcspecial/docs/tcspecial.html">The
 tcspecial manual</a> and <a
 href="https://vomlehn.github.io/tcspecial/docs/design.html">design</a>.</li>
 </ul>
-<h2 id="license">License</h2>
+<h1 id="license">License</h1>
 <p>Licensed under either of the Apache License, Version 2.0 (<a
 href="https://github.com/vomlehn/tcspecial/blob/main/LICENSE-APACHE">LICENSE-APACHE</a>
 or <a href="http://www.apache.org/licenses/LICENSE-2.0"

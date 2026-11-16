@@ -169,7 +169,21 @@
   </style>
 </head>
 <body>
-<h1 id="tcsmoc">tcsmoc</h1>
+<header id="title-block-header">
+<h1 class="title">tcsmoc</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Table of Contents</h2>
+<ul>
+<li><a href="#what-tcsmoc-is-not" id="toc-what-tcsmoc-is-not">What
+tcsmoc is not</a></li>
+<li><a href="#who-uses-it" id="toc-who-uses-it">Who uses it</a></li>
+<li><a href="#building-and-testing"
+id="toc-building-and-testing">Building and testing</a></li>
+<li><a href="#see-also" id="toc-see-also">See also</a></li>
+<li><a href="#license" id="toc-license">License</a></li>
+</ul>
+</nav>
 <p><strong>tcsmoc, the TCSpecial MOC Correspondent, is the library a
 ground station is built on.</strong> It is the ground’s side of the link
 to a spacecraft running tcspecial, the TCSpecial Flight Executive:
@@ -239,7 +253,7 @@ that cFS’s own ground system.</p></li>
 <p>The link to tcspecial is UDP, and only UDP: <code>TcsClient</code>
 sends its commands through a <code>UdpConnection</code> – on a bus, to
 the station’s peer of it, which publishes each one.</p>
-<h2 id="what-tcsmoc-is-not">What tcsmoc is not</h2>
+<h1 id="what-tcsmoc-is-not">What tcsmoc is not</h1>
 <p>tcsmoc has no windows. Showing what it receives is the job of the
 programs built on it: <code>tcs-ui</code> holds the panels the ground
 programs share, and <code>tcs-moc</code> is the test ground station that
@@ -248,7 +262,7 @@ puts them on the screen.</p>
 and the configuration files both ends read belong to
 <code>tcsprotocol</code>, which the vehicle uses too. tcsmoc re-exports
 all of it, so a ground program needs only tcsmoc.</p>
-<h2 id="who-uses-it">Who uses it</h2>
+<h1 id="who-uses-it">Who uses it</h1>
 <ul>
 <li><code>tcs-moc</code>, the test ground station.</li>
 <li><code>tcs-sim</code>, whose <code>--wait</code> waits through
@@ -262,13 +276,13 @@ beforehand.</li>
 <li><code>examples/beacon</code>, whose window watches the beacon
 through <code>beacon</code>.</li>
 </ul>
-<h2 id="building-and-testing">Building and testing</h2>
+<h1 id="building-and-testing">Building and testing</h1>
 <pre><code>cargo build -p tcsmoc
 cargo test -p tcsmoc
 cargo doc -p tcsmoc --open</code></pre>
 <p><code>make</code> in this directory builds <code>README.html</code>
 from this file, and <code>make clean</code> removes it.</p>
-<h2 id="see-also">See also</h2>
+<h1 id="see-also">See also</h1>
 <ul>
 <li><a
 href="https://vomlehn.github.io/tcspecial/tcsmoc/README.html">This page
@@ -283,7 +297,7 @@ href="https://vomlehn.github.io/tcspecial/docs/tcspecial.html">The
 tcspecial manual</a> and <a
 href="https://vomlehn.github.io/tcspecial/docs/design.html">design</a>.</li>
 </ul>
-<h2 id="license">License</h2>
+<h1 id="license">License</h1>
 <p>Licensed under either of the Apache License, Version 2.0 (<a
 href="https://github.com/vomlehn/tcspecial/blob/main/LICENSE-APACHE">LICENSE-APACHE</a>
 or <a href="http://www.apache.org/licenses/LICENSE-2.0"

@@ -251,7 +251,43 @@
   </style>
 </head>
 <body>
-<h1 id="examples">Examples</h1>
+<header id="title-block-header">
+<h1 class="title">Examples</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Table of Contents</h2>
+<ul>
+<li><a href="#installed-tcsx" id="toc-installed-tcsx">Installed:
+tcsx</a></li>
+<li><a href="#simple-examples" id="toc-simple-examples">Simple
+examples</a>
+<ul>
+<li><a href="#minimal" id="toc-minimal">minimal</a></li>
+<li><a href="#beacon" id="toc-beacon">beacon</a></li>
+<li><a href="#ping" id="toc-ping">ping</a></li>
+<li><a href="#ping-yamcs" id="toc-ping-yamcs">ping-yamcs</a></li>
+</ul></li>
+<li><a href="#payloads-on-the-kernels-dummy-devices"
+id="toc-payloads-on-the-kernels-dummy-devices">Payloads on the kernel’s
+dummy devices</a>
+<ul>
+<li><a href="#can" id="toc-can">can</a></li>
+<li><a href="#gpio" id="toc-gpio">gpio</a></li>
+<li><a href="#iio" id="toc-iio">iio</a></li>
+</ul></li>
+<li><a href="#more-complex-examples" id="toc-more-complex-examples">More
+complex examples</a>
+<ul>
+<li><a href="#thermostat" id="toc-thermostat">thermostat</a></li>
+<li><a href="#memusage" id="toc-memusage">memusage</a></li>
+<li><a href="#thermostat-yamcs"
+id="toc-thermostat-yamcs">thermostat-yamcs</a></li>
+<li><a href="#battery" id="toc-battery">battery</a></li>
+<li><a href="#descent" id="toc-descent">descent</a></li>
+<li><a href="#simple-app" id="toc-simple-app">simple-app</a></li>
+</ul></li>
+</ul>
+</nav>
 <p>Each example is a directory holding four files:</p>
 <ul>
 <li><code>&lt;name&gt;.ytcs</code> is a tcspecial configuration.</li>
@@ -349,7 +385,7 @@ from this file, with <code>style.html</code> in its head – which is
 where the tables’ cells are told to sit at the top of their row,
 markdown having no way to say so. <code>make help</code> lists the
 targets, including the ones that run tcspecial on each example.</p>
-<h2 id="installed-tcsx">Installed: tcsx</h2>
+<h1 id="installed-tcsx">Installed: tcsx</h1>
 <p>The <code>tcspecial-examples</code> package installs every example
 under <code>/opt/tcs/share/examples/tcspecial</code>, laid out as here,
 with the programs each runs, the Rust ground stations
@@ -367,7 +403,7 @@ ground station. The examples through Yamcs need <code>YAMCS_HOME</code>
 set to where a Yamcs release is unpacked. <code>TCSX_EXAMPLES</code> and
 <code>TCSX_BIN</code> point <code>tcsx</code> at other examples and
 programs, such as these and a build’s <code>target/debug</code>.</p>
-<h2 id="simple-examples">Simple examples</h2>
+<h1 id="simple-examples">Simple examples</h1>
 <p>Each shows one thing at its simplest: a payload’s data reaching the
 ground, the vehicle saying it is alive, the vehicle answering a ping.
 Start with <code>minimal</code>, the smallest configuration that does
@@ -468,7 +504,7 @@ commands it from tcsmoc.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="minimal">minimal</h3>
+<h2 id="minimal">minimal</h2>
 <p>The smallest configuration that does anything: one payload,
 <code>sensor</code>, a program on this host at
 <code>127.0.0.1:5001</code> that sends its readings over UDP. Nothing is
@@ -489,7 +525,7 @@ arrived, what it said, and how many there have been.</p>
 <li>Payload: Rust – tcs-sim simulates <code>sensor</code>, a network
 payload.</li>
 </ul>
-<h3 id="beacon">beacon</h3>
+<h2 id="beacon">beacon</h2>
 <p>What a ground station can know about a spacecraft without asking it
 anything. tcspecial sends a beacon every
 <code>beacon.default_interval</code> for as long as it runs, over a
@@ -568,7 +604,7 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 <li>Payload: Rust – tcs-sim simulates <code>sensor</code>, a network
 payload.</li>
 </ul>
-<h3 id="ping">ping</h3>
+<h2 id="ping">ping</h2>
 <p>The ground sends a ping up to the gateway node, which hands it to the
 <code>ping</code> node; the <code>ping</code> node answers with the
 vehicle’s time on the end, and the answer comes back down. What a ping
@@ -636,7 +672,7 @@ answers.</li>
 <li>Payload: none. The <code>ping</code> node is the vehicle’s own, and
 nothing is simulated.</li>
 </ul>
-<h3 id="ping-yamcs">ping-yamcs</h3>
+<h2 id="ping-yamcs">ping-yamcs</h2>
 <p>The ping example with <a href="https://yamcs.org">Yamcs</a> at the
 ground end. The vehicle and what is timed are the same; what differs is
 the configuration’s gateway, <code>yamcs</code>, so every packet to and
@@ -772,8 +808,8 @@ uses.</p>
 <li>ground program: Python 3 (<code>ping_yamcs.py</code>), with Yamcs
 (Java)</li>
 </ul>
-<h2 id="payloads-on-the-kernels-dummy-devices">Payloads on the kernel’s
-dummy devices</h2>
+<h1 id="payloads-on-the-kernels-dummy-devices">Payloads on the kernel’s
+dummy devices</h1>
 <p>Each is one of the payload types whose far end is a device the kernel
 makes rather than a file or a socket tcs-sim can make, and each is flown
 against the kernel’s dummy device for it by
@@ -828,7 +864,7 @@ up: a buffer is read and never written.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="can">can</h3>
+<h2 id="can">can</h2>
 <p><code>vcan0</code> is the kernel’s virtual CAN bus: a bus with no
 wire, whose members are the sockets bound to it. tcspecial joins it as
 two of them, one for each identifier, and tcs-sim joins it as the motor,
@@ -836,7 +872,7 @@ sending a status frame a second and counting the commands. On a vehicle
 the interface is the controller’s, such as <code>can0</code>, and
 nothing else changes.</p>
 <pre><code>make run-can</code></pre>
-<h3 id="gpio">gpio</h3>
+<h2 id="gpio">gpio</h2>
 <p>The switch is a <code>gpio_in</code>, whose line is watched, and the
 lamp a <code>gpio_out</code>, whose line is driven: see “A GPIO Payload”
 in the manual. The chip is one of the kernel’s <code>gpio-sim</code>,
@@ -849,7 +885,7 @@ what the simulated chip is on a host with one chip of its own; the
 number is given as chips appear, so write the one
 <code>bin/mk-kernel-dummies</code> printed.</p>
 <pre><code>make run-gpio</code></pre>
-<h3 id="iio">iio</h3>
+<h2 id="iio">iio</h2>
 <p>The sensor is one of the kernel’s <code>iio_dummy</code>, whose
 buffer a software trigger fills a hundred times a second: the dummy
 device is the whole payload, and tcs-sim makes nothing. Its buffer is
@@ -868,7 +904,7 @@ dummy is on a host with one sensor of its own; write the number
 <li>Payload: the kernel’s dummy device, with tcs-sim playing the
 device’s far end for CAN and GPIO.</li>
 </ul>
-<h2 id="more-complex-examples">More complex examples</h2>
+<h1 id="more-complex-examples">More complex examples</h1>
 <p>Each puts the vehicle to work on its payloads: what they send, and
 what is done with it aboard and on the ground.</p>
 <table>
@@ -925,7 +961,7 @@ Rust.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="thermostat">thermostat</h3>
+<h2 id="thermostat">thermostat</h2>
 <p>A control loop, aboard. Three temperature sensors are read together,
 once a second, as the group <code>zone_temps</code>:
 <code>temp_1</code>, <code>temp_2</code> and <code>temp_3</code>. Each
@@ -995,7 +1031,7 @@ log are its own nodes.</li>
 they read, and the heaters’ switches, on the kernel’s simulated GPIO
 chip.</li>
 </ul>
-<h3 id="memusage">memusage</h3>
+<h2 id="memusage">memusage</h2>
 <p>A vehicle to watch the memory of: a <code>gateway_yamcs</code> node
 and three ping nodes, each a thread of its own, answering to Yamcs.
 Nothing is pinged. <code>memusage.py</code> has Yamcs send
@@ -1026,7 +1062,7 @@ QUERY_THREADS from a port the system chooses.
 <li>MOC: Python 3 – <code>memusage.py</code>, through Yamcs.</li>
 <li>Vehicle: Rust – tcspecial.</li>
 </ul>
-<h3 id="thermostat-yamcs">thermostat-yamcs</h3>
+<h2 id="thermostat-yamcs">thermostat-yamcs</h2>
 <p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at
 the ground end, as ping-yamcs is the ping example with it. The vehicle
 is the thermostat’s – the same conversions, vote, thermostat, heaters,
@@ -1149,7 +1185,7 @@ or XML (<code>thermostat-yamcs.xtcs</code>)</li>
 Yamcs (Java)</li>
 <li>payloads: Rust – tcs-sim, as in the thermostat example</li>
 </ul>
-<h3 id="battery">battery</h3>
+<h2 id="battery">battery</h2>
 <p>A spacecraft’s power bus through an orbit: the example of a payload
 that is asked, of a computation that is a program, and of physics with
 events in it.</p>
@@ -1186,7 +1222,7 @@ the example’s.</li>
 <li>Payload: Rust – tcs-sim simulates the power monitor, with a
 pseudo-terminal at its path, the shunt and the science switch.</li>
 </ul>
-<h3 id="descent">descent</h3>
+<h2 id="descent">descent</h2>
 <p>A lander’s terminal descent over the Moon: the example of a
 computation that drives a device with a value, and of a device that
 speaks the moment something happens.</p>
@@ -1221,7 +1257,7 @@ example’s.</li>
 <li>Payload: Rust – tcs-sim simulates the radar, the velocimeter, the
 switch and the engine.</li>
 </ul>
-<h3 id="simple-app">simple-app</h3>
+<h2 id="simple-app">simple-app</h2>
 <p>The one example that runs end to end on one host, and the one to look
 at to see what an app node is. Two programs, both in
 <code>examples/simple-app</code>:</p>

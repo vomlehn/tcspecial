@@ -2,6 +2,10 @@
 TCS Design and Documentation
 ============================
 
+.. contents:: Table of Contents
+   :depth: 4
+   :local:
+
 .. warning::
    TCSpecial is an alpha release. It is not fully tested, it is not feature
    complete, and it is subject to rapid change. Until 1.0, any change to its
@@ -201,6 +205,15 @@ Verification tools
 `The tcs-moc manual <tcs-moc.html>`__
     The simulated operations center. tcs-moc shows what the vehicle sends
     the ground, panel by panel and in plots, and sends it commands.
+
+`The TCS test container <../container/README.html>`__
+    A Kubuntu or Fedora system in a container, in which the TCS packages are
+    installed and tried as an administrator would, without touching the
+    machine it runs on: ``container/bin/start`` starts it, made from
+    scratch with the newest packages built the first time or with
+    ``--rebuild``, and opens a shell in it, where ``tcsx`` runs an
+    example, ``cfge`` edits a configuration in tcs-cfge and ``xtcee`` edits
+    XTCE in tcs-xtcee.
 
 Analysis tools
 --------------

@@ -10,14 +10,15 @@ case $- in
 *i*)
 	if [ -x /opt/tcs/bin/tcsx ]; then
 		alias tcsx='tcsx --no-memlock'
-		echo "Run tcsx to see a list of tcspecial's examples," \
+		echo "Run tcsx to list tcspecial's examples," \
 			"tcsx EXAMPLE to run one."
-		echo "Run cfge FILE to edit a configuration, cfge -e" \
-			"EXAMPLE to edit an example's."
+		echo "Run cfge FILE to edit a configuration," \
+			"cfge -e to list the examples, cfge -e EXAMPLE to" \
+			"edit one."
 	fi
 	if [ -x /opt/tcs/bin/tcs-xtcee ]; then
-		echo "Run xtcee FILE to edit an XTCE file, xtcee -e to list" \
-			"tcs-xtce's examples, xtcee -e EXAMPLE to edit one."
+		echo "Run xtcee FILE to edit XTCE, xtcee -e to list the" \
+			"examples, xtcee -e EXAMPLE to edit one."
 	fi
 	;;
 esac

@@ -5,11 +5,16 @@
 #
 #   tcs-container [--distro kubuntu|fedora] COMMAND [ARGUMENT...]
 #
-#   build              build the image, from
-#                      image/Containerfile.DISTRO
+#   build [--no-cache] build the image, from
+#                      image/Containerfile.DISTRO; --no-cache builds every
+#                      layer again rather than reusing what the last build
+#                      made
 #   fresh              throw the container away, with all that was done in
 #                      it, and start a new one from the image, building the
 #                      image first if there is none
+#   exists             succeed if the container exists, and fail if not
+#   start              start it, as it was left, making it first if there
+#                      is none
 #   shell [COMMAND...] a login shell in it as the user tcs, or COMMAND;
 #                      --root before COMMAND runs it as root
 #   install FILE...    install the .deb or .rpm files, with apt-get or dnf
@@ -46,7 +51,8 @@ set -eu
 
 # Prints how to call this command.
 usage() {
-	echo "usage: tcs-container [--distro kubuntu|fedora] build | fresh |"
+	echo "usage: tcs-container [--distro kubuntu|fedora]"
+	echo "       build [--no-cache] | fresh | exists | start |"
 	echo "       shell [--root] [COMMAND...] | install FILE... |"
 	echo "       remove PACKAGE... | installed | copy DIR... |"
 	echo "       example [--hidden] [NAME [ARGUMENT...]] |"
@@ -80,9 +86,20 @@ image_exists() {
 
 # Builds the image from its Containerfile, with the user tcs given the uid
 # and gid of whoever runs this.
+#
+# Arguments:
+#   $1  --no-cache to build every layer again, or nothing to reuse the
+#       layers the last build made where their part of the Containerfile
+#       has not changed.
 build() {
 	images=$here/image
-	"$podman" build -t "$image" -f "$images/Containerfile.$distro" \
+	case ${1:-} in
+	"") cache= ;;
+	--no-cache) cache=--no-cache ;;
+	*) die "build takes --no-cache or nothing, not $1" ;;
+	esac
+	# shellcheck disable=SC2086 # $cache is one word or none
+	"$podman" build $cache -t "$image" -f "$images/Containerfile.$distro" \
 		--build-arg TCS_UID="$(id -u)" --build-arg TCS_GID="$(id -g)" \
 		"$images"
 }
@@ -363,8 +380,10 @@ image=localhost/tcs-test-$distro
 command=$1
 shift
 case $command in
-build) build ;;
+build) build "$@" ;;
 fresh) fresh ;;
+exists) exists ;;
+start) running ;;
 shell) shell "$@" ;;
 install) install "$@" ;;
 remove) remove "$@" ;;

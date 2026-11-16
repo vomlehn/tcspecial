@@ -90,12 +90,14 @@ check:
 	$(TCS_HELPERS)/bin/html-pages check .
 
 # README.md is the documentation; README.html is it as a page of its own,
-# with pandoc's --standalone giving it a head and a title, which
-# tcspecial's manual links. tcs-helpers' pre-commit hook remakes it
-# whenever a commit changes README.md, and make check fails where it is
-# behind.
+# which tcspecial's manual links, with pandoc's --standalone giving it a
+# head, README.md's first heading made its title with a table of contents
+# under it. tcs-helpers' pre-commit hook remakes it whenever a commit
+# changes README.md, and make check fails where it is behind.
 README.html: README.md
-	pandoc --standalone --metadata pagetitle="The TCS test container" \
+	pandoc --standalone --shift-heading-level-by=-1 --toc --toc-depth=3 \
+		--metadata toc-title="Table of Contents" \
+		--metadata pagetitle="The TCS test container" \
 		README.md -o README.html
 
 .PHONY: html

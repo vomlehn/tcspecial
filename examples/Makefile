@@ -124,9 +124,12 @@ run-simple: docs
 docs: README.html
 
 # README.html, with style.html in its head: see that file for what is in it
-# and why it is not in the markdown.
+# and why it is not in the markdown. README.md's first heading is made the
+# page's title, with a table of contents under it.
 README.html: README.md style.html
-	pandoc --standalone --metadata pagetitle=Examples -H style.html \
+	pandoc --standalone --shift-heading-level-by=-1 --toc --toc-depth=3 \
+		--metadata toc-title="Table of Contents" \
+		--metadata pagetitle=Examples -H style.html \
 		README.md -o README.html
 
 # Run tcs-moc on the thermostat example.

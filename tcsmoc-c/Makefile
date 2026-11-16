@@ -19,10 +19,12 @@ help:
 docs: README.html
 
 # A page of its own, so pandoc's --standalone: it carries its own head and
-# styling, and reads the same wherever it is copied to.
+# styling, and reads the same wherever it is copied to. README.md's first
+# heading is made the page's title, with a table of contents under it.
 README.html: README.md
-	pandoc --standalone --metadata pagetitle=tcsmoc-c README.md \
-		-o README.html
+	pandoc --standalone --shift-heading-level-by=-1 --toc --toc-depth=3 \
+		--metadata toc-title="Table of Contents" \
+		--metadata pagetitle=tcsmoc-c README.md -o README.html
 
 .PHONY: clean
 clean:

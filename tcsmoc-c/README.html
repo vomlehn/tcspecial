@@ -169,7 +169,28 @@
   </style>
 </head>
 <body>
-<h1 id="tcsmoc-c">tcsmoc-c</h1>
+<header id="title-block-header">
+<h1 class="title">tcsmoc-c</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Table of Contents</h2>
+<ul>
+<li><a href="#what-is-in-it" id="toc-what-is-in-it">What is in
+it</a></li>
+<li><a href="#building-with-it" id="toc-building-with-it">Building with
+it</a>
+<ul>
+<li><a href="#the-abi-version" id="toc-the-abi-version">The ABI
+version</a></li>
+</ul></li>
+<li><a href="#how-the-header-is-kept-honest"
+id="toc-how-the-header-is-kept-honest">How the header is kept
+honest</a></li>
+<li><a href="#known-limits" id="toc-known-limits">Known limits</a></li>
+<li><a href="#see-also" id="toc-see-also">See also</a></li>
+<li><a href="#license" id="toc-license">License</a></li>
+</ul>
+</nav>
 <p><strong>tcsmoc-c is tcsmoc, the TCSpecial MOC Correspondent, for C
 and C++.</strong> It is the library a ground station written in C or C++
 is built on: the vehicle’s beacons, the vehicle’s data from a gateway
@@ -188,7 +209,7 @@ thread of its own, and the beacons, the data and the commands go over
 that peer (see “A vehicle on a cFS software bus” in <a
 href="../tcsmoc/README.md">tcsmoc’s README</a>). Nothing in the header
 changes.</p>
-<h2 id="what-is-in-it">What is in it</h2>
+<h1 id="what-is-in-it">What is in it</h1>
 <ul>
 <li><strong>The configuration.</strong>
 <code>tcs_configuration_open</code> reads and checks a configuration,
@@ -300,7 +321,7 @@ gives the round trip and the two halves of it.</li>
 <code>_close</code>. A function that cannot do what it was asked returns
 <code>NULL</code> or -1, and <code>tcs_last_error()</code> says why. The
 header says the rest.</p>
-<h2 id="building-with-it">Building with it</h2>
+<h1 id="building-with-it">Building with it</h1>
 <p>Cargo builds <code>libtcsmoc_c.a</code> and
 <code>libtcsmoc_c.so</code>, from the repository’s root, with an
 underscore because a crate’s name cannot have a hyphen; they are
@@ -319,7 +340,7 @@ header as <code>/opt/tcs/include/tcsmoc-c.h</code>, and
 <code>&lt;tcsmoc-c.h&gt;</code> and is built with pkg-config:</p>
 <pre><code>cc  my_station.c   $(pkg-config --cflags --libs tcsmoc-c)
 c++ my_station.cpp $(pkg-config --cflags --libs tcsmoc-c)</code></pre>
-<h3 id="the-abi-version">The ABI version</h3>
+<h2 id="the-abi-version">The ABI version</h2>
 <p><code>&lt;ABI&gt;</code> is the library’s ABI version, the one whole
 number in <code>abi-version</code>, now 4. It is the shared library’s
 soname, <code>libtcsmoc-c.so.&lt;ABI&gt;</code>, which a station linked
@@ -366,8 +387,8 @@ node, a value as a temperature. They take <code>--yaml</code> or
 <code>--restart</code> to arm a restart and restart the vehicle, and
 <code>--send=&lt;text&gt;</code> to send the text up to the gateway
 node, each of which they do only when asked.</p>
-<h2 id="how-the-header-is-kept-honest">How the header is kept
-honest</h2>
+<h1 id="how-the-header-is-kept-honest">How the header is kept
+honest</h1>
 <p>It is written by hand, for people, so the proof that it says what the
 library does is a program that compiles against it and works.
 <code>tests/c_and_cpp.rs</code> builds <code>libtcsmoc_c.a</code> from
@@ -377,7 +398,7 @@ the test plays. The two must print the same lines, and the right ones,
 and they compare what they read against the header’s own constants, so a
 header whose numbers had drifted from the library’s fails. The header
 alone is also compiled as C99 and as C++11.</p>
-<h2 id="known-limits">Known limits</h2>
+<h1 id="known-limits">Known limits</h1>
 <ul>
 <li><strong>A query’s counts are not given.</strong>
 <code>tcs_client_query_node</code> says whether a node is running; the
@@ -443,7 +464,7 @@ say why.</li>
 </ul>
 <p><code>make</code> in this directory builds <code>README.html</code>
 from this file.</p>
-<h2 id="see-also">See also</h2>
+<h1 id="see-also">See also</h1>
 <ul>
 <li><a
 href="https://vomlehn.github.io/tcspecial/tcsmoc-c/README.html">This
@@ -458,7 +479,7 @@ href="https://vomlehn.github.io/tcspecial/docs/tcspecial.html">The
 tcspecial manual</a> and <a
 href="https://vomlehn.github.io/tcspecial/docs/design.html">design</a>.</li>
 </ul>
-<h2 id="license">License</h2>
+<h1 id="license">License</h1>
 <p>Licensed under either of the Apache License, Version 2.0 (<a
 href="https://github.com/vomlehn/tcspecial/blob/main/LICENSE-APACHE">LICENSE-APACHE</a>
 or <a href="http://www.apache.org/licenses/LICENSE-2.0"

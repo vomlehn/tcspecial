@@ -8,15 +8,20 @@
 #   xtcee -e | --example
 #
 # With FILE it opens that file. With -e or --example, NAME is an example's,
-# the name of its directory among those the package installs, and it opens
-# the example's .xtce file, or, for an example of several, all of them
-# together, as one mission. -e with no NAME lists the examples.
+# the name of its directory among those the packages install -- tcs-xtce's
+# own examples of XTCE, and tcspecial's, each of which has the XTCE of the
+# vehicle it configures -- and it opens the example's .xtce file, or, for an
+# example of several, all of them together, as one mission. A name both
+# have is tcs-xtce's. -e with no NAME lists the examples, tcs-xtce's and
+# tcspecial's apart.
 
 set -eu
 
-# Where the tcs-xtce package installs the editor and the examples.
+# Where the tcs-xtce package installs the editor and its examples, and
+# where tcspecial-examples installs tcspecial's.
 EDITOR=/opt/tcs/bin/tcs-xtcee
 EXAMPLES=/opt/tcs/share/examples/tcs-xtce
+TCSPECIAL_EXAMPLES=/opt/tcs/share/examples/tcspecial
 
 # Prints how to call this command.
 usage() {
@@ -34,11 +39,22 @@ die() {
 	exit 1
 }
 
-# Lists the examples, those with an .xtce file, one a line.
+# Lists the examples in a directory, those with an .xtce file, one a line
+# under a heading, if there are any.
+#
+# Arguments:
+#   $1  The directory.
+#   $2  The heading.
 list() {
-	for dir in "$EXAMPLES"/*/; do
+	heading=$2
+	for dir in "$1"/*/; do
 		set -- "$dir"*.xtce
-		[ -f "$1" ] && basename "$dir"
+		[ -f "$1" ] || continue
+		if [ -n "$heading" ]; then
+			echo "$heading"
+			heading=
+		fi
+		echo "  $(basename "$dir")"
 	done
 	return 0
 }
@@ -48,7 +64,9 @@ example=
 case ${1:-} in
 -e | --example)
 	if [ $# -eq 1 ]; then
-		list
+		list "$EXAMPLES" "tcs-xtce's examples:"
+		list "$TCSPECIAL_EXAMPLES" \
+			"tcspecial's examples, the XTCE of each vehicle:"
 		exit 0
 	fi
 	example=$2
@@ -76,5 +94,6 @@ case $example in
 "" | */* | .*) die "no example ${example:-named}: xtcee -e lists them" ;;
 esac
 set -- "$EXAMPLES/$example"/*.xtce
+[ -f "$1" ] || set -- "$TCSPECIAL_EXAMPLES/$example"/*.xtce
 [ -f "$1" ] || die "no example $example: xtcee -e lists them"
 exec "$EDITOR" "$@"

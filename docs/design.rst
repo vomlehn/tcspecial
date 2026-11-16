@@ -2,6 +2,10 @@
 TCSpecial Design
 ================
 
+.. contents:: Table of Contents
+   :depth: 4
+   :local:
+
 How TCSpecial works inside, and why. Each of its programs has a design
 document of its own, as it has a manual of its own.
 

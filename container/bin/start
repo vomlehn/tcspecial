@@ -1,18 +1,26 @@
 #!/bin/sh
-# bin/start: start the test container afresh, install the newest build of
-# every TCS package in it, and open a terminal window with a shell in it.
+# bin/start: start the test container, and open a terminal window with a
+# shell in it: the container as it was left, or, where there is none, or
+# with -r or --rebuild, one made from scratch with the newest build of
+# every TCS package installed in it.
 #
-#   bin/start [-f | --fedora] [DIR...]
+#   bin/start [-f | --fedora] [-r | --rebuild] [DIR...]
 #
-# The packages are the .deb files, for the kubuntu container, or with -f or
-# --fedora the .rpm files, for the fedora one, in each DIR's build/packages:
+# The container is the kubuntu one, for the .debs, or with -f or --fedora
+# the fedora one, for the RPMs. Where it exists, it is started as it was
+# left, with what was installed and done in it, and nothing is installed.
+# Where it does not, it is made from its image, the image built first if
+# there is none, and the packages installed. With -r or --rebuild it is
+# made from scratch: the image built again with no layer of the last build
+# reused, the container made afresh from it, and the packages installed.
+#
+# The packages are the .deb or .rpm files in each DIR's build/packages:
 # each TCS checkout, ../../tcs* from container/, when no DIR is given: the
 # tcspecial checkout this is in and those beside it. A project builds all
 # its packages at one version, so from each DIR only the files at the
 # version of its newest file are installed, by the time each was written:
 # an older version left beside them, or a package since renamed, is not.
-# It is tcs-container fresh and tcs-container install, one after the
-# other: see bin/tcs-container.
+# DIRs given to a container that exists, without -r, say nothing.
 #
 # Then it opens a new terminal window running tcs-container shell, a login
 # shell in the container as tcs. Leaving the shell, or closing the window,
@@ -27,7 +35,7 @@ set -eu
 
 # Prints how to call this command.
 usage() {
-	echo "usage: bin/start [-f | --fedora] [DIR...]"
+	echo "usage: bin/start [-f | --fedora] [-r | --rebuild] [DIR...]"
 }
 
 # Says what is wrong and stops.
@@ -125,11 +133,15 @@ open_window() {
 here=$(cd "$(dirname "$0")" && pwd)
 distro=kubuntu
 kind=deb
+rebuild=
 while [ $# -gt 0 ]; do
 	case $1 in
 	-f | --fedora)
 		distro=fedora
 		kind=rpm
+		;;
+	-r | --rebuild)
+		rebuild=1
 		;;
 	-h | --help)
 		usage
@@ -145,7 +157,11 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-if [ $# -eq 0 ]; then
+# The container is made, and the packages are wanted, only where there is
+# none or it is to be rebuilt.
+make=$rebuild
+"$here/tcs-container" --distro "$distro" exists || make=1
+if [ -n "$make" ] && [ $# -eq 0 ]; then
 	for dir in "$here"/../../../tcs*/; do
 		if [ -d "$dir/.git" ]; then
 			set -- "$@" "${dir%/}"
@@ -154,23 +170,26 @@ if [ $# -eq 0 ]; then
 fi
 
 # From each directory, the files at the version of its newest one.
-newest=$(for dir in "$@"; do
-	[ -d "$dir" ] || die "no directory $dir"
-	files=$(for file in "$dir"/build/packages/*."$kind"; do
-		if [ -f "$file" ]; then
-			echo "$file"
-		fi
-	done | xargs -r ls -t)
-	[ -n "$files" ] || continue
-	version=$(version_of "$(echo "$files" | head -n 1)")
-	echo "$files" | while read -r file; do
-		if [ "$(version_of "$file")" = "$version" ]; then
-			echo "$file"
-		fi
+newest=$(if [ -n "$make" ]; then
+	for dir in "$@"; do
+		[ -d "$dir" ] || die "no directory $dir"
+		files=$(for file in "$dir"/build/packages/*."$kind"; do
+			if [ -f "$file" ]; then
+				echo "$file"
+			fi
+		done | xargs -r ls -t)
+		[ -n "$files" ] || continue
+		version=$(version_of "$(echo "$files" | head -n 1)")
+		echo "$files" | while read -r file; do
+			if [ "$(version_of "$file")" = "$version" ]; then
+				echo "$file"
+			fi
+		done
 	done
-done)
-[ -n "$newest" ] || die "no .$kind files in build/packages of $*:" \
-	"build them with make packages there"
+fi)
+[ -z "$make" ] || [ -n "$newest" ] \
+	|| die "no .$kind files in build/packages of $*:" \
+		"build them with make packages there"
 
 # The window is where the container is used, so there must be one to open
 # before anything is started.
@@ -180,11 +199,21 @@ terminal=$(terminal) || die "no terminal to open the container's window" \
 	"with: x-terminal-emulator, konsole, gnome-terminal or xterm, or" \
 	"one TERMINAL names"
 
-echo "Installing in the $distro container:"
-echo "$newest" | sed 's/^/  /'
-"$here/tcs-container" --distro "$distro" fresh
-# shellcheck disable=SC2086 # one file a word; TCS paths have no spaces
-"$here/tcs-container" --distro "$distro" install $newest
+if [ -n "$rebuild" ]; then
+	echo "Building the $distro image from scratch"
+	"$here/tcs-container" --distro "$distro" build --no-cache
+fi
+if [ -n "$make" ]; then
+	echo "Installing in a new $distro container:"
+	echo "$newest" | sed 's/^/  /'
+	"$here/tcs-container" --distro "$distro" fresh
+	# shellcheck disable=SC2086 # one file a word; TCS paths have no spaces
+	"$here/tcs-container" --distro "$distro" install $newest
+else
+	echo "Starting the $distro container as it was left:" \
+		"bin/start --rebuild makes it again"
+	"$here/tcs-container" --distro "$distro" start
+fi
 open_window "$terminal" "$distro"
 
 # Waits in the background, so that a signal ends the wait at once, as it

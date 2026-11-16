@@ -18,6 +18,11 @@ in tcspecial's checkout.
 - `README.html` -- this page as HTML, made from `README.md` with
   `make html`, which tcspecial's manual links.
 
+In the container, three commands use what is installed: `tcsx` runs one
+of tcspecial's examples, `cfge` edits a configuration, a file or an
+example's, in tcs-cfge, and `xtcee` edits XTCE, a file or one of
+tcs-xtce's examples, in tcs-xtcee. The sections below say how.
+
 ## What it is
 
 The scripts in `bin/` keep a test system in a container, to install a
@@ -39,28 +44,44 @@ program with a window shows it on your desktop. `tcs` has your uid, there
 as on the host, and `fresh` gives the container your Wayland and X11
 sockets, your X authority and your GPU, so `bin/tcs-container-shell
 tcs-cfge` opens tcs-cfge's window beside your others. A display gone since,
-as after logging out and in again, needs `bin/tcs-container-fresh`. Xvfb
-is there too, for a program to open its window where nobody sees it. What
-a package needs it brings with it, and what building a project needs that
-project's `make install-tools` installs.
+as after logging out and in again, needs the container made again, as
+`bin/start --rebuild` makes it. Xvfb is there too, for a program to open
+its window where nobody sees it. What a package needs it brings with
+it, and what building a project needs that project's `make
+install-tools` installs.
 
 The quickest way in: build the packages of whatever you are testing, then
-have the newest of them installed in a container just made:
+start the container, made from scratch with the newest of them installed
+in it the first time, and as you left it after that:
 
 ```sh
 make -C .. packages
 bin/start                               # the .debs, in kubuntu
 bin/start -f                            # the RPMs, in fedora
+bin/start --rebuild                     # kubuntu, from scratch
 ```
 
-`bin/start [-f | --fedora] [DIR...]` takes the `.deb` files, or with
-`-f` or `--fedora` the `.rpm` files, from `build/packages` of each TCS
-checkout, this tcspecial and those beside it (`../../tcs*`), or of each
-DIR given. From each, it takes only the files at the version of its
-newest one, so that an older build left beside them, or a package since
-renamed, is not installed. It starts the container afresh, installs them all in one go,
-and opens a new terminal window with a login shell in the container, as
-`tcs`, to try them in. The terminal is `$TERMINAL`, or the first there
+`bin/start [-f | --fedora] [-r | --rebuild] [DIR...]` takes these:
+
+- `-f`, `--fedora` -- the Fedora container, for the RPMs, rather than the
+  Kubuntu one, for the `.deb` files.
+- `-r`, `--rebuild` -- the container made again from scratch: its image
+  built again with no layer of the last build reused, the container made
+  afresh from that, and the newest packages installed in it. Without it,
+  a container that exists is started as it was left, with what was
+  installed and done in it, and nothing is installed; one that does not
+  is made from its image, the image built first if there is none, and the
+  packages installed.
+- `DIR...` -- where the packages are: the `build/packages` of each DIR,
+  or, with none given, of each TCS checkout, this tcspecial and those
+  beside it (`../../tcs*`). From each, only the files at the version of
+  its newest one are installed, so that an older build left beside them,
+  or a package since renamed, is not. Given to a container that is
+  started as it was left, they say nothing.
+- `-h`, `--help` -- how to call it.
+
+It then opens a new terminal window with a login shell in the container,
+as `tcs`, to try them in. The terminal is `$TERMINAL`, or the first there
 of `x-terminal-emulator` (Konsole on Kubuntu), `konsole`,
 `gnome-terminal` and `xterm`; with no display, or no terminal,
 `bin/start` says so and starts nothing.
@@ -68,7 +89,8 @@ of `x-terminal-emulator` (Konsole on Kubuntu), `konsole`,
 `bin/start` then waits until the container stops. Leaving the window's
 shell, or closing the window, stops it, with everything in it, other
 shells such as `bin/tcs-container-shell` gives too, and so does Ctrl+C in
-the terminal `bin/start` was run from. The commands below are run from
+the terminal `bin/start` was run from. Stopped, it keeps what was done in
+it, for the next `bin/start`. The commands below are run from
 another terminal on the host while it waits.
 
 The commands, each a script of its own in `bin/`, `tcs-container-` and
@@ -76,6 +98,8 @@ its name, such as `bin/tcs-container-fresh`:
 
 ```sh
 fresh             # throw the container away, start anew
+start             # start it as it was left, or make it
+exists            # succeed if it exists
 install FILE...   # install .deb or .rpm files
 installed         # the TCS packages it has
 shell             # a login shell in it, as tcs
@@ -87,7 +111,7 @@ copy DIR...       # copy checkouts in, without their builds
 example [NAME]    # run a tcspecial example, or list them
 wait              # wait until it stops
 stop              # stop it, keeping what was done in it
-build             # build its image
+build             # build its image; --no-cache from scratch
 destroy [--image] # remove it, and with --image its image
 ```
 
@@ -200,16 +224,19 @@ every edit to both, so editing one keeps the other the same.
 
 ## Editing XTCE
 
-Each image has `xtcee`, which opens a file, or one of tcs-xtce's examples
-by name, in tcs-xtce's editor, `tcs-xtcee`, once the tcs-xtce package is
-installed, as `bin/start` installs it. An example of several documents,
-such as `split-mission`, opens all of them together, as one mission. The
-window `bin/start` opens says how to use it:
+Each image has `xtcee`, which opens a file, or an example by name, in
+tcs-xtce's editor, `tcs-xtcee`, once the tcs-xtce package is installed,
+as `bin/start` installs it. The examples are tcs-xtce's own examples of
+XTCE and tcspecial's, each of which has the XTCE of the vehicle it
+configures; `xtcee -e` lists them, the two sets apart. An example of
+several documents, such as `split-mission`, opens all of them together,
+as one mission. The window `bin/start` opens says how to use it:
 
 ```sh
 xtcee FILE                      # opens FILE
 xtcee -e                        # lists the examples
-xtcee -e housekeeping           # opens housekeeping.xtce
+xtcee -e housekeeping           # opens tcs-xtce's housekeeping.xtce
+xtcee -e thermostat             # opens tcspecial's thermostat.xtce
 xtcee --example split-mission   # opens its three documents
 ```
 

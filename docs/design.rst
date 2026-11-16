@@ -49,10 +49,10 @@ Examples
 ========
 
 `The lander example design <lander-design.html>`__
-    A plan, not yet built: a lunar landing in two dimensions, flown by hand
-    with a joystick in tcs-sim, its two axes flown by two tcspecials, and
+    A lunar landing in two dimensions, flown by hand with a joystick in
+    tcs-sim or by its autopilot, its two axes flown by two tcspecials, and
     shown again on the ground through Yamcs, a Moon-to-Earth light time
-    late.
+    late: what it is, and the stages it was made in.
 
 How to use each program is in its manual, and the categories of TCS
 software are said in `TCS Design and Documentation <manual.html>`__,

@@ -965,7 +965,7 @@
       "additionalProperties": false
     },
     "lander": {
-      "description": "A lander, flown in two dimensions over a landscape: its terminals are throttle_x and throttle_y, inputs taking ratios from -1 to 1; x and y, in m; velocity_x and velocity_y, in m/s; fuel, the fraction of a full tank left; and landed and crashed, decisions asserted while it is down. Touching the ground, leaving the display, running dry and starting again are events, found ahead of time.",
+      "description": "A lander, flown in two dimensions over a landscape: its terminals are throttle_x and throttle_y, inputs taking ratios from -1 to 1; x and y, in m; velocity_x and velocity_y, in m/s; fuel, the fraction of a full tank left; landed and crashed, decisions asserted while it is down; and acceleration_x and acceleration_y, in m/s2. Touching the ground, leaving the display, running dry and starting again are events, found ahead of time.",
       "type": "object",
       "properties": {
         "component": {

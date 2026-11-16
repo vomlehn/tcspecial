@@ -23,7 +23,7 @@ fn with_errors(dir: &Path, count: usize) -> PathBuf {
 description: many
 tcspecial:
   gateway: radio
-  interface: \"85b9e713bed11d3415d182a4742a26b2\"
+  interface: \"b03f49878bcc9c45e7b854c7da1bce47\"
   state_file: /tmp/tcspecial-test.state
   max_consolidator_inputs: 32
   beacon:
@@ -492,7 +492,7 @@ fn with_vehicle_node(dir: &Path, node_type: &str, node: &str) -> PathBuf {
 description: one vehicle node
 tcspecial:
   gateway: radio
-  interface: \"85b9e713bed11d3415d182a4742a26b2\"
+  interface: \"b03f49878bcc9c45e7b854c7da1bce47\"
   state_file: /tmp/tcspecial-test.state
   max_consolidator_inputs: 32
   beacon:

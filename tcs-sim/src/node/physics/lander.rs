@@ -5,8 +5,9 @@
 //! Its terminals are `tcsprotocol::node::physics::lander`'s: `throttle_x`
 //! and `throttle_y`, ratios from minus one to one; `x` and `y`, in metres;
 //! `velocity_x` and `velocity_y`, in metres a second; `fuel`, the fraction
-//! of a full tank left; and `landed` and `crashed`, decisions asserted while
-//! it is down.
+//! of a full tank left; `landed` and `crashed`, decisions asserted while
+//! it is down; and `acceleration_x` and `acceleration_y`, in metres a second
+//! a second, gravity's included.
 //!
 //! # The arithmetic
 //!
@@ -51,6 +52,8 @@ const VELOCITY_Y: usize = 5;
 const FUEL: usize = 6;
 const LANDED: usize = 7;
 const CRASHED: usize = 8;
+const ACCELERATION_X: usize = 9;
+const ACCELERATION_Y: usize = 10;
 
 /// Standard gravity, which turns a specific impulse in seconds into an
 /// exhaust velocity: a definition, not the gravity of anywhere in
@@ -208,6 +211,18 @@ impl Lander {
             self.throttle.0 * self.figures.thrust_x,
             self.throttle.1 * self.figures.thrust_y,
         )
+    }
+
+    /// How fast it is speeding up now, along each axis: its thrust over its
+    /// mass, and gravity on Y.
+    ///
+    /// # Returns
+    ///
+    /// Metres a second a second along X and along Y.
+    fn acceleration(&self) -> Point {
+        let mass = self.figures.dry_mass + self.fuel;
+        let (fx, fy) = self.force();
+        (fx / mass, fy / mass - self.figures.gravity)
     }
 
     /// The fuel it burns now, in kilograms a second.
@@ -436,6 +451,8 @@ impl Component for Lander {
             (FUEL, _) => self.fuel / self.figures.fuel,
             (LANDED, Flight::Down { landed, .. }) => decision(landed),
             (CRASHED, Flight::Down { landed, .. }) => decision(!landed),
+            (ACCELERATION_X, Flight::Flying) => self.acceleration().0,
+            (ACCELERATION_Y, Flight::Flying) => self.acceleration().1,
             _ => 0.0,
         }
     }
@@ -549,6 +566,8 @@ mod tests {
         assert_eq!(names[FUEL], "fuel");
         assert_eq!(names[LANDED], "landed");
         assert_eq!(names[CRASHED], "crashed");
+        assert_eq!(names[ACCELERATION_X], "acceleration_x");
+        assert_eq!(names[ACCELERATION_Y], "acceleration_y");
     }
 
     /// Thrust accelerates it at its force over its mass, more as the tank
@@ -568,6 +587,10 @@ mod tests {
         assert!((l.velocity.1 + 1.62).abs() < 1e-9, "{:?}", l.velocity);
         assert!((l.fuel - (2000.0 - flow)).abs() < 1e-9);
         assert!((l.output(FUEL) - l.fuel / 2000.0).abs() < 1e-12);
+        // Its acceleration is its thrust over the mass left, and gravity.
+        let mass = 6000.0 + l.fuel;
+        assert!((l.output(ACCELERATION_X) - 12000.0 / mass).abs() < 1e-12);
+        assert!((l.output(ACCELERATION_Y) + 1.62).abs() < 1e-12);
     }
 
     /// With the tank empty there is no thrust, whatever the throttles.

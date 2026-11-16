@@ -34,5 +34,5 @@ attributes:
   - name: carries
     required: true
     about: >
-      The value type it takes at every input and sends: kelvin, volt, ampere, watt, metre, metre_per_second, newton,
+      The value type it takes at every input and sends: kelvin, volt, ampere, watt, metre, metre_per_second, metre_per_second_squared, newton,
       kilogram_per_second or ratio.

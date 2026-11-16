@@ -629,8 +629,11 @@ Requirement
     mass, with ``gravity`` on Y alone; the tank running dry is a moment it
     foresees, and from then on there is no thrust. It gives out ``x`` and
     ``y``, the place between its feet; ``velocity_x`` and ``velocity_y``;
-    ``fuel``, the fraction of a full tank left; and ``landed`` and
-    ``crashed``, decisions asserted while it is down.
+    ``fuel``, the fraction of a full tank left; ``landed`` and
+    ``crashed``, decisions asserted while it is down; and
+    ``acceleration_x`` and ``acceleration_y``, in metres a second a second,
+    its thrust over its mass, with gravity on Y, and nought while it is
+    down.
 
 Requirement
     A lander's landscape is its display, ``width`` by ``height``; its

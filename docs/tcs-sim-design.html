@@ -1023,8 +1023,11 @@ throttles held each axis is the body's rocket equation, sharing the
 mass, with <tt class="docutils literal">gravity</tt> on Y alone; the tank running dry is a moment it
 foresees, and from then on there is no thrust. It gives out <tt class="docutils literal">x</tt> and
 <tt class="docutils literal">y</tt>, the place between its feet; <tt class="docutils literal">velocity_x</tt> and <tt class="docutils literal">velocity_y</tt>;
-<tt class="docutils literal">fuel</tt>, the fraction of a full tank left; and <tt class="docutils literal">landed</tt> and
-<tt class="docutils literal">crashed</tt>, decisions asserted while it is down.</dd>
+<tt class="docutils literal">fuel</tt>, the fraction of a full tank left; <tt class="docutils literal">landed</tt> and
+<tt class="docutils literal">crashed</tt>, decisions asserted while it is down; and
+<tt class="docutils literal">acceleration_x</tt> and <tt class="docutils literal">acceleration_y</tt>, in metres a second a second,
+its thrust over its mass, with gravity on Y, and nought while it is
+down.</dd>
 <dt>Requirement</dt>
 <dd>A lander's landscape is its display, <tt class="docutils literal">width</tt> by <tt class="docutils literal">height</tt>; its
 <tt class="docutils literal">ground</tt>, points from the left edge to the right, each further right

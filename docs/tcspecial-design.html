@@ -1285,7 +1285,8 @@ lines, what a thermostat drives a heater's switch with.</dd>
 <dd>True or false, where something wants to be told one and nothing else.</dd>
 <dt>One value type for each unit</dt>
 <dd><tt class="docutils literal">kelvin</tt>, <tt class="docutils literal">volt</tt>, <tt class="docutils literal">ampere</tt>, <tt class="docutils literal">watt</tt>, <tt class="docutils literal">metre</tt>,
-<tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">newton</tt>, <tt class="docutils literal">kilogram_per_second</tt> and
+<tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">metre_per_second_squared</tt>, <tt class="docutils literal">newton</tt>,
+<tt class="docutils literal">kilogram_per_second</tt> and
 <tt class="docutils literal">ratio</tt>, each named as one of its unit is: a value as it is today, a 32-bit signed count of the unit's
 step (see <a class="reference internal" href="#compute-elements">Compute elements</a>), stated as an integer encoding with the
 calibrator that makes it the unit and the unit's symbol in its unit set.</dd>
@@ -1895,7 +1896,7 @@ section every configuration holds, and it is required of every one of them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">radio</span><span class="whitespace">
-  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;85b9e713bed11d3415d182a4742a26b2&quot;</span><span class="whitespace">
+  </span><span class="name tag">interface</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;b03f49878bcc9c45e7b854c7da1bce47&quot;</span><span class="whitespace">
   </span><span class="name tag">tcs_cmd</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">recv</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">0.0.0.0:4000</span><span class="whitespace">
     </span><span class="name tag">send</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">127.0.0.1:4100</span><span class="whitespace">

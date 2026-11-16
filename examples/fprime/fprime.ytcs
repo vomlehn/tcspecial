@@ -18,7 +18,7 @@ tcspecial:
     reset_interval: "1 s"
     send: "0.0.0.0:9500"
   gateway: "fprime"
-  interface: "85b9e713bed11d3415d182a4742a26b2"
+  interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"

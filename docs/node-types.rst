@@ -103,8 +103,8 @@ attribute to change. Nothing is inferred and nothing is converted between nodes.
 The types are stated once, in ``tcsprotocol/xtce/types.xtce``, and named in
 ``tcsprotocol/src/link_type.rs``: the integers ``u8`` to ``i64``,
 ``boolean``, the quantities (``kelvin``, ``volt``, ``ampere``, ``watt``,
-``metre``, ``metre_per_second``, ``newton``, ``kilogram_per_second``,
-``ratio``), ``string``, ``bytes``, and structures of up to sixteen named fields,
+``metre``, ``metre_per_second``, ``metre_per_second_squared``, ``newton``,
+``kilogram_per_second``, ``ratio``), ``string``, ``bytes``, and structures of up to sixteen named fields,
 ``"x: i16, y: i16"``. A structure's fields are of fixed width, so a ``string``
 or ``bytes`` field in one is refused. A new node type adds no type there.
 

@@ -63,6 +63,7 @@ UNITS = (
     Unit("Watt", "W", "watts", 1e3),
     Unit("Metre", "m", "metres", 1e3),
     Unit("MetrePerSecond", "m/s", "metres a second", 1e6),
+    Unit("MetrePerSecondSquared", "m/s2", "metres a second a second", 1e6),
     Unit("Newton", "N", "newtons", 1e3),
     Unit("KilogramPerSecond", "kg/s", "kilograms a second", 1e6),
     Unit("Ratio", "ratio", "a ratio", 1e6),

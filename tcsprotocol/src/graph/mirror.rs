@@ -295,7 +295,7 @@ mod tests {
             format!(
                 "tcspecial:
   gateway: radio
-  interface: \"85b9e713bed11d3415d182a4742a26b2\"
+  interface: \"b03f49878bcc9c45e7b854c7da1bce47\"
   state_file: /tmp/tcspecial-test.state
   max_consolidator_inputs: 32
   tcs_cmd:

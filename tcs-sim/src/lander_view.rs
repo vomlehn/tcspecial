@@ -39,6 +39,8 @@ const VELOCITY_Y: usize = 5;
 const FUEL: usize = 6;
 const LANDED: usize = 7;
 const CRASHED: usize = 8;
+const ACCELERATION_X: usize = 9;
+const ACCELERATION_Y: usize = 10;
 
 /// The joystick's inputs' places, in
 /// `tcsprotocol::node::physics::joystick::TERMINALS`'s order.
@@ -429,6 +431,8 @@ fn paint(window: &LanderWindow, f: &Resolved, out: &[f64]) {
     window.set_position_y(format!("{:.1}", out[Y]).into());
     window.set_velocity_x(format!("{:.2}", out[VELOCITY_X]).into());
     window.set_velocity_y(format!("{:.2}", out[VELOCITY_Y]).into());
+    window.set_acceleration_x(format!("{:.3}", out[ACCELERATION_X]).into());
+    window.set_acceleration_y(format!("{:.3}", out[ACCELERATION_Y]).into());
 }
 
 #[cfg(test)]
@@ -585,6 +589,8 @@ mod tests {
                 0.0,
                 0.62,
                 if zoom { 0.0 } else { 1.0 },
+                0.0,
+                0.0,
                 0.0,
             ],
         );

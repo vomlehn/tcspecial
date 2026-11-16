@@ -24,8 +24,8 @@ attributes:
     required: true
     about: >
       The value type it reads, which its setpoint and half_band are in:
-      kelvin, volt, ampere, watt, metre, metre_per_second, newton,
-      kilogram_per_second or ratio.
+      kelvin, volt, ampere, watt, metre, metre_per_second,
+      metre_per_second_squared, newton, kilogram_per_second or ratio.
   - name: type-out
     required: true
     about: >

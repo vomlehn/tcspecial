@@ -762,7 +762,8 @@ The types are few, because what a vehicle's nodes hand each other is:
 
 One value type for each unit
     ``kelvin``, ``volt``, ``ampere``, ``watt``, ``metre``,
-    ``metre_per_second``, ``newton``, ``kilogram_per_second`` and
+    ``metre_per_second``, ``metre_per_second_squared``, ``newton``,
+    ``kilogram_per_second`` and
     ``ratio``, each named as one of its unit is: a value as it is today, a 32-bit signed count of the unit's
     step (see `Compute elements`_), stated as an integer encoding with the
     calibrator that makes it the unit and the unit's symbol in its unit set.
@@ -1392,7 +1393,7 @@ section every configuration holds, and it is required of every one of them.
 
    tcspecial:
      gateway: radio
-     interface: "85b9e713bed11d3415d182a4742a26b2"
+     interface: "b03f49878bcc9c45e7b854c7da1bce47"
      tcs_cmd:
        recv: 0.0.0.0:4000
        send: 127.0.0.1:4100

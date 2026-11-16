@@ -8,8 +8,10 @@
 //! other way. It gives out where it is, `x` and `y`, in metres, the place
 //! between its feet; how fast it is going, `velocity_x` and `velocity_y`, in
 //! metres a second; the `fuel` it has left, as a fraction of a full tank;
-//! and two decisions, `landed` and `crashed`, each asserted from the moment
-//! it touches down until it starts again.
+//! two decisions, `landed` and `crashed`, each asserted from the moment it
+//! touches down until it starts again; and how fast it is speeding up,
+//! `acceleration_x` and `acceleration_y`, in metres a second a second,
+//! gravity's included and nought while it is down.
 //!
 //! # The arithmetic
 //!
@@ -65,6 +67,14 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::output("fuel", Kind::Value(Unit::Ratio)),
     Terminal::output("landed", Kind::Decision),
     Terminal::output("crashed", Kind::Decision),
+    Terminal::output(
+        "acceleration_x",
+        Kind::Value(Unit::MetrePerSecondSquared),
+    ),
+    Terminal::output(
+        "acceleration_y",
+        Kind::Value(Unit::MetrePerSecondSquared),
+    ),
 ];
 
 /// Everything it states, by the name a file writes, the

@@ -66,7 +66,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
             "<configuration>
     <tcspecial>
         <gateway>radio</gateway>
-        <interface>85b9e713bed11d3415d182a4742a26b2</interface>
+        <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <beacon>
             <default_interval>5 s</default_interval>
             <reset_interval>1 s</reset_interval>

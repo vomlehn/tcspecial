@@ -108,7 +108,7 @@ fn configuration(dir: &std::path::Path, payloads: &str) -> std::path::PathBuf {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"85b9e713bed11d3415d182a4742a26b2\"
+  interface: \"b03f49878bcc9c45e7b854c7da1bce47\"
   beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", recv: \
             \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   log: {{ directory: \"{}\", segment_size: \"65536\" }}
@@ -304,7 +304,7 @@ fn a_sim_address_is_where_a_simulated_channel_is_reached() {
         format!(
             "tcspecial:
   gateway: radio
-  interface: \"85b9e713bed11d3415d182a4742a26b2\"
+  interface: \"b03f49878bcc9c45e7b854c7da1bce47\"
   beacon: {{ default_interval: \"5 s\", reset_interval: \"1 s\", recv: \
             \"127.0.0.1:1\", send: \"127.0.0.1:2\" }}
   payload_command: {{ dest_base: \"127.0.0.1:3\", source_base: \

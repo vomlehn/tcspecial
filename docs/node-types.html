@@ -478,8 +478,8 @@ attribute to change. Nothing is inferred and nothing is converted between nodes.
 The types are stated once, in <tt class="docutils literal">tcsprotocol/xtce/types.xtce</tt>, and named in
 <tt class="docutils literal">tcsprotocol/src/link_type.rs</tt>: the integers <tt class="docutils literal">u8</tt> to <tt class="docutils literal">i64</tt>,
 <tt class="docutils literal">boolean</tt>, the quantities (<tt class="docutils literal">kelvin</tt>, <tt class="docutils literal">volt</tt>, <tt class="docutils literal">ampere</tt>, <tt class="docutils literal">watt</tt>,
-<tt class="docutils literal">metre</tt>, <tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">newton</tt>, <tt class="docutils literal">kilogram_per_second</tt>,
-<tt class="docutils literal">ratio</tt>), <tt class="docutils literal">string</tt>, <tt class="docutils literal">bytes</tt>, and structures of up to sixteen named fields,
+<tt class="docutils literal">metre</tt>, <tt class="docutils literal">metre_per_second</tt>, <tt class="docutils literal">metre_per_second_squared</tt>, <tt class="docutils literal">newton</tt>,
+<tt class="docutils literal">kilogram_per_second</tt>, <tt class="docutils literal">ratio</tt>), <tt class="docutils literal">string</tt>, <tt class="docutils literal">bytes</tt>, and structures of up to sixteen named fields,
 <tt class="docutils literal">&quot;x: i16, y: i16&quot;</tt>. A structure's fields are of fixed width, so a <tt class="docutils literal">string</tt>
 or <tt class="docutils literal">bytes</tt> field in one is refused. A new node type adds no type there.</p>
 <p>What a node type carries is decided in one function, <tt class="docutils literal">carries</tt> in

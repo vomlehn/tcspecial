@@ -1261,6 +1261,7 @@ fn c_symbol(unit: Unit) -> &'static CStr {
         Unit::Watt => c"W",
         Unit::Metre => c"m",
         Unit::MetrePerSecond => c"m/s",
+        Unit::MetrePerSecondSquared => c"m/s2",
         Unit::Newton => c"N",
         Unit::KilogramPerSecond => c"kg/s",
         Unit::Ratio => c"ratio",

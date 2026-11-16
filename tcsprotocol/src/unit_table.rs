@@ -16,6 +16,8 @@ pub enum Unit {
     Metre,
     /// Speed.
     MetrePerSecond,
+    /// Acceleration.
+    MetrePerSecondSquared,
     /// Force: a thrust.
     Newton,
     /// A flow of mass: what an engine burns.
@@ -26,13 +28,14 @@ pub enum Unit {
 
 impl Unit {
     /// Every unit, in the order of the table.
-    pub const ALL: [Unit; 9] = [
+    pub const ALL: [Unit; 10] = [
         Unit::Kelvin,
         Unit::Volt,
         Unit::Ampere,
         Unit::Watt,
         Unit::Metre,
         Unit::MetrePerSecond,
+        Unit::MetrePerSecondSquared,
         Unit::Newton,
         Unit::KilogramPerSecond,
         Unit::Ratio,
@@ -40,7 +43,7 @@ impl Unit {
 }
 
 /// The table, one row per value type.
-const TABLE: [Row; 9] = [
+const TABLE: [Row; 10] = [
     Row {
         unit: Unit::Kelvin,
         type_name: "kelvin",
@@ -88,6 +91,14 @@ const TABLE: [Row; 9] = [
         name: "metres a second",
         per_unit: 1e6,
         step: "micro-metres a second",
+    },
+    Row {
+        unit: Unit::MetrePerSecondSquared,
+        type_name: "metre_per_second_squared",
+        symbol: "m/s2",
+        name: "metres a second a second",
+        per_unit: 1e6,
+        step: "micro-metres a second a second",
     },
     Row {
         unit: Unit::Newton,

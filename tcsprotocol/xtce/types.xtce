@@ -162,6 +162,25 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
+      <FloatParameterType name="metre_per_second_squared" sizeInBits="64"
+          shortDescription="Acceleration.">
+        <AncillaryDataSet>
+          <AncillaryData
+              name="tcspecial.name">metres a second a second</AncillaryData>
+          <AncillaryData
+              name="tcspecial.step">micro-metres a second a second</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>m/s2</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
       <FloatParameterType name="newton" sizeInBits="64"
           shortDescription="Force: a thrust.">
         <AncillaryDataSet>

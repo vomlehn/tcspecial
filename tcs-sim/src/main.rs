@@ -1679,7 +1679,7 @@ fn main() {
         let quit = quit.clone();
         ui.on_quit_clicked(move || quit());
     }
-    quit_when_signalled(signalled.clone(), quit);
+    quit_when_signalled(signalled.clone(), quit.clone());
 
     // Periodic update timer
     {
@@ -1701,7 +1701,7 @@ fn main() {
 
     // Kept while tcs-sim runs: the window, and the timer that keeps it up
     // to the world.
-    let _lander = lander.and_then(lander_view::open);
+    let _lander = lander.and_then(|scene| lander_view::open(scene, quit));
 
     ui.run().unwrap();
 

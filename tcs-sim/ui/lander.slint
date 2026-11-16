@@ -5,10 +5,12 @@
 // path commands, reads the world, and turns the joystick's pointer into the
 // two axes.
 //
-// Colour says nothing alone here. The ground is grey with a little brown,
-// the pad is marked by an upright line at each end as well as by being level,
-// and whether the lander has landed or crashed is said in words, with a
-// smiling face drawn over it on a landing.
+// Colour says nothing alone here. The ground is grey with a little brown
+// under a black sky with twinkling stars, the pad is marked by an upright
+// line at each end as well as by being level, the lander is white with
+// thin black lines so that it shows against the sky and the ground alike, and
+// whether the lander has landed or crashed is said in words, with a smiling
+// face drawn over it on a landing.
 
 import { Fonts } from "../../tcs-ui/ui/fonts.slint";
 import { Colors } from "../../tcs-ui/ui/colors.slint";
@@ -22,8 +24,9 @@ import { Colors } from "../../tcs-ui/ui/colors.slint";
 // encloses the plus. Letting go is said too, and the dot goes back to the
 // middle. A press anywhere else does nothing.
 component Joystick inherits Rectangle {
-    // The square's side, and how far each rectangle reaches beyond it.
-    in property <length> square: 56px;
+    // The square's side, which is each rectangle's thickness, and how far
+    // each rectangle reaches beyond it.
+    in property <length> square: 33.6px;
     in property <length> arm: 56px;
     // Where the dot is, from the square's middle: set by Rust.
     in property <length> dot-x: 0px;
@@ -34,7 +37,7 @@ component Joystick inherits Rectangle {
     callback released();
 
     property <length> reach: root.square / 2 + root.arm;
-    property <length> thick: root.square * 0.6;
+    property <length> thick: root.square;
     property <bool> held: false;
 
     width: 2 * root.reach;
@@ -139,13 +142,25 @@ export component LanderWindow inherits Window {
     in property <float> world-width: 1000;
     in property <float> world-height: 600;
     // The pictures, as path commands in metres: the ground filled, its
-    // line, the pad with its end marks, the lander, and the face drawn over
-    // it on a landing, empty otherwise.
+    // line, the pad with its end marks, the lander's single lines -- its
+    // struts, legs and antenna -- and its shapes, and the face drawn over it
+    // on a landing, empty otherwise.
     in property <string> ground-fill;
     in property <string> ground-line;
     in property <string> pad;
-    in property <string> lander;
+    in property <string> lander-lines;
+    in property <string> lander-shapes;
     in property <string> face;
+    // The stars, in four groups, and how bright each group is now, from
+    // nought to one: set by Rust, which makes them twinkle.
+    in property <string> stars-0;
+    in property <string> stars-1;
+    in property <string> stars-2;
+    in property <string> stars-3;
+    in property <float> twinkle-0: 1;
+    in property <float> twinkle-1: 1;
+    in property <float> twinkle-2: 1;
+    in property <float> twinkle-3: 1;
     // What it is doing, in words: "Flying", "Landed" or "Crashed".
     in property <string> state: "Flying";
     // The fraction of a full tank left.
@@ -172,15 +187,30 @@ export component LanderWindow inherits Window {
         scene := Rectangle {
             width: 800px;
             height: 800px * root.world-height / root.world-width;
+            background: #000000;
             border-width: 1px;
             border-color: #6b7280;
+            for group in [
+                { commands: root.stars-0, bright: root.twinkle-0 },
+                { commands: root.stars-1, bright: root.twinkle-1 },
+                { commands: root.stars-2, bright: root.twinkle-2 },
+                { commands: root.stars-3, bright: root.twinkle-3 },
+            ]: Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: group.commands;
+                fill: #ffffff;
+                opacity: group.bright;
+            }
             Path {
                 width: 100%;
                 height: 100%;
                 viewbox-width: root.world-width;
                 viewbox-height: root.world-height;
                 commands: root.ground-fill;
-                fill: #857a6c;
+                fill: #aaa197;
             }
             Path {
                 width: 100%;
@@ -198,16 +228,50 @@ export component LanderWindow inherits Window {
                 viewbox-height: root.world-height;
                 commands: root.pad;
                 stroke: #000000;
-                stroke-width: 3px;
+                stroke-width: 4px;
             }
             Path {
                 width: 100%;
                 height: 100%;
                 viewbox-width: root.world-width;
                 viewbox-height: root.world-height;
-                commands: root.lander;
+                commands: root.pad;
+                stroke: #ffffff;
+                stroke-width: 2.5px;
+            }
+            // The lander, white so that it shows against the sky, and edged
+            // with a very thin black line so that it shows against the
+            // ground. Its single lines first, each a black line a little
+            // wider than the white one over it; then its shapes over their
+            // ends, filled white, each with its own thin black line, so that
+            // where one part meets another shows.
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.lander-lines;
                 stroke: #000000;
+                stroke-width: 2.5px;
+            }
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.lander-lines;
+                stroke: #ffffff;
                 stroke-width: 1.5px;
+            }
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: root.world-width;
+                viewbox-height: root.world-height;
+                commands: root.lander-shapes;
+                fill: #ffffff;
+                stroke: #000000;
+                stroke-width: 0.75px;
             }
             if root.face != "": Path {
                 width: 100%;
@@ -225,6 +289,7 @@ export component LanderWindow inherits Window {
                 text: root.state;
                 font-size: 18px;
                 font-weight: 700;
+                color: #ffffff;
             }
         }
 

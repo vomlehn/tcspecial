@@ -16,6 +16,8 @@
 //! would start it as soon as it opened. So it reads the world as it stands
 //! until then, and the joystick drives it the same way: see
 //! `World::glance_component` and `World::drive_by_hand`.
+//!
+//! Closing the window ends tcs-sim, as closing its payload panels' does.
 
 use std::rc::Rc;
 use std::sync::Arc;
@@ -47,13 +49,31 @@ const ACCELERATION_Y: usize = 10;
 const SET_X: usize = 0;
 const SET_Y: usize = 1;
 
-/// The joystick's square's side, and how far each of its rectangles reaches
-/// beyond the square, in logical pixels: `ui/lander.slint`'s `Joystick`.
-const SQUARE: f32 = 56.0;
+/// The joystick's square's side, which is as thick as each of its
+/// rectangles, and how far each rectangle reaches beyond the square, in
+/// logical pixels: `ui/lander.slint`'s `Joystick`.
+const SQUARE: f32 = 33.6;
 const ARM: f32 = 56.0;
 
 /// How often the window is brought up to the world.
 const REFRESH: Duration = Duration::from_millis(50);
+
+/// How many stars the sky has.
+const STARS: usize = 140;
+
+/// How many groups the stars twinkle in, each brightening and dimming at a
+/// pace of its own: as many as `ui/lander.slint` draws.
+const TWINKLE_GROUPS: usize = 4;
+
+/// How long each group takes to brighten and dim again, in seconds.
+const TWINKLE_PERIODS: [f64; TWINKLE_GROUPS] = [1.3, 1.9, 2.6, 3.4];
+
+/// How far above the ground a star is at least, as a fraction of the
+/// display's height.
+const STAR_CLEARANCE: f64 = 0.02;
+
+/// How far a star reaches from its middle, in metres.
+const STAR_SIZE: f64 = 1.2;
 
 /// The world's lander, and the joystick it is flown with if there is one.
 pub struct Scene {
@@ -202,19 +222,118 @@ fn polyline(f: &Resolved, points: &[Point], by: Point) -> String {
     commands
 }
 
-/// The lander, its outline where the place between its feet is.
+/// The ground's height at a place across the display.
 ///
 /// # Arguments
 ///
-/// * `f`     - The lander's figures.
-/// * `place` - Where the place between its feet is, in metres.
+/// * `f` - The lander's figures.
+/// * `x` - The place, in metres.
+///
+/// # Returns
+///
+/// The height, in metres, along the line between the ground's points
+/// either side.
+fn ground_at(f: &Resolved, x: f64) -> f64 {
+    for pair in f.ground.windows(2) {
+        let ((x0, y0), (x1, y1)) = (pair[0], pair[1]);
+        if x <= x1 {
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+        }
+    }
+    f.ground.last().map_or(0.0, |&(_, y)| y)
+}
+
+/// The stars in the sky, in their twinkling groups: each a small diamond
+/// somewhere above the ground.
+///
+/// Placed by a little generator seeded from the landscape, so that one
+/// landscape has one sky, and the same each time the window is opened.
+///
+/// # Arguments
+///
+/// * `f` - The lander's figures.
+///
+/// # Returns
+///
+/// Each group's picture commands.
+pub fn stars(f: &Resolved) -> [String; TWINKLE_GROUPS] {
+    // xorshift64, from the ground's points.
+    let mut state = f
+        .ground
+        .iter()
+        .fold(0x9E37_79B9_7F4A_7C15_u64, |h, &(x, y)| {
+            (h ^ x.to_bits()).rotate_left(23) ^ y.to_bits()
+        })
+        | 1;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        (state >> 11) as f64 / (1u64 << 53) as f64
+    };
+    let mut groups: [String; TWINKLE_GROUPS] = Default::default();
+    for n in 0..STARS {
+        let x = next() * f.width;
+        let lowest = ground_at(f, x) + STAR_CLEARANCE * f.height;
+        if lowest >= f.height {
+            continue;
+        }
+        let y = lowest + next() * (f.height - lowest);
+        let s = STAR_SIZE;
+        let group = &mut groups[n % TWINKLE_GROUPS];
+        if !group.is_empty() {
+            group.push(' ');
+        }
+        group.push_str(&format!(
+            "M {} L {} L {} L {} Z",
+            at(f, (x - s, y)),
+            at(f, (x, y + s)),
+            at(f, (x + s, y)),
+            at(f, (x, y - s)),
+        ));
+    }
+    groups
+}
+
+/// How bright each group of stars is at a moment.
+///
+/// # Arguments
+///
+/// * `seconds` - The time since the window opened, in seconds.
+///
+/// # Returns
+///
+/// Each group's opacity, from a fifth to one.
+pub fn twinkle(seconds: f64) -> [f32; TWINKLE_GROUPS] {
+    let mut each = [0.0; TWINKLE_GROUPS];
+    for (n, period) in TWINKLE_PERIODS.iter().enumerate() {
+        let turn = std::f64::consts::TAU * seconds / period + n as f64;
+        each[n] = (0.6 + 0.4 * turn.sin()) as f32;
+    }
+    each
+}
+
+/// The lander's shapes or its single lines, where the place between its
+/// feet is.
+///
+/// A line of more than two points is a shape -- the body, the cabin, the
+/// nozzle, a foot -- which is filled; one of two is a strut, a leg or the
+/// antenna, which is not. The window draws the two differently: see
+/// `ui/lander.slint`.
+///
+/// # Arguments
+///
+/// * `f`      - The lander's figures.
+/// * `place`  - Where the place between its feet is, in metres.
+/// * `shapes` - True for its shapes, false for its single lines.
 ///
 /// # Returns
 ///
 /// The picture's commands.
-pub fn lander(f: &Resolved, place: Point) -> String {
+pub fn lander(f: &Resolved, place: Point, shapes: bool) -> String {
     f.outline
         .iter()
+        .filter(|line| (line.len() > 2) == shapes)
         .map(|line| polyline(f, line, place))
         .collect::<Vec<_>>()
         .join(" ")
@@ -315,19 +434,19 @@ pub fn axes(dx: f32, dy: f32) -> (f64, f64, f32, f32) {
 /// # Arguments
 ///
 /// * `scene` - The world's lander.
+/// * `quit`  - What tcs-sim's Quit button does, done when the window is
+///             closed.
 ///
 /// # Returns
 ///
 /// The window and the timer that keeps it up to the world, both to be kept
 /// while tcs-sim runs; `None` if the window cannot be made.
-pub fn open(scene: Scene) -> Option<(LanderWindow, slint::Timer)> {
+pub fn open(
+    scene: Scene,
+    quit: Rc<dyn Fn()>,
+) -> Option<(LanderWindow, slint::Timer)> {
     let window = LanderWindow::new().ok()?;
-    let f = &scene.figures;
-    window.set_world_width(f.width as f32);
-    window.set_world_height(f.height as f32);
-    window.set_ground_fill(ground_fill(f).into());
-    window.set_ground_line(ground_line(f).into());
-    window.set_pad(pad(f).into());
+    draw_landscape(&window, &scene.figures);
 
     let scene = Rc::new(scene);
     if let Some(stick) = scene.joystick {
@@ -374,30 +493,64 @@ pub fn open(scene: Scene) -> Option<(LanderWindow, slint::Timer)> {
         });
     }
 
-    show(&window, &scene);
+    let opened = Instant::now();
+    show(&window, &scene, 0.0);
     let timer = slint::Timer::default();
     {
         let weak = window.as_weak();
         let scene = Rc::clone(&scene);
         timer.start(slint::TimerMode::Repeated, REFRESH, move || {
             if let Some(window) = weak.upgrade() {
-                show(&window, &scene);
+                show(&window, &scene, opened.elapsed().as_secs_f64());
             }
         });
     }
+    // Closing it ends tcs-sim, its payload panels with it: the lander is
+    // flown here, and a run with no way left to fly it is over.
+    window.window().on_close_requested(move || {
+        quit();
+        slint::CloseRequestResponse::HideWindow
+    });
     window.show().ok()?;
     Some((window, timer))
 }
 
-/// Brings the window up to the world.
+/// Draws what does not move: the display's size, the ground, the pad and
+/// the stars.
 ///
 /// # Arguments
 ///
 /// * `window` - The lander's window.
-/// * `scene`  - The world's lander.
-fn show(window: &LanderWindow, scene: &Scene) {
+/// * `f`      - The lander's figures.
+fn draw_landscape(window: &LanderWindow, f: &Resolved) {
+    window.set_world_width(f.width as f32);
+    window.set_world_height(f.height as f32);
+    window.set_ground_fill(ground_fill(f).into());
+    window.set_ground_line(ground_line(f).into());
+    window.set_pad(pad(f).into());
+    let [s0, s1, s2, s3] = stars(f);
+    window.set_stars_0(s0.into());
+    window.set_stars_1(s1.into());
+    window.set_stars_2(s2.into());
+    window.set_stars_3(s3.into());
+}
+
+/// Brings the window up to the world, and the stars to how bright they are
+/// now.
+///
+/// # Arguments
+///
+/// * `window`  - The lander's window.
+/// * `scene`   - The world's lander.
+/// * `seconds` - The time since the window opened, in seconds.
+fn show(window: &LanderWindow, scene: &Scene, seconds: f64) {
     let out = scene.world.glance_component(scene.lander, Instant::now());
     paint(window, &scene.figures, &out);
+    let [t0, t1, t2, t3] = twinkle(seconds);
+    window.set_twinkle_0(t0);
+    window.set_twinkle_1(t1);
+    window.set_twinkle_2(t2);
+    window.set_twinkle_3(t3);
 }
 
 /// Shows the lander as its outputs say it is.
@@ -409,7 +562,8 @@ fn show(window: &LanderWindow, scene: &Scene) {
 /// * `out`    - Its terminals' values, in its type's order.
 fn paint(window: &LanderWindow, f: &Resolved, out: &[f64]) {
     let place = (out[X], out[Y]);
-    window.set_lander(lander(f, place).into());
+    window.set_lander_lines(lander(f, place, false).into());
+    window.set_lander_shapes(lander(f, place, true).into());
     let landed = out[LANDED] > 0.5;
     window.set_face(if landed {
         face(f, place).into()
@@ -572,11 +726,12 @@ mod tests {
             ..Resolved::default()
         };
         let window = LanderWindow::new().expect("a window");
-        window.set_world_width(f.width as f32);
-        window.set_world_height(f.height as f32);
-        window.set_ground_fill(ground_fill(&f).into());
-        window.set_ground_line(ground_line(&f).into());
-        window.set_pad(pad(&f).into());
+        draw_landscape(&window, &f);
+        let [t0, t1, t2, t3] = twinkle(0.7);
+        window.set_twinkle_0(t0);
+        window.set_twinkle_1(t1);
+        window.set_twinkle_2(t2);
+        window.set_twinkle_3(t3);
         paint(
             &window,
             &f,
@@ -651,9 +806,10 @@ mod tests {
     #[test]
     fn the_lander_is_drawn_where_it_is() {
         assert_eq!(
-            lander(&figures(), (500.0, 100.0)),
+            lander(&figures(), (500.0, 100.0), true),
             "M 485.00 500.00 L 515.00 500.00 L 515.00 470.00"
         );
+        assert_eq!(lander(&figures(), (500.0, 100.0), false), "");
     }
 
     /// The face is three circles and a smile.

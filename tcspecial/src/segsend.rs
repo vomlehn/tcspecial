@@ -390,20 +390,50 @@ fn run(program: &CStr, name: &Name) -> std::io::Result<i32> {
         std::ptr::null_mut(),
     ];
     let mut pid: libc::pid_t = 0;
+    // Started with no signal blocked, as every program tcspecial starts is
+    // (see "Its signals" in tcsapp::parent): the thread this runs in has the
+    // stop signals blocked, as every thread of tcspecial's has, and the
+    // block would otherwise pass to it.
+    // SAFETY: the attributes and the empty set are this frame's own; the
+    // attributes are destroyed once made, whatever comes after, and on a
+    // failure to make or set them the program is not started.
+    let mut attributes: libc::posix_spawnattr_t = unsafe { std::mem::zeroed() };
+    let made = unsafe { libc::posix_spawnattr_init(&mut attributes) };
+    if made != 0 {
+        return Err(std::io::Error::from_raw_os_error(made));
+    }
+    let set = unsafe {
+        let mut none: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut none);
+        match libc::posix_spawnattr_setsigmask(&mut attributes, &none) {
+            0 => libc::posix_spawnattr_setflags(
+                &mut attributes,
+                libc::POSIX_SPAWN_SETSIGMASK as libc::c_short,
+            ),
+            failed => failed,
+        }
+    };
+    if set != 0 {
+        // SAFETY: made by posix_spawnattr_init above, and used no more.
+        unsafe { libc::posix_spawnattr_destroy(&mut attributes) };
+        return Err(std::io::Error::from_raw_os_error(set));
+    }
     // SAFETY: the program, the argument and the vector of them are
-    // nul-terminated and outlive the call, which copies them; no file actions
-    // or attributes are given, so the child inherits what any child of this
-    // process does, and every descriptor tcspecial opens is closed on exec.
+    // nul-terminated and outlive the call, which copies them, as it does the
+    // attributes; no file actions are given, and every descriptor tcspecial
+    // opens is closed on exec.
     let started = unsafe {
         libc::posix_spawn(
             &mut pid,
             program.as_ptr(),
             std::ptr::null(),
-            std::ptr::null(),
+            &attributes,
             argv.as_ptr(),
             environ,
         )
     };
+    // SAFETY: made by posix_spawnattr_init above, and used no more.
+    unsafe { libc::posix_spawnattr_destroy(&mut attributes) };
     if started != 0 {
         return Err(std::io::Error::from_raw_os_error(started));
     }
@@ -638,6 +668,54 @@ mod tests {
             "{SEGSEND} was given {:?}",
             handed(tools.path())
         );
+    }
+
+    /// segsend is started with no signal blocked, though the thread that
+    /// starts it has the stop signals blocked, as every thread of
+    /// tcspecial's has. The program run is a script that says, by its exit
+    /// status, whether it found any blocked: run through `env`, which leaves
+    /// the mask as it finds it, where a shell would clear it.
+    #[test]
+    fn segsend_starts_with_no_signal_blocked() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let script = dir.path().join("mask");
+        std::fs::write(
+            &script,
+            "#!/usr/bin/env python3\n\
+             import sys\n\
+             for line in open('/proc/self/status'):\n\
+             \x20   if line.startswith('SigBlk:'):\n\
+             \x20       sys.exit(0 if int(line.split()[1], 16) == 0 else 1)\n\
+             sys.exit(2)\n",
+        )
+        .expect("written");
+        std::fs::set_permissions(
+            &script,
+            std::fs::Permissions::from_mode(0o755),
+        )
+        .expect("made executable");
+        let name = Name::of(&script, "").expect("a name");
+
+        // SAFETY: sets this thread's own mask, with sets on this stack, and
+        // puts back what was there before the assertion.
+        let before = unsafe {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            libc::sigaddset(&mut set, libc::SIGINT);
+            libc::sigaddset(&mut set, libc::SIGTERM);
+            let mut before: libc::sigset_t = std::mem::zeroed();
+            libc::pthread_sigmask(libc::SIG_BLOCK, &set, &mut before);
+            before
+        };
+        let ended = run(c"/usr/bin/env", &name);
+        unsafe {
+            libc::pthread_sigmask(
+                libc::SIG_SETMASK,
+                &before,
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(ended.expect("it runs"), 0, "it found a signal blocked");
     }
 
     /// A `segsend` that is not there, or cannot be run, is refused by name.

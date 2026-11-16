@@ -5041,6 +5041,18 @@ stop sent to the supervisor, or to both, as systemd sends one to every
 process of a service, is not affected.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
+<dd>Every program tcspecial starts -- an app node's, a <tt class="docutils literal">process</tt> node's,
+and segsend -- starts with no signal blocked, whatever the thread that
+starts it has. A signal mask passes through <tt class="docutils literal">fork</tt> and <tt class="docutils literal">exec</tt>
+unchanged, and Rust's standard library does not clear it, so without
+this each program inherited the two signals blocked, and one that
+outlived its tcspecial could not be stopped by SIGTERM.
+<tt class="docutils literal"><span class="pre">tcsapp::parent::unblocking</span></tt> clears the mask for those started with a
+<tt class="docutils literal">Command</tt>, and segsend, which is started with <tt class="docutils literal">posix_spawn</tt>, is
+given an empty mask through its attributes. The supervisor's own child
+is the one exception: it is started with the two blocked, as above, and
+takes them itself.</dd>
+<dt>Requirement</dt>
 <dd>Where the supervisor cannot start a child, it says why in its log, and
 tries again after a delay in flight, as it does for a bottom that
 fails, and stops under <tt class="docutils literal"><span class="pre">--simulate</span></tt>. A process that carried on after

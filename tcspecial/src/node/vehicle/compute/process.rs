@@ -190,16 +190,19 @@ impl Process {
     /// A message naming the program if it cannot be run, or comes without
     /// the pipes.
     fn spawn(&self) -> Result<Running, String> {
-        let mut child = Command::new(&self.executable)
+        let mut command = Command::new(&self.executable);
+        command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             // Left alone: whatever the program complains about should arrive
             // wherever this program's own complaints do.
-            .stderr(Stdio::inherit())
-            .spawn()
-            .map_err(|e| {
-                format!("\"{}\" cannot be run: {e}", self.executable)
-            })?;
+            .stderr(Stdio::inherit());
+        // With no signal blocked, as an app's program is: tcspecial blocks
+        // the stop signals in every thread, and the block would pass to it.
+        tcsapp::parent::unblocking(&mut command);
+        let mut child = command.spawn().map_err(|e| {
+            format!("\"{}\" cannot be run: {e}", self.executable)
+        })?;
 
         // Both pipes are taken out of the child, which is why they were asked
         // for; a child without them is one nothing could be said to.

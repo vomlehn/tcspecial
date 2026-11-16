@@ -4741,6 +4741,19 @@ stop sent to the supervisor, or to both, as systemd sends one to every
 process of a service, is not affected.
 
 Requirement
+    Every program tcspecial starts -- an app node's, a ``process`` node's,
+    and segsend -- starts with no signal blocked, whatever the thread that
+    starts it has. A signal mask passes through ``fork`` and ``exec``
+    unchanged, and Rust's standard library does not clear it, so without
+    this each program inherited the two signals blocked, and one that
+    outlived its tcspecial could not be stopped by SIGTERM.
+    ``tcsapp::parent::unblocking`` clears the mask for those started with a
+    ``Command``, and segsend, which is started with ``posix_spawn``, is
+    given an empty mask through its attributes. The supervisor's own child
+    is the one exception: it is started with the two blocked, as above, and
+    takes them itself.
+
+Requirement
     Where the supervisor cannot start a child, it says why in its log, and
     tries again after a delay in flight, as it does for a bottom that
     fails, and stops under ``--simulate``. A process that carried on after

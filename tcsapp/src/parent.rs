@@ -29,6 +29,16 @@
 //! that silently succeeds and a read that silently ends -- the two outcomes an
 //! app node must never have.
 //!
+//! # Its signals
+//!
+//! A program is started with no signal blocked. tcspecial blocks SIGINT and
+//! SIGTERM in every thread, so that one thread of its own takes them, and a
+//! signal mask passes through `fork` and `exec` unchanged: without
+//! [`unblocking`], every app inherited the block, and one left behind by a
+//! tcspecial that went was a process a plain `kill` could not stop. Every
+//! program tcspecial starts is started so, the `process` node's and
+//! segsend's too.
+//!
 //! # Reading does not wait
 //!
 //! The reading here answers with whatever has arrived and does not wait for
@@ -573,6 +583,7 @@ pub fn start(
 
     let mut command = Command::new(executable);
     command.args(arguments);
+    unblocking(&mut command);
     // Each of the three descriptors is set from this end's own pair, or to
     // nothing where the app does not support it -- and the nothing is closed
     // below, `Stdio::null` being a descriptor that is open on /dev/null.
@@ -636,6 +647,33 @@ pub fn start(
         errors: end(errors.0, "the error interface")?,
         waits: Some(WAITS),
     })
+}
+
+/// Has a program a command starts begin with no signal blocked, whatever
+/// the thread that starts it has blocked: see "Its signals" above. For
+/// every program tcspecial starts that it starts with a [`Command`].
+///
+/// # Arguments
+///
+/// * `command` - The command, not yet spawned.
+pub fn unblocking(command: &mut Command) {
+    // SAFETY: pre_exec needs a closure that is safe to run between fork and
+    // exec, in a child that may have one thread. sigemptyset fills a set on
+    // this closure's own stack, and sigprocmask sets the calling thread's
+    // mask, the child's only thread: both are async-signal-safe, and
+    // neither allocates or locks.
+    unsafe {
+        command.pre_exec(|| {
+            let mut none: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut none);
+            if libc::sigprocmask(libc::SIG_SETMASK, &none, std::ptr::null_mut())
+                != 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
 }
 
 /// Gives the child's half of a pair, as what a command wants for a
@@ -902,6 +940,50 @@ fn said(interface: Interface, doing: &str, e: io::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// A program started by [`super::unblocking`] begins with no signal
+    /// blocked, though the thread that started it had SIGINT and SIGTERM
+    /// blocked, as tcspecial's every thread has; one started without it
+    /// inherits the block, which is what this is the fix for.
+    #[test]
+    fn a_program_starts_with_no_signal_blocked() {
+        // The program says which signals it has blocked, as the kernel
+        // reports them: SigBlk, in hexadecimal. grep, run directly, rather
+        // than a shell, which clears its own mask as it starts and so
+        // would say nothing blocked either way.
+        let blocked = |unblocked: bool| -> String {
+            let mut command = std::process::Command::new("grep");
+            command.args(["SigBlk", "/proc/self/status"]);
+            if unblocked {
+                super::unblocking(&mut command);
+            }
+            let said = command.output().expect("sh runs");
+            String::from_utf8_lossy(&said.stdout).trim().to_string()
+        };
+        // Blocked in this thread alone, as tcspecial's signal set is; given
+        // back as the test ends, so the thread is as it was.
+        // SAFETY: sets this thread's own mask, with sets on this stack.
+        let before = unsafe {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            libc::sigaddset(&mut set, libc::SIGINT);
+            libc::sigaddset(&mut set, libc::SIGTERM);
+            let mut before: libc::sigset_t = std::mem::zeroed();
+            libc::pthread_sigmask(libc::SIG_BLOCK, &set, &mut before);
+            before
+        };
+        let (without, with) = (blocked(false), blocked(true));
+        // SAFETY: as above, putting back what was there.
+        unsafe {
+            libc::pthread_sigmask(
+                libc::SIG_SETMASK,
+                &before,
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(without, "SigBlk:\t0000000000004002", "inherited");
+        assert_eq!(with, "SigBlk:\t0000000000000000");
+    }
+
     use super::*;
 
     /// This end of an interface, and the other end to write on.

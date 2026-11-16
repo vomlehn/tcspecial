@@ -822,9 +822,9 @@ make run-lander YAMCS_HOME=<yamcs>
 Fly it from tcs-sim's window: hold the button down in the joystick's middle
 square and drag along an arm; letting go centres it.
 
-tcs-sim's window has the lander's pane at its left and two columns of
-payload panels beside it, so that the MOC's window fits beside it on a
-screen about 1600 logical pixels wide. Where the two open is the window
+tcs-sim's window has the lander's pane at its left and its payload
+panels beside it, three to a row, and the MOC's window fits beside it on
+a screen about 1700 logical pixels wide. Where the two open is the window
 manager's to say: on Wayland a program cannot place its own window. On KDE
 Plasma, `lander/lander-windows.kwinrule`, imported in System Settings,
 Window Management, Window Rules, opens tcs-sim's window at the top left and

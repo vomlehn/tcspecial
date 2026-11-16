@@ -136,9 +136,10 @@ LOWER_AFTER_MS = 500
 #: How often the reading loop asks Yamcs, in seconds.
 READ_EVERY = 0.1
 
-#: The window's display of the landscape, in pixels for each metre: half of
-#: tcs-sim's.
-SCALE = 0.5
+#: The window's display of the landscape, in pixels for each metre: a little
+#: under tcs-sim's, so that the window fits beside tcs-sim's on a screen
+#: 1707 logical pixels wide, as 3840 at a scale of 2.25 is.
+SCALE = 0.48
 
 #: The joystick's square's side, which is each arm's thickness, and how far
 #: each arm reaches beyond it, in pixels: as tcs-sim's lander pane draws
@@ -147,11 +148,21 @@ SQUARE = 25.2
 ARM = 70
 
 #: How many stars the sky has.
-STARS = 140
+STARS = 300
 
-#: How long each group of stars takes to brighten and dim again, in
-#: seconds: a group each, as tcs-sim's lander pane has them.
-TWINKLE_PERIODS = (1.3, 1.9, 2.6, 3.4)
+#: The faintest star, as an apparent magnitude, the brightest being nought;
+#: how many times as many stars there are at each magnitude as at the one
+#: brighter; and the magnitude at which a star has shrunk to a single
+#: pixel: as tcs-sim's lander pane has them.
+FAINTEST = 6.0
+MORE_EACH_MAGNITUDE = 3.0
+PIXEL_FROM = 3.0
+
+#: The radius of the brightest star's disk, and of a single pixel's, in
+#: pixels; and how many classes of brightness the stars are drawn in.
+BRIGHTEST_RADIUS = 2.0
+PIXEL_RADIUS = 0.5
+STAR_CLASSES = 8
 
 #: How far above the ground a star is at least, as a fraction of the
 #: display's height.
@@ -873,40 +884,66 @@ def ground_at(lander, x):
     return lander.ground[-1][1]
 
 
+def magnitude(u):
+    """An apparent magnitude drawn at random, as the night sky's are: each
+    magnitude :data:`MORE_EACH_MAGNITUDE` times as common as the one
+    brighter, from nought to :data:`FAINTEST`.
+
+    Args:
+        u: A number drawn evenly from nought to one.
+
+    Returns:
+        The magnitude.
+    """
+    k = MORE_EACH_MAGNITUDE
+    return math.log(1 + u * (k ** FAINTEST - 1)) / math.log(k)
+
+
+def star_class(m):
+    """How a star of an apparent magnitude is drawn.
+
+    Args:
+        m: The magnitude.
+
+    Returns:
+        Its radius, in pixels, and its brightness, from nought to one: a
+        disk shrinking with the magnitude to a single pixel, and fainter
+        than that a single pixel, a fifth of a magnitude dimmer for each
+        magnitude, gentler than the sky's own so that the faintest show.
+    """
+    width = FAINTEST / STAR_CLASSES
+    middle = (min(int(m / width), STAR_CLASSES - 1) + 0.5) * width
+    if middle < PIXEL_FROM:
+        disks = max(round(PIXEL_FROM / width), 1) - 1
+        along = int(m / width) / disks if disks else 1.0
+        shrunk = along * (BRIGHTEST_RADIUS - PIXEL_RADIUS)
+        return BRIGHTEST_RADIUS - shrunk, 1.0
+    return PIXEL_RADIUS, 10 ** (-0.2 * (middle - PIXEL_FROM))
+
+
 def star_places(lander, seed):
-    """The stars in the sky, each somewhere above the ground.
+    """The stars in the sky, each somewhere above the ground, with how each
+    is drawn by its apparent brightness.
 
     Args:
         lander: The :class:`Lander`, whose ground they are above.
         seed:   The landscape's seed, so that one landscape has one sky.
 
     Returns:
-        Each star as ``(x, y, group)``, in metres, ``group`` the twinkling
-        group it is in.
+        Each star as ``(x, y, radius, brightness)``: its place, in metres,
+        and as :func:`star_class` gives the rest.
     """
     rng = random.Random(seed)
     places = []
-    for number in range(STARS):
+    for _ in range(STARS):
         x = rng.uniform(0, lander.width)
         lowest = ground_at(lander, x) + STAR_CLEARANCE * lander.height
+        u, height = rng.random(), rng.random()
         if lowest >= lander.height:
             continue
-        y = rng.uniform(lowest, lander.height)
-        places.append((x, y, number % len(TWINKLE_PERIODS)))
+        y = lowest + height * (lander.height - lowest)
+        places.append((x, y, *star_class(magnitude(u))))
     return places
-
-
-def twinkle(seconds):
-    """How bright each group of stars is at a moment.
-
-    Args:
-        seconds: The time since the window opened, in seconds.
-
-    Returns:
-        Each group's brightness, from a fifth to one.
-    """
-    return [0.6 + 0.4 * math.sin(math.tau * seconds / period + number)
-            for number, period in enumerate(TWINKLE_PERIODS)]
 
 
 def display_scale():
@@ -1042,19 +1079,20 @@ def run_the_window(readings, lander, seed, delay, stopped):
         """
         return x * scale, high - y * scale
 
-    # A black sky with twinkling stars over grey ground, as tcs-sim's lander
-    # window draws it.
+    # A black sky with stars over grey ground, as tcs-sim's lander pane
+    # draws it.
     scene = tk.Canvas(window, width=wide, height=high, background="#000000",
                       highlightthickness=1, highlightbackground="#6b7280")
     scene.pack(padx=between, pady=(between, between // 2))
     scene.create_rectangle(0, 0, wide, high, fill="#000000", outline="")
-    stars = [[] for _ in TWINKLE_PERIODS]
-    for x, y, group in star_places(lander, seed):
+    for x, y, radius, bright in star_places(lander, seed):
         cx, cy = at(x, y)
-        stars[group].append(scene.create_rectangle(
-            cx - zoom / 2, cy - zoom / 2, cx + zoom / 2, cy + zoom / 2,
-            fill="#ffffff",
-            outline=""))
+        r = radius * zoom
+        level = round(255 * bright)
+        grey = f"#{level:02x}{level:02x}{level:02x}"
+        draw = (scene.create_oval if radius > PIXEL_RADIUS
+                else scene.create_rectangle)
+        draw(cx - r, cy - r, cx + r, cy + r, fill=grey, outline="")
     flat = [c for x, y in lander.ground for c in at(x, y)]
     scene.create_polygon(*at(0, 0), *flat, *at(lander.width, 0),
                          fill=GROUND, outline="")
@@ -1182,11 +1220,6 @@ def run_the_window(readings, lander, seed, delay, stopped):
         lit = since % PAD_FLASH < PAD_FLASH / 2
         for light in lights:
             scene.itemconfigure(light, fill="#E69F00" if lit else "#5c4000")
-        for group, bright in zip(stars, twinkle(since)):
-            level = round(255 * bright)
-            for star in group:
-                scene.itemconfigure(star, fill=f"#{level:02x}{level:02x}"
-                                               f"{level:02x}")
         sx = readings.number("to_joystick_x") or 0.0
         sy = readings.number("to_joystick_y") or 0.0
         cx = reach + stick_offset(sx) * zoom

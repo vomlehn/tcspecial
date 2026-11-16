@@ -11,8 +11,8 @@ import { Colors } from "../../tcs-ui/ui/colors.slint";
 // shows.
 export { StartupWindow, StartupLine } from "../../tcs-verify/ui/startup.slint";
 // The lander's pane, at the left of the panels when the world has a lander.
-import { LanderPane, LanderScene } from "lander.slint";
-export { LanderScene }
+import { LanderPane, LanderScene, StarClass } from "lander.slint";
+export { LanderScene, StarClass }
 
 // One simulated payload: what the tcspecial configuration file says about the
 // data handler it simulates, what the simulator configuration file says
@@ -69,10 +69,6 @@ component PayloadPanel inherits Rectangle {
 
     callback transfer-clicked();
 
-    // Wide enough for the longest name and status of the shipped examples,
-    // and for most of their configuration lines; a longer one ends with an
-    // ellipsis.
-    min-width: 260px;
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
@@ -154,7 +150,9 @@ component PayloadPanel inherits Rectangle {
 
         // Header row - combine name and status
         title-row := HorizontalLayout {
-            spacing: 2px;
+            // A space's width between the name and the status, so that the
+            // two do not read as one word in the narrowest panel.
+            spacing: 6px;
             // The name and the number of the payload, which is its place in
             // the payload configuration -- the first payload the file
             // describes is 0. Nothing states it: the file's order decides it,
@@ -245,14 +243,23 @@ component PayloadPanel inherits Rectangle {
         // what it is doing instead, in words: whether a heater is heating,
         // off, or disabled in this panel and so off whatever it is sent.
         sent-row := HorizontalLayout {
+            // Each ends with an ellipsis where it is longer than the panel
+            // is wide, as the configuration line does, rather than making
+            // every panel as wide as the longest sample.
             if driving == "" : Text {
                 text: "Sent: " + last-sent-time + " " + last-sent-data;
                 font-size: SimFonts.window;
+                overflow: elide;
+                min-width: 0px;
+                horizontal-stretch: 1;
             }
             if driving != "" : Text {
                 text: driving;
                 font-size: SimFonts.window;
                 font-weight: 700;
+                overflow: elide;
+                min-width: 0px;
+                horizontal-stretch: 1;
             }
         }
         // The line stays and its contents go, for a payload that is never
@@ -271,6 +278,9 @@ component PayloadPanel inherits Rectangle {
                     ? "Recv: " + last-recv-time + " " + last-recv-data
                     : "";
                 font-size: SimFonts.window;
+                overflow: elide;
+                min-width: 0px;
+                horizontal-stretch: 1;
             }
         }
         // The received count goes the same way the received line does, and
@@ -303,7 +313,15 @@ component PayloadPanel inherits Rectangle {
 // Rust builds one, reads the two lengths, and drops it.
 export component PanelProbe inherits Window {
     default-font-size: SimFonts.window;
-    probe := PayloadPanel { }
+    // A payload's name and number, which Rust sets to each of the window's
+    // in turn to find the widest panel: the heading is the widest line a
+    // panel does not shorten with an ellipsis.
+    in property <string> name: "";
+    in property <int> id: 0;
+    probe := PayloadPanel {
+        payload-name: root.name;
+        dev-id: root.id;
+    }
     // A line of the window's type, with a descender and an underscore in
     // it, which is the least a row of text in a panel may be given. Only
     // the tests ask for it: they hold every row of a panel to it.
@@ -311,9 +329,7 @@ export component PanelProbe inherits Window {
         text: "temp_1 gy";
         font-size: SimFonts.window;
     }
-    // At least the panel's minimum, which its preferred width leaves out.
-    out property <length> panel-width:
-        max(probe.preferred-width, probe.min-width);
+    out property <length> panel-width: probe.preferred-width;
     out property <length> panel-height: probe.preferred-height;
     out property <length> line-height: line.preferred-height;
 }
@@ -360,10 +376,14 @@ export component MainWindow inherits Window {
     // grid::columns_for. Because it sizes the window to exactly that many
     // panels' width plus the chrome, the floor below comes out at the same
     // number it asked for.
+    // The most panels in a row, however wide the window is made: grid.rs's
+    // MAX_COLUMNS, which Rust sets.
+    in property <int> most-columns: 3;
     property <int> columns: Math.max(
         1,
         Math.min(
             payload-model.length,
+            root.most-columns,
             Math.floor((root.width - root.chrome-width) / root.panel-width)
         )
     );

@@ -1477,10 +1477,11 @@ fn main() {
     if lander.is_some() {
         lander_view::make_room(&ui);
     }
-    let sizes = grid::settle(&ui);
     let ui_weak = ui.as_weak();
 
-    // One panel per payload, in a grid worked out from how many there are.
+    // One panel per payload, in a grid worked out from how many there are:
+    // given before the window is measured, a panel being as wide as its
+    // widest payload wants.
     let model: Rc<VecModel<PayloadInfo>> = Rc::new(VecModel::from(
         dh_configs
             .iter()
@@ -1490,17 +1491,13 @@ fn main() {
             .collect::<Vec<_>>(),
     ));
     ui.set_payload_model(ModelRc::from(model.clone()));
+    // No more than this in a row, however wide the window is made.
+    ui.set_most_columns(i32::try_from(grid::MAX_COLUMNS).unwrap_or(1));
+    let sizes = grid::settle(&ui);
 
     // What the markup says a panel and the chrome come to, asked for rather
     // than written down here as well: see grid::Sizes.
-    // Fewer across beside a lander's pane, so that the lander example's MOC
-    // window has room beside this one.
-    let most = if lander.is_some() {
-        grid::COLUMNS_BESIDE_A_LANDER
-    } else {
-        grid::MAX_COLUMNS
-    };
-    let shape = grid::grid_shape_within(&sizes, configs.len(), most);
+    let shape = grid::grid_shape(&sizes, configs.len());
     // Taller than the grid asks for where there is a third row to look
     // ahead for, and no taller than the payloads on hand need otherwise. It
     // is also why the window can open taller than it is wide, which the shape
@@ -2507,9 +2504,9 @@ mod tests {
             //
             // The column count is the window's own, worked out from the width
             // it has rather than handed over once at startup: a window
-            // dragged wider is meant to fit another column and use it. This
-            // drags it and counts the columns by how many panels share the
-            // top row.
+            // dragged wider is meant to fit another column and use it, up to
+            // three in a row. This drags it and counts the columns by how
+            // many panels share the top row.
             //
             // Done last in the case, because it leaves the window a different
             // size than it was opened at.
@@ -2545,15 +2542,18 @@ mod tests {
                      column"
                 );
 
-                // And wide enough for every panel in a row, so it goes up.
+                // And wide enough for every panel in a row, so it goes up --
+                // to three at most, however wide.
                 let wide =
                     panels as f32 * sizes.panel_width + sizes.chrome_width;
                 ui.window()
                     .set_size(slint::LogicalSize::new(wide, window.height));
+                let most = panels.min(grid::MAX_COLUMNS);
                 assert_eq!(
                     columns_now(&ui),
-                    panels,
-                    "{set}: a window {panels} panels wide did not use the room"
+                    most,
+                    "{set}: a window {panels} panels wide did not use the \
+                     room, up to {most} in a row"
                 );
             }
 

@@ -30,7 +30,7 @@ use tcsprotocol::sim_config::SimConfigFile;
 
 use crate::node::physics::world::World;
 use crate::payload::PayloadConfig;
-use crate::{LanderProbe, LanderScene, MainWindow};
+use crate::{LanderProbe, LanderScene, MainWindow, StarClass};
 
 /// The lander's outputs' places, in
 /// `tcsprotocol::node::physics::lander::TERMINALS`'s order.
@@ -59,21 +59,37 @@ const ARM: f32 = 70.0;
 const REFRESH: Duration = Duration::from_millis(50);
 
 /// How many stars the sky has.
-const STARS: usize = 140;
+const STARS: usize = 300;
 
-/// How many groups the stars twinkle in, each brightening and dimming at a
-/// pace of its own: as many as `ui/lander.slint` draws.
-const TWINKLE_GROUPS: usize = 4;
+/// The faintest star, as an apparent magnitude: about what the eye sees on a
+/// dark night. The brightest is nought.
+const FAINTEST: f64 = 6.0;
 
-/// How long each group takes to brighten and dim again, in seconds.
-const TWINKLE_PERIODS: [f64; TWINKLE_GROUPS] = [1.3, 1.9, 2.6, 3.4];
+/// How many times as many stars there are at each apparent magnitude as at
+/// the one brighter: about three, in the night sky.
+const MORE_EACH_MAGNITUDE: f64 = 3.0;
+
+/// The apparent magnitude at which a star has shrunk to a single pixel:
+/// brighter ones are disks, fainter ones single pixels, dimmer the fainter.
+const PIXEL_FROM: f64 = 3.0;
+
+/// The radius of the brightest star's disk, and of a single pixel's, in
+/// pixels.
+const BRIGHTEST_RADIUS: f64 = 2.0;
+const PIXEL_RADIUS: f64 = 0.5;
+
+/// How many classes of brightness the stars are drawn in: half of them
+/// disks, from the brightest to a single pixel, and half single pixels,
+/// dimming.
+const STAR_CLASSES: usize = 8;
+
+/// How wide the landscape is drawn, in logical pixels: `ui/lander.slint`'s
+/// scene, which a star's size in pixels is turned into metres by.
+const SCENE_WIDTH: f64 = 600.0;
 
 /// How far above the ground a star is at least, as a fraction of the
 /// display's height.
 const STAR_CLEARANCE: f64 = 0.02;
-
-/// How far a star reaches from its middle, in metres.
-const STAR_SIZE: f64 = 1.2;
 
 /// The world's lander, and the joystick it is flown with if there is one.
 pub struct Scene {
@@ -416,8 +432,60 @@ fn ground_at(f: &Resolved, x: f64) -> f64 {
     f.ground.last().map_or(0.0, |&(_, y)| y)
 }
 
-/// The stars in the sky, in their twinkling groups: each a small diamond
-/// somewhere above the ground.
+/// An apparent magnitude drawn at random, as the night sky's are: each
+/// magnitude [`MORE_EACH_MAGNITUDE`] times as common as the one brighter,
+/// from nought to [`FAINTEST`].
+///
+/// # Arguments
+///
+/// * `u` - A number drawn evenly from nought to one.
+///
+/// # Returns
+///
+/// The magnitude.
+pub fn magnitude(u: f64) -> f64 {
+    let k = MORE_EACH_MAGNITUDE;
+    (1.0 + u * (k.powf(FAINTEST) - 1.0)).ln() / k.ln()
+}
+
+/// The class a star of an apparent magnitude is drawn in, and how that
+/// class is drawn.
+///
+/// # Arguments
+///
+/// * `m` - The magnitude.
+///
+/// # Returns
+///
+/// The class, from nought, the brightest; its radius, in pixels; and its
+/// brightness, from nought to one.
+pub fn star_class(m: f64) -> (usize, f64, f32) {
+    let width = FAINTEST / STAR_CLASSES as f64;
+    let class = ((m / width) as usize).min(STAR_CLASSES - 1);
+    let middle = (class as f64 + 0.5) * width;
+    if middle < PIXEL_FROM {
+        // A disk, shrinking with the magnitude to a single pixel.
+        let disks = (PIXEL_FROM / width).round().max(1.0) - 1.0;
+        let along = if disks > 0.0 {
+            class as f64 / disks
+        } else {
+            1.0
+        };
+        let radius =
+            BRIGHTEST_RADIUS - along * (BRIGHTEST_RADIUS - PIXEL_RADIUS);
+        (class, radius, 1.0)
+    } else {
+        // A single pixel, a fifth of a magnitude's dimming for each
+        // magnitude: gentler than the sky's own, so that the faintest still
+        // show on a screen.
+        let bright = 10f64.powf(-0.2 * (middle - PIXEL_FROM));
+        (class, PIXEL_RADIUS, bright as f32)
+    }
+}
+
+/// The stars in the sky, each somewhere above the ground, in classes by
+/// their apparent brightness: the brightest small disks, shrinking to a
+/// single pixel, and the fainter single pixels, dimmer the fainter.
 ///
 /// Placed by a little generator seeded from the landscape, so that one
 /// landscape has one sky, and the same each time the window is opened.
@@ -428,8 +496,9 @@ fn ground_at(f: &Resolved, x: f64) -> f64 {
 ///
 /// # Returns
 ///
-/// Each group's picture commands.
-pub fn stars(f: &Resolved) -> [String; TWINKLE_GROUPS] {
+/// Each class's picture commands, and its brightness, from nought to one,
+/// the brightest first.
+pub fn stars(f: &Resolved) -> Vec<(String, f32)> {
     // xorshift64, from the ground's points.
     let mut state = f
         .ground
@@ -444,46 +513,29 @@ pub fn stars(f: &Resolved) -> [String; TWINKLE_GROUPS] {
         state ^= state << 17;
         (state >> 11) as f64 / (1u64 << 53) as f64
     };
-    let mut groups: [String; TWINKLE_GROUPS] = Default::default();
-    for n in 0..STARS {
+    let metres = f.width / SCENE_WIDTH;
+    let mut classes: Vec<(String, f32)> = (0..STAR_CLASSES)
+        .map(|class| {
+            let middle = (class as f64 + 0.5) * FAINTEST / STAR_CLASSES as f64;
+            (String::new(), star_class(middle).2)
+        })
+        .collect();
+    for _ in 0..STARS {
         let x = next() * f.width;
         let lowest = ground_at(f, x) + STAR_CLEARANCE * f.height;
+        let (u, height) = (next(), next());
         if lowest >= f.height {
             continue;
         }
-        let y = lowest + next() * (f.height - lowest);
-        let s = STAR_SIZE;
-        let group = &mut groups[n % TWINKLE_GROUPS];
-        if !group.is_empty() {
-            group.push(' ');
+        let y = lowest + height * (f.height - lowest);
+        let (class, radius, _) = star_class(magnitude(u));
+        let commands = &mut classes[class].0;
+        if !commands.is_empty() {
+            commands.push(' ');
         }
-        group.push_str(&format!(
-            "M {} L {} L {} L {} Z",
-            at(f, (x - s, y)),
-            at(f, (x, y + s)),
-            at(f, (x + s, y)),
-            at(f, (x, y - s)),
-        ));
+        commands.push_str(&circle(f, (x, y), radius * metres));
     }
-    groups
-}
-
-/// How bright each group of stars is at a moment.
-///
-/// # Arguments
-///
-/// * `seconds` - The time since the window opened, in seconds.
-///
-/// # Returns
-///
-/// Each group's opacity, from a fifth to one.
-pub fn twinkle(seconds: f64) -> [f32; TWINKLE_GROUPS] {
-    let mut each = [0.0; TWINKLE_GROUPS];
-    for (n, period) in TWINKLE_PERIODS.iter().enumerate() {
-        let turn = std::f64::consts::TAU * seconds / period + n as f64;
-        each[n] = (0.6 + 0.4 * turn.sin()) as f32;
-    }
-    each
+    classes
 }
 
 /// The lander's shapes or its single lines, where the place between its
@@ -807,11 +859,14 @@ fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
     pane.set_ground_line(ground_line(f).into());
     pane.set_pad(pad(f).into());
     pane.set_pad_lights(pad_lights(f).into());
-    let [s0, s1, s2, s3] = stars(f);
-    pane.set_stars_0(s0.into());
-    pane.set_stars_1(s1.into());
-    pane.set_stars_2(s2.into());
-    pane.set_stars_3(s3.into());
+    let classes: Vec<StarClass> = stars(f)
+        .into_iter()
+        .map(|(commands, brightness)| StarClass {
+            commands: commands.into(),
+            brightness,
+        })
+        .collect();
+    pane.set_stars(slint::ModelRc::new(slint::VecModel::from(classes)));
 }
 
 /// Brings the window up to the world, and the stars to how bright they are
@@ -826,11 +881,6 @@ fn show(pane: &LanderScene<'_>, scene: &Scene, seconds: f64) {
     let out = scene.world.glance_component(scene.lander, Instant::now());
     paint(pane, &scene.figures, &out);
     pane.set_pad_lit(pad_lit(seconds));
-    let [t0, t1, t2, t3] = twinkle(seconds);
-    pane.set_twinkle_0(t0);
-    pane.set_twinkle_1(t1);
-    pane.set_twinkle_2(t2);
-    pane.set_twinkle_3(t3);
 }
 
 /// Shows the lander as its outputs say it is.
@@ -1016,11 +1066,6 @@ mod tests {
         window.set_lander_height(height);
         let pane = window.global::<LanderScene>();
         draw_landscape(&pane, &f);
-        let [t0, t1, t2, t3] = twinkle(0.7);
-        pane.set_twinkle_0(t0);
-        pane.set_twinkle_1(t1);
-        pane.set_twinkle_2(t2);
-        pane.set_twinkle_3(t3);
         paint(
             &pane,
             &f,
@@ -1204,6 +1249,36 @@ mod tests {
         ];
         let said = autoland(high, 4, (60.0, 540.0));
         assert!(matches!(said, Some((true, _))), "{said:?}");
+    }
+
+    /// Stars are about three times as many at each magnitude as at the one
+    /// brighter, the brightest are disks shrinking to a single pixel, and
+    /// fainter ones are single pixels, dimmer the fainter.
+    #[test]
+    fn the_stars_are_as_bright_as_the_sky_has_them() {
+        assert_eq!(magnitude(0.0), 0.0);
+        assert!((magnitude(1.0) - FAINTEST).abs() < 1e-9);
+        // How many of a thousand evenly drawn fall in each magnitude.
+        let mut counts = [0usize; 6];
+        for n in 0..1000 {
+            let m = magnitude((n as f64 + 0.5) / 1000.0);
+            counts[(m as usize).min(5)] += 1;
+        }
+        for pair in counts[2..].windows(2) {
+            let ratio = pair[1] as f64 / pair[0] as f64;
+            assert!((2.5..3.5).contains(&ratio), "{counts:?}");
+        }
+        let classes: Vec<(usize, f64, f32)> = (0..STAR_CLASSES)
+            .map(|c| star_class((c as f64 + 0.5) * FAINTEST / 8.0))
+            .collect();
+        assert_eq!(classes[0].1, BRIGHTEST_RADIUS);
+        for pair in classes.windows(2) {
+            let ((_, r0, b0), (_, r1, b1)) = (pair[0], pair[1]);
+            assert!(r1 <= r0 && b1 <= b0, "{classes:?}");
+            assert!(r1 < r0 || b1 < b0, "{classes:?}");
+        }
+        assert_eq!(classes[STAR_CLASSES - 1].1, PIXEL_RADIUS);
+        assert!(classes[STAR_CLASSES - 1].2 < 0.5, "{classes:?}");
     }
 
     /// A light sits on top of each end mark of the pad, and the lights are

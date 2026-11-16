@@ -193,7 +193,7 @@ For a world that has a two-dimensional body, tcs-sim's window shows, in a
 pane at the left of its payload panels:
 
 * the landscape and the lander, drawn to scale, positive X to the right and
-  positive Y upward, under a black sky with twinkling stars, the lander
+  positive Y upward, under a black sky with stars, the lander
   white with thin black lines so that it shows against the sky and the
   ground, with the smiley face after a landing;
 * "Landed" or "Crashed" in words, and the fuel left, in words and as a

@@ -50,9 +50,13 @@ impl Sizes {
     /// question and is answered without laying anything out. The window is
     /// told the panel size back, so that it lays the grid out by it.
     ///
+    /// A panel is as wide as the widest of the window's payloads wants: its
+    /// heading, the name and number, is the one line a panel does not end
+    /// with an ellipsis, so each payload's is tried in turn.
+    ///
     /// # Arguments
     ///
-    /// * `ui` - The main window, not yet sized.
+    /// * `ui` - The main window, not yet sized, its payloads given.
     ///
     /// # Returns
     ///
@@ -66,10 +70,17 @@ impl Sizes {
         // ui/main.slint -- and the chrome from the real one, which knows its
         // own padding and the two rows above and below the grid. The probe is
         // built, read and dropped here; it is never shown.
+        use slint::Model;
         let probe =
             crate::PanelProbe::new().expect("a window to measure a panel in");
+        let mut panel_width = probe.get_panel_width();
+        for payload in ui.get_payload_model().iter() {
+            probe.set_name(payload.name.clone());
+            probe.set_id(payload.dev_id);
+            panel_width = panel_width.max(probe.get_panel_width());
+        }
         let sizes = Self {
-            panel_width: probe.get_panel_width(),
+            panel_width,
             panel_height: probe.get_panel_height(),
             chrome_width: ui.get_chrome_width(),
             chrome_height: ui.get_chrome_height(),
@@ -97,7 +108,7 @@ impl Sizes {
     #[cfg(test)]
     pub fn for_tests() -> Self {
         Self {
-            panel_width: 260.0,
+            panel_width: 188.0,
             panel_height: 136.0,
             chrome_width: 20.0,
             chrome_height: 75.0,
@@ -174,13 +185,6 @@ pub struct GridShape {
 /// takes in at once. tcs-moc says the same number for the same reason.
 pub const MAX_COLUMNS: usize = 3;
 
-/// The most panels tcs-sim puts in a row beside the lander's pane.
-///
-/// Two, so that the window, pane and all, leaves room beside it on a common
-/// screen for the lander example's MOC window: with three it was wider than
-/// the two could share.
-pub const COLUMNS_BESIDE_A_LANDER: usize = 2;
-
 /// How many columns `panels` payloads are laid out in.
 ///
 /// A row is filled before another is started under it, up to [`MAX_COLUMNS`]
@@ -211,42 +215,23 @@ pub fn columns_for(panels: usize) -> usize {
 /// # Returns
 ///
 /// The columns and rows, and the window size they ask for.
-///
-/// For the tests and the manual's screenshots, of windows with no lander:
-/// tcs-sim itself says how many across with [`grid_shape_within`].
-#[cfg(test)]
 pub fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
-    grid_shape_within(sizes, panels, MAX_COLUMNS)
-}
-
-/// Chooses the grid shape for the simulated payloads, with no more than so
-/// many panels in a row.
-///
-/// # Arguments
-///
-/// * `sizes`  - What the window says about a panel and its chrome.
-/// * `panels` - How many simulated payloads; none is laid out as one.
-/// * `most`   - The most panels in a row: [`MAX_COLUMNS`], or
-///              [`COLUMNS_BESIDE_A_LANDER`].
-///
-/// # Returns
-///
-/// The columns and rows, and the window size they ask for.
-pub fn grid_shape_within(
-    sizes: &Sizes,
-    panels: usize,
-    most: usize,
-) -> GridShape {
     // An empty configuration still has to produce a window.
     let panels = panels.max(1);
-    let columns = columns_for(panels).min(most.max(1));
+    let columns = columns_for(panels);
     let rows = panels.div_ceil(columns);
 
+    // No narrower than tall while the grid fits two rows: a panel as narrow
+    // as its contents is a little taller than wide with the chrome round
+    // it, and a window of one or two is widened to square rather than every
+    // panel being padded.
+    let height = height_for_rows(sizes, rows);
+    let width = columns as f32 * sizes.panel_width + sizes.chrome_width;
     GridShape {
         columns,
         rows,
-        width: columns as f32 * sizes.panel_width + sizes.chrome_width,
-        height: height_for_rows(sizes, rows),
+        width: if rows <= 2 { width.max(height) } else { width },
+        height,
     }
 }
 
@@ -296,21 +281,11 @@ mod tests {
     fn four_panels_make_a_row_of_three_and_a_row_of_one() {
         let shape = grid_shape(&sizes(), 4);
         assert_eq!((shape.columns, shape.rows), (3, 2));
-        // Three panels across and two rows down, plus the chrome: 3 x 260 + 20
+        // Three panels across and two rows down, plus the chrome: 3 x 188 + 20
         // and 2 x 136 + 75. Written out rather than computed from the fixture,
         // so that a change to a panel's size has to be looked at here rather
         // than silently agreeing with itself.
-        assert_eq!((shape.width, shape.height), (800.0, 347.0));
-    }
-
-    /// Beside a lander's pane a row holds two panels, and the rows go on
-    /// down for the rest.
-    #[test]
-    fn two_panels_a_row_beside_a_lander() {
-        let shape = grid_shape_within(&sizes(), 13, COLUMNS_BESIDE_A_LANDER);
-        assert_eq!((shape.columns, shape.rows), (2, 7));
-        let shape = grid_shape_within(&sizes(), 1, COLUMNS_BESIDE_A_LANDER);
-        assert_eq!((shape.columns, shape.rows), (1, 1));
+        assert_eq!((shape.width, shape.height), (584.0, 347.0));
     }
 
     /// A row is filled before another is started under it, three across.

@@ -980,8 +980,10 @@ left of the payload panels, the window opening wide and tall enough for
 both. From the top:
 
 * The landscape, drawn to scale with positive X to the right and positive Y
-  up: a black sky with twinkling stars, the same for one landscape each
-  time; the ground, filled grey with a little brown below its line; the
+  up: a black sky with stars, the same for one landscape each
+  time, as many and as bright as the night sky's to the sixth magnitude --
+  a few bright ones as small disks and many faint ones as single points,
+  dimmer the fainter; the ground, filled grey with a little brown below its line; the
   pad, a level white line with an upright mark at each end and a light
   flashing on top of each mark; and the lander
   where it is, in white with thin black lines, so that it shows against

@@ -230,6 +230,24 @@ class Shown(unittest.TestCase):
                                side_effect=OSError("no xrdb")):
             self.assertEqual(lander_yamcs.display_scale(), 1.0)
 
+    def test_the_stars_are_as_bright_as_the_sky_has_them(self):
+        """About three times as many at each magnitude as at the one
+        brighter; disks shrinking to a pixel, then pixels dimming."""
+        counts = [0] * 6
+        for n in range(1000):
+            m = lander_yamcs.magnitude((n + 0.5) / 1000)
+            counts[min(int(m), 5)] += 1
+        for fewer, more in zip(counts[2:], counts[3:]):
+            self.assertTrue(2.5 < more / fewer < 3.5, counts)
+        drawn = [lander_yamcs.star_class((c + 0.5) * 0.75)
+                 for c in range(8)]
+        self.assertEqual(drawn[0], (lander_yamcs.BRIGHTEST_RADIUS, 1.0))
+        for (r0, b0), (r1, b1) in zip(drawn, drawn[1:]):
+            self.assertTrue(r1 <= r0 and b1 <= b0, drawn)
+            self.assertTrue(r1 < r0 or b1 < b0, drawn)
+        self.assertEqual(drawn[-1][0], lander_yamcs.PIXEL_RADIUS)
+        self.assertLess(drawn[-1][1], 0.5)
+
     def test_a_signal_says_yes_with_a_one(self):
         """The landed and crashed signals are the text 1 or 0."""
         readings = lander_yamcs.Readings([])

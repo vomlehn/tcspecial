@@ -1760,10 +1760,13 @@ by Rust, from the width the window has at the time, so dragging a window wider
 reflows the grid into the room that appeared. Rust opens the window wide enough
 for the columns the payload count calls for, and because it opens it at exactly
 that many panels' width plus the chrome, the window arrives at the same count.</p>
-<p>The five sources of the thermostat example give a row of three and a row of two in a
-800x483 window. The size is the one <tt class="docutils literal">window_size</tt> gives, which a test reads
-out of this document so that the number here cannot quietly stop being the one
-the program opens at.</p>
+<p>A panel is as wide as the widest of the window's payloads wants: its heading,
+the payload's name and number, is the one line it does not end with an
+ellipsis. With panels at their narrowest, as wide as their buttons, four
+payloads give a row of three and a row of one in a 584x483 window; their names
+make it wider. The size is the one <tt class="docutils literal">window_size</tt> gives, which a test reads out
+of this document so that the number here cannot quietly stop being the one the
+program opens at.</p>
 </div>
 </div>
 <div class="section" id="see-also">

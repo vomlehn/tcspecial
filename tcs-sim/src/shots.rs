@@ -188,7 +188,6 @@ impl Scene {
         let made = windows.borrow().len();
         let ui = MainWindow::new().unwrap();
         let window = windows.borrow()[made].clone();
-        let sizes = grid::settle(&ui);
         let model: Rc<VecModel<PayloadInfo>> = Rc::new(VecModel::from(
             dh_configs
                 .iter()
@@ -198,6 +197,8 @@ impl Scene {
                 .collect::<Vec<_>>(),
         ));
         ui.set_payload_model(ModelRc::from(model.clone()));
+        // After the payloads, as main() measures: see grid::Sizes::of.
+        let sizes = grid::settle(&ui);
         let shape = grid::grid_shape(&sizes, configs.len());
         let size = grid::window_size(&sizes, &shape, configs.len());
         ui.window().set_size(size);

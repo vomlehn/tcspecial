@@ -7,7 +7,7 @@
 // two axes.
 //
 // Colour says nothing alone here. The ground is grey with a little brown
-// under a black sky with twinkling stars, the pad is marked by an upright
+// under a black sky with stars, the pad is marked by an upright
 // line at each end as well as by being level, the lander is white with
 // thin black lines so that it shows against the sky and the ground alike, and
 // whether the lander has landed or crashed is said in words, with a smiling
@@ -134,6 +134,15 @@ component Values inherits HorizontalLayout {
     }
 }
 
+// One class of stars, all drawn alike: their disks, as path commands in
+// metres, and how bright they are.
+export struct StarClass {
+    // The disks.
+    commands: string,
+    // How bright, from nought to one.
+    brightness: float,
+}
+
 // What tcs-sim shows of a world that has a lander, and what the joystick
 // says: set and handled by Rust, read by LanderPane. A global, so that
 // the pane can be put in any window without each passing it all on.
@@ -156,16 +165,9 @@ export global LanderScene {
     in-out property <string> lander-lines;
     in-out property <string> lander-shapes;
     in-out property <string> face;
-    // The stars, in four groups, and how bright each group is now, from
-    // nought to one: set by Rust, which makes them twinkle.
-    in-out property <string> stars-0;
-    in-out property <string> stars-1;
-    in-out property <string> stars-2;
-    in-out property <string> stars-3;
-    in-out property <float> twinkle-0: 1;
-    in-out property <float> twinkle-1: 1;
-    in-out property <float> twinkle-2: 1;
-    in-out property <float> twinkle-3: 1;
+    // The stars, in classes by their apparent brightness, the brightest
+    // first: set by Rust.
+    in-out property <[StarClass]> stars;
     // What it is doing, in words: "Flying", "Landed" or "Crashed".
     in-out property <string> state: "Flying";
     // The fraction of a full tank left.
@@ -210,31 +212,14 @@ export component LanderPane inherits Rectangle {
             background: #000000;
             border-width: 1px;
             border-color: #6b7280;
-            for group in [
-                {
-                    commands: LanderScene.stars-0,
-                    bright: LanderScene.twinkle-0,
-                },
-                {
-                    commands: LanderScene.stars-1,
-                    bright: LanderScene.twinkle-1,
-                },
-                {
-                    commands: LanderScene.stars-2,
-                    bright: LanderScene.twinkle-2,
-                },
-                {
-                    commands: LanderScene.stars-3,
-                    bright: LanderScene.twinkle-3,
-                },
-            ]: Path {
+            for class in LanderScene.stars: Path {
                 width: 100%;
                 height: 100%;
                 viewbox-width: LanderScene.world-width;
                 viewbox-height: LanderScene.world-height;
-                commands: group.commands;
+                commands: class.commands;
                 fill: #ffffff;
-                opacity: group.bright;
+                opacity: class.brightness;
             }
             Path {
                 width: 100%;

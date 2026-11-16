@@ -36,7 +36,7 @@ pub const STAR_CLASSES: usize = 8;
 
 /// How much brighter than their magnitudes say the faint stars are drawn,
 /// so that they show on a screen; none brighter than full.
-pub const STARS_BRIGHTER: f64 = 2.0;
+pub const STARS_BRIGHTER: f64 = 3.0;
 
 /// How far above the ground a star is at least, as a fraction of the
 /// display's height.
@@ -109,8 +109,8 @@ pub fn star_class(m: f64) -> (usize, f64, f32) {
         // A single pixel, a fifth of a magnitude's dimming for each
         // magnitude: gentler than the sky's own, so that the faintest still
         // show on a screen.
-        // Twice that, as bright as a screen's black shows them, no brighter
-        // than full.
+        // Three times that, as bright as a screen's black shows them, no
+        // brighter than full.
         let bright = (STARS_BRIGHTER
             * 10f64.powf(-0.2 * (middle - PIXEL_FROM)))
         .min(1.0);

@@ -1,13 +1,16 @@
 //! A lander: flown in two dimensions over a landscape by thrust along each
-//! axis, burning its fuel, until it touches down; then, after a pause, flown
-//! again from where it started.
+//! axis, burning its fuel, until it crashes; then, after a pause, flown
+//! again from where it started. Set down gently on the pad it has landed,
+//! and stands there, still flyable: thrust greater than its weight lifts
+//! it off again.
 //!
 //! Its terminals are `tcsprotocol::node::physics::lander`'s: `throttle_x`
 //! and `throttle_y`, ratios from minus one to one; `x` and `y`, in metres;
 //! `velocity_x` and `velocity_y`, in metres a second; `fuel`, the fraction
-//! of a full tank left; `landed` and `crashed`, decisions asserted while
-//! it is down; and `acceleration_x` and `acceleration_y`, in metres a second
-//! a second, gravity's included.
+//! of a full tank left; `landed`, a decision asserted while it stands on
+//! the pad, and `crashed`, one asserted from a crash until it starts again;
+//! and `acceleration_x` and `acceleration_y`, in metres a second a second,
+//! gravity's included, nought while it is not flying.
 //!
 //! # The arithmetic
 //!
@@ -95,19 +98,20 @@ const INTO_THE_PAD: f64 = 0.01;
 enum Flight {
     /// Flying.
     Flying,
-    /// Down since a moment, landed or crashed, until it starts again.
-    Down {
-        /// When it came down, in simulated seconds.
+    /// Standing on the pad, landed: still, its engines burning as the
+    /// throttles say, until thrust greater than its weight lifts it off.
+    Landed,
+    /// Crashed since a moment, until it starts again.
+    Crashed {
+        /// When it crashed, in simulated seconds.
         since: f64,
-        /// Whether it landed.
-        landed: bool,
     },
 }
 
 /// What happens next, and when.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Next {
-    /// It touches the ground, or leaves the display.
+    /// It touches the ground.
     Down,
     /// Its tank runs dry.
     Dry,
@@ -133,9 +137,9 @@ pub struct Lander {
     /// What its restart input was last held at: a new value other than
     /// nought starts it again.
     restart: f64,
-    /// Whether it starts again by itself once it has been down for its
-    /// pause: its autorestart input asserted. Otherwise, down, it stays down
-    /// until it is restarted.
+    /// Whether it starts again by itself once it has been crashed for its
+    /// pause: its autorestart input asserted. Otherwise, crashed, it stays
+    /// down until it is restarted.
     autorestart: bool,
     /// Its sky, as the records its `sky` output sends.
     sky: Vec<[u8; tcsprotocol::node::physics::lander::STAR_RECORD]>,
@@ -237,13 +241,13 @@ impl Lander {
     }
 
     /// Its thrust along each axis now, in newtons: nothing with an empty
-    /// tank, or once it is down.
+    /// tank, or once it has crashed.
     ///
     /// # Returns
     ///
     /// The thrust along X and along Y.
     fn force(&self) -> Point {
-        if self.fuel <= 0.0 || self.flight != Flight::Flying {
+        if self.fuel <= 0.0 || matches!(self.flight, Flight::Crashed { .. }) {
             return (0.0, 0.0);
         }
         (
@@ -416,7 +420,18 @@ impl Lander {
             && self.velocity.0.abs() <= f.landing_drift
     }
 
-    /// Finds what happens next, and when, with the throttles it holds.
+    /// Whether, standing on the pad, its thrust up is greater than its
+    /// weight, so that it lifts off.
+    ///
+    /// # Returns
+    ///
+    /// Whether it does.
+    fn lifts(&self) -> bool {
+        self.acceleration().1 > 0.0
+    }
+
+    /// Finds what happens next in flight, and when, with the throttles it
+    /// holds.
     ///
     /// # Arguments
     ///
@@ -426,7 +441,7 @@ impl Lander {
     ///
     /// When, in simulated seconds, and what.
     fn next(&self, now: f64) -> (f64, Next) {
-        if let Flight::Down { since, .. } = self.flight {
+        if let Flight::Crashed { since } = self.flight {
             return (since + self.figures.pause.as_secs_f64(), Next::Again);
         }
         let flow = self.flow();
@@ -486,14 +501,18 @@ impl Component for Lander {
     }
 
     fn advance(&mut self, from: f64, to: f64) {
-        if self.flight != Flight::Flying || to <= from {
+        if matches!(self.flight, Flight::Crashed { .. }) || to <= from {
             return;
         }
         let t = to - from;
         let burnt = (self.flow() * t).min(self.fuel);
-        let (at, velocity) = self.flown(t);
-        self.at = at;
-        self.velocity = velocity;
+        // Standing on the pad it burns what the throttles say, held still
+        // by the pad until it lifts off.
+        if self.flight == Flight::Flying {
+            let (at, velocity) = self.flown(t);
+            self.at = at;
+            self.velocity = velocity;
+        }
         self.fuel = (self.fuel - burnt).max(0.0);
     }
 
@@ -505,8 +524,8 @@ impl Component for Lander {
             (VELOCITY_X, _) => self.velocity.0,
             (VELOCITY_Y, _) => self.velocity.1,
             (FUEL, _) => self.fuel / self.figures.fuel,
-            (LANDED, Flight::Down { landed, .. }) => decision(landed),
-            (CRASHED, Flight::Down { landed, .. }) => decision(!landed),
+            (LANDED, Flight::Landed) => decision(true),
+            (CRASHED, Flight::Crashed { .. }) => decision(true),
             (ACCELERATION_X, Flight::Flying) => self.acceleration().0,
             (ACCELERATION_Y, Flight::Flying) => self.acceleration().1,
             (SKY, _) => f64::from(SKY_GENERATION),
@@ -533,34 +552,43 @@ impl Component for Lander {
     }
 
     fn next_event(&self, now: f64) -> Option<f64> {
-        // Down with no autorestart, nothing happens until it is restarted
-        // or its autorestart is asserted.
-        if !self.autorestart && matches!(self.flight, Flight::Down { .. }) {
-            return None;
+        match self.flight {
+            // Crashed with no autorestart, nothing happens until it is
+            // restarted or its autorestart is asserted.
+            Flight::Crashed { .. } if !self.autorestart => None,
+            // On the pad, it lifts off now if its thrust is greater than its
+            // weight, and otherwise stands until its throttles change.
+            Flight::Landed => self.lifts().then_some(now),
+            _ => Some(self.next(now).0),
         }
-        Some(self.next(now).0)
     }
 
     fn event(&mut self, at: f64) {
         match self.flight {
-            Flight::Down { since, .. }
+            Flight::Crashed { since }
                 if self.autorestart
                     && at
                         >= since + self.figures.pause.as_secs_f64() - 1e-9 =>
             {
                 self.start_again();
             }
-            Flight::Down { .. } => {}
+            Flight::Crashed { .. } => {}
+            Flight::Landed => {
+                if self.lifts() {
+                    self.flight = Flight::Flying;
+                }
+            }
             Flight::Flying => {
                 if self.down_at(self.at) {
-                    let landed = self.landed_now();
-                    if landed {
+                    if self.landed_now() {
                         // Set down on the pad, standing on its lowest point.
                         let (_, _, least_y, _) = self.figures.extent();
                         let ((_, pad_y), _) = self.figures.pad_ends();
                         self.at.1 = pad_y - least_y;
+                        self.flight = Flight::Landed;
+                    } else {
+                        self.flight = Flight::Crashed { since: at };
                     }
-                    self.flight = Flight::Down { since: at, landed };
                     self.velocity = (0.0, 0.0);
                 } else if self.fuel <= self.flow() * FOUND_WITHIN {
                     self.fuel = 0.0;
@@ -644,13 +672,10 @@ mod tests {
         let mut inputs = held(0.0, 0.0, 0.0);
         l.hold(&inputs);
         l.at = (100.0, 60.0);
-        l.flight = Flight::Down {
-            since: 1.0,
-            landed: false,
-        };
+        l.flight = Flight::Crashed { since: 1.0 };
         assert_eq!(l.next_event(2.0), None);
         l.event(100.0);
-        assert!(matches!(l.flight, Flight::Down { .. }));
+        assert!(matches!(l.flight, Flight::Crashed { .. }));
 
         // Given autorestart, long after the pause: it starts again at the
         // next event, which is now.
@@ -664,10 +689,7 @@ mod tests {
         // Without autorestart and crashed again, a restart still starts it.
         inputs[AUTORESTART] = 0.0;
         l.hold(&inputs);
-        l.flight = Flight::Down {
-            since: 200.0,
-            landed: false,
-        };
+        l.flight = Flight::Crashed { since: 200.0 };
         inputs[RESTART] = 7.0;
         l.hold(&inputs);
         assert_eq!(l.flight, Flight::Flying);
@@ -729,10 +751,7 @@ mod tests {
         l.at = (100.0, 60.0);
         l.velocity = (0.0, -30.0);
         l.fuel = 10.0;
-        l.flight = Flight::Down {
-            since: 1.0,
-            landed: false,
-        };
+        l.flight = Flight::Crashed { since: 1.0 };
         l.hold(&held(0.0, 0.0, 1.0));
         assert_eq!(l.flight, Flight::Flying);
         assert_eq!(l.at, figures().start);
@@ -824,8 +843,8 @@ mod tests {
         assert_eq!(l.flow(), 0.0);
     }
 
-    /// Falling slowly onto the pad it lands, and, given autorestart, after
-    /// the pause starts again where it started with a full tank.
+    /// Falling slowly onto the pad it lands, and stands there, even given
+    /// autorestart and long past its pause: only a crash ends a flight.
     #[test]
     fn a_slow_touchdown_on_the_pad_lands() {
         let mut f = figures();
@@ -838,13 +857,45 @@ mod tests {
         assert_eq!(l.output(LANDED), 1.0);
         assert_eq!(l.output(CRASHED), 0.0);
         assert_eq!(l.at.1, 60.0);
-        // Down at about 1.57 s, so started again at about 4.57 s: just
-        // after, it is where it started, falling again with a full tank.
-        run(&mut l, 2.0, 4.6);
-        assert_eq!(l.output(LANDED), 0.0);
-        assert_eq!(l.at.0, 500.0);
-        assert!((l.at.1 - 62.0).abs() < 0.01, "{:?}", l.at);
+        assert_eq!(l.next_event(2.0), None);
+        run(&mut l, 2.0, 10.0);
+        assert_eq!(l.flight, Flight::Landed);
+        assert_eq!(l.at, (500.0, 60.0));
         assert_eq!(l.output(FUEL), 1.0);
+    }
+
+    /// Standing on the pad, thrust no greater than its weight leaves it
+    /// there, burning fuel; thrust greater lifts it off, and it flies on,
+    /// no longer landed, until it comes down again.
+    #[test]
+    fn a_landed_lander_lifts_off() {
+        let mut l = Lander::new(figures());
+        l.at = (500.0, 60.0);
+        l.flight = Flight::Landed;
+        // Half of 24 kN is less than 8000 kg's weight, 12.96 kN.
+        l.hold(&held(0.0, 0.5, 0.0));
+        assert_eq!(l.next_event(1.0), None);
+        l.advance(1.0, 2.0);
+        assert_eq!(l.flight, Flight::Landed);
+        assert_eq!(l.at, (500.0, 60.0));
+        assert!(l.output(FUEL) < 1.0);
+        assert_eq!(l.output(ACCELERATION_Y), 0.0);
+
+        // Full thrust lifts it off, now.
+        l.hold(&held(0.0, 1.0, 0.0));
+        assert_eq!(l.next_event(2.0), Some(2.0));
+        l.event(2.0);
+        assert_eq!(l.flight, Flight::Flying);
+        assert_eq!(l.output(LANDED), 0.0);
+        run(&mut l, 2.0, 3.0);
+        assert!(l.at.1 > 60.0, "{:?}", l.at);
+        assert!(l.velocity.1 > 0.0, "{:?}", l.velocity);
+
+        // Shut off, it falls back onto the pad, slowly enough to land.
+        l.hold(&held(0.0, 0.0, 0.0));
+        run(&mut l, 3.0, 10.0);
+        assert_eq!(l.flight, Flight::Landed);
+        assert_eq!(l.output(CRASHED), 0.0);
     }
 
     /// Too fast down, it crashes even on the pad: falling 240 m it is

@@ -135,17 +135,21 @@ in the direction of negative Y, on the whole of the lander's mass.
 Touchdown
 ---------
 
-The lander is down the moment any part of its outline first meets a line
-of the terrain or the pad. It has landed if both its feet are on the pad,
+The lander touches down the moment any part of its outline first meets a
+line of the terrain or the pad. It has landed if both its feet are on the pad,
 nothing of it touches the terrain, and it is moving no faster than the
 Apollo lunar module's touchdown limits: 3.05 m/s downward and 1.22 m/s
 sideways. Anything else that touches has crashed. A lander that leaves the
 display flies on out of sight, and has crashed only if it drops below the
 display's bottom line, which goes on indefinitely to the left and right.
 
-After a crash, there is a pause, and the lander starts again at the upper
-left with a full tank. After a landing, a smiling face is drawn over the
-lander, and then there is the same pause and the same start.
+A landing does not end the flight. The landed lander stands still on the
+pad, with a smiling face drawn over it, burning fuel if its throttles are
+open, until thrust up greater than its weight lifts it off; then it flies
+on, the face gone, and may land again or crash. Only a crash ends a
+flight: after one, the lander stays down until Restart, or, with
+autorestart enabled, until a pause has run, and then starts again at the
+upper left with a full tank.
 
 The vehicles
 ============
@@ -239,8 +243,9 @@ second and shows:
 * Disable Autorestart and Enable Autorestart, which send a command up
   through lander-a's gateway to a simulated payload, ``autorestart``,
   joined to the lander's ``autorestart`` input. Until it is enabled, a
-  lander that has landed or crashed stays down until it is restarted;
-  enabled, it starts again by itself after its pause.
+  lander that has crashed stays down until it is restarted; enabled, it
+  starts again by itself after its pause. A landed lander is still
+  flying, so autorestart does nothing to it.
 
 The sky, sent down
 ------------------
@@ -349,3 +354,7 @@ In this order, each stage checked before the next:
      tenth of its full thrust;
    * a lander that leaves the display flying on, crashing only below the
      display's bottom line.
+
+8. **Flying on after a landing.** A landed lander stands on the pad until
+   thrust greater than its weight lifts it off, and only a crash ends a
+   flight, so autorestart follows crashes alone.

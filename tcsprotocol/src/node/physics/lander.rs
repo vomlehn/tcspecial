@@ -1,6 +1,7 @@
 //! A lander: a craft flown in two dimensions over a landscape, under
 //! gravity, by thrust along each axis, burning the fuel it carries, until
-//! it touches the ground.
+//! it crashes. Set down gently on the pad, it stands there and can be flown
+//! off again.
 //!
 //! It takes `throttle_x`, a ratio from minus one to one, and `throttle_y`, from
 //! nought to one, which simulated payloads the vehicle drives set: positive
@@ -9,10 +10,11 @@
 //! bottom, and nothing on its top pushes it down. It gives out where it is, `x`
 //! and `y`, in metres, the place between its feet; how fast it is going,
 //! `velocity_x` and `velocity_y`, in metres a second; the `fuel` it has left,
-//! as a fraction of a full tank; two decisions, `landed` and `crashed`, each
-//! asserted from the moment it touches down until it starts again; and how fast
-//! it is speeding up, `acceleration_x` and `acceleration_y`, in metres a second
-//! a second, gravity's included and nought while it is down.
+//! as a fraction of a full tank; two decisions, `landed`, asserted while it
+//! stands on the pad, and `crashed`, asserted from a crash until it starts
+//! again; and how fast it is speeding up, `acceleration_x` and
+//! `acceleration_y`, in metres a second a second, gravity's included and
+//! nought while it stands on the pad or has crashed.
 //!
 //! # The arithmetic
 //!
@@ -42,15 +44,21 @@
 //!
 //! The lander's `outline`, a set of lines about the place between its feet,
 //! is what meets the ground. The moment any of it first meets the ground, the
-//! lander is down: landed, if all of it is above the pad, it meets nothing
-//! but the pad, and it is going no faster than `landing_speed` down and
-//! `landing_drift` sideways; crashed, otherwise. Leaving the display is not
-//! coming down: the lander flies on out of sight, and has crashed only if
-//! it drops below the display's bottom line, which goes on indefinitely
-//! beyond its edges. Down, it stays where it is until it is restarted, by
-//! its `restart` input, or, with its `autorestart` input asserted, for
-//! `pause`; then it starts again where it started, with a full tank. The
-//! arithmetic is tcs-sim's `physics::lander`.
+//! lander has landed, if all of it is above the pad, it meets nothing but
+//! the pad, and it is going no faster than `landing_speed` down and
+//! `landing_drift` sideways; it has crashed, otherwise. Leaving the display
+//! is not coming down: the lander flies on out of sight, and has crashed
+//! only if it drops below the display's bottom line, which goes on
+//! indefinitely beyond its edges.
+//!
+//! Landed, it stands still on the pad, its engines burning fuel as its
+//! throttles say, until thrust up greater than its weight lifts it off and
+//! it flies on: a landing does not end a flight, only a crash does.
+//! Crashed, it stays where it is until it is restarted, by its `restart`
+//! input, or, with its `autorestart` input asserted, for `pause`; then it
+//! starts again where it started, with a full tank. A restart starts it
+//! again however it is, landed or flying too. The arithmetic is tcs-sim's
+//! `physics::lander`.
 //!
 //! # Sky
 //!
@@ -97,10 +105,11 @@ pub const TERMINALS: &[Terminal] = &[
     // is driven to a new value other than nought: what the ground's Restart
     // sends, a count, so that each press differs from the last.
     Terminal::input("restart", Kind::Decision),
-    // While asserted, a lander that has landed or crashed starts again by
-    // itself once its pause has run; otherwise it stays down until it is
-    // restarted. Nothing driving it, it is not asserted: by default a lander
-    // stays down.
+    // While asserted, a lander that has crashed starts again by itself once
+    // its pause has run; otherwise it stays down until it is restarted.
+    // Nothing driving it, it is not asserted: by default a crashed lander
+    // stays down. A landing is not the end of a flight, so it does nothing
+    // to a landed one.
     Terminal::input("autorestart", Kind::Decision),
     // Its sky's records: see the module's "Sky".
     Terminal::output("sky", Kind::Records),
@@ -275,7 +284,8 @@ pub struct Lander {
     /// The fastest it may be going sideways as it touches the pad and still
     /// be landed: `"1.22 m/s"`, the Apollo lunar module's.
     pub landing_drift: String,
-    /// How long it stays down before it starts again: `"3 s"`.
+    /// How long it stays down after a crash before it starts again, with
+    /// autorestart asserted: `"3 s"`.
     pub pause: String,
 }
 

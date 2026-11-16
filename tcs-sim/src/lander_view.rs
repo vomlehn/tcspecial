@@ -616,9 +616,9 @@ const FIRE_PER_KG: f64 = 0.12;
 const FIRE_GROWS: f64 = 0.4;
 
 /// How fast the debris flies for each (metre a second) squared of the speed
-/// the lander hit at, in seconds a metre: 8 m/s from a 20 m/s impact, 18
+/// the lander hit at, in seconds a metre: 10 m/s from a 20 m/s impact, 22.5
 /// from 30, so that most of it lands within the display.
-const DEBRIS_PER_SPEED_SQUARED: f64 = 0.02;
+const DEBRIS_PER_SPEED_SQUARED: f64 = 0.025;
 
 /// How many fragments the lander breaks into.
 const FRAGMENTS: usize = 24;

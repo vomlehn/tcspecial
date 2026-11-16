@@ -2927,11 +2927,13 @@ Yamcs, 1.3 s later.</p>
 <p>The MOC's window also commands the lander. Its Restart button sends a
 command up through <tt class="docutils literal"><span class="pre">lander-b</span></tt>'s gateway to the payload <tt class="docutils literal">restart</tt>,
 which starts the lander again; Disable Autorestart and Enable Autorestart
-send one up through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s to the payload <tt class="docutils literal">autorestart</tt>. Until
-autorestart is enabled, a lander that has landed or crashed stays down
-until Restart; enabled, it starts again by itself, with a full tank, after
-a pause. Each command reaches the lander 1.3 s after it is sent, and is
-seen 1.3 s after that.</p>
+send one up through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s to the payload <tt class="docutils literal">autorestart</tt>. A
+landing does not end a flight: the landed lander stands on the pad until
+thrust greater than its weight lifts it off again. A crash does: until
+autorestart is enabled, a crashed lander stays down until Restart;
+enabled, it starts again by itself, with a full tank, after a pause.
+Each command reaches the lander 1.3 s after it is sent, and is seen 1.3 s
+after that.</p>
 <p>The MOC's sky is tcs-sim's, sent down: <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s payload <tt class="docutils literal">sky</tt>
 sends the stars a few to a packet, round and round, and the sky fills in
 as they arrive, a packet lost leaving it thinner until a later pass. Once

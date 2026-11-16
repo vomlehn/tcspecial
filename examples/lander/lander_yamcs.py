@@ -897,7 +897,7 @@ class Readings:
         last reported position, carried on by its last reported velocity
         and acceleration for the time since that position arrived -- at
         most :data:`RECKON_FOR`, so that a link gone quiet does not carry it
-        off -- and not at all once it is down.
+        off -- and not at all while it stands on the pad or has crashed.
 
         Args:
             axis: ``"x"`` or ``"y"``.
@@ -1176,9 +1176,10 @@ class Restarter:
 
 class Autorestart:
     """Has Yamcs tell the lander whether to start again by itself after a
-    landing or a crash, up through the vehicle whose gateway passes it to
-    the payload that sets the lander's autorestart. Until it is told, it
-    does not: it stays down until it is restarted.
+    crash, up through the vehicle whose gateway passes it to the payload
+    that sets the lander's autorestart. Until it is told, it does not: it
+    stays down until it is restarted. A landing does not end a flight, so
+    this says nothing to a landed lander.
 
     Args:
         uplink: The :class:`Uplink` to the autorestart payload's vehicle.
@@ -1188,8 +1189,7 @@ class Autorestart:
         self._uplink = uplink
 
     def disable(self):
-        """Keeps the lander down after a landing or a crash, until it is
-        restarted.
+        """Keeps the lander down after a crash, until it is restarted.
 
         Returns:
             The command's arguments.
@@ -1197,8 +1197,8 @@ class Autorestart:
         return self._uplink.send(0)
 
     def enable(self):
-        """Lets the lander start again by itself after a landing or a
-        crash, once its pause has run.
+        """Lets the lander start again by itself after a crash, once its
+        pause has run.
 
         Returns:
             The command's arguments.

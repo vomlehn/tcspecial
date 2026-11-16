@@ -801,9 +801,10 @@ landing is the lander wholly on the pad within 3.05 m/s down and 1.22 m/s
 across, the Apollo lunar module's limits; touching any other ground, or
 dropping below the display's bottom line off either side, is a crash. The
 lander has no thrust down, so its joystick has no arm below its middle. A
-smiling face is drawn over it on a landing. Down, it stays down until
-Restart, or, with autorestart enabled, starts again with a full tank after a
-pause.
+landing does not end the flight: the lander stands on the pad, a smiling
+face drawn over it, until thrust greater than its weight lifts it off
+again. A crash ends it: the lander stays down until Restart, or, with
+autorestart enabled, starts again with a full tank after a pause.
 
 `lander/lander_yamcs.py` is the ground station. It makes a landscape at
 random from a seed -- `--seed N`, or one it chooses and says -- and writes
@@ -823,8 +824,8 @@ command up to lander-b, whose gateway passes it to the payload that starts
 the lander again: it arrives 1.3 s later, and is seen 1.3 s after that.
 Disable Autorestart and Enable Autorestart send one up to lander-a, whose
 gateway passes it to the payload that sets the lander's autorestart. It is
-off until enabled: after a landing or a crash the lander stays down until
-Restart, or, enabled, starts again by itself after its pause. Closing
+off until enabled: after a crash the lander stays down until Restart, or,
+enabled, starts again by itself after its pause. Closing
 tcs-sim's window,
 or the MOC's, stops everything. Yamcs's web interface is at
 <http://localhost:19090>.

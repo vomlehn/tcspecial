@@ -751,8 +751,8 @@ lander                 a craft flown in two dimensions over a
                        &quot;3.05 m/s&quot;
   landing_drift        the fastest sideways it may touch the pad and
                        land: &quot;1.22 m/s&quot;
-  pause                how long it stays down before it starts again:
-                       &quot;3 s&quot;
+  pause                how long it stays down after a crash before it
+                       starts again, with autorestart: &quot;3 s&quot;
 
 joystick_3_4           a three-armed joystick: two axes set by hand from
                        tcs-sim's window
@@ -807,19 +807,19 @@ lander         throttle_x    in    a ratio, held within minus one and one
                velocity_x    out   m/s
                velocity_y    out   m/s, up more than nought
                fuel          out   a ratio, the fraction of a full tank
-               landed        out   a decision: asserted while it is down,
-                                   having landed
-               crashed       out   a decision: asserted while it is down,
-                                   having crashed
+               landed        out   a decision: asserted while it stands
+                                   on the pad, having landed
+               crashed       out   a decision: asserted from a crash
+                                   until it starts again
                acceleration_x out  m/s2, its thrust over its mass
                acceleration_y out  m/s2, its thrust over its mass and
                                    gravity, up more than nought
                restart       in    a whole number: each new one other
                                    than nought starts it again at once
-               autorestart   in    a decision: while asserted, down it
-                                   starts again after its pause;
-                                   otherwise it stays down until it
-                                   is restarted
+               autorestart   in    a decision: while asserted,
+                                   crashed it starts again after its
+                                   pause; otherwise it stays down
+                                   until it is restarted
                sky           out   records: its stars, sent down
                sky_quench    in    a whole number: while it is the
                                    sky's generation, the sky is not
@@ -870,9 +870,12 @@ pad, it meets nothing but the pad, and it is going no faster than
 <tt class="docutils literal">landing_speed</tt> down and <tt class="docutils literal">landing_drift</tt> sideways, and has crashed
 otherwise. Leaving the display is not coming down: it flies on out of
 sight, and has crashed only if it drops below the display's bottom line,
-which goes on indefinitely to either side. Down, it stays still, until it
-is restarted or, with its <tt class="docutils literal">autorestart</tt> asserted, for <tt class="docutils literal">pause</tt>; then it
-starts again where it started, with a full tank. A
+which goes on indefinitely to either side. Landed, it stands still on
+the pad, burning fuel as its throttles say, until thrust up greater than
+its weight lifts it off and it flies on: only a crash ends a flight.
+Crashed, it stays still until it is restarted or, with its
+<tt class="docutils literal">autorestart</tt> asserted, for <tt class="docutils literal">pause</tt>; then it starts again where it
+started, with a full tank. A
 joystick gives out what tcs-sim's window sets it to, each axis held within
 minus one and one.</p>
 <p>A simulated payload is joined to one terminal by a setting of its own, which
@@ -1294,8 +1297,8 @@ flashing on top of each mark; and the lander
 where it is, in white with thin black lines, so that it shows against
 the sky and the ground alike. What it is doing is said in its top
 corner, <em>Flying</em>, <em>Landed</em> or, on a crash, <em>On the Moon, no one can hear
-you CRASH!</em>, and on a landing a smiling face
-is drawn over it until it starts again.</li>
+you CRASH!</em>, and while it stands on the pad, landed, a smiling face
+is drawn over it, gone as it lifts off again.</li>
 <li>The fuel left, as a percentage and as a bar.</li>
 <li>The lander's X and Y position, velocity and acceleration, each with its
 unit, and beside them:</li>
@@ -1329,15 +1332,16 @@ height clear of the ground between it and the pad, across to above the
 pad, and down onto it, slowing to a metre a second at touchdown. A
 landing is not certain: the fuel can run out. The joystick's lines show
 where it holds the stick; taking hold of the joystick hands it back to
-you, and a landing or a crash stops it. Greyed out where the world has
-no joystick.</dd>
+you, and a landing or a crash stops it; once landed, the lander can be
+flown off the pad again by hand. Greyed out where the world has no
+joystick.</dd>
 </dl>
 <p>Each of the lander's engines shows a plume while it fires -- the bottom
 engine's below its nozzle, a side thruster's out of the body's side, away
 from the way it pushes -- a warm off-white core in a pale orange glow,
 longer and brighter the harder it fires, as its thrust is worked out from
-the lander's acceleration and mass; none once the fuel is gone or the
-lander is down.</p>
+the lander's acceleration and mass; none once the fuel is gone, nor
+while the lander stands on the pad or has crashed.</p>
 <p>A crash on the display explodes. A fireball, its size in proportion to the
 fuel left, swells from the lower part of the lander and fades over the
 pause, and the lander's debris flies from where it met the ground, spread

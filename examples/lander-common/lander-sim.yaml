@@ -99,9 +99,9 @@ simulated_payloads:
         protocol: udp
         simulate: true
       # What the ground's autorestart buttons reach, through lander-a's
-      # gateway: 1 lets the lander start again by itself after a landing or
-      # a crash, 0, as it is until told, keeps it down until it is
-      # restarted.
+      # gateway: 1 lets the lander start again by itself after a crash, 0,
+      # as it is until told, keeps it down until it is restarted. A landing
+      # does not end a flight, so neither touches a landed lander.
       - payload: autorestart
         configuration: lander-a
         connects: lander.autorestart

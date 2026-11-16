@@ -4338,9 +4338,19 @@ than that.</p>
 naming one.
 Failing an argument, tcspecial reads <tt class="docutils literal">PAYLOAD_CONFIG_PATH</tt> and tcs-sim reads
 <tt class="docutils literal">SIM_PAYLOAD_CONFIG_PATH</tt>; failing that, every program reads
-<tt class="docutils literal">tests/manual/thermostat.ytcs</tt>. Tcs-moc has no variable of its own, because the programs it
-starts inherit its environment: a variable naming tcs-moc's file would name
-theirs as well.</p>
+<tt class="docutils literal">tests/manual/thermostat.ytcs</tt>. Tcs-moc has no variable of its own,
+because the programs it starts inherit its environment: a variable naming
+tcs-moc's file would name theirs as well.</p>
+<p>tcs-sim alone takes several configuration files, for two tcspecials on one
+vehicle whose payloads read one physics model: it simulates all of them in
+one world, from one simulator file they share. That file is beside none of
+them, so it is named, by <tt class="docutils literal"><span class="pre">--simulator=FILE</span></tt> or <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>, and
+each payload it simulates is a payload of exactly one of the
+configurations. See the <a class="reference external" href="tcs-sim.html">tcs-sim manual</a>.</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcs-sim<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="whitespace">    </span>--simulator<span class="operator">=</span>lander-sim.yaml<span class="whitespace"> </span>lander-a.ytcs<span class="whitespace"> </span>lander-b.ytcs
+</pre>
 <p>The configuration file is the only argument tcspecial takes. Where it serves
 commands is in <tt class="docutils literal">tcspecial.ytcs</tt>:</p>
 <pre class="code yaml literal-block">
@@ -5286,8 +5296,11 @@ waiting:</p>
 <p><tt class="docutils literal"><span class="pre">--wait</span></tt> waits thirty seconds, or as many as <tt class="docutils literal"><span class="pre">--wait=&lt;seconds&gt;</span></tt> says, and
 exits with a failure saying what it last heard: nothing, which is a tcs-sim not
 running or an address that is wrong, or a simulator still starting, or one that
-failed or is set up for another run. A ground station of its own waits through
-<tt class="docutils literal"><span class="pre">tcsmoc::simulator::wait</span></tt>, or <tt class="docutils literal">tcsmoc.simulator.wait</tt> in Python.</p>
+failed or is set up for another run. A simulator given several configurations
+is waited for with the same files, in the same order, and the same
+<tt class="docutils literal"><span class="pre">--simulator</span></tt>: what it is set up for is a digest of them in that order. A
+ground station of its own waits through <tt class="docutils literal"><span class="pre">tcsmoc::simulator::wait</span></tt>, or
+<tt class="docutils literal">tcsmoc.simulator.wait</tt> in Python.</p>
 <p>Each payload starts silent, until its panel's button is pressed, unless the
 simulator file says <tt class="docutils literal">enable: true</tt> of it or of its group, and then it starts
 sending as though the button had been pressed. <tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--sending</span></tt> starts

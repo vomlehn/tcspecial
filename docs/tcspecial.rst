@@ -4181,9 +4181,21 @@ An argument naming the configuration file beats any environment variable
 naming one.
 Failing an argument, tcspecial reads ``PAYLOAD_CONFIG_PATH`` and tcs-sim reads
 ``SIM_PAYLOAD_CONFIG_PATH``; failing that, every program reads
-``tests/manual/thermostat.ytcs``. Tcs-moc has no variable of its own, because the programs it
-starts inherit its environment: a variable naming tcs-moc's file would name
-theirs as well.
+``tests/manual/thermostat.ytcs``. Tcs-moc has no variable of its own,
+because the programs it starts inherit its environment: a variable naming
+tcs-moc's file would name theirs as well.
+
+tcs-sim alone takes several configuration files, for two tcspecials on one
+vehicle whose payloads read one physics model: it simulates all of them in
+one world, from one simulator file they share. That file is beside none of
+them, so it is named, by ``--simulator=FILE`` or ``PAYLOAD_SIM_YAML``, and
+each payload it simulates is a payload of exactly one of the
+configurations. See the `tcs-sim manual <tcs-sim.html>`__.
+
+.. code-block:: console
+
+   $ cargo run --bin tcs-sim -- --simulate=all \
+       --simulator=lander-sim.yaml lander-a.ytcs lander-b.ytcs
 
 The configuration file is the only argument tcspecial takes. Where it serves
 commands is in ``tcspecial.ytcs``:
@@ -5268,8 +5280,11 @@ waiting:
 ``--wait`` waits thirty seconds, or as many as ``--wait=<seconds>`` says, and
 exits with a failure saying what it last heard: nothing, which is a tcs-sim not
 running or an address that is wrong, or a simulator still starting, or one that
-failed or is set up for another run. A ground station of its own waits through
-``tcsmoc::simulator::wait``, or ``tcsmoc.simulator.wait`` in Python.
+failed or is set up for another run. A simulator given several configurations
+is waited for with the same files, in the same order, and the same
+``--simulator``: what it is set up for is a digest of them in that order. A
+ground station of its own waits through ``tcsmoc::simulator::wait``, or
+``tcsmoc.simulator.wait`` in Python.
 
 Each payload starts silent, until its panel's button is pressed, unless the
 simulator file says ``enable: true`` of it or of its group, and then it starts

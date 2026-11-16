@@ -27,7 +27,7 @@ pub const SETTINGS: &[&str] = &[];
 /// A joystick, as a physics model states it: by its name alone.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
-pub struct Joystick {
+pub struct Joystick34 {
     /// What it is called, which is how a connection, a simulated payload or
     /// tcs-sim's window names it.
     #[serde(rename = "component")]

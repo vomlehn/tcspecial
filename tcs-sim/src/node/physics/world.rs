@@ -55,7 +55,7 @@ use super::clock::Clock;
 use super::component::{Component, MOST_TERMINALS};
 use super::engine::Engine;
 use super::heater::Heater;
-use super::joystick::Joystick;
+use super::joystick_3_4::Joystick34;
 use super::lander::Lander;
 use super::load::Load;
 use super::queue::Queue;
@@ -148,7 +148,7 @@ impl World {
                     Resolution::Lander(figures) => {
                         Box::new(Lander::new(figures.clone()))
                     }
-                    Resolution::Joystick => Box::new(Joystick::default()),
+                    Resolution::Joystick34 => Box::new(Joystick34::default()),
                 };
                 (component.name.clone(), component.what.terminals(), made)
             })
@@ -344,6 +344,40 @@ impl World {
         (0..self.terminals[component].len())
             .map(|terminal| state.components[component].output(terminal))
             .collect()
+    }
+
+    /// Some of the records an output of the records kind sends now: see
+    /// [`Component::records`].
+    ///
+    /// # Arguments
+    ///
+    /// * `place` - The output.
+    /// * `from`  - The first record wanted, counting round.
+    /// * `most`  - How many are wanted at most.
+    /// * `now`   - The moment, on the wall clock.
+    /// * `out`   - Where their bytes are put.
+    ///
+    /// # Returns
+    ///
+    /// How many records it has in all, nought where it has none to send.
+    pub fn records(
+        &self,
+        place: Place,
+        from: usize,
+        most: usize,
+        now: Instant,
+        out: &mut Vec<u8>,
+    ) -> usize {
+        let mut state = self.held();
+        if let Some(seconds) = self.clock.started_at(now) {
+            self.advance_to(&mut state, seconds);
+        }
+        state.components[place.component].records(
+            place.terminal,
+            from,
+            most,
+            out,
+        )
     }
 
     /// Drives an input by hand, from tcs-sim's window: at a moment of the

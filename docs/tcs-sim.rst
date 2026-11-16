@@ -416,7 +416,8 @@ Each component is one simple part, of one of these types:
      pause                how long it stays down before it starts again:
                           "3 s"
 
-   joystick               two axes set by hand from tcs-sim's window
+   joystick_3_4           a three-armed joystick: two axes set by hand from
+                          tcs-sim's window
      component            the name connections, payloads and the window
                           use
 
@@ -427,7 +428,7 @@ kelvin a second. A fraction, which has no unit, is written bare. A
 refused, told the name it has now.
 
 Each type has fixed terminals, the places it is joined at, each an input or an
-output, carrying a value in one unit or a decision:
+output, carrying a value in one unit, a decision, or records:
 
 .. code-block:: text
 
@@ -463,7 +464,10 @@ output, carrying a value in one unit or a decision:
                   velocity      out   m/s, up more than nought
                   contact       out   a decision: asserted on the ground
    lander         throttle_x    in    a ratio, held within minus one and one
-                  throttle_y    in    a ratio, held within minus one and one
+                  throttle_y    in    a ratio, held within nought and one:
+                                      up only, from the engine on its
+                                      bottom, which once lit burns at no
+                                      less than a tenth
                   x, y          out   m, the place between its feet
                   velocity_x    out   m/s
                   velocity_y    out   m/s, up more than nought
@@ -475,7 +479,17 @@ output, carrying a value in one unit or a decision:
                   acceleration_x out  m/s2, its thrust over its mass
                   acceleration_y out  m/s2, its thrust over its mass and
                                       gravity, up more than nought
-   joystick       set_x         in    a ratio, driven by tcs-sim's window
+                  restart       in    a whole number: each new one other
+                                      than nought starts it again at once
+                  autorestart   in    a decision: while asserted, down it
+                                      starts again after its pause;
+                                      otherwise it stays down until it
+                                      is restarted
+                  sky           out   records: its stars, sent down
+                  sky_quench    in    a whole number: while it is the
+                                      sky's generation, the sky is not
+                                      sent
+   joystick_3_4   set_x         in    a ratio, driven by tcs-sim's window
                   set_y         in    a ratio, driven by tcs-sim's window
                   x, y          out   a ratio each, held within minus one
                                       and one
@@ -521,8 +535,11 @@ display. The moment any of its outline first meets the ground is found ahead
 of time, by looking along its path; it has landed if all of it is over the
 pad, it meets nothing but the pad, and it is going no faster than
 ``landing_speed`` down and ``landing_drift`` sideways, and has crashed
-otherwise, or if it leaves the display altogether. Down, it stays still for
-``pause``, and then starts again where it started, with a full tank. A
+otherwise. Leaving the display is not coming down: it flies on out of
+sight, and has crashed only if it drops below the display's bottom line,
+which goes on indefinitely to either side. Down, it stays still, until it
+is restarted or, with its ``autorestart`` asserted, for ``pause``; then it
+starts again where it started, with a full tank. A
 joystick gives out what tcs-sim's window sets it to, each axis held within
 minus one and one.
 
@@ -545,6 +562,10 @@ A payload joined to an output reports a value in the encoding of the conversion
 its readings go to, and a decision -- a lander's contact with the ground -- as
 the text ``1`` or ``0``: at once when it changes, waiting on the model for the
 moment rather than for its next turn, and again every packet interval. A
+payload joined to records -- a lander's ``sky`` -- sends four whole records
+a packet, never one split between two, every packet interval, round and
+round, and nothing while they are quenched: a lander's sky's records are each
+16 bytes, laid out as tcsprotocol's ``node::physics::lander`` says. A
 payload joined to an input drives it with what the vehicle sends: a whole
 number -- a set of lines, or a thermostat's decision as the ``u8`` a switch
 takes, a thermal mass's heater being on where it is not nought -- or a value,
@@ -988,27 +1009,32 @@ both. From the top:
   flashing on top of each mark; and the lander
   where it is, in white with thin black lines, so that it shows against
   the sky and the ground alike. What it is doing is said in its top
-  corner, *Flying*, *Landed* or *Crashed*, and on a landing a smiling face
+  corner, *Flying*, *Landed* or, on a crash, *On the Moon, no one can hear
+  you CRASH!*, and on a landing a smiling face
   is drawn over it until it starts again.
 * The fuel left, as a percentage and as a bar.
 * The lander's X and Y position, velocity and acceleration, each with its
   unit, and beside them:
-* The joystick, where the world has one: a square with a rectangle, as
-  thick as the square is wide, joined to each side. Press in the square and
-  drag: each axis reads on its own,
-  nought while the pointer is within the square's span along it, rising in a
-  straight line to one across a rectangle, positive to the right and up, and
-  held at one beyond it, so that a drag on a diagonal moves both. A dot
-  follows the pointer within the rectangle enclosing the plus, and when the
-  button is let go it goes back to the middle and both axes read nought. The
-  joystick's two axes, from minus one to one, are what its ``x`` and ``y``
-  give out, for the vehicle to read through the simulated payloads joined to
-  them.
+* The joystick, where the world has one: a square, its dead zone, with a
+  rectangle, as thick as the square is wide, extending from its left, right and
+  top -- the lander has no thrust down, so nothing below -- each hatched along
+  its outside a tenth of its travel apart. Press in the square and drag: each
+  axis reads on its own, nought while the pointer is within the square's span
+  along it, rising in a straight line to one across a rectangle, positive to the
+  right and up, and held at one beyond it, so that a drag on a diagonal moves
+  both; below the square, Y stays nought. At rest a plus is drawn across the
+  square; held, two lines track the pointer instead, a vertical one across the
+  left and right rectangles, from end to end, and a horizontal one across the
+  top rectangle, from halfway up the square to its far end. When the button is
+  let go the plus comes back and both axes read nought. The joystick's X, from
+  minus one to one, and Y, from nought to one, are what its ``x`` and ``y`` give
+  out, for the vehicle to read through the simulated payloads joined to them.
 
 At the foot of the pane are two buttons:
 
 ``Pause`` and ``Resume``
-  Halt the simulated world, and set it going again from where it stood: the
+  Halt the simulated world, and set it going again from where it stood --
+  the joystick takes nothing meanwhile: the
   lander hangs where it is, its fuel and speeds unchanged, and the payloads
   go on reporting it there. The time spent paused is left out of the
   world's time.
@@ -1018,10 +1044,25 @@ At the foot of the pane are two buttons:
   pilot would -- so through the vehicles, as a pilot's commands go: up to a
   height clear of the ground between it and the pad, across to above the
   pad, and down onto it, slowing to a metre a second at touchdown. A
-  landing is not certain: the fuel can run out. The joystick's dot shows
+  landing is not certain: the fuel can run out. The joystick's lines show
   where it holds the stick; taking hold of the joystick hands it back to
   you, and a landing or a crash stops it. Greyed out where the world has
   no joystick.
+
+Each of the lander's engines shows a plume while it fires -- the bottom
+engine's below its nozzle, a side thruster's out of the body's side, away
+from the way it pushes -- a warm off-white core in a pale orange glow,
+longer and brighter the harder it fires, as its thrust is worked out from
+the lander's acceleration and mass; none once the fuel is gone or the
+lander is down.
+
+A crash on the display explodes. A fireball, its size in proportion to the
+fuel left, swells from the lower part of the lander and fades over the
+pause, and the lander's debris flies from where it met the ground, spread
+over ninety degrees either side of the ground's perpendicular there, at a
+speed in proportion to the square of the speed it hit at; each fragment
+tumbles, and stops, half buried, where it lands. A crash off the display
+shows nothing.
 
 The pane watches the world without starting it: until a simulated payload
 first asks the world anything, which is when its run begins, the pane shows

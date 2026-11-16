@@ -49,11 +49,19 @@
                 <address>127.0.0.1:19600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:19700</ground_base>
+                <moc-out>autorestart.gateway</moc-out>
+                <world-in>sky</world-in>
                 <world-in>to_accel_x</world-in>
                 <world-in>to_fuel</world-in>
-                <world-in>to_joystick_x</world-in>
+                <world-in>to_joystick_3_4_x</world-in>
                 <world-in>to_velocity_x</world-in>
                 <world-in>to_x</world-in>
+            </gateway>
+            <gateway name="gateway_sky">
+                <address>127.0.0.1:19601</address>
+                <apid_base>0x480</apid_base>
+                <ground_base>127.0.0.1:19750</ground_base>
+                <moc-out>sky_quench.gateway_sky</moc-out>
             </gateway>
         </type>
     </gateways>
@@ -77,15 +85,15 @@
                 <world-out>gateway.to_fuel</world-out>
                 <world-in>fuel</world-in>
             </compute>
-            <compute name="to_joystick_x">
+            <compute name="to_joystick_3_4_x">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.0001</scale>
                 <type-in>i16</type-in>
                 <type-out>ratio</type-out>
-                <moc-out>thruster_x.to_joystick_x</moc-out>
-                <world-out>gateway.to_joystick_x</world-out>
-                <world-in>joystick_x</world-in>
+                <moc-out>thruster_x.to_joystick_3_4_x</moc-out>
+                <world-out>gateway.to_joystick_3_4_x</world-out>
+                <world-in>joystick_3_4_x</world-in>
             </compute>
             <compute name="to_velocity_x">
                 <function>to_value</function>
@@ -115,23 +123,39 @@
                 <world-out-type>i16</world-out-type>
                 <world-out>to_accel_x.accel_x</world-out>
             </payload>
+            <payload name="autorestart">
+                <address>127.0.0.1:19807</address>
+                <protocol>udp</protocol>
+                <moc-in>gateway</moc-in>
+            </payload>
             <payload name="fuel">
                 <address>127.0.0.1:19804</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_fuel.fuel</world-out>
             </payload>
-            <payload name="joystick_x">
+            <payload name="joystick_3_4_x">
                 <address>127.0.0.1:19805</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>to_joystick_x.joystick_x</world-out>
+                <world-out>to_joystick_3_4_x.joystick_3_4_x</world-out>
+            </payload>
+            <payload name="sky">
+                <read_size>64</read_size>
+                <address>127.0.0.1:19808</address>
+                <protocol>udp</protocol>
+                <world-out>gateway.sky</world-out>
+            </payload>
+            <payload name="sky_quench">
+                <address>127.0.0.1:19809</address>
+                <protocol>udp</protocol>
+                <moc-in>gateway_sky</moc-in>
             </payload>
             <payload name="thruster_x">
                 <address>127.0.0.1:19806</address>
                 <moc-in-type>ratio</moc-in-type>
                 <protocol>udp</protocol>
-                <moc-in>to_joystick_x</moc-in>
+                <moc-in>to_joystick_3_4_x</moc-in>
             </payload>
             <payload name="velocity_x">
                 <address>127.0.0.1:19802</address>

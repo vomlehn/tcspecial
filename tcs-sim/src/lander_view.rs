@@ -28,9 +28,10 @@ use tcsprotocol::node::physics::lander::{Point, Resolved};
 use tcsprotocol::node::physics::{Place, Resolution};
 use tcsprotocol::sim_config::SimConfigFile;
 
+use crate::node::physics::sky::{ground_at, stars};
 use crate::node::physics::world::World;
 use crate::payload::PayloadConfig;
-use crate::{LanderProbe, LanderScene, MainWindow, StarClass};
+use crate::{LanderProbe, LanderScene, MainWindow};
 
 /// The lander's outputs' places, in
 /// `tcsprotocol::node::physics::lander::TERMINALS`'s order.
@@ -45,51 +46,25 @@ const ACCELERATION_X: usize = 9;
 const ACCELERATION_Y: usize = 10;
 
 /// The joystick's inputs' places, in
-/// `tcsprotocol::node::physics::joystick::TERMINALS`'s order.
+/// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
 const SET_X: usize = 0;
 const SET_Y: usize = 1;
 
 /// The joystick's square's side, which is as thick as each of its
 /// rectangles, and how far each rectangle reaches beyond the square, in
-/// logical pixels: `ui/lander.slint`'s `Joystick`.
-const SQUARE: f32 = 25.2;
-const ARM: f32 = 70.0;
+/// logical pixels: `ui/lander.slint`'s `Joystick34`.
+const SQUARE: f32 = 9.45;
+const ARM: f32 = 105.0;
+
+/// What the pane says of a crashed lander.
+pub const CRASHED_SAID: &str = "On the Moon, no one can hear you CRASH!";
 
 /// How often the window is brought up to the world.
-const REFRESH: Duration = Duration::from_millis(50);
-
-/// How many stars the sky has.
-const STARS: usize = 300;
-
-/// The faintest star, as an apparent magnitude: about what the eye sees on a
-/// dark night. The brightest is nought.
-const FAINTEST: f64 = 6.0;
-
-/// How many times as many stars there are at each apparent magnitude as at
-/// the one brighter: about three, in the night sky.
-const MORE_EACH_MAGNITUDE: f64 = 3.0;
-
-/// The apparent magnitude at which a star has shrunk to a single pixel:
-/// brighter ones are disks, fainter ones single pixels, dimmer the fainter.
-const PIXEL_FROM: f64 = 3.0;
-
-/// The radius of the brightest star's disk, and of a single pixel's, in
-/// pixels.
-const BRIGHTEST_RADIUS: f64 = 2.0;
-const PIXEL_RADIUS: f64 = 0.5;
-
-/// How many classes of brightness the stars are drawn in: half of them
-/// disks, from the brightest to a single pixel, and half single pixels,
-/// dimming.
-const STAR_CLASSES: usize = 8;
+const REFRESH: Duration = Duration::from_millis(16);
 
 /// How wide the landscape is drawn, in logical pixels: `ui/lander.slint`'s
 /// scene, which a star's size in pixels is turned into metres by.
-const SCENE_WIDTH: f64 = 600.0;
-
-/// How far above the ground a star is at least, as a fraction of the
-/// display's height.
-const STAR_CLEARANCE: f64 = 0.02;
+const SCENE_WIDTH: f64 = tcsprotocol::node::physics::lander::SKY_WIDTH;
 
 /// The world's lander, and the joystick it is flown with if there is one.
 pub struct Scene {
@@ -100,7 +75,10 @@ pub struct Scene {
     /// What the model says of it.
     figures: Resolved,
     /// The joystick's place among the world's components.
-    joystick: Option<usize>,
+    joystick_3_4: Option<usize>,
+    /// What the window last saw of the lander, and its explosion while it
+    /// has crashed: see [`Watch`].
+    watch: RefCell<Watch>,
 }
 
 /// Finds the world's lander, if it has one.
@@ -133,15 +111,16 @@ pub fn scene(
                 _ => None,
             }
         })?;
-    let joystick = model
+    let joystick_3_4 = model
         .components
         .iter()
-        .position(|c| matches!(c.what, Resolution::Joystick));
+        .position(|c| matches!(c.what, Resolution::Joystick34));
     Some(Scene {
         world,
         lander,
         figures,
-        joystick,
+        joystick_3_4,
+        watch: RefCell::default(),
     })
 }
 
@@ -160,7 +139,19 @@ fn at(f: &Resolved, (x, y): Point) -> String {
     format!("{x:.2} {:.2}", f.height - y)
 }
 
-/// The ground and everything below it, filled.
+/// The ground's fill, grey with a little brown, and its line, dark brown,
+/// as the colours of a picture's pixel.
+const GROUND_FILL: [u8; 3] = [0xaa, 0xa1, 0x97];
+const GROUND_LINE: [u8; 3] = [0x3b, 0x31, 0x27];
+
+/// The width of the ground's line, in the scene's pixels.
+const GROUND_LINE_WIDTH: f64 = 1.5;
+
+/// The ground, painted once into a picture, as the sky is: everything below
+/// its line filled, softly at the edge, and the line along it, over nothing
+/// above it. One image costs the window the same each frame where the
+/// paths of the fill and the line were drawn again whenever the lander
+/// moved.
 ///
 /// # Arguments
 ///
@@ -168,27 +159,77 @@ fn at(f: &Resolved, (x, y): Point) -> String {
 ///
 /// # Returns
 ///
-/// The picture's commands.
-pub fn ground_fill(f: &Resolved) -> String {
-    let mut commands = format!("M {}", at(f, (0.0, 0.0)));
-    for &point in &f.ground {
-        commands.push_str(&format!(" L {}", at(f, point)));
+/// The picture, as large as [`sky`]'s.
+pub fn ground_picture(
+    f: &Resolved,
+) -> slint::SharedPixelBuffer<slint::Rgba8Pixel> {
+    let wide = (SCENE_WIDTH * SKY_DETAIL).round() as u32;
+    let high = (SCENE_WIDTH * SKY_DETAIL * f.height / f.width).round() as u32;
+    let mut picture =
+        slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(wide, high);
+    let pixels = picture.make_mut_slice();
+    let (sx, sy) = (f64::from(wide) / f.width, f64::from(high) / f.height);
+    // The line's points in the picture's pixels, Y down.
+    let line: Vec<Point> = f
+        .ground
+        .iter()
+        .map(|&(x, y)| (x * sx, (f.height - y) * sy))
+        .collect();
+    let half = GROUND_LINE_WIDTH * SKY_DETAIL / 2.0;
+    for px in 0..wide {
+        let cx = f64::from(px) + 0.5;
+        let edge = (f.height - ground_at(f, cx / sx)) * sy;
+        let from = (edge - half - 2.0).max(0.0) as u32;
+        for py in 0..high {
+            let cy = f64::from(py) + 0.5;
+            // How much of the pixel is below the line, softly at the edge.
+            let fill = (cy - edge + 0.5).clamp(0.0, 1.0);
+            // And how much of it the line covers, by its distance from the
+            // nearest stretch of it.
+            let stroke = if py >= from && cy <= edge + half + 2.0 {
+                let near = line
+                    .windows(2)
+                    .map(|pair| distance(pair[0], pair[1], (cx, cy)))
+                    .fold(f64::MAX, f64::min);
+                (half + 0.5 - near).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            if fill == 0.0 && stroke == 0.0 {
+                continue;
+            }
+            let mix = |a: u8, b: u8| {
+                (f64::from(a) * (1.0 - stroke) + f64::from(b) * stroke) as u8
+            };
+            let alpha = fill.max(stroke);
+            pixels[(py * wide + px) as usize] = slint::Rgba8Pixel::new(
+                mix(GROUND_FILL[0], GROUND_LINE[0]),
+                mix(GROUND_FILL[1], GROUND_LINE[1]),
+                mix(GROUND_FILL[2], GROUND_LINE[2]),
+                (alpha * 255.0) as u8,
+            );
+        }
     }
-    commands.push_str(&format!(" L {} Z", at(f, (f.width, 0.0))));
-    commands
+    picture
 }
 
-/// The ground's line.
+/// How far a point is from a stretch of line.
 ///
 /// # Arguments
 ///
-/// * `f` - The lander's figures.
+/// * `a`     - The stretch's one end.
+/// * `b`     - Its other.
+/// * `point` - The point.
 ///
 /// # Returns
 ///
-/// The picture's commands.
-pub fn ground_line(f: &Resolved) -> String {
-    polyline(f, &f.ground, (0.0, 0.0))
+/// The distance, in the units the three are in.
+fn distance(a: Point, b: Point, point: Point) -> f64 {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let along = (((point.0 - a.0) * dx + (point.1 - a.1) * dy)
+        / (dx * dx + dy * dy))
+        .clamp(0.0, 1.0);
+    (a.0 + along * dx - point.0).hypot(a.1 + along * dy - point.1)
 }
 
 /// The pad: its level line, and an upright line at each end, so that it is
@@ -255,6 +296,112 @@ pub fn pad_lights(f: &Resolved) -> String {
 /// True while they are lit.
 pub fn pad_lit(seconds: f64) -> bool {
     seconds.rem_euclid(PAD_FLASH) < PAD_FLASH / 2.0
+}
+
+/// The radius of each of the lander's lights, in pixels.
+const LANDER_LIGHT: f64 = 1.5;
+
+/// How long the lander's white lights take to flash again, and how long each
+/// flash lasts, in seconds: brief, as an aircraft's strobes are.
+const STROBE_EVERY: f64 = 1.0;
+const STROBE_FOR: f64 = 0.15;
+
+/// The lander's upper stage, the cabin: the shape of its outline that
+/// reaches highest.
+///
+/// # Arguments
+///
+/// * `f` - The lander's figures.
+///
+/// # Returns
+///
+/// Its left, right, bottom and top, in metres from the place between the
+/// lander's feet; `None` where the outline has no shape.
+fn cabin(f: &Resolved) -> Option<(f64, f64, f64, f64)> {
+    let top = |line: &Vec<Point>| {
+        line.iter().map(|&(_, y)| y).fold(f64::MIN, f64::max)
+    };
+    let line = f
+        .outline
+        .iter()
+        .filter(|line| line.len() > 2)
+        .max_by(|a, b| top(a).total_cmp(&top(b)))?;
+    let fold = |pick: fn(&Point) -> f64, best: fn(f64, f64) -> f64, from| {
+        line.iter().map(pick).fold(from, best)
+    };
+    Some((
+        fold(|p| p.0, f64::min, f64::MAX),
+        fold(|p| p.0, f64::max, f64::MIN),
+        fold(|p| p.1, f64::min, f64::MAX),
+        fold(|p| p.1, f64::max, f64::MIN),
+    ))
+}
+
+/// The lander's lights, where it is. The display shows the lander's right
+/// side, its front to the display's right: so the steady green light on the
+/// right of its cabin, as an aircraft's right is green, faces the viewer, in
+/// the middle of the cabin, and the flashing white lights are on the
+/// cabin's top and its rear, the display's left, and on the front of the
+/// nozzle, halfway up it.
+///
+/// # Arguments
+///
+/// * `f`     - The lander's figures.
+/// * `place` - Where the place between its feet is, in metres.
+///
+/// # Returns
+///
+/// The green light's picture commands and the white lights', each empty
+/// where the outline has no cabin.
+pub fn lander_lights(f: &Resolved, place: Point) -> (String, String) {
+    let Some((left, right, bottom, top)) = cabin(f) else {
+        return (String::new(), String::new());
+    };
+    let r = LANDER_LIGHT * f.width / SCENE_WIDTH;
+    let (x, y) = place;
+    let (middle, half) = ((left + right) / 2.0, (bottom + top) / 2.0);
+    // The nozzle: the shape straight below the cabin's middle that reaches
+    // lowest, not the legs' feet to either side. Its front is its right,
+    // the lander facing right.
+    let bounds = |line: &Vec<Point>| {
+        line.iter().fold(
+            (f64::MAX, f64::MIN, f64::MAX, f64::MIN),
+            |(l, r, b, t), &(x, y)| (l.min(x), r.max(x), b.min(y), t.max(y)),
+        )
+    };
+    let nozzle = f
+        .outline
+        .iter()
+        .filter(|line| line.len() > 2)
+        .map(bounds)
+        .filter(|&(l, r, _, _)| (l..=r).contains(&middle))
+        .min_by(|a, b| a.2.total_cmp(&b.2));
+    let front =
+        nozzle.map_or((middle, bottom), |(_, r, b, t)| (r, (b + t) / 2.0));
+    let green = circle(f, (x + middle, y + half), r);
+    let white = [
+        (x + middle, y + top),
+        (x + front.0, y + front.1),
+        (x + left, y + half),
+    ]
+    .iter()
+    .map(|&at| circle(f, at, r))
+    .collect::<Vec<_>>()
+    .join(" ");
+    (green, white)
+}
+
+/// Whether the lander's white lights are flashing at a moment.
+///
+/// # Arguments
+///
+/// * `seconds` - The time since the window opened, in seconds.
+///
+/// # Returns
+///
+/// True during each brief flash.
+pub fn strobe_lit(seconds: f64) -> bool {
+    seconds.rem_euclid(STROBE_EVERY) < STROBE_FOR
 }
 
 /// How far above the highest ground on its way the autopilot keeps the
@@ -346,8 +493,10 @@ impl Autopilot {
                 .min(f.height - top);
             (0.4 * (safe - y)).clamp(-DESCENT, DESCENT)
         };
+        // Up only: there is no thruster on the top to push it down, which
+        // gravity does.
         let throttle_y = (RESPONSE * (want_vy - vy) + f.gravity) / up;
-        (throttle_x.clamp(-1.0, 1.0), throttle_y.clamp(-1.0, 1.0))
+        (throttle_x.clamp(-1.0, 1.0), throttle_y.clamp(0.0, 1.0))
     }
 }
 
@@ -411,84 +560,317 @@ fn polyline(f: &Resolved, points: &[Point], by: Point) -> String {
     commands
 }
 
-/// The ground's height at a place across the display.
+/// How many pixels the sky's picture has for each of the scene's: enough
+/// that it stays sharp as the window is made larger.
+const SKY_DETAIL: f64 = 2.0;
+
+/// The sky, painted once into a picture: drawn as one image, it costs the
+/// window the same each frame however many stars there are, where a path
+/// for each was drawn again whenever the lander moved.
 ///
 /// # Arguments
 ///
 /// * `f` - The lander's figures.
-/// * `x` - The place, in metres.
 ///
 /// # Returns
 ///
-/// The height, in metres, along the line between the ground's points
-/// either side.
-fn ground_at(f: &Resolved, x: f64) -> f64 {
-    for pair in f.ground.windows(2) {
-        let ((x0, y0), (x1, y1)) = (pair[0], pair[1]);
-        if x <= x1 {
-            return y0 + (y1 - y0) * (x - x0) / (x1 - x0);
+/// The picture, white stars on nothing, as wide as the scene is drawn at
+/// first times [`SKY_DETAIL`], and as tall as the display's proportions
+/// make that.
+pub fn sky(f: &Resolved) -> slint::SharedPixelBuffer<slint::Rgba8Pixel> {
+    let wide = (SCENE_WIDTH * SKY_DETAIL).round() as u32;
+    let high = (SCENE_WIDTH * SKY_DETAIL * f.height / f.width).round() as u32;
+    let mut picture =
+        slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(wide, high);
+    let pixels = picture.make_mut_slice();
+    for ((x, y), radius, brightness) in stars(f) {
+        let cx = x / f.width * f64::from(wide);
+        let cy = (1.0 - y / f.height) * f64::from(high);
+        let r = radius * SKY_DETAIL;
+        let reach = r.ceil() as i64 + 1;
+        for py in (cy as i64 - reach)..=(cy as i64 + reach) {
+            for px in (cx as i64 - reach)..=(cx as i64 + reach) {
+                if px < 0 || py < 0 || px >= wide as i64 || py >= high as i64 {
+                    continue;
+                }
+                // How much of the pixel the disk covers, softly at its edge.
+                let d = (px as f64 + 0.5 - cx).hypot(py as f64 + 0.5 - cy);
+                let cover = (r + 0.5 - d).clamp(0.0, 1.0);
+                let alpha = (cover * f64::from(brightness) * 255.0) as u8;
+                let pixel =
+                    &mut pixels[(py as u32 * wide + px as u32) as usize];
+                if alpha > pixel.a {
+                    *pixel = slint::Rgba8Pixel::new(255, 255, 255, alpha);
+                }
+            }
         }
     }
-    f.ground.last().map_or(0.0, |&(_, y)| y)
+    picture
 }
 
-/// An apparent magnitude drawn at random, as the night sky's are: each
-/// magnitude [`MORE_EACH_MAGNITUDE`] times as common as the one brighter,
-/// from nought to [`FAINTEST`].
-///
-/// # Arguments
-///
-/// * `u` - A number drawn evenly from nought to one.
-///
-/// # Returns
-///
-/// The magnitude.
-pub fn magnitude(u: f64) -> f64 {
-    let k = MORE_EACH_MAGNITUDE;
-    (1.0 + u * (k.powf(FAINTEST) - 1.0)).ln() / k.ln()
+/// The radius the fireball grows to for each kilogram of fuel left at the
+/// crash, in metres: about sixty for a full tank of 500 kg.
+const FIRE_PER_KG: f64 = 0.12;
+
+/// How quickly the fireball grows, in seconds: most of the way in this.
+const FIRE_GROWS: f64 = 0.4;
+
+/// How fast the debris flies for each (metre a second) squared of the speed
+/// the lander hit at, in seconds a metre: 8 m/s from a 20 m/s impact, 18
+/// from 30, so that most of it lands within the display.
+const DEBRIS_PER_SPEED_SQUARED: f64 = 0.02;
+
+/// How many fragments the lander breaks into.
+const FRAGMENTS: usize = 24;
+
+/// Half a fragment's width, in pixels: large enough that one stopped half
+/// buried in the ground is still plain to see.
+const FRAGMENT_SIZE: f64 = 3.0;
+
+/// The slowest and fastest a fragment tumbles, in turns a second, either
+/// way round.
+const SLOWEST_SPIN: f64 = 0.2;
+const FASTEST_SPIN: f64 = 3.0;
+
+/// The step a fragment's flight is followed in, in seconds.
+const FRAGMENT_STEP: f64 = 0.01;
+
+/// What the window last saw of the lander, and its explosion while it has
+/// crashed.
+#[derive(Debug, Default)]
+pub struct Watch {
+    /// Where it was, how fast it was going and how much fuel it had, the
+    /// last time it was seen flying: what it crashed with.
+    flying: Option<Flying>,
+    /// Whether it had crashed then.
+    crashed: bool,
+    /// Its explosion, from the crash until it starts again.
+    explosion: Option<Explosion>,
 }
 
-/// The class a star of an apparent magnitude is drawn in, and how that
-/// class is drawn.
-///
-/// # Arguments
-///
-/// * `m` - The magnitude.
-///
-/// # Returns
-///
-/// The class, from nought, the brightest; its radius, in pixels; and its
-/// brightness, from nought to one.
-pub fn star_class(m: f64) -> (usize, f64, f32) {
-    let width = FAINTEST / STAR_CLASSES as f64;
-    let class = ((m / width) as usize).min(STAR_CLASSES - 1);
-    let middle = (class as f64 + 0.5) * width;
-    if middle < PIXEL_FROM {
-        // A disk, shrinking with the magnitude to a single pixel.
-        let disks = (PIXEL_FROM / width).round().max(1.0) - 1.0;
-        let along = if disks > 0.0 {
-            class as f64 / disks
-        } else {
-            1.0
+/// The lander as last seen flying.
+#[derive(Debug, Clone, Copy)]
+struct Flying {
+    /// Where the place between its feet was, in metres.
+    place: Point,
+    /// Its velocity, in metres a second.
+    velocity: Point,
+    /// The fuel it had, in kilograms.
+    fuel: f64,
+}
+
+/// A crashed lander's explosion: a fireball of its fuel and a spray of its
+/// debris.
+#[derive(Debug)]
+pub struct Explosion {
+    /// When it began, in simulated seconds.
+    began: f64,
+    /// The fireball's middle, on the lower part of the lander, in metres.
+    centre: Point,
+    /// The radius the fireball grows to, in metres.
+    fire: f64,
+    /// Each fragment of debris.
+    fragments: Vec<Fragment>,
+}
+
+/// One fragment of a crashed lander.
+#[derive(Debug, Clone, Copy)]
+struct Fragment {
+    /// Where it is, in metres.
+    place: Point,
+    /// Its velocity, in metres a second.
+    velocity: Point,
+    /// Which way it is turned, in radians.
+    angle: f64,
+    /// How fast it tumbles, in radians a second, either way round.
+    spin: f64,
+    /// The simulated time it is followed to, in seconds from the crash.
+    at: f64,
+    /// Whether it has hit the ground and stopped there.
+    stopped: bool,
+}
+
+impl Explosion {
+    /// The explosion of a lander that crashed as it was last seen flying.
+    ///
+    /// The fireball is centred on the lower part of the lander and grows to
+    /// a radius proportional to the fuel left. The debris flies from where
+    /// the lander met the ground, at a speed proportional to the square of
+    /// its speed then, spread over ninety degrees either side of the
+    /// perpendicular to the ground there.
+    ///
+    /// # Arguments
+    ///
+    /// * `f`      - The lander's figures.
+    /// * `flying` - The lander as last seen flying.
+    /// * `began`  - When it crashed, in simulated seconds.
+    ///
+    /// # Returns
+    ///
+    /// The explosion; `None` where the lander was off the display, which
+    /// has no ground to explode on.
+    fn of(f: &Resolved, flying: Flying, began: f64) -> Option<Explosion> {
+        let (x, y) = flying.place;
+        if !(0.0..=f.width).contains(&x) || y > f.height {
+            return None;
+        }
+        let (_, _, bottom, top) = f.extent();
+        let centre = (x, y + bottom + 0.25 * (top - bottom));
+        // The ground the lander met: the stretch under it, and the
+        // perpendicular to it, pointing up out of it.
+        let pair = f
+            .ground
+            .windows(2)
+            .find(|pair| x <= pair[1].0)
+            .unwrap_or(&f.ground[f.ground.len() - 2..]);
+        let (dx, dy) = (pair[1].0 - pair[0].0, pair[1].1 - pair[0].1);
+        let length = dx.hypot(dy);
+        let normal = (-dy / length, dx / length);
+        let contact = (x, ground_at(f, x).max(y.min(ground_at(f, x) + 1.0)));
+        // xorshift64, from the moment and the place.
+        let mut state = (began.to_bits() ^ x.to_bits().rotate_left(17)) | 1;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 11) as f64 / (1u64 << 53) as f64
         };
-        let radius =
-            BRIGHTEST_RADIUS - along * (BRIGHTEST_RADIUS - PIXEL_RADIUS);
-        (class, radius, 1.0)
-    } else {
-        // A single pixel, a fifth of a magnitude's dimming for each
-        // magnitude: gentler than the sky's own, so that the faintest still
-        // show on a screen.
-        let bright = 10f64.powf(-0.2 * (middle - PIXEL_FROM));
-        (class, PIXEL_RADIUS, bright as f32)
+        let speed = flying.velocity.0.hypot(flying.velocity.1);
+        let fastest = DEBRIS_PER_SPEED_SQUARED * speed * speed;
+        let up = normal.1.atan2(normal.0);
+        let fragments = (0..FRAGMENTS)
+            .map(|_| {
+                let angle = up + (next() - 0.5) * std::f64::consts::PI;
+                let pace = fastest * (0.3 + 0.7 * next());
+                let turns =
+                    SLOWEST_SPIN + next() * (FASTEST_SPIN - SLOWEST_SPIN);
+                let way = if next() < 0.5 { -1.0 } else { 1.0 };
+                Fragment {
+                    angle: next() * std::f64::consts::TAU,
+                    spin: way * turns * std::f64::consts::TAU,
+                    place: (
+                        contact.0 + 0.5 * normal.0,
+                        contact.1 + 0.5 * normal.1,
+                    ),
+                    velocity: (pace * angle.cos(), pace * angle.sin()),
+                    at: 0.0,
+                    stopped: false,
+                }
+            })
+            .collect();
+        Some(Explosion {
+            began,
+            centre,
+            fire: FIRE_PER_KG * flying.fuel.max(0.0),
+            fragments,
+        })
+    }
+
+    /// Follows each fragment to a moment: falling under the Moon's gravity
+    /// until it first meets the ground, where it stops, half buried, however
+    /// fast it was going.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - The lander's figures.
+    /// * `t` - The moment, in seconds from the crash.
+    fn follow(&mut self, f: &Resolved, t: f64) {
+        for fragment in &mut self.fragments {
+            while !fragment.stopped && fragment.at < t {
+                let step = FRAGMENT_STEP.min(t - fragment.at);
+                let (x, y) = fragment.place;
+                let (vx, vy) = fragment.velocity;
+                let next = (x + vx * step, y + vy * step);
+                fragment.velocity.1 -= f.gravity * step;
+                fragment.angle += fragment.spin * step;
+                fragment.at += step;
+                if !(0.0..=f.width).contains(&next.0) {
+                    fragment.place = next;
+                    fragment.stopped = true;
+                } else if next.1 <= ground_at(f, next.0) {
+                    fragment.place = (next.0, ground_at(f, next.0));
+                    fragment.stopped = true;
+                } else {
+                    fragment.place = next;
+                }
+            }
+        }
+    }
+
+    /// The explosion's pictures at a moment.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - The lander's figures.
+    /// * `t` - The moment, in seconds from the crash.
+    ///
+    /// # Returns
+    ///
+    /// The fireball's outer cloud, its flame and its core, each as picture
+    /// commands; how much of it is left, from one at the crash to nought
+    /// at the restart; and the debris's commands.
+    fn pictures(&self, f: &Resolved, t: f64) -> ([String; 3], f32, String) {
+        let lasts = f.pause.as_secs_f64().max(1.0);
+        let flicker = 1.0 + 0.06 * (23.0 * t).sin();
+        let radius = self.fire * (1.0 - (-t / FIRE_GROWS).exp()) * flicker;
+        let ring = |share: f64| {
+            if radius * share > 0.0 {
+                circle(f, self.centre, radius * share)
+            } else {
+                String::new()
+            }
+        };
+        let left = (1.0 - t / lasts).clamp(0.0, 1.0) as f32;
+        let size = FRAGMENT_SIZE * f.width / SCENE_WIDTH;
+        let debris = self
+            .fragments
+            .iter()
+            .filter(|fragment| (0.0..=f.width).contains(&fragment.place.0))
+            .map(|fragment| {
+                // A square, turned as far as it has tumbled.
+                let (x, y) = fragment.place;
+                let (sin, cos) = fragment.angle.sin_cos();
+                let corner = |u: f64, v: f64| {
+                    at(
+                        f,
+                        (
+                            x + size * (u * cos - v * sin),
+                            y + size * (u * sin + v * cos),
+                        ),
+                    )
+                };
+                format!(
+                    "M {} L {} L {} L {} Z",
+                    corner(-1.0, -1.0),
+                    corner(1.0, -1.0),
+                    corner(1.0, 1.0),
+                    corner(-1.0, 1.0),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        ([ring(1.0), ring(0.75), ring(0.45)], left, debris)
     }
 }
 
-/// The stars in the sky, each somewhere above the ground, in classes by
-/// their apparent brightness: the brightest small disks, shrinking to a
-/// single pixel, and the fainter single pixels, dimmer the fainter.
-///
-/// Placed by a little generator seeded from the landscape, so that one
-/// landscape has one sky, and the same each time the window is opened.
+/// How long the bottom engine's plume is at full thrust, and a side
+/// thruster's, in metres.
+const PLUME_LONGEST: f64 = 40.0;
+const SIDE_PLUME_LONGEST: f64 = 20.0;
+
+/// How much wider a plume is at its tip than where it leaves its engine:
+/// a plume spreads in a vacuum.
+const PLUME_SPREADS: f64 = 2.0;
+
+/// How long and how wide a plume's core is, as shares of its glow's.
+const CORE_LENGTH: f64 = 0.6;
+const CORE_WIDTH: f64 = 0.6;
+
+/// How wide a side thruster is where its plume leaves it, in metres.
+const SIDE_NOZZLE: f64 = 2.0;
+
+/// The left, right, bottom and top of each of the lander's shapes, in
+/// metres from the place between its feet.
 ///
 /// # Arguments
 ///
@@ -496,46 +878,149 @@ pub fn star_class(m: f64) -> (usize, f64, f32) {
 ///
 /// # Returns
 ///
-/// Each class's picture commands, and its brightness, from nought to one,
-/// the brightest first.
-pub fn stars(f: &Resolved) -> Vec<(String, f32)> {
-    // xorshift64, from the ground's points.
-    let mut state = f
-        .ground
+/// One for each shape, a line of more than two points, in the outline's
+/// order.
+fn shape_bounds(f: &Resolved) -> Vec<(f64, f64, f64, f64)> {
+    f.outline
         .iter()
-        .fold(0x9E37_79B9_7F4A_7C15_u64, |h, &(x, y)| {
-            (h ^ x.to_bits()).rotate_left(23) ^ y.to_bits()
+        .filter(|line| line.len() > 2)
+        .map(|line| {
+            line.iter().fold(
+                (f64::MAX, f64::MIN, f64::MAX, f64::MIN),
+                |(l, r, b, t), &(x, y)| {
+                    (l.min(x), r.max(x), b.min(y), t.max(y))
+                },
+            )
         })
-        | 1;
-    let mut next = move || {
-        state ^= state << 13;
-        state ^= state >> 7;
-        state ^= state << 17;
-        (state >> 11) as f64 / (1u64 << 53) as f64
-    };
-    let metres = f.width / SCENE_WIDTH;
-    let mut classes: Vec<(String, f32)> = (0..STAR_CLASSES)
-        .map(|class| {
-            let middle = (class as f64 + 0.5) * FAINTEST / STAR_CLASSES as f64;
-            (String::new(), star_class(middle).2)
-        })
-        .collect();
-    for _ in 0..STARS {
-        let x = next() * f.width;
-        let lowest = ground_at(f, x) + STAR_CLEARANCE * f.height;
-        let (u, height) = (next(), next());
-        if lowest >= f.height {
-            continue;
-        }
-        let y = lowest + height * (f.height - lowest);
-        let (class, radius, _) = star_class(magnitude(u));
-        let commands = &mut classes[class].0;
-        if !commands.is_empty() {
-            commands.push(' ');
-        }
-        commands.push_str(&circle(f, (x, y), radius * metres));
+        .collect()
+}
+
+/// A plume as a picture: a quadrilateral leaving its engine's mouth and
+/// spreading to its tip.
+///
+/// # Arguments
+///
+/// * `f`      - The lander's figures.
+/// * `mouth`  - The middle of the engine's mouth, in metres.
+/// * `toward` - Which way the plume goes, a unit vector.
+/// * `width`  - How wide the mouth is, in metres.
+/// * `length` - How long the plume is, in metres.
+///
+/// # Returns
+///
+/// The picture's commands; empty for a plume of no length.
+fn plume(
+    f: &Resolved,
+    mouth: Point,
+    toward: Point,
+    width: f64,
+    length: f64,
+) -> String {
+    if length <= 0.0 {
+        return String::new();
     }
-    classes
+    let across = (-toward.1, toward.0);
+    let tip = (mouth.0 + toward.0 * length, mouth.1 + toward.1 * length);
+    let (near, far) = (width / 2.0, width * PLUME_SPREADS / 2.0);
+    let corner = |at: Point, half: f64, side: f64| {
+        let (x, y) = at;
+        self::at(f, (x + across.0 * half * side, y + across.1 * half * side))
+    };
+    format!(
+        "M {} L {} L {} L {} Z",
+        corner(mouth, near, -1.0),
+        corner(mouth, near, 1.0),
+        corner(tip, far, 1.0),
+        corner(tip, far, -1.0),
+    )
+}
+
+/// The plumes of the lander's engines, as its outputs say they are firing:
+/// the bottom engine's out of the nozzle's foot, pointing down, and a side
+/// thruster's out of the body's side, the left one firing to push it right
+/// and the right one to push it left. Each is as long as its thrust is a
+/// share of its full thrust, worked out from the lander's acceleration and
+/// its mass, so that a plume goes out with the fuel; none while it is
+/// down.
+///
+/// # Arguments
+///
+/// * `f`   - The lander's figures.
+/// * `out` - Its terminals' values, in its type's order.
+///
+/// # Returns
+///
+/// The bottom engine's glow and core, and the side thruster's, each as
+/// picture commands, and how hard each is firing, from nought to one.
+pub fn plumes(f: &Resolved, out: &[f64]) -> ([String; 4], f32, f32) {
+    let none = || {
+        (
+            [String::new(), String::new(), String::new(), String::new()],
+            0.0,
+            0.0,
+        )
+    };
+    if out[LANDED] > 0.5 || out[CRASHED] > 0.5 {
+        return none();
+    }
+    let mass = f.dry_mass + out[FUEL].clamp(0.0, 1.0) * f.fuel;
+    let down = (out[ACCELERATION_Y] + f.gravity) * mass / f.thrust_y;
+    let across = out[ACCELERATION_X] * mass / f.thrust_x;
+    let (down, across) = (down.clamp(0.0, 1.0), across.clamp(-1.0, 1.0));
+    let place = (out[X], out[Y]);
+    let shapes = shape_bounds(f);
+    let Some(&(left, right, bottom, top)) =
+        shapes.iter().max_by(|a, b| a.3.total_cmp(&b.3))
+    else {
+        return none();
+    };
+    let middle = (left + right) / 2.0;
+    // The nozzle: the shape below the cabin's middle that reaches lowest;
+    // the body: the widest shape.
+    let nozzle = shapes
+        .iter()
+        .filter(|&&(l, r, _, _)| (l..=r).contains(&middle))
+        .min_by(|a, b| a.2.total_cmp(&b.2))
+        .copied()
+        .unwrap_or((left, right, bottom, top));
+    let body = shapes
+        .iter()
+        .max_by(|a, b| (a.1 - a.0).total_cmp(&(b.1 - b.0)))
+        .copied()
+        .unwrap_or(nozzle);
+    let main = |share: f64, wide: f64| {
+        plume(
+            f,
+            (place.0 + (nozzle.0 + nozzle.1) / 2.0, place.1 + nozzle.2),
+            (0.0, -1.0),
+            (nozzle.1 - nozzle.0) * wide,
+            PLUME_LONGEST * down * share,
+        )
+    };
+    let side_mouth = if across > 0.0 {
+        (place.0 + body.0, place.1 + (body.2 + body.3) / 2.0)
+    } else {
+        (place.0 + body.1, place.1 + (body.2 + body.3) / 2.0)
+    };
+    let side = |share: f64, wide: f64| {
+        plume(
+            f,
+            side_mouth,
+            (-across.signum(), 0.0),
+            SIDE_NOZZLE * wide,
+            SIDE_PLUME_LONGEST * across.abs() * share,
+        )
+    };
+    (
+        [
+            main(1.0, 1.0),
+            main(CORE_LENGTH, CORE_WIDTH),
+            side(1.0, 1.0),
+            side(CORE_LENGTH, CORE_WIDTH),
+        ],
+        down as f32,
+        across.abs() as f32,
+    )
 }
 
 /// The lander's shapes or its single lines, where the place between its
@@ -599,6 +1084,7 @@ fn circle(f: &Resolved, (x, y): Point, radius: f64) -> String {
 pub fn face(f: &Resolved, place: Point) -> String {
     let (x0, x1, y0, y1) = f.extent();
     let centre = (place.0 + (x0 + x1) / 2.0, place.1 + (y0 + y1) / 2.0);
+    // Three fifths of the lander, which it grows with.
     let r = 0.6 * (x1 - x0).min(y1 - y0) / 2.0;
     let eye = r * 0.14;
     let (cx, cy) = centre;
@@ -632,8 +1118,12 @@ pub fn face(f: &Resolved, place: Point) -> String {
 ///
 /// # Returns
 ///
-/// The X axis and the Y axis, each within minus one and one, and the dot's
-/// place from the square's middle, right and down, in logical pixels.
+/// The X axis, within minus one and one, and the Y axis, within nought and
+/// one -- there is no arm below the square, the lander having no thruster to
+/// push it down -- and where the two tracking lines go, from the square's
+/// middle, right and down, in logical pixels: the vertical one from the left
+/// end of the left arm to the right end of the right one, and the
+/// horizontal one from halfway up the square to the top arm's far end.
 pub fn axes(dx: f32, dy: f32) -> (f64, f64, f32, f32) {
     let half = SQUARE / 2.0;
     let reach = half + ARM;
@@ -647,9 +1137,9 @@ pub fn axes(dx: f32, dy: f32) -> (f64, f64, f32, f32) {
     };
     (
         along(dx),
-        -along(dy),
+        (-along(dy)).max(0.0),
         dx.clamp(-reach, reach),
-        dy.clamp(-reach, reach),
+        dy.clamp(-reach, 0.0),
     )
 }
 
@@ -676,7 +1166,9 @@ fn hold_stick(ui: &MainWindow, scene: &Scene, stick: usize, axes: (f64, f64)) {
     }
     let pane = ui.global::<LanderScene>();
     pane.set_dot_x(dot_of(axes.0));
-    pane.set_dot_y(-dot_of(axes.1));
+    // The horizontal line halfway up the square for no thrust, and out
+    // along the top arm for more.
+    pane.set_dot_y(-dot_of(axes.1.max(0.0)));
 }
 
 /// Makes room in tcs-sim's window for the lander's pane, at the left of its
@@ -712,7 +1204,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     let scene = Rc::new(scene);
     // The autopilot, while it flies the lander: see `Autopilot`.
     let pilot: Rc<RefCell<Option<Autopilot>>> = Rc::default();
-    pane.set_has_joystick(scene.joystick.is_some());
+    pane.set_has_joystick_3_4(scene.joystick_3_4.is_some());
     {
         let held = Rc::clone(&scene);
         let weak = ui.as_weak();
@@ -728,7 +1220,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             }
         });
     }
-    if let Some(stick) = scene.joystick {
+    if let Some(stick) = scene.joystick_3_4 {
         let held = Rc::clone(&scene);
         let flying = Rc::clone(&pilot);
         let weak = ui.as_weak();
@@ -744,11 +1236,16 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             ui.global::<LanderScene>().set_autoland(flying.is_some());
         });
     }
-    if let Some(stick) = scene.joystick {
+    if let Some(stick) = scene.joystick_3_4 {
         let held = Rc::clone(&scene);
         let flying = Rc::clone(&pilot);
         let weak = ui.as_weak();
         pane.on_stick_moved(move |dx, dy| {
+            // Paused, the joystick takes nothing: the window does not take
+            // hold of it either.
+            if held.world.paused() {
+                return;
+            }
             // The pilot takes over from the autopilot.
             if flying.borrow_mut().take().is_some() {
                 if let Some(ui) = weak.upgrade() {
@@ -826,7 +1323,9 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
 /// * `scene` - The world's lander.
 /// * `pilot` - The autopilot, while it flies.
 fn fly(ui: &MainWindow, scene: &Scene, pilot: &RefCell<Option<Autopilot>>) {
-    let Some(stick) = scene.joystick else { return };
+    let Some(stick) = scene.joystick_3_4 else {
+        return;
+    };
     let mut flying = pilot.borrow_mut();
     let Some(autopilot) = flying.as_mut() else {
         return;
@@ -855,18 +1354,10 @@ fn fly(ui: &MainWindow, scene: &Scene, pilot: &RefCell<Option<Autopilot>>) {
 fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
     pane.set_world_width(f.width as f32);
     pane.set_world_height(f.height as f32);
-    pane.set_ground_fill(ground_fill(f).into());
-    pane.set_ground_line(ground_line(f).into());
+    pane.set_ground(slint::Image::from_rgba8(ground_picture(f)));
     pane.set_pad(pad(f).into());
     pane.set_pad_lights(pad_lights(f).into());
-    let classes: Vec<StarClass> = stars(f)
-        .into_iter()
-        .map(|(commands, brightness)| StarClass {
-            commands: commands.into(),
-            brightness,
-        })
-        .collect();
-    pane.set_stars(slint::ModelRc::new(slint::VecModel::from(classes)));
+    pane.set_sky(slint::Image::from_rgba8(sky(f)));
 }
 
 /// Brings the window up to the world, and the stars to how bright they are
@@ -878,9 +1369,63 @@ fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
 /// * `scene`   - The world's lander.
 /// * `seconds` - The time since the window opened, in seconds.
 fn show(pane: &LanderScene<'_>, scene: &Scene, seconds: f64) {
-    let out = scene.world.glance_component(scene.lander, Instant::now());
-    paint(pane, &scene.figures, &out);
+    let now = Instant::now();
+    let out = scene.world.glance_component(scene.lander, now);
+    let f = &scene.figures;
+    paint(pane, f, &out);
     pane.set_pad_lit(pad_lit(seconds));
+    pane.set_strobe_lit(strobe_lit(seconds));
+
+    // A crash explodes, from the crash until the lander starts again; the
+    // lander is gone meanwhile.
+    let mut watch = scene.watch.borrow_mut();
+    let crashed = out[CRASHED] > 0.5;
+    if !crashed {
+        watch.flying = Some(Flying {
+            place: (out[X], out[Y]),
+            velocity: (out[VELOCITY_X], out[VELOCITY_Y]),
+            fuel: out[FUEL].clamp(0.0, 1.0) * f.fuel,
+        });
+        watch.explosion = None;
+    } else if !watch.crashed {
+        let began = scene.world.seconds(now);
+        watch.explosion = watch
+            .flying
+            .and_then(|flying| Explosion::of(f, flying, began));
+    }
+    watch.crashed = crashed;
+    let shown = watch.explosion.as_mut().map(|explosion| {
+        let t = scene.world.seconds(now) - explosion.began;
+        explosion.follow(f, t);
+        explosion.pictures(f, t)
+    });
+    match shown {
+        Some(([outer, flame, core], left, debris)) => {
+            pane.set_fire_outer(outer.into());
+            pane.set_fire_flame(flame.into());
+            pane.set_fire_core(core.into());
+            pane.set_fire_left(left);
+            pane.set_debris(debris.into());
+            for empty in [
+                LanderScene::set_lander_lines,
+                LanderScene::set_lander_shapes,
+                LanderScene::set_lander_green,
+                LanderScene::set_lander_strobes,
+            ] {
+                empty(pane, "".into());
+            }
+        }
+        None => {
+            for empty in [
+                LanderScene::set_fire_outer,
+                LanderScene::set_fire_flame,
+                LanderScene::set_fire_core,
+                LanderScene::set_debris,
+            ] {
+                empty(pane, "".into());
+            }
+        }
+    }
 }
 
 /// Shows the lander as its outputs say it is.
@@ -894,6 +1439,16 @@ fn paint(pane: &LanderScene<'_>, f: &Resolved, out: &[f64]) {
     let place = (out[X], out[Y]);
     pane.set_lander_lines(lander(f, place, false).into());
     pane.set_lander_shapes(lander(f, place, true).into());
+    let (green, white) = lander_lights(f, place);
+    pane.set_lander_green(green.into());
+    pane.set_lander_strobes(white.into());
+    let ([glow, core, side_glow, side_core], main, side) = plumes(f, out);
+    pane.set_plume_glow(glow.into());
+    pane.set_plume_core(core.into());
+    pane.set_plume_strength(main);
+    pane.set_side_plume_glow(side_glow.into());
+    pane.set_side_plume_core(side_core.into());
+    pane.set_side_plume_strength(side);
     let landed = out[LANDED] > 0.5;
     pane.set_face(if landed {
         face(f, place).into()
@@ -904,7 +1459,7 @@ fn paint(pane: &LanderScene<'_>, f: &Resolved, out: &[f64]) {
         if landed {
             "Landed"
         } else if out[CRASHED] > 0.5 {
-            "Crashed"
+            CRASHED_SAID
         } else {
             "Flying"
         }
@@ -920,7 +1475,7 @@ fn paint(pane: &LanderScene<'_>, f: &Resolved, out: &[f64]) {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     /// The lander example's figure: a body with its corners cut, a cabin on
@@ -956,7 +1511,7 @@ mod tests {
                  outline: \"{OUTLINE}\"\n            \
                  landing_speed: 3.05 m/s\n            \
                  landing_drift: 1.22 m/s\n            pause: 3 s\n      \
-                 - type joystick:\n          - component: stick\n    \
+                 - type joystick_3_4:\n          - component: stick\n    \
                  connections:\n      - from: stick.x\n        \
                  to: lander.throttle_x\n"
             ),
@@ -978,7 +1533,7 @@ mod tests {
             .components
             .iter()
             .position(|c| c.name == "stick")
-            .expect("the joystick");
+            .expect("the joystick_3_4");
         let now = Instant::now();
         assert_eq!(world.glance_component(lander, now)[Y], 540.0);
         world.drive_by_hand(
@@ -998,6 +1553,65 @@ mod tests {
             540.0,
             "the lander fell, so the clock started"
         );
+    }
+
+    /// A paused world's joystick still moves when it is driven by hand, so
+    /// that the pilot can set it while the world waits.
+    #[test]
+    fn a_paused_worlds_joystick_moves() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("lander-sim.yaml");
+        let ground = "0,200 200,300 470,90 530,90 800,250 1000,150 m";
+        std::fs::write(
+            &path,
+            format!(
+                "simulated_payloads: []\nworld:\n  physics:\n    \
+                 components:\n      - type lander:\n          - \
+                 component: lander\n            dry_mass: 6000 kg\n            \
+                 fuel: 2000 kg\n            isp: 311 s\n            \
+                 thrust_x: 12000 N\n            thrust_y: 24000 N\n            \
+                 gravity: 1.62 m/s2\n            x: 60 m\n            \
+                 y: 540 m\n            width: 1000 m\n            \
+                 height: 600 m\n            ground: \"{ground}\"\n            \
+                 pad: \"470,90 530,90 m\"\n            \
+                 outline: \"{OUTLINE}\"\n            \
+                 landing_speed: 3.05 m/s\n            \
+                 landing_drift: 1.22 m/s\n            pause: 3 s\n      \
+                 - type joystick_3_4:\n          - component: stick\n    \
+                 connections:\n      - from: stick.x\n        \
+                 to: lander.throttle_x\n"
+            ),
+        )
+        .expect("written");
+        let sim_file = SimConfigFile::load(&path).expect("it reads");
+        let model = sim_file.physics().expect("it resolves").expect("a model");
+        let world = World::new(
+            &model,
+            crate::node::physics::clock::Clock::starting_when_asked(1.0),
+            1,
+        );
+        let stick = model
+            .components
+            .iter()
+            .position(|c| c.name == "stick")
+            .expect("the joystick_3_4");
+        let now = Instant::now();
+        let _ = world.seconds(now);
+        world.pause(now);
+        world.drive_by_hand(
+            Place {
+                component: stick,
+                terminal: SET_X,
+            },
+            0.5,
+            Instant::now(),
+        );
+        assert_eq!(world.glance_component(stick, Instant::now())[2], 0.5);
+        let x = Place {
+            component: stick,
+            terminal: 2,
+        };
+        assert_eq!(world.read(x, Instant::now()), 0.5);
     }
 
     /// Draws the lander's pane, landed on a pad over a varied ground,
@@ -1109,7 +1723,7 @@ mod tests {
     /// # Returns
     ///
     /// Its figures.
-    fn figures() -> Resolved {
+    pub(crate) fn figures() -> Resolved {
         Resolved {
             width: 1000.0,
             height: 600.0,
@@ -1126,15 +1740,25 @@ mod tests {
     }
 
     /// The ground is filled down to the bottom of the display, with Y
-    /// counted down from the top, and the pad has its two upright marks.
+    /// counted down from the top, its line dark along its top and nothing
+    /// above it; and the pad has its two upright marks.
     #[test]
     fn the_landscape_is_drawn_to_the_bottom() {
         let f = figures();
+        let picture = ground_picture(&f);
+        let (wide, high) = (picture.width(), picture.height());
+        let at = |x: u32, y: u32| picture.as_slice()[(y * wide + x) as usize];
+        // The ground is sixty metres up a display of 600: a tenth of the
+        // picture's height above its bottom.
+        let edge = high - high / 10;
+        assert_eq!(at(wide / 2, edge - 20).a, 0, "the sky is clear");
+        let below = at(wide / 2, (edge + high) / 2);
         assert_eq!(
-            ground_fill(&f),
-            "M 0.00 600.00 L 0.00 540.00 L 470.00 540.00 L 530.00 540.00 \
-             L 1000.00 540.00 L 1000.00 600.00 Z"
+            (below.r, below.g, below.b, below.a),
+            (GROUND_FILL[0], GROUND_FILL[1], GROUND_FILL[2], 255)
         );
+        let line = at(wide / 2, edge);
+        assert!(line.r < 0x60 && line.a == 255, "{line:?}");
         assert_eq!(pad(&f).matches('M').count(), 3);
         assert!(pad(&f).contains("M 470.00 540.00 L 470.00 528.00"));
     }
@@ -1167,7 +1791,7 @@ mod tests {
             fuel: 500.0,
             isp: Duration::from_secs(311),
             thrust_x: 12000.0,
-            thrust_y: 24000.0,
+            thrust_y: 48000.0,
             gravity: 1.62,
             start,
             width: 1000.0,
@@ -1251,34 +1875,143 @@ mod tests {
         assert!(matches!(said, Some((true, _))), "{said:?}");
     }
 
-    /// Stars are about three times as many at each magnitude as at the one
-    /// brighter, the brightest are disks shrinking to a single pixel, and
-    /// fainter ones are single pixels, dimmer the fainter.
+    /// The lander's cabin is its highest shape, the green light faces the
+    /// viewer from its middle, the white lights sit on its top, bottom and
+    /// rear, and the white ones flash briefly once a second.
     #[test]
-    fn the_stars_are_as_bright_as_the_sky_has_them() {
-        assert_eq!(magnitude(0.0), 0.0);
-        assert!((magnitude(1.0) - FAINTEST).abs() < 1e-9);
-        // How many of a thousand evenly drawn fall in each magnitude.
-        let mut counts = [0usize; 6];
-        for n in 0..1000 {
-            let m = magnitude((n as f64 + 0.5) / 1000.0);
-            counts[(m as usize).min(5)] += 1;
+    fn the_landers_lights_are_on_its_cabin() {
+        let outline =
+            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+                .expect("the outline reads");
+        let f = Resolved {
+            width: 1000.0,
+            height: 600.0,
+            outline,
+            ..figures()
+        };
+        assert_eq!(cabin(&f), Some((-7.0, 7.0, 18.0, 26.0)));
+        let (green, white) = lander_lights(&f, (100.0, 50.0));
+        let r = LANDER_LIGHT * f.width / SCENE_WIDTH;
+        let left_of = |x: f64, y: f64| format!("M {}", at(&f, (x - r, y)));
+        assert!(green.starts_with(&left_of(100.0, 72.0)), "{green}");
+        for (x, y) in [(100.0, 76.0), (103.5, 57.25), (93.0, 72.0)] {
+            assert!(white.contains(&left_of(x, y)), "{x},{y} in {white}");
         }
-        for pair in counts[2..].windows(2) {
-            let ratio = pair[1] as f64 / pair[0] as f64;
-            assert!((2.5..3.5).contains(&ratio), "{counts:?}");
+        assert!(strobe_lit(0.0) && strobe_lit(1.1));
+        assert!(!strobe_lit(0.5) && !strobe_lit(0.2));
+    }
+
+    /// A crash's debris flies at a speed in proportion to the square of the
+    /// impact speed, spread over ninety degrees either side of the
+    /// ground's perpendicular, tumbling at a variety of rates either way,
+    /// and stops dead on the ground; its fireball grows with the fuel left.
+    #[test]
+    fn a_crash_explodes_as_the_impact_says() {
+        let f = Resolved {
+            gravity: 1.62,
+            pause: Duration::from_secs(5),
+            ..figures()
+        };
+        let flying = |speed: f64, fuel: f64| Flying {
+            place: (200.0, 61.0),
+            velocity: (0.0, -speed),
+            fuel,
+        };
+        let slow = Explosion::of(&f, flying(10.0, 0.0), 1.0).expect("one");
+        let fast = Explosion::of(&f, flying(20.0, 400.0), 1.0).expect("one");
+        let fastest = |e: &Explosion| {
+            e.fragments
+                .iter()
+                .map(|d| d.velocity.0.hypot(d.velocity.1))
+                .fold(0.0, f64::max)
+        };
+        // Twice the impact speed, four times the debris's.
+        let ratio = fastest(&fast) / fastest(&slow);
+        assert!((3.0..5.0).contains(&ratio), "{ratio}");
+        // The ground here is level: the perpendicular is straight up, and
+        // nothing flies into the ground.
+        for d in &fast.fragments {
+            assert!(d.velocity.1 >= -1e-9, "{:?}", d.velocity);
         }
-        let classes: Vec<(usize, f64, f32)> = (0..STAR_CLASSES)
-            .map(|c| star_class((c as f64 + 0.5) * FAINTEST / 8.0))
-            .collect();
-        assert_eq!(classes[0].1, BRIGHTEST_RADIUS);
-        for pair in classes.windows(2) {
-            let ((_, r0, b0), (_, r1, b1)) = (pair[0], pair[1]);
-            assert!(r1 <= r0 && b1 <= b0, "{classes:?}");
-            assert!(r1 < r0 || b1 < b0, "{classes:?}");
+        let spins: Vec<f64> = fast.fragments.iter().map(|d| d.spin).collect();
+        assert!(
+            spins.iter().any(|s| *s > 0.0) && spins.iter().any(|s| *s < 0.0)
+        );
+        let (least, most) = spins
+            .iter()
+            .map(|s| s.abs())
+            .fold((f64::MAX, 0.0_f64), |(a, b), s| (a.min(s), b.max(s)));
+        assert!(most > 3.0 * least, "{least} to {most}");
+        assert_eq!(slow.fire, 0.0, "no fuel, no fireball");
+        assert!((fast.fire - FIRE_PER_KG * 400.0).abs() < 1e-9);
+
+        // Long enough for every fragment to come down: each stopped on
+        // the ground, and turning no more.
+        let mut e = fast;
+        e.follow(&f, 60.0);
+        for d in &e.fragments {
+            assert!(d.stopped, "{d:?}");
+            if (0.0..=f.width).contains(&d.place.0) {
+                assert!((d.place.1 - ground_at(&f, d.place.0)).abs() < 1e-9);
+            }
         }
-        assert_eq!(classes[STAR_CLASSES - 1].1, PIXEL_RADIUS);
-        assert!(classes[STAR_CLASSES - 1].2 < 0.5, "{classes:?}");
+        let turned: Vec<f64> = e.fragments.iter().map(|d| d.angle).collect();
+        e.follow(&f, 70.0);
+        let still: Vec<f64> = e.fragments.iter().map(|d| d.angle).collect();
+        assert_eq!(turned, still);
+    }
+
+    /// A plume is as long as its engine's thrust is a share of its full
+    /// thrust, worked out from the acceleration and the mass; there is none
+    /// for no thrust or once the lander is down; and a push right fires from
+    /// the body's left, a push left from its right.
+    #[test]
+    fn the_plumes_follow_the_thrust() {
+        let outline =
+            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+                .expect("the outline reads");
+        let f = Resolved {
+            dry_mass: 5500.0,
+            fuel: 500.0,
+            thrust_x: 12000.0,
+            thrust_y: 48000.0,
+            gravity: 1.62,
+            outline,
+            ..figures()
+        };
+        let mass = 6000.0;
+        let mut out = vec![0.0; 11];
+        out[X] = 500.0;
+        out[Y] = 300.0;
+        out[FUEL] = 1.0;
+        // Full thrust up, none across.
+        out[ACCELERATION_Y] = 48000.0 / mass - 1.62;
+        let ([glow, core, side, _], main, across) = plumes(&f, &out);
+        assert!(!glow.is_empty() && !core.is_empty());
+        assert!((main - 1.0).abs() < 1e-6 && across == 0.0);
+        assert!(side.is_empty(), "{side}");
+        // The tip is 40 m below the nozzle's foot, 5.5 m up the lander.
+        assert!(
+            glow.contains(&format!("{:.2}", f.height - (300.0 + 5.5 - 40.0))),
+            "{glow}"
+        );
+
+        // Falling with no thrust: no plume.
+        out[ACCELERATION_Y] = -1.62;
+        let ([glow, ..], main, _) = plumes(&f, &out);
+        assert!(glow.is_empty() && main == 0.0);
+
+        // Half a push right: the left thruster, its plume blowing left.
+        out[ACCELERATION_X] = 0.5 * 12000.0 / mass;
+        let ([_, _, side, _], _, across) = plumes(&f, &out);
+        assert!((across - 0.5).abs() < 1e-6);
+        let left_edge = format!("{:.2}", 500.0 - 11.0 - 10.0);
+        assert!(side.contains(&left_edge), "{side}");
+
+        // Down: nothing, whatever the accelerations say.
+        out[CRASHED] = 1.0;
+        let ([glow, _, side, _], _, _) = plumes(&f, &out);
+        assert!(glow.is_empty() && side.is_empty());
     }
 
     /// A light sits on top of each end mark of the pad, and the lights are
@@ -1331,15 +2064,19 @@ mod tests {
         assert!((x - 0.5).abs() < 1e-6 && y == 0.0, "{x} {y}");
         let (x, _, _, _) = axes(-(half + ARM / 4.0), 0.0);
         assert!((x + 0.25).abs() < 1e-6, "{x}");
-        // Above the square is positive Y, below it negative.
+        // Above the square is positive Y; below it, where there is no arm,
+        // nought: there is no thrust down.
         assert_eq!(axes(0.0, -(half + ARM)).1, 1.0);
-        assert_eq!(axes(0.0, half + ARM).1, -1.0);
+        assert_eq!(axes(0.0, half + ARM).1, 0.0);
         // On a diagonal, both at once.
         let (x, y, _, _) = axes(half + ARM, -(half + ARM));
         assert_eq!((x, y), (1.0, 1.0));
-        // Beyond the rectangles, held at one, the dot at the edge.
+        // Beyond the rectangles, held at one, the lines at the ends: the
+        // horizontal one no lower than halfway up the square.
         let (x, y, dot_x, dot_y) = axes(500.0, 400.0);
-        assert_eq!((x, y), (1.0, -1.0));
-        assert_eq!((dot_x, dot_y), (half + ARM, half + ARM));
+        assert_eq!((x, y), (1.0, 0.0));
+        assert_eq!((dot_x, dot_y), (half + ARM, 0.0));
+        let (_, y, _, dot_y) = axes(0.0, -500.0);
+        assert_eq!((y, dot_y), (1.0, -(half + ARM)));
     }
 }

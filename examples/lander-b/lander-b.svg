@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1110" height="772" viewBox="0 0 1110 772" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1110" height="858" viewBox="0 0 1110 858" role="img" aria-labelledby="title desc">
   <title id="title">The lander example: lander-b, the Y axis</title>
-  <desc id="desc">lander-b, one of the lander example's two tcspecials, flying the Y axis. Each payload at the left is a UDP socket tcs-sim simulates, joined to the lander or the joystick in tcs-sim's world; each reading is made a value by a to_value node and sent to the gateway, which takes it down through Yamcs. to_joystick_y also drives thruster_y, the dashed line, so the pilot's joystick is the thrust on the Y axis.</desc>
+  <desc id="desc">lander-b, one of the lander example's two tcspecials, flying the Y axis. Each payload at the left is a UDP socket tcs-sim simulates, joined to the lander or the joystick in tcs-sim's world; each reading is made a value by a to_value node and sent to the gateway, which takes it down through Yamcs. to_joystick_3_4_y also drives thruster_y, the dashed line, so the pilot's joystick is the thrust on the Y axis. The gateway passes what the ground sends it to restart, the dashed line from it, which restarts the lander.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -17,7 +17,7 @@
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
     </marker>
   </defs>
-  <rect x="0" y="0" width="1110" height="772" fill="#ffffff"/>
+  <rect x="0" y="0" width="1110" height="858" fill="#ffffff"/>
   <text class="heading" x="40" y="40">PAYLOADS, SIMULATED BY TCS-SIM</text>
   <text class="heading" x="420" y="40">VEHICLE: lander-b</text>
   <text class="heading" x="820" y="40">GATEWAY, TO YAMCS</text>
@@ -31,7 +31,7 @@
   <text class="kind" x="52" y="216">payload, network</text>
   <text class="detail" x="52" y="232">127.0.0.1:20807</text>
   <rect class="payload" x="40" y="262" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="284">joystick_y</text>
+  <text class="name" x="52" y="284">joystick_3_4_y</text>
   <text class="kind" x="52" y="302">payload, network</text>
   <text class="detail" x="52" y="318">127.0.0.1:20804</text>
   <rect class="payload" x="40" y="348" width="250" height="64" rx="8"/>
@@ -39,23 +39,27 @@
   <text class="kind" x="52" y="388">payload, network</text>
   <text class="detail" x="52" y="404">127.0.0.1:20806</text>
   <rect class="payload" x="40" y="434" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="456">thruster_y</text>
+  <text class="name" x="52" y="456">restart</text>
   <text class="kind" x="52" y="474">payload, network</text>
-  <text class="detail" x="52" y="490">127.0.0.1:20805</text>
+  <text class="detail" x="52" y="490">127.0.0.1:20808</text>
   <rect class="payload" x="40" y="520" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="542">velocity_y</text>
+  <text class="name" x="52" y="542">thruster_y</text>
   <text class="kind" x="52" y="560">payload, network</text>
-  <text class="detail" x="52" y="576">127.0.0.1:20802</text>
+  <text class="detail" x="52" y="576">127.0.0.1:20805</text>
   <rect class="payload" x="40" y="606" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="628">y</text>
+  <text class="name" x="52" y="628">velocity_y</text>
   <text class="kind" x="52" y="646">payload, network</text>
-  <text class="detail" x="52" y="662">127.0.0.1:20801</text>
+  <text class="detail" x="52" y="662">127.0.0.1:20802</text>
+  <rect class="payload" x="40" y="692" width="250" height="64" rx="8"/>
+  <text class="name" x="52" y="714">y</text>
+  <text class="kind" x="52" y="732">payload, network</text>
+  <text class="detail" x="52" y="748">127.0.0.1:20801</text>
   <rect class="vehicle" x="420" y="90" width="250" height="64" rx="8"/>
   <text class="name" x="432" y="112">to_accel_y</text>
   <text class="kind" x="432" y="130">compute</text>
   <text class="detail" x="432" y="146">to_value, metre_per_second_squared</text>
   <rect class="vehicle" x="420" y="176" width="250" height="64" rx="8"/>
-  <text class="name" x="432" y="198">to_joystick_y</text>
+  <text class="name" x="432" y="198">to_joystick_3_4_y</text>
   <text class="kind" x="432" y="216">compute</text>
   <text class="detail" x="432" y="232">to_value, ratio</text>
   <rect class="vehicle" x="420" y="262" width="250" height="64" rx="8"/>
@@ -66,19 +70,20 @@
   <text class="name" x="432" y="370">to_y</text>
   <text class="kind" x="432" y="388">compute</text>
   <text class="detail" x="432" y="404">to_value, metre</text>
-  <rect class="gateway" x="820" y="348.0" width="250" height="64" rx="8"/>
-  <text class="name" x="832" y="370.0">gateway</text>
-  <text class="kind" x="832" y="388.0">gateway, Yamcs</text>
-  <text class="detail" x="832" y="404.0">127.0.0.1:20600</text>
-  <line class="link" x1="670" y1="122" x2="820" y2="380" marker-end="url(#arrow)"/>
+  <rect class="gateway" x="820" y="391.0" width="250" height="64" rx="8"/>
+  <text class="name" x="832" y="413.0">gateway</text>
+  <text class="kind" x="832" y="431.0">gateway, Yamcs</text>
+  <text class="detail" x="832" y="447.0">127.0.0.1:20600</text>
+  <line class="link" x1="670" y1="122" x2="820" y2="423" marker-end="url(#arrow)"/>
   <line class="link" x1="290" y1="122" x2="420" y2="122" marker-end="url(#arrow)"/>
-  <line class="link" x1="420" y1="208" x2="290" y2="466" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
-  <line class="link" x1="670" y1="208" x2="820" y2="380" marker-end="url(#arrow)"/>
+  <line class="link" x1="420" y1="208" x2="290" y2="552" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
+  <line class="link" x1="670" y1="208" x2="820" y2="423" marker-end="url(#arrow)"/>
   <line class="link" x1="290" y1="294" x2="420" y2="208" marker-end="url(#arrow)"/>
-  <line class="link" x1="670" y1="294" x2="820" y2="380" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="552" x2="420" y2="294" marker-end="url(#arrow)"/>
-  <line class="link" x1="670" y1="380" x2="820" y2="380" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="638" x2="420" y2="380" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="380" x2="820" y2="380" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="208" x2="820" y2="380" marker-end="url(#arrow)"/>
+  <line class="link" x1="670" y1="294" x2="820" y2="423" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="638" x2="420" y2="294" marker-end="url(#arrow)"/>
+  <line class="link" x1="670" y1="380" x2="820" y2="423" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="724" x2="420" y2="380" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="380" x2="820" y2="423" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="208" x2="820" y2="423" marker-end="url(#arrow)"/>
+  <line class="link" x1="820" y1="423" x2="290" y2="466" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
 </svg>

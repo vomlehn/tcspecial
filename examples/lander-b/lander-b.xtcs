@@ -49,10 +49,11 @@
                 <address>127.0.0.1:20600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:20700</ground_base>
+                <moc-out>restart.gateway</moc-out>
                 <world-in>crashed</world-in>
                 <world-in>landed</world-in>
                 <world-in>to_accel_y</world-in>
-                <world-in>to_joystick_y</world-in>
+                <world-in>to_joystick_3_4_y</world-in>
                 <world-in>to_velocity_y</world-in>
                 <world-in>to_y</world-in>
             </gateway>
@@ -69,15 +70,15 @@
                 <world-out>gateway.to_accel_y</world-out>
                 <world-in>accel_y</world-in>
             </compute>
-            <compute name="to_joystick_y">
+            <compute name="to_joystick_3_4_y">
                 <function>to_value</function>
                 <offset>0</offset>
                 <scale>0.0001</scale>
                 <type-in>i16</type-in>
                 <type-out>ratio</type-out>
-                <moc-out>thruster_y.to_joystick_y</moc-out>
-                <world-out>gateway.to_joystick_y</world-out>
-                <world-in>joystick_y</world-in>
+                <moc-out>thruster_y.to_joystick_3_4_y</moc-out>
+                <world-out>gateway.to_joystick_3_4_y</world-out>
+                <world-in>joystick_3_4_y</world-in>
             </compute>
             <compute name="to_velocity_y">
                 <function>to_value</function>
@@ -113,11 +114,11 @@
                 <protocol>udp</protocol>
                 <world-out>gateway.crashed</world-out>
             </payload>
-            <payload name="joystick_y">
+            <payload name="joystick_3_4_y">
                 <address>127.0.0.1:20804</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
-                <world-out>to_joystick_y.joystick_y</world-out>
+                <world-out>to_joystick_3_4_y.joystick_3_4_y</world-out>
             </payload>
             <payload name="landed">
                 <read_size>16</read_size>
@@ -125,11 +126,16 @@
                 <protocol>udp</protocol>
                 <world-out>gateway.landed</world-out>
             </payload>
+            <payload name="restart">
+                <address>127.0.0.1:20808</address>
+                <protocol>udp</protocol>
+                <moc-in>gateway</moc-in>
+            </payload>
             <payload name="thruster_y">
                 <address>127.0.0.1:20805</address>
                 <moc-in-type>ratio</moc-in-type>
                 <protocol>udp</protocol>
-                <moc-in>to_joystick_y</moc-in>
+                <moc-in>to_joystick_3_4_y</moc-in>
             </payload>
             <payload name="velocity_y">
                 <address>127.0.0.1:20802</address>

@@ -11,8 +11,8 @@ import { Colors } from "../../tcs-ui/ui/colors.slint";
 // shows.
 export { StartupWindow, StartupLine } from "../../tcs-verify/ui/startup.slint";
 // The lander's pane, at the left of the panels when the world has a lander.
-import { LanderPane, LanderScene, StarClass } from "lander.slint";
-export { LanderScene, StarClass }
+import { LanderPane, LanderScene } from "lander.slint";
+export { LanderScene }
 
 // One simulated payload: what the tcspecial configuration file says about the
 // data handler it simulates, what the simulator configuration file says
@@ -379,14 +379,30 @@ export component MainWindow inherits Window {
     // The most panels in a row, however wide the window is made: grid.rs's
     // MAX_COLUMNS, which Rust sets.
     in property <int> most-columns: 3;
-    property <int> columns: Math.max(
+    // Beside a lander's pane, as many as the window opened with, however it
+    // is resized: the pane takes the room. It does not depend on the
+    // window's width, since the panels' area is sized from it and the
+    // window's width from that.
+    property <int> lander-columns: Math.max(
         1,
-        Math.min(
-            payload-model.length,
-            root.most-columns,
-            Math.floor((root.width - root.chrome-width) / root.panel-width)
-        )
+        Math.min(payload-model.length, root.most-columns)
     );
+    // Without a lander's pane, as many as fit.
+    property <int> columns: root.lander-width > 0px
+        ? root.lander-columns
+        : Math.max(
+            1,
+            Math.min(
+                payload-model.length,
+                root.most-columns,
+                Math.floor((root.width - root.chrome-width)
+                    / root.panel-width)
+            )
+        );
+    // The panels' area beside a lander's pane: exactly its columns wide,
+    // so that a panel keeps its size as the window grows.
+    property <length> grid-width: root.lander-columns * root.panel-width
+        + grid.padding * 2;
 
     // One callback for the one button a panel has. Which way a press goes is
     // Rust's to decide, from the status the button's own label comes from.
@@ -431,9 +447,14 @@ export component MainWindow inherits Window {
         // The lander's pane, where there is one, and the panels beside it.
         HorizontalLayout {
             if root.lander-width > 0px: LanderPane {
-                width: root.lander-width;
+                min-width: root.lander-width;
+                horizontal-stretch: 1;
             }
             scroll := ScrollView {
+                horizontal-stretch: root.lander-width > 0px ? 0 : 1;
+                min-width: root.lander-width > 0px ? root.grid-width : 0px;
+                max-width: root.lander-width > 0px
+                    ? root.grid-width : 100000px;
                 // The panels keep to the top of the scrolling area.
                 //
                 // The area is commonly taller than the grid: the window opens

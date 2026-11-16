@@ -45,7 +45,16 @@ gateways:
         address: "127.0.0.1:19600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:19700"
-        world-in: [to_accel_x, to_fuel, to_joystick_x, to_velocity_x, to_x]
+        moc-out:
+          - autorestart.gateway
+        world-in: [sky, to_accel_x, to_fuel, to_joystick_3_4_x, to_velocity_x,
+          to_x]
+      - gateway: gateway_sky
+        address: "127.0.0.1:19601"
+        apid_base: "0x480"
+        ground_base: "127.0.0.1:19750"
+        moc-out:
+          - sky_quench.gateway_sky
 
 vehicle:
   - type compute:
@@ -67,17 +76,17 @@ vehicle:
         world-out:
           - gateway.to_fuel
         world-in: [fuel]
-      - compute: to_joystick_x
+      - compute: to_joystick_3_4_x
         function: "to_value"
         offset: "0"
         scale: "0.0001"
         type-in: "i16"
         type-out: "ratio"
         moc-out:
-          - thruster_x.to_joystick_x
+          - thruster_x.to_joystick_3_4_x
         world-out:
-          - gateway.to_joystick_x
-        world-in: [joystick_x]
+          - gateway.to_joystick_3_4_x
+        world-in: [joystick_3_4_x]
       - compute: to_velocity_x
         function: "to_value"
         offset: "0"
@@ -105,23 +114,37 @@ payloads:
         world-out-type: "i16"
         world-out:
           - to_accel_x.accel_x
+      - payload: autorestart
+        address: "127.0.0.1:19807"
+        protocol: "udp"
+        moc-in: [gateway]
       - payload: fuel
         address: "127.0.0.1:19804"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_fuel.fuel
-      - payload: joystick_x
+      - payload: joystick_3_4_x
         address: "127.0.0.1:19805"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - to_joystick_x.joystick_x
+          - to_joystick_3_4_x.joystick_3_4_x
+      - payload: sky
+        read_size: "64"
+        address: "127.0.0.1:19808"
+        protocol: "udp"
+        world-out:
+          - gateway.sky
+      - payload: sky_quench
+        address: "127.0.0.1:19809"
+        protocol: "udp"
+        moc-in: [gateway_sky]
       - payload: thruster_x
         address: "127.0.0.1:19806"
         moc-in-type: "ratio"
         protocol: "udp"
-        moc-in: [to_joystick_x]
+        moc-in: [to_joystick_3_4_x]
       - payload: velocity_x
         address: "127.0.0.1:19802"
         protocol: "udp"

@@ -291,6 +291,42 @@ fn payload_info_from(
     }
 }
 
+/// The order of a set of data handlers by their names: the order their
+/// panels are shown in.
+///
+/// # Arguments
+///
+/// * `dh_configs` - The data handlers, in their configurations' order.
+///
+/// # Returns
+///
+/// Each one's place among them, the first name's first; two of one name,
+/// which a configuration refuses, in their own order.
+fn name_order(dh_configs: &[DHConfig]) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..dh_configs.len()).collect();
+    order.sort_by(|&a, &b| dh_configs[a].name.0.cmp(&dh_configs[b].name.0));
+    order
+}
+
+/// Puts a list in an order.
+///
+/// # Arguments
+///
+/// * `items` - The list.
+/// * `order` - Each item's place in it, in the order wanted: every place
+///             once.
+///
+/// # Returns
+///
+/// The items in that order.
+fn in_order<T>(items: Vec<T>, order: &[usize]) -> Vec<T> {
+    let mut items: Vec<Option<T>> = items.into_iter().map(Some).collect();
+    order
+        .iter()
+        .map(|&at| items[at].take().expect("each place once"))
+        .collect()
+}
+
 /// Changes one panel's contents, leaving the rest of it alone.
 ///
 /// A Slint model row is a value rather than a place, so a field is changed by
@@ -446,6 +482,11 @@ fn joined_to_the_world(
                 )?,
                 sensor: Arc::new(Sensor::new(&name, *sensor, seed)),
             },
+            Some(Attached::Streams { at }) => Attachment::Streams {
+                world: world.clone(),
+                place: place(at)?,
+                next: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            },
             Some(Attached::Pulls { at }) => Attachment::Pulls {
                 world: world.clone(),
                 places: at.iter().map(place).collect::<Result<_, _>>()?,
@@ -465,7 +506,7 @@ fn joined_to_the_world(
                         )?;
                         Some(*unit)
                     }
-                    Kind::Decision => None,
+                    Kind::Decision | Kind::Records => None,
                 };
                 let place = place(at)?;
                 // A heater's switch, which its panel says is heating rather
@@ -1414,6 +1455,15 @@ fn main() {
     else {
         process::exit(1);
     };
+    // The panels in their payloads' names' order, left to right and top to
+    // bottom: the payloads, their settings and their configurations put in
+    // that order together, since a panel's place is what finds its payload.
+    // Each keeps its id, its place in the configuration.
+    let order = name_order(&dh_configs);
+    let dev_ids = order.clone();
+    let dh_configs = in_order(dh_configs, &order);
+    let sims = in_order(sims, &order);
+    let configs = in_order(configs, &order);
     // A world with a lander is shown in a window of its own, beside the
     // panels: see `lander_view`. Found now, while the payloads, which reach
     // the world, are still to hand.
@@ -1486,8 +1536,8 @@ fn main() {
         dh_configs
             .iter()
             .zip(&sims)
-            .enumerate()
-            .map(|(row, (dh, sim))| payload_info_from(row, dh, sim))
+            .zip(&dev_ids)
+            .map(|((dh, sim), &dev_id)| payload_info_from(dev_id, dh, sim))
             .collect::<Vec<_>>(),
     ));
     ui.set_payload_model(ModelRc::from(model.clone()));
@@ -1591,8 +1641,14 @@ fn main() {
         std::mem::forget(timer);
     }
 
-    // Against the bottom of the display, tcs-moc having asked for the top.
-    ask_for_the_edge(&ui, Edge::Bottom);
+    // Against the bottom of the display, tcs-moc having asked for the top;
+    // or, with a lander's pane, at the top right, leaving the rest of the
+    // width to the lander example's MOC window.
+    if lander.is_some() {
+        ask_for_the_top_right(&ui);
+    } else {
+        ask_for_the_edge(&ui, Edge::Bottom);
+    }
 
     // Kept while tcs-sim runs: the timer that keeps the lander's pane up to
     // the world.
@@ -1668,6 +1724,59 @@ fn quit_when_signalled(signalled: Arc<AtomicUsize>, quit: Rc<dyn Fn()>) {
     std::mem::forget(timer);
 }
 
+/// The environment variable naming the file tcs-sim writes, with a lander's
+/// pane, the width the display has left beside its window into: what the
+/// lander example's ground station sizes its window to.
+const ROOM_FILE: &str = "TCS_SIM_ROOM_FILE";
+
+/// Asks for this window to be put at the top right of the display, and says
+/// how much width that leaves to its left, in the file [`ROOM_FILE`] names,
+/// where it names one.
+///
+/// Asked once the event loop is running, as [`ask_for_the_edge`] asks, for
+/// the window to have its size. A request: a Wayland compositor may place
+/// the window where it likes, and the lander example's window rule for KDE
+/// puts it there in any case. The width left is the display's, in logical
+/// pixels -- its physical width over the window's scale -- less the
+/// window's, written as a whole number; nothing is written where the
+/// display's width is unknown.
+///
+/// # Arguments
+///
+/// * `ui` - The main window.
+fn ask_for_the_top_right(ui: &MainWindow) {
+    let ui_weak = ui.as_weak();
+    let timer = slint::Timer::default();
+    // A second after the loop starts, not at once: a Wayland compositor
+    // tells a window its scale after it is shown, and until then it reads
+    // as one, which would make the room left far too wide.
+    timer.start(
+        slint::TimerMode::SingleShot,
+        std::time::Duration::from_secs(1),
+        move || {
+            let Some(ui) = ui_weak.upgrade() else { return };
+            let window = ui.window();
+            let Some(screen) = tcsprotocol::display::screen_width() else {
+                return;
+            };
+            let wide = window.size().width;
+            let left = screen.saturating_sub(wide);
+            window.set_position(slint::PhysicalPosition::new(
+                i32::try_from(left).unwrap_or(0),
+                0,
+            ));
+            if let Ok(path) = std::env::var(ROOM_FILE) {
+                let room = f64::from(left) / f64::from(window.scale_factor());
+                if let Err(e) = std::fs::write(&path, format!("{room:.0}\n")) {
+                    eprintln!("tcs-sim: {path}: {e}");
+                }
+            }
+        },
+    );
+    // As ask_for_the_edge's: dropped, it would never fire.
+    std::mem::forget(timer);
+}
+
 /// Asks for this window to be put against one edge of the display.
 ///
 /// Asked once the event loop is running, because that is when the window has
@@ -1707,6 +1816,13 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A list put in an order has each item once, where the order puts it.
+    #[test]
+    fn a_list_goes_into_its_order() {
+        assert_eq!(in_order(vec!["c", "a", "b"], &[1, 2, 0]), ["a", "b", "c"]);
+        assert!(in_order(Vec::<u8>::new(), &[]).is_empty());
+    }
     use std::path::Path;
     use std::time::Duration;
     use tcsprotocol::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
@@ -3182,7 +3298,9 @@ mod tests {
                 Attachment::Drives { place, .. } => {
                     heaters.push((payload.clone(), attachment.clone(), *place));
                 }
-                Attachment::Signals { .. } | Attachment::Pulls { .. } => {}
+                Attachment::Signals { .. }
+                | Attachment::Streams { .. }
+                | Attachment::Pulls { .. } => {}
             }
         }
         let (world, zone) = zone.expect("a sensor of the zone");

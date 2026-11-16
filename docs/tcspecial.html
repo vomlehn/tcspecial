@@ -2923,7 +2923,25 @@ starts Yamcs, with a relay between Yamcs and each vehicle that holds
 everything 1.3 s each way, the time light takes from the Moon; tcs-sim
 with both configurations; and both tcspecials. The lander is flown from
 tcs-sim's window, and the MOC's window shows what arrives through
-Yamcs, 1.3 s later. Closing either window stops everything:</p>
+Yamcs, 1.3 s later.</p>
+<p>The MOC's window also commands the lander. Its Restart button sends a
+command up through <tt class="docutils literal"><span class="pre">lander-b</span></tt>'s gateway to the payload <tt class="docutils literal">restart</tt>,
+which starts the lander again; Disable Autorestart and Enable Autorestart
+send one up through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s to the payload <tt class="docutils literal">autorestart</tt>. Until
+autorestart is enabled, a lander that has landed or crashed stays down
+until Restart; enabled, it starts again by itself, with a full tank, after
+a pause. Each command reaches the lander 1.3 s after it is sent, and is
+seen 1.3 s after that.</p>
+<p>The MOC's sky is tcs-sim's, sent down: <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s payload <tt class="docutils literal">sky</tt>
+sends the stars a few to a packet, round and round, and the sky fills in
+as they arrive, a packet lost leaving it thinner until a later pass. Once
+the ground has every star it sends a quench up through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s
+second gateway, <tt class="docutils literal">gateway_sky</tt>, to the payload <tt class="docutils literal">sky_quench</tt>, and the
+stars stop. The quench has a gateway of its own because a gateway passes
+what the ground sends to every payload it feeds, and <tt class="docutils literal">autorestart</tt>
+would take a quench for an order. The design gives the stars' records in
+&quot;The sky, sent down&quot;.</p>
+<p>Closing either window stops everything:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-lander<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>&lt;yamcs&gt;
 </pre>
@@ -2931,15 +2949,18 @@ Yamcs, 1.3 s later. Closing either window stops everything:</p>
 <div class="figure">
 <object data="../examples/lander-a/lander-a.svg" style="width: 100%;" type="image/svg+xml">lander-a, the X axis: payloads reading the lander's X position,
 velocity and acceleration, its fuel and the joystick's X, each
-made a value and sent to the Yamcs gateway; the joystick's X also
-drives the X thruster.</object>
+made a value and sent to the Yamcs gateway, with the stars of the
+sky; the joystick's X also drives the X thruster. The gateway
+passes what the ground sends to the autorestart payload, and a
+second gateway, gateway_sky, passes the quench to sky_quench.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">lander-a</span></tt>, the X axis.</p>
 </div>
 <div class="figure">
 <object data="../examples/lander-b/lander-b.svg" style="width: 100%;" type="image/svg+xml">lander-b, the Y axis: payloads reading the lander's Y position,
 velocity and acceleration and the joystick's Y, each made a value
 and sent to the Yamcs gateway, with whether it has landed or
-crashed; the joystick's Y also drives the Y thruster.</object>
+crashed; the joystick's Y also drives the Y thruster. The gateway
+passes what the ground sends to the restart payload.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">lander-b</span></tt>, the Y axis.</p>
 </div>
 </div>

@@ -19,7 +19,7 @@
 
 /// The most terminals a component type has: the room each component's inputs
 /// are given, which is fixed so that holding them allocates nothing.
-pub const MOST_TERMINALS: usize = 12;
+pub const MOST_TERMINALS: usize = 15;
 
 /// A component of the world.
 ///
@@ -82,5 +82,32 @@ pub trait Component: Send + std::fmt::Debug {
     /// * `at` - When, in simulated seconds.
     fn event(&mut self, at: f64) {
         let _ = at;
+    }
+
+    /// Some of the records an output of the records kind sends, as the
+    /// inputs it holds have it: a lander's sky.
+    ///
+    /// # Arguments
+    ///
+    /// * `terminal` - Which, by its place among its type's terminals.
+    /// * `from`     - The first record wanted, counting round: the one after
+    ///                the last is the first again.
+    /// * `most`     - How many are wanted at most.
+    /// * `out`      - Where their bytes are put, after what is there.
+    ///
+    /// # Returns
+    ///
+    /// How many records it has in all, nought where it has none to send:
+    /// none at all, or none while they are quenched. Most components have
+    /// no records.
+    fn records(
+        &self,
+        terminal: usize,
+        from: usize,
+        most: usize,
+        out: &mut Vec<u8>,
+    ) -> usize {
+        let _ = (terminal, from, most, out);
+        0
     }
 }

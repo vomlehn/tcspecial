@@ -1633,6 +1633,9 @@ pub enum Attached {
     /// them, to one of these decision outputs: a line sensing a heater,
     /// pulled high while the heater is heating.
     Pulls { at: Vec<At> },
+    /// It sends this output's records, a few whole ones to a packet, round
+    /// and round until they are quenched: a lander's sky.
+    Streams { at: At },
 }
 
 /// The terminals a simulated payload's `connects` names: one, or one for each
@@ -1710,7 +1713,11 @@ fn lined(
                 .to_string(),
         )),
         (
-            Some(Attached::Reports { at, .. } | Attached::Drives { at, .. }),
+            Some(
+                Attached::Reports { at, .. }
+                | Attached::Drives { at, .. }
+                | Attached::Streams { at },
+            ),
             Some(_),
         ) => Err(bad(format!(
             "a GPIO payload's watched lines are pulled to decisions, and \
@@ -2081,6 +2088,12 @@ impl SimConfigFile {
                             component.what.type_name(),
                             unit.name()
                         ),
+                        Kind::Records => format!(
+                            "a {}'s records go nowhere without it, so \
+                             connect a simulated payload to it with \
+                             connects: {at}",
+                            component.what.type_name()
+                        ),
                     };
                     return Err(bad(
                         &component.name,
@@ -2321,6 +2334,17 @@ impl SimConfigFile {
                     )));
                 }
                 Ok(Some(Attached::Signals { at }))
+            }
+            (Direction::Out, Kind::Records) => {
+                if let Some((what, _)) =
+                    errors.iter().find(|(_, s)| s.is_some())
+                {
+                    return Err(bad(format!(
+                        "{what} says what a sensor gets wrong about a value, \
+                         and {at} is records, which are sent as they are"
+                    )));
+                }
+                Ok(Some(Attached::Streams { at }))
             }
         }
     }

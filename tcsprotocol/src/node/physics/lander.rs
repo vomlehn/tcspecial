@@ -2,16 +2,17 @@
 //! gravity, by thrust along each axis, burning the fuel it carries, until
 //! it touches the ground.
 //!
-//! It takes `throttle_x` and `throttle_y`, each a ratio from minus one to
-//! one, which simulated payloads the vehicle drives set: positive pushes it
-//! towards positive X, to the right, or positive Y, up, and negative the
-//! other way. It gives out where it is, `x` and `y`, in metres, the place
-//! between its feet; how fast it is going, `velocity_x` and `velocity_y`, in
-//! metres a second; the `fuel` it has left, as a fraction of a full tank;
-//! two decisions, `landed` and `crashed`, each asserted from the moment it
-//! touches down until it starts again; and how fast it is speeding up,
-//! `acceleration_x` and `acceleration_y`, in metres a second a second,
-//! gravity's included and nought while it is down.
+//! It takes `throttle_x`, a ratio from minus one to one, and `throttle_y`, from
+//! nought to one, which simulated payloads the vehicle drives set: positive
+//! pushes it towards positive X, to the right, or positive Y, up, and a
+//! negative X the other way. There is no thrust down: its engine is on its
+//! bottom, and nothing on its top pushes it down. It gives out where it is, `x`
+//! and `y`, in metres, the place between its feet; how fast it is going,
+//! `velocity_x` and `velocity_y`, in metres a second; the `fuel` it has left,
+//! as a fraction of a full tank; two decisions, `landed` and `crashed`, each
+//! asserted from the moment it touches down until it starts again; and how fast
+//! it is speeding up, `acceleration_x` and `acceleration_y`, in metres a second
+//! a second, gravity's included and nought while it is down.
 //!
 //! # The arithmetic
 //!
@@ -43,10 +44,27 @@
 //! is what meets the ground. The moment any of it first meets the ground, the
 //! lander is down: landed, if all of it is above the pad, it meets nothing
 //! but the pad, and it is going no faster than `landing_speed` down and
-//! `landing_drift` sideways; crashed, otherwise. It has crashed as well if it
-//! leaves the display altogether. Down, it stays where it is for `pause`, and
-//! then starts again where it started, with a full tank. The arithmetic is
-//! tcs-sim's `physics::lander`.
+//! `landing_drift` sideways; crashed, otherwise. Leaving the display is not
+//! coming down: the lander flies on out of sight, and has crashed only if
+//! it drops below the display's bottom line, which goes on indefinitely
+//! beyond its edges. Down, it stays where it is until it is restarted, by
+//! its `restart` input, or, with its `autorestart` input asserted, for
+//! `pause`; then it starts again where it started, with a full tank. The
+//! arithmetic is tcs-sim's `physics::lander`.
+//!
+//! # Sky
+//!
+//! The lander's sky, its stars, is sent by its `sky` output, records a
+//! simulated payload sends [`STARS_IN_A_PACKET`] at a time, round and
+//! round, so that a ground station that misses one has it again on the next
+//! pass. Each is [`STAR_RECORD`] bytes, most significant byte first: the
+//! sky's generation and how many stars it has, two bytes each; the star's
+//! number, from nought, two bytes; its radius, in tenths of a pixel of a
+//! scene [`SKY_WIDTH`] pixels wide, and its brightness, from nought to
+//! 255, a byte each; and its place across and up, in centimetres, four
+//! bytes each. A ground station that has every star of a generation drives
+//! `sky_quench` to that generation, and the lander stops sending until its
+//! sky is made again, with a new generation.
 
 use std::time::Duration;
 
@@ -75,7 +93,103 @@ pub const TERMINALS: &[Terminal] = &[
         "acceleration_y",
         Kind::Value(Unit::MetrePerSecondSquared),
     ),
+    // Starts it again at once, at its start with a full tank, each time it
+    // is driven to a new value other than nought: what the ground's Restart
+    // sends, a count, so that each press differs from the last.
+    Terminal::input("restart", Kind::Decision),
+    // While asserted, a lander that has landed or crashed starts again by
+    // itself once its pause has run; otherwise it stays down until it is
+    // restarted. Nothing driving it, it is not asserted: by default a lander
+    // stays down.
+    Terminal::input("autorestart", Kind::Decision),
+    // Its sky's records: see the module's "Sky".
+    Terminal::output("sky", Kind::Records),
+    // Driven to the generation of its sky that the ground has whole: while
+    // it is the sky's own, the sky is not sent.
+    Terminal::input("sky_quench", Kind::Decision),
 ];
+
+/// How many bytes one of the sky's records is.
+pub const STAR_RECORD: usize = 16;
+
+/// How many of the sky's records a packet carries: none is split between
+/// two.
+pub const STARS_IN_A_PACKET: usize = 4;
+
+/// How wide, in pixels, the scene is that a star's radius is given for.
+pub const SKY_WIDTH: f64 = 600.0;
+
+/// One star of the sky, as a record carries it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StarRecord {
+    /// The sky's generation: a new one each time the sky is made.
+    pub generation: u16,
+    /// How many stars the sky has.
+    pub total: u16,
+    /// Which star this is, from nought.
+    pub id: u16,
+    /// Its radius, in pixels of a scene [`SKY_WIDTH`] wide.
+    pub radius: f64,
+    /// Its brightness, from nought to one.
+    pub brightness: f64,
+    /// Its place across, in metres.
+    pub x: f64,
+    /// Its place up, in metres.
+    pub y: f64,
+}
+
+impl StarRecord {
+    /// Its bytes, as the module's "Sky" lays them out.
+    ///
+    /// # Returns
+    ///
+    /// The record. A radius, brightness or place beyond what its field
+    /// holds is held at the most it holds, none below nought.
+    pub fn to_bytes(&self) -> [u8; STAR_RECORD] {
+        let mut out = [0u8; STAR_RECORD];
+        out[0..2].copy_from_slice(&self.generation.to_be_bytes());
+        out[2..4].copy_from_slice(&self.total.to_be_bytes());
+        out[4..6].copy_from_slice(&self.id.to_be_bytes());
+        out[6] = (self.radius * 10.0).round().clamp(0.0, 255.0) as u8;
+        out[7] = (self.brightness * 255.0).round().clamp(0.0, 255.0) as u8;
+        let centimetres = |m: f64| {
+            ((m * 100.0).round().clamp(0.0, f64::from(u32::MAX))) as u32
+        };
+        out[8..12].copy_from_slice(&centimetres(self.x).to_be_bytes());
+        out[12..16].copy_from_slice(&centimetres(self.y).to_be_bytes());
+        out
+    }
+
+    /// A record read back from its bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The record's bytes.
+    ///
+    /// # Returns
+    ///
+    /// The star, to the precision its fields hold.
+    pub fn from_bytes(bytes: &[u8; STAR_RECORD]) -> StarRecord {
+        let two = |at: usize| u16::from_be_bytes([bytes[at], bytes[at + 1]]);
+        let four = |at: usize| {
+            f64::from(u32::from_be_bytes([
+                bytes[at],
+                bytes[at + 1],
+                bytes[at + 2],
+                bytes[at + 3],
+            ]))
+        };
+        StarRecord {
+            generation: two(0),
+            total: two(2),
+            id: two(4),
+            radius: f64::from(bytes[6]) / 10.0,
+            brightness: f64::from(bytes[7]) / 255.0,
+            x: four(8) / 100.0,
+            y: four(12) / 100.0,
+        }
+    }
+}
 
 /// Everything it states, by the name a file writes, the
 /// `component` naming it apart: the one list, from which an editor builds
@@ -476,6 +590,38 @@ fn landscape_kept(l: &Resolved) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A star's record reads back as it was written, to its fields'
+    /// precision, laid out as the module's "Sky" says.
+    #[test]
+    fn a_star_record_reads_back() {
+        let star = StarRecord {
+            generation: 3,
+            total: 300,
+            id: 299,
+            radius: 1.5,
+            brightness: 0.6,
+            x: 682.65,
+            y: 389.97,
+        };
+        let bytes = star.to_bytes();
+        assert_eq!(&bytes[..8], &[0, 3, 1, 44, 1, 43, 15, 153]);
+        assert_eq!(&bytes[8..12], &68265u32.to_be_bytes());
+        let back = StarRecord::from_bytes(&bytes);
+        assert_eq!((back.generation, back.total, back.id), (3, 300, 299));
+        assert_eq!((back.radius, back.x, back.y), (1.5, 682.65, 389.97));
+        assert!((back.brightness - 0.6).abs() < 0.5 / 255.0);
+        // Beyond its fields, held at their ends.
+        let wild = StarRecord {
+            radius: 40.0,
+            brightness: 2.0,
+            x: -1.0,
+            ..star
+        };
+        let bytes = wild.to_bytes();
+        assert_eq!((bytes[6], bytes[7]), (255, 255));
+        assert_eq!(&bytes[8..12], &[0, 0, 0, 0]);
+    }
 
     /// A lander as the lander example states it.
     ///

@@ -4,6 +4,7 @@ None needs Yamcs, tcs-sim or a vehicle, or opens a window. The landscapes
 made are held to the lander's physics by tcs-verify, where it is built.
 """
 
+import math
 import socket
 import subprocess
 import sys
@@ -89,7 +90,7 @@ class Landscape(unittest.TestCase):
                                              "configuration:", "outline"))]
         for line in kept:
             self.assertIn(line, text)
-        ground, pad = lander_yamcs.landscape(11, 1000, 600, 30)
+        ground, pad = lander_yamcs.landscape(11, 1000, 600, 45)
         self.assertEqual(lander.ground, ground)
         self.assertEqual(lander.pad, pad)
 
@@ -230,30 +231,168 @@ class Shown(unittest.TestCase):
                                side_effect=OSError("no xrdb")):
             self.assertEqual(lander_yamcs.display_scale(), 1.0)
 
-    def test_the_stars_are_as_bright_as_the_sky_has_them(self):
-        """About three times as many at each magnitude as at the one
-        brighter; disks shrinking to a pixel, then pixels dimming."""
-        counts = [0] * 6
-        for n in range(1000):
-            m = lander_yamcs.magnitude((n + 0.5) / 1000)
-            counts[min(int(m), 5)] += 1
-        for fewer, more in zip(counts[2:], counts[3:]):
-            self.assertTrue(2.5 < more / fewer < 3.5, counts)
-        drawn = [lander_yamcs.star_class((c + 0.5) * 0.75)
-                 for c in range(8)]
-        self.assertEqual(drawn[0], (lander_yamcs.BRIGHTEST_RADIUS, 1.0))
-        for (r0, b0), (r1, b1) in zip(drawn, drawn[1:]):
-            self.assertTrue(r1 <= r0 and b1 <= b0, drawn)
-            self.assertTrue(r1 < r0 or b1 < b0, drawn)
-        self.assertEqual(drawn[-1][0], lander_yamcs.PIXEL_RADIUS)
-        self.assertLess(drawn[-1][1], 0.5)
+    def test_the_sky_comes_down_and_is_quenched(self):
+        """No stars at first; each star once, as its record arrives, with a
+        part record left alone; a quench for each packet once the sky is
+        whole; and a new generation starting the sky afresh."""
+        import struct
+        sent = []
+        sky = lander_yamcs.Sky(sent.append)
+        self.assertEqual(sky.fresh(), (False, []))
+
+        def packet(generation, total, *numbers):
+            return b"".join(
+                struct.pack(lander_yamcs.STAR_LAYOUT, generation, total, n,
+                            15, 255, 100 * n, 25050)
+                for n in numbers)
+
+        self.assertEqual(sky.take(packet(1, 3, 0, 1) + b"\x00\x01"), [])
+        cleared, stars = sky.fresh()
+        self.assertTrue(cleared)
+        self.assertEqual(stars, [(0.0, 250.5, 1.5, 1.0),
+                                 (1.0, 250.5, 1.5, 1.0)])
+        # Again: nothing new, and not yet whole.
+        self.assertEqual(sky.take(packet(1, 3, 0, 1)), [])
+        self.assertEqual(sky.fresh(), (False, []))
+        self.assertEqual(sent, [])
+        self.assertEqual(sky.take(packet(1, 3, 2, 0)), [1])
+        self.assertEqual(sky.fresh(), (False, [(2.0, 250.5, 1.5, 1.0)]))
+        self.assertEqual(sky.take(packet(1, 3, 1)), [1])
+        self.assertEqual(sent, [1, 1])
+        # A new generation.
+        self.assertEqual(sky.take(packet(2, 2, 1)), [])
+        cleared, stars = sky.fresh()
+        self.assertTrue(cleared)
+        self.assertEqual(len(stars), 1)
+
+    def test_a_star_holds_the_light_tcs_sim_gives_it(self):
+        """Scaled from the scene its radius is given for; a disk where it
+        is a pixel or more, and a single pixel, dimmed by the part of it
+        the disk would cover, where it is less."""
+        disk, r, level = lander_yamcs.star_drawing(2.0, 1.0, 1.5)
+        self.assertEqual((disk, r, level), (True, 3.0, 255))
+        # Half a scene pixel at 0.8 of a pixel each: a disk a little short
+        # of half a pixel across, a fraction of a pixel's light.
+        disk, r, level = lander_yamcs.star_drawing(0.5, 0.6, 0.8)
+        self.assertFalse(disk)
+        self.assertEqual(level, round(255 * 0.6 * math.pi * 0.16))
+
+    def test_an_uplink_sends_a_number_in_its_bytes(self):
+        """Two bytes, most significant first, for a sky's generation."""
+        class Yamcs:
+            """Keeps what it is asked to send."""
+
+            def __init__(self):
+                self.issued = []
+
+            def issue(self, command, args):
+                """Keeps it.
+
+                Args:
+                    command: The command.
+                    args:    Its arguments.
+                """
+                self.issued.append((command, args))
+
+        uplink = lander_yamcs.Uplink(Yamcs(), "/x/gateway_sky", "sky")
+        self.assertEqual(uplink.send(258, 2),
+                         {"Data": "0102", "DataBits": 16})
+        self.assertEqual(uplink.send(7), {"Data": "07", "DataBits": 8})
+
+    def test_the_landers_lights_are_on_its_cabin(self):
+        """The green light in the cabin's middle, facing the viewer, and
+        the white ones on its top and rear, the left, and on the front of
+        the nozzle."""
+        import yaml
+        lander = lander_yamcs.Lander(lander_yamcs.lander_settings(
+            yaml.safe_load(lander_yamcs.SHIPPED_SIM.read_text())))
+        green, whites = lander_yamcs.lander_lights(lander)
+        # The shipped cabin: from -10.5 to 10.5 across and 27 to 39 up;
+        # its nozzle from -5.25 to 5.25 across and 8.25 to 13.5 up.
+        self.assertEqual(green, (0.0, 33.0))
+        self.assertEqual(whites,
+                         [(0.0, 39.0), (5.25, 10.875), (-10.5, 33.0)])
+
+    def test_each_restart_is_a_new_count(self):
+        """Restart sends the gateway's command with a count that differs
+        each time, from one to 255 and round again."""
+        sent = []
+
+        class Yamcs:
+            """A Yamcs that keeps what it is asked to send."""
+
+            def issue(self, command, args):
+                """Keeps a command.
+
+                Args:
+                    command: Its name.
+                    args:    Its arguments.
+                """
+                sent.append((command, args))
+
+        restarter = lander_yamcs.Restarter(
+            lander_yamcs.Uplink(Yamcs(), "/TcsYamcs/gateway", "restart"))
+        said = [restarter.restart()["Data"] for _ in range(256)]
+        self.assertEqual(said[:2], ["01", "02"])
+        self.assertEqual(said[254:], ["ff", "01"])
+        for _ in range(100):
+            if len(sent) == 256:
+                break
+            time.sleep(0.01)
+        self.assertEqual(sent[0], ("/TcsYamcs/gateway",
+                                   {"Data": "01", "DataBits": 8}))
+
+    def test_each_vehicle_takes_its_controls(self):
+        """lander-a's gateway passes the ground's command to autorestart,
+        and its gateway_sky to sky_quench; lander-b's to restart."""
+        a, b = (lander_yamcs.Craft(name) for name in lander_yamcs.VEHICLES)
+        self.assertEqual(a.commands,
+                         {"autorestart": "/TcsYamcs/gateway",
+                          "sky_quench": "/TcsYamcs/gateway_sky"})
+        self.assertEqual(b.commands, {"restart": "/TcsYamcs/gateway"})
+
+    def test_autorestart_sends_nought_to_disable_and_one_to_enable(self):
+        """Disable keeps the lander down, with 0; Enable lets it start
+        again by itself, with 1."""
+        sent = []
+
+        class Uplink:
+            """An uplink that keeps what it is asked to send."""
+
+            def send(self, byte):
+                """Keeps a byte.
+
+                Args:
+                    byte: It.
+                """
+                sent.append(byte)
+
+        autorestart = lander_yamcs.Autorestart(Uplink())
+        autorestart.disable()
+        autorestart.enable()
+        self.assertEqual(sent, [0, 1])
+
+    def test_the_lander_is_reckoned_on_between_readings(self):
+        """Between readings the lander is carried on by its velocity and
+        acceleration, no further than RECKON_FOR, and not once down."""
+        readings = lander_yamcs.Readings([])
+        readings.values.update({"to_x": 100.0, "to_velocity_x": 10.0,
+                                "to_accel_x": 2.0})
+        readings.changed["to_x"] = 50.0
+        self.assertAlmostEqual(readings.estimate("x", now=50.25),
+                               100.0 + 2.5 + 0.0625)
+        far = readings.estimate("x", now=60.0)
+        reach = lander_yamcs.RECKON_FOR
+        self.assertAlmostEqual(far, 100.0 + 10.0 * reach + reach * reach)
+        readings.values["crashed"] = b"1"
+        self.assertEqual(readings.estimate("x", now=50.25), 100.0)
 
     def test_a_signal_says_yes_with_a_one(self):
         """The landed and crashed signals are the text 1 or 0."""
         readings = lander_yamcs.Readings([])
         self.assertEqual(readings.state(), "Flying")
         readings.values["crashed"] = b"1"
-        self.assertEqual(readings.state(), "Crashed")
+        self.assertEqual(readings.state(), lander_yamcs.CRASHED_SAID)
         readings.values["crashed"] = b"0"
         readings.values["landed"] = "1"
         self.assertEqual(readings.state(), "Landed")

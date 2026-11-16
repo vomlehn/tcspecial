@@ -43,7 +43,7 @@ whole, the ground's smaller.
 The landing pad
 ---------------
 
-The pad is a level line twice as wide as the lander, 60 m. Its centre is
+The pad is a level line twice as wide as the lander, 90 m. Its centre is
 within the middle 50% of the display's width, and its height within the
 lowest 20% of the display's height. It is drawn as a level line with a
 short upright mark at each end, so that it is told from the terrain by its
@@ -72,7 +72,7 @@ The lander
 
 The lander is a simple figure of a lunar lander, drawn for this example
 and copied from no other: a body on two splayed legs with feet, about a
-twentieth of the display's height, 30 m, and about as wide as it is tall;
+thirteenth of the display's height, 45 m, and about as wide as it is tall;
 its outline is what meets the ground. It starts at the
 upper left of the display, wholly in view.
 
@@ -82,25 +82,30 @@ Flying it
 The joystick
 ------------
 
-The joystick, in tcs-sim's window beside the X and Y values, is a plus: a
-square, the neutral part, with a rectangle joined to each of its four
-sides. A press in the square, dragged out of it, moves the axes; each axis
-reads on its own, from the pointer's place along it, so a drag outward on a
-diagonal moves both.
+The joystick, in tcs-sim's window beside the X and Y values, is a T: a
+square, the neutral part, with a rectangle joined to its left, its right
+and its top. The lander's engine is on its bottom, pushing it up, and
+nothing on its top pushes it down, so there is no rectangle below the
+square. A press in the square, dragged out of it, moves the axes; each
+axis reads on its own, from the pointer's place along it, so a drag
+outward on a diagonal moves both.
 
 * X is 0 at the square's left side and falls linearly to -100 at the left
   end of the left rectangle; it stays at -100 further left, and comes back
   to 0 the same way when the pointer comes back. At the square's right side
   it rises in the same way to 100 at the right end of the right rectangle.
 * Y is 0 at the square's top and rises linearly to 100 at the top of the
-  upper rectangle, and falls from 0 at the square's bottom to -100 at the
-  bottom of the lower rectangle, held at the ends in the same way.
+  upper rectangle, held there beyond it; below the square it stays 0.
 
-A small dot follows the pointer while the button is held, within the
-rectangle that encloses the plus, and stays at that rectangle's edge when
-the pointer goes beyond it. When the button is let go, the dot goes back to
-the centre of the square, and both axes read 0 until the next press in the
-square is dragged out of it.
+The square is the joystick's dead zone. The rectangles, as thick as the
+square, are hatched along their outsides a tenth of their travel apart. At
+rest a plus is drawn across the square. While the button is held two lines
+track the pointer instead: a vertical one across the left and right
+rectangles, from the left end of the left one to the right end of the
+right one, and a horizontal one across the top rectangle, from halfway up
+the square to the rectangle's far end. When the button is let go, the plus
+comes back, and both axes read 0 until the next press in the square is
+dragged out of it.
 
 Thrust, mass and fuel
 ---------------------
@@ -134,11 +139,12 @@ The lander is down the moment any part of its outline first meets a line
 of the terrain or the pad. It has landed if both its feet are on the pad,
 nothing of it touches the terrain, and it is moving no faster than the
 Apollo lunar module's touchdown limits: 3.05 m/s downward and 1.22 m/s
-sideways. Anything else that touches has crashed, and so has a lander that
-leaves the display entirely.
+sideways. Anything else that touches has crashed. A lander that leaves the
+display flies on out of sight, and has crashed only if it drops below the
+display's bottom line, which goes on indefinitely to the left and right.
 
 After a crash, there is a pause, and the lander starts again at the upper
-left with a full tank. After a landing, a smiley face is drawn over the
+left with a full tank. After a landing, a smiling face is drawn over the
 lander, and then there is the same pause and the same start.
 
 The vehicles
@@ -193,10 +199,12 @@ For a world that has a two-dimensional body, tcs-sim's window shows, in a
 pane at the left of its payload panels:
 
 * the landscape and the lander, drawn to scale, positive X to the right and
-  positive Y upward, under a black sky with stars, the lander
+  positive Y upward, under a black sky with stars, which lander-a also
+  sends down (see "The sky, sent down"), the lander
   white with thin black lines so that it shows against the sky and the
-  ground, with the smiley face after a landing;
-* "Landed" or "Crashed" in words, and the fuel left, in words and as a
+  ground, with the smiling face after a landing;
+* "Landed", or on a crash "On the Moon, no one can hear you CRASH!", in
+  words, and the fuel left, in words and as a
   bar;
 * below them, the X and Y position, velocity and acceleration, each named
   and with its unit;
@@ -216,10 +224,60 @@ second and shows:
 
 * the landscape, from the run's simulator file, and the lander at the
   position sent down, smaller than tcs-sim's;
+* the stars of tcs-sim's sky, as they are sent down: none at first, each
+  appearing as its record arrives (see "The sky, sent down");
 * the six values, and the fuel left;
-* an area like the joystick, with a dot at the X and Y values the joystick
-  sent down; the pointer does nothing there;
-* "Landed" or "Crashed" when the values sent down say so.
+* a joystick like tcs-sim's, its two lines at the X and Y values the
+  joystick sent down, or its plus when they are nought; the pointer does
+  nothing there;
+* "Landed", or "On the Moon, no one can hear you CRASH!", when the values
+  sent down say so;
+* a Restart button, which sends a command up through lander-b's gateway to
+  a simulated payload, ``restart``, joined to the lander's ``restart``
+  input: each press a new count, the lander starting again at each, a light
+  time after the press;
+* Disable Autorestart and Enable Autorestart, which send a command up
+  through lander-a's gateway to a simulated payload, ``autorestart``,
+  joined to the lander's ``autorestart`` input. Until it is enabled, a
+  lander that has landed or crashed stays down until it is restarted;
+  enabled, it starts again by itself after its pause.
+
+The sky, sent down
+------------------
+
+The ground's sky is tcs-sim's, sent down rather than worked out again:
+the one place the stars are made is tcs-sim's ``physics::sky``, which its
+pane draws and its lander sends. The lander's ``sky`` output is records, a
+kind of terminal of its own, one for each star. lander-a's simulated
+payload ``sky`` sends them four to a packet, every 50 ms, round and round,
+and the vehicle passes them down through its gateway, as bytes, to Yamcs's
+``sky`` parameter. Each record is 16 bytes, most significant byte first:
+
+* the sky's generation, how many stars it has, and the star's number, from
+  nought, two bytes each;
+* its radius, in tenths of a pixel of a scene 600 pixels wide, and its
+  brightness, from nought to 255, a byte each;
+* its place across and up, in centimetres, four bytes each.
+
+No record is split between two packets, so a packet lost costs only the
+stars it carried. The ground reads Yamcs for the latest packet several
+times a second, so it misses some, besides those UDP loses on the way;
+each comes round again on a later pass. The sky fills in over a few
+seconds, and where packets are lost it is thinner for a while: less to
+look at, and nothing else.
+
+Once the ground has every star of a generation, it answers each further
+packet of that generation with a quench: the generation, two bytes, sent
+up through lander-a's second gateway, ``gateway_sky``, to the simulated
+payload ``sky_quench``, joined to the lander's ``sky_quench`` input.
+While that input holds the sky's generation, nothing is sent. A quench
+lost on the way is answered again by the next packet, so the sending
+stops a round trip after the sky is whole. The quench has a gateway of
+its own because a gateway passes what the ground sends to every payload
+it feeds, and lander-a's first feeds ``autorestart``, which would read a
+quench as an order. A sky made again would have a new generation, sent
+afresh and gathered afresh; tcs-sim makes its sky once a run, as
+generation 1.
 
 How it was made
 ===============
@@ -242,7 +300,8 @@ In this order, each stage checked before the next:
      inputs; the X and Y position and velocity, the fuel left, and landed
      and crashed, as outputs. The thrust, mass and fuel are as described
      above, extending what ``body`` and ``engine`` do on one axis.
-   * ``joystick``: two inputs, which tcs-sim's window drives as a simulated
+   * ``joystick_3_4``, the three-armed joystick: two inputs, which tcs-sim's
+     window drives as a simulated
      payload drives an input, and two outputs, X and Y from -1 to 1, which
      simulated payloads report.
    * a unit, metres per second squared, for the acceleration: a type in
@@ -274,3 +333,19 @@ In this order, each stage checked before the next:
      manual;
    * the packaging, so that tcspecial-examples carries every new kind of
      file, and so that the container has the example.
+
+7. **Commanding it, and its sky.** Once it was flying:
+
+   * Restart, a simulated payload ``restart`` on ``lander-b`` joined to
+     the lander's ``restart`` input, and Disable and Enable Autorestart,
+     ``autorestart`` on ``lander-a``, joined to its ``autorestart`` input,
+     each commanded from the MOC's window through its vehicle's gateway;
+   * the sky, made once in tcs-sim's ``physics::sky``, drawn by its pane
+     and sent down as the lander's ``sky`` records through ``lander-a``,
+     and quenched through ``lander-a``'s ``gateway_sky``, as in "The sky,
+     sent down";
+   * the joystick a T, with no arm below its middle, since nothing pushes
+     the lander down, and the bottom engine, once lit, at no less than a
+     tenth of its full thrust;
+   * a lander that leaves the display flying on, crashing only below the
+     display's bottom line.

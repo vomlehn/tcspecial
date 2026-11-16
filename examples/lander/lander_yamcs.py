@@ -56,6 +56,7 @@ import random
 import re
 import select
 import socket
+import struct
 import subprocess
 import sys
 import textwrap
@@ -125,8 +126,13 @@ LOWEST_PAD = 0.02
 NOTHING_YET = "--"
 
 #: How often the window takes in what the reading loop has read, in
-#: milliseconds.
-REFRESH_MS = 100
+#: milliseconds: about as often as a screen is drawn, the lander drawn
+#: between readings by dead reckoning, so that it moves smoothly.
+REFRESH_MS = 16
+
+#: The longest the lander is carried on from its last reported position by
+#: dead reckoning, in seconds: past this, the link has gone quiet.
+RECKON_FOR = 0.5
 
 #: How long after it opens the window puts itself under tcs-sim's, in
 #: milliseconds: long enough for it to have been shown, which it must be
@@ -144,29 +150,21 @@ SCALE = 0.48
 #: The joystick's square's side, which is each arm's thickness, and how far
 #: each arm reaches beyond it, in pixels: as tcs-sim's lander pane draws
 #: it.
-SQUARE = 25.2
-ARM = 70
+SQUARE = 9.45
+ARM = 105
 
-#: How many stars the sky has.
-STARS = 300
+#: How many bytes one of the sky's records is, and how they are laid out:
+#: the sky's generation, how many stars it has, and the star's number, two
+#: bytes each; its radius, in tenths of a pixel, and its brightness, from
+#: nought to 255, a byte each; and its place across and up, in centimetres,
+#: four bytes each; most significant byte first. tcsprotocol's
+#: ``node::physics::lander``, "Sky", is where they are said.
+STAR_RECORD = 16
+STAR_LAYOUT = ">HHHBBII"
 
-#: The faintest star, as an apparent magnitude, the brightest being nought;
-#: how many times as many stars there are at each magnitude as at the one
-#: brighter; and the magnitude at which a star has shrunk to a single
-#: pixel: as tcs-sim's lander pane has them.
-FAINTEST = 6.0
-MORE_EACH_MAGNITUDE = 3.0
-PIXEL_FROM = 3.0
-
-#: The radius of the brightest star's disk, and of a single pixel's, in
-#: pixels; and how many classes of brightness the stars are drawn in.
-BRIGHTEST_RADIUS = 2.0
-PIXEL_RADIUS = 0.5
-STAR_CLASSES = 8
-
-#: How far above the ground a star is at least, as a fraction of the
-#: display's height.
-STAR_CLEARANCE = 0.02
+#: How wide, in pixels, the scene is that a record's radius is given for:
+#: tcsprotocol's ``SKY_WIDTH``, part of the records' layout.
+SKY_WIDTH = 600.0
 
 #: How tall each end mark of the pad is, as a fraction of the display's
 #: height, and the radius of the light on top of it, in metres: as tcs-sim's
@@ -177,9 +175,19 @@ PAD_LIGHT = 6.0
 #: How long the pad's lights take to flash on and off again, in seconds.
 PAD_FLASH = 1.0
 
+#: The radius of each of the lander's lights, in pixels; and how long its
+#: white lights take to flash again, and how long each flash lasts, in
+#: seconds: as tcs-sim's lander pane has them.
+LANDER_LIGHT = 1.5
+STROBE_EVERY = 1.0
+STROBE_FOR = 0.15
+
 #: The ground's fill: grey with a little brown, as tcs-sim's lander pane
 #: has it.
 GROUND = "#aaa197"
+
+#: What the window says of a crashed lander, as tcs-sim's lander pane does.
+CRASHED_SAID = "On the Moon, no one can hear you CRASH!"
 
 #: Whether to print status messages: ``-v`` or ``--verbose``.
 VERBOSE = False
@@ -643,6 +651,18 @@ class Craft:
         self.parameters = {link.source: generated.qualified(link.name)
                            for link in generated.telemetry(self.config)}
         self.digest, self.why_no_digest = configuration.digest(self.path)
+        #: The command the ground sends up through the gateway, by the
+        #: payload the gateway passes it to, where the gateway binds aboard
+        #: to take it and passes it on by moc-out: lander-a's to autorestart,
+        #: lander-b's to restart.
+        self.commands = {}
+        for uplink in generated.uplinks(self.config):
+            if uplink.vehicle is None:
+                continue
+            for target in self.config.node(uplink.name).links.get(
+                    "moc-out", []):
+                self.commands[target.split(".", 1)[0]] = (
+                    generated.qualified(uplink.command))
 
     def log_directory(self):
         """Where the vehicle logs its telemetry.
@@ -755,6 +775,84 @@ def simulator_ready(program, sim_path, crafts, patience):
                            f"{asked.stderr.strip() or asked.stdout.strip()}")
 
 
+class Sky:
+    """The lander's sky, as its records come down: no stars until the first
+    arrives, and each star drawn as its record arrives.
+
+    tcs-sim sends the stars round and round, four to a packet, each record
+    whole; Yamcs is read for the latest, so a packet newer than the last
+    read hides the one before it, and a packet lost on the way is lost.
+    Either is had on a later pass. Once every star of a generation is here,
+    each packet more of it is answered with a quench, the generation sent
+    up to ``sky_quench``, which stops the sending; a lost quench is answered
+    again by the next packet. A new generation starts the sky afresh.
+
+    Args:
+        quench: Sends a generation up to quench it, or ``None`` to send
+                nothing.
+    """
+
+    def __init__(self, quench=None):
+        self._quench = quench
+        #: The generation being gathered, ``None`` before any.
+        self.generation = None
+        #: How many stars it has.
+        self.total = 0
+        #: Each star had, by its number, as ``(x, y, radius, brightness)``:
+        #: its place, in metres; its radius, in pixels; and its brightness,
+        #: from nought to one.
+        self.stars = {}
+        #: The numbers of the stars had and not yet drawn.
+        self._fresh = []
+        #: Whether the generation changed since the window last drew.
+        self._changed = False
+        self._lock = threading.Lock()
+
+    def take(self, data):
+        """Takes a packet of records, quenching the sky where it is whole.
+
+        Args:
+            data: The packet's bytes: whole records, a trailing part of one
+                  left alone.
+
+        Returns:
+            The generations quenched, each once, in order.
+        """
+        quenched = []
+        for at in range(0, len(data) - STAR_RECORD + 1, STAR_RECORD):
+            (generation, total, number, radius, bright, x, y) = (
+                struct.unpack(STAR_LAYOUT, data[at:at + STAR_RECORD]))
+            with self._lock:
+                if generation != self.generation:
+                    self.generation, self.total = generation, total
+                    self.stars, self._fresh = {}, []
+                    self._changed = True
+                if number < total and number not in self.stars:
+                    self.stars[number] = (x / 100, y / 100, radius / 10,
+                                          bright / 255)
+                    self._fresh.append(number)
+                whole = len(self.stars) >= self.total
+            if whole and generation not in quenched:
+                quenched.append(generation)
+        if self._quench is not None:
+            for generation in quenched:
+                self._quench(generation)
+        return quenched
+
+    def fresh(self):
+        """The stars not yet drawn, and whether the sky drawn so far is to
+        be cleared first, a new generation having come.
+
+        Returns:
+            ``(cleared, stars)``: whether to clear; and each star as
+            :attr:`stars` holds it.
+        """
+        with self._lock:
+            stars = [self.stars[n] for n in self._fresh]
+            cleared, self._changed, self._fresh = self._changed, False, []
+        return cleared, stars
+
+
 class Readings:
     """What the two vehicles last said, read from Yamcs.
 
@@ -763,21 +861,63 @@ class Readings:
                ``(yamcs, craft)``.
     """
 
-    def __init__(self, reads):
+    def __init__(self, reads, sky=None):
         self._reads = reads
+        #: The :class:`Sky`, which each new packet of the ``sky`` node's
+        #: records is given to; ``None`` for none.
+        self.sky = sky
         #: Each value, by the name of the node that sent it.
         self.values = {}
+        #: When each value last changed, on this program's monotonic clock.
+        self.changed = {}
         self._lock = threading.Lock()
 
     def read(self):
         """Reads each vehicle's latest values from Yamcs."""
         for yamcs, craft in self._reads:
+            fresh = []
             names = list(craft.parameters.values())
             latest = yamcs.latest(names)
+            now = time.monotonic()
             with self._lock:
                 for node, parameter in craft.parameters.items():
                     if parameter in latest:
-                        self.values[node] = latest[parameter][0]
+                        value = latest[parameter][0]
+                        if self.values.get(node) != value:
+                            self.changed[node] = now
+                            if node == "sky" and self.sky is not None:
+                                fresh.append(value)
+                        self.values[node] = value
+            # Outside the lock: a whole sky sends a quench.
+            for value in fresh:
+                self.sky.take(value)
+
+    def estimate(self, axis, now=None):
+        """Where the lander is along an axis now, by dead reckoning: its
+        last reported position, carried on by its last reported velocity
+        and acceleration for the time since that position arrived -- at
+        most :data:`RECKON_FOR`, so that a link gone quiet does not carry it
+        off -- and not at all once it is down.
+
+        Args:
+            axis: ``"x"`` or ``"y"``.
+            now:  The moment, on this program's monotonic clock; now if
+                  ``None``.
+
+        Returns:
+            The position, in metres, or ``None`` before one has arrived.
+        """
+        where = self.number(f"to_{axis}")
+        if where is None or self.state() != "Flying":
+            return where
+        with self._lock:
+            since = self.changed.get(f"to_{axis}")
+        if since is None:
+            return where
+        t = min(RECKON_FOR, max(0.0, (now or time.monotonic()) - since))
+        speed = self.number(f"to_velocity_{axis}") or 0.0
+        push = self.number(f"to_accel_{axis}") or 0.0
+        return where + speed * t + 0.5 * push * t * t
 
     def number(self, node):
         """A node's latest value as a number.
@@ -812,12 +952,12 @@ class Readings:
         """What the lander is doing, as the values sent down say.
 
         Returns:
-            ``"Landed"``, ``"Crashed"`` or ``"Flying"``.
+            ``"Landed"``, :data:`CRASHED_SAID` or ``"Flying"``.
         """
         if self.said("landed"):
             return "Landed"
         if self.said("crashed"):
-            return "Crashed"
+            return CRASHED_SAID
         return "Flying"
 
     def text(self, node, places=2):
@@ -861,7 +1001,7 @@ class Readings:
 ROWS = (("Position", "m", "to_x", "to_y"),
         ("Velocity", "m/s", "to_velocity_x", "to_velocity_y"),
         ("Acceleration", "m/s²", "to_accel_x", "to_accel_y"),
-        ("Joystick", "", "to_joystick_x", "to_joystick_y"))
+        ("Joystick", "", "to_joystick_3_4_x", "to_joystick_3_4_y"))
 
 #: Every node of :data:`ROWS`, in order.
 ROWS_FLAT = tuple(node for _, _, x, y in ROWS for node in (x, y))
@@ -884,66 +1024,28 @@ def ground_at(lander, x):
     return lander.ground[-1][1]
 
 
-def magnitude(u):
-    """An apparent magnitude drawn at random, as the night sky's are: each
-    magnitude :data:`MORE_EACH_MAGNITUDE` times as common as the one
-    brighter, from nought to :data:`FAINTEST`.
+def star_drawing(radius, bright, per_scene):
+    """How a star sent down is drawn, holding as much light as tcs-sim's
+    pane gives it: a disk of its radius, its edge soft, so that the light
+    in it goes as the disk's area.
 
     Args:
-        u: A number drawn evenly from nought to one.
+        radius:    Its radius, in pixels of a scene :data:`SKY_WIDTH` wide,
+                   as its record says.
+        bright:    Its brightness, from nought to one, as its record says.
+        per_scene: This window's pixels for each of that scene's.
 
     Returns:
-        The magnitude.
+        ``(disk, r, level)``: whether to draw a disk of radius ``r``
+        pixels, or else a single pixel; and its grey, nought to 255. A
+        star whose disk is smaller than a pixel is one pixel, dimmed by
+        the part of a pixel its disk would cover.
     """
-    k = MORE_EACH_MAGNITUDE
-    return math.log(1 + u * (k ** FAINTEST - 1)) / math.log(k)
-
-
-def star_class(m):
-    """How a star of an apparent magnitude is drawn.
-
-    Args:
-        m: The magnitude.
-
-    Returns:
-        Its radius, in pixels, and its brightness, from nought to one: a
-        disk shrinking with the magnitude to a single pixel, and fainter
-        than that a single pixel, a fifth of a magnitude dimmer for each
-        magnitude, gentler than the sky's own so that the faintest show.
-    """
-    width = FAINTEST / STAR_CLASSES
-    middle = (min(int(m / width), STAR_CLASSES - 1) + 0.5) * width
-    if middle < PIXEL_FROM:
-        disks = max(round(PIXEL_FROM / width), 1) - 1
-        along = int(m / width) / disks if disks else 1.0
-        shrunk = along * (BRIGHTEST_RADIUS - PIXEL_RADIUS)
-        return BRIGHTEST_RADIUS - shrunk, 1.0
-    return PIXEL_RADIUS, 10 ** (-0.2 * (middle - PIXEL_FROM))
-
-
-def star_places(lander, seed):
-    """The stars in the sky, each somewhere above the ground, with how each
-    is drawn by its apparent brightness.
-
-    Args:
-        lander: The :class:`Lander`, whose ground they are above.
-        seed:   The landscape's seed, so that one landscape has one sky.
-
-    Returns:
-        Each star as ``(x, y, radius, brightness)``: its place, in metres,
-        and as :func:`star_class` gives the rest.
-    """
-    rng = random.Random(seed)
-    places = []
-    for _ in range(STARS):
-        x = rng.uniform(0, lander.width)
-        lowest = ground_at(lander, x) + STAR_CLEARANCE * lander.height
-        u, height = rng.random(), rng.random()
-        if lowest >= lander.height:
-            continue
-        y = lowest + height * (lander.height - lowest)
-        places.append((x, y, *star_class(magnitude(u))))
-    return places
+    r = radius * per_scene
+    area = math.pi * r * r
+    if area < 1.0:
+        return False, 0.5, round(255 * bright * area)
+    return True, r, round(255 * bright)
 
 
 def display_scale():
@@ -968,6 +1070,156 @@ def display_scale():
     if not found or float(found.group(1)) <= 0:
         return 1.0
     return float(found.group(1)) / 96
+
+
+def lander_lights(lander):
+    """Where the lander's lights are, from the place between its feet.
+
+    The display shows the lander's right side, its front to the display's
+    right: so the green light on the right of its cabin, its upper stage,
+    faces the viewer from the cabin's middle, and the flashing white lights
+    are on the cabin's top and its rear, the display's left, and on the
+    front of the nozzle, halfway up it: the nozzle being the shape straight
+    below the cabin's middle that reaches lowest.
+    The cabin is the shape of the outline that reaches highest.
+
+    Args:
+        lander: The :class:`Lander`.
+
+    Returns:
+        The green light's place, and the white lights', each ``(x, y)`` in
+        metres; ``None`` and none where the outline has no shape.
+    """
+    shapes = [line for line in lander.outline if len(line) > 2]
+    if not shapes:
+        return None, []
+    cabin = max(shapes, key=lambda line: max(y for _, y in line))
+    xs = [x for x, _ in cabin]
+    ys = [y for _, y in cabin]
+    middle, half = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
+    # The nozzle's front, its right, the lander facing right, halfway up.
+    below = [line for line in shapes
+             if min(x for x, _ in line) <= middle <= max(x for x, _ in line)]
+    nozzle = min(below, key=lambda line: min(y for _, y in line))
+    front = (max(x for x, _ in nozzle),
+             (min(y for _, y in nozzle) + max(y for _, y in nozzle)) / 2)
+    return (middle, half), [(middle, max(ys)), front, (min(xs), half)]
+
+
+class Uplink:
+    """Has Yamcs send a vehicle's gateway a number, which the gateway passes
+    to a payload of the vehicle's.
+
+    Args:
+        yamcs:   The Yamcs instance of that vehicle.
+        command: The gateway's command, its qualified name.
+        what:    What the byte does, for the status and a complaint.
+    """
+
+    def __init__(self, yamcs, command, what):
+        self._yamcs = yamcs
+        self._command = command
+        self._what = what
+
+    def send(self, byte, octets=1):
+        """Sends a number, from a thread of its own, so that the window does
+        not wait on Yamcs: a refusal is said on stderr.
+
+        Args:
+            byte:   The number, most significant byte first.
+            octets: How many bytes it is sent in.
+
+        Returns:
+            The command's arguments.
+        """
+        args = {"Data": byte.to_bytes(octets, "big").hex(),
+                "DataBits": 8 * octets}
+
+        def send():
+            """Has Yamcs send it, saying why where it will not."""
+            try:
+                self._yamcs.issue(self._command, args)
+                status(f"{self._what} {args['Data']} sent")
+            except (RuntimeError, OSError) as why:
+                print(f"lander_yamcs: {self._what}: {why}", file=sys.stderr,
+                      flush=True)
+
+        threading.Thread(target=send, daemon=True).start()
+        return args
+
+
+class Restarter:
+    """Has Yamcs send the lander a restart, up through the vehicle whose
+    gateway passes it to the payload that restarts the lander.
+
+    Each restart is a count, from one to 255 and round again, so that each
+    differs from the last: the simulated payload passes a value on only
+    when it changes, and the lander starts again at each new one.
+
+    Args:
+        uplink: The :class:`Uplink` to the restart payload's vehicle.
+    """
+
+    def __init__(self, uplink):
+        self._uplink = uplink
+        self._count = 0
+
+    def restart(self):
+        """Sends the next restart.
+
+        Returns:
+            The command's arguments.
+        """
+        self._count = self._count % 255 + 1
+        return self._uplink.send(self._count)
+
+
+class Autorestart:
+    """Has Yamcs tell the lander whether to start again by itself after a
+    landing or a crash, up through the vehicle whose gateway passes it to
+    the payload that sets the lander's autorestart. Until it is told, it
+    does not: it stays down until it is restarted.
+
+    Args:
+        uplink: The :class:`Uplink` to the autorestart payload's vehicle.
+    """
+
+    def __init__(self, uplink):
+        self._uplink = uplink
+
+    def disable(self):
+        """Keeps the lander down after a landing or a crash, until it is
+        restarted.
+
+        Returns:
+            The command's arguments.
+        """
+        return self._uplink.send(0)
+
+    def enable(self):
+        """Lets the lander start again by itself after a landing or a
+        crash, once its pause has run.
+
+        Returns:
+            The command's arguments.
+        """
+        return self._uplink.send(1)
+
+
+def room_of(path):
+    """The width tcs-sim's window left for this program's, as it wrote it.
+
+    Args:
+        path: The file it was told to write it in.
+
+    Returns:
+        The width, in logical pixels; ``None`` where it wrote none, or
+        none that reads.
+    """
+    try:
+        return float(Path(path).read_text().strip())
+    except (OSError, ValueError):
+        return None
 
 
 def stick_offset(axis):
@@ -1022,17 +1274,27 @@ def watch_and_print(readings, seconds, every, stopped):
     return 1
 
 
-def run_the_window(readings, lander, seed, delay, stopped):
+def run_the_window(readings, lander, seed, delay, stopped, restarter,
+                   autorestart, room=None):
     """The window, and the loop that reads Yamcs for it.
 
+    At the top left of the display, as no wider than ``room``, where it is
+    given: the width tcs-sim's window, at the top right, leaves it.
+
     Args:
-        readings: The :class:`Readings`.
-        lander:   The :class:`Lander`, whose landscape and outline are
-                  drawn.
-        seed:     The landscape's seed, which the window says.
-        delay:    The link's delay, in seconds, which the window says.
-        stopped:  Says whether tcs-sim has stopped, its window closed:
-                  this window is closed then too, which ends the run.
+        readings:    The :class:`Readings`.
+        lander:      The :class:`Lander`, whose landscape and outline are
+                     drawn.
+        seed:        The landscape's seed, which the window says.
+        delay:       The link's delay, in seconds, which the window says.
+        stopped:     Says whether tcs-sim has stopped, its window closed:
+                     this window is closed then too, which ends the run.
+        restarter:   The :class:`Restarter` its Restart button sends by, or
+                     ``None``, for no button, where no vehicle takes one.
+        autorestart: The :class:`Autorestart` its two autorestart buttons
+                     send by, or ``None``, for none.
+        room:        The width it may take, in logical pixels, or ``None``
+                     for its own.
 
     Returns:
         The exit status, nought, once the window is closed.
@@ -1062,8 +1324,15 @@ def run_the_window(readings, lander, seed, delay, stopped):
     window.title("TCS Lander MOC")
     window.configure(background="#ffffff")
     window.resizable(False, False)
+    # The top left: tcs-sim's window asks for the top right.
+    window.geometry("+0+0")
     between = round(theme.BETWEEN * zoom)
     scale = SCALE * zoom
+    if room is not None:
+        # The landscape no wider than the room less the window's margins,
+        # the rest of the window being no wider than it.
+        fits = (room - 2 * theme.BETWEEN - 4) / lander.width
+        scale = min(SCALE, max(fits, 0.1)) * zoom
 
     wide, high = lander.width * scale, lander.height * scale
 
@@ -1084,15 +1353,31 @@ def run_the_window(readings, lander, seed, delay, stopped):
     scene = tk.Canvas(window, width=wide, height=high, background="#000000",
                       highlightthickness=1, highlightbackground="#6b7280")
     scene.pack(padx=between, pady=(between, between // 2))
-    scene.create_rectangle(0, 0, wide, high, fill="#000000", outline="")
-    for x, y, radius, bright in star_places(lander, seed):
-        cx, cy = at(x, y)
-        r = radius * zoom
-        level = round(255 * bright)
-        grey = f"#{level:02x}{level:02x}{level:02x}"
-        draw = (scene.create_oval if radius > PIXEL_RADIUS
-                else scene.create_rectangle)
-        draw(cx - r, cy - r, cx + r, cy + r, fill=grey, outline="")
+    night = scene.create_rectangle(0, 0, wide, high, fill="#000000",
+                                   outline="")
+
+    def draw_the_sky():
+        """Draws the stars come down since it last drew, just above the
+        black, so that the ground and the lander cover them; a new
+        generation clears those drawn first."""
+        if readings.sky is None:
+            return
+        cleared, stars = readings.sky.fresh()
+        if cleared:
+            scene.delete("star")
+        # This window's pixels for each of the scene's a record's radius is
+        # given in: the landscape is drawn narrower than tcs-sim's.
+        per_scene = scale * lander.width / SKY_WIDTH
+        for x, y, radius, bright in stars:
+            cx, cy = at(x, y)
+            disk, r, level = star_drawing(radius, bright, per_scene)
+            if level == 0:
+                continue
+            grey = f"#{level:02x}{level:02x}{level:02x}"
+            draw = scene.create_oval if disk else scene.create_rectangle
+            star = draw(cx - r, cy - r, cx + r, cy + r, fill=grey,
+                        outline="", tags="star")
+            scene.tag_raise(star, night)
     flat = [c for x, y in lander.ground for c in at(x, y)]
     scene.create_polygon(*at(0, 0), *flat, *at(lander.width, 0),
                          fill=GROUND, outline="")
@@ -1122,17 +1407,17 @@ def run_the_window(readings, lander, seed, delay, stopped):
                               font=("TkDefaultFont", 14, "bold"))
     drawn = []
     opened = time.monotonic()
+    green, whites = lander_lights(lander)
 
-    # Below the landscape, the values and the joystick side by side, and
-    # the note under them, so that the window is no wider than the
-    # landscape. In the type tcs-sim's window is set in, two points under
-    # the theme's.
+    # Below the landscape, the values, the joystick under them, and the note
+    # under that, so that the window is no wider than the landscape. In the
+    # type tcs-sim's window is set in, two points under the theme's.
     ttk.Style(window).configure("Lander.TLabel",
                                 font=("TkDefaultFont", fonts.POINTS - 2))
     below = ttk.Frame(window)
     below.pack(fill="x", padx=between)
     panel = ttk.Frame(below, padding=round(theme.INSIDE * zoom))
-    panel.pack(side="left", anchor="n")
+    panel.pack(side="top", anchor="w")
 
     def label(**options):
         """A label in the lander window's type.
@@ -1162,24 +1447,60 @@ def run_the_window(readings, lander, seed, delay, stopped):
                      text=f"Seed {seed}; everything here is {delay:g} s "
                           "behind the lander")
     note.pack(fill="x", padx=between, pady=(0, between))
+    # Commands sent up: each reaches the lander a light time later, and
+    # what it did is seen here a light time after that.
+    buttons = ttk.Frame(window)
+    buttons.pack(anchor="w", padx=between, pady=(0, between))
+    if restarter is not None:
+        ttk.Button(buttons, text="Restart",
+                   command=restarter.restart).pack(side="left")
+    if autorestart is not None:
+        for text, command in (("Disable Autorestart", autorestart.disable),
+                              ("Enable Autorestart", autorestart.enable)):
+            ttk.Button(buttons, text=text, command=command).pack(
+                side="left", padx=(between // 2, 0))
 
-    # The joystick, as it was held: the pointer does nothing here.
-    square, arm, spot = SQUARE * zoom, ARM * zoom, 7 * zoom
+    # The joystick, as it was sent down, as tcs-sim's draws it: the square,
+    # its dead zone, and rectangles extending from its left, right and top,
+    # each hatched along its outside -- there is no thrust down -- with a
+    # plus across the square while it is at rest, and two lines where it is
+    # held otherwise. The pointer does nothing here.
+    square, arm = SQUARE * zoom, ARM * zoom
+    tick, long_tick = 6 * zoom, 10.5 * zoom
     reach = square / 2 + arm
     thick = square
-    stick = tk.Canvas(below, width=2 * reach, height=2 * reach,
+    stick = tk.Canvas(below, width=2 * reach,
+                      height=reach + square / 2 + long_tick,
                       background="#ffffff", highlightthickness=0)
-    stick.pack(side="right", padx=(between, 0), pady=between // 2)
+    stick.pack(side="top", anchor="center", pady=between // 2)
     stick.create_rectangle(0, reach - thick / 2, 2 * reach, reach + thick / 2,
                            fill="#e5e7eb", outline="#6b7280")
-    stick.create_rectangle(reach - thick / 2, 0, reach + thick / 2, 2 * reach,
-                           fill="#e5e7eb", outline="#6b7280")
+    stick.create_rectangle(reach - thick / 2, 0, reach + thick / 2,
+                           reach + thick / 2, fill="#e5e7eb",
+                           outline="#6b7280")
     stick.create_rectangle(arm, arm, arm + square, arm + square,
-                           fill="#f3f4f6", outline="#374151",
-                           width=2 * zoom)
-    dot = stick.create_oval(reach - spot, reach - spot, reach + spot,
-                            reach + spot, fill="#0072B2",
-                            outline="#000000")
+                           fill="#f3f4f6", outline="#374151")
+    for n in range(1, 11):
+        along = square / 2 + n * arm / 10
+        size = long_tick if n % 5 == 0 else tick
+        for x in (reach - along, reach + along):
+            stick.create_line(x, reach - thick / 2 - size, x,
+                              reach - thick / 2, fill="#374151")
+            stick.create_line(x, reach + thick / 2, x,
+                              reach + thick / 2 + size, fill="#374151")
+        y = reach - along
+        stick.create_line(reach - thick / 2 - size, y, reach - thick / 2, y,
+                          fill="#374151")
+        stick.create_line(reach + thick / 2, y, reach + thick / 2 + size, y,
+                          fill="#374151")
+    plus = [stick.create_line(arm, reach, arm + square, reach,
+                              fill="#0072B2"),
+            stick.create_line(reach, arm, reach, arm + square,
+                              fill="#0072B2")]
+    across = stick.create_line(0, 0, 0, 0, fill="#0072B2", width=2 * zoom,
+                               state="hidden")
+    up = stick.create_line(0, 0, 0, 0, fill="#0072B2", width=2 * zoom,
+                           state="hidden")
 
     def take_in():
         """Shows what the loop has read, and comes back in
@@ -1194,10 +1515,11 @@ def run_the_window(readings, lander, seed, delay, stopped):
         fuel.configure(text="Fuel --" if left is None
                        else f"Fuel {round(left * 100)}%")
         scene.itemconfigure(state, text=readings.state())
+        draw_the_sky()
         for item in drawn:
             scene.delete(item)
         drawn.clear()
-        x, y = readings.number("to_x"), readings.number("to_y")
+        x, y = readings.estimate("x"), readings.estimate("y")
         if x is not None and y is not None:
             # As tcs-sim's lander pane draws it: its single lines --
             # struts, legs, the antenna -- first, each a black line a little
@@ -1216,15 +1538,38 @@ def run_the_window(readings, lander, seed, delay, stopped):
                     drawn.append(scene.create_polygon(
                         *flat, fill="#ffffff", outline="#000000",
                         width=0.75 * zoom))
+            # Its lights over it: the green steady, the white flashing --
+            # bright in a flash and dim between.
+            strobe = (time.monotonic() - opened) % STROBE_EVERY < STROBE_FOR
+            r = LANDER_LIGHT * zoom
+            flash = "#ffffff" if strobe else "#9ca3af"
+            lamps = [(place, flash, "#000000") for place in whites]
+            if green is not None:
+                lamps.append((green, "#009E73", ""))
+            for (lx, ly), fill, edge in lamps:
+                cx, cy = at(x + lx, y + ly)
+                # A black ring round each white one, so that it shows on
+                # the white lander as well as against the sky.
+                drawn.append(scene.create_oval(cx - r, cy - r, cx + r,
+                                               cy + r, fill=fill,
+                                               outline=edge, width=zoom))
         since = time.monotonic() - opened
         lit = since % PAD_FLASH < PAD_FLASH / 2
         for light in lights:
             scene.itemconfigure(light, fill="#E69F00" if lit else "#5c4000")
-        sx = readings.number("to_joystick_x") or 0.0
-        sy = readings.number("to_joystick_y") or 0.0
+        sx = readings.number("to_joystick_3_4_x") or 0.0
+        sy = readings.number("to_joystick_3_4_y") or 0.0
+        # At rest, the plus; held, a line across the level rectangles and
+        # one across the upright, halfway up the square for no thrust.
+        resting = sx == 0 and sy == 0
+        for item in plus:
+            stick.itemconfigure(item, state="normal" if resting else "hidden")
+        for item in (across, up):
+            stick.itemconfigure(item, state="hidden" if resting else "normal")
         cx = reach + stick_offset(sx) * zoom
-        cy = reach - stick_offset(sy) * zoom
-        stick.coords(dot, cx - spot, cy - spot, cx + spot, cy + spot)
+        cy = reach - stick_offset(max(0.0, sy)) * zoom
+        stick.coords(across, cx, reach - thick / 2, cx, reach + thick / 2)
+        stick.coords(up, reach - thick / 2, cy, reach + thick / 2, cy)
         window.after(REFRESH_MS, take_in)
 
     threading.Thread(target=reading_loop, daemon=True).start()
@@ -1299,6 +1644,7 @@ def main(argv):
                   f"CONNECT: {craft.why_no_digest}", file=sys.stderr)
             return 2
     yamcs_dir = run_dir / "yamcs"
+    room_file = run_dir / "room"
     first = Yamcs(options.yamcs, yamcs_dir, options.http_port, VEHICLES[0])
     yamcses = [first] + [first.instance_of(instance)
                          for instance in VEHICLES[1:]]
@@ -1330,9 +1676,14 @@ def main(argv):
             status(f"Yamcs is at http://localhost:{options.http_port}")
         if not options.no_simulator:
             tcs_sim = options.tcs_sim or built("tcs-sim", "say --no-simulator")
+            # Told where to say how much width its window leaves, at the top
+            # right, for this program's window to fit in.
+            room_file.unlink(missing_ok=True)
             simulator = Child(tcs_sim, ["--sending"]
                               + simulator_args(sim_path, crafts), "tcs-sim",
-                              options.verbose)
+                              options.verbose,
+                              env=dict(os.environ,
+                                       TCS_SIM_ROOM_FILE=str(room_file)))
             simulator.start()
             started.append(simulator)
             status("waiting for tcs-sim to make its simulated devices")
@@ -1356,10 +1707,22 @@ def main(argv):
                 return 1
             print(f"connected: {craft.instance} is running its "
                   "configuration", flush=True)
-        readings = Readings(list(zip(yamcses, crafts)))
+        uplinks = {target: Uplink(yamcs, command, target)
+                   for yamcs, craft in zip(yamcses, crafts)
+                   for target, command in craft.commands.items()}
+        # The sky, quenched by its generation, two bytes, once it is whole.
+        quencher = uplinks.get("sky_quench")
+        sky = Sky(None if quencher is None
+                  else lambda generation: quencher.send(generation, 2))
+        readings = Readings(list(zip(yamcses, crafts)), sky)
+        restarter = (Restarter(uplinks["restart"]) if "restart" in uplinks
+                     else None)
+        autorestart = (Autorestart(uplinks["autorestart"])
+                       if "autorestart" in uplinks else None)
         if options.seconds is None:
             return run_the_window(readings, lander, seed, options.delay,
-                                  stopped)
+                                  stopped, restarter, autorestart,
+                                  room_of(room_file))
         return watch_and_print(readings, options.seconds, options.every,
                                stopped)
     except (RuntimeError, ValueError, OSError) as why:

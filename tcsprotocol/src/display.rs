@@ -124,9 +124,51 @@ fn height_of(mode: &str) -> Option<u32> {
     mode.trim().split_once('x')?.1.trim().parse().ok()
 }
 
+/// The width in a mode line, which reads `3840x2400`.
+fn width_of(mode: &str) -> Option<u32> {
+    mode.trim().split_once('x')?.0.trim().parse().ok()
+}
+
+/// How wide the display is, in physical pixels, if it can be found out:
+/// read as [`screen_height`] reads the height, the widest connected output.
+///
+/// # Returns
+///
+/// The width of the widest connected output, in physical pixels, or `None`
+/// if no connected output says how wide it is.
+pub fn screen_width() -> Option<u32> {
+    let mut widest = None;
+    for output in fs::read_dir("/sys/class/drm").ok()? {
+        let output = match output {
+            Ok(output) => output.path(),
+            Err(_) => continue,
+        };
+        match fs::read_to_string(output.join("status")) {
+            Ok(status) if status.trim() == "connected" => {}
+            _ => continue,
+        }
+        let Ok(modes) = fs::read_to_string(output.join("modes")) else {
+            continue;
+        };
+        if let Some(width) = modes.lines().next().and_then(width_of) {
+            widest =
+                Some(widest.map_or(width, |so_far: u32| so_far.max(width)));
+        }
+    }
+    widest
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_mode_line_says_how_wide_the_display_is() {
+        assert_eq!(width_of("3840x2400"), Some(3840));
+        assert_eq!(width_of(" 1280x720 "), Some(1280));
+        assert_eq!(width_of(""), None);
+        assert_eq!(width_of("x720"), None);
+    }
 
     #[test]
     fn a_mode_line_says_how_tall_the_display_is() {

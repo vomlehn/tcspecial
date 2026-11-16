@@ -26,38 +26,41 @@ world:
     components:
       - type lander:
           - component: lander
-            # 5500 kg empty and 500 kg of fuel. A full push gives 4 m/s2 up
-            # and 2 m/s2 across with a full tank, and more as it empties;
-            # full thrust up empties it in about 63 s.
+            # 5500 kg empty and 500 kg of fuel. A full push gives 8 m/s2 up,
+            # from the engine on its bottom -- there is nothing on its top to
+            # push it down -- and 2 m/s2 across with a full tank, and more as
+            # it empties; full thrust up empties it in about 32 s.
             dry_mass: "5500 kg"
             fuel: "500 kg"
             isp: "311 s"
             thrust_x: "12000 N"
-            thrust_y: "24000 N"
+            thrust_y: "48000 N"
             gravity: "1.62 m/s2"
             # The upper left, wholly in view.
             x: "60 m"
             y: "540 m"
             width: "1000 m"
             height: "600 m"
-            ground: "0,210 90,300 180,170 300,240 420,80 480,80 600,190
+            ground: "0,210 90,300 180,170 300,240 405,80 495,80 600,190
               720,120 850,330 1000,200 m"
-            pad: "420,80 480,80 m"
+            pad: "405,80 495,80 m"
             # A body with its corners cut, a cabin on it with an antenna, a
             # nozzle under it, and two splayed legs, each with a strut and a
-            # foot: thirty metres wide and as tall, a twentieth of the
-            # display's height, its feet at nought.
-            outline: "-9,9 9,9 11,11 11,16 9,18 -9,18 -11,16 -11,11 -9,9 |
-              -6,18 -7,22 -4,26 4,26 7,22 6,18 | 0,26 0,30 | -2,30 2,30 |
-              -2.5,9 -3.5,5.5 3.5,5.5 2.5,9 | -11,13 -13.5,2 | -9,9 -13.5,2
-              | -15,0 -12,0 -13.5,2 -15,0 | 11,13 13.5,2 | 9,9 13.5,2 |
-              15,0 12,0 13.5,2 15,0 m"
+            # foot: forty-five metres wide and as tall, about a thirteenth
+            # of the display's height, its feet at nought. The pad is twice
+            # as wide.
+            outline: "-13.5,13.5 13.5,13.5 16.5,16.5 16.5,24 13.5,27 -13.5,27
+              -16.5,24 -16.5,16.5 -13.5,13.5 | -9,27 -10.5,33 -6,39 6,39
+              10.5,33 9,27 | 0,39 0,45 | -3,45 3,45 | -3.75,13.5 -5.25,8.25
+              5.25,8.25 3.75,13.5 | -16.5,19.5 -20.25,3 | -13.5,13.5 -20.25,3
+              | -22.5,0 -18,0 -20.25,3 -22.5,0 | 16.5,19.5 20.25,3 | 13.5,13.5
+              20.25,3 | 22.5,0 18,0 20.25,3 22.5,0 m"
             # The Apollo lunar module's touchdown limits.
             landing_speed: "3.05 m/s"
             landing_drift: "1.22 m/s"
-            pause: "3 s"
-      - type joystick:
-          - component: stick
+            pause: "5 s"
+      - type joystick_3_4:
+          - component: joystick_3_4
 
 simulated_payload_groups:
   - group: readings
@@ -84,14 +87,40 @@ simulated_payloads:
         configuration: lander-a
         connects: lander.fuel
         group: readings
-      - payload: joystick_x
+      - payload: joystick_3_4_x
         configuration: lander-a
-        connects: stick.x
+        connects: joystick_3_4.x
         group: readings
         packet_interval: 50 ms
       - payload: thruster_x
         configuration: lander-a
         connects: lander.throttle_x
+        enable: true
+        protocol: udp
+        simulate: true
+      # What the ground's autorestart buttons reach, through lander-a's
+      # gateway: 1 lets the lander start again by itself after a landing or
+      # a crash, 0, as it is until told, keeps it down until it is
+      # restarted.
+      - payload: autorestart
+        configuration: lander-a
+        connects: lander.autorestart
+        enable: true
+        protocol: udp
+        simulate: true
+      # The lander's sky, four stars a packet, round and round, until the
+      # ground has every star and quenches it through lander-a's
+      # gateway_sky, driving sky_quench to the sky's generation.
+      - payload: sky
+        configuration: lander-a
+        connects: lander.sky
+        enable: true
+        packet_interval: 50 ms
+        protocol: udp
+        simulate: true
+      - payload: sky_quench
+        configuration: lander-a
+        connects: lander.sky_quench
         enable: true
         protocol: udp
         simulate: true
@@ -107,9 +136,9 @@ simulated_payloads:
         configuration: lander-b
         connects: lander.acceleration_y
         group: readings
-      - payload: joystick_y
+      - payload: joystick_3_4_y
         configuration: lander-b
-        connects: stick.y
+        connects: joystick_3_4.y
         group: readings
         packet_interval: 50 ms
       - payload: thruster_y
@@ -126,3 +155,11 @@ simulated_payloads:
         configuration: lander-b
         connects: lander.crashed
         group: readings
+      # What the ground's Restart reaches, through lander-b's gateway: a
+      # count, each new one starting the lander again.
+      - payload: restart
+        configuration: lander-b
+        connects: lander.restart
+        enable: true
+        protocol: udp
+        simulate: true

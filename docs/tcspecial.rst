@@ -2615,7 +2615,28 @@ starts Yamcs, with a relay between Yamcs and each vehicle that holds
 everything 1.3 s each way, the time light takes from the Moon; tcs-sim
 with both configurations; and both tcspecials. The lander is flown from
 tcs-sim's window, and the MOC's window shows what arrives through
-Yamcs, 1.3 s later. Closing either window stops everything:
+Yamcs, 1.3 s later.
+
+The MOC's window also commands the lander. Its Restart button sends a
+command up through ``lander-b``'s gateway to the payload ``restart``,
+which starts the lander again; Disable Autorestart and Enable Autorestart
+send one up through ``lander-a``'s to the payload ``autorestart``. Until
+autorestart is enabled, a lander that has landed or crashed stays down
+until Restart; enabled, it starts again by itself, with a full tank, after
+a pause. Each command reaches the lander 1.3 s after it is sent, and is
+seen 1.3 s after that.
+
+The MOC's sky is tcs-sim's, sent down: ``lander-a``'s payload ``sky``
+sends the stars a few to a packet, round and round, and the sky fills in
+as they arrive, a packet lost leaving it thinner until a later pass. Once
+the ground has every star it sends a quench up through ``lander-a``'s
+second gateway, ``gateway_sky``, to the payload ``sky_quench``, and the
+stars stop. The quench has a gateway of its own because a gateway passes
+what the ground sends to every payload it feeds, and ``autorestart``
+would take a quench for an order. The design gives the stars' records in
+"The sky, sent down".
+
+Closing either window stops everything:
 
 .. code-block:: console
 
@@ -2626,8 +2647,10 @@ or, installed, ``tcsx lander``.
 .. figure:: ../examples/lander-a/lander-a.svg
    :alt: lander-a, the X axis: payloads reading the lander's X position,
          velocity and acceleration, its fuel and the joystick's X, each
-         made a value and sent to the Yamcs gateway; the joystick's X also
-         drives the X thruster.
+         made a value and sent to the Yamcs gateway, with the stars of the
+         sky; the joystick's X also drives the X thruster. The gateway
+         passes what the ground sends to the autorestart payload, and a
+         second gateway, gateway_sky, passes the quench to sky_quench.
    :width: 100%
 
    ``lander-a``, the X axis.
@@ -2636,7 +2659,8 @@ or, installed, ``tcsx lander``.
    :alt: lander-b, the Y axis: payloads reading the lander's Y position,
          velocity and acceleration and the joystick's Y, each made a value
          and sent to the Yamcs gateway, with whether it has landed or
-         crashed; the joystick's Y also drives the Y thruster.
+         crashed; the joystick's Y also drives the Y thruster. The gateway
+         passes what the ground sends to the restart payload.
    :width: 100%
 
    ``lander-b``, the Y axis.

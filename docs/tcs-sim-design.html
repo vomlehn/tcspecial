@@ -771,7 +771,7 @@ configuration has links: <tt class="docutils literal">components</tt> and <tt cl
 heater:</tt>, holding the components of that type, each named by <tt class="docutils literal">component</tt>.
 The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>,
 <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt>, <tt class="docutils literal">body</tt>, <tt class="docutils literal">lander</tt> and
-<tt class="docutils literal">joystick</tt>, and a type of any
+<tt class="docutils literal">joystick_3_4</tt>, and a type of any
 other is refused; a <tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was
 called before, is told the name it has now. A type is written once, with a
 component under it. Each type's settings, terminals and rules are stated
@@ -848,6 +848,13 @@ or <tt class="docutils literal">0</tt>, again every packet interval and at once 
 on the world for the change, and the world advances itself to each event it
 foresees at that event's moment on the wall clock, so the vehicle hears of a
 touchdown when it happens and not at the simulated payload's next turn.</dd>
+<dt>Requirement</dt>
+<dd>A simulated payload joined to records -- a lander's <tt class="docutils literal">sky</tt>, its stars,
+made where its pane's are, in <tt class="docutils literal"><span class="pre">physics::sky</span></tt>, so that a ground station
+drawing what it is sent shows the pane's sky -- sends a few whole records
+a packet, round and round, every packet interval: none is split between
+packets, so a packet lost costs only its own. While the input that
+quenches them holds their generation, it sends nothing.</dd>
 <dt>Requirement</dt>
 <dd>A simulated payload driving a decision takes <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, as a thermostat
 sends it. One driving a value takes four bytes of its unit's steps, as every
@@ -1053,7 +1060,8 @@ down on the pad. Anything else is a crash. Down, it stays still for
 <tt class="docutils literal">pause</tt>, and then starts again where it started, at rest, with a full
 tank.</dd>
 <dt>Requirement</dt>
-<dd>A joystick takes <tt class="docutils literal">set_x</tt> and <tt class="docutils literal">set_y</tt>, which nothing in the model
+<dd>A <tt class="docutils literal">joystick_3_4</tt>, the three-armed joystick, takes <tt class="docutils literal">set_x</tt> and
+<tt class="docutils literal">set_y</tt>, which nothing in the model
 drives: tcs-sim's window drives them as its joystick is moved, as a
 simulated payload drives an input. It gives them out as <tt class="docutils literal">x</tt> and
 <tt class="docutils literal">y</tt>, each held within minus one and one, for simulated payloads

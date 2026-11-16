@@ -130,11 +130,11 @@
                       "$ref": "#/$defs/lander"
                     }
                   },
-                  "type joystick": {
+                  "type joystick_3_4": {
                     "type": "array",
                     "minItems": 1,
                     "items": {
-                      "$ref": "#/$defs/joystick"
+                      "$ref": "#/$defs/joystick_3_4"
                     }
                   }
                 },
@@ -1097,8 +1097,8 @@
       ],
       "additionalProperties": false
     },
-    "joystick": {
-      "description": "A joystick, set by hand from tcs-sim's window: its terminals are set_x and set_y, inputs taking ratios from -1 to 1, which the window drives, and x and y, which give them out for simulated payloads to report.",
+    "joystick_3_4": {
+      "description": "A three-armed joystick, joystick_3_4, set by hand from tcs-sim's window: its terminals are set_x and set_y, inputs taking ratios from -1 to 1, which the window drives, and x and y, which give them out for simulated payloads to report.",
       "type": "object",
       "properties": {
         "component": {

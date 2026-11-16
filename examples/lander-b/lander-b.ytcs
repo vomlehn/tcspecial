@@ -45,7 +45,10 @@ gateways:
         address: "127.0.0.1:20600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:20700"
-        world-in: [crashed, landed, to_accel_y, to_joystick_y, to_velocity_y, to_y]
+        moc-out:
+          - restart.gateway
+        world-in: [crashed, landed, to_accel_y, to_joystick_3_4_y,
+          to_velocity_y, to_y]
 
 vehicle:
   - type compute:
@@ -58,17 +61,17 @@ vehicle:
         world-out:
           - gateway.to_accel_y
         world-in: [accel_y]
-      - compute: to_joystick_y
+      - compute: to_joystick_3_4_y
         function: "to_value"
         offset: "0"
         scale: "0.0001"
         type-in: "i16"
         type-out: "ratio"
         moc-out:
-          - thruster_y.to_joystick_y
+          - thruster_y.to_joystick_3_4_y
         world-out:
-          - gateway.to_joystick_y
-        world-in: [joystick_y]
+          - gateway.to_joystick_3_4_y
+        world-in: [joystick_3_4_y]
       - compute: to_velocity_y
         function: "to_value"
         offset: "0"
@@ -102,23 +105,27 @@ payloads:
         protocol: "udp"
         world-out:
           - gateway.crashed
-      - payload: joystick_y
+      - payload: joystick_3_4_y
         address: "127.0.0.1:20804"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
-          - to_joystick_y.joystick_y
+          - to_joystick_3_4_y.joystick_3_4_y
       - payload: landed
         read_size: "16"
         address: "127.0.0.1:20806"
         protocol: "udp"
         world-out:
           - gateway.landed
+      - payload: restart
+        address: "127.0.0.1:20808"
+        protocol: "udp"
+        moc-in: [gateway]
       - payload: thruster_y
         address: "127.0.0.1:20805"
         moc-in-type: "ratio"
         protocol: "udp"
-        moc-in: [to_joystick_y]
+        moc-in: [to_joystick_3_4_y]
       - payload: velocity_y
         address: "127.0.0.1:20802"
         protocol: "udp"

@@ -109,7 +109,7 @@
       <Parameter name="crashed" parameterTypeRef="bytes"/>
       <Parameter name="landed" parameterTypeRef="bytes"/>
       <Parameter name="to_accel_y" parameterTypeRef="metre_per_second_squared"/>
-      <Parameter name="to_joystick_y" parameterTypeRef="ratio"/>
+      <Parameter name="to_joystick_3_4_y" parameterTypeRef="ratio"/>
       <Parameter name="to_velocity_y" parameterTypeRef="metre_per_second"/>
       <Parameter name="to_y" parameterTypeRef="metre"/>
     </ParameterSet>
@@ -131,9 +131,9 @@
           <ParameterRefEntry parameterRef="to_accel_y"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="to_joystick_y_packet">
+      <SequenceContainer name="to_joystick_3_4_y_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="to_joystick_y"/>
+          <ParameterRefEntry parameterRef="to_joystick_3_4_y"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="to_velocity_y_packet">

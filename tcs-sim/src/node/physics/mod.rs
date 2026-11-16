@@ -18,12 +18,13 @@ pub mod clock;
 pub mod component;
 pub mod engine;
 pub mod heater;
-pub mod joystick;
+pub mod joystick_3_4;
 pub mod lander;
 pub mod load;
 pub mod queue;
 pub mod random;
 pub mod sensor;
+pub mod sky;
 pub mod solar_array;
 pub mod sun;
 pub mod thermal_mass;
@@ -83,6 +84,15 @@ pub enum Attachment {
         /// thermostat tcs-sim simulates, so that all of them see the one
         /// panel.
         power: Arc<Power>,
+    },
+    /// It sends this output's records, a few whole ones to a packet, round
+    /// and round, and nothing while they are quenched: a lander's sky.
+    Streams {
+        world: Arc<World>,
+        place: Place,
+        /// The record its next packet starts with. Shared by the copies of
+        /// its payload's configuration.
+        next: Arc<std::sync::atomic::AtomicUsize>,
     },
     /// It pulls each of a GPIO payload's lines, in the order its node names
     /// them, to one of these decision outputs: high while the output is on.
@@ -184,6 +194,7 @@ impl Attachment {
             Attachment::Reports { world, .. }
             | Attachment::Signals { world, .. }
             | Attachment::Drives { world, .. }
+            | Attachment::Streams { world, .. }
             | Attachment::Pulls { world, .. } => world,
         }
     }
@@ -352,6 +363,9 @@ impl Attachment {
             Attachment::Drives { world, place, .. } => {
                 format!("{payload} drives {}", world.name_of(*place))
             }
+            Attachment::Streams { world, place, .. } => {
+                format!("{payload} sends {}'s records", world.name_of(*place))
+            }
             Attachment::Pulls { world, places } => {
                 let names: Vec<String> =
                     places.iter().map(|p| world.name_of(*p)).collect();
@@ -383,9 +397,10 @@ impl Attachment {
         true
     }
 
-    /// What a reporting or signalling payload sends now: its terminal,
-    /// read by its sensor, in its encoding, or a decision as the text `1`
-    /// or `0`.
+    /// What a reporting, signalling or streaming payload sends now: its
+    /// terminal, read by its sensor, in its encoding; a decision as the text
+    /// `1` or `0`; or the next few of its records, whole, which are none
+    /// while they are quenched.
     ///
     /// # Returns
     ///
@@ -407,6 +422,23 @@ impl Attachment {
                 let value = world.read(*place, now);
                 said.store(value.to_bits(), Ordering::Relaxed);
                 Some(if value > 0.5 { b"1" } else { b"0" }.to_vec())
+            }
+            Attachment::Streams { world, place, next } => {
+                let mut out = Vec::new();
+                let from = next.load(Ordering::Relaxed);
+                let total = world.records(
+                    *place,
+                    from,
+                    tcsprotocol::node::physics::lander::STARS_IN_A_PACKET,
+                    now,
+                    &mut out,
+                );
+                if total > 0 {
+                    let sent = out.len()
+                        / tcsprotocol::node::physics::lander::STAR_RECORD;
+                    next.store((from + sent) % total, Ordering::Relaxed);
+                }
+                Some(out)
             }
             Attachment::Drives { .. } | Attachment::Pulls { .. } => None,
         }

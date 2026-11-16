@@ -343,7 +343,7 @@ Requirement
     heater:``, holding the components of that type, each named by ``component``.
     The types are ``heater``, ``thermal_mass``, ``sun``, ``solar_array``,
     ``load``, ``bus``, ``battery``, ``engine``, ``body``, ``lander`` and
-    ``joystick``, and a type of any
+    ``joystick_3_4``, and a type of any
     other is refused; a ``thermal_zone``, which is what a ``thermal_mass`` was
     called before, is told the name it has now. A type is written once, with a
     component under it. Each type's settings, terminals and rules are stated
@@ -430,6 +430,14 @@ Requirement
     on the world for the change, and the world advances itself to each event it
     foresees at that event's moment on the wall clock, so the vehicle hears of a
     touchdown when it happens and not at the simulated payload's next turn.
+
+Requirement
+    A simulated payload joined to records -- a lander's ``sky``, its stars,
+    made where its pane's are, in ``physics::sky``, so that a ground station
+    drawing what it is sent shows the pane's sky -- sends a few whole records
+    a packet, round and round, every packet interval: none is split between
+    packets, so a packet lost costs only its own. While the input that
+    quenches them holds their generation, it sends nothing.
 
 Requirement
     A simulated payload driving a decision takes ``1`` or ``0``, as a thermostat
@@ -662,7 +670,8 @@ Requirement
     tank.
 
 Requirement
-    A joystick takes ``set_x`` and ``set_y``, which nothing in the model
+    A ``joystick_3_4``, the three-armed joystick, takes ``set_x`` and
+    ``set_y``, which nothing in the model
     drives: tcs-sim's window drives them as its joystick is moved, as a
     simulated payload drives an input. It gives them out as ``x`` and
     ``y``, each held within minus one and one, for simulated payloads

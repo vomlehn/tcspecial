@@ -386,9 +386,10 @@ ul.auto-toc {
 <li><a class="reference internal" href="#the-windows" id="toc-entry-13">The windows</a><ul>
 <li><a class="reference internal" href="#tcs-sim-s-window" id="toc-entry-14">tcs-sim's window</a></li>
 <li><a class="reference internal" href="#the-ground-s-window" id="toc-entry-15">The ground's window</a></li>
+<li><a class="reference internal" href="#the-sky-sent-down" id="toc-entry-16">The sky, sent down</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-it-was-made" id="toc-entry-16">How it was made</a></li>
+<li><a class="reference internal" href="#how-it-was-made" id="toc-entry-17">How it was made</a></li>
 </ul>
 </div>
 <div class="admonition note">
@@ -423,7 +424,7 @@ whole, the ground's smaller.</p>
 </div>
 <div class="section" id="the-landing-pad">
 <h2><a class="toc-backref" href="#toc-entry-4">The landing pad</a></h2>
-<p>The pad is a level line twice as wide as the lander, 60 m. Its centre is
+<p>The pad is a level line twice as wide as the lander, 90 m. Its centre is
 within the middle 50% of the display's width, and its height within the
 lowest 20% of the display's height. It is drawn as a level line with a
 short upright mark at each end, so that it is told from the terrain by its
@@ -449,7 +450,7 @@ vehicles do not need it.</p>
 <h2><a class="toc-backref" href="#toc-entry-6">The lander</a></h2>
 <p>The lander is a simple figure of a lunar lander, drawn for this example
 and copied from no other: a body on two splayed legs with feet, about a
-twentieth of the display's height, 30 m, and about as wide as it is tall;
+thirteenth of the display's height, 45 m, and about as wide as it is tall;
 its outline is what meets the ground. It starts at the
 upper left of the display, wholly in view.</p>
 </div>
@@ -458,25 +459,30 @@ upper left of the display, wholly in view.</p>
 <h1><a class="toc-backref" href="#toc-entry-7">Flying it</a></h1>
 <div class="section" id="the-joystick">
 <h2><a class="toc-backref" href="#toc-entry-8">The joystick</a></h2>
-<p>The joystick, in tcs-sim's window beside the X and Y values, is a plus: a
-square, the neutral part, with a rectangle joined to each of its four
-sides. A press in the square, dragged out of it, moves the axes; each axis
-reads on its own, from the pointer's place along it, so a drag outward on a
-diagonal moves both.</p>
+<p>The joystick, in tcs-sim's window beside the X and Y values, is a T: a
+square, the neutral part, with a rectangle joined to its left, its right
+and its top. The lander's engine is on its bottom, pushing it up, and
+nothing on its top pushes it down, so there is no rectangle below the
+square. A press in the square, dragged out of it, moves the axes; each
+axis reads on its own, from the pointer's place along it, so a drag
+outward on a diagonal moves both.</p>
 <ul class="simple">
 <li>X is 0 at the square's left side and falls linearly to -100 at the left
 end of the left rectangle; it stays at -100 further left, and comes back
 to 0 the same way when the pointer comes back. At the square's right side
 it rises in the same way to 100 at the right end of the right rectangle.</li>
 <li>Y is 0 at the square's top and rises linearly to 100 at the top of the
-upper rectangle, and falls from 0 at the square's bottom to -100 at the
-bottom of the lower rectangle, held at the ends in the same way.</li>
+upper rectangle, held there beyond it; below the square it stays 0.</li>
 </ul>
-<p>A small dot follows the pointer while the button is held, within the
-rectangle that encloses the plus, and stays at that rectangle's edge when
-the pointer goes beyond it. When the button is let go, the dot goes back to
-the centre of the square, and both axes read 0 until the next press in the
-square is dragged out of it.</p>
+<p>The square is the joystick's dead zone. The rectangles, as thick as the
+square, are hatched along their outsides a tenth of their travel apart. At
+rest a plus is drawn across the square. While the button is held two lines
+track the pointer instead: a vertical one across the left and right
+rectangles, from the left end of the left one to the right end of the
+right one, and a horizontal one across the top rectangle, from halfway up
+the square to the rectangle's far end. When the button is let go, the plus
+comes back, and both axes read 0 until the next press in the square is
+dragged out of it.</p>
 </div>
 <div class="section" id="thrust-mass-and-fuel">
 <h2><a class="toc-backref" href="#toc-entry-9">Thrust, mass and fuel</a></h2>
@@ -504,10 +510,11 @@ in the direction of negative Y, on the whole of the lander's mass.</p>
 of the terrain or the pad. It has landed if both its feet are on the pad,
 nothing of it touches the terrain, and it is moving no faster than the
 Apollo lunar module's touchdown limits: 3.05 m/s downward and 1.22 m/s
-sideways. Anything else that touches has crashed, and so has a lander that
-leaves the display entirely.</p>
+sideways. Anything else that touches has crashed. A lander that leaves the
+display flies on out of sight, and has crashed only if it drops below the
+display's bottom line, which goes on indefinitely to the left and right.</p>
 <p>After a crash, there is a pause, and the lander starts again at the upper
-left with a full tank. After a landing, a smiley face is drawn over the
+left with a full tank. After a landing, a smiling face is drawn over the
 lander, and then there is the same pause and the same start.</p>
 </div>
 </div>
@@ -557,10 +564,12 @@ delayed.</p>
 pane at the left of its payload panels:</p>
 <ul class="simple">
 <li>the landscape and the lander, drawn to scale, positive X to the right and
-positive Y upward, under a black sky with stars, the lander
+positive Y upward, under a black sky with stars, which lander-a also
+sends down (see &quot;The sky, sent down&quot;), the lander
 white with thin black lines so that it shows against the sky and the
-ground, with the smiley face after a landing;</li>
-<li>&quot;Landed&quot; or &quot;Crashed&quot; in words, and the fuel left, in words and as a
+ground, with the smiling face after a landing;</li>
+<li>&quot;Landed&quot;, or on a crash &quot;On the Moon, no one can hear you CRASH!&quot;, in
+words, and the fuel left, in words and as a
 bar;</li>
 <li>below them, the X and Y position, velocity and acceleration, each named
 and with its unit;</li>
@@ -579,15 +588,63 @@ second and shows:</p>
 <ul class="simple">
 <li>the landscape, from the run's simulator file, and the lander at the
 position sent down, smaller than tcs-sim's;</li>
+<li>the stars of tcs-sim's sky, as they are sent down: none at first, each
+appearing as its record arrives (see &quot;The sky, sent down&quot;);</li>
 <li>the six values, and the fuel left;</li>
-<li>an area like the joystick, with a dot at the X and Y values the joystick
-sent down; the pointer does nothing there;</li>
-<li>&quot;Landed&quot; or &quot;Crashed&quot; when the values sent down say so.</li>
+<li>a joystick like tcs-sim's, its two lines at the X and Y values the
+joystick sent down, or its plus when they are nought; the pointer does
+nothing there;</li>
+<li>&quot;Landed&quot;, or &quot;On the Moon, no one can hear you CRASH!&quot;, when the values
+sent down say so;</li>
+<li>a Restart button, which sends a command up through lander-b's gateway to
+a simulated payload, <tt class="docutils literal">restart</tt>, joined to the lander's <tt class="docutils literal">restart</tt>
+input: each press a new count, the lander starting again at each, a light
+time after the press;</li>
+<li>Disable Autorestart and Enable Autorestart, which send a command up
+through lander-a's gateway to a simulated payload, <tt class="docutils literal">autorestart</tt>,
+joined to the lander's <tt class="docutils literal">autorestart</tt> input. Until it is enabled, a
+lander that has landed or crashed stays down until it is restarted;
+enabled, it starts again by itself after its pause.</li>
 </ul>
+</div>
+<div class="section" id="the-sky-sent-down">
+<h2><a class="toc-backref" href="#toc-entry-16">The sky, sent down</a></h2>
+<p>The ground's sky is tcs-sim's, sent down rather than worked out again:
+the one place the stars are made is tcs-sim's <tt class="docutils literal"><span class="pre">physics::sky</span></tt>, which its
+pane draws and its lander sends. The lander's <tt class="docutils literal">sky</tt> output is records, a
+kind of terminal of its own, one for each star. lander-a's simulated
+payload <tt class="docutils literal">sky</tt> sends them four to a packet, every 50 ms, round and round,
+and the vehicle passes them down through its gateway, as bytes, to Yamcs's
+<tt class="docutils literal">sky</tt> parameter. Each record is 16 bytes, most significant byte first:</p>
+<ul class="simple">
+<li>the sky's generation, how many stars it has, and the star's number, from
+nought, two bytes each;</li>
+<li>its radius, in tenths of a pixel of a scene 600 pixels wide, and its
+brightness, from nought to 255, a byte each;</li>
+<li>its place across and up, in centimetres, four bytes each.</li>
+</ul>
+<p>No record is split between two packets, so a packet lost costs only the
+stars it carried. The ground reads Yamcs for the latest packet several
+times a second, so it misses some, besides those UDP loses on the way;
+each comes round again on a later pass. The sky fills in over a few
+seconds, and where packets are lost it is thinner for a while: less to
+look at, and nothing else.</p>
+<p>Once the ground has every star of a generation, it answers each further
+packet of that generation with a quench: the generation, two bytes, sent
+up through lander-a's second gateway, <tt class="docutils literal">gateway_sky</tt>, to the simulated
+payload <tt class="docutils literal">sky_quench</tt>, joined to the lander's <tt class="docutils literal">sky_quench</tt> input.
+While that input holds the sky's generation, nothing is sent. A quench
+lost on the way is answered again by the next packet, so the sending
+stops a round trip after the sky is whole. The quench has a gateway of
+its own because a gateway passes what the ground sends to every payload
+it feeds, and lander-a's first feeds <tt class="docutils literal">autorestart</tt>, which would read a
+quench as an order. A sky made again would have a new generation, sent
+afresh and gathered afresh; tcs-sim makes its sky once a run, as
+generation 1.</p>
 </div>
 </div>
 <div class="section" id="how-it-was-made">
-<h1><a class="toc-backref" href="#toc-entry-16">How it was made</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-17">How it was made</a></h1>
 <p>In this order, each stage checked before the next:</p>
 <ol class="arabic simple">
 <li><strong>One world for two tcspecials.</strong> tcs-sim takes more than one
@@ -605,7 +662,8 @@ to the landscape's rules; the throttle on each axis, from -1 to 1, as
 inputs; the X and Y position and velocity, the fuel left, and landed
 and crashed, as outputs. The thrust, mass and fuel are as described
 above, extending what <tt class="docutils literal">body</tt> and <tt class="docutils literal">engine</tt> do on one axis.</li>
-<li><tt class="docutils literal">joystick</tt>: two inputs, which tcs-sim's window drives as a simulated
+<li><tt class="docutils literal">joystick_3_4</tt>, the three-armed joystick: two inputs, which tcs-sim's
+window drives as a simulated
 payload drives an input, and two outputs, X and Y from -1 to 1, which
 simulated payloads report.</li>
 <li>a unit, metres per second squared, for the acceleration: a type in
@@ -637,6 +695,22 @@ comparison of spellings, and the new components and unit in the tcs-sim
 manual;</li>
 <li>the packaging, so that tcspecial-examples carries every new kind of
 file, and so that the container has the example.</li>
+</ul>
+</li>
+<li><strong>Commanding it, and its sky.</strong> Once it was flying:<ul>
+<li>Restart, a simulated payload <tt class="docutils literal">restart</tt> on <tt class="docutils literal"><span class="pre">lander-b</span></tt> joined to
+the lander's <tt class="docutils literal">restart</tt> input, and Disable and Enable Autorestart,
+<tt class="docutils literal">autorestart</tt> on <tt class="docutils literal"><span class="pre">lander-a</span></tt>, joined to its <tt class="docutils literal">autorestart</tt> input,
+each commanded from the MOC's window through its vehicle's gateway;</li>
+<li>the sky, made once in tcs-sim's <tt class="docutils literal"><span class="pre">physics::sky</span></tt>, drawn by its pane
+and sent down as the lander's <tt class="docutils literal">sky</tt> records through <tt class="docutils literal"><span class="pre">lander-a</span></tt>,
+and quenched through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s <tt class="docutils literal">gateway_sky</tt>, as in &quot;The sky,
+sent down&quot;;</li>
+<li>the joystick a T, with no arm below its middle, since nothing pushes
+the lander down, and the bottom engine, once lit, at no less than a
+tenth of its full thrust;</li>
+<li>a lander that leaves the display flying on, crashing only below the
+display's bottom line.</li>
 </ul>
 </li>
 </ol>

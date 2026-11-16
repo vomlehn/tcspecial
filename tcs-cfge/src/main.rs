@@ -6648,7 +6648,7 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
 const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
     ("Thermal", &["heater", "thermal_mass"]),
     ("Power", &["battery", "bus", "load", "solar_array", "sun"]),
-    ("Motion", &["body", "engine", "joystick", "lander"]),
+    ("Motion", &["body", "engine", "joystick_3_4", "lander"]),
 ];
 
 /// Where a link's line starts and finishes, and which way it points at each

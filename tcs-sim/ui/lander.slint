@@ -17,22 +17,34 @@ import { Button } from "std-widgets.slint";
 import { SimFonts } from "sim-fonts.slint";
 import { Colors } from "../../tcs-ui/ui/colors.slint";
 
-// The joystick: a square, the neutral part, with a rectangle joined to each
-// of its sides, and a dot showing where it is held.
+// The joystick: a square, its dead zone, with a rectangle extending away
+// from its left side, its right side and its top -- up is the engine on the
+// lander's bottom, and there is no thruster on its top to push it down. The
+// left and right rectangles are as tall as the square, and the top one as
+// wide; each has hatchmarks along its outside, a tenth of its travel apart.
 //
-// A press in the square, dragged, is said to Rust as where the pointer is
-// from the square's middle, as long as the button is held; Rust works out the
-// axes and where the dot goes, which it keeps within the rectangle that
-// encloses the plus. Letting go is said too, and the dot goes back to the
-// middle. A press anywhere else does nothing.
-component Joystick inherits Rectangle {
+// At rest a plus is drawn across the square. A press in the square takes
+// hold, and while the button is held two lines track the pointer instead: a
+// vertical one across the left and right rectangles, from the left end of
+// the left one to the right end of the right one, and a horizontal one
+// across the top rectangle, from halfway up the square to the rectangle's
+// far end. Where the pointer is, from the square's middle, is said to Rust, which
+// works out the axes and where the lines go. Letting go is said too, and the
+// plus comes back. A press anywhere else does nothing.
+component Joystick34 inherits Rectangle {
     // The square's side, which is each rectangle's thickness, and how far
     // each rectangle reaches beyond it.
-    in property <length> square: 25.2px;
-    in property <length> arm: 70px;
-    // Where the dot is, from the square's middle: set by Rust.
+    in property <length> square: 9.45px;
+    in property <length> arm: 105px;
+    // Where the lines are, from the square's middle, right and down: set by
+    // Rust.
     in property <length> dot-x: 0px;
     in property <length> dot-y: 0px;
+    // Whether something other than the pointer holds it -- the autopilot --
+    // so that the lines show where it is held.
+    in property <bool> steered: false;
+    // Whether the world is paused: then a press takes no hold of it.
+    in property <bool> paused: false;
     // The pointer, held, is this far from the square's middle.
     callback moved(length, length);
     // The button was let go.
@@ -40,26 +52,32 @@ component Joystick inherits Rectangle {
 
     property <length> reach: root.square / 2 + root.arm;
     property <length> thick: root.square;
+    // A hatchmark's length, and the half and full marks'.
+    property <length> tick: 6px;
+    property <length> long-tick: 10.5px;
     property <bool> held: false;
+    // Whether the lines show rather than the plus: held, or steered.
+    property <bool> showing: root.held || root.steered;
 
     width: 2 * root.reach;
-    height: 2 * root.reach;
+    height: root.reach + root.square / 2 + root.long-tick;
 
-    // The four rectangles, then the square over them.
+    // The level rectangles, meeting the square's left and right sides, and
+    // the upright one, meeting its top; then the square.
     Rectangle {
         x: 0;
-        y: (parent.height - root.thick) / 2;
-        width: parent.width;
+        y: root.reach - root.thick / 2;
+        width: 2 * root.reach;
         height: root.thick;
         background: #e5e7eb;
         border-width: 1px;
         border-color: #6b7280;
     }
     Rectangle {
-        x: (parent.width - root.thick) / 2;
+        x: root.reach - root.thick / 2;
         y: 0;
         width: root.thick;
-        height: parent.height;
+        height: root.reach + root.thick / 2;
         background: #e5e7eb;
         border-width: 1px;
         border-color: #6b7280;
@@ -70,23 +88,96 @@ component Joystick inherits Rectangle {
         width: root.square;
         height: root.square;
         background: #f3f4f6;
-        border-width: 2px;
+        border-width: 1px;
         border-color: #374151;
     }
-    // The dot.
-    Rectangle {
-        x: root.reach + root.dot-x - 7px;
-        y: root.reach + root.dot-y - 7px;
-        width: 14px;
-        height: 14px;
-        border-radius: 7px;
+    // The hatchmarks, outside each rectangle along both its long sides: a
+    // tenth of its travel apart, the half and the full marks longer.
+    for i in 10: Rectangle {
+        property <length> along: root.square / 2 + (i + 1) * root.arm / 10;
+        property <length> long: Math.mod(i + 1, 5) == 0 ? root.long-tick
+                                                        : root.tick;
+        // Left, above and below.
+        Rectangle {
+            x: root.reach - parent.along;
+            y: root.reach - root.thick / 2 - parent.long;
+            width: 1px;
+            height: parent.long;
+            background: #374151;
+        }
+        Rectangle {
+            x: root.reach - parent.along;
+            y: root.reach + root.thick / 2;
+            width: 1px;
+            height: parent.long;
+            background: #374151;
+        }
+        // Right, above and below.
+        Rectangle {
+            x: root.reach + parent.along - 1px;
+            y: root.reach - root.thick / 2 - parent.long;
+            width: 1px;
+            height: parent.long;
+            background: #374151;
+        }
+        Rectangle {
+            x: root.reach + parent.along - 1px;
+            y: root.reach + root.thick / 2;
+            width: 1px;
+            height: parent.long;
+            background: #374151;
+        }
+        // Up, left and right.
+        Rectangle {
+            x: root.reach - root.thick / 2 - parent.long;
+            y: root.reach - parent.along;
+            width: parent.long;
+            height: 1px;
+            background: #374151;
+        }
+        Rectangle {
+            x: root.reach + root.thick / 2;
+            y: root.reach - parent.along;
+            width: parent.long;
+            height: 1px;
+            background: #374151;
+        }
+    }
+    // At rest, a plus across the dead zone, the square.
+    if !root.showing: Rectangle {
+        x: root.arm;
+        y: root.reach - 0.5px;
+        width: root.square;
+        height: 1px;
         background: #0072B2;
-        border-width: 1px;
-        border-color: #000000;
+    }
+    if !root.showing: Rectangle {
+        x: root.reach - 0.5px;
+        y: root.arm;
+        width: 1px;
+        height: root.square;
+        background: #0072B2;
+    }
+    // Held, a line across the level rectangles at the pointer's place from
+    // side to side, and one across the upright rectangle at its height.
+    if root.showing: Rectangle {
+        x: root.reach + root.dot-x - 1px;
+        y: root.reach - root.thick / 2;
+        width: 2px;
+        height: root.thick;
+        background: #0072B2;
+    }
+    if root.showing: Rectangle {
+        x: root.reach - root.thick / 2;
+        y: root.reach + root.dot-y - 1px;
+        width: root.thick;
+        height: 2px;
+        background: #0072B2;
     }
     TouchArea {
         pointer-event(e) => {
             if (e.kind == PointerEventKind.down
+                    && !root.paused
                     && e.button == PointerEventButton.left
                     && abs(self.mouse-x - root.reach) <= root.square / 2
                     && abs(self.mouse-y - root.reach) <= root.square / 2) {
@@ -134,15 +225,6 @@ component Values inherits HorizontalLayout {
     }
 }
 
-// One class of stars, all drawn alike: their disks, as path commands in
-// metres, and how bright they are.
-export struct StarClass {
-    // The disks.
-    commands: string,
-    // How bright, from nought to one.
-    brightness: float,
-}
-
 // What tcs-sim shows of a world that has a lander, and what the joystick
 // says: set and handled by Rust, read by LanderPane. A global, so that
 // the pane can be put in any window without each passing it all on.
@@ -155,8 +237,9 @@ export global LanderScene {
     // line, the pad with its end marks, the lander's single lines -- its
     // struts, legs and antenna -- and its shapes, and the face drawn over it
     // on a landing, empty otherwise.
-    in-out property <string> ground-fill;
-    in-out property <string> ground-line;
+    // The ground, its fill and its line, painted once into a picture: set
+    // by Rust.
+    in-out property <image> ground;
     in-out property <string> pad;
     // The round lights on top of the pad's end marks, and whether they are
     // lit now: set by Rust, which flashes them.
@@ -164,11 +247,35 @@ export global LanderScene {
     in-out property <bool> pad-lit: true;
     in-out property <string> lander-lines;
     in-out property <string> lander-shapes;
+    // The lander's lights, seen from its right side: a steady green one
+    // facing the viewer from the middle of its cabin, and white ones on the
+    // cabin's top, bottom and rear, and whether those are in a flash now:
+    // set by Rust.
+    in-out property <string> lander-green;
+    in-out property <string> lander-strobes;
+    in-out property <bool> strobe-lit: false;
+    // The plumes of the bottom engine and of a side thruster: each a glow
+    // and a core inside it, and how hard the engine fires, from nought to
+    // one, which makes them brighter: set by Rust, empty when not firing.
+    in-out property <string> plume-glow;
+    in-out property <string> plume-core;
+    in-out property <float> plume-strength: 0;
+    in-out property <string> side-plume-glow;
+    in-out property <string> side-plume-core;
+    in-out property <float> side-plume-strength: 0;
+    // A crashed lander's explosion: the fireball's outer cloud, flame and
+    // core, how much of it is left, from one at the crash to nought at the
+    // restart, and the debris: set by Rust, empty but for a crash.
+    in-out property <string> fire-outer;
+    in-out property <string> fire-flame;
+    in-out property <string> fire-core;
+    in-out property <float> fire-left: 0;
+    in-out property <string> debris;
     in-out property <string> face;
-    // The stars, in classes by their apparent brightness, the brightest
-    // first: set by Rust.
-    in-out property <[StarClass]> stars;
-    // What it is doing, in words: "Flying", "Landed" or "Crashed".
+    // The stars, painted once into a picture of the sky: set by Rust.
+    in-out property <image> sky;
+    // What it is doing, in words: "Flying", "Landed", or for a crash "On the
+    // Moon, no one can hear you CRASH!".
     in-out property <string> state: "Flying";
     // The fraction of a full tank left.
     in-out property <float> fuel: 1;
@@ -189,7 +296,7 @@ export global LanderScene {
     in-out property <bool> paused: false;
     in-out property <bool> autoland: false;
     // Whether there is a joystick for the autopilot to fly through.
-    in-out property <bool> has-joystick: true;
+    in-out property <bool> has-joystick_3_4: true;
     callback pause-clicked();
     callback autoland-clicked();
 
@@ -200,125 +307,210 @@ export global LanderScene {
 // with. tcs-sim puts it at the left of its window when the world it
 // simulates has a lander.
 export component LanderPane inherits Rectangle {
+    // The display's height over its width, which the landscape keeps.
+    property <float> ratio: LanderScene.world-height / LanderScene.world-width;
     VerticalLayout {
         padding: 2px;
         spacing: 2px;
-        alignment: start;
 
         // The landscape, drawn to scale.
-        scene := Rectangle {
-            width: 600px;
-            height: 600px * LanderScene.world-height / LanderScene.world-width;
-            background: #000000;
-            border-width: 1px;
-            border-color: #6b7280;
-            for class in LanderScene.stars: Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: class.commands;
-                fill: #ffffff;
-                opacity: class.brightness;
-            }
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.ground-fill;
-                fill: #aaa197;
-            }
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.ground-line;
-                stroke: #3b3127;
-                stroke-width: 1.5px;
-            }
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.pad;
-                stroke: #000000;
-                stroke-width: 4px;
-            }
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.pad;
-                stroke: #ffffff;
-                stroke-width: 2.5px;
-            }
-            // The pad's lights, flashing: bright while lit and dim between,
-            // so that they are seen even then.
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.pad-lights;
-                fill: LanderScene.pad-lit ? #E69F00 : #5c4000;
-                stroke: #000000;
-                stroke-width: 1px;
-            }
-            // The lander, white so that it shows against the sky, and edged
-            // with a very thin black line so that it shows against the
-            // ground. Its single lines first, each a black line a little
-            // wider than the white one over it; then its shapes over their
-            // ends, filled white, each with its own thin black line, so that
-            // where one part meets another shows.
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.lander-lines;
-                stroke: #000000;
-                stroke-width: 2.5px;
-            }
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.lander-lines;
-                stroke: #ffffff;
-                stroke-width: 1.5px;
-            }
-            Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.lander-shapes;
-                fill: #ffffff;
-                stroke: #000000;
-                stroke-width: 0.75px;
-            }
-            if LanderScene.face != "": Path {
-                width: 100%;
-                height: 100%;
-                viewbox-width: LanderScene.world-width;
-                viewbox-height: LanderScene.world-height;
-                commands: LanderScene.face;
-                fill: #F0E442;
-                stroke: #000000;
-                stroke-width: 1.5px;
-            }
-            Text {
-                x: 8px;
-                y: 6px;
-                text: LanderScene.state;
-                font-size: SimFonts.heading;
-                font-weight: 700;
-                color: #ffffff;
+        // The room the landscape has: all of the pane that the rows below
+        // leave it, which grows with the window, the landscape in it as
+        // large as fits at its own proportions.
+        scene-room := Rectangle {
+            min-width: 300px;
+            min-height: 300px * root.ratio;
+            preferred-width: 600px;
+            preferred-height: 600px * root.ratio;
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
+            scene := Rectangle {
+                x: 0;
+                y: 0;
+                width: Math.min(parent.width, parent.height / root.ratio);
+                height: self.width * root.ratio;
+                background: #000000;
+                border-width: 1px;
+                border-color: #6b7280;
+                Image {
+                    width: 100%;
+                    height: 100%;
+                    source: LanderScene.sky;
+                    image-fit: fill;
+                }
+                // The debris, behind the ground, so that a fragment stopped
+                // on it shows half buried.
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.debris;
+                    fill: #d1d5db;
+                }
+                Image {
+                    width: 100%;
+                    height: 100%;
+                    source: LanderScene.ground;
+                    image-fit: fill;
+                }
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.pad;
+                    stroke: #000000;
+                    stroke-width: 4px;
+                }
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.pad;
+                    stroke: #ffffff;
+                    stroke-width: 2.5px;
+                }
+                // The pad's lights, flashing: bright while lit and dim between,
+                // so that they are seen even then.
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.pad-lights;
+                    fill: LanderScene.pad-lit ? #E69F00 : #5c4000;
+                    stroke: #000000;
+                    stroke-width: 1px;
+                }
+                // The plumes, behind the lander so that its engines cover
+                // their roots: a pale orange glow and a warm off-white core,
+                // longer and brighter the harder each engine fires.
+                for plume in [
+                    {
+                        glow: LanderScene.plume-glow,
+                        core: LanderScene.plume-core,
+                        strength: LanderScene.plume-strength,
+                    },
+                    {
+                        glow: LanderScene.side-plume-glow,
+                        core: LanderScene.side-plume-core,
+                        strength: LanderScene.side-plume-strength,
+                    },
+                ]: Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    Path {
+                        width: 100%;
+                        height: 100%;
+                        viewbox-width: LanderScene.world-width;
+                        viewbox-height: LanderScene.world-height;
+                        commands: plume.glow;
+                        fill: #F5C99A;
+                        opacity: 0.2 + 0.4 * plume.strength;
+                    }
+                    Path {
+                        width: 100%;
+                        height: 100%;
+                        viewbox-width: LanderScene.world-width;
+                        viewbox-height: LanderScene.world-height;
+                        commands: plume.core;
+                        fill: #FFF1D6;
+                        opacity: 0.3 + 0.6 * plume.strength;
+                    }
+                }
+                // The lander, white so that it shows against the sky, and edged
+                // with a very thin black line so that it shows against the
+                // ground. Its single lines first, each a black line a little
+                // wider than the white one over it; then its shapes over their
+                // ends, filled white, each with its own thin black line, so that
+                // where one part meets another shows.
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.lander-lines;
+                    stroke: #000000;
+                    stroke-width: 2.5px;
+                }
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.lander-lines;
+                    stroke: #ffffff;
+                    stroke-width: 1.5px;
+                }
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.lander-shapes;
+                    fill: #ffffff;
+                    stroke: #000000;
+                    stroke-width: 0.75px;
+                }
+                // Its lights over it: the green steady, the white flashing --
+                // bright in a flash and dim between.
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.lander-green;
+                    fill: #009E73;
+                }
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.lander-strobes;
+                    fill: LanderScene.strobe-lit ? #ffffff : #9ca3af;
+                    // A black ring, so that a white light shows on the white
+                    // lander as well as against the sky.
+                    stroke: #000000;
+                    stroke-width: 1px;
+                }
+                // The fireball: a vermillion cloud, an orange flame and a
+                // yellow core, fading as it burns out.
+                for part in [
+                    { commands: LanderScene.fire-outer, colour: #D55E00 },
+                    { commands: LanderScene.fire-flame, colour: #E69F00 },
+                    { commands: LanderScene.fire-core, colour: #F0E442 },
+                ]: Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: part.commands;
+                    fill: part.colour;
+                    opacity: 0.85 * LanderScene.fire-left;
+                }
+                if LanderScene.face != "": Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-width: LanderScene.world-width;
+                    viewbox-height: LanderScene.world-height;
+                    commands: LanderScene.face;
+                    // Bright, and edged in black so that it shows against
+                    // the ground as well as the sky.
+                    fill: #FFF35A;
+                    stroke: #000000;
+                    stroke-width: 2px;
+                }
+                Text {
+                    x: 8px;
+                    y: 6px;
+                    text: LanderScene.state;
+                    font-size: SimFonts.heading;
+                    font-weight: 700;
+                    color: #ffffff;
+                }
             }
         }
 
@@ -383,9 +575,11 @@ export component LanderPane inherits Rectangle {
             // The joystick, beside them.
             HorizontalLayout {
                 alignment: center;
-                Joystick {
+                Joystick34 {
                     dot-x: LanderScene.dot-x;
                     dot-y: LanderScene.dot-y;
+                    steered: LanderScene.autoland;
+                    paused: LanderScene.paused;
                     moved(px, py) => { LanderScene.stick-moved(px, py); }
                     released => { LanderScene.stick-released(); }
                 }
@@ -403,7 +597,7 @@ export component LanderPane inherits Rectangle {
             }
             Button {
                 text: LanderScene.autoland ? "Stop Autoland" : "Autoland";
-                enabled: LanderScene.has-joystick;
+                enabled: LanderScene.has-joystick_3_4;
                 clicked => { LanderScene.autoland-clicked(); }
             }
         }

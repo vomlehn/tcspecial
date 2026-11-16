@@ -88,15 +88,38 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
+      <IntegerParameterType name="bytes_length" signed="false"
+          sizeInBits="32">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="4096"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="bytes">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="bytes_length"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
     </ParameterTypeSet>
     <ParameterSet>
+      <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
+      <Parameter name="sky" parameterTypeRef="bytes"/>
       <Parameter name="to_accel_x" parameterTypeRef="metre_per_second_squared"/>
       <Parameter name="to_fuel" parameterTypeRef="ratio"/>
-      <Parameter name="to_joystick_x" parameterTypeRef="ratio"/>
+      <Parameter name="to_joystick_3_4_x" parameterTypeRef="ratio"/>
       <Parameter name="to_velocity_x" parameterTypeRef="metre_per_second"/>
       <Parameter name="to_x" parameterTypeRef="metre"/>
     </ParameterSet>
     <ContainerSet>
+      <SequenceContainer name="sky_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="bytes_length"/>
+          <ParameterRefEntry parameterRef="sky"/>
+        </EntryList>
+      </SequenceContainer>
       <SequenceContainer name="to_accel_x_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="to_accel_x"/>
@@ -107,9 +130,9 @@
           <ParameterRefEntry parameterRef="to_fuel"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="to_joystick_x_packet">
+      <SequenceContainer name="to_joystick_3_4_x_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="to_joystick_x"/>
+          <ParameterRefEntry parameterRef="to_joystick_3_4_x"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="to_velocity_x_packet">

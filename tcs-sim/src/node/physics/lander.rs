@@ -32,7 +32,9 @@
 //! by halving the interval it was found in until it is within
 //! [`FOUND_WITHIN`]. A step is short enough that a lander going no faster
 //! than a lunar landing goes cannot pass through a line of the ground
-//! between two looks. Leaving the display is found the same way. Where
+//! between two looks. Beyond the display's edges the ground is its bottom
+//! line, going on indefinitely, so a lander flown off a side flies on out of
+//! sight, and comes down if it drops below that line. Where
 //! nothing is found ahead, the lander's next event is the end of the look,
 //! where it looks again.
 
@@ -54,6 +56,14 @@ const LANDED: usize = 7;
 const CRASHED: usize = 8;
 const ACCELERATION_X: usize = 9;
 const ACCELERATION_Y: usize = 10;
+const RESTART: usize = 11;
+const AUTORESTART: usize = 12;
+const SKY: usize = 13;
+const SKY_QUENCH: usize = 14;
+
+/// The generation of the lander's sky: made once, as it is started, and
+/// never made again in a run, so always the first.
+pub const SKY_GENERATION: u16 = 1;
 
 /// Standard gravity, which turns a specific impulse in seconds into an
 /// exhaust velocity: a definition, not the gravity of anywhere in
@@ -66,6 +76,11 @@ pub const LOOK_EVERY: f64 = 0.02;
 /// How far ahead, in seconds, the path is looked at before the lander looks
 /// again.
 pub const LOOK_AHEAD: f64 = 0.5;
+
+/// The least the bottom engine burns at, as a share of its full thrust, once
+/// it burns at all: as the Apollo lunar module's descent engine could be
+/// throttled no lower than about a tenth.
+pub const LEAST_THROTTLE: f64 = 0.1;
 
 /// How close, in seconds, the moment of touchdown is found.
 pub const FOUND_WITHIN: f64 = 1e-4;
@@ -115,6 +130,18 @@ pub struct Lander {
     flight: Flight,
     /// Its throttles, as last held, each within minus one and one.
     throttle: Point,
+    /// What its restart input was last held at: a new value other than
+    /// nought starts it again.
+    restart: f64,
+    /// Whether it starts again by itself once it has been down for its
+    /// pause: its autorestart input asserted. Otherwise, down, it stays down
+    /// until it is restarted.
+    autorestart: bool,
+    /// Its sky, as the records its `sky` output sends.
+    sky: Vec<[u8; tcsprotocol::node::physics::lander::STAR_RECORD]>,
+    /// The generation of its sky the ground last said it has whole: while
+    /// it is [`SKY_GENERATION`], the sky is not sent.
+    sky_quench: f64,
 }
 
 /// `h(u) = (1 - u) ln(1 - u) + u`, by its series where `u` is small: see
@@ -193,8 +220,20 @@ impl Lander {
             fuel: figures.fuel,
             flight: Flight::Flying,
             throttle: (0.0, 0.0),
+            restart: 0.0,
+            autorestart: false,
+            sky: super::sky::records(&figures, SKY_GENERATION),
+            sky_quench: 0.0,
             figures,
         }
+    }
+
+    /// Starts it again: at its start, still, with a full tank, flying.
+    fn start_again(&mut self) {
+        self.at = self.figures.start;
+        self.velocity = (0.0, 0.0);
+        self.fuel = self.figures.fuel;
+        self.flight = Flight::Flying;
     }
 
     /// Its thrust along each axis now, in newtons: nothing with an empty
@@ -302,7 +341,9 @@ impl Lander {
             .map(|pair| (pair[0], pair[1]))
     }
 
-    /// The height of the ground at an X within the display.
+    /// The height of the ground at an X: beyond either edge of the display,
+    /// the display's bottom line, nought, which goes on indefinitely either
+    /// way, so that a lander flown off a side comes down somewhere.
     ///
     /// # Arguments
     ///
@@ -310,8 +351,12 @@ impl Lander {
     ///
     /// # Returns
     ///
-    /// Metres; nought outside the display.
+    /// Metres.
     fn ground_at(&self, x: f64) -> f64 {
+        let ground = &self.figures.ground;
+        if x < ground[0].0 || x > ground[ground.len() - 1].0 {
+            return 0.0;
+        }
         self.ground()
             .find(|&((x0, _), (x1, _))| x >= x0 && x <= x1)
             .map(|((x0, y0), (x1, y1))| {
@@ -325,7 +370,9 @@ impl Lander {
     }
 
     /// Whether it would be down, where it would be: its outline meeting the
-    /// ground, any of it below the ground, or all of it off the display.
+    /// ground, or any of it below the ground, which beyond the display's
+    /// edges is its bottom line. Leaving the display is not coming down: it
+    /// flies on out of sight, and may come back.
     ///
     /// # Arguments
     ///
@@ -335,17 +382,11 @@ impl Lander {
     ///
     /// Whether it would be.
     fn down_at(&self, at: Point) -> bool {
-        let (x0, x1, y0, y1) = self.figures.extent();
-        let (w, ht) = (self.figures.width, self.figures.height);
-        if at.0 + x1 < 0.0 || at.0 + x0 > w || at.1 + y1 < 0.0 || at.1 + y0 > ht
-        {
-            return true;
-        }
         let segments = self.segments(at);
         let below = segments
             .iter()
             .flat_map(|&(p, q)| [p, q])
-            .any(|(x, y)| (0.0..=w).contains(&x) && y < self.ground_at(x));
+            .any(|(x, y)| y < self.ground_at(x));
         below || segments.iter().any(|&s| self.ground().any(|g| meet(s, g)))
     }
 
@@ -422,11 +463,26 @@ impl Lander {
 
 impl Component for Lander {
     fn hold(&mut self, inputs: &[f64]) {
-        // A throttle opens no further than fully either way.
-        self.throttle = (
-            inputs[THROTTLE_X].clamp(-1.0, 1.0),
-            inputs[THROTTLE_Y].clamp(-1.0, 1.0),
-        );
+        // A throttle opens no further than fully: either way across, and up
+        // only, the lander having its engine on its bottom and nothing on its
+        // top to push it down.
+        // And the bottom engine, lit, burns no lower than its floor.
+        let up = inputs[THROTTLE_Y].clamp(0.0, 1.0);
+        let up = if up > 0.0 {
+            up.max(LEAST_THROTTLE)
+        } else {
+            0.0
+        };
+        self.throttle = (inputs[THROTTLE_X].clamp(-1.0, 1.0), up);
+        // Driven to a new value other than nought, it starts again now,
+        // however it is: the world has brought it to this moment first.
+        let restart = inputs[RESTART];
+        if restart != self.restart && restart != 0.0 {
+            self.start_again();
+        }
+        self.restart = restart;
+        self.autorestart = inputs[AUTORESTART] > 0.5;
+        self.sky_quench = inputs[SKY_QUENCH];
     }
 
     fn advance(&mut self, from: f64, to: f64) {
@@ -453,24 +509,46 @@ impl Component for Lander {
             (CRASHED, Flight::Down { landed, .. }) => decision(!landed),
             (ACCELERATION_X, Flight::Flying) => self.acceleration().0,
             (ACCELERATION_Y, Flight::Flying) => self.acceleration().1,
+            (SKY, _) => f64::from(SKY_GENERATION),
             _ => 0.0,
         }
     }
 
+    fn records(
+        &self,
+        terminal: usize,
+        from: usize,
+        most: usize,
+        out: &mut Vec<u8>,
+    ) -> usize {
+        let quenched = self.sky_quench == f64::from(SKY_GENERATION);
+        if terminal != SKY || quenched || self.sky.is_empty() {
+            return 0;
+        }
+        let total = self.sky.len();
+        for n in 0..most.min(total) {
+            out.extend_from_slice(&self.sky[(from + n) % total]);
+        }
+        total
+    }
+
     fn next_event(&self, now: f64) -> Option<f64> {
+        // Down with no autorestart, nothing happens until it is restarted
+        // or its autorestart is asserted.
+        if !self.autorestart && matches!(self.flight, Flight::Down { .. }) {
+            return None;
+        }
         Some(self.next(now).0)
     }
 
     fn event(&mut self, at: f64) {
         match self.flight {
             Flight::Down { since, .. }
-                if at >= since + self.figures.pause.as_secs_f64() - 1e-9 =>
+                if self.autorestart
+                    && at
+                        >= since + self.figures.pause.as_secs_f64() - 1e-9 =>
             {
-                // Started again, with a full tank.
-                self.at = self.figures.start;
-                self.velocity = (0.0, 0.0);
-                self.fuel = self.figures.fuel;
-                self.flight = Flight::Flying;
+                self.start_again();
             }
             Flight::Down { .. } => {}
             Flight::Flying => {
@@ -535,6 +613,144 @@ mod tests {
         }
     }
 
+    /// Its inputs, as the world holds them: one for each terminal, the
+    /// outputs' nought.
+    ///
+    /// # Arguments
+    ///
+    /// * `x`       - The X throttle.
+    /// * `y`       - The Y throttle.
+    /// * `restart` - The restart input.
+    ///
+    /// # Returns
+    ///
+    /// The inputs.
+    fn held(x: f64, y: f64, restart: f64) -> Vec<f64> {
+        let mut inputs = vec![0.0; TERMINALS.len()];
+        inputs[AUTORESTART] = 0.0;
+        inputs[THROTTLE_X] = x;
+        inputs[THROTTLE_Y] = y;
+        inputs[RESTART] = restart;
+        inputs
+    }
+
+    /// With no autorestart, the default, a lander that has crashed stays
+    /// down past its pause, and foresees nothing; given autorestart, it
+    /// starts again at once, its pause long run; and a restart starts it
+    /// again whether autorestart is given or not.
+    #[test]
+    fn without_autorestart_it_stays_down() {
+        let mut l = Lander::new(figures());
+        let mut inputs = held(0.0, 0.0, 0.0);
+        l.hold(&inputs);
+        l.at = (100.0, 60.0);
+        l.flight = Flight::Down {
+            since: 1.0,
+            landed: false,
+        };
+        assert_eq!(l.next_event(2.0), None);
+        l.event(100.0);
+        assert!(matches!(l.flight, Flight::Down { .. }));
+
+        // Given autorestart, long after the pause: it starts again at the
+        // next event, which is now.
+        inputs[AUTORESTART] = 1.0;
+        l.hold(&inputs);
+        let at = l.next_event(100.0).expect("it starts again");
+        assert!(at <= 100.0, "{at}");
+        l.event(100.0);
+        assert_eq!(l.flight, Flight::Flying);
+
+        // Without autorestart and crashed again, a restart still starts it.
+        inputs[AUTORESTART] = 0.0;
+        l.hold(&inputs);
+        l.flight = Flight::Down {
+            since: 200.0,
+            landed: false,
+        };
+        inputs[RESTART] = 7.0;
+        l.hold(&inputs);
+        assert_eq!(l.flight, Flight::Flying);
+    }
+
+    /// The bottom engine, lit, burns at no less than its floor; off, it does
+    /// not burn; and it pushes no lower than nought, nor beyond full.
+    #[test]
+    fn the_bottom_engine_has_a_floor() {
+        let mut l = Lander::new(figures());
+        for (asked, burns) in
+            [(0.0, 0.0), (0.02, LEAST_THROTTLE), (0.5, 0.5), (2.0, 1.0)]
+        {
+            l.hold(&held(0.0, asked, 0.0));
+            assert_eq!(l.throttle.1, burns, "{asked}");
+        }
+        l.hold(&held(0.0, -1.0, 0.0));
+        assert_eq!(l.throttle.1, 0.0);
+    }
+
+    /// The sky goes a few records at a time, round and round, each record
+    /// whole, until the ground quenches its generation; quenched with
+    /// another generation, it goes on.
+    #[test]
+    fn the_sky_is_sent_until_it_is_quenched() {
+        use tcsprotocol::node::physics::lander::{StarRecord, STAR_RECORD};
+        let mut l = Lander::new(figures());
+        let total = l.sky.len();
+        assert!(total > 4);
+        let mut out = Vec::new();
+        assert_eq!(l.records(SKY, total - 2, 4, &mut out), total);
+        assert_eq!(out.len(), 4 * STAR_RECORD);
+        let ids: Vec<u16> = out
+            .chunks(STAR_RECORD)
+            .map(|r| StarRecord::from_bytes(r.try_into().unwrap()).id)
+            .collect();
+        let last = u16::try_from(total).unwrap();
+        assert_eq!(ids, [last - 2, last - 1, 0, 1]);
+        // No other terminal has records.
+        assert_eq!(l.records(X, 0, 4, &mut Vec::new()), 0);
+        let mut inputs = vec![0.0; TERMINALS.len()];
+        inputs[SKY_QUENCH] = f64::from(SKY_GENERATION) + 1.0;
+        l.hold(&inputs);
+        assert_eq!(l.records(SKY, 0, 4, &mut Vec::new()), total);
+        inputs[SKY_QUENCH] = f64::from(SKY_GENERATION);
+        l.hold(&inputs);
+        let mut out = Vec::new();
+        assert_eq!(l.records(SKY, 0, 4, &mut out), 0);
+        assert!(out.is_empty());
+    }
+
+    /// Driven to a new value other than nought, a lander starts again at
+    /// once, however it is; held at the same value, or at nought, it does
+    /// not.
+    #[test]
+    fn a_new_restart_starts_it_again() {
+        let mut l = Lander::new(figures());
+        // Down the full height and crashed beside the pad.
+        l.at = (100.0, 60.0);
+        l.velocity = (0.0, -30.0);
+        l.fuel = 10.0;
+        l.flight = Flight::Down {
+            since: 1.0,
+            landed: false,
+        };
+        l.hold(&held(0.0, 0.0, 1.0));
+        assert_eq!(l.flight, Flight::Flying);
+        assert_eq!(l.at, figures().start);
+        assert_eq!(l.velocity, (0.0, 0.0));
+        assert_eq!(l.fuel, figures().fuel);
+
+        // The same value again, a throttle moving, starts nothing.
+        l.at = (200.0, 200.0);
+        l.hold(&held(0.5, 0.0, 1.0));
+        assert_eq!(l.at, (200.0, 200.0));
+        // Nor does nought.
+        l.hold(&held(0.5, 0.0, 0.0));
+        assert_eq!(l.at, (200.0, 200.0));
+        // A new count does.
+        l.hold(&held(0.0, 0.0, 2.0));
+        assert_eq!(l.at, figures().start);
+    }
+
     /// Runs a lander, as the world does, from one moment to another,
     /// letting each event it foresees happen.
     ///
@@ -568,6 +784,8 @@ mod tests {
         assert_eq!(names[CRASHED], "crashed");
         assert_eq!(names[ACCELERATION_X], "acceleration_x");
         assert_eq!(names[ACCELERATION_Y], "acceleration_y");
+        assert_eq!(names[RESTART], "restart");
+        assert_eq!(names[AUTORESTART], "autorestart");
     }
 
     /// Thrust accelerates it at its force over its mass, more as the tank
@@ -576,7 +794,7 @@ mod tests {
     #[test]
     fn thrust_against_mass_and_gravity() {
         let mut l = Lander::new(figures());
-        l.hold(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        l.hold(&held(1.0, 0.0, 0.0));
         let flow = 12000.0 / (311.0 * STANDARD_GRAVITY);
         assert!((l.flow() - flow).abs() < 1e-12);
         l.advance(0.0, 1.0);
@@ -599,20 +817,23 @@ mod tests {
         let mut f = figures();
         f.fuel = 1.0;
         let mut l = Lander::new(f);
-        l.hold(&[0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        l.hold(&held(0.0, 1.0, 0.0));
         run(&mut l, 0.0, 2.0);
         assert_eq!(l.fuel, 0.0);
         assert_eq!(l.force(), (0.0, 0.0));
         assert_eq!(l.flow(), 0.0);
     }
 
-    /// Falling slowly onto the pad it lands, and after the pause starts
-    /// again where it started with a full tank.
+    /// Falling slowly onto the pad it lands, and, given autorestart, after
+    /// the pause starts again where it started with a full tank.
     #[test]
     fn a_slow_touchdown_on_the_pad_lands() {
         let mut f = figures();
         f.start = (500.0, 62.0);
         let mut l = Lander::new(f);
+        let mut inputs = held(0.0, 0.0, 0.0);
+        inputs[AUTORESTART] = 1.0;
+        l.hold(&inputs);
         run(&mut l, 0.0, 2.0);
         assert_eq!(l.output(LANDED), 1.0);
         assert_eq!(l.output(CRASHED), 0.0);
@@ -657,16 +878,29 @@ mod tests {
         assert_eq!(l.output(CRASHED), 1.0);
     }
 
-    /// Flying off the display altogether is a crash.
+    /// Flying off the display is not coming down: it flies on out of sight,
+    /// and comes down where it drops below the display's bottom line,
+    /// which goes on indefinitely beyond the edge.
     #[test]
-    fn leaving_the_display_crashes() {
+    fn leaving_the_display_flies_on() {
         let mut f = figures();
         f.start = (980.0, 400.0);
         let mut l = Lander::new(f);
         l.velocity = (40.0, 0.0);
         run(&mut l, 0.0, 3.0);
-        assert_eq!(l.output(CRASHED), 1.0);
-        assert!(l.at.0 - 15.0 > 1000.0 - 1.0, "{:?}", l.at);
+        assert_eq!(l.output(CRASHED), 0.0);
+        assert_eq!(l.flight, Flight::Flying);
+        assert!(l.at.0 - 15.0 > 1000.0, "{:?}", l.at);
+        // Out there it falls until it drops to the bottom line, and crashes:
+        // looked at a step at a time, so as to see it before it starts
+        // again.
+        let mut now = 3.0;
+        while l.output(CRASHED) == 0.0 && now < 60.0 {
+            run(&mut l, now, now + 0.1);
+            now += 0.1;
+        }
+        assert_eq!(l.output(CRASHED), 1.0, "{:?} at {now}", l.at);
+        assert!(l.at.1.abs() < 0.5, "{:?}", l.at);
     }
 
     /// Two segments meet where they cross or one ends on the other, and

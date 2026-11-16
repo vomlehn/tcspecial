@@ -763,6 +763,8 @@ pub(crate) fn a_packet_from<R: Rng>(
         .as_ref()
         .and_then(crate::node::physics::Attachment::reading)
     {
+        // Records that are quenched, or none to send: nothing goes.
+        Some(reading) if reading.is_empty() => return Produce::Nothing,
         Some(reading) => reading,
         None => generate(rng, pacing.packet_size),
     };

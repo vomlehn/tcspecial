@@ -31,6 +31,10 @@ pub enum Kind {
     /// On or off, which is what a thermostat node sends to drive a set of
     /// discrete lines.
     Decision,
+    /// Records, which a simulated payload sends a few at a time, each whole
+    /// in its packet, round and round: a lander's sky. What it reads as a
+    /// number is which generation of records it is sending.
+    Records,
 }
 
 impl Kind {
@@ -38,11 +42,12 @@ impl Kind {
     ///
     /// # Returns
     ///
-    /// Its unit's name, `kelvin`, or `a decision`.
+    /// Its unit's name, `kelvin`, `a decision`, or `records`.
     pub fn describe(self) -> &'static str {
         match self {
             Kind::Value(unit) => unit.name(),
             Kind::Decision => "a decision",
+            Kind::Records => "records",
         }
     }
 }

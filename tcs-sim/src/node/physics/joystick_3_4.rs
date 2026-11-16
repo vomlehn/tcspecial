@@ -8,7 +8,7 @@
 use super::component::Component;
 
 /// Its terminals' places, in
-/// `tcsprotocol::node::physics::joystick::TERMINALS`'s order, which a test
+/// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order, which a test
 /// holds this to.
 const SET_X: usize = 0;
 const SET_Y: usize = 1;
@@ -17,13 +17,13 @@ const Y: usize = 3;
 
 /// A joystick of the world.
 #[derive(Debug, Default)]
-pub struct Joystick {
+pub struct Joystick34 {
     /// Its axes, as last set, each within minus one and one.
     x: f64,
     y: f64,
 }
 
-impl Component for Joystick {
+impl Component for Joystick34 {
     fn hold(&mut self, inputs: &[f64]) {
         self.x = inputs[SET_X].clamp(-1.0, 1.0);
         self.y = inputs[SET_Y].clamp(-1.0, 1.0);
@@ -43,7 +43,7 @@ impl Component for Joystick {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcsprotocol::node::physics::joystick::TERMINALS;
+    use tcsprotocol::node::physics::joystick_3_4::TERMINALS;
 
     /// The places here are the type's.
     #[test]
@@ -57,7 +57,7 @@ mod tests {
     /// What it is set to is what it gives out, held within its stops.
     #[test]
     fn it_gives_out_what_it_is_set_to() {
-        let mut stick = Joystick::default();
+        let mut stick = Joystick34::default();
         stick.hold(&[0.25, -1.5, 0.0, 0.0]);
         assert_eq!(stick.output(X), 0.25);
         assert_eq!(stick.output(Y), -1.0);

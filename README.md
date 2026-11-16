@@ -8,6 +8,13 @@ as at the Moon, which shaped it to work over unreliable communication links.
 However, it works over any distance, and can be extended to use reliable
 links.
 
+TCSpecial runs as a process of its own, so the kernel keeps it in a fault
+domain apart from the rest of the vehicle's software. Because it reaches the
+operations center, an F´ flight computer or cFS's software bus over UDP, it
+can also run on a processor of its own, isolating faults further still. And
+a vehicle may run several TCSpecials, each with its own group of payloads,
+so that one that fails leaves the rest running.
+
 > **Warning:** TCSpecial is an alpha release. It is not fully tested, it
 > is not feature complete, and it is subject to rapid change. Until 1.0,
 > any change to its API changes the minor version number (0.1 to 0.2), so

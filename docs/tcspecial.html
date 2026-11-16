@@ -542,6 +542,16 @@ a <strong>link</strong>. Neither is written in the software. Both are read from 
 configuration file at startup, which is the whole of the architecture: the
 program is a set of node types and a machine for moving data along declared
 links, and what a particular vehicle does is a file.</p>
+<p><strong>A fault domain of its own.</strong> TCSpecial runs as an ordinary process, so the
+kernel keeps its work apart from everything else aboard: its memory is its
+own, a fault in it ends it and nothing else, and a fault elsewhere cannot
+reach into it. Each gateway -- to the MOC, to an F´ flight computer, to cFS's
+software bus -- speaks UDP, so TCSpecial need not even share a processor with
+the flight software it answers to. It can run on one of its own, beside the
+devices it serves, and a failure on either side is held there. And the
+domain can be divided further: a vehicle may run several tcspecials, each
+with its own group of payloads, so that one that fails leaves the rest
+running, as <a class="reference internal" href="#more-than-one-tcspecial-on-a-vehicle">More than one tcspecial on a vehicle</a> describes.</p>
 <p><strong>tcs-xtce and tcslog stand alone.</strong> Two of the projects TCSpecial is built
 from are products in their own right, meant to be used either with TCSpecial
 or as independent tools by software that has nothing else of TCS: <a class="reference external" href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>, the XTCE packet compiler and the

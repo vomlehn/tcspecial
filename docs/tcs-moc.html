@@ -677,6 +677,15 @@ consolidator's datum arrives in its own panel, as any node's does; its
 inputs have no panels of their own. Its <tt class="docutils literal">Configuration</tt> begins with
 its latest datum, under &quot;latest datum&quot;, a member to a line, whether or
 not a <tt class="docutils literal">Query</tt> has been answered.</p>
+<div class="figure">
+<img alt="The housekeeping panel of the consolidator example, Active, its From payload line reading &quot;sun=21509 wheel=-7&quot; and an ellipsis, the rest of its members cut off at the panel's edge." src="shots/tcs-moc-consolidation.png" />
+<p class="caption">A consolidator's panel: its members, as many as fit.</p>
+</div>
+<div class="figure">
+<img alt="The housekeeping parameters pop-up: &quot;latest datum&quot; and under it sun=21509, wheel=-7, battery=85 and battery_age=3, a member to a line; then its device id, what it has moved, and &quot;what it has sent since the vehicle started&quot;: 41 datums, 6 with all new and 35 at its interval, and each input's new, held and default -- the battery 9 new, 31 held and 1 with its default." src="shots/tcs-moc-consolidation-configuration.png" />
+<p class="caption">Its <tt class="docutils literal">Configuration</tt>: the whole datum, and after a <tt class="docutils literal">Query</tt> what it
+has sent.</p>
+</div>
 </li>
 <li><p class="first"><tt class="docutils literal">Disable</tt> on <tt class="docutils literal">to_k3</tt>'s panel sends <tt class="docutils literal">STOP_NODE</tt> for its device id.
 The vehicle answers <tt class="docutils literal">Success</tt>, <tt class="docutils literal">Last Response</tt> says so, naming the

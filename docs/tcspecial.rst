@@ -2238,7 +2238,10 @@ it, log it -- is its own business. A consolidator's datum is handed out
 whole, named by the consolidator, as any node's is, once the receive has
 checked it is one the consolidator's layout can have made; a station that
 wants each input's value takes it apart with
-``tcsprotocol::consolidation::Layout::unpack``, by the same configuration.
+``tcsprotocol::consolidation::Layout::unpack``, by the same configuration,
+or from C and C++ with libtcsmoc-c's ``tcs_consolidation_unpack``, and
+writes it as text, ``input=value`` as ``defaults`` writes a default, with
+``Layout::write_text`` or ``tcs_consolidation_text``.
 A gateway node that the ground sends commands
 or other data through also states the ``address`` tcspecial binds to receive
 them, its host and port together, as ``127.0.0.1:5000``.
@@ -2587,7 +2590,7 @@ and the rest after.
 The lander example
 ------------------
 A lunar landing in two dimensions, flown by hand: two tcspecials, one for
-each axis, read a joystick in tcs-sim's lander window and drive the
+each axis, read a joystick in tcs-sim's window and drive the
 lander's thrust with it, and send its position, velocity and acceleration
 down through Yamcs. ``lander-a`` flies the X axis and ``lander-b`` the Y
 axis; one tcs-sim simulates the payloads of both, in one world, from the
@@ -2600,7 +2603,7 @@ at random from a seed -- ``--seed N``, or one it chooses and says -- and
 starts Yamcs, with a relay between Yamcs and each vehicle that holds
 everything 1.3 s each way, the time light takes from the Moon; tcs-sim
 with both configurations; and both tcspecials. The lander is flown from
-tcs-sim's lander window, and the MOC's window shows what arrives through
+tcs-sim's window, and the MOC's window shows what arrives through
 Yamcs, 1.3 s later. Closing either window stops everything:
 
 .. code-block:: console

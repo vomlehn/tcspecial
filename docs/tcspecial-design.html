@@ -3694,7 +3694,11 @@ receives through, hands the datum out whole, named by the
 consolidator, and refuses one its layout cannot have made;
 <tt class="docutils literal"><span class="pre">consolidation::Layout::unpack_into</span></tt> puts each member's value back in
 its place, in the order of the inputs, into buffers made beforehand,
-allocating nothing, for a station that reads no XTCE.</dd>
+allocating nothing, for a station that reads no XTCE, and
+<tt class="docutils literal"><span class="pre">Layout::write_text</span></tt> writes the datum as text. libtcsmoc-c gives C and
+C++ the same, <tt class="docutils literal">tcs_consolidation_open</tt>, <tt class="docutils literal">_unpack</tt> and <tt class="docutils literal">_text</tt>, by
+the same layout. Python has none, since a Python station receives
+through Yamcs, which decodes the datum itself.</dd>
 <dt>Requirement</dt>
 <dd>A string or bytes input states its most, as <tt class="docutils literal">string(64)</tt>, which <a class="reference internal" href="#how-large-a-datum-may-be">How
 large a datum may be</a> asks of every one: the length's width and the

@@ -3255,7 +3255,11 @@ Requirement
     consolidator, and refuses one its layout cannot have made;
     ``consolidation::Layout::unpack_into`` puts each member's value back in
     its place, in the order of the inputs, into buffers made beforehand,
-    allocating nothing, for a station that reads no XTCE.
+    allocating nothing, for a station that reads no XTCE, and
+    ``Layout::write_text`` writes the datum as text. libtcsmoc-c gives C and
+    C++ the same, ``tcs_consolidation_open``, ``_unpack`` and ``_text``, by
+    the same layout. Python has none, since a Python station receives
+    through Yamcs, which decodes the datum itself.
 
 Requirement
     A string or bytes input states its most, as ``string(64)``, which `How

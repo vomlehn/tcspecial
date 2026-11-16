@@ -639,6 +639,34 @@ fn answer(command: &Command, aboard: &mut Aboard) -> Telemetry {
             answer.threads[..told].copy_from_slice(&all[from..]);
             Telemetry::QueryThreads(answer.tell(all.len(), told))
         }
+        // A consolidator of four inputs a minute and a half into a run, as
+        // the consolidator example's housekeeping would answer: sent mostly
+        // at its interval, the battery, slowest, mostly held, and it and its
+        // age sent once with their defaults before the battery reported.
+        Command::QueryConsolidator(cmd) => {
+            let mut answer = tcsprotocol::QueryConsolidatorTelemetry::new(
+                seq,
+                CommandStatus::Success,
+                cmd.node,
+                cmd.first,
+            );
+            answer.counts = tcsprotocol::consolidation::ConsolidatorCounts {
+                sent: 41,
+                sent_all_new: 6,
+                sent_interval: 35,
+                sent_moc: 0,
+                refused: 0,
+            };
+            let input = |held, none| tcsprotocol::consolidation::InputCounts {
+                held,
+                none,
+            };
+            let all = [input(2, 0), input(0, 0), input(31, 1), input(0, 1)];
+            let from = (cmd.first as usize).min(all.len());
+            let told = all.len() - from;
+            answer.inputs[..told].copy_from_slice(&all[from..]);
+            Telemetry::QueryConsolidator(answer.tell(all.len(), told))
+        }
         Command::StopNode(cmd) => {
             aboard.running.insert(cmd.node.0, false);
             Telemetry::StopNode(NodeTelemetry::stopped(
@@ -1243,6 +1271,7 @@ fn screenshots() {
 
     thermostat();
     ping();
+    consolidator();
 }
 
 /// The thermostat example's pictures: coming up and connecting, the data
@@ -1340,24 +1369,9 @@ fn thermostat() {
     let panel = &panel_elements(ui)[consensus];
     press_in(panel, "Configuration");
     settle();
-    // The pop-up, which is sized to what it shows, and the panel it is
-    // over. Its elements give their positions within the pop-up, which is
-    // 4 pixels in from the panel's corner: see the PopupWindow's x and y.
-    let popup =
-        ElementHandle::find_by_element_id(ui, "DHPanel::parameters-layout")
-            .next()
-            .expect("the Configuration pop-up");
-    let around = Region::around(panel, 10.0);
-    let at = panel.absolute_position();
-    let right = at.x + 4.0 + popup.size().width + 10.0;
-    let foot = at.y + 4.0 + popup.size().height + 10.0;
     shoot(
         ui.window(),
-        Some(Region {
-            width: (right - around.x).max(around.width),
-            height: (foot - around.y).max(around.height),
-            ..around
-        }),
+        Some(with_its_popup(ui, panel)),
         "configuration",
     );
     click_outside(ui);
@@ -1453,6 +1467,97 @@ fn thermostat() {
     station.beacon(1, true);
     station.refresh();
     shoot(ui.window(), Some(above_panels(ui)), "restarted");
+
+    station.done.store(true, Ordering::Relaxed);
+}
+
+/// The region a panel's Configuration pop-up takes, with the panel it is
+/// over.
+///
+/// The pop-up is sized to what it shows. Its elements give their positions
+/// within it, and it is 4 pixels in from the panel's corner: see the
+/// PopupWindow's x and y.
+///
+/// # Arguments
+///
+/// * `ui`    - The main window, with the pop-up open.
+/// * `panel` - The panel it was opened from.
+///
+/// # Returns
+///
+/// The region round both, with a margin.
+fn with_its_popup(ui: &MainWindow, panel: &ElementHandle) -> Region {
+    let popup =
+        ElementHandle::find_by_element_id(ui, "DHPanel::parameters-layout")
+            .next()
+            .expect("the Configuration pop-up");
+    let around = Region::around(panel, 10.0);
+    let at = panel.absolute_position();
+    let right = at.x + 4.0 + popup.size().width + 10.0;
+    let foot = at.y + 4.0 + popup.size().height + 10.0;
+    Region {
+        width: (right - around.x).max(around.width),
+        height: (foot - around.y).max(around.height),
+        ..around
+    }
+}
+
+/// The consolidator example's pictures: its panel with a datum in it, each
+/// member `input=value` as many as fit, and its Configuration, which shows
+/// them all, a member to a line.
+fn consolidator() {
+    let station = Station::on("consolidator");
+    let ui = &station.ui;
+    station.beacon(1, true);
+    station.connect();
+    station.beacon(2, false);
+    station.refresh();
+
+    // A datum as housekeeping sends it: the sun at 215.09 degrees, the
+    // wheel a little backwards, the battery at 85 per cent, reported three
+    // seconds ago.
+    let layout = consolidated_of(&station.moved)["housekeeping"].clone();
+    let mut datum = [0u8; 64];
+    let used = layout
+        .pack(
+            &[
+                &21509u16.to_be_bytes(),
+                &(-7i32).to_be_bytes(),
+                &[85],
+                &3u16.to_be_bytes(),
+            ],
+            &mut datum,
+        )
+        .expect("it packs");
+    station.send(&BTreeMap::from([(
+        "housekeeping".to_string(),
+        datum[..used].to_vec(),
+    )]));
+    pause(Duration::from_millis(100));
+    station.refresh();
+    let housekeeping = station.row_of("housekeeping");
+    let panel = &panel_elements(ui)[housekeeping];
+    shoot(
+        ui.window(),
+        Some(Region::around(panel, 10.0)),
+        "consolidation",
+    );
+    // A window of one panel is shorter than the pop-up, which Slint then
+    // moves up to keep inside it, away from where `with_its_popup` finds
+    // it: made tall enough for it to open where it belongs.
+    let size = ui.window().size().to_logical(ui.window().scale_factor());
+    ui.window()
+        .set_size(slint::LogicalSize::new(size.width, size.height + 600.0));
+    settle();
+    let panel = &panel_elements(ui)[housekeeping];
+    press_in(panel, "Configuration");
+    settle();
+    shoot(
+        ui.window(),
+        Some(with_its_popup(ui, panel)),
+        "consolidation-configuration",
+    );
+    click_outside(ui);
 
     station.done.store(true, Ordering::Relaxed);
 }

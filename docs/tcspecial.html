@@ -2588,7 +2588,10 @@ it, log it -- is its own business. A consolidator's datum is handed out
 whole, named by the consolidator, as any node's is, once the receive has
 checked it is one the consolidator's layout can have made; a station that
 wants each input's value takes it apart with
-<tt class="docutils literal"><span class="pre">tcsprotocol::consolidation::Layout::unpack</span></tt>, by the same configuration.
+<tt class="docutils literal"><span class="pre">tcsprotocol::consolidation::Layout::unpack</span></tt>, by the same configuration,
+or from C and C++ with libtcsmoc-c's <tt class="docutils literal">tcs_consolidation_unpack</tt>, and
+writes it as text, <tt class="docutils literal">input=value</tt> as <tt class="docutils literal">defaults</tt> writes a default, with
+<tt class="docutils literal"><span class="pre">Layout::write_text</span></tt> or <tt class="docutils literal">tcs_consolidation_text</tt>.
 A gateway node that the ground sends commands
 or other data through also states the <tt class="docutils literal">address</tt> tcspecial binds to receive
 them, its host and port together, as <tt class="docutils literal">127.0.0.1:5000</tt>.</p>
@@ -2897,7 +2900,7 @@ and the rest after.</p>
 <div class="section" id="the-lander-example">
 <h2><a class="toc-backref" href="#toc-entry-39">The lander example</a></h2>
 <p>A lunar landing in two dimensions, flown by hand: two tcspecials, one for
-each axis, read a joystick in tcs-sim's lander window and drive the
+each axis, read a joystick in tcs-sim's window and drive the
 lander's thrust with it, and send its position, velocity and acceleration
 down through Yamcs. <tt class="docutils literal"><span class="pre">lander-a</span></tt> flies the X axis and <tt class="docutils literal"><span class="pre">lander-b</span></tt> the Y
 axis; one tcs-sim simulates the payloads of both, in one world, from the
@@ -2909,7 +2912,7 @@ at random from a seed -- <tt class="docutils literal"><span class="pre">--seed</
 starts Yamcs, with a relay between Yamcs and each vehicle that holds
 everything 1.3 s each way, the time light takes from the Moon; tcs-sim
 with both configurations; and both tcspecials. The lander is flown from
-tcs-sim's lander window, and the MOC's window shows what arrives through
+tcs-sim's window, and the MOC's window shows what arrives through
 Yamcs, 1.3 s later. Closing either window stops everything:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-lander<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>&lt;yamcs&gt;

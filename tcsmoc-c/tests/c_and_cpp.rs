@@ -561,6 +561,71 @@ fn the_ground_station_works_as_c_and_as_cpp_and_says_the_same() {
     }
 }
 
+/// `examples/consolidation.c`, built as C and as C++, takes a consolidator's
+/// datum apart through the header -- each input's name and type, each
+/// value, the string from the datum's end back in its place, and the whole
+/// as text -- and refuses a datum its layout cannot have made: both say the
+/// same, and what they say is what the layout holds.
+#[test]
+fn a_consolidation_is_taken_apart_from_c_and_cpp() {
+    let library = fresh_library();
+    let dir = tempfile::tempdir().expect("a directory");
+    let fixture = here().join("../tests/consolidator/yamcs.ytcs");
+    // The temperature 0x1234, the valve 1, and "hot", after a count of 3.
+    let good = "1234 01 03 686f74";
+    // A boolean of 2.
+    let damaged = "1234 02 03 686f74";
+    let mut said = Vec::new();
+    for (compiler, standard) in [("gcc", "-std=c11"), ("g++", "-std=c++17")] {
+        let Some(program) = compiled(
+            compiler,
+            standard,
+            "consolidation.c",
+            &library,
+            &dir.path().join(format!("consolidation_{compiler}")),
+        ) else {
+            continue;
+        };
+        let run = |datum: &str| {
+            let ran = Command::new(&program)
+                .arg(&fixture)
+                .arg("pack")
+                .arg(datum)
+                .output()
+                .expect("it runs");
+            assert!(
+                ran.status.success(),
+                "{compiler}: {}",
+                String::from_utf8_lossy(&ran.stderr)
+            );
+            String::from_utf8_lossy(&ran.stdout).to_string()
+        };
+        let (good, damaged) = (run(good), run(damaged));
+        assert_eq!(
+            good,
+            "inputs 3\n\
+             input temp u16\n\
+             input valve boolean\n\
+             input name string(8)\n\
+             member temp: 12 34\n\
+             member valve: 01\n\
+             member name: 68 6f 74\n\
+             temp=4660\n\
+             valve=1\n\
+             name=\"hot\"\n",
+            "{compiler}"
+        );
+        assert!(
+            damaged.contains("refused: ") && damaged.contains("valve"),
+            "{compiler}: {damaged}"
+        );
+        said.push(good + &damaged);
+    }
+    if let [c, cpp] = said.as_slice() {
+        assert_eq!(c, cpp, "the C and the C++ should say the same");
+    }
+}
+
 /// The header alone, included first, compiles as old C and old C++: nothing
 /// in it needs more than C99 or C++11.
 #[test]

@@ -51,7 +51,7 @@ use tcsmoc::matched::Matched;
 use tcsmoc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
 use tcsmoc::{command_links_of, CommandStatus, TcsClient};
 use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
-use tcsprotocol::consolidation::INPUTS_PER_ANSWER;
+use tcsprotocol::consolidation::{Layout, INPUTS_PER_ANSWER};
 use tcsprotocol::graph::link_table::LinkTable;
 use tcsprotocol::graph::parameters::beacon_interval_of;
 use tcsprotocol::graph::units;
@@ -1553,6 +1553,311 @@ unsafe fn bytes_of<'a>(
         Err(fail("the data is NULL"))
     } else {
         Ok(std::slice::from_raw_parts(data, length))
+    }
+}
+
+// ---- A consolidator's datum ------------------------------------------------
+
+/// A consolidator's layout, by which its datum is taken apart, and room to
+/// take one apart in: see `tcsprotocol::consolidation`.
+pub struct tcs_consolidation {
+    /// How its datum is laid out, from the configuration.
+    layout: Layout,
+    /// Each input's name as C reads it, in the order of its `world-in`.
+    names: Vec<CString>,
+    /// Each input's type as C reads it, `u16` or `string(8)`, in the same
+    /// order.
+    types: Vec<CString>,
+    /// Where each input's value is put by an unpack, end to end: room for
+    /// every one at its most. It holds the last until the next.
+    values: Vec<u8>,
+    /// Where each input's value is: in `values` after an unpack, in the
+    /// datum while text is written.
+    spans: Vec<std::ops::Range<usize>>,
+    /// The text [`tcs_consolidation_text`] writes, kept so that its room is
+    /// made once and reused.
+    text: String,
+}
+
+/// What the header's `tcs_member` is.
+#[repr(C)]
+pub struct tcs_member {
+    input: *const c_char,
+    data: *const u8,
+    length: usize,
+}
+
+/// Opens the layout of the consolidator called `node`.
+///
+/// # Arguments
+///
+/// * `configuration` - The configuration.
+/// * `node`          - The consolidator's name.
+///
+/// # Returns
+///
+/// The consolidation, or NULL where there is no such node, it is not a
+/// consolidator, or its layout does not work out.
+///
+/// # Safety
+///
+/// `configuration` as [`tcs_configuration_digest`]; `node` NULL or a
+/// NUL-terminated string.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_open(
+    configuration: *const tcs_configuration,
+    node: *const c_char,
+) -> *mut tcs_consolidation {
+    guard(std::ptr::null_mut(), || {
+        let configuration = handle_of(configuration, "the configuration")?;
+        let name = text_of(node, "the consolidator's name")?;
+        let graph = &configuration.graph;
+        let found = graph.node(name).ok_or_else(|| {
+            fail(format_args!(
+                "{}: there is no node called \"{name}\"",
+                configuration.path.display()
+            ))
+        })?;
+        let (_, layout) = Layout::of_node(graph, found)
+            .ok_or_else(|| {
+                fail(format_args!(
+                    "{}: \"{name}\" is not a consolidator",
+                    configuration.path.display()
+                ))
+            })?
+            .map_err(|why| {
+                fail(format_args!(
+                    "{}: \"{name}\" (consolidator): {why}",
+                    configuration.path.display()
+                ))
+            })?;
+        // Allocates, once, at startup: the handle, which outlives this call,
+        // the inputs' names and types, and the room every unpack and every
+        // text is made in.
+        let c_text = |text: &str| {
+            CString::new(text.replace('\0', " ")).unwrap_or_default()
+        };
+        let names = layout.inputs.iter().map(|i| c_text(&i.name)).collect();
+        let types = layout
+            .inputs
+            .iter()
+            .map(|i| c_text(&i.kind.to_string()))
+            .collect();
+        let values = vec![0; layout.largest_link_bytes()];
+        let spans = vec![0..0; layout.inputs.len()];
+        Ok(Box::into_raw(Box::new(tcs_consolidation {
+            layout,
+            names,
+            types,
+            values,
+            spans,
+            text: String::new(),
+        })))
+    })
+}
+
+/// How many inputs a consolidation has.
+///
+/// # Arguments
+///
+/// * `consolidation` - The consolidation.
+///
+/// # Returns
+///
+/// The count, or 0 where `consolidation` is NULL.
+///
+/// # Safety
+///
+/// `consolidation` NULL or made by `tcs_consolidation_open` and not yet
+/// closed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_inputs(
+    consolidation: *const tcs_consolidation,
+) -> usize {
+    guard(0, || {
+        Ok(handle_of(consolidation, "the consolidation")?.names.len())
+    })
+}
+
+/// The name of an input of a consolidation.
+///
+/// # Arguments
+///
+/// * `consolidation` - The consolidation.
+/// * `at`            - The input's place in its `world-in`, from 0.
+///
+/// # Returns
+///
+/// The name, held by the consolidation, or NULL past its last input.
+///
+/// # Safety
+///
+/// As [`tcs_consolidation_inputs`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_input(
+    consolidation: *const tcs_consolidation,
+    at: usize,
+) -> *const c_char {
+    guard(std::ptr::null(), || {
+        let held = handle_of(consolidation, "the consolidation")?;
+        Ok(held.names.get(at).map_or(std::ptr::null(), |n| n.as_ptr()))
+    })
+}
+
+/// The type of an input of a consolidation, as a configuration writes it.
+///
+/// # Arguments
+///
+/// * `consolidation` - The consolidation.
+/// * `at`            - The input's place in its `world-in`, from 0.
+///
+/// # Returns
+///
+/// The type, `u16` or `string(8)`, held by the consolidation, or NULL past
+/// its last input.
+///
+/// # Safety
+///
+/// As [`tcs_consolidation_inputs`].
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_type(
+    consolidation: *const tcs_consolidation,
+    at: usize,
+) -> *const c_char {
+    guard(std::ptr::null(), || {
+        let held = handle_of(consolidation, "the consolidation")?;
+        Ok(held.types.get(at).map_or(std::ptr::null(), |t| t.as_ptr()))
+    })
+}
+
+/// Takes a consolidator's datum apart into each input's value, allocating
+/// nothing: each as its source sends it on a link, a string or bytes back
+/// in its place from the datum's end.
+///
+/// # Arguments
+///
+/// * `consolidation` - The consolidation.
+/// * `datum`         - The datum, as `tcs_gateway_receive` gave it.
+/// * `length`        - Its length.
+/// * `members`       - Where each input's name and value are written, in
+///                     the order of its `world-in`; the values are the
+///                     consolidation's, good until the next unpack.
+/// * `count`         - How many `members` holds: at least
+///                     [`tcs_consolidation_inputs`].
+///
+/// # Returns
+///
+/// How many members were written, or -1 where the datum is not one the
+/// layout can have made, or `members` is too short.
+///
+/// # Safety
+///
+/// `consolidation` as [`tcs_consolidation_inputs`], used from one thread at
+/// a time; `datum` readable for `length` bytes; `members` writable for
+/// `count`.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_unpack(
+    consolidation: *mut tcs_consolidation,
+    datum: *const u8,
+    length: usize,
+    members: *mut tcs_member,
+    count: usize,
+) -> c_int {
+    guard(-1, || {
+        let held = handle_of_mut(consolidation, "the consolidation")?;
+        let datum = bytes_of(datum, length)?;
+        let inputs = held.names.len();
+        if count < inputs || members.is_null() {
+            return Err(fail(format_args!(
+                "room for {count} members, and the consolidation has {inputs}"
+            )));
+        }
+        held.layout
+            .unpack_into(datum, &mut held.values, &mut held.spans)
+            .map_err(fail)?;
+        let out = std::slice::from_raw_parts_mut(members, inputs);
+        for ((member, name), span) in
+            out.iter_mut().zip(&held.names).zip(&held.spans)
+        {
+            *member = tcs_member {
+                input: name.as_ptr(),
+                data: held.values[span.clone()].as_ptr(),
+                length: span.len(),
+            };
+        }
+        Ok(c_int::try_from(inputs).unwrap_or(c_int::MAX))
+    })
+}
+
+/// Writes a consolidator's datum as text, as `snprintf` does: each member
+/// `input=value`, as a consolidator's `defaults` writes a default, in the
+/// order of its `world-in`, `between` between them.
+///
+/// # Arguments
+///
+/// * `consolidation` - The consolidation.
+/// * `datum`         - The datum, as `tcs_gateway_receive` gave it.
+/// * `length`        - Its length.
+/// * `between`       - What goes between members: " " for a line, "\n"
+///                     for a member to a line.
+/// * `out`           - Where the text is written, or NULL to ask only its
+///                     length.
+/// * `size`          - How many bytes `out` holds, its NUL included.
+///
+/// # Returns
+///
+/// The text's length, without its NUL, which is all of it where it is less
+/// than `size`; or -1 where the datum is not one the layout can have made.
+///
+/// # Safety
+///
+/// `consolidation` as [`tcs_consolidation_unpack`]; `datum` readable for
+/// `length` bytes; `between` NULL or a NUL-terminated string; `out` NULL or
+/// writable for `size` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_text(
+    consolidation: *mut tcs_consolidation,
+    datum: *const u8,
+    length: usize,
+    between: *const c_char,
+    out: *mut c_char,
+    size: usize,
+) -> i64 {
+    guard(-1, || {
+        let held = handle_of_mut(consolidation, "the consolidation")?;
+        let datum = bytes_of(datum, length)?;
+        let between = text_of(between, "what goes between members")?;
+        // Allocates only while the text grows past the longest it has been:
+        // its room is kept from one call to the next.
+        held.text.clear();
+        held.layout
+            .write_text(datum, &mut held.spans, between, &mut held.text)
+            .map_err(fail)?;
+        // A NUL in a string member would end the text early for C: a space,
+        // in place.
+        // SAFETY: a NUL and a space are each one byte, and neither is part
+        // of any other character, so the text stays UTF-8.
+        for byte in unsafe { held.text.as_bytes_mut() } {
+            if *byte == 0 {
+                *byte = b' ';
+            }
+        }
+        Ok(written(held.text.as_bytes(), out, size))
+    })
+}
+
+/// Close a consolidation.
+///
+/// # Safety
+///
+/// `consolidation` NULL or made by `tcs_consolidation_open` and not yet
+/// closed.
+#[no_mangle]
+pub unsafe extern "C" fn tcs_consolidation_close(
+    consolidation: *mut tcs_consolidation,
+) {
+    if !consolidation.is_null() {
+        drop(Box::from_raw(consolidation));
     }
 }
 

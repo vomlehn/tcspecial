@@ -262,7 +262,13 @@ are in, <code>tcs_value_in</code> reads one as a number in it, and
 <code>tcs_configuration_sends_decisions</code> says whether they are
 <em>decisions</em> – the text <code>1</code> or <code>0</code>, which a
 thermostat makes – and <code>tcs_decision_on</code> reads one as on or
-off.</li>
+off. A consolidator’s datum, a structure of its inputs, is taken apart
+by its layout, which <code>tcs_consolidation_open</code> works out of
+the configuration: <code>tcs_consolidation_unpack</code> gives each
+input’s name and value, a string or bytes back in its place from the
+datum’s end, and <code>tcs_consolidation_text</code> writes it as
+<code>input=value</code> text. <code>examples/consolidation.c</code>
+uses them, built as C and as C++.</li>
 <li><strong>Data up.</strong> <code>tcs_uplink_open</code> opens the way
 up to a gateway node that binds an address and port aboard, and each
 <code>tcs_uplink_send</code> sends one datum there, which leaves the

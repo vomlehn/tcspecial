@@ -355,6 +355,24 @@ Commanding a node
    its latest datum, under "latest datum", a member to a line, whether or
    not a ``Query`` has been answered.
 
+   .. figure:: shots/tcs-moc-consolidation.png
+      :alt: The housekeeping panel of the consolidator example, Active, its
+            From payload line reading "sun=21509 wheel=-7" and an ellipsis,
+            the rest of its members cut off at the panel's edge.
+
+      A consolidator's panel: its members, as many as fit.
+
+   .. figure:: shots/tcs-moc-consolidation-configuration.png
+      :alt: The housekeeping parameters pop-up: "latest datum" and under it
+            sun=21509, wheel=-7, battery=85 and battery_age=3, a member to
+            a line; then its device id, what it has moved, and "what it has
+            sent since the vehicle started": 41 datums, 6 with all new and
+            35 at its interval, and each input's new, held and default --
+            the battery 9 new, 31 held and 1 with its default.
+
+      Its ``Configuration``: the whole datum, and after a ``Query`` what it
+      has sent.
+
 3. ``Disable`` on ``to_k3``'s panel sends ``STOP_NODE`` for its device id.
    The vehicle answers ``Success``, ``Last Response`` says so, naming the
    node by id and name, and the panel says ``Stopped``, in grey.

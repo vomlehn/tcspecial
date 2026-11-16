@@ -339,6 +339,98 @@ int tcs_gateway_receive(tcs_gateway *gateway, int64_t wait_ms,
  * @param gateway  The gateway node, or NULL to do nothing. */
 void tcs_gateway_close(tcs_gateway *gateway);
 
+/* ---- A consolidator's datum --------------------------------------------- */
+
+/* A consolidator's layout, from the configuration: what its datum, a
+ * structure of its inputs, is taken apart by. Each member of a fixed width is
+ * at a fixed offset, and each string or bytes is a count and its bytes after
+ * them; tcs_consolidation_unpack() puts each back in its place. */
+typedef struct tcs_consolidation tcs_consolidation;
+
+/* One input of a consolidation, and its value. */
+typedef struct tcs_member {
+	const char *input;   /* the input's name, as its world-in lists it */
+	const uint8_t *data; /* its value, as its source sends it on a link */
+	size_t length;
+} tcs_member;
+
+/** Opens the layout of a consolidator.
+ *
+ * @param configuration  The configuration.
+ * @param node           The consolidator's name.
+ * @return               The consolidation, or NULL where there is no such
+ *                       node, it is not a consolidator, or its layout does
+ *                       not work out. */
+tcs_consolidation *tcs_consolidation_open(
+	const tcs_configuration *configuration, const char *node);
+
+/** How many inputs a consolidation has.
+ *
+ * @param consolidation  The consolidation.
+ * @return               The count, or 0 where it is NULL. */
+size_t tcs_consolidation_inputs(const tcs_consolidation *consolidation);
+
+/** The name of an input.
+ *
+ * @param consolidation  The consolidation.
+ * @param at             The input's place in its world-in, from 0.
+ * @return               The name, held by the consolidation, or NULL past
+ *                       its last input. */
+const char *tcs_consolidation_input(const tcs_consolidation *consolidation,
+				    size_t at);
+
+/** The type of an input, as a configuration writes it.
+ *
+ * @param consolidation  The consolidation.
+ * @param at             The input's place in its world-in, from 0.
+ * @return               The type, such as "u16" or "string(8)", held by the
+ *                       consolidation, or NULL past its last input. */
+const char *tcs_consolidation_type(const tcs_consolidation *consolidation,
+				   size_t at);
+
+/** Takes a consolidator's datum apart into each input's value, allocating
+ * nothing.
+ *
+ * @param consolidation  The consolidation.
+ * @param datum          The datum, as tcs_gateway_receive() gave it.
+ * @param length         Its length.
+ * @param members        Where each input's name and value are written, in
+ *                       the order of its world-in; the values are the
+ *                       consolidation's, good until the next unpack.
+ * @param count          How many members holds: at least
+ *                       tcs_consolidation_inputs().
+ * @return               How many members were written, or -1 where the
+ *                       datum is not one the layout can have made or
+ *                       members is too short. */
+int tcs_consolidation_unpack(tcs_consolidation *consolidation,
+			     const uint8_t *datum, size_t length,
+			     tcs_member *members, size_t count);
+
+/** Writes a consolidator's datum as text, as snprintf() does: each member
+ * input=value, as a consolidator's defaults writes a default -- a number, 1
+ * or 0 for a boolean, a string in quotes, bytes in hexadecimal in square
+ * brackets -- in the order of its world-in.
+ *
+ * @param consolidation  The consolidation.
+ * @param datum          The datum, as tcs_gateway_receive() gave it.
+ * @param length         Its length.
+ * @param between        What goes between members: " " for a line, "\n"
+ *                       for a member to a line.
+ * @param out            Where the text is written, or NULL to ask only its
+ *                       length.
+ * @param size           How many bytes out holds, its NUL included.
+ * @return               The text's length, without its NUL, which is all of
+ *                       it where it is less than size; or -1 where the
+ *                       datum is not one the layout can have made. */
+int64_t tcs_consolidation_text(tcs_consolidation *consolidation,
+			       const uint8_t *datum, size_t length,
+			       const char *between, char *out, size_t size);
+
+/** Closes a consolidation.
+ *
+ * @param consolidation  The consolidation, or NULL to do nothing. */
+void tcs_consolidation_close(tcs_consolidation *consolidation);
+
 /* A value is what a computation that makes one sends: four bytes of a signed
  * count of its unit's steps, most significant first -- micro-kelvin for a
  * temperature, micro-volts for a voltage, millimetres for a length. Only the

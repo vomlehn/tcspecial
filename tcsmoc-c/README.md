@@ -64,7 +64,12 @@ peer (see "A vehicle on a cFS software bus" in
   `tcs_value_kelvin` reads a temperature.
   `tcs_configuration_sends_decisions` says whether they are *decisions* --
   the text `1` or `0`, which a thermostat makes -- and `tcs_decision_on`
-  reads one as on or off.
+  reads one as on or off. A consolidator's datum, a structure of its
+  inputs, is taken apart by its layout, which `tcs_consolidation_open`
+  works out of the configuration: `tcs_consolidation_unpack` gives each
+  input's name and value, a string or bytes back in its place from the
+  datum's end, and `tcs_consolidation_text` writes it as `input=value`
+  text. `examples/consolidation.c` uses them, built as C and as C++.
 - **Data up.** `tcs_uplink_open` opens the way up to a gateway node that
   binds an address and port aboard, and each `tcs_uplink_send` sends one
   datum there, which leaves the node by its `moc-out` links for the

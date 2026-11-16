@@ -179,7 +179,7 @@ impl Scene {
     fn new(windows: &Windows, payload_path: &Path, sim_path: &Path) -> Self {
         let mut startup = Startup::default();
         let (dh_configs, _, sims, configs) = load(
-            payload_path.to_str().expect("a path"),
+            &[payload_path.to_str().expect("a path")],
             sim_path.to_str().expect("a path"),
             Mode::All,
             &mut startup,

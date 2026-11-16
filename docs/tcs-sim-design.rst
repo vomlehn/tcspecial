@@ -838,7 +838,8 @@ Requirement
     sharing a name is an error rather than one silently shadowing the other,
     and as in the payload configuration the rule reaches no further than the
     file: a simulator file names the payloads of the set it belongs to, and
-    two sets may name their payloads alike.
+    two sets may name their payloads alike. Two configurations sharing one
+    simulator file are one set, and name theirs apart.
 
 Requirement
     A word that is not a setting is an error, in a payload, in a group, and in
@@ -924,6 +925,33 @@ environment variable when that is set, and says which payloads exist, how each
 is reached, and how big its packets are. What simulating them takes comes from
 the simulator file beside it, named by ``PAYLOAD_SIM_YAML``; see `Simulator Configuration
 Files`_.
+
+Several configurations can be simulated together, in one world: two
+tcspecials on one vehicle, each with its own configuration, whose payloads
+read one physics model. tcs-sim is then given every configuration, and one
+simulator file they share, named by ``--simulator=FILE`` or
+``PAYLOAD_SIM_YAML``, since it is beside none of them:
+
+.. code-block:: console
+
+   $ tcs-sim --simulate=all --simulator=lander-sim.yaml \
+       lander-a.ytcs lander-b.ytcs
+
+Requirement
+    A simulator file shared by several configurations simulates each payload
+    it names as a payload of exactly one of them. A name that is a payload of
+    none, or of more than one, is refused: tcs-sim keeps each payload --
+    its panel, its settings, what it is to the world -- by its name, and two
+    payloads of one name would be one. Each configuration is verified on its
+    own, without the simulator file, which would find the others' payloads
+    in it unknown; the file is held to the set of them as tcs-sim reads it.
+
+Requirement
+    The configuration a simulator says it is set up for, in its readiness
+    answers, is the digest of the one configuration it was given, as
+    always, or for several the digest of their digests in the order they
+    were given. A harness waiting for it with ``--wait`` gives the same files
+    in the same order.
 
 Requirement
     A tcspecial configuration file describes payloads and says nothing about

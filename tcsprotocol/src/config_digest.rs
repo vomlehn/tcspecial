@@ -155,6 +155,42 @@ pub fn digest_of_file<P: AsRef<Path>>(path: P) -> TcsResult<ConfigDigest> {
     digest_of_graph(&crate::graph::Graph::load(path.as_ref())?)
 }
 
+/// The digest of a set of configurations simulated together, as a
+/// simulator serving all of them says it is set up for.
+///
+/// For one configuration, its own digest, [`digest_of_file`]'s, so that
+/// whatever compares a simulator against one configuration compares as it
+/// always has. For several, the digest of their digests, in the order given:
+/// a harness waiting for the simulator gives the same files in the same
+/// order.
+///
+/// # Arguments
+///
+/// * `paths` - The configuration files, each in either format.
+///
+/// # Returns
+///
+/// The digest.
+///
+/// # Errors
+///
+/// Any error reading one of the files, or none given.
+pub fn digest_of_files<P: AsRef<Path>>(paths: &[P]) -> TcsResult<ConfigDigest> {
+    match paths {
+        [] => Err(crate::error::TcsError::Config(
+            "no configuration to digest".to_string(),
+        )),
+        [one] => digest_of_file(one),
+        several => {
+            let mut digests = Vec::with_capacity(16 * several.len());
+            for path in several {
+                digests.extend_from_slice(&digest_of_file(path)?.0);
+            }
+            Ok(ConfigDigest(md5::compute(&digests).0))
+        }
+    }
+}
+
 /// The digest of a configuration: everything the vehicle and the
 /// ground act on, across every file it was read from.
 ///
@@ -585,6 +621,19 @@ fn write_canonical(value: &serde_json::Value, out: &mut Vec<u8>) {
 
 #[cfg(test)]
 mod tests {
+    /// A set of one configuration digests as the configuration does, and a
+    /// set of none is refused rather than digested as nothing.
+    #[test]
+    fn a_set_of_one_configuration_digests_as_it_does() {
+        let minimal = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples/minimal/minimal.ytcs");
+        assert_eq!(
+            super::digest_of_files(&[&minimal]).expect("digested"),
+            super::digest_of_file(&minimal).expect("digested")
+        );
+        assert!(super::digest_of_files::<&std::path::Path>(&[]).is_err());
+    }
+
     /// A configuration file's version is read as the three bytes it goes on
     /// the link as, and a version that is not that is refused rather than
     /// rounded.

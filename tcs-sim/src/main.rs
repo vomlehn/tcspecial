@@ -437,8 +437,9 @@ type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 /// # Arguments
 ///
 /// * `sim_file`   - The simulator file, which names the model.
-/// * `graph`      - The tcspecial configuration's graph, whose conversions
-///                  give the sensors' encodings, if it was read.
+/// * `graphs`     - The tcspecial configurations' graphs, whose conversions
+///                  give the sensors' encodings: each payload's is the one
+///                  it is a node of. Empty if none was read.
 /// * `sims`       - Each handler's simulator settings, beside `dh_configs`.
 /// * `dh_configs` - The data handlers simulated.
 ///
@@ -456,7 +457,7 @@ type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 /// switch one heater.
 fn joined_to_the_world(
     sim_file: &SimConfigFile,
-    graph: Option<&tcsprotocol::graph::Graph>,
+    graphs: &[&tcsprotocol::graph::Graph],
     sims: &[ResolvedSim],
     dh_configs: &[DHConfig],
 ) -> Result<Attachments, String> {
@@ -481,7 +482,7 @@ fn joined_to_the_world(
 
     // A model needs a graph to take its sensors' encodings from: without the
     // graph's conversions nothing says which bytes stand for a reading.
-    let Some(graph) = graph else {
+    let Some(first) = graphs.first().copied() else {
         return Err(
             "the simulator file has a physics model, and no graph was read: a \
                     simulated sensor sends the bytes a to_kelvin or to_value \
@@ -519,9 +520,21 @@ fn joined_to_the_world(
         model.find(at).map(|(place, _)| place)
     };
 
+    // The graph a node is of: its own configuration's, where several are
+    // simulated together, since only it has the node's links and conversions.
+    // A name no configuration has is looked for in the first, which says so.
+    let graph_of = |name: &str| {
+        graphs
+            .iter()
+            .copied()
+            .find(|graph| graph.node(name).is_some())
+            .unwrap_or(first)
+    };
+
     let mut attached = BTreeMap::new();
     for (dh, sim) in dh_configs.iter().zip(sims) {
         let name = dh.name.0.clone();
+        let graph = graph_of(&name);
         let attachment = match &sim.attached {
             None => continue,
             Some(Attached::Reports {
@@ -583,7 +596,7 @@ fn joined_to_the_world(
 
     let mut thermostats: Vec<Arc<Thermostat>> = Vec::new();
     for name in &simulating {
-        let thermostat = thermostat_of(graph, name, &attached)?;
+        let thermostat = thermostat_of(graph_of(name), name, &attached)?;
         // Two thermostats switching one heater would each undo the other's
         // decision, which no configuration means.
         if let Some((other, heater)) = thermostats.iter().find_map(|other| {
@@ -606,7 +619,9 @@ fn joined_to_the_world(
 ///
 /// Its sensors are the payloads reporting the world whose data reaches the
 /// node, and its heaters the payloads driving it that data from the node
-/// reaches.
+/// reaches. Where several configurations are simulated together, only the
+/// node's own configuration's payloads can be either: no link reaches from
+/// one configuration into another.
 ///
 /// # Arguments
 ///
@@ -682,21 +697,26 @@ type Loaded = (
 ///
 /// # Arguments
 ///
-/// * `payload_path` - The tcspecial configuration file.
-/// * `sim_path`     - The simulator file.
-/// * `mode`         - The `--simulate` setting.
-/// * `startup`      - Where each problem found is said.
+/// * `payload_paths` - The tcspecial configuration files: one, or several
+///                     simulated together in one world, which the simulator
+///                     file is then shared by.
+/// * `sim_path`      - The simulator file.
+/// * `mode`          - The `--simulate` setting.
+/// * `startup`       - Where each problem found is said.
 ///
 /// # Returns
 ///
 /// The handlers, the simulator file, their settings and the payloads'
-/// configurations, or `None` if anything stops the pair being simulated.
+/// configurations, or `None` if anything stops the set being simulated.
 fn load(
-    payload_path: &str,
+    payload_paths: &[&str],
     sim_path: &str,
     mode: Mode,
     startup: &mut Startup,
 ) -> Option<Loaded> {
+    // How the configurations are named in what is said: as they always were
+    // where there is one.
+    let said = payload_paths.join(", ");
     let sim_file = match SimConfigFile::load(sim_path) {
         Ok(sim_file) => sim_file,
         Err(e) => {
@@ -714,24 +734,41 @@ fn load(
     // handlers are made: a sensor joined to the world sends what it reports in
     // the encoding the graph's own conversion reads, and that is where the
     // encoding is.
-    let mut graph = None;
-    let loaded = tcsprotocol::graph::Graph::load(payload_path)
-        .map_err(|e| e.to_string())
-        .and_then(|read| {
-            let handlers =
-                tcsprotocol::graph::simulated::handlers(&read, &sim_file);
-            graph = Some(read);
-            handlers
-        });
-    let dh_configs = match loaded {
-        Ok(dh_configs) => dh_configs,
-        Err(e) => {
-            startup.error(format!(
-                "Error loading payload configuration from {payload_path}: {e}"
-            ));
+    //
+    // Several configurations share the one file, each taking the payloads
+    // it has a node of: see `shared_out`, which holds the file to naming
+    // each payload of exactly one of them.
+    let mut graphs = Vec::with_capacity(payload_paths.len());
+    let mut dh_configs = Vec::new();
+    for payload_path in payload_paths {
+        let loaded = tcsprotocol::graph::Graph::load(payload_path)
+            .map_err(|e| e.to_string())
+            .and_then(|read| {
+                let handlers = if payload_paths.len() == 1 {
+                    tcsprotocol::graph::simulated::handlers(&read, &sim_file)
+                } else {
+                    tcsprotocol::graph::simulated::handlers_in(&read, &sim_file)
+                };
+                graphs.push(read);
+                handlers
+            });
+        match loaded {
+            Ok(handlers) => dh_configs.extend(handlers),
+            Err(e) => {
+                startup.error(format!(
+                    "Error loading payload configuration from \
+                     {payload_path}: {e}"
+                ));
+                return None;
+            }
+        }
+    }
+    if payload_paths.len() > 1 {
+        if let Err(e) = shared_out(payload_paths, &graphs, &sim_file) {
+            startup.error(format!("Error in {sim_path} against {said}: {e}"));
             return None;
         }
-    };
+    }
 
     // Join the two by name. Every data handler needs settings and every
     // settings entry needs a handler, so this is where a file naming a payload
@@ -739,9 +776,7 @@ fn load(
     let sims = match sim_file.resolve(&dh_configs) {
         Ok(sims) => sims,
         Err(e) => {
-            startup.error(format!(
-                "Error in {sim_path} against {payload_path}: {e}"
-            ));
+            startup.error(format!("Error in {sim_path} against {said}: {e}"));
             return None;
         }
     };
@@ -753,31 +788,29 @@ fn load(
     // hardware in a file that says it is simulated, or a simulator file that
     // forgot a payload, is caught here, before anything runs; only tcspecial's
     // own check protects the hardware, because only tcspecial opens it.
-    if let Some(graph) = graph.as_ref() {
-        let refused = simulation_refused(graph, &sim_file, sim_path, mode);
-        if !refused.is_empty() {
-            for refusal in refused {
-                startup.error(format!("{payload_path}: {refusal}"));
-            }
-            return None;
+    let mut refusing = false;
+    for (graph, payload_path) in graphs.iter().zip(payload_paths) {
+        for refusal in simulation_refused(graph, &sim_file, sim_path, mode) {
+            startup.error(format!("{payload_path}: {refusal}"));
+            refusing = true;
         }
+    }
+    if refusing {
+        return None;
     }
 
     // The world, made once and shared: the sensors joined to it read the
     // same state the heaters joined to it warm, which is the whole point of
     // the world being one thing rather than a figure per payload.
-    let (joined, thermostats) = match joined_to_the_world(
-        &sim_file,
-        graph.as_ref(),
-        &sims,
-        &dh_configs,
-    ) {
-        Ok(found) => found,
-        Err(e) => {
-            startup.error(format!("Error in {sim_path}: {e}"));
-            return None;
-        }
-    };
+    let read: Vec<&tcsprotocol::graph::Graph> = graphs.iter().collect();
+    let (joined, thermostats) =
+        match joined_to_the_world(&sim_file, &read, &sims, &dh_configs) {
+            Ok(found) => found,
+            Err(e) => {
+                startup.error(format!("Error in {sim_path}: {e}"));
+                return None;
+            }
+        };
 
     let configs: Vec<PayloadConfig> = match dh_configs
         .iter()
@@ -800,9 +833,8 @@ fn load(
     {
         Ok(configs) => configs,
         Err(e) => {
-            startup.error(format!(
-                "Error in payload configuration {payload_path}: {e}"
-            ));
+            startup
+                .error(format!("Error in payload configuration {said}: {e}"));
             return None;
         }
     };
@@ -819,12 +851,83 @@ fn load(
     }
 
     if configs.is_empty() {
-        startup
-            .error(format!("{payload_path} describes no payloads to simulate"));
+        let describe = if payload_paths.len() == 1 {
+            "describes"
+        } else {
+            "describe"
+        };
+        startup.error(format!("{said} {describe} no payloads to simulate"));
         return None;
     }
 
     Some((dh_configs, sim_file, sims, configs))
+}
+
+/// Holds a simulator file shared by several configurations to naming each
+/// payload it simulates as a payload of exactly one of them.
+///
+/// Everything tcs-sim keeps of a payload -- its panel, its settings, what it
+/// is to the world, the thermostat it reports to -- is kept by its name, so
+/// a name that is a payload of two configurations would be two payloads
+/// with one name, and is refused; the configurations name theirs apart.
+///
+/// # Arguments
+///
+/// * `payload_paths` - The configuration files, beside `graphs`.
+/// * `graphs`        - Their graphs.
+/// * `sim_file`      - The simulator file they share.
+///
+/// # Errors
+///
+/// A message for the first name the file simulates that is a payload of
+/// none of the configurations, or of more than one.
+fn shared_out(
+    payload_paths: &[&str],
+    graphs: &[tcsprotocol::graph::Graph],
+    sim_file: &SimConfigFile,
+) -> Result<(), String> {
+    for entry in &sim_file.simulated_payloads {
+        let mut payload_of = Vec::new();
+        let mut node_of = None;
+        for (graph, path) in graphs.iter().zip(payload_paths) {
+            match graph.node(&entry.name) {
+                Some(node) if node.is_payload() => payload_of.push(*path),
+                Some(node) => {
+                    node_of = Some((*path, node.node_type.clone()));
+                }
+                None => {}
+            }
+        }
+        match (payload_of.as_slice(), node_of) {
+            ([_], _) => {}
+            ([], Some((path, node_type))) => {
+                return Err(format!(
+                    "\"{}\" is simulated, and it is a {node_type} node of \
+                     {path}, not a payload",
+                    entry.name
+                ))
+            }
+            ([], None) => {
+                return Err(format!(
+                    "\"{}\" is simulated, and none of {} has a node of that \
+                     name",
+                    entry.name,
+                    payload_paths.join(", ")
+                ))
+            }
+            (several, _) => {
+                return Err(format!(
+                    "\"{}\" is simulated, and it is a payload of {}: one \
+                     simulator file simulates a payload of one configuration, \
+                     so the configurations simulated together name their \
+                     payloads apart",
+                    entry.name,
+                    several.join(" and ")
+                ))
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Finds every way the payloads of a graph disagree with what the
@@ -911,10 +1014,10 @@ fn simulation_refused(
 ///
 /// # Arguments
 ///
-/// * `payload_path` - The tcspecial configuration file.
-/// * `sim_path`     - The simulator file.
-/// * `sim_file`     - The simulator file as read, which gives the address.
-/// * `mode`         - The `--simulate` setting.
+/// * `payload_paths` - The tcspecial configuration files.
+/// * `sim_path`      - The simulator file.
+/// * `sim_file`      - The simulator file as read, which gives the address.
+/// * `mode`          - The `--simulate` setting.
 ///
 /// # Returns
 ///
@@ -925,13 +1028,13 @@ fn simulation_refused(
 /// A message naming the file if the address is wrong or cannot be bound,
 /// or either file cannot be digested.
 fn ready_socket(
-    payload_path: &str,
+    payload_paths: &[&str],
     sim_path: &str,
     sim_file: &SimConfigFile,
     mode: Mode,
 ) -> Result<(std::net::UdpSocket, SetUpFor), String> {
     let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
-    let set_up_for = set_up_for(payload_path, sim_path, mode)?;
+    let set_up_for = set_up_for(payload_paths, sim_path, mode)?;
     let socket = ready::bind(at).map_err(|e| format!("{sim_path}: {e}"))?;
     eprintln!("answering whether it is ready at {at}");
     Ok((socket, set_up_for))
@@ -942,25 +1045,28 @@ fn ready_socket(
 ///
 /// # Arguments
 ///
-/// * `payload_path` - The tcspecial configuration file.
-/// * `sim_path`     - The simulator file.
-/// * `mode`         - The `--simulate` setting.
+/// * `payload_paths` - The tcspecial configuration files.
+/// * `sim_path`      - The simulator file.
+/// * `mode`          - The `--simulate` setting.
 ///
 /// # Returns
 ///
-/// The two files' digests and the mode.
+/// The configurations' digest, one configuration's own or the digest of
+/// several's, the simulator file's, and the mode.
 ///
 /// # Errors
 ///
-/// A message naming the file if either cannot be read for its digest.
+/// A message naming the files if any cannot be read for its digest.
 fn set_up_for(
-    payload_path: &str,
+    payload_paths: &[&str],
     sim_path: &str,
     mode: Mode,
 ) -> Result<SetUpFor, String> {
     Ok(SetUpFor {
-        configuration: tcsprotocol::config_digest::digest_of_file(payload_path)
-            .map_err(|e| format!("{payload_path}: {e}"))?,
+        configuration: tcsprotocol::config_digest::digest_of_files(
+            payload_paths,
+        )
+        .map_err(|e| format!("{}: {e}", payload_paths.join(", ")))?,
         simulator: tcsprotocol::config_digest::digest_of_simulator_file(
             sim_path,
         )
@@ -1061,23 +1167,109 @@ fn take_sending(args: Vec<String>) -> Result<(bool, Vec<String>), String> {
     Ok((sending, rest))
 }
 
+/// What names the simulator file on the command line.
+const SIMULATOR_FLAG: &str = "--simulator";
+
+/// Takes `--simulator=FILE` out of the arguments.
+///
+/// The one way to name the simulator file several configurations share: a
+/// file beside a configuration and named for it is that configuration's, and
+/// there is no one configuration for a shared file to be beside.
+///
+/// # Arguments
+///
+/// * `args` - The command line's arguments.
+///
+/// # Returns
+///
+/// The file, where it was given, and the arguments left.
+///
+/// # Errors
+///
+/// A message if it is given twice, or given without a file.
+fn take_simulator(
+    args: Vec<String>,
+) -> Result<(Option<String>, Vec<String>), String> {
+    let mut simulator = None;
+    let mut rest = Vec::with_capacity(args.len());
+    for arg in args {
+        let Some(file) = arg.strip_prefix(&format!("{SIMULATOR_FLAG}=")) else {
+            if arg == SIMULATOR_FLAG {
+                return Err(format!(
+                    "{SIMULATOR_FLAG} takes the simulator file: give \
+                     {SIMULATOR_FLAG}=FILE"
+                ));
+            }
+            rest.push(arg);
+            continue;
+        };
+        if file.is_empty() {
+            return Err(format!(
+                "{SIMULATOR_FLAG}= names no file: give {SIMULATOR_FLAG}=FILE"
+            ));
+        }
+        if simulator.replace(file.to_string()).is_some() {
+            return Err(format!(
+                "{SIMULATOR_FLAG} is given twice: give it once"
+            ));
+        }
+    }
+    Ok((simulator, rest))
+}
+
+/// Takes the configuration files from what is left of the command line.
+///
+/// One, or none, as every program takes it: see
+/// `tcsprotocol::config::payload_path_from_args`, which falls back to
+/// `SIM_PAYLOAD_CONFIG_PATH` and then to the default. Several, simulated
+/// together in one world.
+///
+/// # Arguments
+///
+/// * `args` - What is left of the command line, the program's name first.
+///
+/// # Returns
+///
+/// The configuration files, in the order given.
+///
+/// # Errors
+///
+/// A message if an argument left is an option tcs-sim does not take.
+fn payload_paths_from(args: Vec<String>) -> Result<Vec<String>, String> {
+    if let Some(unknown) = args.iter().skip(1).find(|a| a.starts_with("--")) {
+        return Err(format!(
+            "tcs-sim: {unknown} is not an option tcs-sim takes\nusage: \
+             tcs-sim [--simulate=MODE] [--sending] [--wait[=SECONDS]] \
+             [{SIMULATOR_FLAG}=FILE] [CONFIGURATION...]"
+        ));
+    }
+    if args.len() <= 2 {
+        return Ok(vec![payload_path_from_args(
+            args.into_iter(),
+            Some(SIM_PAYLOAD_CONFIG_PATH_VAR),
+        )?]);
+    }
+    Ok(args.into_iter().skip(1).collect())
+}
+
 /// Does `--wait`: waits for a simulator started on these files under a mode
 /// to be ready, and says what to exit with. Nothing is simulated and no
 /// window opens: this is the harness for a run started by hand.
 ///
 /// # Arguments
 ///
-/// * `payload_path` - The tcspecial configuration file.
-/// * `sim_path`     - The simulator file, which says where to ask.
-/// * `mode`         - The `--simulate` setting the simulator must have.
-/// * `patience`     - How long to wait.
+/// * `payload_paths` - The tcspecial configuration files, in the order the
+///                     simulator was given them.
+/// * `sim_path`      - The simulator file, which says where to ask.
+/// * `mode`          - The `--simulate` setting the simulator must have.
+/// * `patience`      - How long to wait.
 ///
 /// # Returns
 ///
 /// The exit status: 0 once it is ready; 1 if it is not ready in time, is
 /// set up for something else, or the files cannot be read.
 fn wait_for_another(
-    payload_path: &str,
+    payload_paths: &[&str],
     sim_path: &str,
     mode: Mode,
     patience: std::time::Duration,
@@ -1087,7 +1279,7 @@ fn wait_for_another(
         .and_then(|sim_file| {
             sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))
         })
-        .and_then(|at| Ok((at, set_up_for(payload_path, sim_path, mode)?)));
+        .and_then(|at| Ok((at, set_up_for(payload_paths, sim_path, mode)?)));
     let (at, ours) = match wanted {
         Ok(wanted) => wanted,
         Err(e) => {
@@ -1198,6 +1390,13 @@ fn main() {
             process::exit(1);
         }
     };
+    let (simulator, args) = match take_simulator(args) {
+        Ok(taken) => taken,
+        Err(e) => {
+            eprintln!("tcs-sim: {e}");
+            process::exit(1);
+        }
+    };
     if mode.is_flight() {
         eprintln!(
             "tcs-sim: --simulate={mode} is the flight setting, which allows \
@@ -1210,26 +1409,42 @@ fn main() {
 
     // Read both configuration files before the window exists, so a file that
     // cannot be read is reported plainly rather than as an empty window.
-    let payload_path = match payload_path_from_args(
-        args.into_iter(),
-        Some(SIM_PAYLOAD_CONFIG_PATH_VAR),
-    ) {
-        Ok(payload_path) => payload_path,
+    let payload_paths = match payload_paths_from(args) {
+        Ok(payload_paths) => payload_paths,
         Err(e) => {
             eprintln!("{}", e);
             process::exit(1);
         }
     };
-    // The one PAYLOAD_SIM_YAML names, and otherwise the one beside the
-    // configuration and named for it, found as tcs-moc finds it.
-    let sim_path = env::var(SIM_CONFIG_PATH_VAR).unwrap_or_else(|_| {
-        tcsprotocol::config::sim_path_beside(&payload_path)
-            .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
-    });
+    let payload_paths: Vec<&str> =
+        payload_paths.iter().map(String::as_str).collect();
+    // The one --simulator names, then the one PAYLOAD_SIM_YAML names, and
+    // otherwise, for one configuration, the one beside it and named for it,
+    // found as tcs-moc finds it. Several configurations share a file, which
+    // is beside none of them, so it is named.
+    let sim_path =
+        match simulator.or_else(|| env::var(SIM_CONFIG_PATH_VAR).ok()) {
+            Some(sim_path) => sim_path,
+            None => match payload_paths.as_slice() {
+                [payload_path] => {
+                    tcsprotocol::config::sim_path_beside(payload_path)
+                        .unwrap_or_else(|| DEFAULT_SIM_CONFIG_PATH.to_string())
+                }
+                several => {
+                    eprintln!(
+                    "tcs-sim: {} configurations are simulated together, and \
+                     nothing says which simulator file they share: give \
+                     {SIMULATOR_FLAG}=FILE, or set {SIM_CONFIG_PATH_VAR}",
+                    several.len()
+                );
+                    process::exit(1);
+                }
+            },
+        };
 
     if let Some(patience) = waiting {
         process::exit(wait_for_another(
-            &payload_path,
+            &payload_paths,
             &sim_path,
             mode,
             patience,
@@ -1242,19 +1457,38 @@ fn main() {
     // say about the same files. Then what only a simulator has to ask. All of
     // it is shown before the main window is, and the window is not shown at
     // all where any of it is an error.
+    //
+    // Several configurations sharing a simulator file are each verified on
+    // their own: verified with the file, each would find the others'
+    // payloads in it unknown. The file is then held to the set of them as
+    // it is read: see `load` and `shared_out`.
     let mut startup = Startup::default();
-    startup.report(
-        &tcsverify::verify(
-            Path::new(&payload_path),
-            Some(Path::new(&sim_path)),
-            tcsverify::Limits::EVERYTHING,
+    match payload_paths.as_slice() {
+        [payload_path] => startup.report(
+            &tcsverify::verify(
+                Path::new(payload_path),
+                Some(Path::new(&sim_path)),
+                tcsverify::Limits::EVERYTHING,
+            ),
+            true,
         ),
-        true,
-    );
+        several => {
+            for payload_path in several {
+                startup.report(
+                    &tcsverify::verify(
+                        Path::new(payload_path),
+                        None,
+                        tcsverify::Limits::EVERYTHING,
+                    ),
+                    true,
+                );
+            }
+        }
+    }
     let loaded = if startup.fatal() {
         None
     } else {
-        load(&payload_path, &sim_path, mode, &mut startup)
+        load(&payload_paths, &sim_path, mode, &mut startup)
     };
     if !startup.is_empty() {
         present(&startup);
@@ -1270,7 +1504,7 @@ fn main() {
     // an address already held -- by a simulator left running -- stops this
     // one before it fights that one for the payloads' paths.
     let readiness =
-        match ready_socket(&payload_path, &sim_path, &sim_file, mode) {
+        match ready_socket(&payload_paths, &sim_path, &sim_file, mode) {
             Ok(readiness) => readiness,
             Err(e) => {
                 let mut refused = Startup::default();
@@ -1284,29 +1518,33 @@ fn main() {
     // software bus the vehicle joins as an SBN peer, and the ground joins
     // too, as the radio's far end is the ground itself. Made before the
     // readiness socket says ready, so that a vehicle started then finds it;
-    // kept until tcs-sim ends. See `tcsmoc::bus`.
-    let _cfs_end = match Graph::load(&payload_path)
-        .map_err(|e| format!("{payload_path}: {e}"))
-        .and_then(|graph| tcsmoc::bus::SimulatedCfs::open(&graph))
-    {
-        Ok(cfs) => {
-            if let Some(cfs) = &cfs {
-                eprintln!("simulating the cFS end at {}", cfs.local_addr());
+    // kept until tcs-sim ends. See `tcsmoc::bus`. One for each
+    // configuration that answers to cFS.
+    let mut _cfs_ends = Vec::new();
+    for payload_path in &payload_paths {
+        match Graph::load(payload_path)
+            .map_err(|e| format!("{payload_path}: {e}"))
+            .and_then(|graph| tcsmoc::bus::SimulatedCfs::open(&graph))
+        {
+            Ok(cfs) => {
+                if let Some(cfs) = &cfs {
+                    eprintln!("simulating the cFS end at {}", cfs.local_addr());
+                }
+                _cfs_ends.push(cfs);
             }
-            cfs
+            Err(e) => {
+                let mut refused = Startup::default();
+                refused.error(e);
+                present(&refused);
+                process::exit(1);
+            }
         }
-        Err(e) => {
-            let mut refused = Startup::default();
-            refused.error(e);
-            present(&refused);
-            process::exit(1);
-        }
-    };
+    }
 
     eprintln!(
         "Simulating {} payloads from {} and {}",
         configs.len(),
-        payload_path,
+        payload_paths.join(", "),
         sim_path
     );
     if let Some(description) = &sim_file.description {
@@ -1574,6 +1812,165 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(name)
     }
 
+    /// Writes two configurations into a directory -- the minimal example's,
+    /// and the same again with its payload renamed and moved to another
+    /// port -- and one simulator file for both, simulating each payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir`    - The directory.
+    /// * `second` - The name the second configuration's payload is given.
+    /// * `extra`  - A further name the simulator file simulates, if any.
+    ///
+    /// # Returns
+    ///
+    /// The two configurations' paths and the simulator file's.
+    fn two_minimals(
+        dir: &Path,
+        second: &str,
+        extra: Option<&str>,
+    ) -> (String, String, String) {
+        let minimal =
+            std::fs::read_to_string(repo_file("examples/minimal/minimal.ytcs"))
+                .expect("the example reads");
+        let a = dir.join("a.ytcs");
+        let b = dir.join("b.ytcs");
+        std::fs::write(&a, &minimal).expect("written");
+        let renamed = minimal
+            .replace("payload: sensor", &format!("payload: {second}"))
+            .replace("node: sensor", &format!("node: {second}"))
+            .replace("127.0.0.1:5001", "127.0.0.1:5002");
+        std::fs::write(&b, renamed).expect("written");
+        let entry = |name: &str| {
+            format!(
+                "      - payload: {name}\n        packet_interval: 1 s\n\
+                 \x20       protocol: udp\n        simulate: true\n"
+            )
+        };
+        let mut sim = String::from(
+            "tcs-sim:\n  ready: \"127.0.0.1:7999\"\nsimulated_payloads:\n  \
+             - type network:\n",
+        );
+        sim.push_str(&entry("sensor"));
+        if second != "sensor" {
+            sim.push_str(&entry(second));
+        }
+        if let Some(extra) = extra {
+            sim.push_str(&entry(extra));
+        }
+        let sim_path = dir.join("both-sim.yaml");
+        std::fs::write(&sim_path, sim).expect("written");
+        let path = |p: &Path| p.to_str().expect("a path").to_string();
+        (path(&a), path(&b), path(&sim_path))
+    }
+
+    /// Two configurations sharing one simulator file are simulated in one
+    /// world: each payload with its own configuration's endpoint.
+    #[test]
+    fn two_configurations_are_simulated_together() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let (a, b, sim) = two_minimals(dir.path(), "probe", None);
+        let mut startup = Startup::default();
+        let (dh_configs, _, _, configs) =
+            load(&[&a, &b], &sim, Mode::All, &mut startup)
+                .unwrap_or_else(|| panic!("refused: {:?}", startup.lines()));
+        assert!(startup.is_empty(), "{:?}", startup.lines());
+        let names: Vec<&str> =
+            dh_configs.iter().map(|dh| dh.name.0.as_str()).collect();
+        assert_eq!(names, ["sensor", "probe"]);
+        assert_eq!(configs.len(), 2);
+        let ports: Vec<String> = dh_configs
+            .iter()
+            .map(|dh| format!("{:?}", dh.endpoint))
+            .collect();
+        assert!(ports[0].contains("5001"), "{ports:?}");
+        assert!(ports[1].contains("5002"), "{ports:?}");
+    }
+
+    /// A payload two configurations both have is refused where they share a
+    /// simulator file: tcs-sim keeps each payload by its name.
+    #[test]
+    fn a_payload_of_two_configurations_is_refused() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let (a, b, sim) = two_minimals(dir.path(), "sensor", None);
+        let mut startup = Startup::default();
+        assert!(load(&[&a, &b], &sim, Mode::All, &mut startup).is_none());
+        assert!(
+            startup.lines().iter().any(|(error, line)| *error
+                && line.contains(
+                    "\"sensor\" is simulated, and it is a \
+                                  payload of"
+                )),
+            "{:?}",
+            startup.lines()
+        );
+    }
+
+    /// A name the shared file simulates that no configuration has is
+    /// refused, naming every configuration it was looked for in.
+    #[test]
+    fn a_payload_of_no_configuration_is_refused() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let (a, b, sim) = two_minimals(dir.path(), "probe", Some("ghost"));
+        let mut startup = Startup::default();
+        assert!(load(&[&a, &b], &sim, Mode::All, &mut startup).is_none());
+        assert!(
+            startup.lines().iter().any(|(error, line)| *error
+                && line.contains("\"ghost\" is simulated, and none of")),
+            "{:?}",
+            startup.lines()
+        );
+    }
+
+    /// What a simulator says it is set up for: one configuration's own
+    /// digest, as every harness comparing against one configuration
+    /// expects, and for several a digest of theirs, in the order given.
+    #[test]
+    fn a_set_of_configurations_has_one_digest() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let (a, b, sim) = two_minimals(dir.path(), "probe", None);
+        let one = set_up_for(&[&a], &sim, Mode::All).expect("digested");
+        assert_eq!(
+            one.configuration,
+            tcsprotocol::config_digest::digest_of_file(&a).expect("digested")
+        );
+        let ab = set_up_for(&[&a, &b], &sim, Mode::All).expect("digested");
+        let ba = set_up_for(&[&b, &a], &sim, Mode::All).expect("digested");
+        assert_ne!(ab.configuration, one.configuration);
+        assert_ne!(ab.configuration, ba.configuration);
+        assert_eq!(
+            ab.configuration,
+            set_up_for(&[&a, &b], &sim, Mode::All)
+                .expect("digested")
+                .configuration
+        );
+    }
+
+    /// --simulator names the simulator file, once and with a file; the
+    /// configurations are what is left.
+    #[test]
+    fn the_simulator_file_is_named_once() {
+        let args = |words: &[&str]| -> Vec<String> {
+            words.iter().map(|w| w.to_string()).collect()
+        };
+        let (simulator, rest) =
+            take_simulator(args(&["tcs-sim", "--simulator=s.yaml", "a", "b"]))
+                .expect("taken");
+        assert_eq!(simulator.as_deref(), Some("s.yaml"));
+        assert_eq!(rest, args(&["tcs-sim", "a", "b"]));
+        assert_eq!(payload_paths_from(rest).expect("taken"), args(&["a", "b"]));
+        assert!(take_simulator(args(&["tcs-sim", "--simulator"])).is_err());
+        assert!(take_simulator(args(&["tcs-sim", "--simulator="])).is_err());
+        assert!(take_simulator(args(&[
+            "tcs-sim",
+            "--simulator=a",
+            "--simulator=b"
+        ]))
+        .is_err());
+        let bogus = args(&["tcs-sim", "--bogus", "a"]);
+        assert!(payload_paths_from(bogus).is_err());
+    }
+
     /// An example is simulated: its simulated payload nodes, reached where
     /// tcspecial reaches them, with the simulator file beside it found as
     /// tcs-moc finds it.
@@ -1587,7 +1984,7 @@ mod tests {
 
         let mut startup = Startup::default();
         let (dh_configs, _, sims, configs) =
-            load(payload, &sim, Mode::All, &mut startup).expect("it loads");
+            load(&[payload], &sim, Mode::All, &mut startup).expect("it loads");
         assert!(startup.is_empty(), "{:?}", startup.lines());
         assert_eq!(dh_configs.len(), 1);
         assert_eq!(dh_configs[0].name.0, "sensor");
@@ -1678,7 +2075,7 @@ mod tests {
             .expect("its simulator file");
 
         let mut startup = Startup::default();
-        assert!(load(payload, &sim, Mode::All, &mut startup).is_none());
+        assert!(load(&[payload], &sim, Mode::All, &mut startup).is_none());
         assert!(
             startup.lines().iter().any(|(error, line)| *error
                 && line.contains("no payloads to simulate")),
@@ -2737,7 +3134,7 @@ mod tests {
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
 
         let (attached, thermostats) =
-            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+            joined_to_the_world(&sim_file, &[&graph], &sims, &dh_configs)
                 .expect("the world and the thermostat are made");
         let named: Vec<&str> = thermostats.iter().map(|t| t.name()).collect();
         assert_eq!(named, ["thermostat"]);
@@ -2753,13 +3150,10 @@ mod tests {
 
         // Naming a node that is not a thermostat node is refused.
         simulate_for(&mut sim_file, &["thermostat", "temp1"]);
-        assert!(joined_to_the_world(
-            &sim_file,
-            Some(&graph),
-            &sims,
-            &dh_configs
-        )
-        .is_err());
+        assert!(
+            joined_to_the_world(&sim_file, &[&graph], &sims, &dh_configs)
+                .is_err()
+        );
     }
 
     /// The thermostat example's two heater switches each say which heater
@@ -2783,7 +3177,7 @@ mod tests {
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
         let (attached, _) =
-            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+            joined_to_the_world(&sim_file, &[&graph], &sims, &dh_configs)
                 .expect("the world is made");
 
         for (payload, heater) in [
@@ -2884,7 +3278,7 @@ mod tests {
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
 
         let (_, thermostats) =
-            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+            joined_to_the_world(&sim_file, &[&graph], &sims, &dh_configs)
                 .expect("the world and the thermostats are made");
         let named: Vec<&str> = thermostats.iter().map(|t| t.name()).collect();
         assert_eq!(named, ["thermostat", "backstop"]);
@@ -2932,7 +3326,7 @@ mod tests {
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
 
         let refused =
-            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+            joined_to_the_world(&sim_file, &[&graph], &sims, &dh_configs)
                 .expect_err("refused");
         assert!(
             refused.contains("thermostat")
@@ -3006,7 +3400,7 @@ mod tests {
         let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
         let sims = sim_file.resolve(&dh_configs).expect("it fits");
         let (attached, _) =
-            joined_to_the_world(&sim_file, Some(&graph), &sims, &dh_configs)
+            joined_to_the_world(&sim_file, &[&graph], &sims, &dh_configs)
                 .expect("the world is made");
 
         let thermostat = thermostat_of(&graph, "thermostat").expect("one");

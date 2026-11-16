@@ -319,6 +319,40 @@ pub fn handlers(
         }
     }
 
+    handlers_in(graph, sim_file)
+}
+
+/// Makes what the simulator takes for each payload node of one configuration
+/// the simulator file names, where the file may also name the payloads of
+/// other configurations simulated with it.
+///
+/// [`handlers`] for a simulator file shared by several configurations, one
+/// world simulated for more than one tcspecial: a name the file gives that
+/// is not a node of this configuration is taken to be another's, and is left
+/// to whoever reads the file with that one. Which configuration each name
+/// is a payload of, and that it is of no more than one, is the caller's to
+/// check, since only it has them all.
+///
+/// # Arguments
+///
+/// * `graph`    - The configuration.
+/// * `sim_file` - The simulator file, which says which payloads are
+///                simulated.
+///
+/// # Returns
+///
+/// A handler for each payload of this configuration whose `simulate` is
+/// true, in the order the configuration declares them.
+///
+/// # Errors
+///
+/// A payload node of this configuration the simulator cannot simulate (an
+/// app node, or one whose endpoint cannot be reached) is refused, saying
+/// which.
+pub fn handlers_in(
+    graph: &Graph,
+    sim_file: &SimConfigFile,
+) -> Result<Vec<DHConfig>, String> {
     // Those whose simulate is true. One that is false is the real device,
     // which tcs-sim makes nothing for; one whose simulate is missing or stated
     // twice is refused where the file is checked, and is not simulated here.
@@ -425,6 +459,27 @@ mod tests {
         )
         .expect("its simulator file reads");
         (graph, sim)
+    }
+
+    /// A simulator file naming payloads another configuration has is
+    /// refused by `handlers`, which takes the file to be this
+    /// configuration's alone, and left to that configuration by
+    /// `handlers_in`, which takes this one's payloads from a shared file.
+    #[test]
+    fn another_configurations_payloads_are_left_to_it() {
+        let (minimal, own) = example("minimal");
+        let (_, theirs) = example("thermostat");
+        assert!(handlers(&minimal, &theirs).is_err());
+        assert!(handlers_in(&minimal, &theirs)
+            .expect("nothing of this one's is refused")
+            .is_empty());
+        let names = |handlers: Vec<DHConfig>| -> Vec<String> {
+            handlers.into_iter().map(|h| h.name.0).collect()
+        };
+        assert_eq!(
+            names(handlers_in(&minimal, &own).expect("simulated")),
+            names(handlers(&minimal, &own).expect("simulated"))
+        );
     }
 
     /// The minimal example's sensor is simulated where tcspecial reaches it.

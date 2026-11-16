@@ -722,6 +722,23 @@ naming it, and a name here that no handler has is an error rather than a line
 with no effect, because a typo is otherwise indistinguishable from a payload
 meant to be left out.
 
+Several configurations can share one simulator file, and so one world: two
+tcspecials on one vehicle, say, each flying its own configuration and both
+reading one physics model. tcs-sim is then given every configuration and
+the file, which is beside none of them, so it is named, with
+``--simulator=FILE`` or ``PAYLOAD_SIM_YAML``:
+
+.. code-block:: console
+
+   $ tcs-sim --simulate=all --simulator=lander-sim.yaml \
+       lander-a.ytcs lander-b.ytcs
+
+Each payload the file names is a payload of exactly one of the
+configurations, so the configurations name their payloads apart: a name
+that is a payload of two of them, or of none, is refused. One window shows
+every configuration's payloads, and ``--wait`` waits for a simulator given
+the same files in the same order.
+
 A simulated triggered payload sends one packet for each request it is sent and
 nothing otherwise. The segment settings still apply to it -- how a payload
 divides an answer is its own business however it was prompted -- but the packet

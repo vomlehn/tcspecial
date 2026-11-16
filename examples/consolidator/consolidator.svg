@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="530" viewBox="0 0 900 530" role="img" aria-labelledby="title desc">
   <title id="title">The consolidator example</title>
-  <desc id="desc">Three payloads, UDP sockets: sun, a u16, at 127.0.0.1:5001, every second; wheel, an i32, at 5002, four times a second; and battery, a u8, at 5003, every five seconds. Each sends its readings to housekeeping, a consolidator aboard tcspecial, at its inputs sun, wheel and battery. housekeeping sends one datum, a consolidation, when all three are new or every two seconds: a structure of the three readings, seven bytes, each sensor's default -- 65535, 0 and 255 -- until it has reported and its latest reading, held, after. It goes down through the gateway node, gateway, to 127.0.0.1:5102: ground_base, 5100, plus housekeeping's device id, 2. On the ground the datum is housekeeping's, decoded as a structure by the configuration's own XTCE.</desc>
+  <desc id="desc">Three payloads, UDP sockets: sun, a u16, at 127.0.0.1:5001, every second; wheel, an i32, at 5002, four times a second; and battery, a u8, at 5003, every five seconds. Each sends its readings to housekeeping, a consolidator aboard tcspecial, at its inputs sun, wheel and battery. The battery's readings go to battery_age too, an app_all_veh node, a program aboard, which sends every second how many seconds it has been since the battery last reported, to housekeeping's fourth input, battery_age. housekeeping sends one datum, a consolidation, when all four are new or every two seconds: a structure of the four, nine bytes, each input's default -- 65535, 0, 255 and 65535 -- until it has reported and its latest reading, held, after. It goes down through the gateway node, gateway, to 127.0.0.1:5102: ground_base, 5100, plus housekeeping's device id, 2. On the ground the datum is housekeeping's, decoded as a structure by the configuration's own XTCE.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -12,6 +12,7 @@
       .note { font-size: 12px; fill: #4b5563; }
       .payload { fill: #eaf2fb; stroke: #2f6db5; stroke-width: 1.6; }
       .compute { fill: #fff7e6; stroke: #b7791f; stroke-width: 1.6; }
+      .app { fill: #fff7e6; stroke: #b7791f; stroke-width: 1.6; stroke-dasharray: 6 3; }
       .gateway { fill: #ecfdf5; stroke: #047857; stroke-width: 1.6; }
       .ground { fill: #f3f4f6; stroke: #4b5563; stroke-width: 1.6; }
       .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
@@ -28,14 +29,14 @@
     </marker>
   </defs>
 
-  <rect width="900" height="470" fill="#ffffff"/>
+  <rect width="900" height="530" fill="#ffffff"/>
 
   <!-- Column headings -->
   <text class="heading" x="30" y="40">PAYLOADS</text>
   <text class="heading" x="700" y="40">MOC</text>
 
   <!-- tcspecial, the vehicle -->
-  <rect class="boundary" x="215" y="54" width="450" height="270" rx="14"/>
+  <rect class="boundary" x="215" y="54" width="450" height="340" rx="14"/>
   <text class="heading" x="233" y="80">TCSPECIAL (VEHICLE)</text>
 
   <!-- The three sensors -->
@@ -59,8 +60,14 @@
   <text class="name" x="316" y="156">housekeeping</text>
   <text class="kind" x="316" y="176">consolidator</text>
   <text class="detail" x="316" y="196">all_new, or every 2 s</text>
-  <text class="detail" x="316" y="214">defaults 65535, 0, 255</text>
-  <text class="detail" x="316" y="232">a structure, 7 bytes</text>
+  <text class="detail" x="316" y="214">a default for each</text>
+  <text class="detail" x="316" y="232">a structure, 9 bytes</text>
+
+  <!-- battery_age, the app node -->
+  <rect class="app" x="300" y="270" width="190" height="66" rx="10"/>
+  <text class="name" x="316" y="294">battery_age</text>
+  <text class="kind" x="316" y="312">app_all_veh, a program</text>
+  <text class="detail" x="316" y="328">seconds since battery</text>
 
   <!-- gateway -->
   <rect class="gateway" x="525" y="150" width="120" height="72" rx="10"/>
@@ -75,6 +82,7 @@
   <text class="kind" x="714" y="186">and decodes the datum</text>
   <text class="kind" x="714" y="204">as a structure:</text>
   <text class="detail" x="714" y="226">sun   wheel   battery</text>
+  <text class="detail" x="714" y="244">battery_age</text>
 
   <!-- Links into housekeeping, each named by its input -->
   <path class="groundward" d="M190,103 C250,103 250,158 296,158" marker-end="url(#arrow-blue)"/>
@@ -83,28 +91,34 @@
   <text class="label" x="228" y="182">wheel</text>
   <path class="groundward" d="M190,275 C250,275 250,220 296,220" marker-end="url(#arrow-blue)"/>
   <text class="label" x="226" y="254">battery</text>
+  <path class="groundward" d="M190,290 C245,290 250,303 296,303" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="226" y="320">battery</text>
+  <path class="groundward" d="M395,270 L395,247" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="402" y="262">battery_age</text>
 
   <!-- The one datum down -->
   <path class="packed" d="M490,186 L521,186" marker-end="url(#arrow-thick)"/>
   <path class="packed" d="M645,186 L696,186" marker-end="url(#arrow-thick)"/>
   <text class="label" x="652" y="174">datum</text>
 
-  <text class="note" x="233" y="282">One datum where there were three packets: each reading,</text>
-  <text class="note" x="233" y="298">or its default until its sensor reports, and after that</text>
-  <text class="note" x="233" y="314">its latest, held until another comes.</text>
+  <text class="note" x="233" y="356">One datum where there were four packets: each reading,</text>
+  <text class="note" x="233" y="372">or its default until it reports, and after that its latest,</text>
+  <text class="note" x="233" y="388">held until another comes; battery_age says how old.</text>
 
   <!-- Legend -->
-  <line x1="30" y1="350" x2="870" y2="350" stroke="#e5e7eb" stroke-width="1"/>
-  <path class="groundward" d="M30,382 L80,382" marker-end="url(#arrow-blue)"/>
-  <text class="label" x="90" y="386">a reading, to an input</text>
-  <path class="packed" d="M270,382 L320,382" marker-end="url(#arrow-thick)"/>
-  <text class="label" x="330" y="386">the consolidation: one datum, thick line</text>
-  <rect class="payload" x="30" y="410" width="22" height="16" rx="4"/>
-  <text class="label" x="60" y="423">payload</text>
-  <rect class="compute" x="150" y="410" width="22" height="16" rx="4"/>
-  <text class="label" x="180" y="423">computation</text>
-  <rect class="gateway" x="300" y="410" width="22" height="16" rx="4"/>
-  <text class="label" x="330" y="423">gateway node</text>
-  <rect class="ground" x="460" y="410" width="22" height="16" rx="4"/>
-  <text class="label" x="490" y="423">MOC program</text>
+  <line x1="30" y1="420" x2="870" y2="420" stroke="#e5e7eb" stroke-width="1"/>
+  <path class="groundward" d="M30,452 L80,452" marker-end="url(#arrow-blue)"/>
+  <text class="label" x="90" y="456">a reading, to an input</text>
+  <path class="packed" d="M270,452 L320,452" marker-end="url(#arrow-thick)"/>
+  <text class="label" x="330" y="456">the consolidation: one datum, thick line</text>
+  <rect class="payload" x="30" y="480" width="22" height="16" rx="4"/>
+  <text class="label" x="60" y="493">payload</text>
+  <rect class="compute" x="150" y="480" width="22" height="16" rx="4"/>
+  <text class="label" x="180" y="493">computation</text>
+  <rect class="gateway" x="300" y="480" width="22" height="16" rx="4"/>
+  <text class="label" x="330" y="493">gateway node</text>
+  <rect class="ground" x="460" y="480" width="22" height="16" rx="4"/>
+  <text class="label" x="490" y="493">MOC program</text>
+  <rect class="app" x="620" y="480" width="22" height="16" rx="4"/>
+  <text class="label" x="650" y="493">app node, a program: dashed</text>
 </svg>

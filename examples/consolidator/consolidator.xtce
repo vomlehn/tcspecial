@@ -47,6 +47,7 @@
       <Parameter name="housekeeping_sun" parameterTypeRef="u16"/>
       <Parameter name="housekeeping_wheel" parameterTypeRef="i32"/>
       <Parameter name="housekeeping_battery" parameterTypeRef="u8"/>
+      <Parameter name="housekeeping_battery_age" parameterTypeRef="u16"/>
     </ParameterSet>
     <ContainerSet>
       <SequenceContainer name="housekeeping_packet">
@@ -55,6 +56,7 @@
           <ParameterRefEntry parameterRef="housekeeping_sun"/>
           <ParameterRefEntry parameterRef="housekeeping_wheel"/>
           <ParameterRefEntry parameterRef="housekeeping_battery"/>
+          <ParameterRefEntry parameterRef="housekeeping_battery_age"/>
         </EntryList>
       </SequenceContainer>
     </ContainerSet>

@@ -81,30 +81,53 @@
                 <protocol>udp</protocol>
                 <world-out-type>u8</world-out-type>
                 <world-out>housekeeping.battery</world-out>
+                <world-out>battery_age.battery</world-out>
             </payload>
         </type>
     </payloads>
     <vehicle>
         <type name="compute">
-            <!-- Sends when all three are new, and every two seconds
-                 otherwise: all_new alone is refused, since one sensor that
-                 stopped would stop it for good. Until a sensor has
+            <!-- Sends when all four are new, and every two seconds
+                 otherwise: all_new alone is refused, since one input that
+                 stopped would stop it for good. Until an input has
                  reported, its default goes down in its place: the
                  battery's charge is 0 to 100, so 255 says "never read" by
                  being impossible, and so does 65535 for a sun angle in
-                 hundredths of a degree; a wheel at rest reads 0, so its
-                 default cannot be told from a reading. -->
+                 hundredths of a degree and for the battery's age; a wheel
+                 at rest reads 0, so its default cannot be told from a
+                 reading. -->
             <compute name="housekeeping">
                 <function>consolidator</function>
                 <defaults>sun=65535</defaults>
                 <defaults>wheel=0</defaults>
                 <defaults>battery=255</defaults>
+                <defaults>battery_age=65535</defaults>
                 <interval>2 s</interval>
                 <send>all_new</send>
                 <send>interval</send>
                 <world-out>gateway.housekeeping</world-out>
                 <world-in>sun</world-in>
                 <world-in>wheel</world-in>
+                <world-in>battery</world-in>
+                <world-in>battery_age</world-in>
+            </compute>
+        </type>
+        <type name="app_all_veh">
+            <!-- How many seconds since the battery last reported, every
+                 second: a member of the example's own beside the battery's
+                 charge, which the datum otherwise holds unchanged however
+                 long the battery is quiet. A Python 3 program beside this
+                 file, named relative to the repository's root because that
+                 is where tcspecial is run from: see examples/Makefile.
+                 Nothing reaches its moc-in, so app-gateway-arg, which every
+                 app_all_veh states, says nothing to it. -->
+            <compute name="battery_age">
+                <executable>examples/consolidator/battery_age.py</executable>
+                <app-payload-arg>1</app-payload-arg>
+                <app-gateway-arg>none</app-gateway-arg>
+                <world-in-type>u8</world-in-type>
+                <world-out-type>u16</world-out-type>
+                <world-out>housekeeping.battery_age</world-out>
                 <world-in>battery</world-in>
             </compute>
         </type>
@@ -116,6 +139,7 @@
             <node name="battery" x="34" y="234"/>
             <node name="housekeeping" x="242" y="134"/>
             <node name="gateway" x="469" y="134"/>
+            <node name="battery_age" x="138" y="334"/>
         </nodes>
     </tcs-cfge>
 </configuration>

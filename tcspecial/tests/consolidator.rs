@@ -1,12 +1,14 @@
-//! The consolidator example, flown: three sensors' readings go down as one
-//! datum, a structure of them, with each one's default until it has
-//! reported, and its last reading, held, after.
+//! The consolidator example, flown: three sensors' readings and the
+//! battery's age go down as one datum, a structure of them, with each one's
+//! default until it has reported, and its last reading, held, after.
 //!
 //! What is run is `examples/consolidator/consolidator.ytcs` itself, with
 //! each of its sockets moved to a port nothing holds -- so that this runs
 //! beside anything else, the example included -- and its log and state moved
 //! to a directory of the test's. The test plays the three sensors, and is
-//! the ground through tcsmoc's `GatewayReceiver`, as tcs-moc is.
+//! the ground through tcsmoc's `GatewayReceiver`, as tcs-moc is; the
+//! battery's age is the example's own program, `battery_age.py`, which needs
+//! Python 3.
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -46,32 +48,52 @@ fn received_for(
     got
 }
 
-/// Sends readings until a datum that is `wanted` comes down.
+/// Sends readings until a datum that `wanted` accepts comes down.
 ///
 /// # Arguments
 ///
 /// * `ground`   - The gateway node, open on the ground.
 /// * `sensors`  - The socket the sensors send from.
 /// * `readings` - Each sensor's address and reading, sent again each round.
-/// * `wanted`   - The datum waited for.
+/// * `wanted`   - Whether a datum is the one waited for.
+///
+/// # Returns
+///
+/// The datum.
 fn until_sent(
     ground: &mut GatewayReceiver,
     sensors: &std::net::UdpSocket,
     readings: &[(SocketAddr, &[u8])],
-    wanted: &[u8],
-) {
+    wanted: impl Fn(&[u8]) -> bool,
+) -> Vec<u8> {
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut heard: Vec<(String, Vec<u8>)> = Vec::new();
-    while !heard
-        .iter()
-        .any(|(source, data)| source == "housekeeping" && data == wanted)
-    {
+    loop {
+        if let Some((_, datum)) = heard
+            .iter()
+            .find(|(source, data)| source == "housekeeping" && wanted(data))
+        {
+            return datum.clone();
+        }
         assert!(Instant::now() < deadline, "only {heard:?} came down");
         for (at, reading) in readings {
             sensors.send_to(reading, at).expect("sent");
         }
         heard.extend(received_for(ground, Duration::from_millis(300)));
     }
+}
+
+/// The battery's age in a datum: its last two bytes.
+///
+/// # Arguments
+///
+/// * `datum` - The datum.
+///
+/// # Returns
+///
+/// The age, in seconds.
+fn age_of(datum: &[u8]) -> u16 {
+    u16::from_be_bytes([datum[7], datum[8]])
 }
 
 #[test]
@@ -111,6 +133,15 @@ fn the_datum_carries_defaults_then_readings() {
             "/tmp/tcspecial-consolidator.state",
             dir.path().join("state").display().to_string(),
         ),
+        (
+            "\"examples/consolidator/battery_age.py\"",
+            format!(
+                "\"{}\"",
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../examples/consolidator/battery_age.py")
+                    .display()
+            ),
+        ),
     ] {
         text = moved(&text, was, &now);
     }
@@ -144,7 +175,8 @@ fn the_datum_carries_defaults_then_readings() {
     common::connect(&commands, take, 1, common::checksum_of(&configuration));
 
     // The three sensors, each sending its own type: a u16, an i32 and a u8,
-    // in the datum in that order, the order of housekeeping's world-in.
+    // in the datum in that order, the order of housekeeping's world-in, and
+    // then the battery's age, a u16.
     let sensors = bound();
     let at = |port: u16| -> SocketAddr {
         format!("127.0.0.1:{port}").parse().expect("an address")
@@ -152,15 +184,14 @@ fn the_datum_carries_defaults_then_readings() {
 
     // The sun alone, again until the interval sends it: the wheel and the
     // battery have never reported, and go down as their defaults, 0 and
-    // 255.
-    until_sent(
-        &mut ground,
-        &sensors,
-        &[(at(sun), &[0x01, 0x02])],
-        &[0x01, 0x02, 0, 0, 0, 0, 0xff],
-    );
+    // 255, and the battery's age as never, 65535.
+    until_sent(&mut ground, &sensors, &[(at(sun), &[0x01, 0x02])], |d| {
+        d == [0x01, 0x02, 0, 0, 0, 0, 0xff, 0xff, 0xff]
+    });
 
-    // All three, until a datum with every one of them comes down.
+    // All three, until a datum with every one of them comes down and the
+    // battery's age a second or two: the age is sent once a second, so the
+    // first datum after the battery's reading may still say never.
     until_sent(
         &mut ground,
         &sensors,
@@ -169,20 +200,23 @@ fn the_datum_carries_defaults_then_readings() {
             (at(wheel), &[0xff, 0xff, 0xff, 0xf9]),
             (at(battery), &[0x55]),
         ],
-        &[0x03, 0x04, 0xff, 0xff, 0xff, 0xf9, 0x55],
+        |d| {
+            d.starts_with(&[0x03, 0x04, 0xff, 0xff, 0xff, 0xf9, 0x55])
+                && age_of(d) <= 2
+        },
     );
 
-    // Quiet until whatever was in flight has come down and the interval
-    // has found nothing new.
-    while !received_for(&mut ground, Duration::from_secs(3)).is_empty() {}
+    // The sun alone, new, the battery quiet: the wheel and the battery go
+    // down held at their last readings, and the battery's age grows.
+    let quiet =
+        until_sent(&mut ground, &sensors, &[(at(sun), &[0x05, 0x06])], |d| {
+            d.starts_with(&[0x05, 0x06, 0xff, 0xff, 0xff, 0xf9, 0x55])
+                && age_of(d) >= 3
+        });
+    assert!(age_of(&quiet) < 0xffff, "{quiet:?}");
 
-    // The sun alone, new: housekeeping sends it at its interval, the wheel
-    // and the battery held at their last readings, and the datum takes
-    // apart by the layout the configuration gives.
-    sensors.send_to(&[0x05, 0x06], at(sun)).expect("sent");
-    let after = received_for(&mut ground, Duration::from_secs(4));
-    let datum = [0x05, 0x06, 0xff, 0xff, 0xff, 0xf9, 0x55];
-    assert_eq!(after, [("housekeeping".to_string(), datum.to_vec())]);
+    // And the datum takes apart by the layout the configuration gives.
+    let datum = quiet;
     let node = graph.node("housekeeping").expect("the consolidator");
     let (_, layout) = Layout::of_node(&graph, node)
         .expect("a consolidator")
@@ -192,7 +226,8 @@ fn the_datum_carries_defaults_then_readings() {
         Ok(vec![
             vec![0x05, 0x06],
             vec![0xff, 0xff, 0xff, 0xf9],
-            vec![0x55]
+            vec![0x55],
+            datum[7..].to_vec(),
         ])
     );
 }

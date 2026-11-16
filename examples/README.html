@@ -474,11 +474,14 @@ and a <code>u8</code>, each at its own pace – put together by a
 three, and sent down when all three are new or every two seconds. Each
 sensor’s default goes in its place until it reports – 255 for the
 battery, a charge no reading can be – and its latest reading, held,
-after. The datum arrives as the consolidator’s own, which the
-configuration’s own XTCE describes member by member, and the
+after. A held reading looks like a new one, so
+<code>battery_age.py</code>, an <code>app_all_veh</code> program, sends
+how many seconds since the battery last reported, a fourth input beside
+the charge it is about. The datum arrives as the consolidator’s own,
+which the configuration’s own XTCE describes member by member, and the
 consolidator’s <code>Configuration</code> in tcs-moc, after a Query,
 says how often each input went in held or with its default.
-<code>make run-consolidator</code> runs it;
+<code>make run-consolidator</code> runs it, and needs Python 3;
 <code>tcspecial/tests/consolidator.rs</code> flies it.</td>
 </tr>
 <tr>

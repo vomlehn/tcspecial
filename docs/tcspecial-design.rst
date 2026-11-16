@@ -3432,8 +3432,7 @@ To rebuild it
 What the first design built that stays: the triggers, the end-of-pass
 sending, the counters and ``QUERY_CONSOLIDATOR`` everywhere it is asked,
 ``max_consolidator_inputs`` and the size checks, the link table and its
-digest, and the example's sensors. In order, of which the first three are
-built:
+digest, and the example's sensors. In order, all four built:
 
 1. tcsprotocol: ``defaults``, read and checked against each input's
    type; the consolidation as a structure whose variable members go at the

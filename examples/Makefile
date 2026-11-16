@@ -155,8 +155,9 @@ run-descent:
 run-tees:
 	$(call runexample_on,tees)
 
-# Run tcs-moc on the consolidator example: three sensors' readings sent down
-# as one datum, and shown on the ground each in its sensor's panel.
+# Run tcs-moc on the consolidator example: three sensors' readings and the
+# battery's age, which battery_age.py works out with Python 3, sent down as
+# one datum, a structure of them.
 .PHONY: run-consolidator
 run-consolidator:
 	$(call runexample_on,consolidator)

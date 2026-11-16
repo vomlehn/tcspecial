@@ -3111,14 +3111,16 @@ The consolidator example
 .. figure:: ../examples/consolidator/consolidator.svg
    :alt: The consolidator example: sun, a u16 every second, wheel, an i32
          four times a second, and battery, a u8 every five seconds, each send
-         to housekeeping, a consolidator, which sends one datum when all three
-         are new or every two seconds, seven bytes: the three readings, or
-         their defaults until they have reported, down through gateway to
+         to housekeeping, a consolidator; battery sends to battery_age too, a
+         program aboard, which sends housekeeping how many seconds since the
+         battery last reported. housekeeping sends one datum when all four
+         are new or every two seconds, nine bytes: the four, or their
+         defaults until they have reported, down through gateway to
          127.0.0.1:5102, where the ground decodes it as a structure.
    :width: 100%
 
-   ``examples/consolidator``: three sensors' readings sent down as one datum,
-   a structure of them.
+   ``examples/consolidator``: three sensors' readings and the battery's
+   age sent down as one datum, a structure of them.
 
 Three sensors, each reporting at its own pace and in its own type: ``sun``, a
 ``u16``, every second; ``wheel``, an ``i32``, four times a second; and
@@ -3126,16 +3128,27 @@ Three sensors, each reporting at its own pace and in its own type: ``sun``, a
 ``consolidator`` computation, takes all three at its inputs, named in its
 ``world-in``, and sends one datum -- a *consolidation* -- when every input
 has something new (``all_new``) or every two seconds whatever has arrived
-(``interval``). The datum is a structure of the three, in the order its
-``world-in`` lists them: the sun's two bytes, the wheel's four and the
-battery's one, seven bytes where three packets would each carry their own.
-Until a sensor has reported, its default goes in its place, which
-``defaults`` gives: ``sun=65535, wheel=0, battery=255``. The battery's
-charge runs from 0 to 100, so 255 says "never read" by being a value no
-reading is, and so does 65535 for a sun angle; a wheel at rest reads 0, so
-its default cannot be told from a reading. After a sensor's first reading,
-the datum carries its latest, held until another comes. Only
-``housekeeping`` is drawn into the gateway node; it arrives at
+(``interval``).
+
+A held reading looks, in the datum, like a new one, so a battery quiet for
+an hour would go down as though it had just reported. The example says how
+old the battery's reading is with a member of its own, as `What defaults
+mean`_ suggests: ``battery_age``, an ``app_all_veh`` node whose program,
+``examples/consolidator/battery_age.py``, is sent the battery's readings
+too and sends ``housekeeping``, every second, a ``u16`` of the seconds
+since the last one -- 65535 before the first. It is ``housekeeping``'s
+fourth input, and goes down beside the charge it is about.
+
+The datum is a structure of the four, in the order ``world-in`` lists
+them: the sun's two bytes, the wheel's four, the battery's one and its
+age's two, nine bytes where four packets would each carry their own. Until
+an input has reported, its default goes in its place, which ``defaults``
+gives: ``sun=65535, wheel=0, battery=255, battery_age=65535``. The
+battery's charge runs from 0 to 100, so 255 says "never read" by being a
+value no reading is, and so does 65535 for a sun angle and for the age; a
+wheel at rest reads 0, so its default cannot be told from a reading. After
+an input's first reading, the datum carries its latest, held until another
+comes. Only ``housekeeping`` is drawn into the gateway node; it arrives at
 ``ground_base`` plus its device id, ``127.0.0.1:5102``.
 
 On the ground the datum is ``housekeeping``'s, as any node's datum is its
@@ -3145,15 +3158,17 @@ shows it in ``housekeeping``'s panel. A ``Query`` asks ``housekeeping``
 datums it has sent, by trigger, and how often each input went in new, held
 and with its default -- the battery, slowest, most often held.
 ``tcs-verify --summary`` lists the layout: the sun at offset 0, two bytes,
-the wheel at 2, four, and the battery at 6, one, each with its default.
+the wheel at 2, four, the battery at 6, one, and its age at 7, two, each
+with its default.
 
 ``make -C examples run-consolidator`` runs tcs-moc on the example, which starts
 tcspecial and tcs-sim, tcs-sim playing the sensors.
 ``tcspecial/tests/consolidator.rs`` flies it, with its sockets moved to ports
-nothing holds:
-a datum with only the sun reported carries the others' defaults, one with all
-three carries all three, and a later one in which only the sun is new carries
-the other two held.
+nothing holds, and runs ``battery_age.py`` with Python 3: a datum with only
+the sun reported carries the others' defaults, the age's among them, one
+with all three carries all three and an age of a second or two, and a later
+one in which only the sun is new carries the other two held, and an age
+that has grown.
 
 The fprime example
 ------------------
@@ -4577,7 +4592,9 @@ The datum carries values and nothing about them, so whether a reading is
 new, how old it is and whether its sensor is healthy are said, where they
 matter, by inputs of your own: a node that works out what you want said --
 an app node, a ``process`` -- linked to the consolidator as any input is,
-which puts it in the datum beside the reading it is about. The counts
+which puts it in the datum beside the reading it is about. `The consolidator
+example`_ does this for its battery: ``battery_age`` sends how many seconds
+it has been since the battery last reported. The counts
 ``QUERY_CONSOLIDATOR`` answers say how often each input went down held or
 with its default, without costing the link anything until asked.
 

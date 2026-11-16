@@ -70,24 +70,40 @@ payloads:
         address: "127.0.0.1:5003"
         protocol: "udp"
         world-out-type: "u8"
-        world-out: [housekeeping.battery]
+        world-out: [housekeeping.battery, battery_age.battery]
 
 vehicle:
   - type compute:
-      # Sends when all three are new, and every two seconds otherwise:
-      # all_new alone is refused, since one sensor that stopped would stop
-      # it for good. Until a sensor has reported, its default goes down in
+      # Sends when all four are new, and every two seconds otherwise:
+      # all_new alone is refused, since one input that stopped would stop
+      # it for good. Until an input has reported, its default goes down in
       # its place: the battery's charge is 0 to 100, so 255 says "never
       # read" by being impossible, and so does 65535 for a sun angle in
-      # hundredths of a degree; a wheel at rest reads 0, so its default
-      # cannot be told from a reading.
+      # hundredths of a degree and for the battery's age; a wheel at rest
+      # reads 0, so its default cannot be told from a reading.
       - compute: housekeeping
         function: consolidator
-        defaults: [sun=65535, wheel=0, battery=255]
+        defaults: [sun=65535, wheel=0, battery=255, battery_age=65535]
         interval: "2 s"
         send: [all_new, interval]
         world-out: [gateway.housekeeping]
-        world-in: [sun, wheel, battery]
+        world-in: [sun, wheel, battery, battery_age]
+  - type app_all_veh:
+      # How many seconds since the battery last reported, every second: a
+      # member of the example's own beside the battery's charge, which the
+      # datum otherwise holds unchanged however long the battery is quiet.
+      # A Python 3 program beside this file, named relative to the
+      # repository's root because that is where tcspecial is run from: see
+      # examples/Makefile. Nothing reaches its moc-in, so app-gateway-arg,
+      # which every app_all_veh states, says nothing to it.
+      - compute: battery_age
+        executable: "examples/consolidator/battery_age.py"
+        app-payload-arg: "1"
+        app-gateway-arg: "none"
+        world-in-type: "u8"
+        world-out-type: "u16"
+        world-out: [housekeeping.battery_age]
+        world-in: [battery]
 
 tcs-cfge:
   nodes:
@@ -96,3 +112,4 @@ tcs-cfge:
     - { node: battery, x: 34, y: 234 }
     - { node: housekeeping, x: 242, y: 134 }
     - { node: gateway, x: 469, y: 134 }
+    - { node: battery_age, x: 138, y: 334 }

@@ -3363,12 +3363,14 @@ the eight thousands, which no other example uses.</p>
 <div class="figure">
 <object data="../examples/consolidator/consolidator.svg" style="width: 100%;" type="image/svg+xml">The consolidator example: sun, a u16 every second, wheel, an i32
 four times a second, and battery, a u8 every five seconds, each send
-to housekeeping, a consolidator, which sends one datum when all three
-are new or every two seconds, seven bytes: the three readings, or
-their defaults until they have reported, down through gateway to
+to housekeeping, a consolidator; battery sends to battery_age too, a
+program aboard, which sends housekeeping how many seconds since the
+battery last reported. housekeeping sends one datum when all four
+are new or every two seconds, nine bytes: the four, or their
+defaults until they have reported, down through gateway to
 127.0.0.1:5102, where the ground decodes it as a structure.</object>
-<p class="caption"><tt class="docutils literal">examples/consolidator</tt>: three sensors' readings sent down as one datum,
-a structure of them.</p>
+<p class="caption"><tt class="docutils literal">examples/consolidator</tt>: three sensors' readings and the battery's
+age sent down as one datum, a structure of them.</p>
 </div>
 <p>Three sensors, each reporting at its own pace and in its own type: <tt class="docutils literal">sun</tt>, a
 <tt class="docutils literal">u16</tt>, every second; <tt class="docutils literal">wheel</tt>, an <tt class="docutils literal">i32</tt>, four times a second; and
@@ -3376,16 +3378,25 @@ a structure of them.</p>
 <tt class="docutils literal">consolidator</tt> computation, takes all three at its inputs, named in its
 <tt class="docutils literal"><span class="pre">world-in</span></tt>, and sends one datum -- a <em>consolidation</em> -- when every input
 has something new (<tt class="docutils literal">all_new</tt>) or every two seconds whatever has arrived
-(<tt class="docutils literal">interval</tt>). The datum is a structure of the three, in the order its
-<tt class="docutils literal"><span class="pre">world-in</span></tt> lists them: the sun's two bytes, the wheel's four and the
-battery's one, seven bytes where three packets would each carry their own.
-Until a sensor has reported, its default goes in its place, which
-<tt class="docutils literal">defaults</tt> gives: <tt class="docutils literal">sun=65535, wheel=0, battery=255</tt>. The battery's
-charge runs from 0 to 100, so 255 says &quot;never read&quot; by being a value no
-reading is, and so does 65535 for a sun angle; a wheel at rest reads 0, so
-its default cannot be told from a reading. After a sensor's first reading,
-the datum carries its latest, held until another comes. Only
-<tt class="docutils literal">housekeeping</tt> is drawn into the gateway node; it arrives at
+(<tt class="docutils literal">interval</tt>).</p>
+<p>A held reading looks, in the datum, like a new one, so a battery quiet for
+an hour would go down as though it had just reported. The example says how
+old the battery's reading is with a member of its own, as <a class="reference internal" href="#what-defaults-mean">What defaults
+mean</a> suggests: <tt class="docutils literal">battery_age</tt>, an <tt class="docutils literal">app_all_veh</tt> node whose program,
+<tt class="docutils literal">examples/consolidator/battery_age.py</tt>, is sent the battery's readings
+too and sends <tt class="docutils literal">housekeeping</tt>, every second, a <tt class="docutils literal">u16</tt> of the seconds
+since the last one -- 65535 before the first. It is <tt class="docutils literal">housekeeping</tt>'s
+fourth input, and goes down beside the charge it is about.</p>
+<p>The datum is a structure of the four, in the order <tt class="docutils literal"><span class="pre">world-in</span></tt> lists
+them: the sun's two bytes, the wheel's four, the battery's one and its
+age's two, nine bytes where four packets would each carry their own. Until
+an input has reported, its default goes in its place, which <tt class="docutils literal">defaults</tt>
+gives: <tt class="docutils literal">sun=65535, wheel=0, battery=255, battery_age=65535</tt>. The
+battery's charge runs from 0 to 100, so 255 says &quot;never read&quot; by being a
+value no reading is, and so does 65535 for a sun angle and for the age; a
+wheel at rest reads 0, so its default cannot be told from a reading. After
+an input's first reading, the datum carries its latest, held until another
+comes. Only <tt class="docutils literal">housekeeping</tt> is drawn into the gateway node; it arrives at
 <tt class="docutils literal">ground_base</tt> plus its device id, <tt class="docutils literal">127.0.0.1:5102</tt>.</p>
 <p>On the ground the datum is <tt class="docutils literal">housekeeping</tt>'s, as any node's datum is its
 own: the configuration's own XTCE describes it, member by member, and tcs-moc
@@ -3394,14 +3405,16 @@ shows it in <tt class="docutils literal">housekeeping</tt>'s panel. A <tt class=
 datums it has sent, by trigger, and how often each input went in new, held
 and with its default -- the battery, slowest, most often held.
 <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt> lists the layout: the sun at offset 0, two bytes,
-the wheel at 2, four, and the battery at 6, one, each with its default.</p>
+the wheel at 2, four, the battery at 6, one, and its age at 7, two, each
+with its default.</p>
 <p><tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-consolidator</span></tt> runs tcs-moc on the example, which starts
 tcspecial and tcs-sim, tcs-sim playing the sensors.
 <tt class="docutils literal">tcspecial/tests/consolidator.rs</tt> flies it, with its sockets moved to ports
-nothing holds:
-a datum with only the sun reported carries the others' defaults, one with all
-three carries all three, and a later one in which only the sun is new carries
-the other two held.</p>
+nothing holds, and runs <tt class="docutils literal">battery_age.py</tt> with Python 3: a datum with only
+the sun reported carries the others' defaults, the age's among them, one
+with all three carries all three and an age of a second or two, and a later
+one in which only the sun is new carries the other two held, and an age
+that has grown.</p>
 </div>
 <div class="section" id="the-fprime-example">
 <h2><a class="toc-backref" href="#toc-entry-47">The fprime example</a></h2>
@@ -4688,7 +4701,9 @@ whose every reading matters is linked to the gateway as well, which
 new, how old it is and whether its sensor is healthy are said, where they
 matter, by inputs of your own: a node that works out what you want said --
 an app node, a <tt class="docutils literal">process</tt> -- linked to the consolidator as any input is,
-which puts it in the datum beside the reading it is about. The counts
+which puts it in the datum beside the reading it is about. <a class="reference internal" href="#the-consolidator-example">The consolidator
+example</a> does this for its battery: <tt class="docutils literal">battery_age</tt> sends how many seconds
+it has been since the battery last reported. The counts
 <tt class="docutils literal">QUERY_CONSOLIDATOR</tt> answers say how often each input went down held or
 with its default, without costing the link anything until asked.</p>
 </div>

@@ -41,7 +41,7 @@ use tcsprotocol::Timestamp;
 
 use crate::payload::{PayloadConfig, SimulatedPayload};
 use crate::{
-    grid, handle_config_edits, handle_transfer_button, load, may_start,
+    grid, handle_transfer_button, load,
     payload_info_from, show_progress, update_row, MainWindow, PayloadInfo,
     RUNNING_STATUS,
 };
@@ -209,8 +209,7 @@ impl Scene {
             .map(|config: PayloadConfig| SimulatedPayload::new(config))
             .collect();
         for (row, payload) in made.iter().enumerate() {
-            let startable = model.row_data(row).is_some_and(|i| may_start(&i));
-            if startable && sims.get(row).is_some_and(|sim| sim.enabled) {
+            if sims.get(row).is_some_and(|sim| sim.enabled) {
                 payload.send(true);
                 update_row(&model, row, |info| {
                     info.status = RUNNING_STATUS.into();
@@ -221,7 +220,6 @@ impl Scene {
         }
         let payloads = Arc::new(Mutex::new(made));
         handle_transfer_button(&ui, payloads.clone(), model.clone());
-        handle_config_edits(&ui, payloads.clone(), model.clone());
         ui.show().unwrap();
 
         Scene {
@@ -261,7 +259,7 @@ impl Scene {
     ///
     /// Its panel's area.
     fn panel(&self, name: &str) -> Area {
-        let heading = format!("{name} (dev id {})", self.row(name));
+        let heading = format!("{name} (id {})", self.row(name));
         let label = ElementHandle::find_by_accessible_label(&self.ui, &heading)
             .next()
             .unwrap_or_else(|| panic!("no heading {heading}"));
@@ -307,34 +305,6 @@ impl Scene {
     fn press(&self, name: &str, label: &str) {
         self.in_panel(name, label)
             .invoke_accessible_default_action();
-    }
-
-    /// Steps one of a payload's spin boxes, as its arrows do.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`  - The payload.
-    /// * `which` - Which spin box, counted from the panel's first, its
-    ///             packet size.
-    /// * `up`    - Up rather than down.
-    fn step(&self, name: &str, which: usize, up: bool) {
-        let panel = self.panel(name);
-        let spin =
-            ElementHandle::find_by_element_type_name(&self.ui, "SpinBox")
-                .filter(|e| {
-                    let at = e.absolute_position();
-                    at.x >= panel.x
-                        && at.x < panel.x + panel.width
-                        && at.y >= panel.y
-                        && at.y < panel.y + panel.height
-                })
-                .nth(which)
-                .unwrap_or_else(|| panic!("no spin box {which} in {name}'s"));
-        if up {
-            spin.invoke_accessible_increment_action();
-        } else {
-            spin.invoke_accessible_decrement_action();
-        }
     }
 
     /// Turns the mouse wheel over an element of a popup a payload's panel
@@ -523,26 +493,6 @@ fn screenshots() {
     scene.drive("gpio-out-tmass1", 0);
     scene.shoot("tcs-sim-heater-3.png", Some(heater), 1.0);
 
-    // Changing the sizes: a packet made smaller than its segment, and put
-    // back. The popup that says so hangs under the panel's buttons and
-    // below the panel's foot, so the picture is taken deeper than the
-    // panel is.
-    let panel = scene.panel("temp_2");
-    let sizes = Area {
-        height: panel.height + 70.0,
-        ..panel
-    }
-    .grown(1.0);
-    scene.step("temp_2", 0, false);
-    scene.shoot("tcs-sim-sizes-1.png", Some(sizes), 1.0);
-    scene.step("temp_2", 0, true);
-    // No popup now, so the panel alone.
-    scene.shoot("tcs-sim-sizes-2.png", Some(panel.grown(1.0)), 1.0);
-    // And a payload already running when its sizes go wrong, which can
-    // still be stopped: only starting is refused.
-    scene.press("temp_2", "Enable");
-    scene.step("temp_2", 0, false);
-    scene.shoot("tcs-sim-sizes-3.png", Some(sizes), 1.0);
     drop(scene);
 
     // A fault: the same set, with temp_3 told to go quiet after three

@@ -1211,30 +1211,14 @@ while it is not, in black for the one and in bold red for the other.</dd>
 <dt>how the payload is reached</dt>
 <dd>The same description tcs-moc's panels carry for the handler at the other end
 of the link.</dd>
-<dt><tt class="docutils literal">Pkt</tt> and <tt class="docutils literal">Seg</tt></dt>
-<dd>The packet size, from the tcspecial configuration, and the segment size,
-from the simulator configuration.</dd>
-<dt><tt class="docutils literal">Pkt Int</tt> and <tt class="docutils literal">Seg Int</tt></dt>
-<dd>The interval between packets and between the segments of one packet, both
-from the simulator configuration.</dd>
 </dl>
-<p>Those four can be changed while a payload is running, and take effect on the
-next packet: that is what the simulator is for, and it is quicker than editing
-a file and starting again. Nothing is written back to the files, so the next
-run starts from what they say.</p>
-<p>A segment is a piece of a packet, so the segment size may not be larger than
-the packet size. Equal is the ordinary case -- a packet sent in one segment.
-Make them disagree and a message says so at once, naming both sizes and
-either way out of it, and the button that starts the payload is taken away
-until they agree again; the edit that fixes them takes the message back.
-Only starting is refused: a payload already running when its sizes stop
-agreeing still offers <tt class="docutils literal">Disable</tt>, which stops it, rather than going on
-sending them until they are put right. Nor does <tt class="docutils literal"><span class="pre">--sending</span></tt> or the
-simulator configuration's <tt class="docutils literal">enable</tt> start a payload whose files give sizes
-that cannot be sent; tcs-sim says so as it starts, and the panel says why. The
-sizes are checked when the files are read as well, so a set whose simulator
-configuration states a segment larger than the packet it is given says so
-before anything is touched.</p>
+<p>A payload's packet and segment sizes and the intervals between its packets
+and between their segments are not shown: they are the simulator
+configuration's, set there and read once (see <a class="reference internal" href="#the-simulator-configuration">The Simulator
+Configuration</a> above). A segment is a piece of a packet, so a simulator
+configuration stating a segment larger than the packet it is given is
+refused as it is read, by tcs-sim and by tcs-verify alike, naming the
+payload.</p>
 <p>Below them are the two buttons -- one to start and stop the payload, described
 under <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>, and <tt class="docutils literal">Configuration</tt>, described
 under <a class="reference external" href="tcspecial.html#seeing-what-was-read">Seeing what was read</a> -- and then three lines:</p>
@@ -1337,9 +1321,7 @@ button offers <tt class="docutils literal">Disable</tt>; no reading has gone yet
 <img alt="The temp_1 panel three seconds later: Running, Sent: 10:00:03 followed by two bytes, and Pkts: 3 sent." src="shots/tcs-sim-enable-3.png" />
 <p class="caption">Three seconds on. <tt class="docutils literal">Sent</tt> gives the time of the last reading and its
 bytes -- the zone's temperature as the sensor reads it, in the encoding
-tcspecial's conversion reads back -- and <tt class="docutils literal">Pkts</tt> counts three.
-<tt class="docutils literal">Pkt</tt>, <tt class="docutils literal">Seg</tt>, <tt class="docutils literal">Pkt Int</tt> and <tt class="docutils literal">Seg Int</tt> can be changed here while
-it runs, and take effect on the next reading.</p>
+tcspecial's conversion reads back -- and <tt class="docutils literal">Pkts</tt> counts three.</p>
 </div>
 </li>
 </ol>
@@ -1369,31 +1351,6 @@ decision, which comes only when the decision changes.</p>
 <p class="caption">The thermostat switches it off, and the line says
 <tt class="docutils literal">zone.heater_1: off</tt>. A heater sends nothing, so its <tt class="docutils literal">Pkts</tt> stays
 at nought throughout.</p>
-</div>
-</li>
-</ol>
-<p><strong>Sizes that cannot be sent</strong></p>
-<ol class="arabic">
-<li><div class="first figure">
-<img alt="The temp_2 panel, Pkt 1 and Seg 2, its Enable button greyed out, and below the buttons a popup outlined in red: temp_2: these sizes cannot be sent. A segment of 2 bytes cannot be part of a packet of 1: a segment is a piece of a packet. Raise the packet size to 2 or more, or lower the segment size to 1 or less." src="shots/tcs-sim-sizes-1.png" />
-<p class="caption"><tt class="docutils literal">Pkt</tt> stepped down from 2 to 1 on <tt class="docutils literal">temp_2</tt>, leaving its 2-byte
-segment larger than the packet. A popup under the buttons says so at
-once, naming both sizes and either way out, and <tt class="docutils literal">Enable</tt> is greyed
-out.</p>
-</div>
-</li>
-<li><div class="first figure">
-<img alt="The temp_2 panel with Pkt and Seg both 2, no popup, and the Enable button pressable again." src="shots/tcs-sim-sizes-2.png" />
-<p class="caption"><tt class="docutils literal">Pkt</tt> stepped back up to 2. The popup goes and <tt class="docutils literal">Enable</tt> comes
-back. Nothing is written to the files either way.</p>
-</div>
-</li>
-<li><div class="first figure">
-<img alt="The temp_2 panel Running, Pkt 1 and Seg 2, the same popup under its buttons, and its Disable button pressable." src="shots/tcs-sim-sizes-3.png" />
-<p class="caption"><tt class="docutils literal">Enable</tt> pressed, and <tt class="docutils literal">Pkt</tt> stepped down to 1 again while it
-runs. The popup says the same, but <tt class="docutils literal">Disable</tt> stays: only starting is
-refused, and a payload sending sizes that cannot be sent can always be
-stopped.</p>
 </div>
 </li>
 </ol>

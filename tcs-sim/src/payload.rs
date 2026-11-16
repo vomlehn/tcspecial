@@ -430,30 +430,6 @@ impl SimulatedPayload {
             last_recv: guard.last_recv,
         }
     }
-
-    /// Update packet size
-    pub fn set_packet_size(&self, size: u32) {
-        self.config.packet_size.store(size, Ordering::SeqCst);
-    }
-
-    /// Update segment size
-    pub fn set_segment_size(&self, size: u32) {
-        self.config.segment_size.store(size, Ordering::SeqCst);
-    }
-
-    /// Update packet interval
-    pub fn set_packet_interval(&self, interval_ms: u32) {
-        self.config
-            .packet_interval_ms
-            .store(interval_ms, Ordering::SeqCst);
-    }
-
-    /// Update segment interval
-    pub fn set_segment_interval(&self, interval_ms: u32) {
-        self.config
-            .segment_interval_ms
-            .store(interval_ms, Ordering::SeqCst);
-    }
 }
 
 /// What the payload's thread does, done by hand, for the screenshots the

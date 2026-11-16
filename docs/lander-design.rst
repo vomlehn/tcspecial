@@ -8,9 +8,10 @@ The Lander Example Design
 
 .. note::
 
-   This is a plan. Nothing it describes is built yet; it says what the
-   lander example is to be and how it is to be made, in the order it is
-   to be made, so that each stage can be checked against it.
+   The lander example is built as described here. It was written as a plan
+   first, and made in the stages of "How it was made", each checked before
+   the next; how to run it is in the tcspecial manual's "The lander
+   example" and in ``examples/README.md``.
 
 What it is
 ==========
@@ -191,7 +192,9 @@ tcs-sim's window
 For a world that has a two-dimensional body, tcs-sim's window shows:
 
 * the landscape and the lander, drawn to scale, positive X to the right and
-  positive Y upward, with the smiley face after a landing;
+  positive Y upward, under a black sky with twinkling stars, the lander
+  white with thin black lines so that it shows against the sky and the
+  ground, with the smiley face after a landing;
 * "Landed" or "Crashed" in words, and the fuel left, in words and as a
   bar;
 * below them, the X and Y position, velocity and acceleration, each named
@@ -211,8 +214,8 @@ second and shows:
   sent down; the pointer does nothing there;
 * "Landed" or "Crashed" when the values sent down say so.
 
-How it is to be made
-====================
+How it was made
+===============
 
 In this order, each stage checked before the next:
 
@@ -244,13 +247,14 @@ In this order, each stage checked before the next:
 4. **The vehicles**, ``lander-a`` and ``lander-b``, as described above.
 5. **The ground station**, ``examples/lander/lander_yamcs.py``: it makes the
    landscape from the seed and writes it into the run's simulator file;
-   starts Yamcs with an instance for each vehicle, the two delaying relays,
-   tcs-sim with both configurations, and both tcspecials; and opens its
-   window.
+   starts Yamcs with an instance for each vehicle, a delaying relay on
+   each of their links, tcs-sim with both configurations, and both
+   tcspecials; and opens its window.
 6. **The rest of an example**:
 
-   * ``lander.svg``, drawn by hand and naming every node, and
-     ``lander.xtce``, from ``make xtce``;
+   * each vehicle's diagram, ``lander-a.svg`` and ``lander-b.svg``, naming
+     every node, and its XTCE, ``lander-a.xtce`` and ``lander-b.xtce``,
+     from ``make xtce``;
    * tests: the landscape's rules kept for many seeds; thrust against mass,
      the fuel running out, landing and crashing at the limits and leaving the
      display; the joystick's mapping; the delay; the pair of vehicles, with

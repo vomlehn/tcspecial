@@ -112,80 +112,6 @@ fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
     (SharedString::from(time), SharedString::from(data))
 }
 
-/// Takes an edited setting to the payload it belongs to, and says whether
-/// the two sizes still describe something that can be sent.
-///
-/// A panel holds no state of its own: what a spin box shows is what the model
-/// says, so an edit has to come through here to be kept. The answer about the
-/// sizes is decided here too, so there is one rule -- the window disables the
-/// button while this says something and shows what it says, rather than
-/// comparing the two numbers itself.
-///
-/// # Arguments
-///
-/// * `ui`       - The main window, whose edits are handled.
-/// * `payloads` - The simulated payloads, in the panels' order.
-/// * `model`    - The panels' rows, where the answer about the sizes goes.
-fn handle_config_edits(
-    ui: &MainWindow,
-    payloads: Arc<Mutex<Vec<SimulatedPayload>>>,
-    model: Rc<VecModel<PayloadInfo>>,
-) {
-    ui.on_config_payload(
-        move |row,
-              packet_size,
-              segment_size,
-              packet_interval,
-              segment_interval| {
-            let guard = payloads.lock().unwrap();
-            if let Some(payload) = guard.get(row as usize) {
-                payload.set_packet_size(packet_size as u32);
-                payload.set_segment_size(segment_size as u32);
-                payload.set_packet_interval(packet_interval as u32);
-                payload.set_segment_interval(segment_interval as u32);
-            }
-            drop(guard);
-
-            let problem = sizes_problem(packet_size, segment_size);
-            update_row(&model, row as usize, |info| {
-                info.sizes_problem = SharedString::from(problem);
-            });
-        },
-    );
-}
-
-/// Says what is wrong with a packet size and a segment size together, and
-/// nothing when they agree.
-///
-/// A segment is a piece of a packet, so a segment larger than the packet
-/// describes a piece larger than the whole it is a piece of. Equal is the
-/// ordinary case -- a packet sent in one segment -- and is what a simulator
-/// file that states no segment size asks for, so only a segment strictly
-/// larger than the packet is wrong.
-///
-/// # Arguments
-///
-/// * `packet_size`  - The packet size, in bytes.
-/// * `segment_size` - The segment size, in bytes.
-///
-/// # Returns
-///
-/// The sentence the window shows, which says both numbers and either way
-/// out of it: the two spin boxes are side by side and either can be the
-/// one that was meant to change. Empty when the sizes agree.
-fn sizes_problem(packet_size: i32, segment_size: i32) -> String {
-    if segment_size <= packet_size {
-        return String::new();
-    }
-
-    format!(
-        "A segment of {segment_size} bytes cannot be part of a packet of \
-         {packet_size}: a segment is a piece of a packet. Raise the packet \
-         size to {segment_size} or more, or lower the segment size to \
-         {packet_size} or less."
-    )
-}
-
 /// What a press of a panel's one button asks of the payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Transfer {
@@ -266,8 +192,8 @@ fn handle_transfer_button(
 
         // The status the button's label came from, so what happens is
         // what the label offered.
-        let (showing, startable) = match model.row_data(row) {
-            Some(info) => (info.status.to_string(), may_start(&info)),
+        let showing = match model.row_data(row) {
+            Some(info) => info.status.to_string(),
             None => return,
         };
 
@@ -278,10 +204,6 @@ fn handle_transfer_button(
         };
 
         match transfer_wanted(&showing) {
-            // The window offers no Enable while the sizes cannot be sent,
-            // and this holds to the same answer rather than trusting that
-            // it never asks.
-            Transfer::Send if !startable => return,
             Transfer::Send => {
                 payload.send(true);
                 update_row(&model, row, |info| {
@@ -300,22 +222,6 @@ fn handle_transfer_button(
         let driving = SharedString::from(payload.driving_said());
         update_row(&model, row, |info| info.driving = driving);
     });
-}
-
-/// Says whether a panel's payload may be started: not while its packet and
-/// segment sizes cannot be sent, which `sizes_problem` decides and the
-/// panel's row holds. Only starting is refused. A payload already sending
-/// may always be stopped, whatever its sizes have become.
-///
-/// # Arguments
-///
-/// * `info` - The panel's row.
-///
-/// # Returns
-///
-/// Whether it may be started.
-fn may_start(info: &PayloadInfo) -> bool {
-    info.sizes_problem.is_empty()
 }
 
 /// Puts what each payload has done since the last look into its panel:
@@ -366,10 +272,6 @@ fn payload_info_from(
         // same way.
         dev_id: i32::try_from(dev_id).unwrap_or(i32::MAX),
         config: SharedString::from(endpoint_description(&dh.endpoint)),
-        packet_size: i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
-        segment_size: sim.segment_size as i32,
-        packet_interval: sim.packet_interval.as_millis() as i32,
-        segment_interval: sim.segment_interval.as_millis() as i32,
         status: SharedString::from(STOPPED_STATUS),
         // Said once the payload is made: see `SimulatedPayload::driving_said`.
         driving: SharedString::new(),
@@ -386,14 +288,6 @@ fn payload_info_from(
         // Whether anything is ever sent to this payload, which decides
         // whether its panel has a received line at all.
         triggered: sim.triggered,
-        // Checked from the start, not only after an edit: a simulator file may
-        // state a segment larger than the tcspecial configuration's packet, and
-        // a panel that said nothing about it until a spin box was touched would
-        // have the payload refuse to start for no stated reason.
-        sizes_problem: SharedString::from(sizes_problem(
-            i32::try_from(dh.packet_size).unwrap_or(i32::MAX),
-            sim.segment_size as i32,
-        )),
     }
 }
 
@@ -1632,19 +1526,9 @@ fn main() {
         let _ = payload.start();
         // As though its button had been pressed, where --sending asks, or
         // the simulator file's enable says so of this payload: which for a
-        // heater is to power it. And so refused, as the button is, while
-        // the files give sizes that cannot be sent; the panel says why.
+        // heater is to power it.
         let asked = sending || sims.get(row).is_some_and(|sim| sim.enabled);
-        let info = model.row_data(row);
-        let startable = info.as_ref().is_some_and(may_start);
-        if let (true, false, Some(info)) = (asked, startable, &info) {
-            eprintln!(
-                "tcs-sim: {} is not started: its packet and segment sizes \
-                 cannot be sent; its panel says why",
-                info.name
-            );
-        }
-        if asked && startable {
+        if asked {
             payload.send(true);
             update_row(&model, row, |info| {
                 info.status = SharedString::from(RUNNING_STATUS);
@@ -1657,7 +1541,6 @@ fn main() {
         Arc::new(Mutex::new(made));
 
     handle_transfer_button(&ui, payloads.clone(), model.clone());
-    handle_config_edits(&ui, payloads.clone(), model.clone());
 
     // What the Quit button does, and a signal: every payload stopped, which
     // clears what it made, and the window closed, which ends the event loop.
@@ -2169,204 +2052,6 @@ mod tests {
             text.contains(&said),
             "{} does not say the window opens at {said}",
             doc.display()
-        );
-    }
-
-    /// An edit that makes the two sizes disagree says so and takes the
-    /// button away, and an edit that fixes them gives it back.
-    ///
-    /// The whole path, from the spin box to the button: the window asks Rust,
-    /// Rust answers in the row, and the panel obeys the answer. Checking the
-    /// rule alone would say nothing about any of that, and a panel that
-    /// quietly let an unsendable pair be started is what this is for.
-    ///
-    /// Not a test of its own: one test per binary may start the testing
-    /// backend, and its windows belong to the thread that made them.
-    fn sizes_that_cannot_be_sent_stop_the_button_and_say_so() {
-        use i_slint_backend_testing::ElementHandle;
-
-        let dh = handler("DH0");
-        let settings = sim(1000, 1000, 12);
-        let model: Rc<VecModel<PayloadInfo>> =
-            Rc::new(VecModel::from(vec![payload_info_from(0, &dh, &settings)]));
-
-        let ui = MainWindow::new().unwrap();
-        let _ = grid::settle(&ui);
-        ui.set_payload_model(ModelRc::from(model.clone()));
-
-        // The handler the running program registers, over the payload the
-        // files describe.
-        let payloads: Arc<Mutex<Vec<SimulatedPayload>>> =
-            Arc::new(Mutex::new(vec![SimulatedPayload::new(
-                payload_config_attached(&dh, &settings, None)
-                    .expect("a payload"),
-            )]));
-        handle_config_edits(&ui, payloads.clone(), model.clone());
-        handle_transfer_button(&ui, payloads, model.clone());
-        ui.show().unwrap();
-
-        let button_offering = |ui: &MainWindow, label: &str| {
-            ElementHandle::find_by_accessible_label(ui, label)
-                .next()
-                .and_then(|b| b.accessible_enabled())
-        };
-        let button = |ui: &MainWindow| button_offering(ui, ENABLE_LABEL);
-        // What the popup says is selectable text, whose words are its
-        // accessible value rather than a label: see copy.slint.
-        let said = |ui: &MainWindow| -> Vec<String> {
-            ElementHandle::find_by_element_type_name(ui, "Text")
-                .filter_map(|e| e.accessible_label())
-                .chain(
-                    ElementHandle::find_by_element_type_name(ui, "TextInput")
-                        .filter_map(|e| e.accessible_value()),
-                )
-                .map(|label| label.to_string())
-                .filter(|line| line.contains("cannot be"))
-                .collect()
-        };
-
-        // A packet of twelve bytes in segments of twelve: the ordinary case,
-        // and nothing to say about it.
-        assert_eq!(button(&ui), Some(true), "the button is not there to press");
-        assert!(
-            said(&ui).is_empty(),
-            "something is said before anything is wrong"
-        );
-
-        // The packet size, down one, which leaves the segment larger than the
-        // packet it is a piece of. The first spin box of the panel is the
-        // packet size; Slint's testing backend does not report the last child
-        // of a layout, which is why the segment's is not reached here.
-        let packet_size =
-            ElementHandle::find_by_element_type_name(&ui, "SpinBox")
-                .next()
-                .expect("the panel has a packet size to edit");
-        packet_size.invoke_accessible_decrement_action();
-        assert_eq!(packet_size.accessible_value().as_deref(), Some("11"));
-
-        assert_eq!(
-            button(&ui),
-            Some(false),
-            "a pair that cannot be sent left the button there to press"
-        );
-        let shown = said(&ui);
-        assert!(
-            shown.iter().any(|line| line.contains("segment of 12")
-                && line.contains("packet of 11")),
-            "nothing on screen says what is wrong: {shown:?}"
-        );
-
-        // And all of what it says is inside the popup's border. The popup
-        // was a fixed 290x100, and the sentence ran past the foot of it.
-        let border =
-            ElementHandle::find_by_element_id(&ui, "PayloadPanel::sizes-box")
-                .next()
-                .expect("the popup is open");
-        let foot = border.absolute_position().y + border.size().height;
-        for text in ElementHandle::find_by_element_type_name(&ui, "TextInput")
-            .filter(|e| {
-                e.accessible_value()
-                    .is_some_and(|v| v.contains("cannot be part"))
-            })
-        {
-            let bottom = text.absolute_position().y + text.size().height;
-            assert!(
-                bottom <= foot + 0.5,
-                "what the popup says reaches {bottom}, past its border's \
-                 foot at {foot}"
-            );
-        }
-
-        // A press of the Enable the window does not offer starts nothing:
-        // Rust holds to the same answer the button does.
-        ui.invoke_transfer_payload(0);
-        assert_eq!(
-            model.row_data(0).map(|info| info.status.to_string()),
-            Some(STOPPED_STATUS.to_string()),
-            "a payload whose sizes cannot be sent was started"
-        );
-
-        // But a payload already sending when its sizes went wrong can
-        // always be stopped: the button was taken away from it too, and it
-        // went on sending sizes that cannot be sent until they were put
-        // right.
-        update_row(&model, 0, |info| info.status = RUNNING_STATUS.into());
-        assert_eq!(
-            button_offering(&ui, DISABLE_LABEL),
-            Some(true),
-            "a running payload whose sizes cannot be sent cannot be stopped"
-        );
-        ElementHandle::find_by_accessible_label(&ui, DISABLE_LABEL)
-            .next()
-            .expect("a Disable button")
-            .invoke_accessible_default_action();
-        assert_eq!(
-            model.row_data(0).map(|info| info.status.to_string()),
-            Some(STOPPED_STATUS.to_string()),
-            "Disable did not stop it"
-        );
-        assert_eq!(button(&ui), Some(false), "stopped, it offers a start");
-
-        // And back up again: the pair can be sent, so the button returns and
-        // the popup stops saying otherwise. An open popup still saying these
-        // sizes cannot be sent, after the edit that made them sendable, would
-        // be the wrong answer left on the screen.
-        packet_size.invoke_accessible_increment_action();
-        assert_eq!(packet_size.accessible_value().as_deref(), Some("12"));
-        assert_eq!(button(&ui), Some(true), "the button did not come back");
-        assert!(
-            said(&ui).is_empty(),
-            "the popup is still saying it: {:?}",
-            said(&ui)
-        );
-    }
-
-    /// A payload whose files disagree about the two sizes cannot be started,
-    /// and says why before anything is touched.
-    ///
-    /// A simulator file may state a segment larger than the tcspecial
-    /// configuration's packet. A panel that said nothing about it until a spin
-    /// box was touched would have the payload refuse to start for no stated
-    /// reason.
-    #[test]
-    fn a_payload_whose_files_disagree_starts_out_unsendable() {
-        let dh = handler("DH0");
-        let info = payload_info_from(0, &dh, &sim(1000, 1000, 20));
-        assert_eq!(
-            dh.packet_size, 12,
-            "the tcspecial configuration says twelve bytes"
-        );
-        assert!(
-            info.sizes_problem.contains("segment of 20")
-                && info.sizes_problem.contains("packet of 12"),
-            "{}",
-            info.sizes_problem
-        );
-
-        // And one whose files agree says nothing.
-        let info = payload_info_from(0, &dh, &sim(1000, 1000, 12));
-        assert_eq!(info.sizes_problem, "");
-    }
-
-    /// A segment larger than the packet it is a piece of is refused, and
-    /// equal sizes are the ordinary case.
-    #[test]
-    fn a_segment_cannot_be_larger_than_its_packet() {
-        // The ordinary case, which is what a simulator file stating no
-        // segment size asks for: one segment, the size of the packet.
-        assert_eq!(sizes_problem(12, 12), "");
-        assert_eq!(sizes_problem(12, 5), "");
-        assert_eq!(sizes_problem(1, 1), "");
-
-        // And the one that cannot be sent. The sentence says both numbers and
-        // either way out of it: the two spin boxes are side by side and
-        // either can be the one that was meant to change.
-        let said = sizes_problem(11, 12);
-        assert!(said.contains("12") && said.contains("11"), "{said}");
-        assert!(
-            said.contains("Raise the packet size")
-                && said.contains("lower the segment size"),
-            "the error should say either way out of it: {said}"
         );
     }
 
@@ -2918,7 +2603,6 @@ mod tests {
         the_panel_shows_the_time_and_bytes_it_was_given();
         each_panel_says_which_payload_of_the_set_it_is();
         the_params_button_shows_what_both_files_said();
-        sizes_that_cannot_be_sent_stop_the_button_and_say_so();
     }
 
     /// A shipped set's simulator file, read as `load` reads it with that
@@ -3882,7 +3566,7 @@ mod tests {
                 .map(|label| label.to_string())
                 .collect();
 
-        for wanted in ["DH0 (dev id 0)", "DH1 (dev id 1)"] {
+        for wanted in ["DH0 (id 0)", "DH1 (id 1)"] {
             assert!(
                 shown.iter().any(|line| line == wanted),
                 "no panel is labelled {wanted:?}: {shown:?}"
@@ -4029,11 +3713,5 @@ mod tests {
         let info = payload_info_from(0, &dh, &sim(500, 250, 5));
         assert_eq!(info.name, SharedString::from("DH3"));
         assert_eq!(info.config, SharedString::from("UDP localhost:5003"));
-        // From the tcspecial configuration
-        assert_eq!(info.packet_size, 15);
-        // From the simulator file
-        assert_eq!(info.packet_interval, 500);
-        assert_eq!(info.segment_interval, 250);
-        assert_eq!(info.segment_size, 5);
     }
 }

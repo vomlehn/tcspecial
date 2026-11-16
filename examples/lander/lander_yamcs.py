@@ -138,8 +138,8 @@ SCALE = 0.5
 #: The joystick's square's side, which is each arm's thickness, and how far
 #: each arm reaches beyond it, in pixels: as tcs-sim's lander window draws
 #: it.
-SQUARE = 33.6
-ARM = 56
+SQUARE = 25.2
+ARM = 70
 
 #: How many stars the sky has.
 STARS = 140

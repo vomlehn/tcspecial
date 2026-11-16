@@ -1263,66 +1263,22 @@ Requirement
     hour old, and a byte written differently would look like a difference in
     the data. The formatting is one function both call.
 
-The packet size and interval can be changed, as can the segment size and
-interval. Each starts at what the files gave it: the packet size from the
-tcspecial configuration, the rest from the simulator file.
+A payload's packet and segment sizes and its two intervals are not shown on
+its panel, nor changed there: they are the simulator configuration's, read
+once.
 
 Requirement
-    A segment is a piece of a packet, so a segment larger than the packet is
-    refused. Equal is the ordinary case -- a packet sent in one segment, which
-    is what a simulator file stating no segment size asks for -- so only a
-    segment strictly larger than the packet is wrong.
+    The panel shows what a payload is doing, not how it is set up. The four
+    boxes it had, for the packet and segment sizes and intervals, made each
+    panel half as wide again and two rows taller, and were changed so seldom
+    while a run went on that the file was the place for them.
 
 Requirement
-    A pair of sizes that cannot be sent is said at once and the button that
-    would start the payload is taken away until they can be. Either alone
-    would be worse: a message with the button still there invites a press that
-    does something nobody asked for, and a button that had quietly stopped
-    working would leave someone pressing it and wondering.
-
-Requirement
-    What is said names both sizes and both ways out of it. The two spin boxes
-    are side by side and either can be the one that was meant to change, so a
-    message naming only one of them answers half the question.
-
-Requirement
-    The message is taken back by the edit that makes the sizes sendable
-    again. An open popup still saying the sizes cannot be sent, after they
-    can, is the wrong answer left on the screen.
-
-Requirement
-    The two sizes are checked when the files are read, not only when a spin box
-    is touched. A simulator file may state a segment larger than the packet the
-    tcspecial configuration gives, and a panel that said nothing until it was
-    edited would have the payload refuse to start for no stated reason.
-
-Requirement
-    Only starting is refused. A payload already sending when its sizes stop
-    agreeing offers ``Disable`` as ever, and a press of it stops the
-    payload. The button was taken away whatever the payload was doing, so a
-    payload running when its sizes went wrong could not be stopped until
-    they were put right, and went on sending them meanwhile -- the one
-    thing the refusal is there to prevent.
-
-Requirement
-    A payload that ``--sending`` or its simulator file's ``enable`` would
-    start is not started while its files give sizes that cannot be sent.
-    It is started as though its ``Enable`` had been pressed, and that press
-    would be refused; tcs-sim says so as it starts, and the panel says why.
-
-Requirement
-    The window decides neither. It asks for the two sizes to be judged and
-    obeys the answer -- showing what it says and disabling the button that
-    starts the payload while it says anything -- so there is one rule
-    rather than one in each place that acts on it. Rust holds a press to
-    the same answer, so an ``Enable`` that reached it while the sizes cannot
-    be sent starts nothing.
-
-Requirement
-    The popup that says the sizes cannot be sent is as tall as what it
-    says, and hangs under the panel's buttons, so that it hides neither the
-    two sizes nor whether the payload can be started. It was a fixed size
-    that the sentence ran out of, hung over the spin box just stepped.
+    A segment is a piece of a packet, so a simulator configuration stating a
+    segment larger than the packet it is given is refused as it is read, by
+    the one rule tcs-sim and tcs-verify both read it by, naming the payload.
+    Equal is the ordinary case -- a packet sent in one segment, which is
+    what a simulator file stating no segment size asks for.
 
 Each panel has two buttons: one that starts and stops the payload, and one
 that shows the whole of what the two files said about it.
@@ -1489,7 +1445,7 @@ for the columns the payload count calls for, and because it opens it at exactly
 that many panels' width plus the chrome, the window arrives at the same count.
 
 The five sources of the thermostat example give a row of three and a row of two in a
-1206x764 window. The size is the one ``window_size`` gives, which a test reads
+954x572 window. The size is the one ``window_size`` gives, which a test reads
 out of this document so that the number here cannot quietly stop being the one
 the program opens at.
 

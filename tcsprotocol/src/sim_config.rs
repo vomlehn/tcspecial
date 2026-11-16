@@ -104,6 +104,12 @@ pub enum SimConfigError {
         payload: String,
         setting: &'static str,
     },
+    /// A segment larger than the packet it is a piece of.
+    SegmentLargerThanPacket {
+        payload: String,
+        segment: u32,
+        packet: usize,
+    },
     /// A setting that is a length of time and does not read as one.
     NotAnInterval {
         payload: String,
@@ -247,6 +253,17 @@ impl fmt::Display for SimConfigError {
                  nothing, and {setting} governs nothing: take it out"
             )
             }
+            SimConfigError::SegmentLargerThanPacket {
+                payload,
+                segment,
+                packet,
+            } => write!(
+                f,
+                "simulated payload \"{payload}\": segment_size is {segment} \
+                 bytes, and a segment is a piece of a packet, which is \
+                 {packet}: make segment_size {packet} or less, or leave it \
+                 out for one segment a packet"
+            ),
             SimConfigError::NoPacketInterval { payload } => write!(
                 f,
                 "simulated payload \"{}\" has no packet interval: state one \
@@ -466,6 +483,7 @@ impl SimConfigError {
             | SimConfigError::SimulateTwice { payload, .. }
             | SimConfigError::NoPacketInterval { payload }
             | SimConfigError::NotAnInterval { payload, .. }
+            | SimConfigError::SegmentLargerThanPacket { payload, .. }
             | SimConfigError::IntervalForATriggeredPayload {
                 payload, ..
             }
@@ -2566,6 +2584,13 @@ impl SimConfigFile {
             let segment_size = settings.segment_size.unwrap_or_else(|| {
                 u32::try_from(dh.packet_size).unwrap_or(u32::MAX)
             });
+            if segment_size as usize > dh.packet_size {
+                return Err(SimConfigError::SegmentLargerThanPacket {
+                    payload: payload.name.clone(),
+                    segment: segment_size,
+                    packet: dh.packet_size,
+                });
+            }
 
             // What this payload is asked to do wrong, and whether it is
             // a payload that could do it. A percentage above a hundred is
@@ -3313,6 +3338,42 @@ simulated_payloads:
                 setting: "packet_interval",
             })
         );
+    }
+
+    /// A segment is a piece of a packet, so one larger than the packet is
+    /// refused as the file is read, and one as large is the ordinary case.
+    #[test]
+    fn a_segment_larger_than_its_packet_is_refused() {
+        let sensor = handler("sensor", 12);
+        let with = |segment: usize| {
+            parse(&format!(
+                "
+simulated_payloads:
+  - type network:
+      - payload: sensor
+        packet_interval: 1 s
+        segment_size: {segment}
+        protocol: udp
+        simulate: true
+"
+            ))
+        };
+        let packet = sensor.packet_size;
+        assert!(with(packet)
+            .resolve(std::slice::from_ref(&sensor))
+            .is_ok());
+        let error = with(packet + 1)
+            .resolve(std::slice::from_ref(&sensor))
+            .expect_err("a segment larger than its packet");
+        assert_eq!(
+            error,
+            SimConfigError::SegmentLargerThanPacket {
+                payload: "sensor".to_string(),
+                segment: u32::try_from(packet + 1).unwrap(),
+                packet,
+            }
+        );
+        assert!(error.to_string().contains("segment_size"), "{error}");
     }
 
     /// A payload that is not simulated has no data handler here, the handlers

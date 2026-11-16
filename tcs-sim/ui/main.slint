@@ -1,6 +1,6 @@
 import {
-    Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, SpinBox,
-    ScrollView, GridBox
+    Button, GroupBox, LineEdit, VerticalBox, HorizontalBox, ScrollView,
+    GridBox
 } from "std-widgets.slint";
 import { Copyable, CopyButton } from "../../tcs-verify/ui/copy.slint";
 import { Fonts } from "../../tcs-ui/ui/fonts.slint";
@@ -26,25 +26,15 @@ export struct PayloadInfo {
     // order the file describes them.
     dev-id: int,
     config: string,
-    packet-size: int,
     // Everything both files said about this payload, as Rust read them. Held
     // ready rather than fetched when asked: the files are read once, at
     // startup, and nothing can change them while the window is up.
     parameters: string,
-    // What is wrong with the packet and segment sizes together, and empty
-    // when they agree. Rust decides it -- once at startup and again on every
-    // edit -- so the panel has an answer to obey rather than a rule to
-    // apply.
-    sizes-problem: string,
     // Whether this payload answers requests. The payload configuration
     // decides it, and the panel shows a received line only for such a
     // payload: nothing is ever sent to one that sends on its own, so the line
     // would say the same thing for the whole run.
     triggered: bool,
-    // From the simulator configuration file, and editable here afterwards
-    segment-size: int,
-    packet-interval: int,
-    segment-interval: int,
     // From the running simulation
     status: string,
     // What a part the vehicle drives is doing, in words -- "heater_1:
@@ -65,10 +55,6 @@ component PayloadPanel inherits Rectangle {
     in property <int> dev-id: 0;
     in property <string> payload-config: "TCP localhost:5000";
     in property <string> payload-status: "Stopped";
-    in property <int> packet-size: 12;
-    in property <int> segment-size: 12;
-    in property <int> packet-interval: 1000;
-    in property <int> segment-interval: 1000;
     in property <string> last-sent-time: "--:--:--";
     in property <string> last-sent-data: "";
     in property <string> last-recv-time: "--:--:--";
@@ -76,19 +62,15 @@ component PayloadPanel inherits Rectangle {
     in property <int> packets-sent: 0;
     in property <int> packets-recv: 0;
     in property <string> parameters: "";
-    in property <string> sizes-problem: "";
     in property <bool> triggered: false;
     in property <string> driving: "";
 
     callback transfer-clicked();
-    // One callback per spin box, each carrying the value just set. The panel
-    // holds no state of its own: what a spin box shows is what the model says,
-    // so an edit has to go back to the model to be seen.
-    callback packet-size-edited(int);
-    callback segment-size-edited(int);
-    callback packet-interval-edited(int);
-    callback segment-interval-edited(int);
 
+    // Wide enough for the longest name and status of the shipped examples,
+    // and for most of their configuration lines; a longer one ends with an
+    // ellipsis.
+    min-width: 310px;
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
@@ -96,54 +78,6 @@ component PayloadPanel inherits Rectangle {
     VerticalLayout {
         padding: 4px;
         spacing: 2px;
-        sizes-popup := PopupWindow {
-            // Under the row of buttons, so that it hides neither the two
-            // sizes it is about nor the button that starts and stops the
-            // payload. Hung from the panel's corner, it covered both: the
-            // spin box just stepped, and whether Enable had gone.
-            x: 4px;
-            y: controls-row.y + controls-row.height + 2px;
-            // As wide as the panel inside its padding, and as tall as what it
-            // says comes to at that width. It was a fixed 290x100, and the
-            // sentence, which names both sizes and both ways out, ran four
-            // lines past the bottom of its border.
-            width: root.width - 8px;
-            height: sizes-box.preferred-height;
-            // Closed by a press outside it, not by any press: a press inside
-            // is somebody selecting what it says to copy it.
-            close-policy: close-on-click-outside;
-
-            sizes-box := Rectangle {
-                background: white;
-                border-color: #c00000;
-                border-width: 1px;
-
-                VerticalLayout {
-                    padding: 6px;
-                    spacing: 4px;
-
-                    HorizontalLayout {
-                        spacing: 4px;
-                        Copyable {
-                            text: payload-name + ": these sizes cannot be sent";
-                            font-weight: 700;
-                            font-size: Fonts.window;
-                            color: #c00000;
-                        }
-                        CopyButton {
-                            said: payload-name
-                                + ": these sizes cannot be sent\n"
-                                + sizes-problem;
-                        }
-                    }
-                    Copyable {
-                        text: sizes-problem;
-                        font-size: Fonts.window;
-                    }
-                }
-            }
-        }
-
         parameters-popup := PopupWindow {
             x: 4px;
             y: 4px;
@@ -225,7 +159,7 @@ component PayloadPanel inherits Rectangle {
             // and tcs-moc counts the same way, so a payload is the same number
             // in both windows.
             Text {
-                text: payload-name + " (dev id " + dev-id + ")";
+                text: payload-name + " (id " + dev-id + ")";
                 font-size: Fonts.window;
                 font-weight: 700;
                 vertical-alignment: top;
@@ -241,93 +175,15 @@ component PayloadPanel inherits Rectangle {
 
         config-row := HorizontalLayout {
             spacing: 4px;
+            // Ended with an ellipsis where it is longer than the panel is
+            // wide: the Configuration button shows the whole of it.
             Text {
                 text: "Config: " + payload-config;
                 font-size: Fonts.window;
                 vertical-alignment: top;
-            }
-        }
-
-        // The two sizes, side by side.
-        //
-        // A floor rather than a height, as the row of buttons below is: a
-        // SpinBox is thirty pixels tall in this style and a row told to be
-        // twenty-two did not shrink it, it let it hang six pixels over the
-        // row beneath. And a spacing, which was nought: every label sat
-        // against the box it names and every box against the next label.
-        HorizontalLayout {
-            min-height: 30px;
-            spacing: 6px;
-            Text {
-                text: "Pkt:";
-                vertical-alignment: center;
-                font-size: Fonts.window;
-            }
-            SpinBox {
-                value: packet-size;
-                minimum: 1;
-                maximum: 32;
-                edited(v) => {
-                    packet-size-edited(v);
-                    // Said at once, and taken back at once: an open popup
-                    // still saying these sizes cannot be sent, after the edit
-                    // that made them sendable, would be the wrong answer left
-                    // on the screen.
-                    if (sizes-problem != "") {
-                        sizes-popup.show();
-                    } else {
-                        sizes-popup.close();
-                    }
-                }
-            }
-            Text {
-                text: "Seg:";
-                vertical-alignment: center;
-                font-size: Fonts.window;
-            }
-            SpinBox {
-                value: segment-size;
-                minimum: 1;
-                maximum: 32;
-                edited(v) => {
-                    segment-size-edited(v);
-                    // Said at once, and taken back at once: an open popup
-                    // still saying these sizes cannot be sent, after the edit
-                    // that made them sendable, would be the wrong answer left
-                    // on the screen.
-                    if (sizes-problem != "") {
-                        sizes-popup.show();
-                    } else {
-                        sizes-popup.close();
-                    }
-                }
-            }
-        }
-
-        HorizontalLayout {
-            min-height: 30px;
-            spacing: 6px;
-            Text {
-                text: "Pkt Int:";
-                vertical-alignment: center;
-                font-size: Fonts.window;
-            }
-            SpinBox {
-                value: packet-interval;
-                minimum: 0;
-                maximum: 10000;
-                edited(v) => { packet-interval-edited(v); }
-            }
-            Text {
-                text: "Seg Int:";
-                vertical-alignment: center;
-                font-size: Fonts.window;
-            }
-            SpinBox {
-                value: segment-interval;
-                minimum: 0;
-                maximum: 10000;
-                edited(v) => { segment-interval-edited(v); }
+                overflow: elide;
+                min-width: 0px;
+                horizontal-stretch: 1;
             }
         }
 
@@ -358,14 +214,6 @@ component PayloadPanel inherits Rectangle {
             // what a panel is opened to do.
             Button {
                 text: payload-status == "Running" ? "Disable" : "Enable";
-                // Nothing to start while the two sizes describe something
-                // that cannot be sent: a segment is a piece of a packet, and
-                // a piece larger than the whole is not a thing to start.
-                // Stopping is always there: a payload already sending when
-                // its sizes went wrong goes on sending with them until it
-                // is stopped, and a button taken away from it then left no
-                // way to stop it but to put the sizes right first.
-                enabled: payload-status == "Running" || sizes-problem == "";
                 clicked => { transfer-clicked(); }
             }
             // What the two files said about this payload. On the same row as
@@ -461,7 +309,9 @@ export component PanelProbe inherits Window {
         text: "temp_1 gy";
         font-size: Fonts.window;
     }
-    out property <length> panel-width: probe.preferred-width;
+    // At least the panel's minimum, which its preferred width leaves out.
+    out property <length> panel-width:
+        max(probe.preferred-width, probe.min-width);
     out property <length> panel-height: probe.preferred-height;
     out property <length> line-height: line.preferred-height;
 }
@@ -509,7 +359,6 @@ export component MainWindow inherits Window {
     // One callback for the one button a panel has. Which way a press goes is
     // Rust's to decide, from the status the button's own label comes from.
     callback transfer-payload(int);
-    callback config-payload(int, int, int, int, int);
     callback quit-clicked();
 
     // What a panel comes to, measured by PanelProbe and handed over.
@@ -576,8 +425,8 @@ export component MainWindow inherits Window {
                         col: Math.mod(i, columns);
                         // A minimum rather than a size: the window opens at
                         // exactly this, and the layout stretches the panels if
-                        // it is made larger. Below it the two spin boxes on a
-                        // row stop fitting side by side.
+                        // it is made larger. Below it a panel's rows stop
+                        // fitting.
                         min-width: panel-width;
                         min-height: panel-height;
 
@@ -585,10 +434,6 @@ export component MainWindow inherits Window {
                         dev-id: p.dev-id;
                         payload-config: p.config;
                         payload-status: p.status;
-                        packet-size: p.packet-size;
-                        segment-size: p.segment-size;
-                        packet-interval: p.packet-interval;
-                        segment-interval: p.segment-interval;
                         last-sent-time: p.last-sent-time;
                         last-sent-data: p.last-sent-data;
                         last-recv-time: p.last-recv-time;
@@ -596,36 +441,10 @@ export component MainWindow inherits Window {
                         packets-sent: p.packets-sent;
                         packets-recv: p.packets-recv;
                         parameters: p.parameters;
-                        sizes-problem: p.sizes-problem;
                         triggered: p.triggered;
                         driving: p.driving;
 
                         transfer-clicked => { transfer-payload(i); }
-
-                        // An edit changes the model, so the spin box keeps
-                        // showing it, and then tells Rust the whole set for
-                        // this payload.
-                        packet-size-edited(v) => {
-                            payload-model[i].packet-size = v;
-                            config-payload(i, v, p.segment-size,
-                                           p.packet-interval,
-                                           p.segment-interval);
-                    }
-                    segment-size-edited(v) => {
-                        payload-model[i].segment-size = v;
-                        config-payload(i, p.packet-size, v, p.packet-interval,
-                                       p.segment-interval);
-                    }
-                    packet-interval-edited(v) => {
-                        payload-model[i].packet-interval = v;
-                        config-payload(i, p.packet-size, p.segment-size, v,
-                                       p.segment-interval);
-                    }
-                    segment-interval-edited(v) => {
-                        payload-model[i].segment-interval = v;
-                        config-payload(i, p.packet-size, p.segment-size,
-                                       p.packet-interval, v);
-                    }
                     }
                 }
                 Rectangle { }

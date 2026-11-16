@@ -52,8 +52,8 @@ const SET_Y: usize = 1;
 /// The joystick's square's side, which is as thick as each of its
 /// rectangles, and how far each rectangle reaches beyond the square, in
 /// logical pixels: `ui/lander.slint`'s `Joystick`.
-const SQUARE: f32 = 33.6;
-const ARM: f32 = 56.0;
+const SQUARE: f32 = 25.2;
+const ARM: f32 = 70.0;
 
 /// How often the window is brought up to the world.
 const REFRESH: Duration = Duration::from_millis(50);

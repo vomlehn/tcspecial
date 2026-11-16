@@ -923,32 +923,13 @@ how the payload is reached
   The same description tcs-moc's panels carry for the handler at the other end
   of the link.
 
-``Pkt`` and ``Seg``
-  The packet size, from the tcspecial configuration, and the segment size,
-  from the simulator configuration.
-
-``Pkt Int`` and ``Seg Int``
-  The interval between packets and between the segments of one packet, both
-  from the simulator configuration.
-
-Those four can be changed while a payload is running, and take effect on the
-next packet: that is what the simulator is for, and it is quicker than editing
-a file and starting again. Nothing is written back to the files, so the next
-run starts from what they say.
-
-A segment is a piece of a packet, so the segment size may not be larger than
-the packet size. Equal is the ordinary case -- a packet sent in one segment.
-Make them disagree and a message says so at once, naming both sizes and
-either way out of it, and the button that starts the payload is taken away
-until they agree again; the edit that fixes them takes the message back.
-Only starting is refused: a payload already running when its sizes stop
-agreeing still offers ``Disable``, which stops it, rather than going on
-sending them until they are put right. Nor does ``--sending`` or the
-simulator configuration's ``enable`` start a payload whose files give sizes
-that cannot be sent; tcs-sim says so as it starts, and the panel says why. The
-sizes are checked when the files are read as well, so a set whose simulator
-configuration states a segment larger than the packet it is given says so
-before anything is touched.
+A payload's packet and segment sizes and the intervals between its packets
+and between their segments are not shown: they are the simulator
+configuration's, set there and read once (see `The Simulator
+Configuration`_ above). A segment is a piece of a packet, so a simulator
+configuration stating a segment larger than the packet it is given is
+refused as it is read, by tcs-sim and by tcs-verify alike, naming the
+payload.
 
 Below them are the two buttons -- one to start and stop the payload, described
 under `Starting and stopping a payload <tcspecial.html#starting-and-stopping-a-payload>`__, and ``Configuration``, described
@@ -1065,8 +1046,6 @@ window, drawn without opening it.
       Three seconds on. ``Sent`` gives the time of the last reading and its
       bytes -- the zone's temperature as the sensor reads it, in the encoding
       tcspecial's conversion reads back -- and ``Pkts`` counts three.
-      ``Pkt``, ``Seg``, ``Pkt Int`` and ``Seg Int`` can be changed here while
-      it runs, and take effect on the next reading.
 
 **Switching a heater**
 
@@ -1098,37 +1077,6 @@ window, drawn without opening it.
       The thermostat switches it off, and the line says
       ``zone.heater_1: off``. A heater sends nothing, so its ``Pkts`` stays
       at nought throughout.
-
-**Sizes that cannot be sent**
-
-#. .. figure:: shots/tcs-sim-sizes-1.png
-      :alt: The temp_2 panel, Pkt 1 and Seg 2, its Enable button greyed
-            out, and below the buttons a popup outlined in red: temp_2:
-            these sizes cannot be sent. A segment of 2 bytes cannot be part
-            of a packet of 1: a segment is a piece of a packet. Raise the
-            packet size to 2 or more, or lower the segment size to 1 or
-            less.
-
-      ``Pkt`` stepped down from 2 to 1 on ``temp_2``, leaving its 2-byte
-      segment larger than the packet. A popup under the buttons says so at
-      once, naming both sizes and either way out, and ``Enable`` is greyed
-      out.
-
-#. .. figure:: shots/tcs-sim-sizes-2.png
-      :alt: The temp_2 panel with Pkt and Seg both 2, no popup, and the
-            Enable button pressable again.
-
-      ``Pkt`` stepped back up to 2. The popup goes and ``Enable`` comes
-      back. Nothing is written to the files either way.
-
-#. .. figure:: shots/tcs-sim-sizes-3.png
-      :alt: The temp_2 panel Running, Pkt 1 and Seg 2, the same popup
-            under its buttons, and its Disable button pressable.
-
-      ``Enable`` pressed, and ``Pkt`` stepped down to 1 again while it
-      runs. The popup says the same, but ``Disable`` stays: only starting is
-      refused, and a payload sending sizes that cannot be sent can always be
-      stopped.
 
 **A fault taking effect**
 

@@ -388,14 +388,15 @@ ul.auto-toc {
 <li><a class="reference internal" href="#the-ground-s-window" id="toc-entry-15">The ground's window</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-it-is-to-be-made" id="toc-entry-16">How it is to be made</a></li>
+<li><a class="reference internal" href="#how-it-was-made" id="toc-entry-16">How it was made</a></li>
 </ul>
 </div>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
-<p class="last">This is a plan. Nothing it describes is built yet; it says what the
-lander example is to be and how it is to be made, in the order it is
-to be made, so that each stage can be checked against it.</p>
+<p class="last">The lander example is built as described here. It was written as a plan
+first, and made in the stages of &quot;How it was made&quot;, each checked before
+the next; how to run it is in the tcspecial manual's &quot;The lander
+example&quot; and in <tt class="docutils literal">examples/README.md</tt>.</p>
 </div>
 <div class="section" id="what-it-is">
 <h1><a class="toc-backref" href="#toc-entry-1">What it is</a></h1>
@@ -555,7 +556,9 @@ delayed.</p>
 <p>For a world that has a two-dimensional body, tcs-sim's window shows:</p>
 <ul class="simple">
 <li>the landscape and the lander, drawn to scale, positive X to the right and
-positive Y upward, with the smiley face after a landing;</li>
+positive Y upward, under a black sky with twinkling stars, the lander
+white with thin black lines so that it shows against the sky and the
+ground, with the smiley face after a landing;</li>
 <li>&quot;Landed&quot; or &quot;Crashed&quot; in words, and the fuel left, in words and as a
 bar;</li>
 <li>below them, the X and Y position, velocity and acceleration, each named
@@ -577,8 +580,8 @@ sent down; the pointer does nothing there;</li>
 </ul>
 </div>
 </div>
-<div class="section" id="how-it-is-to-be-made">
-<h1><a class="toc-backref" href="#toc-entry-16">How it is to be made</a></h1>
+<div class="section" id="how-it-was-made">
+<h1><a class="toc-backref" href="#toc-entry-16">How it was made</a></h1>
 <p>In this order, each stage checked before the next:</p>
 <ol class="arabic simple">
 <li><strong>One world for two tcspecials.</strong> tcs-sim takes more than one
@@ -609,12 +612,13 @@ with it the lander's two accelerations as outputs.</li>
 <li><strong>The vehicles</strong>, <tt class="docutils literal"><span class="pre">lander-a</span></tt> and <tt class="docutils literal"><span class="pre">lander-b</span></tt>, as described above.</li>
 <li><strong>The ground station</strong>, <tt class="docutils literal">examples/lander/lander_yamcs.py</tt>: it makes the
 landscape from the seed and writes it into the run's simulator file;
-starts Yamcs with an instance for each vehicle, the two delaying relays,
-tcs-sim with both configurations, and both tcspecials; and opens its
-window.</li>
+starts Yamcs with an instance for each vehicle, a delaying relay on
+each of their links, tcs-sim with both configurations, and both
+tcspecials; and opens its window.</li>
 <li><strong>The rest of an example</strong>:<ul>
-<li><tt class="docutils literal">lander.svg</tt>, drawn by hand and naming every node, and
-<tt class="docutils literal">lander.xtce</tt>, from <tt class="docutils literal">make xtce</tt>;</li>
+<li>each vehicle's diagram, <tt class="docutils literal"><span class="pre">lander-a.svg</span></tt> and <tt class="docutils literal"><span class="pre">lander-b.svg</span></tt>, naming
+every node, and its XTCE, <tt class="docutils literal"><span class="pre">lander-a.xtce</span></tt> and <tt class="docutils literal"><span class="pre">lander-b.xtce</span></tt>,
+from <tt class="docutils literal">make xtce</tt>;</li>
 <li>tests: the landscape's rules kept for many seeds; thrust against mass,
 the fuel running out, landing and crashing at the limits and leaving the
 display; the joystick's mapping; the delay; the pair of vehicles, with

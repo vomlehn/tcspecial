@@ -776,6 +776,60 @@ Languages:
 - Payload: Rust -- tcs-sim simulates the radar, the velocimeter, the
   switch and the engine.
 
+### lander
+
+A lunar landing in two dimensions, flown by hand, watched from the Earth
+through [Yamcs](https://yamcs.org): the example of two tcspecials sharing
+one simulated world, and of a link with the Moon's delay in it.
+
+`lander-a` flies the X axis and `lander-b` the Y axis. Each reads its axis
+of the joystick in tcs-sim's lander window and drives that axis's thruster
+with it, the pilot in the loop and nothing aboard working out a thrust;
+and each sends its axis's position, velocity and acceleration, and the
+joystick's value, down through its `gateway_yamcs` node. `lander-a` sends
+the fuel left too, and `lander-b` whether the lander has landed or crashed.
+The two have their own ports, state files and log directories, so they run
+at once; `tcs-conflict` checks the pair.
+
+One tcs-sim simulates the payloads of both, in one world: a `lander` that
+falls under the Moon's gravity, burns fuel, whose mass counts, as it
+thrusts, and lands or crashes on the landscape, and the `joystick` it is
+flown with. The two share one simulator file,
+`lander-common/lander-sim.yaml`, each directory's `-sim.yaml` a link to
+it, and each payload in it says whose it is with `configuration`. A
+landing is the lander wholly on the pad within 3.05 m/s down and 1.22 m/s
+across, the Apollo lunar module's limits; touching any other ground, or
+leaving the display, is a crash. Either way it starts again, with a full
+tank, after a pause, a smiling face drawn over it on a landing.
+
+`lander/lander_yamcs.py` is the ground station. It makes a landscape at
+random from a seed -- `--seed N`, or one it chooses and says -- and writes
+it into the run's copy of the simulator file; starts one Yamcs with an
+instance for each vehicle, and between each instance and its vehicle a
+relay on every link that holds each datagram 1.3 s, the time light takes
+from the Moon, both ways; starts tcs-sim with both configurations and both
+tcspecials; and has each vehicle answer CONNECT, through the delay. Its
+window, the MOC's, shows the landscape and the lander where it was said to
+be, the values, the fuel, the joystick as it was held, and whether it has
+landed or crashed, all 1.3 s behind tcs-sim's. Closing tcs-sim's lander
+window, or the MOC's, stops everything. Yamcs's web interface is at
+<http://localhost:19090>.
+
+```
+make run-lander YAMCS_HOME=<yamcs>
+```
+
+Fly it from tcs-sim's window: hold the button down in the joystick's middle
+square and drag along an arm; letting go centres it.
+
+Languages:
+
+- MOC: Python 3 -- `lander_yamcs.py`, its window and its relays -- and
+  Java, Yamcs.
+- Vehicle: Rust -- two tcspecials, whose conversions are their own nodes.
+- Payload: Rust -- tcs-sim simulates every sensor and both thrusters, and
+  draws the window the lander is flown from.
+
 ### simple-app
 
 The one example that runs end to end on one host, and the one to look at to

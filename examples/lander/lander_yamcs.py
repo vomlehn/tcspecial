@@ -80,7 +80,7 @@ VEHICLES = ("lander-a", "lander-b")
 
 #: The simulator file the two share, of which each run writes a copy with
 #: its own landscape.
-SHIPPED_SIM = ROOT / "examples" / "lander-common" / "lander-sim.yaml"
+SHIPPED_SIM = HERE.parent / "lander-common" / "lander-sim.yaml"
 
 #: Where Yamcs's web interface and REST API are, unless --http-port says.
 HTTP_PORT = 19090

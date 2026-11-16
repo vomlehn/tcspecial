@@ -94,6 +94,22 @@ class Landscape(unittest.TestCase):
         self.assertEqual(lander.pad, pad)
 
 
+class Vehicles(unittest.TestCase):
+    """The two vehicles the ground station runs."""
+
+    def test_the_two_can_run_at_once(self):
+        """tcs-conflict finds nothing the two would both take: no port, state
+        file or log directory."""
+        conflict = find_built("tcs-conflict")
+        if conflict is None:
+            self.skipTest("tcs-conflict is not built")
+        paths = [str(HERE.parent / name / f"{name}.ytcs")
+                 for name in lander_yamcs.VEHICLES]
+        ran = subprocess.run([str(conflict), *paths], capture_output=True,
+                             text=True)
+        self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+
+
 class Relays(unittest.TestCase):
     """The relays that stand between Yamcs and each vehicle."""
 

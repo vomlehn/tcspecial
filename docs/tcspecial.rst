@@ -2592,8 +2592,22 @@ lander's thrust with it, and send its position, velocity and acceleration
 down through Yamcs. ``lander-a`` flies the X axis and ``lander-b`` the Y
 axis; one tcs-sim simulates the payloads of both, in one world, from the
 simulator file they share, ``examples/lander-common/lander-sim.yaml``, each
-payload there saying whose it is. The design, and the stages it is being
-made in, are in `The lander example design <lander-design.html>`__.
+payload there saying whose it is. The design is in `The lander example
+design <lander-design.html>`__.
+
+Its ground station, ``examples/lander/lander_yamcs.py``, makes a landscape
+at random from a seed -- ``--seed N``, or one it chooses and says -- and
+starts Yamcs, with a relay between Yamcs and each vehicle that holds
+everything 1.3 s each way, the time light takes from the Moon; tcs-sim
+with both configurations; and both tcspecials. The lander is flown from
+tcs-sim's lander window, and the MOC's window shows what arrives through
+Yamcs, 1.3 s later. Closing either window stops everything:
+
+.. code-block:: console
+
+   $ make -C examples run-lander YAMCS_HOME=<yamcs>
+
+or, installed, ``tcsx lander``.
 
 .. figure:: ../examples/lander-a/lander-a.svg
    :alt: lander-a, the X axis: payloads reading the lander's X position,

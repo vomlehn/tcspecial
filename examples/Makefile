@@ -63,6 +63,9 @@ help:
 	@echo "  make run-thermostat-yamcs - Run the thermostat-yamcs" \
 		"example: the thermostat, watched through Yamcs, over CCSDS" \
 		"packets (YAMCS_HOME=<yamcs>)"
+	@echo "  make run-lander      - Run the lander example: two" \
+		"tcspecials flying a lunar lander from tcs-sim's joystick," \
+		"watched through Yamcs 1.3 s away (YAMCS_HOME=<yamcs>)"
 	@echo "  make run-tees        - Run tcs-moc on the tees example: tees" \
 		"and null nodes"
 	@echo "  make run-consolidator - Run tcs-moc on the consolidator" \
@@ -287,6 +290,19 @@ run-memusage:
 run-thermostat-yamcs: check-tkinter
 	$(call tcsx,thermostat-yamcs,tcspecial tcs-sim tcs-verify \
 		segsend)
+
+# The lander example: two tcspecials, lander-a flying the X axis and
+# lander-b the Y, and one tcs-sim simulating both, the lander flown from its
+# window's joystick. YAMCS_HOME is where a Yamcs release is unpacked;
+# lander_yamcs.py makes a landscape from a seed, starts Yamcs with a relay
+# holding everything 1.3 s each way, tcs-sim and both tcspecials, and opens
+# the MOC's window, read from Yamcs. Closing tcs-sim's lander window, or the
+# MOC's, stops them all. With no window of the program's own,
+#   python3 examples/lander/lander_yamcs.py --yamcs <yamcs> --seconds 60
+# prints what arrives for a minute; --seed N has a landscape again.
+.PHONY: run-lander
+run-lander: check-tkinter
+	$(call tcsx,lander,tcspecial tcs-sim tcs-verify segsend)
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
 #

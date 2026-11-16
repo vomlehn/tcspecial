@@ -2902,8 +2902,19 @@ lander's thrust with it, and send its position, velocity and acceleration
 down through Yamcs. <tt class="docutils literal"><span class="pre">lander-a</span></tt> flies the X axis and <tt class="docutils literal"><span class="pre">lander-b</span></tt> the Y
 axis; one tcs-sim simulates the payloads of both, in one world, from the
 simulator file they share, <tt class="docutils literal"><span class="pre">examples/lander-common/lander-sim.yaml</span></tt>, each
-payload there saying whose it is. The design, and the stages it is being
-made in, are in <a class="reference external" href="lander-design.html">The lander example design</a>.</p>
+payload there saying whose it is. The design is in <a class="reference external" href="lander-design.html">The lander example
+design</a>.</p>
+<p>Its ground station, <tt class="docutils literal">examples/lander/lander_yamcs.py</tt>, makes a landscape
+at random from a seed -- <tt class="docutils literal"><span class="pre">--seed</span> N</tt>, or one it chooses and says -- and
+starts Yamcs, with a relay between Yamcs and each vehicle that holds
+everything 1.3 s each way, the time light takes from the Moon; tcs-sim
+with both configurations; and both tcspecials. The lander is flown from
+tcs-sim's lander window, and the MOC's window shows what arrives through
+Yamcs, 1.3 s later. Closing either window stops everything:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-lander<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>&lt;yamcs&gt;
+</pre>
+<p>or, installed, <tt class="docutils literal">tcsx lander</tt>.</p>
 <div class="figure">
 <object data="../examples/lander-a/lander-a.svg" style="width: 100%;" type="image/svg+xml">lander-a, the X axis: payloads reading the lander's X position,
 velocity and acceleration, its fuel and the joystick's X, each

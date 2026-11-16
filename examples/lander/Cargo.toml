@@ -1,0 +1,18 @@
+[package]
+name = "lander-example"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+The tests of the lander example, whose ground station is Python 3: they run \
+the Python's own tests where the Rust's are run"""
+
+# Nothing is built for the example itself: its ground station is
+# lander_yamcs.py beside this. What is here is the test that runs the
+# Python's, so that a change to the Rust the Python has not followed -- the
+# lander's rules for a landscape, the Yamcs links, the tools it runs -- fails
+# where the Rust change is being tested.
+[dev-dependencies]
+
+[lints]
+workspace = true

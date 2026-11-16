@@ -46,10 +46,17 @@ die() {
 }
 
 # The examples run by their own ground station rather than by tcs-moc.
-OWN_GROUND="simple-app beacon ping ping-yamcs thermostat-yamcs memusage"
+OWN_GROUND="simple-app beacon ping ping-yamcs thermostat-yamcs memusage lander"
 
 # The examples whose ground station goes through Yamcs.
-YAMCS="ping-yamcs thermostat-yamcs memusage"
+YAMCS="ping-yamcs thermostat-yamcs memusage lander"
+
+# The examples of several configurations, each run by a ground station in a
+# directory of its own that holds no configuration; and the configurations
+# that are their parts, in directories of their own, which are not listed
+# or run alone.
+SEVERAL="lander"
+PARTS="lander-a lander-b"
 
 # The examples whose payloads are the kernel's dummy devices.
 KERNEL_DUMMIES="can gpio iio"
@@ -81,7 +88,8 @@ list() {
 	[ -x "${YAMCS_HOME:-}/bin/yamcsd" ] || yamcs=$YAMCS
 	for dir in "$examples"/*/; do
 		name=$(basename "$dir")
-		[ -f "$dir/$name.ytcs" ] || continue
+		! among "$name" "$PARTS" || continue
+		[ -f "$dir/$name.ytcs" ] || among "$name" "$SEVERAL" || continue
 		if among "$name" "$yamcs"; then
 			echo "$name (needs Yamcs: YAMCS_HOME)"
 		elif among "$name" "$KERNEL_DUMMIES"; then
@@ -124,7 +132,11 @@ if [ $# -eq 0 ]; then
 fi
 name=$1
 shift
+! among "$name" "$PARTS" \
+	|| die "$name is one of an example's configurations, not run" \
+		"alone: tcsx lists the examples"
 [ -f "$examples/$name/$name.ytcs" ] \
+	|| { among "$name" "$SEVERAL" && [ -d "$examples/$name" ]; } \
 	|| die "no example $name: tcsx lists them"
 if among "$name" "$YAMCS"; then
 	[ -x "${YAMCS_HOME:-}/bin/yamcsd" ] \
@@ -191,6 +203,13 @@ thermostat-yamcs)
 	# shellcheck disable=SC2086
 	python3 examples/thermostat-yamcs/thermostat_yamcs.py \
 		--yamcs "$YAMCS_HOME" $memlock "$@"
+	;;
+lander)
+	# Two tcspecials, each flying one axis, and one tcs-sim, whose
+	# window the lander is flown from.
+	# shellcheck disable=SC2086
+	python3 examples/lander/lander_yamcs.py --yamcs "$YAMCS_HOME" \
+		$memlock "$@"
 	;;
 memusage)
 	# Its own configuration, unless the ARGUMENTs name others, each

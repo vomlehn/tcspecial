@@ -1,0 +1,128 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial-sim.schema.json
+
+# The lander example's simulator file, shared by its two configurations,
+# lander-a, which flies the X axis, and lander-b, which flies the Y axis:
+# one tcs-sim simulates the payloads of both, in one world, with
+#
+#   tcs-sim --simulate=all \
+#       --simulator=examples/lander-common/lander-sim.yaml \
+#       examples/lander-a/lander-a.ytcs examples/lander-b/lander-b.ytcs
+#
+# Each payload says whose it is, by its configuration, so that a tool
+# reading this file with one of them takes that one's payloads alone.
+#
+# The world is the lander and the joystick it is flown with, from tcs-sim's
+# lander window. The landscape here is the one shipped; the lander example's
+# ground station makes one at random for each run, from a seed, and writes it
+# into that run's copy of this file. See docs/lander-design.rst.
+
+description: Simulator settings for the lander example's two configurations
+
+tcs-sim:
+  ready: "127.0.0.1:7914"
+
+world:
+  physics:
+    components:
+      - type lander:
+          - component: lander
+            # 5500 kg empty and 500 kg of fuel. A full push gives 4 m/s2 up
+            # and 2 m/s2 across with a full tank, and more as it empties;
+            # full thrust up empties it in about 63 s.
+            dry_mass: "5500 kg"
+            fuel: "500 kg"
+            isp: "311 s"
+            thrust_x: "12000 N"
+            thrust_y: "24000 N"
+            gravity: "1.62 m/s2"
+            # The upper left, wholly in view.
+            x: "60 m"
+            y: "540 m"
+            width: "1000 m"
+            height: "600 m"
+            ground: "0,210 90,300 180,170 300,240 420,80 480,80 600,190
+              720,120 850,330 1000,200 m"
+            pad: "420,80 480,80 m"
+            # A body with its corners cut, a cabin on it with an antenna, a
+            # nozzle under it, and two splayed legs, each with a strut and a
+            # foot: thirty metres wide and as tall, a twentieth of the
+            # display's height, its feet at nought.
+            outline: "-9,9 9,9 11,11 11,16 9,18 -9,18 -11,16 -11,11 -9,9 |
+              -6,18 -7,22 -4,26 4,26 7,22 6,18 | 0,26 0,30 | -2,30 2,30 |
+              -2.5,9 -3.5,5.5 3.5,5.5 2.5,9 | -11,13 -13.5,2 | -9,9 -13.5,2
+              | -15,0 -12,0 -13.5,2 -15,0 | 11,13 13.5,2 | 9,9 13.5,2 |
+              15,0 12,0 13.5,2 15,0 m"
+            # The Apollo lunar module's touchdown limits.
+            landing_speed: "3.05 m/s"
+            landing_drift: "1.22 m/s"
+            pause: "3 s"
+      - type joystick:
+          - component: stick
+
+simulated_payload_groups:
+  - group: readings
+    enable: true
+    packet_interval: 100 ms
+    protocol: udp
+    simulate: true
+
+simulated_payloads:
+  - type network:
+      - payload: x_sensor
+        configuration: lander-a
+        connects: lander.x
+        group: readings
+      - payload: velocity_x_sensor
+        configuration: lander-a
+        connects: lander.velocity_x
+        group: readings
+      - payload: acceleration_x_sensor
+        configuration: lander-a
+        connects: lander.acceleration_x
+        group: readings
+      - payload: fuel_sensor
+        configuration: lander-a
+        connects: lander.fuel
+        group: readings
+      - payload: joystick_x_sensor
+        configuration: lander-a
+        connects: stick.x
+        group: readings
+        packet_interval: 50 ms
+      - payload: thruster_x
+        configuration: lander-a
+        connects: lander.throttle_x
+        enable: true
+        protocol: udp
+        simulate: true
+      - payload: y_sensor
+        configuration: lander-b
+        connects: lander.y
+        group: readings
+      - payload: velocity_y_sensor
+        configuration: lander-b
+        connects: lander.velocity_y
+        group: readings
+      - payload: acceleration_y_sensor
+        configuration: lander-b
+        connects: lander.acceleration_y
+        group: readings
+      - payload: joystick_y_sensor
+        configuration: lander-b
+        connects: stick.y
+        group: readings
+        packet_interval: 50 ms
+      - payload: thruster_y
+        configuration: lander-b
+        connects: lander.throttle_y
+        enable: true
+        protocol: udp
+        simulate: true
+      - payload: landed
+        configuration: lander-b
+        connects: lander.landed
+        group: readings
+      - payload: crashed
+        configuration: lander-b
+        connects: lander.crashed
+        group: readings

@@ -727,6 +727,14 @@ fn load(
             return None;
         }
     };
+    // One configuration of several sharing the file simulates its own
+    // payloads alone, the others' naming theirs by their `configuration`.
+    let sim_file = match payload_paths {
+        [one] => sim_file.for_configuration(
+            &tcsprotocol::sim_config::configuration_name(Path::new(one)),
+        ),
+        _ => sim_file,
+    };
 
     // A configuration's payloads are nodes of a graph, and the ones simulated
     // are the ones the simulator file names: see
@@ -900,7 +908,21 @@ fn shared_out(
             }
         }
         match (payload_of.as_slice(), node_of) {
-            ([_], _) => {}
+            ([path], _) => {
+                let name =
+                    tcsprotocol::sim_config::configuration_name(Path::new(path));
+                if let Some(said) = entry
+                    .configuration
+                    .as_deref()
+                    .filter(|said| **said != name)
+                {
+                    return Err(format!(
+                        "\"{}\" is simulated as a payload of {said}, and it \
+                         is a payload of {path}",
+                        entry.name
+                    ));
+                }
+            }
             ([], Some((path, node_type))) => {
                 return Err(format!(
                     "\"{}\" is simulated, and it is a {node_type} node of \
@@ -2550,7 +2572,7 @@ mod tests {
         // panel and chrome sizes are right.
         let mut cases: Vec<(String, Vec<PayloadInfo>)> = Vec::new();
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = SimConfigFile::load(&sim_path).unwrap_or_else(|e| {
+            let sim_file = shipped_sim(&payload_path, &sim_path).unwrap_or_else(|e| {
                 panic!("{} failed to load: {e}", sim_path.display())
             });
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
@@ -2899,6 +2921,33 @@ mod tests {
         sizes_that_cannot_be_sent_stop_the_button_and_say_so();
     }
 
+    /// A shipped set's simulator file, read as `load` reads it with that
+    /// configuration alone: a file shared by several configurations without
+    /// the others' payloads.
+    ///
+    /// # Arguments
+    ///
+    /// * `configuration` - The set's tcspecial configuration file.
+    /// * `sim_path`      - Its simulator file.
+    ///
+    /// # Returns
+    ///
+    /// The file, with the payloads of this configuration alone.
+    ///
+    /// # Errors
+    ///
+    /// Why the file cannot be read.
+    fn shipped_sim(
+        configuration: &std::path::Path,
+        sim_path: &std::path::Path,
+    ) -> Result<SimConfigFile, String> {
+        let file =
+            SimConfigFile::load(sim_path).map_err(|e| e.to_string())?;
+        Ok(file.for_configuration(
+            &tcsprotocol::sim_config::configuration_name(configuration),
+        ))
+    }
+
     /// Makes the payloads of a configuration that its simulator file names,
     /// as `load` makes them.
     ///
@@ -2942,7 +2991,8 @@ mod tests {
         for (configuration, sim_path) in shipped_sets() {
             let graph = tcsprotocol::graph::Graph::load(&configuration)
                 .expect("it reads");
-            let sim_file = SimConfigFile::load(&sim_path).expect("it reads");
+            let sim_file =
+                shipped_sim(&configuration, &sim_path).expect("it reads");
             let refused: Vec<String> = simulation_refused(
                 &graph,
                 &sim_file,
@@ -3089,7 +3139,7 @@ mod tests {
     #[test]
     fn the_shipped_files_become_simulator_configs() {
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = SimConfigFile::load(&sim_path).unwrap_or_else(|e| {
+            let sim_file = shipped_sim(&payload_path, &sim_path).unwrap_or_else(|e| {
                 panic!("{} failed to load: {e}", sim_path.display())
             });
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
@@ -3644,7 +3694,7 @@ mod tests {
     #[test]
     fn the_shipped_files_give_a_panel_each() {
         for (payload_path, sim_path) in shipped_sets() {
-            let sim_file = SimConfigFile::load(&sim_path).unwrap();
+            let sim_file = shipped_sim(&payload_path, &sim_path).unwrap();
             let dh_configs = simulated_payloads_of(&payload_path, &sim_file);
             let sims = sim_file.resolve(&dh_configs).unwrap();
 

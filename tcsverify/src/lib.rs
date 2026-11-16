@@ -1057,6 +1057,14 @@ fn check_graph_simulator(
     }
 
     let Some(graph) = graph else { return };
+    // A file shared by several configurations is read with this one's
+    // payloads alone, the others' named theirs by their `configuration`.
+    let sim = match graph.files.first() {
+        Some(top) => sim.for_configuration(
+            &tcsprotocol::sim_config::configuration_name(top),
+        ),
+        None => sim,
+    };
     let names: Vec<&str> = graph
         .nodes
         .iter()

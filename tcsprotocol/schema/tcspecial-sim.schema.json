@@ -469,6 +469,13 @@
             "null"
           ]
         },
+        "configuration": {
+          "description": "Which configuration this payload is a payload of, where the file is shared by several simulated together: the configuration file's name without its extension, lander-a. A reader of the file with one configuration takes no other's payloads. Unstated, the payload is any configuration's that has it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "protocol": {
           "description": "Which transport, for a network payload: udp, tcp or unix.",
           "type": [

@@ -2584,6 +2584,35 @@ one first
 asks the model anything -- so enable ``engine`` and ``radar`` in tcs-sim first,
 and the rest after.
 
+The lander example
+------------------
+A lunar landing in two dimensions, flown by hand: two tcspecials, one for
+each axis, read a joystick in tcs-sim's lander window and drive the
+lander's thrust with it, and send its position, velocity and acceleration
+down through Yamcs. ``lander-a`` flies the X axis and ``lander-b`` the Y
+axis; one tcs-sim simulates the payloads of both, in one world, from the
+simulator file they share, ``examples/lander-common/lander-sim.yaml``, each
+payload there saying whose it is. The design, and the stages it is being
+made in, are in `The lander example design <lander-design.html>`__.
+
+.. figure:: ../examples/lander-a/lander-a.svg
+   :alt: lander-a, the X axis: payloads reading the lander's X position,
+         velocity and acceleration, its fuel and the joystick's X, each
+         made a value and sent to the Yamcs gateway; the joystick's X also
+         drives the X thruster.
+   :width: 100%
+
+   ``lander-a``, the X axis.
+
+.. figure:: ../examples/lander-b/lander-b.svg
+   :alt: lander-b, the Y axis: payloads reading the lander's Y position,
+         velocity and acceleration and the joystick's Y, each made a value
+         and sent to the Yamcs gateway, with whether it has landed or
+         crashed; the joystick's Y also drives the Y thruster.
+   :width: 100%
+
+   ``lander-b``, the Y axis.
+
 The simple-app example
 ----------------------
 .. figure:: ../examples/simple-app/simple-app.svg

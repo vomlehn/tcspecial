@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
+    <description>The lander example's Y, up: a tcspecial flying one axis of a lunar lander, its joystick's Y driving the thrust, its Y position, velocity and acceleration sent down through Yamcs</description>
+    <tcspecial>
+        <!-- The lander example: one of two tcspecials flying a lunar lander
+             in two dimensions, this one its Y axis, the other, lander-a,
+             its X axis. Each reads its axis of a joystick in tcs-sim's
+             lander window and drives that axis's thrust with it, the pilot
+             in the loop, and sends its axis's position, velocity and
+             acceleration, and the joystick's value, down through Yamcs.
+             Their payloads are simulated by one tcs-sim, from the simulator
+             file they share, ../lander-common/lander-sim.yaml, whose world
+             is the lander and its landscape. See docs/lander-design.rst. -->
+        <beacon>
+            <apid>0x110</apid>
+            <default_interval>5 s</default_interval>
+            <recv>127.0.0.1:20510</recv>
+            <reset_interval>1 s</reset_interval>
+            <send>0.0.0.0:20500</send>
+        </beacon>
+        <gateway>yamcs</gateway>
+        <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
+        <log>
+            <directory>/tmp/telemetry/lander-b</directory>
+            <segment_size>65536</segment_size>
+        </log>
+        <max_consolidator_inputs>32</max_consolidator_inputs>
+        <payload_command>
+            <dest_base>0.0.0.0:20300</dest_base>
+            <source_base>127.0.0.1:0</source_base>
+        </payload_command>
+        <payload_telemetry>
+            <apid_base>0x500</apid_base>
+            <dest_base>127.0.0.1:20410</dest_base>
+            <source_base>0.0.0.0:20400</source_base>
+        </payload_telemetry>
+        <state_file>/tmp/tcspecial-lander-b.state</state_file>
+        <tcs_cmd>
+            <apid>0x111</apid>
+            <recv>0.0.0.0:20200</recv>
+            <send>127.0.0.1:0</send>
+        </tcs_cmd>
+    </tcspecial>
+    <gateways>
+        <type name="gateway_yamcs">
+            <gateway name="gateway">
+                <address>127.0.0.1:20600</address>
+                <apid_base>0x400</apid_base>
+                <ground_base>127.0.0.1:20700</ground_base>
+                <world-in>acceleration_y</world-in>
+                <world-in>crashed</world-in>
+                <world-in>joystick_y</world-in>
+                <world-in>landed</world-in>
+                <world-in>velocity_y</world-in>
+                <world-in>y</world-in>
+            </gateway>
+        </type>
+    </gateways>
+    <vehicle>
+        <type name="compute">
+            <compute name="acceleration_y">
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.001</scale>
+                <type-in>i16</type-in>
+                <type-out>metre_per_second_squared</type-out>
+                <world-out>gateway.acceleration_y</world-out>
+                <world-in>acceleration_y_sensor</world-in>
+            </compute>
+            <compute name="joystick_y">
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.0001</scale>
+                <type-in>i16</type-in>
+                <type-out>ratio</type-out>
+                <moc-out>thruster_y.joystick_y</moc-out>
+                <world-out>gateway.joystick_y</world-out>
+                <world-in>joystick_y_sensor</world-in>
+            </compute>
+            <compute name="velocity_y">
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.01</scale>
+                <type-in>i16</type-in>
+                <type-out>metre_per_second</type-out>
+                <world-out>gateway.velocity_y</world-out>
+                <world-in>velocity_y_sensor</world-in>
+            </compute>
+            <compute name="y">
+                <function>to_value</function>
+                <offset>0</offset>
+                <scale>0.1</scale>
+                <type-in>i16</type-in>
+                <type-out>metre</type-out>
+                <world-out>gateway.y</world-out>
+                <world-in>y_sensor</world-in>
+            </compute>
+        </type>
+    </vehicle>
+    <payloads>
+        <type name="network">
+            <payload name="acceleration_y_sensor">
+                <address>127.0.0.1:20803</address>
+                <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
+                <world-out>acceleration_y.acceleration_y_sensor</world-out>
+            </payload>
+            <payload name="crashed">
+                <read_size>16</read_size>
+                <address>127.0.0.1:20807</address>
+                <protocol>udp</protocol>
+                <world-out>gateway.crashed</world-out>
+            </payload>
+            <payload name="joystick_y_sensor">
+                <address>127.0.0.1:20804</address>
+                <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
+                <world-out>joystick_y.joystick_y_sensor</world-out>
+            </payload>
+            <payload name="landed">
+                <read_size>16</read_size>
+                <address>127.0.0.1:20806</address>
+                <protocol>udp</protocol>
+                <world-out>gateway.landed</world-out>
+            </payload>
+            <payload name="thruster_y">
+                <address>127.0.0.1:20805</address>
+                <moc-in-type>ratio</moc-in-type>
+                <protocol>udp</protocol>
+                <moc-in>joystick_y</moc-in>
+            </payload>
+            <payload name="velocity_y_sensor">
+                <address>127.0.0.1:20802</address>
+                <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
+                <world-out>velocity_y.velocity_y_sensor</world-out>
+            </payload>
+            <payload name="y_sensor">
+                <address>127.0.0.1:20801</address>
+                <protocol>udp</protocol>
+                <world-out-type>i16</world-out-type>
+                <world-out>y.y_sensor</world-out>
+            </payload>
+        </type>
+    </payloads>
+</configuration>

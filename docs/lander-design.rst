@@ -155,6 +155,16 @@ run at once; ``tcs-conflict`` checks the pair. Each has:
   is in the loop and nothing aboard needs floating point;
 * a ``gateway_yamcs`` gateway, which takes the four values to the ground.
 
+``lander-a`` also sends the fuel left, and ``lander-b`` whether the lander
+has landed or crashed. Each logs to its own directory under
+``/tmp/telemetry``.
+
+They are ``examples/lander-a/`` and ``examples/lander-b/``. Their simulator
+file is ``examples/lander-common/lander-sim.yaml``, which each directory
+links as its own ``-sim.yaml``; in it each payload says whose it is with
+``configuration``, so that a tool reading the file with one configuration
+takes that one's payloads alone.
+
 The link to the ground
 ======================
 

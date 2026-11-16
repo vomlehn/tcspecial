@@ -1,0 +1,136 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
+
+# The lander example: one of two tcspecials flying a lunar lander in two
+# dimensions, this one its X axis, the other, lander-b, its Y axis. Each
+# reads its axis of a joystick in tcs-sim's lander window and drives that
+# axis's thrust with it, the pilot in the loop, and sends its axis's
+# position, velocity and acceleration, and the joystick's value, down
+# through Yamcs. Their payloads are simulated by one tcs-sim, from the
+# simulator file they share, ../lander-common/lander-sim.yaml, whose world
+# is the lander and its landscape. See docs/lander-design.rst.
+
+description: "The lander example's X, across: a tcspecial flying one axis of a
+  lunar lander, its joystick's X driving the thrust, its X position, velocity
+  and acceleration sent down through Yamcs"
+
+tcspecial:
+  beacon:
+    apid: "0x110"
+    default_interval: "5 s"
+    recv: "127.0.0.1:19510"
+    reset_interval: "1 s"
+    send: "0.0.0.0:19500"
+  gateway: "yamcs"
+  interface: "b03f49878bcc9c45e7b854c7da1bce47"
+  log:
+    directory: "/tmp/telemetry/lander-a"
+    segment_size: "65536"
+  max_consolidator_inputs: "32"
+  payload_command:
+    dest_base: "0.0.0.0:19300"
+    source_base: "127.0.0.1:0"
+  payload_telemetry:
+    apid_base: "0x500"
+    dest_base: "127.0.0.1:19410"
+    source_base: "0.0.0.0:19400"
+  state_file: "/tmp/tcspecial-lander-a.state"
+  tcs_cmd:
+    apid: "0x111"
+    recv: "0.0.0.0:19200"
+    send: "127.0.0.1:0"
+
+gateways:
+  - type gateway_yamcs:
+      - gateway: gateway
+        address: "127.0.0.1:19600"
+        apid_base: "0x400"
+        ground_base: "127.0.0.1:19700"
+        world-in: [acceleration_x, fuel, joystick_x, velocity_x, x]
+
+vehicle:
+  - type compute:
+      - compute: acceleration_x
+        function: "to_value"
+        offset: "0"
+        scale: "0.001"
+        type-in: "i16"
+        type-out: "metre_per_second_squared"
+        world-out:
+          - gateway.acceleration_x
+        world-in: [acceleration_x_sensor]
+      - compute: fuel
+        function: "to_value"
+        offset: "0"
+        scale: "0.0001"
+        type-in: "i16"
+        type-out: "ratio"
+        world-out:
+          - gateway.fuel
+        world-in: [fuel_sensor]
+      - compute: joystick_x
+        function: "to_value"
+        offset: "0"
+        scale: "0.0001"
+        type-in: "i16"
+        type-out: "ratio"
+        moc-out:
+          - thruster_x.joystick_x
+        world-out:
+          - gateway.joystick_x
+        world-in: [joystick_x_sensor]
+      - compute: velocity_x
+        function: "to_value"
+        offset: "0"
+        scale: "0.01"
+        type-in: "i16"
+        type-out: "metre_per_second"
+        world-out:
+          - gateway.velocity_x
+        world-in: [velocity_x_sensor]
+      - compute: x
+        function: "to_value"
+        offset: "0"
+        scale: "0.1"
+        type-in: "i16"
+        type-out: "metre"
+        world-out:
+          - gateway.x
+        world-in: [x_sensor]
+
+payloads:
+  - type network:
+      - payload: acceleration_x_sensor
+        address: "127.0.0.1:19803"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - acceleration_x.acceleration_x_sensor
+      - payload: fuel_sensor
+        address: "127.0.0.1:19804"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - fuel.fuel_sensor
+      - payload: joystick_x_sensor
+        address: "127.0.0.1:19805"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - joystick_x.joystick_x_sensor
+      - payload: thruster_x
+        address: "127.0.0.1:19806"
+        moc-in-type: "ratio"
+        protocol: "udp"
+        moc-in: [joystick_x]
+      - payload: velocity_x_sensor
+        address: "127.0.0.1:19802"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - velocity_x.velocity_x_sensor
+      - payload: x_sensor
+        address: "127.0.0.1:19801"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - x.x_sensor

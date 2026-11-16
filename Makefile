@@ -475,6 +475,8 @@ SPELLINGS = \
 	examples/beacon/beacon:examples/beacon/beacon-sim.yaml \
 	examples/fprime/fprime:examples/fprime/fprime-sim.yaml \
 	examples/cfs/cfs:examples/cfs/cfs-sim.yaml \
+	examples/lander-a/lander-a:examples/lander-a/lander-a-sim.yaml \
+	examples/lander-b/lander-b:examples/lander-b/lander-b-sim.yaml \
 	example:example-sim.yaml \
 	$(foreach stage,$(VEHICLE_GUIDE_STAGES), \
 		$(stage)/deck:$(stage)/deck-sim.yaml)

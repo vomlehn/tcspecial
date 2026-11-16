@@ -524,6 +524,14 @@ velocity and acceleration;</li>
 is in the loop and nothing aboard needs floating point;</li>
 <li>a <tt class="docutils literal">gateway_yamcs</tt> gateway, which takes the four values to the ground.</li>
 </ul>
+<p><tt class="docutils literal"><span class="pre">lander-a</span></tt> also sends the fuel left, and <tt class="docutils literal"><span class="pre">lander-b</span></tt> whether the lander
+has landed or crashed. Each logs to its own directory under
+<tt class="docutils literal">/tmp/telemetry</tt>.</p>
+<p>They are <tt class="docutils literal"><span class="pre">examples/lander-a/</span></tt> and <tt class="docutils literal"><span class="pre">examples/lander-b/</span></tt>. Their simulator
+file is <tt class="docutils literal"><span class="pre">examples/lander-common/lander-sim.yaml</span></tt>, which each directory
+links as its own <tt class="docutils literal"><span class="pre">-sim.yaml</span></tt>; in it each payload says whose it is with
+<tt class="docutils literal">configuration</tt>, so that a tool reading the file with one configuration
+takes that one's payloads alone.</p>
 </div>
 <div class="section" id="the-link-to-the-ground">
 <h1><a class="toc-backref" href="#toc-entry-12">The link to the ground</a></h1>

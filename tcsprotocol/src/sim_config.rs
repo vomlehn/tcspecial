@@ -1463,12 +1463,37 @@ pub struct SimPayload {
     /// Name of the group supplying settings this payload does not state.
     #[serde(default)]
     pub group: Option<String>,
+    /// Which configuration the payload is a payload of, where the file is
+    /// shared by several configurations simulated together: the
+    /// configuration file's name without its extension, `lander-a`. A
+    /// reader of the file with one configuration takes the payloads of no
+    /// other's: see [`SimConfigFile::for_configuration`]. Unstated, the
+    /// payload is any configuration's that has it, as in a file used by
+    /// one configuration, or by several with the same payloads.
+    #[serde(default)]
+    pub configuration: Option<String>,
     #[serde(flatten)]
     pub settings: SimSettings,
     /// Whatever the file wrote here that is not a setting; see
     /// [`SimGroup::unknown`].
     #[serde(flatten)]
     pub unknown: BTreeMap<String, IgnoredAny>,
+}
+
+/// The name a configuration goes by in a simulator file it shares: its
+/// file's name without its extension.
+///
+/// # Arguments
+///
+/// * `path` - The configuration file.
+///
+/// # Returns
+///
+/// The name: `lander-a` for `examples/lander-a/lander-a.ytcs`.
+pub fn configuration_name(path: &std::path::Path) -> String {
+    path.file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// A simulator configuration file, as it parses.
@@ -1789,6 +1814,32 @@ pub const MOVED_THERMAL_MASS: &str = "a simulator file no longer declares \
     examples/thermostat-common/thermostat-sim.yaml writes them";
 
 impl SimConfigFile {
+    /// The file as one configuration of those sharing it reads it: every
+    /// payload that names another configuration, by its `configuration`,
+    /// left out.
+    ///
+    /// What a reader with one configuration -- tcs-verify, tcs-moc, tcs-sim
+    /// given one -- reads a shared file as, so that the other
+    /// configurations' payloads are not taken for payloads of this one that
+    /// it lacks.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The configuration's name: its file's name without its
+    ///            extension, as [`configuration_name`] gives it.
+    ///
+    /// # Returns
+    ///
+    /// The file, with this configuration's payloads and those that name no
+    /// configuration.
+    pub fn for_configuration(&self, name: &str) -> SimConfigFile {
+        let mut file = self.clone();
+        file.simulated_payloads.retain(|payload| {
+            payload.configuration.as_deref().is_none_or(|said| said == name)
+        });
+        file
+    }
+
     /// Read a simulator configuration file.
     ///
     /// # Arguments

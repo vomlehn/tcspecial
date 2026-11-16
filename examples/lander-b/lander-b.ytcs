@@ -1,0 +1,133 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
+
+# The lander example: one of two tcspecials flying a lunar lander in two
+# dimensions, this one its Y axis, the other, lander-a, its X axis. Each
+# reads its axis of a joystick in tcs-sim's lander window and drives that
+# axis's thrust with it, the pilot in the loop, and sends its axis's
+# position, velocity and acceleration, and the joystick's value, down
+# through Yamcs. Their payloads are simulated by one tcs-sim, from the
+# simulator file they share, ../lander-common/lander-sim.yaml, whose world
+# is the lander and its landscape. See docs/lander-design.rst.
+
+description: "The lander example's Y, up: a tcspecial flying one axis of a
+  lunar lander, its joystick's Y driving the thrust, its Y position, velocity
+  and acceleration sent down through Yamcs"
+
+tcspecial:
+  beacon:
+    apid: "0x110"
+    default_interval: "5 s"
+    recv: "127.0.0.1:20510"
+    reset_interval: "1 s"
+    send: "0.0.0.0:20500"
+  gateway: "yamcs"
+  interface: "b03f49878bcc9c45e7b854c7da1bce47"
+  log:
+    directory: "/tmp/telemetry/lander-b"
+    segment_size: "65536"
+  max_consolidator_inputs: "32"
+  payload_command:
+    dest_base: "0.0.0.0:20300"
+    source_base: "127.0.0.1:0"
+  payload_telemetry:
+    apid_base: "0x500"
+    dest_base: "127.0.0.1:20410"
+    source_base: "0.0.0.0:20400"
+  state_file: "/tmp/tcspecial-lander-b.state"
+  tcs_cmd:
+    apid: "0x111"
+    recv: "0.0.0.0:20200"
+    send: "127.0.0.1:0"
+
+gateways:
+  - type gateway_yamcs:
+      - gateway: gateway
+        address: "127.0.0.1:20600"
+        apid_base: "0x400"
+        ground_base: "127.0.0.1:20700"
+        world-in: [acceleration_y, crashed, joystick_y, landed, velocity_y, y]
+
+vehicle:
+  - type compute:
+      - compute: acceleration_y
+        function: "to_value"
+        offset: "0"
+        scale: "0.001"
+        type-in: "i16"
+        type-out: "metre_per_second_squared"
+        world-out:
+          - gateway.acceleration_y
+        world-in: [acceleration_y_sensor]
+      - compute: joystick_y
+        function: "to_value"
+        offset: "0"
+        scale: "0.0001"
+        type-in: "i16"
+        type-out: "ratio"
+        moc-out:
+          - thruster_y.joystick_y
+        world-out:
+          - gateway.joystick_y
+        world-in: [joystick_y_sensor]
+      - compute: velocity_y
+        function: "to_value"
+        offset: "0"
+        scale: "0.01"
+        type-in: "i16"
+        type-out: "metre_per_second"
+        world-out:
+          - gateway.velocity_y
+        world-in: [velocity_y_sensor]
+      - compute: y
+        function: "to_value"
+        offset: "0"
+        scale: "0.1"
+        type-in: "i16"
+        type-out: "metre"
+        world-out:
+          - gateway.y
+        world-in: [y_sensor]
+
+payloads:
+  - type network:
+      - payload: acceleration_y_sensor
+        address: "127.0.0.1:20803"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - acceleration_y.acceleration_y_sensor
+      - payload: crashed
+        read_size: "16"
+        address: "127.0.0.1:20807"
+        protocol: "udp"
+        world-out:
+          - gateway.crashed
+      - payload: joystick_y_sensor
+        address: "127.0.0.1:20804"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - joystick_y.joystick_y_sensor
+      - payload: landed
+        read_size: "16"
+        address: "127.0.0.1:20806"
+        protocol: "udp"
+        world-out:
+          - gateway.landed
+      - payload: thruster_y
+        address: "127.0.0.1:20805"
+        moc-in-type: "ratio"
+        protocol: "udp"
+        moc-in: [joystick_y]
+      - payload: velocity_y_sensor
+        address: "127.0.0.1:20802"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - velocity_y.velocity_y_sensor
+      - payload: y_sensor
+        address: "127.0.0.1:20801"
+        protocol: "udp"
+        world-out-type: "i16"
+        world-out:
+          - y.y_sensor

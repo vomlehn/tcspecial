@@ -422,9 +422,21 @@ impl Editor {
         // payload in an included file as it names one in the top file, the
         // reader allowing no two nodes one name across all of them. See
         // `crate::sim::Simulator::key_of`.
+        //
+        // A file shared by several configurations simulated together names
+        // each of the others' payloads with its `configuration`: those are
+        // theirs, kept and written back as they are, and not this one's to
+        // lack.
+        let ours = tcsprotocol::sim_config::configuration_name(&self.path);
         let stray: Vec<&String> = simulator
             .payloads
-            .keys()
+            .iter()
+            .filter(|(_, settings)| {
+                settings
+                    .get("configuration")
+                    .is_none_or(|said| *said == ours)
+            })
+            .map(|(name, _)| name)
             .filter(|name| {
                 !self.document.nodes.iter().any(|node| {
                     crate::pane::is_payload(&node.node_type)

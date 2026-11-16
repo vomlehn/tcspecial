@@ -512,13 +512,19 @@ fn the_simulator_schema_is_what_the_settings_say() {
                 "{section} has no {setting}: {said:?}"
             );
         }
-        // A payload is named by `payload`, and takes its group's settings
-        // for whatever it does not state; a group is named by `group`, which
-        // is all `group` is in a group.
+        // A payload is named by `payload`, takes its group's settings for
+        // whatever it does not state, and says which configuration it is a
+        // payload of in a file several share; a group is named by `group`,
+        // which is all `group` is in a group.
         let payload = section == "simulated_payloads";
         assert_eq!(said.contains("payload"), payload, "{section}: {said:?}");
+        assert_eq!(
+            said.contains("configuration"),
+            payload,
+            "{section}: {said:?}"
+        );
         assert!(said.contains("group"), "{section}: {said:?}");
-        let extra = if payload { 2 } else { 1 };
+        let extra = if payload { 3 } else { 1 };
         assert_eq!(
             said.len(),
             tcsprotocol::sim_config::SETTINGS.len() + extra,

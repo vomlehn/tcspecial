@@ -1107,6 +1107,22 @@ configurations, so the configurations name their payloads apart: a name
 that is a payload of two of them, or of none, is refused. One window shows
 every configuration's payloads, and <tt class="docutils literal"><span class="pre">--wait</span></tt> waits for a simulator given
 the same files in the same order.</p>
+<p>Each payload says whose it is with <tt class="docutils literal">configuration</tt>, the configuration
+file's name without its extension:</p>
+<pre class="code yaml literal-block">
+<span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">payload</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thruster_x</span><span class="whitespace">
+  </span><span class="name tag">configuration</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">lander-a</span><span class="whitespace">
+  </span><span class="name tag">connects</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">lander.throttle_x</span>
+</pre>
+<p>A tool reading the file with one configuration -- tcs-verify, tcs-moc, the
+configuration editor, or tcs-sim given that configuration alone -- takes
+that configuration's payloads and those naming none, and leaves the others'
+alone, so that they are not taken for payloads it lacks. With several
+configurations, a payload's <tt class="docutils literal">configuration</tt> must be the one it is a
+payload of. The shipped <tt class="docutils literal"><span class="pre">examples/lander-common/lander-sim.yaml</span></tt>, shared
+by <tt class="docutils literal"><span class="pre">lander-a</span></tt> and <tt class="docutils literal"><span class="pre">lander-b</span></tt>, is written this way. A file used by one
+configuration, or by several with the same payloads, as the thermostat's
+below is, needs none.</p>
 <p>A simulated triggered payload sends one packet for each request it is sent and
 nothing otherwise. The segment settings still apply to it -- how a payload
 divides an answer is its own business however it was prompted -- but the packet

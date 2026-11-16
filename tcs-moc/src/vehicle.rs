@@ -860,6 +860,13 @@ pub(crate) fn consolidated_of(graph: &Graph) -> Arc<BTreeMap<String, Layout>> {
 fn anything_simulated(graph: &Graph, sim_path: Option<&str>) -> bool {
     sim_path
         .and_then(|path| SimConfigFile::load(path).ok())
+        .map(|sim| match graph.files.first() {
+            // A shared file's other configurations' payloads are theirs.
+            Some(top) => sim.for_configuration(
+                &tcsprotocol::sim_config::configuration_name(top),
+            ),
+            None => sim,
+        })
         .and_then(|sim| {
             tcsprotocol::graph::simulated::handlers(graph, &sim).ok()
         })

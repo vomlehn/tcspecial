@@ -810,6 +810,25 @@ that is a payload of two of them, or of none, is refused. One window shows
 every configuration's payloads, and ``--wait`` waits for a simulator given
 the same files in the same order.
 
+Each payload says whose it is with ``configuration``, the configuration
+file's name without its extension:
+
+.. code-block:: yaml
+
+   - payload: thruster_x
+     configuration: lander-a
+     connects: lander.throttle_x
+
+A tool reading the file with one configuration -- tcs-verify, tcs-moc, the
+configuration editor, or tcs-sim given that configuration alone -- takes
+that configuration's payloads and those naming none, and leaves the others'
+alone, so that they are not taken for payloads it lacks. With several
+configurations, a payload's ``configuration`` must be the one it is a
+payload of. The shipped ``examples/lander-common/lander-sim.yaml``, shared
+by ``lander-a`` and ``lander-b``, is written this way. A file used by one
+configuration, or by several with the same payloads, as the thermostat's
+below is, needs none.
+
 A simulated triggered payload sends one packet for each request it is sent and
 nothing otherwise. The segment settings still apply to it -- how a payload
 divides an answer is its own business however it was prompted -- but the packet

@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- What the vehicle sends the ground, flying the configuration
+     lander-b: each node whose data reaches it, as a parameter named
+     for the node, of the type the node sends, in a container of its own.
+     Each attribute a command binding sets is a command, as the SET_NODE
+     that sets it goes, its value an argument of the attribute's type.
+     The types are tcsprotocol/xtce/types.xtce's, copied: a string or bytes
+     after a 32-bit count of its bytes, as each is sent where the ground
+     decodes it by XTCE (under Yamcs). Where no XTCE decodes it, the count
+     is sent in groups of seven bits instead, least significant first, each
+     in a byte whose top bit says another follows. How each gateway frames
+     what it sends is the ground station's to add.
+
+     Written by tcs-verify, asked for it by its xtce option, from the
+     configuration and types.xtce, and not to be edited: see "The
+     configuration's own XTCE" in tcspecial's docs/tcspecial-design.rst. -->
+<SpaceSystem xmlns="http://www.omg.org/spec/XTCE/20250214" name="lander-b">
+  <TelemetryMetaData>
+    <ParameterTypeSet>
+      <FloatParameterType name="metre" sizeInBits="64"
+          shortDescription="Length: an altitude, a distance.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">metres</AncillaryData>
+          <AncillaryData name="tcspecial.step">millimetres</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>m</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <FloatParameterType name="metre_per_second" sizeInBits="64"
+          shortDescription="Speed.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">metres a second</AncillaryData>
+          <AncillaryData
+              name="tcspecial.step">micro-metres a second</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>m/s</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <FloatParameterType name="metre_per_second_squared" sizeInBits="64"
+          shortDescription="Acceleration.">
+        <AncillaryDataSet>
+          <AncillaryData
+              name="tcspecial.name">metres a second a second</AncillaryData>
+          <AncillaryData
+              name="tcspecial.step">micro-metres a second a second</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>m/s2</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <FloatParameterType name="ratio" sizeInBits="64"
+          shortDescription="A fraction of a whole: a charge, a throttle.">
+        <AncillaryDataSet>
+          <AncillaryData name="tcspecial.name">a ratio</AncillaryData>
+          <AncillaryData name="tcspecial.step">millionths</AncillaryData>
+        </AncillaryDataSet>
+        <UnitSet>
+          <Unit>ratio</Unit>
+        </UnitSet>
+        <IntegerDataEncoding sizeInBits="32" encoding="twosComplement">
+          <DefaultCalibrator>
+            <PolynomialCalibrator>
+              <Term coefficient="0.000001" exponent="1"/>
+            </PolynomialCalibrator>
+          </DefaultCalibrator>
+        </IntegerDataEncoding>
+      </FloatParameterType>
+      <IntegerParameterType name="bytes_length" signed="false"
+          sizeInBits="32">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="4096"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="bytes">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="bytes_length"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
+    </ParameterTypeSet>
+    <ParameterSet>
+      <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
+      <Parameter name="acceleration_y"
+          parameterTypeRef="metre_per_second_squared"/>
+      <Parameter name="crashed" parameterTypeRef="bytes"/>
+      <Parameter name="joystick_y" parameterTypeRef="ratio"/>
+      <Parameter name="landed" parameterTypeRef="bytes"/>
+      <Parameter name="velocity_y" parameterTypeRef="metre_per_second"/>
+      <Parameter name="y" parameterTypeRef="metre"/>
+    </ParameterSet>
+    <ContainerSet>
+      <SequenceContainer name="acceleration_y_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="acceleration_y"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="crashed_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="bytes_length"/>
+          <ParameterRefEntry parameterRef="crashed"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="joystick_y_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="joystick_y"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="landed_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="bytes_length"/>
+          <ParameterRefEntry parameterRef="landed"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="velocity_y_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="velocity_y"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="y_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="y"/>
+        </EntryList>
+      </SequenceContainer>
+    </ContainerSet>
+  </TelemetryMetaData>
+</SpaceSystem>

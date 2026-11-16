@@ -65,12 +65,16 @@ class WriteYamcsTest(unittest.TestCase):
     """The Yamcs configuration written from the templates."""
 
     def setUp(self):
-        import tempfile
+        # Each removed as the test ends, passed or failed, as a
+        # TemporaryDirectory would be: mkdtemp leaves that to its caller.
         self.home = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
         (self.home / "etc").mkdir()
         (self.home / "etc" / "processor.yaml.sample").write_text(
             'args:\n  stream: "tc_realtime"\n')
-        self.run = Path(tempfile.mkdtemp()) / "run"
+        runs = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, runs, ignore_errors=True)
+        self.run = runs / "run"
 
     def test_every_template_name_is_filled_in(self):
         setup = ping_yamcs.Setup(options())

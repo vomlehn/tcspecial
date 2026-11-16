@@ -14,16 +14,18 @@
 //!
 //! What the supervisor does next, by how the child ended:
 //!
-//! * [`GOOD`], having been told to stop: it stops too.
+//! * [`GOOD`], having been told to stop, or SIGINT or SIGTERM, which ends
+//!   only a child about to exit for a restart, a stop that arrived as it
+//!   went: it stops too.
 //! * [`RESTART`], having taken a RESTART, which pushed what it named: it
 //!   starts a child on the new top.
 //! * [`FATAL`]: it stops, saying so, the stack unchanged.
-//! * [`BAD`], any other status, or a signal: it pops the top, unless it is
-//!   the bottom, and starts a child on what is then the top. The bottom,
-//!   which nothing pops, is started again after a delay that doubles at
-//!   each failure; on a desk, under `--simulate`, a bottom that fails stops
-//!   the supervisor instead, since nothing on a desk is helped by trying
-//!   for ever.
+//! * [`BAD`], any other status, or any other signal: it pops the top,
+//!   unless it is the bottom, and starts a child on what is then the top.
+//!   The bottom, which nothing pops, is started again after a delay that
+//!   doubles at each failure; on a desk, under `--simulate`, a bottom that
+//!   fails stops the supervisor instead, since nothing on a desk is helped
+//!   by trying for ever.
 //!
 //! Before each child the supervisor counts an attempt on the top, in the
 //! state file, and pops a top whose attempts have reached `load_trials`:
@@ -316,6 +318,27 @@ enum Ended {
     Signalled(i32),
 }
 
+/// Says whether a child that ended so was stopped.
+///
+/// SIGINT and SIGTERM are taken by a thread of the child's own, and end it
+/// only once it is about to exit for a restart, when a stop that arrives
+/// must be turned into one rather than lost: see
+/// [`crate::runtime::signals::before_exec`].
+///
+/// # Arguments
+///
+/// * `ended` - How it ended.
+///
+/// # Returns
+///
+/// Whether it exited with [`GOOD`] or was ended by SIGINT or SIGTERM.
+fn stopped(ended: Ended) -> bool {
+    matches!(
+        ended,
+        Ended::Exited(GOOD) | Ended::Signalled(libc::SIGINT | libc::SIGTERM)
+    )
+}
+
 /// Waits for `pid` to end, passing SIGINT and SIGTERM on to it.
 ///
 /// # Arguments
@@ -474,14 +497,18 @@ pub fn run(path: &str, mode: Mode) -> i32 {
         let ended = wait_for(pid, &mut stopping);
         if stopping {
             info!("supervisor: stopped, child {pid} {ended:?}");
-            return if ended == Ended::Exited(GOOD) {
-                GOOD
-            } else {
-                BAD
-            };
+            return if stopped(ended) { GOOD } else { BAD };
+        }
+        if stopped(ended) {
+            if ended != Ended::Exited(GOOD) {
+                info!(
+                    "supervisor: child {pid} {ended:?} as it went to restart: \
+                     stopping"
+                );
+            }
+            return GOOD;
         }
         match ended {
-            Ended::Exited(GOOD) => return GOOD,
             Ended::Exited(RESTART) => {
                 info!("supervisor: child {pid} took a RESTART");
                 delay = FIRST_DELAY;
@@ -593,6 +620,19 @@ mod tests {
         assert_eq!(after_bad(&mut state), Some(ONE));
         assert_eq!(after_bad(&mut state), None);
         assert!(state.stack.is_empty());
+    }
+
+    /// A good exit, SIGINT and SIGTERM are stops; any other signal, and
+    /// any other status, are not.
+    #[test]
+    fn a_stop_signal_is_a_stop() {
+        assert!(stopped(Ended::Exited(GOOD)));
+        assert!(stopped(Ended::Signalled(libc::SIGTERM)));
+        assert!(stopped(Ended::Signalled(libc::SIGINT)));
+        assert!(!stopped(Ended::Signalled(libc::SIGSEGV)));
+        assert!(!stopped(Ended::Signalled(libc::SIGKILL)));
+        assert!(!stopped(Ended::Exited(RESTART)));
+        assert!(!stopped(Ended::Exited(BAD)));
     }
 
     /// The four statuses are four numbers.

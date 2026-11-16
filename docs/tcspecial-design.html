@@ -5037,14 +5037,16 @@ stop that arrives just as the child exits for the restart must still be
 seen. Before the child exits for the restart it ends that thread, so that
 nothing takes either signal from then on, and looks whether one was taken
 or is pending: if so it exits with the good status, as a stopped child
-does, and the supervisor stops rather than starting another. A stop sent to
-the supervisor itself, which is where a service manager sends one, is
-passed on to the child, and the supervisor stops whatever the child exits
-with. Either way the vehicle stops. One gap is left: a stop sent to the
-child alone, after it has looked and before it has exited, ends with the
-child and is not seen, and the supervisor starts the RESTART's target. A
-stop sent to the supervisor, or to both, as systemd sends one to every
-process of a service, is not affected.</p>
+does, and the supervisor stops rather than starting another. If not, it
+gives the two signals back their default action and unblocks them in the
+thread that is to exit, so that one arriving after the look, until the
+child has exited, ends it by that signal; a pending one would otherwise be
+lost with the child. The supervisor takes a child ended by SIGINT or
+SIGTERM as stopped, which it can, because the child's own thread takes
+those two at every other time. A stop sent to the supervisor itself, which
+is where a service manager sends one, is passed on to the child, and the
+supervisor stops whatever the child exits with. Either way the vehicle
+stops, wherever the stop was sent.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Every program tcspecial starts -- an app node's, a <tt class="docutils literal">process</tt> node's,

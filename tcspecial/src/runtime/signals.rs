@@ -16,9 +16,13 @@
 //! into a stop. A child about to exit for a restart first ends that thread
 //! ([`before_exec`]) and looks at what is pending: a stop taken or pending
 //! then makes the exit a good one, and the supervisor stops rather than
-//! starting another. A stop sent to the supervisor itself, which is where a
-//! service manager sends one, is passed on to the child and stops the
-//! supervisor whatever the child exits with.
+//! starting another. Having looked, it gives the two back their default
+//! action and unblocks them, so that one arriving after the look and before
+//! the exit ends the child by that signal, which the supervisor takes as a
+//! stop too: nothing is left between the look and the exit for a stop to be
+//! lost in. A stop sent to the supervisor itself, which is where a service
+//! manager sends one, is passed on to the child and stops the supervisor
+//! whatever the child exits with.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -141,7 +145,10 @@ pub fn listening() -> bool {
 ///
 /// For a restart, just before the child exits for one: a stop asked for is
 /// one the restart is turned into, since a vehicle somebody asked to stop
-/// must stop.
+/// must stop. Where none has been, the two signals are given back their
+/// default action and unblocked in this thread, so that one arriving from
+/// here to the exit ends the process by that signal, which the supervisor
+/// takes as a stop, rather than staying pending and being lost with it.
 ///
 /// # Returns
 ///
@@ -149,6 +156,7 @@ pub fn listening() -> bool {
 pub fn before_exec() -> bool {
     ENDING.store(true, Ordering::SeqCst);
     let thread = THREAD.lock().ok().and_then(|mut held| held.take());
+    let took = thread.is_some();
     if let Some(thread) = thread {
         let _ = thread.join();
     }
@@ -163,6 +171,82 @@ pub fn before_exec() -> bool {
     let asked = SIGNALLED.load(Ordering::SeqCst) || pending;
     if asked {
         info!("a stop was asked for as the restart was under way: stopping");
+    } else if took {
+        // Only where this process took the signals: a test that never did
+        // keeps whatever its harness set.
+        unblock_default();
     }
     asked
+}
+
+/// Gives the two signals their default action, which ends the process, and
+/// unblocks them in this thread, the one that is to exit.
+///
+/// The other threads keep their block, so a stop sent to the process is
+/// handed to this one, and ends it however little of the exit is left. One
+/// that arrived since [`before_exec`] looked is pending, and is handed over
+/// as the block is lifted.
+fn unblock_default() {
+    let set = stop_signals();
+    // SAFETY: setting two signals to their default action, which installs no
+    // handler, and unblocking them in the calling thread, with a set that
+    // lives across the call.
+    unsafe {
+        libc::signal(libc::SIGINT, libc::SIG_DFL);
+        libc::signal(libc::SIGTERM, libc::SIG_DFL);
+        libc::pthread_sigmask(libc::SIG_UNBLOCK, &set, std::ptr::null_mut());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::Command;
+
+    /// Set in the environment of the copy of this test that is to be
+    /// stopped, as the restart's child would be.
+    const CHILD: &str = "TCS_SIGNALS_TEST_CHILD";
+
+    /// What the copy exits with if a stop is lost.
+    const LOST: i32 = 3;
+
+    /// Asks a loop to stop; there is none here.
+    fn nothing() {}
+
+    /// A stop that arrives after the restart has looked, and before the
+    /// child exits, ends the child by that signal rather than being lost
+    /// with it.
+    ///
+    /// The test runs itself again as a child, since what it checks ends a
+    /// process. The copy takes the signals as a vehicle does, looks as a
+    /// restart does, and then is sent SIGTERM -- to its own thread, so that
+    /// none of the test harness's threads, which have no block, takes it --
+    /// and exits as for a restart. It must die of the SIGTERM.
+    #[test]
+    fn a_stop_after_the_look_is_not_lost() {
+        if std::env::var_os(CHILD).is_some() {
+            start(nothing);
+            assert!(!before_exec(), "no stop has been asked for yet");
+            // SAFETY: a signal sent to this thread, and an exit that runs
+            // nothing more of this process.
+            unsafe {
+                libc::pthread_kill(libc::pthread_self(), libc::SIGTERM);
+                libc::_exit(LOST);
+            }
+        }
+        let name =
+            concat!(module_path!(), "::a_stop_after_the_look_is_not_lost");
+        let name = name.split_once("::").map(|(_, rest)| rest).unwrap_or(name);
+        let status = Command::new(std::env::current_exe().expect("this test"))
+            .args(["--exact", name, "--test-threads=1", "--nocapture"])
+            .env(CHILD, "1")
+            .status()
+            .expect("the copy runs");
+        assert_eq!(
+            status.signal(),
+            Some(libc::SIGTERM),
+            "the stop was lost: the copy {status}"
+        );
+    }
 }

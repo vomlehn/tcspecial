@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 name = "tcspecial-moc"
 # The workspace's version, [workspace.package] in ../Cargo.toml.
 # tests/test_version.py fails when the two differ.
-version = "0.2.1"
+version = "0.3.0"
 description = """\
 The Python spelling of tcspecial's ground libraries: beacons and \
 configurations"""

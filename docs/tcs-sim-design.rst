@@ -1447,7 +1447,7 @@ that many panels' width plus the chrome, the window arrives at the same count.
 A panel is as wide as the widest of the window's payloads wants: its heading,
 the payload's name and number, is the one line it does not end with an
 ellipsis. With panels at their narrowest, as wide as their buttons, four
-payloads give a row of three and a row of one in a 584x483 window; their names
+payloads give a row of three and a row of one in a 584x462 window; their names
 make it wider. The size is the one ``window_size`` gives, which a test reads out
 of this document so that the number here cannot quietly stop being the one the
 program opens at.

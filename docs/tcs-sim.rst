@@ -1041,8 +1041,8 @@ window, drawn without opening it.
 **Enabling a sensor**
 
 #. .. figure:: shots/tcs-sim-open.png
-      :alt: The tcs-sim window on the thermostat example: the heading
-            Simulated Payloads, two rows of panels -- gpio-out-tmass1,
+      :alt: The tcs-sim window on the thermostat example: two rows of
+            panels -- gpio-out-tmass1,
             gpio-out-tmass2 and temp_1, then temp_2 and temp_3 -- each
             Stopped, with an Enable button, and Quit All at the foot.
 

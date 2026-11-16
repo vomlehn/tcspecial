@@ -412,15 +412,14 @@ export component MainWindow inherits Window {
     // The least the window is tall for the lander's pane, which the panels
     // beside it may not be.
     out property <length> least-height: root.lander-height
-        + outer.padding * 2 + heading.height + quit-row.height;
+        + outer.padding * 2 + quit-row.height;
 
     // Everything the window needs besides the panels: the padding round the
-    // whole of it, the heading, the row holding the quit button, and the
-    // grid's own padding inside the scrolling area.
+    // whole of it, the row holding the quit button, and the grid's own
+    // padding inside the scrolling area.
     out property <length> chrome-width: outer.padding * 2 + grid.padding * 2
         + root.lander-width;
     out property <length> chrome-height: outer.padding * 2
-        + heading.height
         + quit-row.height
         + grid.padding * 2;
 
@@ -428,14 +427,6 @@ export component MainWindow inherits Window {
     outer := VerticalLayout {
         padding: 2px;
         spacing: 0px;
-
-        heading := Text {
-            text: "Simulated Payloads";
-            font-size: SimFonts.heading;
-            height: self.preferred-height;
-            font-weight: 700;
-            horizontal-alignment: center;
-        }
 
         // The lander's pane, where there is one, and the panels beside it.
         HorizontalLayout {

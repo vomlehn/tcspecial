@@ -1008,10 +1008,10 @@ Requirement
 How large a datum may be
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-**Planned** (2026-11-14); not built. Until it is, a datum is at most
-``tcsprotocol::DATUM_BYTES``, 4,096 bytes, fixed when tcspecial is built,
-every node's buffers are that size, and the requirements elsewhere that
-name it hold.
+**Built** (2026-11-14): see the note at the end of this section. Before it
+a datum was at most ``tcsprotocol::DATUM_BYTES``, 4,096 bytes, fixed when
+tcspecial was built, and every node's buffers were that size; that constant
+is gone.
 
 Requirement
     No datum is longer than one datagram of the link it crosses carries: a
@@ -1038,7 +1038,8 @@ Requirement
     a node's buffers can be sized from it.
 
     **Built** (2026-11-14): ``string(<most>)`` and ``bytes(<most>)``, held
-    to for now by ``DATUM_BYTES``; the warning, aboard and in tcs-verify;
+    to the most any datum may be (``graph::largest::MOST_ANY``) and to the
+    gateway's own; the warning, aboard and in tcs-verify;
     and ``--fatal-warnings``. tcs-xtce takes the same flag for its own
     warning, an XTCE string or binary type with no most.
 
@@ -10227,9 +10228,12 @@ network node whose protocol is ``tcp`` or ``unix_stream``.
 +---------------+----------+--------------------------------------------------+
 
 Requirement
-    A line specifies the maximum read length, and it is at most a datum's,
-    ``tcsprotocol::DATUM_BYTES``: a read is delivered whole, and one longer
-    than a datum would arrive cut short, as pieces nothing knows how to put back
+    A line specifies the maximum read length, and it is at most what a datum
+    may be: the most any datum may be on any link,
+    ``graph::largest::MOST_ANY``, one UDP datagram over IPv6, and the most
+    the gateway's own link carries, which may be less (see `How large a
+    datum may be`_). A read is delivered whole, and one longer than a datum
+    would arrive cut short, as pieces nothing knows how to put back
     together.
 
 Requirement

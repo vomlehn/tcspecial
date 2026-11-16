@@ -85,6 +85,30 @@ pub const LOOK_AHEAD: f64 = 0.5;
 /// throttled no lower than about a tenth.
 pub const LEAST_THROTTLE: f64 = 0.1;
 
+/// The throttles a lander's engines burn at, from those it is given: across
+/// within minus one and one; up within nought and one, the lander having
+/// its engine on its bottom and nothing on its top to push it down, and,
+/// lit, no lower than [`LEAST_THROTTLE`].
+///
+/// # Arguments
+///
+/// * `x` - The X throttle it is given.
+/// * `y` - The Y throttle it is given.
+///
+/// # Returns
+///
+/// The X and Y throttles it burns at, each a share of that axis's full
+/// thrust.
+pub fn throttles(x: f64, y: f64) -> Point {
+    let up = y.clamp(0.0, 1.0);
+    let up = if up > 0.0 {
+        up.max(LEAST_THROTTLE)
+    } else {
+        0.0
+    };
+    (x.clamp(-1.0, 1.0), up)
+}
+
 /// How close, in seconds, the moment of touchdown is found.
 pub const FOUND_WITHIN: f64 = 1e-4;
 
@@ -478,17 +502,7 @@ impl Lander {
 
 impl Component for Lander {
     fn hold(&mut self, inputs: &[f64]) {
-        // A throttle opens no further than fully: either way across, and up
-        // only, the lander having its engine on its bottom and nothing on its
-        // top to push it down.
-        // And the bottom engine, lit, burns no lower than its floor.
-        let up = inputs[THROTTLE_Y].clamp(0.0, 1.0);
-        let up = if up > 0.0 {
-            up.max(LEAST_THROTTLE)
-        } else {
-            0.0
-        };
-        self.throttle = (inputs[THROTTLE_X].clamp(-1.0, 1.0), up);
+        self.throttle = throttles(inputs[THROTTLE_X], inputs[THROTTLE_Y]);
         // Driven to a new value other than nought, it starts again now,
         // however it is: the world has brought it to this moment first.
         let restart = inputs[RESTART];

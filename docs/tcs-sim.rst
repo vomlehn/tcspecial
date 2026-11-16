@@ -1056,9 +1056,11 @@ At the foot of the pane are two buttons:
 Each of the lander's engines shows a plume while it fires -- the bottom
 engine's below its nozzle, a side thruster's out of the body's side, away
 from the way it pushes -- a warm off-white core in a pale orange glow,
-longer and brighter the harder it fires, as its thrust is worked out from
-the lander's acceleration and mass; none once the fuel is gone, nor
-while the lander stands on the pad or has crashed.
+longer and brighter the harder it fires, as its throttle says: the
+joystick's value as the vehicle passes it on to the thruster, as the
+engine burns it, so that the bottom engine, lit, shows no less than a
+tenth. None shows once the fuel is gone or the lander has crashed;
+standing on the pad, a plume shows while its engine burns.
 
 A crash on the display explodes. A fireball, its size in proportion to the
 fuel left, swells from the lower part of the lander and fades over the

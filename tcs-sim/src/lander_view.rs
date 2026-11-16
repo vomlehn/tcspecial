@@ -28,13 +28,17 @@ use tcsprotocol::node::physics::lander::{Point, Resolved};
 use tcsprotocol::node::physics::{Place, Resolution};
 use tcsprotocol::sim_config::SimConfigFile;
 
+use crate::node::physics::lander::throttles;
 use crate::node::physics::sky::{ground_at, stars};
 use crate::node::physics::world::World;
 use crate::payload::PayloadConfig;
 use crate::{LanderProbe, LanderScene, MainWindow};
 
-/// The lander's outputs' places, in
-/// `tcsprotocol::node::physics::lander::TERMINALS`'s order.
+/// The lander's terminals' places, in
+/// `tcsprotocol::node::physics::lander::TERMINALS`'s order: its throttles,
+/// inputs, and its outputs.
+const THROTTLE_X: usize = 0;
+const THROTTLE_Y: usize = 1;
 const X: usize = 2;
 const Y: usize = 3;
 const VELOCITY_X: usize = 4;
@@ -935,18 +939,20 @@ fn plume(
     )
 }
 
-/// The plumes of the lander's engines, as its outputs say they are firing:
+/// The plumes of the lander's engines, as its throttles say they are firing:
 /// the bottom engine's out of the nozzle's foot, pointing down, and a side
 /// thruster's out of the body's side, the left one firing to push it right
 /// and the right one to push it left. Each is as long as its thrust is a
-/// share of its full thrust, worked out from the lander's acceleration and
-/// its mass, so that a plume goes out with the fuel; none while it is
-/// down.
+/// share of its full thrust: its throttle, the joystick's value as the
+/// vehicle passes it on, as the engines burn it. None once the fuel is
+/// gone or the lander has crashed; standing on the pad, a plume shows
+/// while its engine burns.
 ///
 /// # Arguments
 ///
 /// * `f`   - The lander's figures.
-/// * `out` - Its terminals' values, in its type's order.
+/// * `out` - Its terminals' values, in its type's order, its throttles
+///           what they are held at.
 ///
 /// # Returns
 ///
@@ -960,13 +966,10 @@ pub fn plumes(f: &Resolved, out: &[f64]) -> ([String; 4], f32, f32) {
             0.0,
         )
     };
-    if out[LANDED] > 0.5 || out[CRASHED] > 0.5 {
+    if out[CRASHED] > 0.5 || out[FUEL] <= 0.0 {
         return none();
     }
-    let mass = f.dry_mass + out[FUEL].clamp(0.0, 1.0) * f.fuel;
-    let down = (out[ACCELERATION_Y] + f.gravity) * mass / f.thrust_y;
-    let across = out[ACCELERATION_X] * mass / f.thrust_x;
-    let (down, across) = (down.clamp(0.0, 1.0), across.clamp(-1.0, 1.0));
+    let (across, down) = throttles(out[THROTTLE_X], out[THROTTLE_Y]);
     let place = (out[X], out[Y]);
     let shapes = shape_bounds(f);
     let Some(&(left, right, bottom, top)) =
@@ -1962,11 +1965,13 @@ pub(crate) mod tests {
     }
 
     /// A plume is as long as its engine's thrust is a share of its full
-    /// thrust, worked out from the acceleration and the mass; there is none
-    /// for no thrust or once the lander is down; and a push right fires from
-    /// the body's left, a push left from its right.
+    /// thrust, as its throttle says, the bottom engine no less than its
+    /// floor once lit; there is none for no thrust, an empty tank or a
+    /// crash, but there is on the pad; and a push right fires from the
+    /// body's left, a push left from its right.
     #[test]
     fn the_plumes_follow_the_thrust() {
+        use crate::node::physics::lander::LEAST_THROTTLE;
         let outline =
             tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
                 .expect("the outline reads");
@@ -1979,13 +1984,12 @@ pub(crate) mod tests {
             outline,
             ..figures()
         };
-        let mass = 6000.0;
         let mut out = vec![0.0; 11];
         out[X] = 500.0;
         out[Y] = 300.0;
         out[FUEL] = 1.0;
         // Full thrust up, none across.
-        out[ACCELERATION_Y] = 48000.0 / mass - 1.62;
+        out[THROTTLE_Y] = 1.0;
         let ([glow, core, side, _], main, across) = plumes(&f, &out);
         assert!(!glow.is_empty() && !core.is_empty());
         assert!((main - 1.0).abs() < 1e-6 && across == 0.0);
@@ -1997,18 +2001,35 @@ pub(crate) mod tests {
         );
 
         // Falling with no thrust: no plume.
-        out[ACCELERATION_Y] = -1.62;
+        out[THROTTLE_Y] = 0.0;
         let ([glow, ..], main, _) = plumes(&f, &out);
         assert!(glow.is_empty() && main == 0.0);
 
+        // A touch up burns at the bottom engine's floor.
+        out[THROTTLE_Y] = 0.01;
+        let (_, main, _) = plumes(&f, &out);
+        assert!((f64::from(main) - LEAST_THROTTLE).abs() < 1e-6, "{main}");
+        out[THROTTLE_Y] = 0.0;
+
         // Half a push right: the left thruster, its plume blowing left.
-        out[ACCELERATION_X] = 0.5 * 12000.0 / mass;
+        out[THROTTLE_X] = 0.5;
         let ([_, _, side, _], _, across) = plumes(&f, &out);
         assert!((across - 0.5).abs() < 1e-6);
         let left_edge = format!("{:.2}", 500.0 - 11.0 - 10.0);
         assert!(side.contains(&left_edge), "{side}");
 
-        // Down: nothing, whatever the accelerations say.
+        // Standing on the pad, the engines still show as they burn.
+        out[LANDED] = 1.0;
+        out[THROTTLE_Y] = 0.5;
+        let ([glow, ..], main, _) = plumes(&f, &out);
+        assert!(!glow.is_empty() && (main - 0.5).abs() < 1e-6);
+
+        // The tank dry, or crashed: nothing, whatever the throttles say.
+        out[LANDED] = 0.0;
+        out[FUEL] = 0.0;
+        let ([glow, _, side, _], _, _) = plumes(&f, &out);
+        assert!(glow.is_empty() && side.is_empty());
+        out[FUEL] = 1.0;
         out[CRASHED] = 1.0;
         let ([glow, _, side, _], _, _) = plumes(&f, &out);
         assert!(glow.is_empty() && side.is_empty());

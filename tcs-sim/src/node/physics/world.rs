@@ -323,9 +323,9 @@ impl World {
         self.driven.notify_all();
     }
 
-    /// Says what every output of a component is, for a window watching the
-    /// world: at a moment of the wall clock once the run has begun, and as
-    /// the world stands before it, without beginning it.
+    /// Says what every terminal of a component is, for a window watching
+    /// the world: at a moment of the wall clock once the run has begun, and
+    /// as the world stands before it, without beginning it.
     ///
     /// # Arguments
     ///
@@ -334,15 +334,20 @@ impl World {
     ///
     /// # Returns
     ///
-    /// One value for each of its type's terminals, in its type's order: an
-    /// output's value in its unit, nought for an input.
+    /// One value for each of its type's terminals, in its type's order, in
+    /// its unit: an output's value, and what an input is held at.
     pub fn glance_component(&self, component: usize, now: Instant) -> Vec<f64> {
         let mut state = self.held();
         if let Some(seconds) = self.clock.started_at(now) {
             self.advance_to(&mut state, seconds);
         }
-        (0..self.terminals[component].len())
-            .map(|terminal| state.components[component].output(terminal))
+        self.terminals[component]
+            .iter()
+            .enumerate()
+            .map(|(terminal, kind)| match kind.direction {
+                Direction::In => state.inputs[component][terminal],
+                _ => state.components[component].output(terminal),
+            })
             .collect()
     }
 

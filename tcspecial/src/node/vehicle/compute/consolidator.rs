@@ -2,12 +2,14 @@
 //! ground as one datum. See "Compute elements" in the design, and
 //! `tcsprotocol::consolidation`, which lays the datum out.
 //!
-//! It holds, for each input, the latest reading and whether it is new,
-//! held or none, in storage sized when the configuration is loaded. A
-//! reading that arrives replaces the one held; one that is not of its
-//! input's type -- a boolean that is neither 0 nor 1 among them -- is
-//! refused and counted, and the reading held before it stands. What arrives
-//! at its `moc-in` asks for a datum.
+//! It holds, for each input, its value -- its default until a reading
+//! arrives, and then its latest reading -- in storage sized when the
+//! configuration is loaded, and whether that value is new, held or the
+//! default. That is for its triggers and its counters alone: the datum
+//! carries the values and nothing else. A reading that arrives replaces the
+//! value held; one that is not of its input's type -- a boolean that is
+//! neither 0 nor 1 among them -- is refused and counted, and the value held
+//! before it stands. What arrives at its `moc-in` asks for a datum.
 //!
 //! It sends at the end of a pass, never at the arrival that fired a
 //! trigger, so that a datum holds every reading of the pass: see
@@ -18,20 +20,32 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use tcsprotocol::consolidation::{Layout, Shape, State};
+use tcsprotocol::consolidation::Layout;
 use tcsprotocol::node::vehicle::compute::{ConsolidatorParams, Triggers};
 
 use crate::runtime::fabric::{Arriving, Port, Taken};
 use crate::runtime::node_state::ConsolidatorCounters;
 
-/// One input's latest reading.
+/// What an input's value is, since the last datum: what its triggers and
+/// counters go by, and never sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fresh {
+    /// A reading arrived since the last datum.
+    New,
+    /// The reading went in a datum before, and none has arrived since.
+    Held,
+    /// No reading has arrived at all: its value is its default.
+    Default,
+}
+
+/// One input's value.
 struct Held {
-    /// The reading, in storage as long as the input's most.
+    /// The value, in storage as long as the input's most.
     bytes: Vec<u8>,
     /// How many of `bytes` it is.
     len: usize,
-    /// Whether it is new, held, or none.
-    state: State,
+    /// Whether it is new, held, or the default.
+    fresh: Fresh,
 }
 
 /// A consolidator, as the fabric holds it.
@@ -57,7 +71,7 @@ pub struct ConsolidatorPort {
 }
 
 impl ConsolidatorPort {
-    /// Makes a consolidator with nothing arrived: every input none.
+    /// Makes a consolidator with nothing arrived: every input its default.
     ///
     /// # Arguments
     ///
@@ -92,14 +106,12 @@ impl ConsolidatorPort {
             .inputs
             .iter()
             .map(|input| {
-                let most = match input.shape {
-                    Shape::Counted { most, .. } => most,
-                    Shape::Fixed(_) => input.fixed_link_bytes().unwrap_or(0),
-                };
+                let mut bytes = vec![0; input.largest_link_bytes()];
+                bytes[..input.default.len()].copy_from_slice(&input.default);
                 Held {
-                    bytes: vec![0; most],
-                    len: 0,
-                    state: State::None,
+                    bytes,
+                    len: input.default.len(),
+                    fresh: Fresh::Default,
                 }
             })
             .collect();
@@ -131,8 +143,8 @@ impl ConsolidatorPort {
     ///
     /// The triggers that fired: a datum is sent where any did.
     fn fires(&mut self, now: Instant) -> Triggers {
-        let any_new = self.held.iter().any(|held| held.state == State::New);
-        let all_new = self.held.iter().all(|held| held.state == State::New);
+        let any_new = self.held.iter().any(|held| held.fresh == Fresh::New);
+        let all_new = self.held.iter().all(|held| held.fresh == Fresh::New);
         let mut fired = Triggers {
             all_new: self.send.all_new && all_new,
             interval: false,
@@ -187,7 +199,7 @@ impl Port for ConsolidatorPort {
         let held = &mut self.held[at];
         held.bytes[..data.len()].copy_from_slice(data);
         held.len = data.len();
-        held.state = State::New;
+        held.fresh = Fresh::New;
         Ok(())
     }
 
@@ -235,27 +247,25 @@ impl Port for ConsolidatorPort {
         if !(fired.all_new || fired.interval || fired.moc) {
             return Ok(0);
         }
-        // Each input's state and reading, on the stack: at most as many as
-        // a configuration lets a consolidator have.
-        let mut readings: [(State, &[u8]); MOST_INPUTS] =
-            [(State::None, &[]); MOST_INPUTS];
-        for (slot, held) in readings.iter_mut().zip(&self.held) {
-            *slot = (held.state, &held.bytes[..held.len]);
+        // Each input's value, on the stack: at most as many as a
+        // configuration lets a consolidator have.
+        let mut values: [&[u8]; MOST_INPUTS] = [&[]; MOST_INPUTS];
+        for (slot, held) in values.iter_mut().zip(&self.held) {
+            *slot = &held.bytes[..held.len];
         }
-        let used = self
-            .layout
-            .pack(&readings[..self.held.len()], out)
-            .map_err(|at| {
+        let used = self.layout.pack(&values[..self.held.len()], out).map_err(
+            |at| {
                 format!(
                     "\"{}\": input \"{}\" could not be packed",
                     self.what, self.layout.inputs[at].name
                 )
-            })?;
+            },
+        )?;
         self.counters
-            .sent(fired, self.held.iter().map(|held| held.state));
+            .sent(fired, self.held.iter().map(|held| held.fresh));
         for held in &mut self.held {
-            if held.state == State::New {
-                held.state = State::Held;
+            if held.fresh == Fresh::New {
+                held.fresh = Fresh::Held;
             }
         }
         self.asked = false;
@@ -281,28 +291,30 @@ pub const MOST_INPUTS: usize = 256;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcsprotocol::consolidation::{Input, InputCounts};
+    use tcsprotocol::consolidation::{Input, InputCounts, Shape};
     use tcsprotocol::link_type::{Basic, LinkType};
 
-    /// A consolidator of two `u8`s, sending as `send` says, every second
-    /// where it names interval.
+    /// A consolidator of two `u8`s, `a` defaulting to 0xaa and `b` to 0xbb,
+    /// sending as `send` says, every second where it names interval.
     fn port(send: &str, now: Instant) -> ConsolidatorPort {
-        let input = |name: &str| Input {
+        let input = |name: &str, default: u8| Input {
             name: name.to_string(),
             source: name.to_string(),
             kind: LinkType::Basic(Basic::U8),
-            shape: Shape::of_basic(Basic::U8, 0),
+            shape: Shape::Fixed { bytes: 1 },
+            default: vec![default],
         };
         let triggers = Triggers::of(send).expect("triggers");
         ConsolidatorPort::of(
             "pack",
             &ConsolidatorParams {
                 inputs: vec!["a".to_string(), "b".to_string()],
+                defaults: vec!["a=170".to_string(), "b=187".to_string()],
                 send: triggers,
                 interval: triggers.interval.then_some(Duration::from_secs(1)),
             },
             Layout {
-                inputs: vec![input("a"), input("b")],
+                inputs: vec![input("a", 0xaa), input("b", 0xbb)],
             },
             now,
         )
@@ -318,11 +330,14 @@ mod tests {
         let mut out = [0u8; 8];
         assert_eq!(pack.end_of_pass(now, &mut out), Ok(0));
         pack.give(Arriving::ANYWHERE, b"please").expect("asked");
-        // Nothing has arrived from either: both none, every bit nought.
-        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
-        assert_eq!(&out[..3], &[0, 0, 0]);
+        // Nothing has arrived from either: both their defaults.
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(2));
+        assert_eq!(&out[..2], &[0xaa, 0xbb]);
         // Asked once, sent once.
         assert_eq!(pack.end_of_pass(now, &mut out), Ok(0));
+        let mut each = [InputCounts::default(); 2];
+        pack.counters.inputs(0, &mut each);
+        assert_eq!(each[0].none, 1, "sent with its default");
     }
 
     /// A reading arriving at the input it names.
@@ -333,19 +348,18 @@ mod tests {
         }
     }
 
-    /// An input from which nothing arrives goes in none, its bits nought,
-    /// and all_new waits for it for ever: the interval sends without it.
+    /// An input from which nothing arrives goes in as its default, and
+    /// all_new waits for it for ever: the interval sends without it.
     #[test]
-    fn an_input_that_never_arrives_is_none() {
+    fn an_input_that_never_arrives_is_its_default() {
         let now = Instant::now();
         let mut pack = port("all_new, interval", now);
         let mut out = [0u8; 8];
         pack.give(at("a"), &[5]).expect("taken");
         assert_eq!(pack.end_of_pass(now, &mut out), Ok(0), "b never came");
         let later = now + Duration::from_secs(1);
-        // 10 00 | 0000_0101 | 0000_0000 -> 80 50 00.
-        assert_eq!(pack.end_of_pass(later, &mut out), Ok(3));
-        assert_eq!(&out[..3], &[0x80, 0x50, 0x00]);
+        assert_eq!(pack.end_of_pass(later, &mut out), Ok(2));
+        assert_eq!(&out[..2], &[5, 0xbb]);
     }
 
     /// A reading that arrives twice before the datum goes is sent once, the
@@ -359,14 +373,27 @@ mod tests {
         pack.give(at("a"), &[1]).expect("taken");
         pack.give(at("a"), &[2]).expect("taken");
         pack.give(at("b"), &[3]).expect("taken");
-        // 10 10 | 0000_0010 | 0000_0011 -> a0 20 30.
-        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
-        assert_eq!(&out[..3], &[0xa0, 0x20, 0x30]);
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(2));
+        assert_eq!(&out[..2], &[2, 3]);
         assert_eq!(pack.end_of_pass(now, &mut out), Ok(0), "nothing new");
         let mut held = [InputCounts::default(); 2];
         assert_eq!(pack.counters.counts().sent, 1);
         assert_eq!(pack.counters.inputs(0, &mut held), (2, 2));
         assert_eq!(held, [InputCounts::default(); 2], "both new");
+    }
+
+    /// A reading not of its input's type is refused and counted, and the
+    /// value before it stands: here, the default.
+    #[test]
+    fn a_reading_of_another_type_is_refused() {
+        let now = Instant::now();
+        let mut pack = port("moc", now);
+        assert!(pack.give(at("a"), &[1, 2]).is_err());
+        assert_eq!(pack.counters.counts().refused, 1);
+        pack.give(Arriving::ANYWHERE, b"now").expect("asked");
+        let mut out = [0u8; 8];
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(2));
+        assert_eq!(&out[..2], &[0xaa, 0xbb]);
     }
 
     /// The interval alone sends where something is new as it comes round,
@@ -380,7 +407,7 @@ mod tests {
         pack.give(at("b"), &[8]).expect("taken");
         assert_eq!(pack.end_of_pass(now, &mut out), Ok(0), "not yet round");
         let round = now + Duration::from_secs(1);
-        assert_eq!(pack.end_of_pass(round, &mut out), Ok(3));
+        assert_eq!(pack.end_of_pass(round, &mut out), Ok(2));
         let again = now + Duration::from_secs(2);
         assert_eq!(
             pack.end_of_pass(again, &mut out),
@@ -399,16 +426,18 @@ mod tests {
         let mut out = [0u8; 8];
         pack.give(at("a"), &[1]).expect("taken");
         pack.give(at("b"), &[2]).expect("taken");
-        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(2));
         pack.give(Arriving::ANYWHERE, b"now").expect("asked");
-        // 01 01 | 0000_0001 | 0000_0010 -> 50 10 20.
-        assert_eq!(pack.end_of_pass(now, &mut out), Ok(3));
-        assert_eq!(&out[..3], &[0x50, 0x10, 0x20]);
+        assert_eq!(pack.end_of_pass(now, &mut out), Ok(2));
+        assert_eq!(&out[..2], &[1, 2]);
         let counts = pack.counters.counts();
         assert_eq!(
             (counts.sent, counts.sent_all_new, counts.sent_moc),
             (2, 1, 1)
         );
+        let mut each = [InputCounts::default(); 2];
+        pack.counters.inputs(0, &mut each);
+        assert_eq!(each[0].held, 1);
     }
 
     /// The ground may set the interval, and nothing else; and not where

@@ -345,12 +345,10 @@ Commanding a node
    A consolidator's ``Query`` asks ``QUERY_CONSOLIDATOR`` too, and its
    ``Configuration`` goes on, under "what it has sent since the vehicle
    started", to the datums it has sent, in all and by trigger, the readings
-   it has refused, and each input's ``new``, ``held`` and ``none`` -- how
-   many datums it went into in each state. Each of its inputs is shown in
-   its source's own panel, as though the source had sent it the ground
-   itself; a source that is drawn into no gateway node has a panel of its
-   own for this, which says it arrives in the consolidator's datum. A held
-   input adds no arrival, so its panel's ``Last recv`` goes on ageing.
+   it has refused, and each input's ``new``, ``held`` and ``default`` --
+   how many datums it went in new, held, and with its default. The
+   consolidator's datum arrives in its own panel, as any node's does; its
+   inputs have no panels of their own.
 
 3. ``Disable`` on ``to_k3``'s panel sends ``STOP_NODE`` for its device id.
    The vehicle answers ``Success``, ``Last Response`` says so, naming the

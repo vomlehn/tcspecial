@@ -694,7 +694,7 @@ impl QueryThreadsTelemetry {
 
 /// The answer to a QUERY_CONSOLIDATOR: what that consolidator has sent, by
 /// trigger, and how often each of its inputs, from the one the command
-/// asked for, went into a datum held or none.
+/// asked for, went into a datum held or as its default.
 ///
 /// Up to [`INPUTS_PER_ANSWER`] inputs, and how many there are in all, read
 /// in turns as [`QueryThreadsTelemetry`]'s threads are; a `first` at or past

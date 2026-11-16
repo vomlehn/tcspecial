@@ -1,6 +1,6 @@
 //! The consolidator example, flown: three sensors' readings go down as one
-//! datum, and the ground's receive hands each new one out as its sensor's,
-//! and a held one not at all.
+//! datum, a structure of them, with each one's default until it has
+//! reported, and its last reading, held, after.
 //!
 //! What is run is `examples/consolidator/consolidator.ytcs` itself, with
 //! each of its sockets moved to a port nothing holds -- so that this runs
@@ -14,6 +14,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use tcsmoc::gateway::GatewayReceiver;
+use tcsprotocol::consolidation::Layout;
 use tcsprotocol::graph::Graph;
 
 mod common;
@@ -45,8 +46,36 @@ fn received_for(
     got
 }
 
+/// Sends readings until a datum that is `wanted` comes down.
+///
+/// # Arguments
+///
+/// * `ground`   - The gateway node, open on the ground.
+/// * `sensors`  - The socket the sensors send from.
+/// * `readings` - Each sensor's address and reading, sent again each round.
+/// * `wanted`   - The datum waited for.
+fn until_sent(
+    ground: &mut GatewayReceiver,
+    sensors: &std::net::UdpSocket,
+    readings: &[(SocketAddr, &[u8])],
+    wanted: &[u8],
+) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let mut heard: Vec<(String, Vec<u8>)> = Vec::new();
+    while !heard
+        .iter()
+        .any(|(source, data)| source == "housekeeping" && data == wanted)
+    {
+        assert!(Instant::now() < deadline, "only {heard:?} came down");
+        for (at, reading) in readings {
+            sensors.send_to(reading, at).expect("sent");
+        }
+        heard.extend(received_for(ground, Duration::from_millis(300)));
+    }
+}
+
 #[test]
-fn each_new_reading_reaches_the_ground_as_its_sensors() {
+fn the_datum_carries_defaults_then_readings() {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/consolidator/consolidator.ytcs");
     let text = std::fs::read_to_string(&example).expect("the example reads");
@@ -89,13 +118,11 @@ fn each_new_reading_reaches_the_ground_as_its_sensors() {
     std::fs::write(&configuration, &text).expect("written");
 
     // The ground, as the example's is: the gateway node's one port, for
-    // housekeeping's datum, and every sensor among what it hands out.
+    // housekeeping's datum, handed out whole.
     let graph = Graph::load(&configuration).expect("it reads");
     let mut ground =
         GatewayReceiver::open(&graph, "gateway").expect("the ground opens");
-    let mut sources = ground.sources();
-    sources.sort();
-    assert_eq!(sources, ["battery", "housekeeping", "sun", "wheel"]);
+    assert_eq!(ground.sources(), ["housekeeping"]);
 
     let _flying = common::Flying::quiet(
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
@@ -117,34 +144,32 @@ fn each_new_reading_reaches_the_ground_as_its_sensors() {
     common::connect(&commands, take, 1, common::checksum_of(&configuration));
 
     // The three sensors, each sending its own type: a u16, an i32 and a u8,
-    // again until every one has come down, which is how long tcspecial
-    // takes to start.
+    // in the datum in that order, the order of housekeeping's world-in.
     let sensors = bound();
     let at = |port: u16| -> SocketAddr {
         format!("127.0.0.1:{port}").parse().expect("an address")
     };
-    let readings: [(&str, u16, &[u8]); 3] = [
-        ("sun", sun, &[0x01, 0x02]),
-        ("wheel", wheel, &[0xff, 0xff, 0xff, 0xf9]),
-        ("battery", battery, &[0x55]),
-    ];
-    let deadline = Instant::now() + Duration::from_secs(20);
-    let mut heard: Vec<(String, Vec<u8>)> = Vec::new();
-    while !readings.iter().all(|(name, _, reading)| {
-        heard
-            .iter()
-            .any(|(source, data)| source == name && data == reading)
-    }) {
-        assert!(Instant::now() < deadline, "only {heard:?} came down");
-        for (_, port, reading) in &readings {
-            sensors.send_to(reading, at(*port)).expect("sent");
-        }
-        heard.extend(received_for(&mut ground, Duration::from_millis(300)));
-    }
-    // The consolidator's datum itself is never handed out: only its inputs.
-    assert!(
-        heard.iter().all(|(source, _)| source != "housekeeping"),
-        "{heard:?}"
+
+    // The sun alone, again until the interval sends it: the wheel and the
+    // battery have never reported, and go down as their defaults, 0 and
+    // 255.
+    until_sent(
+        &mut ground,
+        &sensors,
+        &[(at(sun), &[0x01, 0x02])],
+        &[0x01, 0x02, 0, 0, 0, 0, 0xff],
+    );
+
+    // All three, until a datum with every one of them comes down.
+    until_sent(
+        &mut ground,
+        &sensors,
+        &[
+            (at(sun), &[0x03, 0x04]),
+            (at(wheel), &[0xff, 0xff, 0xff, 0xf9]),
+            (at(battery), &[0x55]),
+        ],
+        &[0x03, 0x04, 0xff, 0xff, 0xff, 0xf9, 0x55],
     );
 
     // Quiet until whatever was in flight has come down and the interval
@@ -152,8 +177,22 @@ fn each_new_reading_reaches_the_ground_as_its_sensors() {
     while !received_for(&mut ground, Duration::from_secs(3)).is_empty() {}
 
     // The sun alone, new: housekeeping sends it at its interval, the wheel
-    // and the battery held, and only the sun's reading comes down.
-    sensors.send_to(&[0x03, 0x04], at(sun)).expect("sent");
+    // and the battery held at their last readings, and the datum takes
+    // apart by the layout the configuration gives.
+    sensors.send_to(&[0x05, 0x06], at(sun)).expect("sent");
     let after = received_for(&mut ground, Duration::from_secs(4));
-    assert_eq!(after, [("sun".to_string(), vec![0x03, 0x04])]);
+    let datum = [0x05, 0x06, 0xff, 0xff, 0xff, 0xf9, 0x55];
+    assert_eq!(after, [("housekeeping".to_string(), datum.to_vec())]);
+    let node = graph.node("housekeeping").expect("the consolidator");
+    let (_, layout) = Layout::of_node(&graph, node)
+        .expect("a consolidator")
+        .expect("it lays out");
+    assert_eq!(
+        layout.unpack(&datum),
+        Ok(vec![
+            vec![0x05, 0x06],
+            vec![0xff, 0xff, 0xff, 0xf9],
+            vec![0x55]
+        ])
+    );
 }

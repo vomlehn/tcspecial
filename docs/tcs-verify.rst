@@ -206,15 +206,15 @@ nodes sees it in one place:
   alone, not the packets', and a string or bytes has no size its type
   gives.
 * **Consolidators**: each one, the gateway nodes it is drawn into and the
-  most bytes a datum of it may be; then each input in the order of its
-  ``world-in``, with its source, its type and the bits it takes in the
-  datum -- a fixed width, or a string's or bytes' length field and its
-  bytes. An input whose source is drawn into one of those gateway nodes
-  itself too is said to be *sent twice*: it costs the link what the
-  consolidator was there to save. Where the gateway node is a
-  ``gateway_yamcs`` one, the ports and APIDs the ground relays each input
-  on are among the addresses and APIDs above, named as relayed from the
-  consolidator.
+  bytes a datum of it is -- one figure where every input is of a fixed
+  width, the least and the most where a string or bytes is among them;
+  then each input in the order of its ``world-in``, with its source, its
+  type, where it is in the datum -- its offset, or ``end`` for a string or
+  bytes, which goes after every member of a fixed width -- the bytes it
+  takes there, a count and its most for one at the end, and its default,
+  in hexadecimal. An input whose source is drawn into one of those gateway
+  nodes itself too is said to be *sent twice*: it costs the link what the
+  consolidator was there to save.
 
 The lists are each in an order no file can change -- by kind, then by
 gateway node and device id, then by name -- so two summaries can be
@@ -329,16 +329,16 @@ a ground station to read rather than work out again:
   puts in every beacon: a ground station whose own differs was built to
   work these out otherwise than the vehicle;
 * ``ids``, every node's device id;
-* ``links``, every link to the ground -- the sent, those the ground relays
-  from a consolidator, and the untouched payloads' -- each with its source,
-  its gateway node, where it leaves the vehicle and arrives at the ground or
-  its message ID, its APID, its type, how a string or bytes on it is
-  counted, the largest datum it carries and the consolidator it is relayed
-  from;
+* ``links``, every link to the ground -- those drawn into a gateway node
+  and the untouched payloads' -- each with its source, its gateway node,
+  where it leaves the vehicle and arrives at the ground or its message ID,
+  its APID, its type, how a string or bytes on it is counted, and the
+  largest datum it carries;
 * ``apids`` and ``msgids``, every APID and message ID the configuration
   uses and what each carries;
-* ``consolidations``, each consolidator's inputs in order, with the bits of
-  each fixed-width field or the most and length field of a string or bytes.
+* ``consolidations``, each consolidator's inputs in order, with each one's
+  offset and width, or for a string or bytes, ``offset: null``, its most
+  and the width of its count, and each one's default, in hexadecimal.
 
 It is written in one order and one spelling, so the same configuration
 gives the same text, and the two spellings of one the same digest. Comments

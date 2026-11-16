@@ -550,15 +550,15 @@ out of the total, which says how many were. The bytes are the data's
 alone, not the packets', and a string or bytes has no size its type
 gives.</li>
 <li><strong>Consolidators</strong>: each one, the gateway nodes it is drawn into and the
-most bytes a datum of it may be; then each input in the order of its
-<tt class="docutils literal"><span class="pre">world-in</span></tt>, with its source, its type and the bits it takes in the
-datum -- a fixed width, or a string's or bytes' length field and its
-bytes. An input whose source is drawn into one of those gateway nodes
-itself too is said to be <em>sent twice</em>: it costs the link what the
-consolidator was there to save. Where the gateway node is a
-<tt class="docutils literal">gateway_yamcs</tt> one, the ports and APIDs the ground relays each input
-on are among the addresses and APIDs above, named as relayed from the
-consolidator.</li>
+bytes a datum of it is -- one figure where every input is of a fixed
+width, the least and the most where a string or bytes is among them;
+then each input in the order of its <tt class="docutils literal"><span class="pre">world-in</span></tt>, with its source, its
+type, where it is in the datum -- its offset, or <tt class="docutils literal">end</tt> for a string or
+bytes, which goes after every member of a fixed width -- the bytes it
+takes there, a count and its most for one at the end, and its default,
+in hexadecimal. An input whose source is drawn into one of those gateway
+nodes itself too is said to be <em>sent twice</em>: it costs the link what the
+consolidator was there to save.</li>
 </ul>
 <p>The lists are each in an order no file can change -- by kind, then by
 gateway node and device id, then by name -- so two summaries can be
@@ -668,16 +668,16 @@ a ground station to read rather than work out again:</p>
 puts in every beacon: a ground station whose own differs was built to
 work these out otherwise than the vehicle;</li>
 <li><tt class="docutils literal">ids</tt>, every node's device id;</li>
-<li><tt class="docutils literal">links</tt>, every link to the ground -- the sent, those the ground relays
-from a consolidator, and the untouched payloads' -- each with its source,
-its gateway node, where it leaves the vehicle and arrives at the ground or
-its message ID, its APID, its type, how a string or bytes on it is
-counted, the largest datum it carries and the consolidator it is relayed
-from;</li>
+<li><tt class="docutils literal">links</tt>, every link to the ground -- those drawn into a gateway node
+and the untouched payloads' -- each with its source, its gateway node,
+where it leaves the vehicle and arrives at the ground or its message ID,
+its APID, its type, how a string or bytes on it is counted, and the
+largest datum it carries;</li>
 <li><tt class="docutils literal">apids</tt> and <tt class="docutils literal">msgids</tt>, every APID and message ID the configuration
 uses and what each carries;</li>
-<li><tt class="docutils literal">consolidations</tt>, each consolidator's inputs in order, with the bits of
-each fixed-width field or the most and length field of a string or bytes.</li>
+<li><tt class="docutils literal">consolidations</tt>, each consolidator's inputs in order, with each one's
+offset and width, or for a string or bytes, <tt class="docutils literal">offset: null</tt>, its most
+and the width of its count, and each one's default, in hexadecimal.</li>
 </ul>
 <p>It is written in one order and one spelling, so the same configuration
 gives the same text, and the two spellings of one the same digest. Comments

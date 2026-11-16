@@ -263,14 +263,6 @@ are in, <code>tcs_value_in</code> reads one as a number in it, and
 <em>decisions</em> – the text <code>1</code> or <code>0</code>, which a
 thermostat makes – and <code>tcs_decision_on</code> reads one as on or
 off.</li>
-<li><strong>Relaying a consolidator’s inputs.</strong>
-<code>tcs_relay_open</code> starts a thread that binds the ports of the
-consolidators drawn into a gateway node and sends each new input on as
-though its source were drawn into the node, on its own port and under
-its own APID, for a station that reads the node’s other ports itself, as
-Yamcs does; <code>tcs_relay_close</code> stops it, and it ends with the
-process too. A station built on <code>tcs_gateway_receive</code> needs
-none: it is handed the inputs already.</li>
 <li><strong>Data up.</strong> <code>tcs_uplink_open</code> opens the way
 up to a gateway node that binds an address and port aboard, and each
 <code>tcs_uplink_send</code> sends one datum there, which leaves the
@@ -286,8 +278,8 @@ configuration; then ping; start, stop or query a node by its id, set one
 of its attributes, or ask for the last datum it moved each way; ask how
 deep each thread has been into its stack
 (<code>tcs_client_query_threads</code>), or what a consolidator has sent
-and how often each of its inputs went into a datum held or none
-(<code>tcs_client_query_consolidator</code>,
+and how often each of its inputs went into a datum held or as its
+default (<code>tcs_client_query_consolidator</code>,
 <code>TCS_INPUTS_PER_ANSWER</code> inputs to an answer); and arm a
 restart and restart the vehicle. Until the station is matched for
 commanding, every command but connect, arm and restart fails, unsent,

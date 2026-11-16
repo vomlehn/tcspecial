@@ -13,10 +13,10 @@
 //! * each source drawn into the node is the channel at `fprime_id_base` plus
 //!   its device id, named after the source, and of the type the
 //!   configuration says its data are (see [`Form`]);
-//! * a consolidator drawn into it has no channel, since the bridge's receive
-//!   takes its datum apart and hands out each new input as though its
-//!   source had sent it: each of its inputs' sources has the channel it
-//!   would have were it drawn in, and a held input is written to none;
+//! * a consolidator drawn into it is one such channel, holding its datum,
+//!   a structure of its inputs which the configuration's own XTCE
+//!   describes and `tcsprotocol::consolidation::Layout::unpack` takes
+//!   apart;
 //! * the bridge's own channels -- what it has heard of the beacon, whether it
 //!   is matched, what it has counted -- follow every device id the
 //!   configuration has, so that adding a link never moves one;
@@ -37,7 +37,6 @@ use std::fmt::Write as _;
 
 use super::telemetry::{self, Via};
 use super::Graph;
-use crate::consolidation::Layout;
 use crate::gateway::GatewayKind;
 use crate::graph::link_types::{self, Carries};
 use crate::link_type::{Basic, LinkType};
@@ -297,6 +296,13 @@ pub struct Named {
     pub id: usize,
 }
 
+/// The most bytes of a datum the bridge's `Tcs.Datum` channel holds: its
+/// `DATUM_BYTES`, in `fprime/Tcs/TcsBridge/TcsBridge.fpp`, which a test holds
+/// this to. The bridge cuts a longer datum short and counts it; a
+/// consolidation that could be longer is refused, since cut short it loses
+/// members whole.
+pub const BRIDGE_DATUM_BYTES: usize = 64;
+
 /// The F´ model of the bridge at the far end of one `gateway_fprime` node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Model {
@@ -305,9 +311,7 @@ pub struct Model {
     /// The node's `fprime_id_base`: the component instance's base ID.
     pub id_base: u32,
     /// A channel for each source drawn into the node, in the order the
-    /// links are drawn, but for a consolidator, which has none: in its
-    /// place a channel for each of its inputs' sources not drawn in
-    /// themselves, by device id.
+    /// links are drawn.
     pub data: Vec<Source>,
     /// The bridge's own channels, in [`OWN_CHANNELS`]' order.
     pub own: Vec<Channel>,
@@ -436,54 +440,20 @@ pub fn of(graph: &Graph, gateway: &str) -> Result<Model, Refused> {
     };
 
     // The sources whose readings reach the bridge, each once: those drawn
-    // into the node, but a consolidator, which is not -- the bridge's
-    // receive takes its datum apart, and hands each new input out as
-    // though its source had sent it -- and in its place each of its
-    // inputs' sources, named by the consolidator it comes in.
-    let ids = telemetry::ids(graph);
-    let drawn: Vec<&telemetry::Telemetered> = links
+    // into the node.
+    let mut sources: Vec<(String, usize)> = Vec::new();
+    for link in links
         .iter()
         .filter(|l| l.via == Via::Gateway(gateway.to_string()))
-        .collect();
-    let mut sources: Vec<(String, usize, Option<String>)> = Vec::new();
-    for link in &drawn {
-        let laid = graph
-            .node(&link.source)
-            .and_then(|node| Layout::of_node(graph, node));
-        let Some(laid) = laid else {
-            if !sources.iter().any(|(name, ..)| *name == link.source) {
-                sources.push((link.source.clone(), link.id, None));
-            }
-            continue;
-        };
-        // One that does not lay out is the check's to say.
-        let Ok((_, layout)) = laid else {
-            continue;
-        };
-        let mut inputs: Vec<&str> =
-            layout.inputs.iter().map(|i| i.source.as_str()).collect();
-        inputs.sort_by_key(|source| ids.get(*source));
-        for input in inputs {
-            if drawn.iter().any(|l| l.source == input)
-                || sources.iter().any(|(name, ..)| name == input)
-            {
-                continue;
-            }
-            let Some(&id) = ids.get(input) else {
-                continue;
-            };
-            sources.push((input.to_string(), id, Some(link.source.clone())));
+    {
+        if !sources.iter().any(|(name, _)| *name == link.source) {
+            sources.push((link.source.clone(), link.id));
         }
     }
 
     let mut data = Vec::new();
-    for (source, id, by) in &sources {
-        let reaches = match by {
-            None => format!("is drawn into \"{gateway}\""),
-            Some(by) => {
-                format!("reaches \"{gateway}\" in \"{by}\"'s datum")
-            }
-        };
+    for (source, id) in &sources {
+        let reaches = format!("is drawn into \"{gateway}\"");
         if !is_fprime_name(source) {
             return Err(Refused {
                 node: source.clone(),
@@ -494,6 +464,24 @@ pub fn of(graph: &Graph, gateway: &str) -> Result<Model, Refused> {
                      starting with a letter"
                 ),
             });
+        }
+        if let Some(Ok((_, layout))) = graph
+            .node(source)
+            .and_then(|node| crate::consolidation::Layout::of_node(graph, node))
+        {
+            if layout.largest_bytes() > BRIDGE_DATUM_BYTES {
+                return Err(Refused {
+                    node: source.clone(),
+                    why: format!(
+                        "\"{source}\" {reaches}, and its consolidation may be \
+                         {} bytes, more than the {BRIDGE_DATUM_BYTES} the F´ \
+                         bridge's channel holds: give it fewer inputs, or \
+                         strings and bytes with smaller mosts, or split it \
+                         in two",
+                        layout.largest_bytes()
+                    ),
+                });
+            }
         }
         if let Some(own) = OWN_CHANNELS.iter().find(|o| o.name == *source) {
             return Err(Refused {
@@ -903,13 +891,10 @@ mod tests {
         graph
     }
 
-    /// A consolidator drawn into the node has no channel: in its place each
-    /// of its inputs' sources has one, at its own device id, of the type it
-    /// sends, as the bridge's receive hands each new input out as though
-    /// that source had sent it. An input drawn in itself too has its one
-    /// channel.
+    /// A consolidator drawn into the node is a channel of its own, holding
+    /// its datum; its inputs, not drawn in themselves, have none.
     #[test]
-    fn a_consolidators_inputs_are_channels_of_their_own() {
+    fn a_consolidator_is_one_channel() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let text =
             std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
@@ -938,9 +923,51 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![
                 ("label", 0x3001, Form::Datum),
-                ("temp", 0x3003, Form::Whole(Basic::U16)),
-                ("valve", 0x3004, Form::Decision),
+                ("pack", 0x3002, Form::Datum),
             ]
+        );
+    }
+
+    /// A consolidation that may be longer than the bridge's channel holds
+    /// is refused, naming the consolidator: the label's string(8) become a
+    /// string(61) makes it 65 bytes at most, a u16, a boolean, and the
+    /// string with its count. And the bridge's channel is as long as its
+    /// FPP says.
+    #[test]
+    fn a_consolidation_too_long_for_the_bridge_is_refused() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let text =
+            std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
+                .expect("it reads")
+                .replace("gateway: \"yamcs\"", "gateway: \"fprime\"")
+                .replace("type gateway_yamcs", "type gateway_fprime")
+                .replace(
+                    "ground_base: \"127.0.0.1:26700\"",
+                    "bridge_base: \"127.0.0.1:26700\"\n        \
+                     fprime_id_base: \"0x3000\"",
+                )
+                .replace("string(8)", "string(61)")
+                .lines()
+                .filter(|line| !line.contains("apid"))
+                .map(|line| format!("{line}\n"))
+                .collect::<String>();
+        let dir = tempfile::tempdir().expect("a directory");
+        let path = dir.path().join("fprime.ytcs");
+        std::fs::write(&path, text).expect("written");
+        let graph = Graph::load(&path).expect("it reads");
+        let refused = of(&graph, "gateway").expect_err("too long");
+        assert_eq!(refused.node, "pack");
+        assert!(refused.why.contains("64"), "{}", refused.why);
+
+        let fpp = std::fs::read_to_string(
+            root.join("fprime/Tcs/TcsBridge/TcsBridge.fpp"),
+        )
+        .expect("the bridge's FPP reads");
+        assert!(
+            fpp.contains(&format!(
+                "constant DATUM_BYTES = {BRIDGE_DATUM_BYTES}\n"
+            )),
+            "TcsBridge.fpp's DATUM_BYTES is not {BRIDGE_DATUM_BYTES}"
         );
     }
 

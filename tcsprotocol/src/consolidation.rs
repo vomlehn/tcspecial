@@ -2,178 +2,94 @@
 //! different things as one datum, and how it is laid out, packed and taken
 //! apart. See "Compute elements" in `docs/tcspecial-design.rst`.
 //!
-//! The datum is a block of states, two bits for each input in the order its
-//! `world-in` lists them, then each input's **bit string**, packed end to end
-//! with no padding between them, the whole padded with zero bits to a whole
-//! byte. Every field is most significant bit first, so the datum's first bit
-//! is the top bit of its first byte. An input of a fixed width -- a number, a
-//! value of a unit, a boolean, a structure of those -- is a bit string of its
-//! width; a boolean is one bit in it, [`BOOLEAN_BITS`], where it is a byte
-//! on a link. A string or bytes is a length, a count of bytes in a field just
-//! wide enough for the most the input may hold, and then its bytes.
+//! The datum is a structure of the consolidator's inputs, in the order its
+//! `world-in` lists them, every member on a byte boundary and encoded as its
+//! type is on any link: a whole number as wide as its type, most significant
+//! byte first; a value as its four bytes; a boolean as one byte, 1 or 0; a
+//! structure as its fields. A member whose length varies -- a string or
+//! bytes -- keeps its place but takes no bytes there: its count and its bytes
+//! go after every member of a fixed width, in the order those that vary are
+//! listed. So every member of a fixed width is at the same offset in every
+//! datum. The count is one byte for a most up to 255 and two, most
+//! significant first, up to 65,535.
+//!
+//! Each input has a default, which the datum carries until a reading has
+//! arrived at it; after that, its latest reading. Nothing in the datum says
+//! which: that is the user's to say, in values and in members of their own.
 //!
 //! What is laid out is worked out from the configuration alone -- the
-//! inputs' order and each source's type -- so the vehicle and the ground,
-//! reading the same configuration, lay a datum out the same way. Packing
-//! allocates nothing, since the vehicle packs in its loop; taking apart is
-//! the ground's, which may.
+//! inputs' order, each source's type and each input's default -- so the
+//! vehicle and the ground, reading the same configuration, lay a datum out
+//! the same way. Packing allocates nothing, since the vehicle packs in its
+//! loop, and neither does taking a datum apart into buffers made before.
+
+use std::ops::Range;
 
 use crate::graph::link_types::{carries, Carries};
 use crate::graph::{Destination, Graph};
 use crate::link_type::{Basic, LinkType};
 use crate::node::vehicle::compute::{self, Computation, ConsolidatorParams};
 
-/// How many bits a boolean is in a consolidation: one, where it is a byte
-/// on a link. `types.xtce` states it, as `boolean_bit`, beside the byte.
-pub const BOOLEAN_BITS: usize = 1;
-
-/// How many bits each input's state takes, in the block of states.
-pub const STATE_BITS: usize = 2;
-
-/// What a consolidation says of one input.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum State {
-    /// Nothing has arrived from it since tcspecial started: its bit string
-    /// is zeros of its width, or an empty one.
-    None,
-    /// No reading has arrived since the last datum was sent: the value is
-    /// the latest tcspecial has.
-    Held,
-    /// A reading has arrived since the last datum was sent.
-    New,
-}
-
-impl State {
-    /// The state's two bits: `00` for none, so that a datum of zeros says
-    /// nothing has arrived, `01` for held and `10` for new.
-    pub fn bits(self) -> u8 {
-        match self {
-            State::None => 0b00,
-            State::Held => 0b01,
-            State::New => 0b10,
-        }
-    }
-
-    /// The state two bits say.
-    ///
-    /// # Arguments
-    ///
-    /// * `bits` - The two bits.
-    ///
-    /// # Returns
-    ///
-    /// The state, or `None` for `11`, which no state is.
-    pub fn of(bits: u8) -> Option<State> {
-        match bits & 0b11 {
-            0b00 => Some(State::None),
-            0b01 => Some(State::Held),
-            0b10 => Some(State::New),
-            _ => None,
-        }
-    }
-
-    /// What the state is called where it is shown.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            State::None => "none",
-            State::Held => "held",
-            State::New => "new",
-        }
-    }
-}
-
-/// One field of a fixed-width input's bit string, as it is laid out in the
-/// datum and as it is on the link it arrives on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Field {
-    /// A whole number or a value of a unit: its bytes on the link, every
-    /// bit of them, most significant first.
-    Bits(usize),
-    /// A boolean: one byte on the link, 1 or 0, and [`BOOLEAN_BITS`] in the
-    /// datum.
-    Boolean,
-}
-
-impl Field {
-    /// The field of one basic type of a fixed width.
-    ///
-    /// # Arguments
-    ///
-    /// * `basic` - The type.
-    ///
-    /// # Returns
-    ///
-    /// The field, or `None` for a string or bytes.
-    fn of(basic: Basic) -> Option<Field> {
-        match basic {
-            Basic::Boolean => Some(Field::Boolean),
-            other => other.width().map(|bytes| Field::Bits(bytes * 8)),
-        }
-    }
-
-    /// How many bytes it is on the link.
-    fn link_bytes(self) -> usize {
-        match self {
-            Field::Bits(bits) => bits / 8,
-            Field::Boolean => 1,
-        }
-    }
-
-    /// How many bits it is in the datum.
-    fn datum_bits(self) -> usize {
-        match self {
-            Field::Bits(bits) => bits,
-            Field::Boolean => BOOLEAN_BITS,
-        }
-    }
-}
+/// The most bytes a string or bytes input may hold: what a count of two
+/// bytes counts to.
+pub const MOST_VARYING: usize = 65_535;
 
 /// How one input is laid out in the datum.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
-    /// Of a fixed width: these fields, end to end.
-    Fixed(Vec<FixedField>),
-    /// A string or bytes: a length in `length_bits`, a count of bytes up to
-    /// `most`, then the bytes.
-    Counted {
+    /// Of a fixed width, in place: this many bytes.
+    Fixed {
+        /// Its width.
+        bytes: usize,
+    },
+    /// A string or bytes, at the datum's end: a count of `count_bytes`, and
+    /// then up to `most` bytes.
+    Varies {
         /// The most bytes it may hold.
         most: usize,
-        /// The width of its length, just enough to count to `most`.
-        length_bits: usize,
+        /// The width of its count: one byte up to 255, two above.
+        count_bytes: usize,
     },
 }
 
 impl Shape {
-    /// How an input of one basic type is laid out.
+    /// How an input of a type is laid out.
     ///
     /// # Arguments
     ///
-    /// * `basic` - The type.
-    /// * `most`  - The most bytes it may hold, where it is a string or
-    ///             bytes; not read otherwise.
+    /// * `kind` - The type.
+    /// * `most` - The most bytes it may hold, where it is a string or
+    ///            bytes; not read otherwise.
     ///
     /// # Returns
     ///
-    /// Its shape: its one field, or a length and bytes.
-    pub fn of_basic(basic: Basic, most: usize) -> Shape {
-        match Field::of(basic) {
-            Some(field) => Shape::Fixed(vec![FixedField(field)]),
-            None => Shape::Counted {
+    /// Its shape.
+    pub fn of(kind: &LinkType, most: usize) -> Shape {
+        match kind.width() {
+            Some(bytes) => Shape::Fixed { bytes },
+            None => Shape::Varies {
                 most,
-                length_bits: length_bits(most),
+                count_bytes: count_bytes(most),
             },
         }
     }
 }
 
-/// A field of a fixed-width input, as [`Shape::Fixed`] lists them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FixedField(Field);
-
-impl FixedField {
-    /// How many bits it is in the datum: its width, or one for a boolean.
-    pub fn bits(&self) -> usize {
-        self.0.datum_bits()
+/// The width of the count before a string or bytes that holds at most
+/// `most` bytes.
+///
+/// # Arguments
+///
+/// * `most` - The most it holds.
+///
+/// # Returns
+///
+/// One byte up to 255, and two above.
+pub fn count_bytes(most: usize) -> usize {
+    if most <= usize::from(u8::MAX) {
+        1
+    } else {
+        2
     }
 }
 
@@ -188,39 +104,67 @@ pub struct Input {
     pub kind: LinkType,
     /// How it is laid out.
     pub shape: Shape,
+    /// Its default, encoded as its type is on a link: what the datum
+    /// carries until a reading has arrived.
+    pub default: Vec<u8>,
 }
 
 impl Input {
-    /// The most bits its bit string may be: its width, or its length and
-    /// its most bytes.
-    pub fn largest_bits(&self) -> usize {
-        match &self.shape {
-            Shape::Fixed(fields) => {
-                fields.iter().map(|f| f.0.datum_bits()).sum()
-            }
-            Shape::Counted { most, length_bits } => length_bits + most * 8,
-        }
-    }
-
-    /// The most bytes a reading of it is, as it arrived on its link and
-    /// without the count a string or bytes is sent after.
+    /// The most bytes a reading of it is, as it arrives on its link.
     pub fn largest_link_bytes(&self) -> usize {
-        match &self.shape {
-            Shape::Fixed(fields) => {
-                fields.iter().map(|f| f.0.link_bytes()).sum()
-            }
-            Shape::Counted { most, .. } => *most,
+        match self.shape {
+            Shape::Fixed { bytes } => bytes,
+            Shape::Varies { most, .. } => most,
         }
     }
 
-    /// How many bytes a reading of it is on the link, where every reading
-    /// is as long as every other.
-    pub fn fixed_link_bytes(&self) -> Option<usize> {
-        match &self.shape {
-            Shape::Fixed(fields) => {
-                Some(fields.iter().map(|f| f.0.link_bytes()).sum())
+    /// The most bytes it takes in the datum: its width, or its count and
+    /// its most.
+    pub fn largest_bytes(&self) -> usize {
+        match self.shape {
+            Shape::Fixed { bytes } => bytes,
+            Shape::Varies { most, count_bytes } => count_bytes + most,
+        }
+    }
+
+    /// Says whether a reading is one of the input's type: its width, a
+    /// boolean 1 or 0 -- alone or as a structure's field -- and a string or
+    /// bytes no longer than its most, a string being UTF-8.
+    ///
+    /// # Arguments
+    ///
+    /// * `reading` - The reading, as it arrived on its link.
+    ///
+    /// # Returns
+    ///
+    /// Whether it is.
+    pub fn accepts(&self, reading: &[u8]) -> bool {
+        match (&self.kind, self.shape) {
+            (_, Shape::Varies { most, .. }) => {
+                reading.len() <= most
+                    && (!matches!(self.kind, LinkType::Basic(Basic::String(_)))
+                        || std::str::from_utf8(reading).is_ok())
             }
-            Shape::Counted { .. } => None,
+            (LinkType::Basic(Basic::Boolean), Shape::Fixed { .. }) => {
+                matches!(reading, [0] | [1])
+            }
+            (LinkType::Basic(_), Shape::Fixed { bytes }) => {
+                reading.len() == bytes
+            }
+            (LinkType::Structure(fields), Shape::Fixed { bytes }) => {
+                if reading.len() != bytes {
+                    return false;
+                }
+                let mut at = 0;
+                for (_, basic) in fields {
+                    let wide = basic.width().unwrap_or(0);
+                    if *basic == Basic::Boolean && reading[at] > 1 {
+                        return false;
+                    }
+                    at += wide;
+                }
+                true
+            }
         }
     }
 }
@@ -233,30 +177,80 @@ pub struct Layout {
     pub inputs: Vec<Input>,
 }
 
-/// The width of a field that counts from nought to `most`.
+/// Reads an input's default from its `defaults` entry, as a value of its
+/// type is written: a number or a value of a unit in decimal, a boolean 1
+/// or 0, a structure as `name=value` pairs, and a string or bytes as a
+/// trigger is, in quotes or square brackets, `""` and `[]` being empty.
 ///
 /// # Arguments
 ///
-/// * `most` - The most it counts to.
+/// * `input` - The input's name, for what is said.
+/// * `kind`  - Its type.
+/// * `most`  - The most a string or bytes holds.
+/// * `said`  - The default as written.
 ///
 /// # Returns
 ///
-/// The fewest bits that hold `most`: seven for 64, thirteen for 4,096, and
-/// one for nought or one.
-pub fn length_bits(most: usize) -> usize {
-    (usize::BITS - most.leading_zeros()).max(1) as usize
+/// The default, encoded as the type is on a link.
+///
+/// # Errors
+///
+/// A sentence naming the input where the default is not a value of its
+/// type, or is longer than its most.
+fn default_of(
+    input: &str,
+    kind: &LinkType,
+    most: usize,
+    said: &str,
+) -> Result<Vec<u8>, String> {
+    let what = format!("the default of input \"{input}\"");
+    if kind.width().is_some() {
+        let mut out = vec![0u8; kind.width().unwrap_or(0)];
+        let used = crate::link_text::read_text(kind, said, &what, &mut out)?;
+        out.truncate(used);
+        return Ok(out);
+    }
+    let said = said.trim();
+    let bytes = if said == "\"\"" || said == "[]" {
+        Vec::new()
+    } else {
+        crate::trigger::bytes_of(&DEFAULT, said)
+            .map_err(|why| format!("{what}: {why}"))?
+    };
+    if bytes.len() > most {
+        return Err(format!(
+            "{what} is {} bytes, and the input holds at most {most}",
+            bytes.len()
+        ));
+    }
+    if matches!(kind, LinkType::Basic(Basic::String(_)))
+        && std::str::from_utf8(&bytes).is_err()
+    {
+        return Err(format!("{what} is not text, and the input is a string"));
+    }
+    Ok(bytes)
 }
+
+/// A consolidator's default for a string or bytes input, as
+/// [`crate::trigger::bytes_of`] names it.
+const DEFAULT: crate::trigger::Named = crate::trigger::Named {
+    word: "default",
+    a: "a default",
+    empty: "an empty one is written \"\" or []",
+    bare_was_decimal: false,
+};
 
 impl Layout {
     /// Lays out a consolidator's datum from the configuration: each input's
-    /// source, found by the link that reaches it, and the type that source
-    /// sends.
+    /// source, found by the link that reaches it, the type that source
+    /// sends, and the input's default.
     ///
     /// # Arguments
     ///
-    /// * `graph`  - The configuration.
-    /// * `node`   - The consolidator's name.
-    /// * `inputs` - Its inputs, in the order its `world-in` lists them.
+    /// * `graph`    - The configuration.
+    /// * `node`     - The consolidator's name.
+    /// * `inputs`   - Its inputs, in the order its `world-in` lists them.
+    /// * `defaults` - Each input's default as written, in the same order.
     ///
     /// # Returns
     ///
@@ -264,15 +258,18 @@ impl Layout {
     ///
     /// # Errors
     ///
-    /// A sentence naming an input no link reaches, or a source whose type
-    /// cannot be read.
+    /// A sentence naming an input no link reaches, a source whose type
+    /// cannot be read, a string or bytes that may hold more than
+    /// [`MOST_VARYING`], or a default that is not a value of its input's
+    /// type.
     pub fn of(
         graph: &Graph,
         node: &str,
         inputs: &[String],
+        defaults: &[String],
     ) -> Result<Layout, String> {
         let mut laid = Vec::with_capacity(inputs.len());
-        for name in inputs {
+        for (at, name) in inputs.iter().enumerate() {
             let source = graph
                 .links
                 .iter()
@@ -293,30 +290,27 @@ impl Layout {
                 // A source that sends anything: bytes, as long as it may be.
                 Carries::Any => LinkType::Basic(Basic::Bytes(None)),
             };
-            let shape = match &kind {
-                LinkType::Basic(basic) => Shape::of_basic(
-                    *basic,
-                    crate::graph::largest::largest_datum(graph, source).bytes,
-                ),
-                LinkType::Structure(fields) => Shape::Fixed(
-                    fields
-                        .iter()
-                        .map(|(field, basic)| {
-                            Field::of(*basic).map(FixedField).ok_or_else(|| {
-                                format!(
-                                    "input \"{name}\": its field \"{field}\" \
-                                     has no fixed width"
-                                )
-                            })
-                        })
-                        .collect::<Result<_, _>>()?,
-                ),
-            };
+            let most =
+                crate::graph::largest::largest_datum(graph, source).bytes;
+            if kind.width().is_none() && most > MOST_VARYING {
+                return Err(format!(
+                    "input \"{name}\" may hold {most} bytes, and a \
+                     consolidator's string or bytes holds at most \
+                     {MOST_VARYING}: give its source a smaller most"
+                ));
+            }
+            let default = default_of(
+                name,
+                &kind,
+                most,
+                defaults.get(at).map_or("", String::as_str),
+            )?;
             laid.push(Input {
                 name: name.clone(),
                 source: source.name.clone(),
+                shape: Shape::of(&kind, most),
                 kind,
-                shape,
+                default,
             });
         }
         Ok(Layout { inputs: laid })
@@ -335,7 +329,7 @@ impl Layout {
     ///
     /// `None` for a node that is not a consolidator; otherwise what its
     /// node says and its layout, or a sentence where it does not work out,
-    /// which the check has refused.
+    /// which the check refuses.
     pub fn of_node(
         graph: &Graph,
         node: &crate::graph::Node,
@@ -349,21 +343,62 @@ impl Layout {
             return None;
         };
         Some(
-            Layout::of(graph, &node.name, &params.inputs)
+            Layout::of(graph, &node.name, &params.inputs, &params.defaults)
                 .map(|layout| (params, layout)),
         )
     }
 
-    /// The most bits a datum may be: the states and every input at its
-    /// most, before the datum is padded to a whole byte.
-    pub fn largest_bits(&self) -> usize {
-        STATE_BITS * self.inputs.len()
-            + self.inputs.iter().map(Input::largest_bits).sum::<usize>()
+    /// The bytes every member of a fixed width takes together: where the
+    /// counts and bytes of those that vary begin.
+    pub fn fixed_part(&self) -> usize {
+        self.inputs
+            .iter()
+            .map(|input| match input.shape {
+                Shape::Fixed { bytes } => bytes,
+                Shape::Varies { .. } => 0,
+            })
+            .sum()
     }
 
-    /// The most bytes a datum may be.
+    /// Where a member of a fixed width is in every datum.
+    ///
+    /// # Arguments
+    ///
+    /// * `at` - The input's position.
+    ///
+    /// # Returns
+    ///
+    /// Its offset, or `None` for one whose length varies, or no such input.
+    pub fn offset(&self, at: usize) -> Option<usize> {
+        let input = self.inputs.get(at)?;
+        if !matches!(input.shape, Shape::Fixed { .. }) {
+            return None;
+        }
+        Some(
+            self.inputs[..at]
+                .iter()
+                .map(|before| match before.shape {
+                    Shape::Fixed { bytes } => bytes,
+                    Shape::Varies { .. } => 0,
+                })
+                .sum(),
+        )
+    }
+
+    /// The most bytes a datum may be: every member at its most.
     pub fn largest_bytes(&self) -> usize {
-        self.largest_bits().div_ceil(8)
+        self.inputs.iter().map(Input::largest_bytes).sum()
+    }
+
+    /// The fewest bytes a datum may be: every string and bytes empty.
+    pub fn smallest_bytes(&self) -> usize {
+        self.inputs
+            .iter()
+            .map(|input| match input.shape {
+                Shape::Fixed { bytes } => bytes,
+                Shape::Varies { count_bytes, .. } => count_bytes,
+            })
+            .sum()
     }
 
     /// The width of every datum, where every input is of a fixed width and
@@ -371,94 +406,18 @@ impl Layout {
     pub fn fixed_bytes(&self) -> Option<usize> {
         self.inputs
             .iter()
-            .all(|input| matches!(input.shape, Shape::Fixed(_)))
-            .then(|| self.largest_bytes())
+            .all(|input| matches!(input.shape, Shape::Fixed { .. }))
+            .then(|| self.fixed_part())
     }
 
-    /// Packs a datum, allocating nothing.
-    ///
-    /// # Arguments
-    ///
-    /// * `readings` - Each input's state and its latest reading, as it
-    ///                arrived on its link, in the order of the inputs; a
-    ///                reading of an input whose state is none is not read.
-    /// * `out`      - Where the datum is written: at least
-    ///                [`Layout::largest_bytes`] long.
-    ///
-    /// # Returns
-    ///
-    /// How many bytes of `out` the datum is.
-    ///
-    /// # Errors
-    ///
-    /// The input, by position, whose reading is not of its type: a reading
-    /// of the wrong length, a boolean that is neither 0 nor 1, a string or
-    /// bytes longer than its most. Callers check a reading as it arrives,
-    /// with [`Layout::accepts`], so that a bad one never displaces a good.
-    pub fn pack(
-        &self,
-        readings: &[(State, &[u8])],
-        out: &mut [u8],
-    ) -> Result<usize, usize> {
-        let mut bits = Bits::writer(out);
-        for (at, (state, _)) in readings.iter().enumerate() {
-            bits.put(u64::from(state.bits()), STATE_BITS)
-                .map_err(|_| at)?;
-        }
-        for (at, (input, (state, reading))) in
-            self.inputs.iter().zip(readings).enumerate()
-        {
-            let none = *state == State::None;
-            match &input.shape {
-                Shape::Fixed(fields) => {
-                    let mut from = 0;
-                    for field in fields {
-                        let field = field.0;
-                        let bytes = field.link_bytes();
-                        if none {
-                            bits.zeros(field.datum_bits()).map_err(|_| at)?;
-                            continue;
-                        }
-                        let here = reading.get(from..from + bytes).ok_or(at)?;
-                        match field {
-                            Field::Boolean => {
-                                if here[0] > 1 {
-                                    return Err(at);
-                                }
-                                bits.put(u64::from(here[0]), BOOLEAN_BITS)
-                                    .map_err(|_| at)?;
-                            }
-                            Field::Bits(_) => {
-                                for byte in here {
-                                    bits.put(u64::from(*byte), 8)
-                                        .map_err(|_| at)?;
-                                }
-                            }
-                        }
-                        from += bytes;
-                    }
-                    if !none && from != reading.len() {
-                        return Err(at);
-                    }
-                }
-                Shape::Counted { most, length_bits } => {
-                    let reading: &[u8] = if none { &[] } else { reading };
-                    if reading.len() > *most {
-                        return Err(at);
-                    }
-                    bits.put(reading.len() as u64, *length_bits)
-                        .map_err(|_| at)?;
-                    for byte in reading {
-                        bits.put(u64::from(*byte), 8).map_err(|_| at)?;
-                    }
-                }
-            }
-        }
-        Ok(bits.bytes())
+    /// The most bytes every input's value together may be, each as it
+    /// arrives on its link: room for what [`Layout::unpack_into`] puts.
+    pub fn largest_link_bytes(&self) -> usize {
+        self.inputs.iter().map(Input::largest_link_bytes).sum()
     }
 
     /// Says whether a reading is one of an input's type, as it arrives:
-    /// one that is not is counted and dropped, the reading held before it
+    /// one that is not is counted and dropped, the value before it
     /// standing.
     ///
     /// # Arguments
@@ -470,89 +429,92 @@ impl Layout {
     ///
     /// Whether it is.
     pub fn accepts(&self, at: usize, reading: &[u8]) -> bool {
-        let Some(input) = self.inputs.get(at) else {
-            return false;
-        };
-        match &input.shape {
-            Shape::Fixed(fields) => {
-                let mut from = 0;
-                for field in fields {
-                    let bytes = field.0.link_bytes();
-                    let Some(here) = reading.get(from..from + bytes) else {
-                        return false;
-                    };
-                    if field.0 == Field::Boolean && here[0] > 1 {
-                        return false;
-                    }
-                    from += bytes;
-                }
-                from == reading.len()
-            }
-            Shape::Counted { most, .. } => reading.len() <= *most,
-        }
+        self.inputs
+            .get(at)
+            .is_some_and(|input| input.accepts(reading))
     }
 
-    /// Takes a datum apart into each input's state and reading, each
-    /// reading as it arrived on its link, so that what reads a datum of the
-    /// source's type reads it: [`Layout::unpack_into`], into storage of its
-    /// own, for the ground, which may allocate.
+    /// Packs a datum, allocating nothing.
     ///
     /// # Arguments
     ///
-    /// * `datum` - The datum.
+    /// * `values` - Each input's value -- its latest reading, or its
+    ///              default -- as it is on its link, in the order of the
+    ///              inputs.
+    /// * `out`    - Where the datum is written: at least
+    ///              [`Layout::largest_bytes`] long.
     ///
     /// # Returns
     ///
-    /// Each input's state and reading, in the order of the inputs; the
-    /// reading of an input whose state is none is empty.
+    /// How many bytes of `out` the datum is.
     ///
     /// # Errors
     ///
-    /// As [`Layout::unpack_into`].
-    pub fn unpack(
+    /// The input, by position, whose value is not of its type, or that
+    /// does not fit `out`. Callers check a reading as it arrives, with
+    /// [`Layout::accepts`], so that a bad one never displaces a good.
+    pub fn pack(
         &self,
-        datum: &[u8],
-    ) -> Result<Vec<(State, Vec<u8>)>, String> {
-        let mut out = vec![0u8; self.largest_link_bytes()];
-        let mut each = vec![(State::None, 0..0); self.inputs.len()];
-        self.unpack_into(datum, &mut out, &mut each)?;
-        Ok(each
-            .into_iter()
-            .map(|(state, span)| (state, out[span].to_vec()))
-            .collect())
+        values: &[&[u8]],
+        out: &mut [u8],
+    ) -> Result<usize, usize> {
+        let mut at = 0;
+        // The members of a fixed width, in place.
+        for (n, (input, value)) in self.inputs.iter().zip(values).enumerate() {
+            if let Shape::Fixed { .. } = input.shape {
+                if !input.accepts(value) {
+                    return Err(n);
+                }
+                let room = out.get_mut(at..at + value.len()).ok_or(n)?;
+                room.copy_from_slice(value);
+                at += value.len();
+            }
+        }
+        // And each that varies, its count and its bytes, after them.
+        for (n, (input, value)) in self.inputs.iter().zip(values).enumerate() {
+            if let Shape::Varies { count_bytes, .. } = input.shape {
+                if !input.accepts(value) {
+                    return Err(n);
+                }
+                let count = (value.len() as u16).to_be_bytes();
+                let room = out.get_mut(at..at + count_bytes).ok_or(n)?;
+                room.copy_from_slice(&count[2 - count_bytes..]);
+                at += count_bytes;
+                let room = out.get_mut(at..at + value.len()).ok_or(n)?;
+                room.copy_from_slice(value);
+                at += value.len();
+            }
+        }
+        if values.len() != self.inputs.len() {
+            return Err(values.len().min(self.inputs.len()));
+        }
+        Ok(at)
     }
 
-    /// The most bytes every input's reading together may be, as each
-    /// arrived on its link: room for what [`Layout::unpack_into`] puts.
-    pub fn largest_link_bytes(&self) -> usize {
-        self.inputs.iter().map(Input::largest_link_bytes).sum()
-    }
-
-    /// Takes a datum apart into each input's state and reading, allocating
-    /// nothing where the datum is sound: the readings are put end to end
-    /// in `out`, each as it arrived on its link, and `each` says where.
+    /// Takes a datum apart into each input's value, allocating nothing:
+    /// each is put back in its member's place, in the order of the inputs,
+    /// end to end in `out`, and `each` says where. A member that varies is
+    /// read from the datum's end and put in its place among the rest.
     ///
     /// # Arguments
     ///
     /// * `datum` - The datum.
-    /// * `out`   - Where the readings are put: at least
+    /// * `out`   - Where the values are put: at least
     ///             [`Layout::largest_link_bytes`] long.
-    /// * `each`  - Where each input's state and the span of `out` its
-    ///             reading is are put, in the order of the inputs: at least
-    ///             as long as there are inputs. The span of an input whose
-    ///             state is none is empty.
+    /// * `each`  - Where each input's value is in `out`, in the order of
+    ///             the inputs: at least as long as there are inputs.
     ///
     /// # Errors
     ///
-    /// A sentence where the datum is shorter than it says it is, says a
-    /// state no state is, has a length more than its input's most, or has
-    /// bits left over past a byte's padding; or where `out` or `each` is
-    /// too short.
+    /// A sentence where the datum is shorter than its members say, has a
+    /// count past an input's most, a string that is not text, a boolean
+    /// that is neither 0 nor 1, or bytes after its last member; or where
+    /// `out` or `each` is too short.
     pub fn unpack_into(
         &self,
         datum: &[u8],
         out: &mut [u8],
-        each: &mut [(State, std::ops::Range<usize>)],
+        each: &mut [Range<usize>],
     ) -> Result<(), String> {
         if each.len() < self.inputs.len() {
             return Err(format!(
@@ -561,73 +523,132 @@ impl Layout {
                 self.inputs.len()
             ));
         }
-        let mut bits = Bits::reader(datum);
-        let short = |_| format!("a datum of {} bytes ends early", datum.len());
+        // Where each value lands in `out`, in the order of the inputs.
+        let mut put = 0;
         for (input, slot) in self.inputs.iter().zip(each.iter_mut()) {
-            let said = bits.take(STATE_BITS).map_err(short)? as u8;
-            slot.0 = State::of(said).ok_or_else(|| {
-                format!(
-                    "input \"{}\" has the state 11, which no state is: the \
-                     datum is damaged",
-                    input.name
-                )
-            })?;
+            *slot = put..put;
+            put += input.largest_link_bytes();
         }
-        let room = out.len();
-        let no_room =
-            || format!("room for {room} bytes of readings, and they need more");
-        let mut at = 0;
-        for (input, slot) in self.inputs.iter().zip(each.iter_mut()) {
-            let from = at;
-            let mut put = |byte: u64| -> Result<(), String> {
-                *out.get_mut(at).ok_or_else(no_room)? = byte as u8;
-                at += 1;
-                Ok(())
-            };
-            match &input.shape {
-                Shape::Fixed(fields) => {
-                    for field in fields {
-                        match field.0 {
-                            Field::Boolean => {
-                                put(bits.take(BOOLEAN_BITS).map_err(short)?)?;
-                            }
-                            Field::Bits(width) => {
-                                for _ in 0..width / 8 {
-                                    put(bits.take(8).map_err(short)?)?;
-                                }
-                            }
-                        }
-                    }
-                }
-                Shape::Counted { most, length_bits } => {
-                    let length =
-                        bits.take(*length_bits).map_err(short)? as usize;
-                    if length > *most {
-                        return Err(format!(
-                            "input \"{}\" says {length} bytes, and it holds \
-                             at most {most}",
-                            input.name
-                        ));
-                    }
-                    for _ in 0..length {
-                        put(bits.take(8).map_err(short)?)?;
-                    }
-                }
-            }
-            if slot.0 == State::None {
-                at = from;
-            }
-            slot.1 = from..at;
-        }
-        if bits.bytes() != datum.len() {
+        if put > out.len() {
             return Err(format!(
-                "a datum of {} bytes holds {} of a consolidation and more \
+                "room for {} bytes of values, and they need {put}",
+                out.len()
+            ));
+        }
+        self.walk(datum, |n, value| {
+            let slot = &mut each[n];
+            slot.end = slot.start + value.len();
+            out[slot.clone()].copy_from_slice(value);
+        })
+    }
+
+    /// Says whether a datum is one this layout can have made, allocating
+    /// nothing and putting nothing anywhere: what the ground asks of a
+    /// datum it hands on whole.
+    ///
+    /// # Arguments
+    ///
+    /// * `datum` - The datum.
+    ///
+    /// # Errors
+    ///
+    /// As [`Layout::unpack_into`], for the datum.
+    pub fn check(&self, datum: &[u8]) -> Result<(), String> {
+        self.walk(datum, |_, _| {})
+    }
+
+    /// Finds each input's value in a datum, checking it as it goes: the
+    /// one statement of how a datum is read, which [`Layout::unpack_into`]
+    /// and [`Layout::check`] share.
+    ///
+    /// # Arguments
+    ///
+    /// * `datum` - The datum.
+    /// * `found` - Given each input's position and its value, the members
+    ///             of a fixed width first and then those that vary, each
+    ///             once and only where it is of its type.
+    ///
+    /// # Errors
+    ///
+    /// A sentence where the datum is shorter than its members say, has a
+    /// count past an input's most, a value not of its input's type, or
+    /// bytes after its last member.
+    fn walk(
+        &self,
+        datum: &[u8],
+        mut found: impl FnMut(usize, &[u8]),
+    ) -> Result<(), String> {
+        let short = || format!("a datum of {} bytes ends early", datum.len());
+        let damaged = |input: &Input| {
+            format!(
+                "input \"{}\" is not a {}: the datum is damaged",
+                input.name, input.kind
+            )
+        };
+        // The members of a fixed width, in place, then those that vary.
+        let mut at = 0;
+        for (n, input) in self.inputs.iter().enumerate() {
+            if let Shape::Fixed { bytes } = input.shape {
+                let value = datum.get(at..at + bytes).ok_or_else(short)?;
+                at += bytes;
+                if !input.accepts(value) {
+                    return Err(damaged(input));
+                }
+                found(n, value);
+            }
+        }
+        for (n, input) in self.inputs.iter().enumerate() {
+            if let Shape::Varies { most, count_bytes } = input.shape {
+                let count =
+                    datum.get(at..at + count_bytes).ok_or_else(short)?;
+                at += count_bytes;
+                let length = count
+                    .iter()
+                    .fold(0usize, |sum, byte| sum << 8 | usize::from(*byte));
+                if length > most {
+                    return Err(format!(
+                        "input \"{}\" says {length} bytes, and it holds at \
+                         most {most}",
+                        input.name
+                    ));
+                }
+                let value = datum.get(at..at + length).ok_or_else(short)?;
+                at += length;
+                if !input.accepts(value) {
+                    return Err(damaged(input));
+                }
+                found(n, value);
+            }
+        }
+        if at != datum.len() {
+            return Err(format!(
+                "a datum of {} bytes holds {at} of a consolidation and more \
                  after it",
-                datum.len(),
-                bits.bytes()
+                datum.len()
             ));
         }
         Ok(())
+    }
+
+    /// [`Layout::unpack_into`], allocating the values: for the ground, and
+    /// tests.
+    ///
+    /// # Arguments
+    ///
+    /// * `datum` - The datum.
+    ///
+    /// # Returns
+    ///
+    /// Each input's value, in the order of the inputs.
+    ///
+    /// # Errors
+    ///
+    /// As [`Layout::unpack_into`].
+    pub fn unpack(&self, datum: &[u8]) -> Result<Vec<Vec<u8>>, String> {
+        let mut out = vec![0u8; self.largest_link_bytes()];
+        let mut each = vec![0..0; self.inputs.len()];
+        self.unpack_into(datum, &mut out, &mut each)?;
+        Ok(each.into_iter().map(|span| out[span].to_vec()).collect())
     }
 }
 
@@ -670,94 +691,18 @@ pub struct ConsolidatorCounts {
 pub struct InputCounts {
     /// The datums it went into held: the reading before, again.
     pub held: u64,
-    /// The datums it went into none: nothing has arrived from it yet.
+    /// The datums it went into with its default: nothing had arrived from
+    /// it yet.
     pub none: u64,
-}
-
-/// Bits written into, or read out of, a run of bytes, most significant bit
-/// first.
-struct Bits<'a> {
-    /// The bytes written into; empty for a reader.
-    out: &'a mut [u8],
-    /// The bytes read; empty for a writer.
-    from: &'a [u8],
-    /// How many bits have been written or read.
-    at: usize,
-}
-
-/// The run of bytes is too short for what is written or read.
-#[derive(Debug)]
-struct Short;
-
-impl<'a> Bits<'a> {
-    /// Writes into `out`, which is zeroed first.
-    fn writer(out: &'a mut [u8]) -> Bits<'a> {
-        out.fill(0);
-        Bits {
-            out,
-            from: &[],
-            at: 0,
-        }
-    }
-
-    /// Reads from `from`.
-    fn reader(from: &'a [u8]) -> Bits<'a> {
-        Bits {
-            out: &mut [],
-            from,
-            at: 0,
-        }
-    }
-
-    /// Writes the low `width` bits of `value`, most significant first.
-    fn put(&mut self, value: u64, width: usize) -> Result<(), Short> {
-        if self.at + width > self.out.len() * 8 {
-            return Err(Short);
-        }
-        for bit in (0..width).rev() {
-            if value >> bit & 1 == 1 {
-                self.out[self.at / 8] |= 0x80 >> (self.at % 8);
-            }
-            self.at += 1;
-        }
-        Ok(())
-    }
-
-    /// Writes `width` zero bits.
-    fn zeros(&mut self, width: usize) -> Result<(), Short> {
-        if self.at + width > self.out.len() * 8 {
-            return Err(Short);
-        }
-        self.at += width;
-        Ok(())
-    }
-
-    /// Reads `width` bits, at most 64, most significant first.
-    fn take(&mut self, width: usize) -> Result<u64, Short> {
-        if self.at + width > self.from.len() * 8 {
-            return Err(Short);
-        }
-        let mut value = 0u64;
-        for _ in 0..width {
-            let bit = self.from[self.at / 8] >> (7 - self.at % 8) & 1;
-            value = value << 1 | u64::from(bit);
-            self.at += 1;
-        }
-        Ok(value)
-    }
-
-    /// How many whole bytes the bits written or read take, the last padded.
-    fn bytes(&self) -> usize {
-        self.at.div_ceil(8)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// A layout of these inputs, each of this type.
-    fn layout(kinds: &[(&str, LinkType, Option<usize>)]) -> Layout {
+    /// A layout of these inputs, each of this type, its default nought or
+    /// empty.
+    fn layout(kinds: &[(&str, LinkType, usize)]) -> Layout {
         Layout {
             inputs: kinds
                 .iter()
@@ -765,222 +710,149 @@ mod tests {
                     name: name.to_string(),
                     source: name.to_string(),
                     kind: kind.clone(),
-                    shape: match kind {
-                        LinkType::Basic(basic) => match Field::of(*basic) {
-                            Some(field) => {
-                                Shape::Fixed(vec![FixedField(field)])
-                            }
-                            None => Shape::Counted {
-                                most: most.expect("a most"),
-                                length_bits: length_bits(most.unwrap()),
-                            },
-                        },
-                        LinkType::Structure(fields) => Shape::Fixed(
-                            fields
-                                .iter()
-                                .map(|(_, b)| {
-                                    FixedField(Field::of(*b).unwrap())
-                                })
-                                .collect(),
-                        ),
-                    },
+                    shape: Shape::of(kind, *most),
+                    default: vec![0; kind.width().unwrap_or(0)],
                 })
                 .collect(),
         }
     }
 
-    /// A boolean is as many bits in a consolidation as `types.xtce` says
-    /// `boolean_bit` is, the one statement of it.
-    #[test]
-    fn a_booleans_bits_are_types_xtces() {
-        let types = include_str!("../xtce/types.xtce");
-        let at = types
-            .find("<BooleanParameterType name=\"boolean_bit\">")
-            .expect("types.xtce states boolean_bit");
-        let encoding = &types[at..];
-        let said = encoding
-            .split("sizeInBits=\"")
-            .nth(1)
-            .and_then(|rest| rest.split('"').next())
-            .expect("its width");
-        assert_eq!(said.parse::<usize>(), Ok(BOOLEAN_BITS));
+    /// A boolean, a u16, a string of at most 8, bytes of at most 300 and an
+    /// i8: the members of a fixed width in place, in order, and then the
+    /// string's one-byte count and bytes and the bytes' two-byte count and
+    /// bytes, in the order they are listed.
+    fn sample() -> Layout {
+        layout(&[
+            ("flag", LinkType::Basic(Basic::Boolean), 0),
+            ("count", LinkType::Basic(Basic::U16), 0),
+            ("name", LinkType::Basic(Basic::String(Some(8))), 8),
+            ("data", LinkType::Basic(Basic::Bytes(Some(300))), 300),
+            ("level", LinkType::Basic(Basic::I8), 0),
+        ])
     }
 
-    /// A length field is just wide enough for its most.
+    /// Every member of a fixed width is at one offset; those that vary
+    /// follow, each a count and its bytes; and the datum reads back as it
+    /// was, each value in its member's place.
     #[test]
-    fn a_length_is_just_wide_enough() {
-        assert_eq!(length_bits(64), 7);
-        assert_eq!(length_bits(63), 6);
-        assert_eq!(length_bits(4096), 13);
-        assert_eq!(length_bits(1), 1);
-        assert_eq!(length_bits(0), 1);
+    fn a_datum_is_its_members_with_those_that_vary_at_the_end() {
+        let laid = sample();
+        assert_eq!(laid.fixed_part(), 1 + 2 + 1);
+        assert_eq!(
+            (0..5).map(|at| laid.offset(at)).collect::<Vec<_>>(),
+            vec![Some(0), Some(1), None, None, Some(3)]
+        );
+        assert_eq!(laid.smallest_bytes(), 4 + 1 + 2);
+        assert_eq!(laid.largest_bytes(), 4 + 1 + 8 + 2 + 300);
+        assert_eq!(laid.fixed_bytes(), None);
+
+        let mut out = [0xeeu8; 400];
+        let values: [&[u8]; 5] =
+            [&[1], &[0x12, 0x34], b"hi", &[9, 8, 7], &[0xfe]];
+        let used = laid.pack(&values, &mut out).expect("it packs");
+        assert_eq!(
+            &out[..used],
+            &[1, 0x12, 0x34, 0xfe, 2, b'h', b'i', 0, 3, 9, 8, 7]
+        );
+        let back = laid.unpack(&out[..used]).expect("it unpacks");
+        assert_eq!(back, values.iter().map(|v| v.to_vec()).collect::<Vec<_>>());
     }
 
-    /// The states come first, two bits each, then each input's bits, end to
-    /// end and most significant first: a boolean is one bit, and the datum
-    /// is padded only at its end.
+    /// A string at its most and one empty, and bytes empty, are what they
+    /// were; and an input wholly of a fixed width is one length always.
     #[test]
-    fn a_datum_is_packed_bit_by_bit() {
-        let laid = layout(&[
-            ("flag", LinkType::Basic(Basic::Boolean), None),
-            ("count", LinkType::Basic(Basic::U8), None),
-            ("name", LinkType::Basic(Basic::String(Some(3))), Some(3)),
-        ]);
-        // 3 states, 6 bits; flag 1; count 8; name 2 + 16: 33 bits, 5 bytes.
-        assert_eq!(laid.largest_bits(), 6 + 1 + 8 + 2 + 3 * 8);
-        let mut out = [0xffu8; 8];
-        let used = laid
-            .pack(
-                &[
-                    (State::New, &[1]),
-                    (State::Held, &[0xa5]),
-                    (State::New, b"hi"),
-                ],
-                &mut out,
-            )
-            .expect("it packs");
-        // 10 01 10 | 1 | 1010_0101 | 10 | 0110_1000 0110_1001, padded.
-        let mut want = String::from("100110");
-        want += "1";
-        want += "10100101";
-        want += "10";
-        want += "0110100001101001";
-        while want.len() % 8 != 0 {
-            want.push('0');
+    fn a_member_that_varies_may_be_empty_or_at_its_most() {
+        let laid = sample();
+        let mut out = [0u8; 400];
+        for name in [&b""[..], &b"12345678"[..]] {
+            let values: [&[u8]; 5] = [&[0], &[0, 0], name, &[], &[0]];
+            let used = laid.pack(&values, &mut out).expect("it packs");
+            assert_eq!(used, 4 + 1 + name.len() + 2);
+            assert_eq!(laid.unpack(&out[..used]).expect("it reads")[2], name);
         }
-        let got: String = out[..used]
-            .iter()
-            .map(|byte| format!("{byte:08b}"))
-            .collect();
-        assert_eq!(got, want);
-
-        let back = laid.unpack(&out[..used]).expect("it unpacks");
-        assert_eq!(
-            back,
-            vec![
-                (State::New, vec![1]),
-                (State::Held, vec![0xa5]),
-                (State::New, b"hi".to_vec()),
-            ]
-        );
-    }
-
-    /// Each string or bytes has a length field just wide enough for its
-    /// own most, so two of different mosts have fields of different
-    /// widths; one at its most and one empty are each read back as they
-    /// were, and the datum ends partway through a byte, padded.
-    #[test]
-    fn lengths_are_each_as_wide_as_their_most() {
-        let laid = layout(&[
-            ("short", LinkType::Basic(Basic::String(Some(8))), Some(8)),
-            ("long", LinkType::Basic(Basic::Bytes(Some(300))), Some(300)),
+        let fixed = layout(&[
+            ("a", LinkType::Basic(Basic::U32), 0),
+            ("b", LinkType::Basic(Basic::Boolean), 0),
         ]);
-        // States 4; short: a 4-bit length and up to 64; long: 9 and 2400.
-        assert_eq!(laid.largest_bits(), 4 + 4 + 64 + 9 + 300 * 8);
-        let mut out = [0xffu8; 400];
-        let used = laid
-            .pack(&[(State::New, b"abcdefgh"), (State::New, b"")], &mut out)
-            .expect("it packs");
-        // 4 + 4 + 64 + 9 = 81 bits: eleven bytes, the last seven bits pad.
-        assert_eq!(used, 11);
-        let got: String = out[..used]
-            .iter()
-            .map(|byte| format!("{byte:08b}"))
-            .collect();
-        assert!(got.starts_with("1010"), "{got}");
-        assert_eq!(&got[4..8], "1000", "eight, in four bits");
-        assert_eq!(&got[72..81], "000000000", "nought, in nine bits");
-        assert!(got[81..].bytes().all(|b| b == b'0'), "{got}");
-        let back = laid.unpack(&out[..used]).expect("it unpacks");
-        assert_eq!(
-            back,
-            vec![(State::New, b"abcdefgh".to_vec()), (State::New, vec![])]
-        );
-        // Past its most, a reading is not taken.
-        assert!(!laid.accepts(0, b"abcdefghi"));
+        assert_eq!(fixed.fixed_bytes(), Some(5));
     }
 
-    /// An input that has never arrived is zeros of its width, or an empty
-    /// string, and is read back as nothing; a datum of zeros is every input
-    /// none.
+    /// A count is one byte for a most up to 255, and two above.
     #[test]
-    fn an_input_that_never_arrived_is_zeros() {
-        let laid = layout(&[
-            ("a", LinkType::Basic(Basic::I16), None),
-            ("b", LinkType::Basic(Basic::Bytes(Some(10))), Some(10)),
-        ]);
-        let mut out = [0u8; 8];
-        let used = laid
-            .pack(&[(State::None, &[1, 2]), (State::None, b"xyz")], &mut out)
-            .expect("it packs");
-        assert!(out[..used].iter().all(|byte| *byte == 0));
-        let back = laid.unpack(&out[..used]).expect("it unpacks");
-        assert_eq!(back, vec![(State::None, vec![]), (State::None, vec![])]);
+    fn a_count_is_one_byte_or_two() {
+        assert_eq!(count_bytes(0), 1);
+        assert_eq!(count_bytes(255), 1);
+        assert_eq!(count_bytes(256), 2);
+        assert_eq!(count_bytes(MOST_VARYING), 2);
     }
 
-    /// A boolean that is not 0 or 1, a reading of the wrong width and one
-    /// longer than its most are not accepted, nor packed.
+    /// A reading not of its input's type is not accepted, nor packed: a
+    /// boolean that is not 0 or 1, alone or a structure's field; one of the
+    /// wrong width; a string longer than its most, or not text.
     #[test]
     fn a_reading_not_of_its_type_is_refused() {
-        let laid = layout(&[
-            ("flag", LinkType::Basic(Basic::Boolean), None),
-            ("word", LinkType::Basic(Basic::U16), None),
-            ("text", LinkType::Basic(Basic::String(Some(2))), Some(2)),
-        ]);
+        let laid = sample();
         assert!(laid.accepts(0, &[1]));
         assert!(!laid.accepts(0, &[2]));
         assert!(!laid.accepts(1, &[1]));
-        assert!(laid.accepts(2, b"ok"));
-        assert!(!laid.accepts(2, b"too"));
-        let mut out = [0u8; 8];
-        assert_eq!(
-            laid.pack(
-                &[(State::New, &[2]), (State::New, &[0, 1]), (State::New, b"")],
-                &mut out
-            ),
-            Err(0)
-        );
-    }
-
-    /// A structure's booleans are one bit each among its other fields.
-    #[test]
-    fn a_structures_booleans_are_one_bit_each() {
-        let laid = layout(&[
+        assert!(!laid.accepts(2, b"123456789"));
+        assert!(!laid.accepts(2, &[0xff]));
+        assert!(laid.accepts(3, &[0xff]));
+        let structure = layout(&[
             (
-                "status",
+                "s",
                 LinkType::Structure(vec![
                     ("on".to_string(), Basic::Boolean),
-                    ("level".to_string(), Basic::U8),
-                    ("fault".to_string(), Basic::Boolean),
+                    ("n".to_string(), Basic::U8),
                 ]),
-                None,
+                0,
             ),
-            ("other", LinkType::Basic(Basic::Boolean), None),
+            ("t", LinkType::Basic(Basic::U8), 0),
         ]);
-        assert_eq!(
-            laid.fixed_bytes(),
-            Some((4 + 1 + 8 + 1 + 1usize).div_ceil(8))
-        );
-        let mut out = [0u8; 4];
-        let used = laid
-            .pack(&[(State::New, &[1, 7, 0]), (State::Held, &[1])], &mut out)
-            .expect("it packs");
-        assert_eq!(
-            laid.unpack(&out[..used]).expect("it unpacks"),
-            vec![(State::New, vec![1, 7, 0]), (State::Held, vec![1])]
-        );
+        assert!(structure.accepts(0, &[1, 200]));
+        assert!(!structure.accepts(0, &[2, 200]));
+        let mut out = [0u8; 8];
+        assert_eq!(structure.pack(&[&[2, 0], &[0]], &mut out), Err(0));
     }
 
-    /// A state of 11 is a damaged datum, and so is one with bytes past its
-    /// end or one that ends early.
+    /// A datum that cannot be one is refused: cut short, a count past its
+    /// input's most, bytes after its last member, a boolean neither 0 nor
+    /// 1.
     #[test]
     fn a_damaged_datum_is_refused() {
-        let laid = layout(&[
-            ("a", LinkType::Basic(Basic::U8), None),
-            ("b", LinkType::Basic(Basic::U8), None),
-        ]);
-        assert!(laid.unpack(&[0b1100_0000, 0, 0]).is_err());
-        assert!(laid.unpack(&[0b1010_0000, 0, 0, 0]).is_err());
-        assert!(laid.unpack(&[0b1010_0000]).is_err());
+        let laid = sample();
+        assert!(laid.unpack(&[1, 0, 0, 0]).is_err(), "no counts");
+        assert!(
+            laid.unpack(&[1, 0, 0, 0, 9, 0, 0]).is_err(),
+            "nine bytes in a string of eight"
+        );
+        assert!(laid.unpack(&[1, 0, 0, 0, 0, 0, 0, 0]).is_err(), "one over");
+        assert!(laid.unpack(&[2, 0, 0, 0, 0, 0, 0]).is_err(), "boolean 2");
+        assert!(laid.unpack(&[1, 0, 0, 0, 0, 0, 0]).is_ok());
+        assert!(laid.check(&[1, 0, 0, 0, 0, 0, 0]).is_ok());
+        assert!(laid.check(&[2, 0, 0, 0, 0, 0, 0]).is_err());
+    }
+
+    /// A default is read as a value of its input's type is written, and one
+    /// that is not one is refused, naming the input.
+    #[test]
+    fn a_default_is_a_value_of_its_type() {
+        let u8_ = LinkType::Basic(Basic::U8);
+        assert_eq!(default_of("a", &u8_, 0, "7"), Ok(vec![7]));
+        assert!(default_of("a", &u8_, 0, "300")
+            .is_err_and(|why| why.contains("\"a\"")));
+        let flag = LinkType::Basic(Basic::Boolean);
+        assert_eq!(default_of("f", &flag, 0, "1"), Ok(vec![1]));
+        assert!(default_of("f", &flag, 0, "yes").is_err());
+        let i16_ = LinkType::Basic(Basic::I16);
+        assert_eq!(default_of("t", &i16_, 0, "-1"), Ok(vec![0xff, 0xff]));
+        let text = LinkType::Basic(Basic::String(Some(4)));
+        assert_eq!(default_of("s", &text, 4, "\"\""), Ok(vec![]));
+        assert_eq!(default_of("s", &text, 4, "\"none\""), Ok(b"none".to_vec()));
+        assert!(default_of("s", &text, 4, "\"nothing\"").is_err());
+        assert!(default_of("s", &text, 4, "[ff]").is_err(), "not text");
+        let bytes = LinkType::Basic(Basic::Bytes(Some(4)));
+        assert_eq!(default_of("b", &bytes, 4, "[]"), Ok(vec![]));
+        assert_eq!(default_of("b", &bytes, 4, "[de ad]"), Ok(vec![0xde, 0xad]));
     }
 }

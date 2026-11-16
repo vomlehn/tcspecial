@@ -28,7 +28,7 @@
             <send>0.0.0.0:5550</send>
         </beacon>
         <gateway>radio</gateway>
-        <interface>5684f9b97e87a4e3294258ba473c2e79</interface>
+        <interface>85b9e713bed11d3415d182a4742a26b2</interface>
         <log>
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>
@@ -88,9 +88,17 @@
         <type name="compute">
             <!-- Sends when all three are new, and every two seconds
                  otherwise: all_new alone is refused, since one sensor that
-                 stopped would stop it for good. -->
+                 stopped would stop it for good. Until a sensor has
+                 reported, its default goes down in its place: the
+                 battery's charge is 0 to 100, so 255 says "never read" by
+                 being impossible, and so does 65535 for a sun angle in
+                 hundredths of a degree; a wheel at rest reads 0, so its
+                 default cannot be told from a reading. -->
             <compute name="housekeeping">
                 <function>consolidator</function>
+                <defaults>sun=65535</defaults>
+                <defaults>wheel=0</defaults>
+                <defaults>battery=255</defaults>
                 <interval>2 s</interval>
                 <send>all_new</send>
                 <send>interval</send>

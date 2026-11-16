@@ -350,7 +350,7 @@ impl Counters {
 }
 
 /// What a consolidator has sent, and how often each input went into a datum
-/// held or none, counted as it sends: see
+/// held or as its default, counted as it sends: see
 /// [`tcsprotocol::consolidation::ConsolidatorCounts`].
 ///
 /// Atomics, as [`Counters`] are and for the same reason: the port writes
@@ -370,7 +370,7 @@ pub struct ConsolidatorCounters {
     /// Readings refused for not being of their input's type.
     refused: AtomicU64,
     /// Each input's, in the order of the consolidator's `world-in`: the
-    /// datums it went into held, and those it went into none.
+    /// datums it went into held, and those it went into as its default.
     inputs: Vec<(AtomicU64, AtomicU64)>,
 }
 
@@ -399,19 +399,21 @@ impl ConsolidatorCounters {
     }
 
     /// Counts a datum sent: under each trigger that fired, and under each
-    /// input that went into it held or none.
+    /// input that went into it held or as its default.
     ///
     /// # Arguments
     ///
     /// * `fired`  - The triggers that fired in the pass it was sent at.
-    /// * `states` - Each input's state as it went into the datum, in the
-    ///              order of the inputs.
+    /// * `states` - What each input's value was as it went into the datum,
+    ///              in the order of the inputs.
     pub fn sent(
         &self,
         fired: Triggers,
-        states: impl Iterator<Item = tcsprotocol::consolidation::State>,
+        states: impl Iterator<
+            Item = crate::node::vehicle::compute::consolidator::Fresh,
+        >,
     ) {
-        use tcsprotocol::consolidation::State;
+        use crate::node::vehicle::compute::consolidator::Fresh;
         let add = |counter: &AtomicU64| {
             counter.fetch_add(1, Ordering::Relaxed);
         };
@@ -427,9 +429,9 @@ impl ConsolidatorCounters {
         }
         for ((held, none), state) in self.inputs.iter().zip(states) {
             match state {
-                State::Held => add(held),
-                State::None => add(none),
-                State::New => {}
+                Fresh::Held => add(held),
+                Fresh::Default => add(none),
+                Fresh::New => {}
             }
         }
     }

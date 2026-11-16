@@ -49,7 +49,6 @@ use tcsmoc::beacon::{
 use tcsmoc::gateway::GatewayReceiver;
 use tcsmoc::matched::Matched;
 use tcsmoc::ping::{route_of, Pinger, Uplink, NO_MESSAGE};
-use tcsmoc::relay::Relay;
 use tcsmoc::{command_links_of, CommandStatus, TcsClient};
 use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
 use tcsprotocol::consolidation::INPUTS_PER_ANSWER;
@@ -1166,69 +1165,6 @@ pub unsafe extern "C" fn tcs_gateway_receive(
 pub unsafe extern "C" fn tcs_gateway_close(gateway: *mut tcs_gateway) {
     if !gateway.is_null() {
         drop(Box::from_raw(gateway));
-    }
-}
-
-// ---- Relaying a consolidator's inputs --------------------------------------
-
-/// A relay: a thread handing on a consolidator's inputs to a station that
-/// reads the gateway node's ports itself, as Yamcs does.
-pub struct tcs_relay {
-    /// The relay, which stops its thread when dropped.
-    _relay: Relay,
-}
-
-/// Starts relaying the inputs of every consolidator drawn into the gateway
-/// node called `gateway`: see `tcsmoc::relay`.
-///
-/// # Arguments
-///
-/// * `configuration` - The configuration.
-/// * `gateway`       - The gateway node's name.
-/// * `relay`         - Where the relay is put, or NULL where there is
-///                     nothing to relay.
-///
-/// # Returns
-///
-/// 1 for a relay started, 0 for nothing to relay, -1 on an error.
-///
-/// # Safety
-///
-/// `configuration` as [`tcs_configuration_digest`]; `gateway` NULL or a
-/// NUL-terminated string; `relay` NULL or writable.
-#[no_mangle]
-pub unsafe extern "C" fn tcs_relay_open(
-    configuration: *const tcs_configuration,
-    gateway: *const c_char,
-    relay: *mut *mut tcs_relay,
-) -> c_int {
-    guard(-1, || {
-        let configuration = handle_of(configuration, "the configuration")?;
-        let name = text_of(gateway, "the gateway node's name")?;
-        let out = out_of(relay, "where the relay is put")?;
-        *out = std::ptr::null_mut();
-        let Some(started) =
-            Relay::start(&configuration.graph, name).map_err(|e| {
-                fail(format_args!("{}: {e}", configuration.path.display()))
-            })?
-        else {
-            return Ok(0);
-        };
-        // Allocates, once, at startup: the handle, which outlives this call.
-        *out = Box::into_raw(Box::new(tcs_relay { _relay: started }));
-        Ok(1)
-    })
-}
-
-/// Stops a relay, waiting for its thread to end.
-///
-/// # Safety
-///
-/// `relay` NULL or made by `tcs_relay_open` and not yet closed.
-#[no_mangle]
-pub unsafe extern "C" fn tcs_relay_close(relay: *mut tcs_relay) {
-    if !relay.is_null() {
-        drop(Box::from_raw(relay));
     }
 }
 
@@ -2471,7 +2407,7 @@ pub struct tcs_input_counts {
 }
 
 /// Sends QUERY_CONSOLIDATOR, to ask what a consolidator has sent and how
-/// often each of its inputs went into a datum held or none.
+/// often each of its inputs went into a datum held or as its default.
 ///
 /// # Arguments
 ///
@@ -2969,43 +2905,6 @@ mod tests {
             )
         };
         assert_eq!(said, -1, "not a unit");
-    }
-
-    /// A relay starts where a consolidator's inputs need relaying, and runs
-    /// on after its configuration is closed; where none does, there is
-    /// nothing to start, and no relay is put.
-    #[test]
-    fn a_relay_starts_only_where_there_is_something_to_relay() {
-        use super::*;
-
-        for (file, wanted) in [
-            ("tests/consolidator/yamcs.ytcs", 1),
-            ("examples/ping-yamcs/ping-yamcs.ytcs", 0),
-        ] {
-            let path = CString::new(format!(
-                "{}/../{file}",
-                env!("CARGO_MANIFEST_DIR")
-            ))
-            .expect("a path");
-            // SAFETY: a NUL-terminated path that outlives the call.
-            let configuration =
-                unsafe { tcs_configuration_open(path.as_ptr()) };
-            assert!(!configuration.is_null(), "{file} opens");
-            let mut relay = std::ptr::dangling_mut::<tcs_relay>();
-            // SAFETY: a live configuration, a NUL-terminated name and a
-            // writable pointer.
-            let said = unsafe {
-                tcs_relay_open(configuration, c"gateway".as_ptr(), &mut relay)
-            };
-            assert_eq!(said, wanted, "{file}");
-            assert_eq!(relay.is_null(), wanted == 0, "{file}");
-            // SAFETY: made by tcs_configuration_open and not yet closed;
-            // the relay, made by tcs_relay_open or NULL, after it.
-            unsafe {
-                tcs_configuration_close(configuration);
-                tcs_relay_close(relay);
-            }
-        }
     }
 
     /// A setting's value is written as its type: the thermostat's setpoint

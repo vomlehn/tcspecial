@@ -4,9 +4,10 @@ type: compute
 about: >
   Several readings of different things sent as one datum, a consolidation,
   so that what belongs together reaches the ground together: one datum
-  arrives whole or not at all, where two packets may half arrive. It sends
-  what it has and says of each input whether it is new, held or none, and
-  it sends to a gateway, a log or a tee and to nothing else.
+  arrives whole or not at all, where two packets may half arrive. Its
+  datum is a structure of its inputs, each its latest reading, or its
+  default until one has arrived, and it sends to a gateway, a log or a tee
+  and to nothing else.
 sets:
   function: consolidator
 payload-sink: true
@@ -33,3 +34,12 @@ attributes:
     about: >
       How often it sends where send names interval, as a length of time:
       1 s. Given with that trigger and only with it. The ground may set it.
+  - name: defaults
+    required: true
+    about: >
+      What it sends for each input until a reading has arrived at it, one
+      entry for each input, comma separated, written input=value: a number,
+      1 or 0 for a boolean, a string in quotes, bytes in square brackets,
+      as temp=0, valve=0, name="none". A default cannot be told from a
+      reading of the same value, so choose one no reading can be, or add an
+      input of your own that says so.

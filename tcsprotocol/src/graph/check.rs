@@ -2058,6 +2058,20 @@ impl Graph {
             ));
         }
 
+        // Its layout, where its inputs are all linked: a default that is not
+        // a value of its input's type, or a string or bytes too long to
+        // count. An input no link reaches is said just above.
+        if bound == declared {
+            if let Err(why) = crate::consolidation::Layout::of(
+                self,
+                node,
+                &consolidator.inputs,
+                &consolidator.defaults,
+            ) {
+                problems.push(why);
+            }
+        }
+
         // No more inputs than the configuration lets one have. A section
         // that does not read is said where the section is checked.
         if let Some(most) = self.tcspecial.as_ref().and_then(|section| {
@@ -2204,24 +2218,12 @@ impl Graph {
         // A consolidator whose every input is of a fixed width sends datums
         // of one width, which its layout says; one with a string or bytes
         // among them does not.
-        if node.node_type == "compute" {
-            if let Ok(
-                crate::node::vehicle::compute::Computation::Consolidator(
-                    params,
-                ),
-            ) = crate::node::vehicle::compute::params_of(
-                &node.name,
-                &node.attributes,
-            ) {
-                return crate::consolidation::Layout::of(
-                    self,
-                    &node.name,
-                    &params.inputs,
-                )
+        if let Some(laid) = crate::consolidation::Layout::of_node(self, node) {
+            return laid
                 .ok()?
+                .1
                 .fixed_bytes()
                 .and_then(|bytes| u32::try_from(bytes).ok());
-            }
         }
         if node.node_type == "compute" || node.node_type == "log" {
             return None;
@@ -2429,7 +2431,7 @@ mod tests {
         crate::graph::parameters::nest(
             &[
                 ("gateway", "radio"),
-                ("interface", "5684f9b97e87a4e3294258ba473c2e79"),
+                ("interface", "85b9e713bed11d3415d182a4742a26b2"),
                 ("tcs_cmd.recv", "0.0.0.0:4000"),
                 ("tcs_cmd.send", "127.0.0.1:4100"),
                 ("payload_telemetry.source_base", "0.0.0.0:6000"),

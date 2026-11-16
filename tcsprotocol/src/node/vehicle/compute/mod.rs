@@ -660,14 +660,89 @@ pub struct VoteParams {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConsolidatorParams {
     /// The inputs it consolidates, in the order its `world-in` lists them,
-    /// which is the order their states and their bit strings take in the
-    /// datum.
+    /// which is the order of the structure it sends.
     pub inputs: Vec<String>,
+    /// Each input's default, as its `defaults` entry writes it, in the
+    /// order of `inputs`: what the datum carries for the input until a
+    /// reading has arrived. Read as a value of the input's type by
+    /// [`crate::consolidation::Layout::of`], which knows the type.
+    pub defaults: Vec<String>,
     /// When it sends.
     pub send: Triggers,
     /// How often it sends where `send` names `interval`; `None` where it
     /// does not.
     pub interval: Option<Duration>,
+}
+
+/// Reads a consolidator's `defaults`: one entry for each input, written
+/// `input=value`, the value as a value of the input's type is written.
+///
+/// # Arguments
+///
+/// * `attributes` - The node's attributes.
+/// * `inputs`     - Its inputs, in the order its `world-in` lists them.
+///
+/// # Returns
+///
+/// Each input's default as written, in the order of `inputs`.
+///
+/// # Errors
+///
+/// A sentence where `defaults` is missing, an entry is not `input=value`,
+/// names an input the consolidator does not have or one named before, or
+/// an input has no entry.
+fn defaults_of(
+    attributes: &BTreeMap<String, Scalar>,
+    inputs: &[String],
+) -> Result<Vec<String>, String> {
+    let said = attributes.get("defaults").ok_or_else(|| {
+        format!(
+            "defaults is not set: a consolidator says what it sends for each \
+             input until a reading arrives, one entry for each, as \
+             `defaults: [{}=0, ...]`",
+            inputs.first().map_or("temp", String::as_str)
+        )
+    })?;
+    let mut defaults: Vec<Option<String>> = vec![None; inputs.len()];
+    for entry in crate::graph::entries(said.as_str()) {
+        if entry.is_empty() {
+            continue;
+        }
+        let Some((name, value)) = entry.split_once('=') else {
+            return Err(format!(
+                "defaults: \"{entry}\" is not written input=value, the \
+                 input's name, then = and its default"
+            ));
+        };
+        let name = name.trim();
+        let Some(at) = inputs.iter().position(|input| input == name) else {
+            return Err(format!(
+                "defaults: \"{name}\" is no input of this consolidator, \
+                 whose inputs are {}",
+                inputs.join(", ")
+            ));
+        };
+        if defaults[at].is_some() {
+            return Err(format!(
+                "defaults: \"{name}\" is given twice: an input has one \
+                 default"
+            ));
+        }
+        defaults[at] = Some(value.trim().to_string());
+    }
+    inputs
+        .iter()
+        .zip(defaults)
+        .map(|(input, default)| {
+            default.ok_or_else(|| {
+                format!(
+                    "defaults has no entry for \"{input}\": every input has \
+                     a default, sent until a reading arrives, as \
+                     `{input}=0`"
+                )
+            })
+        })
+        .collect()
 }
 
 /// When a consolidator sends: its `send`, a list of any of three triggers,
@@ -909,7 +984,9 @@ pub fn attributes_of(function: &str) -> Option<&'static [&'static str]> {
             Some(&["function", "type-in", "scale", "offset", "type-out"])
         }
         "vote" => Some(&["function", "inputs", "algorithm", "age", "carries"]),
-        "consolidator" => Some(&["function", "inputs", "send", "interval"]),
+        "consolidator" => {
+            Some(&["function", "inputs", "send", "interval", "defaults"])
+        }
         "thermostat" => {
             Some(&["function", "setpoint", "half_band", "type-in", "type-out"])
         }
@@ -1188,8 +1265,11 @@ pub fn params_of(
                     (None, false) => None,
                 };
 
+            let defaults = defaults_of(attributes, &inputs).map_err(named)?;
+
             Ok(Computation::Consolidator(ConsolidatorParams {
                 inputs,
+                defaults,
                 send,
                 interval,
             }))

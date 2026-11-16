@@ -269,10 +269,12 @@
       <!-- A vote's: how old a reading may be and still be voted on. -->
       <xs:element name="age" type="xs:string"/>
       <!-- A consolidator's: when it sends, one element for each of
-           all_new, interval and moc that it names, and how often where it
-           names interval. -->
+           all_new, interval and moc that it names; how often where it
+           names interval; and each input's default, one element for each,
+           written input=value. -->
       <xs:element name="send" type="xs:string"/>
       <xs:element name="interval" type="xs:string"/>
+      <xs:element name="defaults" type="xs:string"/>
       <!-- No longer read: a to_value conversion and a process computation
            state their type-out instead. -->
       <xs:element name="unit" type="xs:string"/>

@@ -19,7 +19,7 @@ station and the vehicle share -- ping-yamcs and thermostat-yamcs:
 * :func:`query_threads` has it send QUERY_THREADS and reads the answer:
   the memory the whole of tcspecial has, and each thread's stack;
   :func:`query_consolidator`, QUERY_CONSOLIDATOR: what a consolidator has
-  sent and how often each of its inputs went in held or none.
+  sent and how often each of its inputs went in held or as its default.
 
 Only the standard library is used, but for PyYAML, with which the
 instance's configuration is written.
@@ -653,7 +653,7 @@ CONSOLIDATOR_PARAMETERS = ("/TcsLink/Sequence", "/TcsLink/Status",
 def query_consolidator(yamcs, sequence, node, first=0, timeout=5.0):
     """Has Yamcs send QUERY_CONSOLIDATOR, and reads the answer it receives:
     what a consolidator has sent, by trigger, and how often each of its
-    inputs went into a datum held or none.
+    inputs went into a datum held or as its default.
 
     Args:
         yamcs:    The :class:`Yamcs` instance of the tcspecial to ask.

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470" role="img" aria-labelledby="title desc">
   <title id="title">The consolidator example</title>
-  <desc id="desc">Three payloads, UDP sockets: sun, a u16, at 127.0.0.1:5001, every second; wheel, an i32, at 5002, four times a second; and battery, a u8, at 5003, every five seconds. Each sends its readings to housekeeping, a consolidator aboard tcspecial, at its inputs sun, wheel and battery. housekeeping sends one datum, a consolidation, when all three are new or every two seconds: a state for each input, new, held or none, and the readings packed to the bit, at most 8 bytes. It goes down through the gateway node, gateway, to 127.0.0.1:5102: ground_base, 5100, plus housekeeping's device id, 2. On the ground, the receive takes the datum apart and hands out each new reading as though sun, wheel or battery had sent it, so the MOC shows each in a panel of its own; a held reading is not handed out.</desc>
+  <desc id="desc">Three payloads, UDP sockets: sun, a u16, at 127.0.0.1:5001, every second; wheel, an i32, at 5002, four times a second; and battery, a u8, at 5003, every five seconds. Each sends its readings to housekeeping, a consolidator aboard tcspecial, at its inputs sun, wheel and battery. housekeeping sends one datum, a consolidation, when all three are new or every two seconds: a structure of the three readings, seven bytes, each sensor's default -- 65535, 0 and 255 -- until it has reported and its latest reading, held, after. It goes down through the gateway node, gateway, to 127.0.0.1:5102: ground_base, 5100, plus housekeeping's device id, 2. On the ground the datum is housekeeping's, decoded as a structure by the configuration's own XTCE.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -17,7 +17,6 @@
       .boundary { fill: #fbfbfd; stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 7 5; }
       .groundward { fill: none; stroke: #2563eb; stroke-width: 2; }
       .packed { fill: none; stroke: #2563eb; stroke-width: 4; }
-      .unpacked { fill: none; stroke: #2563eb; stroke-width: 2; stroke-dasharray: 8 5; }
     </style>
     <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/>
@@ -60,8 +59,8 @@
   <text class="name" x="316" y="156">housekeeping</text>
   <text class="kind" x="316" y="176">consolidator</text>
   <text class="detail" x="316" y="196">all_new, or every 2 s</text>
-  <text class="detail" x="316" y="214">new / held / none</text>
-  <text class="detail" x="316" y="232">at most 8 bytes</text>
+  <text class="detail" x="316" y="214">defaults 65535, 0, 255</text>
+  <text class="detail" x="316" y="232">a structure, 7 bytes</text>
 
   <!-- gateway -->
   <rect class="gateway" x="525" y="150" width="120" height="72" rx="10"/>
@@ -73,8 +72,8 @@
   <rect class="ground" x="700" y="120" width="180" height="132" rx="10"/>
   <text class="name" x="714" y="146">MOC</text>
   <text class="kind" x="714" y="166">receives 127.0.0.1:5102</text>
-  <text class="kind" x="714" y="186">and hands out each new</text>
-  <text class="kind" x="714" y="204">reading as its sensor's:</text>
+  <text class="kind" x="714" y="186">and decodes the datum</text>
+  <text class="kind" x="714" y="204">as a structure:</text>
   <text class="detail" x="714" y="226">sun   wheel   battery</text>
 
   <!-- Links into housekeeping, each named by its input -->
@@ -85,14 +84,14 @@
   <path class="groundward" d="M190,275 C250,275 250,220 296,220" marker-end="url(#arrow-blue)"/>
   <text class="label" x="226" y="254">battery</text>
 
-  <!-- The one datum down, and the readings it is taken apart into -->
+  <!-- The one datum down -->
   <path class="packed" d="M490,186 L521,186" marker-end="url(#arrow-thick)"/>
   <path class="packed" d="M645,186 L696,186" marker-end="url(#arrow-thick)"/>
   <text class="label" x="652" y="174">datum</text>
 
-  <text class="note" x="233" y="282">One datum where there were three packets: the readings</text>
-  <text class="note" x="233" y="298">packed to the bit, each with its state. A held reading,</text>
-  <text class="note" x="233" y="314">the one before sent again, is not handed out on the ground.</text>
+  <text class="note" x="233" y="282">One datum where there were three packets: each reading,</text>
+  <text class="note" x="233" y="298">or its default until its sensor reports, and after that</text>
+  <text class="note" x="233" y="314">its latest, held until another comes.</text>
 
   <!-- Legend -->
   <line x1="30" y1="350" x2="870" y2="350" stroke="#e5e7eb" stroke-width="1"/>

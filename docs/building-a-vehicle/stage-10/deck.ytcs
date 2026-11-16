@@ -27,7 +27,7 @@ tcspecial:
   # deployment's TcsBridge component, which is a ground station built on
   # tcsmoc-c as far as tcspecial can tell.
   gateway: "fprime"
-  interface: "5684f9b97e87a4e3294258ba473c2e79"
+  interface: "85b9e713bed11d3415d182a4742a26b2"
   log:
     directory: "/tmp/telemetry"
     segment_size: "65536"

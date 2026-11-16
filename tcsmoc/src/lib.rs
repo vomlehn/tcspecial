@@ -22,7 +22,6 @@ pub mod gateway;
 pub mod listening;
 pub mod matched;
 pub mod ping;
-pub mod relay;
 pub mod simulator;
 
 pub use client::*;

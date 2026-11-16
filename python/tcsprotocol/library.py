@@ -56,15 +56,6 @@ def library():
                                       ctypes.c_size_t]
     lib.tcs_digest_of_file.restype = ctypes.c_int
     lib.tcs_digest_of_file.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-    lib.tcs_configuration_open.restype = ctypes.c_void_p
-    lib.tcs_configuration_open.argtypes = [ctypes.c_char_p]
-    lib.tcs_configuration_close.restype = None
-    lib.tcs_configuration_close.argtypes = [ctypes.c_void_p]
-    lib.tcs_relay_open.restype = ctypes.c_int
-    lib.tcs_relay_open.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
-                                   ctypes.POINTER(ctypes.c_void_p)]
-    lib.tcs_relay_close.restype = None
-    lib.tcs_relay_close.argtypes = [ctypes.c_void_p]
     _loaded = lib
     return lib
 

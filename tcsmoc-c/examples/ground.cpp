@@ -343,8 +343,9 @@ int main(int argc, char **argv)
 		}
 
 		// What a consolidator has sent, and how often each input went
-		// into a datum held or none. Asked of a node that is not one,
-		// it is refused, which is what this shows of a ping node.
+		// into a datum held or as its default. Asked of a node that is
+		// not one, it is refused, which is what this shows of a ping
+		// node.
 		tcs_consolidator_counts counts{};
 		tcs_input_counts inputs[TCS_INPUTS_PER_ANSWER];
 		std::uint32_t inputs_total = 0;

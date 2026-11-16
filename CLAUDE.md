@@ -23,10 +23,8 @@ argue from this order and say so.
   A rule about what a configuration may say belongs here, and nowhere else.
 - `tcsmoc` -- what a ground station is built on (only in the MOC):
   `TcsClient` for commands, `gateway::GatewayReceiver` for the vehicle's data,
-  `beacon` for its beacons, `relay` for handing a consolidator's inputs
-  to a station that reads a gateway's ports itself (Yamcs), `simulator`
-  for waiting until tcs-sim has made its
-  simulated devices, `bus` for a vehicle on a cFS software bus (the station's
+  `beacon` for its beacons, `simulator` for waiting until tcs-sim has
+  made its simulated devices, `bus` for a vehicle on a cFS software bus (the station's
   SBN peer, and `SimulatedCfs`, the cFS end as tcs-sim simulates it).
 - `tcsmoc-c` -- tcsmoc for C and C++: beacons, data and commands behind
   one hand-written header, `include/tcsmoc-c.h`, which `tests/c_and_cpp.rs`

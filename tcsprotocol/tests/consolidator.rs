@@ -61,6 +61,7 @@ vehicle:
         function: consolidator
         send: [all_new, interval]
         interval: \"1 s\"
+        defaults: [temp=0, valve=0]
         world-in: [temp, valve]
         world-out: [gateway.pack]
 gateways:
@@ -111,6 +112,10 @@ fn a_datum_that_could_be_too_large_is_refused() {
             "world-out-type: \"boolean\"",
             "world-out-type: \"bytes(40000)\"",
         ),
+        (
+            "defaults: [temp=0, valve=0]",
+            "defaults: [\"temp=[]\", \"valve=[]\"]",
+        ),
     ]);
     let pack = graph.node("pack").expect("the consolidator");
     assert!(
@@ -120,6 +125,35 @@ fn a_datum_that_could_be_too_large_is_refused() {
         said.iter()
             .any(|s| s.contains("\"pack\" can send")
                 && s.contains("bytes at once")),
+        "{said:?}"
+    );
+}
+
+/// A default must be given for every input, as a value of its type, and
+/// one that is not is refused, naming the input.
+#[test]
+fn every_input_has_a_default_of_its_type() {
+    let (_, said) =
+        checked(&[("defaults: [temp=0, valve=0]", "defaults: [temp=0]")]);
+    assert!(
+        said.iter().any(|s| s.contains("no entry for \"valve\"")),
+        "{said:?}"
+    );
+    let (_, said) = checked(&[(
+        "defaults: [temp=0, valve=0]",
+        "defaults: [temp=0, valve=2]",
+    )]);
+    assert!(
+        said.iter()
+            .any(|s| s.contains("\"valve\"") && s.contains("boolean")),
+        "{said:?}"
+    );
+    let (_, said) = checked(&[(
+        "defaults: [temp=0, valve=0]",
+        "defaults: [temp=0, valve=0, gauge=1]",
+    )]);
+    assert!(
+        said.iter().any(|s| s.contains("\"gauge\" is no input")),
         "{said:?}"
     );
 }
@@ -138,6 +172,10 @@ fn too_many_inputs_are_refused() {
             "max_consolidator_inputs: \"2\"",
         ),
         ("world-in: [temp, valve]", "world-in: [temp, valve, again]"),
+        (
+            "defaults: [temp=0, valve=0]",
+            "defaults: [temp=0, valve=0, again=0]",
+        ),
         (
             "world-out: [pack.temp]",
             "world-out: [pack.temp, pack.again]",

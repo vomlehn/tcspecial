@@ -45,34 +45,33 @@
           </SizeInBits>
         </BinaryDataEncoding>
       </BinaryParameterType>
+      <StringParameterType name="pack_name_type">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="72">
+            <LeadingSize sizeInBitsOfSizeTag="8"/>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
     </ParameterTypeSet>
     <ParameterSet>
       <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
       <Parameter name="label" parameterTypeRef="string"/>
-      <Parameter name="pack" parameterTypeRef="bytes"/>
-      <Parameter name="temp" parameterTypeRef="u16"/>
-      <Parameter name="valve" parameterTypeRef="boolean"/>
+      <Parameter name="pack_temp" parameterTypeRef="u16"/>
+      <Parameter name="pack_valve" parameterTypeRef="boolean"/>
+      <Parameter name="pack_name" parameterTypeRef="pack_name_type"/>
     </ParameterSet>
     <ContainerSet>
-      <SequenceContainer name="label_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="label"/>
-        </EntryList>
-      </SequenceContainer>
       <SequenceContainer name="pack_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="bytes_length"/>
-          <ParameterRefEntry parameterRef="pack"/>
+          <ParameterRefEntry parameterRef="pack_temp"/>
+          <ParameterRefEntry parameterRef="pack_valve"/>
+          <ParameterRefEntry parameterRef="pack_name"/>
         </EntryList>
       </SequenceContainer>
-      <SequenceContainer name="temp_packet">
+      <SequenceContainer name="label_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="temp"/>
-        </EntryList>
-      </SequenceContainer>
-      <SequenceContainer name="valve_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="valve"/>
+          <ParameterRefEntry parameterRef="label"/>
         </EntryList>
       </SequenceContainer>
     </ContainerSet>

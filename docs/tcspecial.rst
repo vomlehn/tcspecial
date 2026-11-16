@@ -2234,13 +2234,12 @@ from the same configuration and says which node each datum came from. A loop
 that does not keep each datum takes it with ``GatewayReceiver::receive_into``,
 into a buffer of ``tcsmoc::gateway::DATUM_BYTES`` it made before it started,
 and allocates nothing. What it does with the data then -- process it, display
-it, log it -- is its own business. A consolidator's datum is never handed out
-as it arrived: the receive takes it apart, and it and the receives after it
-hand out each new input, one at a time, named by the node whose reading it
-is, as though that node had sent it the ground itself; an input held, sent
-before and sent again, is left out, as is one from which nothing has yet
-arrived. So the nodes a gateway node's data comes from include the sources of
-its consolidators' inputs. A gateway node that the ground sends commands
+it, log it -- is its own business. A consolidator's datum is handed out
+whole, named by the consolidator, as any node's is, once the receive has
+checked it is one the consolidator's layout can have made; a station that
+wants each input's value takes it apart with
+``tcsprotocol::consolidation::Layout::unpack``, by the same configuration.
+A gateway node that the ground sends commands
 or other data through also states the ``address`` tcspecial binds to receive
 them, its host and port together, as ``127.0.0.1:5000``.
 
@@ -3113,13 +3112,13 @@ The consolidator example
    :alt: The consolidator example: sun, a u16 every second, wheel, an i32
          four times a second, and battery, a u8 every five seconds, each send
          to housekeeping, a consolidator, which sends one datum when all three
-         are new or every two seconds, each input new, held or none, at most
-         eight bytes, down through gateway to 127.0.0.1:5102; on the ground the
-         receive hands out each new reading as its sensor's.
+         are new or every two seconds, seven bytes: the three readings, or
+         their defaults until they have reported, down through gateway to
+         127.0.0.1:5102, where the ground decodes it as a structure.
    :width: 100%
 
    ``examples/consolidator``: three sensors' readings sent down as one datum,
-   and taken apart again on the ground.
+   a structure of them.
 
 Three sensors, each reporting at its own pace and in its own type: ``sun``, a
 ``u16``, every second; ``wheel``, an ``i32``, four times a second; and
@@ -3127,29 +3126,34 @@ Three sensors, each reporting at its own pace and in its own type: ``sun``, a
 ``consolidator`` computation, takes all three at its inputs, named in its
 ``world-in``, and sends one datum -- a *consolidation* -- when every input
 has something new (``all_new``) or every two seconds whatever has arrived
-(``interval``). The datum is a two-bit state for each input -- new, held (the
-reading before, sent again) or none -- and then the readings, packed to the
-bit: at most eight bytes where three packets would each carry their own.
-Only ``housekeeping`` is drawn into the gateway node; it arrives at
+(``interval``). The datum is a structure of the three, in the order its
+``world-in`` lists them: the sun's two bytes, the wheel's four and the
+battery's one, seven bytes where three packets would each carry their own.
+Until a sensor has reported, its default goes in its place, which
+``defaults`` gives: ``sun=65535, wheel=0, battery=255``. The battery's
+charge runs from 0 to 100, so 255 says "never read" by being a value no
+reading is, and so does 65535 for a sun angle; a wheel at rest reads 0, so
+its default cannot be told from a reading. After a sensor's first reading,
+the datum carries its latest, held until another comes. Only
+``housekeeping`` is drawn into the gateway node; it arrives at
 ``ground_base`` plus its device id, ``127.0.0.1:5102``.
 
-On the ground nothing has to take the datum apart: tcsmoc's receive does, as it
-arrives, and hands out each new reading as though its sensor had sent it the
-ground itself. tcs-moc so shows ``sun``, ``wheel`` and ``battery`` in panels of
-their own, which say they arrive in ``housekeeping``'s datum; a held reading
-is not handed out, so a slow sensor's ``Last recv`` simply ages between its
-readings. A ``Query`` asks ``housekeeping`` ``QUERY_CONSOLIDATOR`` too, and its
-``Configuration`` then says how many datums it has sent, by trigger, and how
-often each input went in new, held and none -- the battery, slowest, most
-often held. ``tcs-verify --summary`` lists the layout: sixteen bits for the
-sun, thirty-two for the wheel and eight for the battery.
+On the ground the datum is ``housekeeping``'s, as any node's datum is its
+own: the configuration's own XTCE describes it, member by member, and tcs-moc
+shows it in ``housekeeping``'s panel. A ``Query`` asks ``housekeeping``
+``QUERY_CONSOLIDATOR`` too, and its ``Configuration`` then says how many
+datums it has sent, by trigger, and how often each input went in new, held
+and with its default -- the battery, slowest, most often held.
+``tcs-verify --summary`` lists the layout: the sun at offset 0, two bytes,
+the wheel at 2, four, and the battery at 6, one, each with its default.
 
 ``make -C examples run-consolidator`` runs tcs-moc on the example, which starts
 tcspecial and tcs-sim, tcs-sim playing the sensors.
 ``tcspecial/tests/consolidator.rs`` flies it, with its sockets moved to ports
 nothing holds:
-the three readings reach the ground each as its sensor's, and a later datum in
-which only the sun is new brings the sun's reading down and nothing else.
+a datum with only the sun reported carries the others' defaults, one with all
+three carries all three, and a later one in which only the sun is new carries
+the other two held.
 
 The fprime example
 ------------------
@@ -3748,18 +3752,46 @@ Trying the packages in a container
 ``container/`` keeps a test system in a container, Kubuntu's for the
 ``.deb`` files and Fedora's for the RPMs, in which the packages are
 installed and tried as an administrator would, without touching the
-machine it runs on. ``container/bin/start`` makes one afresh, installs
-the newest packages built here and in the TCS checkouts beside this one,
-and opens a terminal window with a shell in it, where ``tcsx`` runs the
-examples and ``cfge`` edits a configuration; closing the window stops it.
-It uses Podman, and ``make container`` in ``container/`` builds both
-images. See `The TCS test container <../container/README.html>`__.
+machine it runs on. ``container/bin/start`` starts it and opens a
+terminal window with a shell in it; closing the window stops it, keeping
+what was done in it. The first time, or with ``--rebuild``, it is made
+from scratch, with the newest packages built here and in the TCS
+checkouts beside this one installed in it. It uses Podman, and ``make
+container`` in ``container/`` builds both images. See `The TCS test
+container <../container/README.html>`__.
 
 .. code-block:: console
 
    $ make packages
-   $ container/bin/start            # the .debs, in Kubuntu
-   $ container/bin/start --fedora   # the RPMs, in Fedora
+   $ container/bin/start             # the .debs, in Kubuntu
+   $ container/bin/start --fedora    # the RPMs, in Fedora
+   $ container/bin/start --rebuild   # Kubuntu, made again from scratch
+
+Three commands in the container use what is installed. The window's
+shell says how to use them as it starts, and each lists the examples it
+knows: ``tcsx`` given no name, ``cfge`` and ``xtcee`` given ``-e`` with
+none.
+
+``tcsx [NAME]``
+    Runs one of tcspecial's examples, or with no name lists them.
+
+``cfge FILE``, ``cfge -e NAME``
+    Edits a configuration in tcs-cfge: FILE, which need not exist yet, or
+    the ``.xtcs`` file of the example NAME, with its simulator file. The
+    examples are copied to ``~/tcspecial-examples`` the first time, and
+    edited there.
+
+``xtcee FILE``, ``xtcee -e NAME``
+    Edits XTCE in tcs-xtcee: FILE, or the ``.xtce`` file of the example
+    NAME, one of tcs-xtce's examples of XTCE or one of tcspecial's, each of
+    which has the XTCE of the vehicle it configures; every document of an
+    example made of several is opened together, as one mission.
+
+.. code-block:: console
+
+   $ tcsx thermostat
+   $ cfge -e thermostat
+   $ xtcee -e housekeeping
 
 The tools
 ---------
@@ -4344,19 +4376,12 @@ soon as it is regenerated:
   node's ``address`` and ``port``, and on each port a source's data arrives
   at.
 
-Yamcs never sees a consolidator's datum. The ground station binds the
-consolidator's port in Yamcs's place with a *relay*, a thread of its own
-process -- ``tcsmoc::relay``, started from Python by
-``python/tcsmoc/relay.py`` through libtcsmoc-c -- which takes each datum
-apart and sends each new input on to Yamcs as though its source were drawn
-into the gateway node: on the port and under the APID it would then have,
-the node's ``ground_base`` and ``apid_base`` counted on by the source's
-device id. So each such source has its container and its link as above,
-and the consolidator has neither. A held input is not sent on, being a
-reading Yamcs already has. A source drawn into the gateway node itself is
-not relayed, Yamcs having its readings already. The relay ends when the
-station does; libtcsmoc-c is needed only by a station whose configuration
-has something to relay, and the Yamcs examples start one where it does.
+A consolidator's datum reaches Yamcs as any node's does, on its own port
+and under its own APID, and Yamcs decodes it: its container is the one the
+configuration's own XTCE gives it, the count it is sent after, its members
+of a fixed width, and then each string or bytes with its count, each a
+parameter named ``<consolidator>_<input>`` -- ``housekeeping_sun`` -- of the
+input's type. Its inputs have no containers or links of their own.
 
 What does not depend on the configuration -- the header, the beacon's and the
 answers' layouts, which it takes from ``tcsprotocol/xtce``, and CONNECT --
@@ -4485,6 +4510,77 @@ holds.
 vehicle is to keep, which nothing removes below; nothing in flight removes
 configurations yet.
 
+Consolidators
+-------------
+
+A consolidator sends several readings to the ground as one datum, so that
+what belongs together arrives together: one datum arrives whole or not at
+all, where several packets may half arrive. It is a compute node, ``function:
+consolidator``:
+
+.. code-block:: yaml
+
+   vehicle:
+     - type compute:
+         - compute: housekeeping
+           function: consolidator
+           defaults: [sun=65535, wheel=0, battery=255]
+           send: [all_new, interval]
+           interval: "2 s"
+           world-in: [sun, wheel, battery]
+           world-out: [gateway.housekeeping]
+
+``world-in`` names its inputs, each linked from one node's ``world-out``, at
+least two. Each may be of any type a link carries, the type of the node
+linked to it. The datum is a structure of them in that order: every input of
+a fixed width at its own offset, each encoded as on any link, and after them
+each string or bytes, as a count of its bytes -- one byte for a most up to
+255, two up to 65,535 -- and the bytes. It may go to a gateway, a log or a
+tee, and nothing else. ``tcs-verify --summary`` shows its layout.
+
+``send`` says when it sends, any of ``all_new``, as soon as every input has
+a reading it has not sent; ``interval``, every ``interval``, where any input
+has; and ``moc``, whenever anything arrives at its ``moc-in``, new or not.
+``all_new`` alone is refused, since one input that stopped would stop it for
+good. The ground may set ``interval``.
+
+``defaults`` gives every input a value, one entry ``input=value`` for each,
+written as a value of the input's type is: a whole number in decimal, a
+value in its unit, ``1`` or ``0`` for a boolean, a structure as
+``name=value`` pairs, a string in quotes and bytes in hexadecimal in square
+brackets, ``""`` and ``[]`` being empty. In XML each is an element of its
+own, ``<defaults>sun=65535</defaults>``. A YAML entry with square brackets
+in it is quoted, ``"data=[de ad]"``, or YAML reads a list inside the list.
+A default that is not a value of its input's type, an entry for no input
+and an input with no entry are refused where the configuration is read.
+
+What defaults mean
+^^^^^^^^^^^^^^^^^^
+
+Defaults are what let a consolidator always send: it never waits for an
+input that has nothing, so one silent sensor cannot stop the datum. What
+goes down for each input is plain:
+
+* **Until its first reading, its default.** Choose a default no reading
+  can be -- 255 for a charge of 0 to 100, -1 for a count -- and the ground
+  can see that the sensor has never reported. A default a reading can
+  equal, such as a wheel's 0 at rest, cannot be told from that reading.
+* **After that, its latest reading, held** until another arrives. A sensor
+  that stops shows its last reading, not its default, for as long as it is
+  quiet.
+* **Only the latest.** Readings that arrive faster than the consolidator
+  sends replace one another, and only the last of them goes down. A source
+  whose every reading matters is linked to the gateway as well, which
+  ``tcs-verify --summary`` points out as sent twice.
+
+The datum carries values and nothing about them, so whether a reading is
+new, how old it is and whether its sensor is healthy are said, where they
+matter, by inputs of your own: a node that works out what you want said --
+an app node, a ``process`` -- linked to the consolidator as any input is,
+which puts it in the datum beside the reading it is about. The counts
+``QUERY_CONSOLIDATOR`` answers say how often each input went down held or
+with its default, without costing the link anything until asked.
+
 How many inputs a consolidator may have
 ---------------------------------------
 
@@ -4497,22 +4593,19 @@ Every configuration states the most inputs one consolidator may have:
 
 It is required, and has no default: a configuration that has not been asked
 how large a consolidation may grow has not answered it. It is at least 2,
-the fewest a consolidator has. 32 is suggested -- their states then take 64
-bits -- and more readings than that are better served by a second
-consolidator than by a larger one. A consolidator is the computation that
-sends several readings to the ground as one datum: see "Compute elements" in
-the design. One with more inputs than this is refused where the
-configuration is read; and tcspecial itself packs at most 256, so one with
-more than that, which only a setting above 256 lets through, is refused as
-tcspecial starts.
+the fewest a consolidator has. 32 is suggested, and more readings than that
+are better served by a second consolidator than by a larger one. One with
+more inputs than this is refused where the configuration is read; and
+tcspecial itself packs at most 256, so one with more than that, which only a
+setting above 256 lets through, is refused as tcspecial starts.
 
 What a consolidator has sent is asked with ``QUERY_CONSOLIDATOR``, on the
 node command link, naming it by its node id: the datums it has sent in all
 and those each trigger sent -- ``all_new``, ``interval`` and ``moc``, a
 datum two triggers sent in one pass counting under both -- the readings it
 has refused for not being of their input's type, and, for each input, how
-many datums it went into held and how many none. How many it went into new
-is the datums sent less those two. One answer tells of up to 32 inputs and
+many datums it went into held and how many with its default. How many it
+went into new is the datums sent less those two. One answer tells of up to 32 inputs and
 says how many there are; ask again from where it stopped for the rest.
 ``TcsClient::consolidator`` in tcsmoc reads them all;
 ``tcs_client_query_consolidator`` asks from C and C++, an answer at a time
@@ -4766,7 +4859,7 @@ for, and every configuration states it:
 .. code-block:: yaml
 
    tcspecial:
-     interface: "5684f9b97e87a4e3294258ba473c2e79"
+     interface: "85b9e713bed11d3415d182a4742a26b2"
 
 It is the digest of the ``tcsprotocol/xtce/link.xtce`` a build was made from
 -- the layouts of every command but CONNECT, RESTART_ARM and RESTART -- as 32
@@ -4781,7 +4874,7 @@ To find the value, ask the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --interface-digest
-   5684f9b97e87a4e3294258ba473c2e79
+   85b9e713bed11d3415d182a4742a26b2
 
 The same digest is the last field of every beacon that build's tcspecial
 sends, so a person with only a packet capture can read it there too.
@@ -4792,8 +4885,8 @@ configuration to the build that is to fly it:
 .. code-block:: text
 
    $ tcs-verify --set-interface vehicle.ytcs vehicle.xtcs
-   vehicle.ytcs: interface set to 5684f9b97e87a4e3294258ba473c2e79, from 0123...
-   vehicle.xtcs: interface is 5684f9b97e87a4e3294258ba473c2e79 already
+   vehicle.ytcs: interface set to 85b9e713bed11d3415d182a4742a26b2, from 0123...
+   vehicle.xtcs: interface is 85b9e713bed11d3415d182a4742a26b2 already
 
 It changes that one value -- or adds the attribute where the section has
 none -- and leaves every other byte of the file as it was, comments and

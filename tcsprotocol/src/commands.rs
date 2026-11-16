@@ -49,7 +49,7 @@ pub enum CommandType {
     /// its stack: see [`crate::threads`].
     QueryThreads,
     /// What a consolidator has sent, and how often each of its inputs went
-    /// in held or none: see [`crate::consolidation::ConsolidatorCounts`].
+    /// in held or as its default: see [`crate::consolidation::ConsolidatorCounts`].
     QueryConsolidator,
 }
 

@@ -795,64 +795,6 @@ pub fn panels(
         })
         .collect();
 
-    // A consolidator's inputs reach the ground in its datum, which the
-    // receive takes apart, handing out each new one as though its source
-    // had sent it: a source that is drawn into no gateway node itself has
-    // a panel too, for them to be shown in.
-    let ids = tcsprotocol::graph::telemetry::ids(graph);
-    for link in &links {
-        let Some(layout) = layout_of(graph, &link.source) else {
-            continue;
-        };
-        let to = match &link.via {
-            Via::Gateway(gateway) => format!("to {gateway}"),
-            Via::PayloadTelemetry => "over payload_telemetry".to_string(),
-        };
-        for input in &layout.inputs {
-            if panels
-                .iter()
-                .any(|panel| panel.name == input.source.as_str())
-            {
-                continue;
-            }
-            let Some(&id) = ids.get(&input.source) else {
-                continue;
-            };
-            let via = format!("in \"{}\"'s datum {to}", link.source);
-            panels.push(DHInfo {
-                name: SharedString::from(input.source.clone()),
-                dev_id: i32::try_from(id).unwrap_or(i32::MAX),
-                config: SharedString::from(via.clone()),
-                packet_size: SharedString::from(size_of(
-                    graph,
-                    &input.source,
-                    &input.kind,
-                )),
-                status: SharedString::from(UNKNOWN_STATUS),
-                oc_time: SharedString::from(NO_TRANSFER_TIME),
-                oc_data: SharedString::new(),
-                packets_recv: 0,
-                parameters: SharedString::from(format!(
-                    "{} (device id {id})\nsends {via}, as its input \"{}\": \
-                     a held reading adds no arrival",
-                    input.source, input.name
-                )),
-                settable: SharedString::from(
-                    settable
-                        .get(&input.source)
-                        .map(|theirs| theirs.join(", "))
-                        .unwrap_or_default(),
-                ),
-                setting: SharedString::from(
-                    settable
-                        .get(&input.source)
-                        .and_then(|theirs| theirs.first().cloned())
-                        .unwrap_or_default(),
-                ),
-                inputs: SharedString::new(),
-            });
-        }
-    }
     panels.sort_by_key(|panel| panel.dev_id);
     panels
 }
@@ -1814,8 +1756,9 @@ fn describes(info: &DHInfo) -> String {
 }
 
 /// What a consolidator has sent and how often each input went into a datum
-/// held or none, as the popup shows it: a column, as [`counted`]'s is, and
-/// in words, since a count of held is what says a payload has gone quiet.
+/// held or as its default, as the popup shows it: a column, as [`counted`]'s
+/// is, and in words, since a count of held is what says a payload has gone
+/// quiet.
 ///
 /// # Arguments
 ///
@@ -1843,7 +1786,7 @@ fn sent_by(
         let name = names.get(at).copied().unwrap_or("?");
         let new = sent.sent.saturating_sub(input.held + input.none);
         lines.push(format!(
-            "input {name}: new {new}, held {}, none {}",
+            "input {name}: new {new}, held {}, default {}",
             input.held, input.none
         ));
     }
@@ -4303,12 +4246,11 @@ payloads:
             .expect("the example reads")
     }
 
-    /// A consolidator's inputs whose sources are drawn into no gateway node
-    /// themselves have panels too, saying they arrive in its datum; the
-    /// consolidator's panel names its inputs, which it is asked
-    /// QUERY_CONSOLIDATOR about, and no other panel does.
+    /// A consolidator's panel names its inputs, which it is asked
+    /// QUERY_CONSOLIDATOR about, and no other panel does; its inputs, which
+    /// reach the ground only in its datum, have no panels of their own.
     #[test]
-    fn a_consolidators_inputs_have_panels_of_their_own() {
+    fn a_consolidators_panel_names_its_inputs() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let graph = Graph::load(root.join("tests/consolidator/yamcs.ytcs"))
             .expect("the fixture reads");
@@ -4335,11 +4277,8 @@ payloads:
                     "to gateway, at 127.0.0.1:26702",
                     "temp, valve, name"
                 ),
-                ("temp", 3, "in \"pack\"'s datum to gateway", ""),
-                ("valve", 4, "in \"pack\"'s datum to gateway", ""),
             ]
         );
-        assert_eq!(panels[2].packet_size, "2 bytes");
         let asked = to_ask(&VecModel::from(panels), None);
         assert_eq!(asked[1].inputs, ["temp", "valve", "name"]);
         assert!(asked[0].inputs.is_empty());
@@ -4366,11 +4305,11 @@ payloads:
         assert!(shown.contains("interval     6"), "{shown}");
         assert!(shown.contains("readings refused 2"), "{shown}");
         assert!(
-            shown.contains("input temp: new 6, held 3, none 1"),
+            shown.contains("input temp: new 6, held 3, default 1"),
             "{shown}"
         );
         assert!(
-            shown.contains("input valve: new 10, held 0, none 0"),
+            shown.contains("input valve: new 10, held 0, default 0"),
             "{shown}"
         );
     }

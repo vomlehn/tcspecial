@@ -19,7 +19,7 @@ tcspecial:
     reset_interval: "1 s"
     send: "0.0.0.0:18500"
   gateway: "yamcs"
-  interface: "5684f9b97e87a4e3294258ba473c2e79"
+  interface: "85b9e713bed11d3415d182a4742a26b2"
   max_consolidator_inputs: "32"
   # Yamcs sends QUERY_THREADS, on this link, from a port the system
   # chooses, as it sends its other commands: so they are taken from any port

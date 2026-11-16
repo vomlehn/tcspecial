@@ -44,31 +44,17 @@
     </ParameterTypeSet>
     <ParameterSet>
       <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
-      <Parameter name="battery" parameterTypeRef="u8"/>
-      <Parameter name="housekeeping" parameterTypeRef="bytes"/>
-      <Parameter name="sun" parameterTypeRef="u16"/>
-      <Parameter name="wheel" parameterTypeRef="i32"/>
+      <Parameter name="housekeeping_sun" parameterTypeRef="u16"/>
+      <Parameter name="housekeeping_wheel" parameterTypeRef="i32"/>
+      <Parameter name="housekeeping_battery" parameterTypeRef="u8"/>
     </ParameterSet>
     <ContainerSet>
-      <SequenceContainer name="battery_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="battery"/>
-        </EntryList>
-      </SequenceContainer>
       <SequenceContainer name="housekeeping_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="bytes_length"/>
-          <ParameterRefEntry parameterRef="housekeeping"/>
-        </EntryList>
-      </SequenceContainer>
-      <SequenceContainer name="sun_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="sun"/>
-        </EntryList>
-      </SequenceContainer>
-      <SequenceContainer name="wheel_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="wheel"/>
+          <ParameterRefEntry parameterRef="housekeeping_sun"/>
+          <ParameterRefEntry parameterRef="housekeeping_wheel"/>
+          <ParameterRefEntry parameterRef="housekeeping_battery"/>
         </EntryList>
       </SequenceContainer>
     </ContainerSet>

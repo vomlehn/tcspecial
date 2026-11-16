@@ -1659,6 +1659,7 @@ impl NodeType {
                 // consolidator, whose inputs are a vote's above
                 ("send", false),
                 ("interval", false),
+                ("defaults", false),
                 // thermostat
                 ("setpoint", false),
                 ("half_band", false),

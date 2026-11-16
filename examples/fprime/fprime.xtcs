@@ -20,7 +20,7 @@
             <send>0.0.0.0:9500</send>
         </beacon>
         <gateway>fprime</gateway>
-        <interface>5684f9b97e87a4e3294258ba473c2e79</interface>
+        <interface>85b9e713bed11d3415d182a4742a26b2</interface>
         <log>
             <directory>/tmp/telemetry</directory>
             <segment_size>65536</segment_size>

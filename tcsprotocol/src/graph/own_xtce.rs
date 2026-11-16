@@ -9,7 +9,14 @@
 //! bytes is sent after a count of its bytes: in XTCE's encoding, which this
 //! states and which is what Yamcs is sent, a 32-bit count, as `types.xtce`
 //! states it; where the ground reads what it is sent by no XTCE, the same
-//! count in groups of seven bits ([`crate::link_type::Count`]). How each
+//! count in groups of seven bits ([`crate::link_type::Count`]).
+//!
+//! A consolidator's datum, a structure of its inputs
+//! ([`crate::consolidation`]), is sent after such a count too, and is not one
+//! parameter but one for each member, `<consolidator>_<input>`, in a
+//! container of its own: the members of a fixed width at their offsets, and
+//! then each string or bytes as its own count, of one or two bytes, and its
+//! bytes. How each
 //! gateway frames what it sends -- a CCSDS header and an APID under Yamcs, a
 //! port of its own over a radio -- is the ground station's to add.
 //!
@@ -32,6 +39,7 @@ use std::fmt::Write as _;
 use super::link_types::{carries, Carries};
 use super::telemetry;
 use super::Graph;
+use crate::consolidation::{Layout, Shape};
 use crate::link_type::{Basic, LinkType};
 
 /// What every type is copied from: `tcsprotocol/xtce/types.xtce`.
@@ -66,10 +74,28 @@ const BYTES_LENGTH: &str = "bytes_length";
 /// read, or is not there: the configuration's check says each of these too.
 pub fn written(graph: &Graph, name: &str) -> Result<String, String> {
     let mut sources: BTreeMap<String, LinkType> = BTreeMap::new();
+    let mut consolidations: BTreeMap<String, Layout> = BTreeMap::new();
     for source in telemetry::sources(graph) {
         let node = graph
             .node(&source)
             .ok_or_else(|| format!("\"{source}\" is no node"))?;
+        if let Some(laid) = Layout::of_node(graph, node) {
+            let (_, layout) =
+                laid.map_err(|why| format!("\"{source}\": {why}"))?;
+            for input in &layout.inputs {
+                let member = member_name(&source, &input.name);
+                if graph.node(&member).is_some() {
+                    return Err(format!(
+                        "\"{source}\"'s input \"{}\" is the parameter \
+                         \"{member}\", which is a node's name too: rename \
+                         the node or the input",
+                        input.name
+                    ));
+                }
+            }
+            consolidations.insert(source, layout);
+            continue;
+        }
         let kind = match carries(node, "world-out")? {
             Carries::Only(kind) => kind,
             Carries::Any => LinkType::Basic(Basic::Bytes(None)),
@@ -80,9 +106,9 @@ pub fn written(graph: &Graph, name: &str) -> Result<String, String> {
     let mut out = String::new();
     head(&mut out, name);
     let _ = writeln!(out, "{INDENT}<TelemetryMetaData>");
-    parameter_types(&mut out, &sources)?;
-    parameters(&mut out, &sources);
-    containers(&mut out, &sources);
+    parameter_types(&mut out, &sources, &consolidations)?;
+    parameters(&mut out, &sources, &consolidations);
+    containers(&mut out, &sources, &consolidations);
     let _ = writeln!(out, "{INDENT}</TelemetryMetaData>");
     commands(&mut out, graph)?;
     out.push_str("</SpaceSystem>\n");
@@ -317,9 +343,19 @@ fn head(out: &mut String, name: &str) {
 fn parameter_types(
     out: &mut String,
     sources: &BTreeMap<String, LinkType>,
+    consolidations: &BTreeMap<String, Layout>,
 ) -> Result<(), String> {
     let mut used: Vec<Basic> = Vec::new();
-    for kind in sources.values() {
+    // A consolidation is sent after a count, as bytes are.
+    if !consolidations.is_empty() {
+        used.push(Basic::Bytes(None));
+    }
+    let members = consolidations.values().flat_map(|layout| &layout.inputs);
+    for kind in sources.values().chain(
+        members
+            .filter(|input| matches!(input.shape, Shape::Fixed { .. }))
+            .map(|input| &input.kind),
+    ) {
         match kind {
             LinkType::Basic(basic) => used.push(*basic),
             LinkType::Structure(fields) => {
@@ -359,8 +395,128 @@ fn parameter_types(
         let _ = writeln!(out, "{level}{INDENT}</MemberList>");
         let _ = writeln!(out, "{level}</AggregateParameterType>");
     }
+    for (source, layout) in consolidations {
+        member_types(out, source, layout);
+    }
     let _ = writeln!(out, "{level}</ParameterTypeSet>");
     Ok(())
+}
+
+/// Writes the types of a consolidation's members that `types.xtce` does not
+/// state: a structure's aggregate; a string's, after its count of one or two
+/// bytes; and for bytes, the count and the bytes it sizes.
+///
+/// # Arguments
+///
+/// * `out`    - Where they are written.
+/// * `source` - The consolidator.
+/// * `layout` - Its datum's layout.
+fn member_types(out: &mut String, source: &str, layout: &Layout) {
+    let level = INDENT.repeat(3);
+    for input in &layout.inputs {
+        let member = member_name(source, &input.name);
+        match (&input.kind, input.shape) {
+            (LinkType::Structure(fields), _) => {
+                let _ = writeln!(
+                    out,
+                    "{level}<AggregateParameterType name=\"{}\">",
+                    structure_name(&member)
+                );
+                let _ = writeln!(out, "{level}{INDENT}<MemberList>");
+                for (field, basic) in fields {
+                    let _ = writeln!(
+                        out,
+                        "{level}{INDENT}{INDENT}<Member name=\"{field}\" \
+                         typeRef=\"{}\"/>",
+                        basic.name()
+                    );
+                }
+                let _ = writeln!(out, "{level}{INDENT}</MemberList>");
+                let _ = writeln!(out, "{level}</AggregateParameterType>");
+            }
+            (
+                LinkType::Basic(Basic::String(_)),
+                Shape::Varies { most, count_bytes },
+            ) => {
+                let tag = count_bytes * 8;
+                let _ = writeln!(
+                    out,
+                    "{level}<StringParameterType name=\"{member}_type\">\n\
+                     {level}{INDENT}<StringDataEncoding encoding=\"UTF-8\">\n\
+                     {level}{INDENT}{INDENT}<Variable maxSizeInBits=\"{}\">\n\
+                     {level}{INDENT}{INDENT}{INDENT}<LeadingSize \
+                     sizeInBitsOfSizeTag=\"{tag}\"/>\n\
+                     {level}{INDENT}{INDENT}</Variable>\n\
+                     {level}{INDENT}</StringDataEncoding>\n\
+                     {level}</StringParameterType>",
+                    tag + most * 8
+                );
+            }
+            (_, Shape::Varies { most, count_bytes }) => {
+                let _ = writeln!(
+                    out,
+                    "{level}<IntegerParameterType name=\"{member}_count\" \
+                     signed=\"false\"\n\
+                     {level}{INDENT}{INDENT}sizeInBits=\"{}\">\n\
+                     {level}{INDENT}<IntegerDataEncoding sizeInBits=\"{}\" \
+                     encoding=\"unsigned\"/>\n\
+                     {level}{INDENT}<ValidRange minInclusive=\"0\" \
+                     maxInclusive=\"{most}\"/>\n\
+                     {level}</IntegerParameterType>\n\
+                     {level}<BinaryParameterType name=\"{member}_type\">\n\
+                     {level}{INDENT}<BinaryDataEncoding>\n\
+                     {level}{INDENT}{INDENT}<SizeInBits>\n\
+                     {level}{INDENT}{INDENT}{INDENT}<DynamicValue>\n\
+                     {level}{INDENT}{INDENT}{INDENT}{INDENT}\
+                     <ParameterInstanceRef parameterRef=\"{member}_count\"/>\n\
+                     {level}{INDENT}{INDENT}{INDENT}{INDENT}\
+                     <LinearAdjustment slope=\"8\"/>\n\
+                     {level}{INDENT}{INDENT}{INDENT}</DynamicValue>\n\
+                     {level}{INDENT}{INDENT}</SizeInBits>\n\
+                     {level}{INDENT}</BinaryDataEncoding>\n\
+                     {level}</BinaryParameterType>",
+                    count_bytes * 8,
+                    count_bytes * 8
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+/// The parameter a consolidation's member is.
+///
+/// # Arguments
+///
+/// * `source` - The consolidator.
+/// * `input`  - The input.
+///
+/// # Returns
+///
+/// `<consolidator>_<input>`.
+pub fn member_name(source: &str, input: &str) -> String {
+    format!("{source}_{input}")
+}
+
+/// The type a consolidation's member's parameter is of.
+///
+/// # Arguments
+///
+/// * `source` - The consolidator.
+/// * `input`  - The member's input.
+///
+/// # Returns
+///
+/// `types.xtce`'s, for a member of a fixed width that is no structure; the
+/// aggregate [`member_types`] writes for a structure; and the type it
+/// writes for a string or bytes.
+fn member_type(source: &str, input: &crate::consolidation::Input) -> String {
+    let member = member_name(source, &input.name);
+    match (&input.kind, input.shape) {
+        (LinkType::Structure(_), _) => structure_name(&member),
+        (_, Shape::Varies { .. }) => format!("{member}_type"),
+        (LinkType::Basic(basic), _) => basic.name().to_string(),
+    }
 }
 
 /// Writes a parameter for each source, and `bytes_length` where a source
@@ -370,12 +526,17 @@ fn parameter_types(
 ///
 /// * `out`     - Where they are written.
 /// * `sources` - Each source's type, by its name.
-fn parameters(out: &mut String, sources: &BTreeMap<String, LinkType>) {
+fn parameters(
+    out: &mut String,
+    sources: &BTreeMap<String, LinkType>,
+    consolidations: &BTreeMap<String, Layout>,
+) {
     let level = INDENT.repeat(2);
     let _ = writeln!(out, "{level}<ParameterSet>");
-    if sources
-        .values()
-        .any(|k| matches!(k, LinkType::Basic(Basic::Bytes(_))))
+    if !consolidations.is_empty()
+        || sources
+            .values()
+            .any(|k| matches!(k, LinkType::Basic(Basic::Bytes(_))))
     {
         let _ = writeln!(
             out,
@@ -383,11 +544,29 @@ fn parameters(out: &mut String, sources: &BTreeMap<String, LinkType>) {
              parameterTypeRef=\"{BYTES_LENGTH}\"/>"
         );
     }
+    let mut each: Vec<(String, String)> = Vec::new();
     for (source, kind) in sources {
         let type_name = match kind {
             LinkType::Basic(basic) => basic.name().to_string(),
             LinkType::Structure(_) => structure_name(source),
         };
+        each.push((source.clone(), type_name));
+    }
+    for (source, layout) in consolidations {
+        for input in &layout.inputs {
+            let member = member_name(source, &input.name);
+            if matches!(input.shape, Shape::Varies { .. })
+                && !matches!(input.kind, LinkType::Basic(Basic::String(_)))
+            {
+                each.push((
+                    format!("{member}_count"),
+                    format!("{member}_count"),
+                ));
+            }
+            each.push((member, member_type(source, input)));
+        }
+    }
+    for (source, type_name) in &each {
         let one_line = format!(
             "{level}{INDENT}<Parameter name=\"{source}\" \
              parameterTypeRef=\"{type_name}\"/>"
@@ -413,9 +592,48 @@ fn parameters(out: &mut String, sources: &BTreeMap<String, LinkType>) {
 ///
 /// * `out`     - Where they are written.
 /// * `sources` - Each source's type, by its name.
-fn containers(out: &mut String, sources: &BTreeMap<String, LinkType>) {
+fn containers(
+    out: &mut String,
+    sources: &BTreeMap<String, LinkType>,
+    consolidations: &BTreeMap<String, Layout>,
+) {
     let level = INDENT.repeat(2);
     let _ = writeln!(out, "{level}<ContainerSet>");
+    let entry = |out: &mut String, parameter: &str| {
+        let _ = writeln!(
+            out,
+            "{}<ParameterRefEntry parameterRef=\"{parameter}\"/>",
+            INDENT.repeat(5)
+        );
+    };
+    for (source, layout) in consolidations {
+        let inner = INDENT.repeat(3);
+        let _ = writeln!(
+            out,
+            "{inner}<SequenceContainer name=\"{}\">",
+            container_name(source)
+        );
+        let _ = writeln!(out, "{inner}{INDENT}<EntryList>");
+        // The count it is sent after, then its members of a fixed width,
+        // then each string or bytes, its count and its bytes.
+        entry(out, BYTES_LENGTH);
+        for input in &layout.inputs {
+            if matches!(input.shape, Shape::Fixed { .. }) {
+                entry(out, &member_name(source, &input.name));
+            }
+        }
+        for input in &layout.inputs {
+            if matches!(input.shape, Shape::Varies { .. }) {
+                let member = member_name(source, &input.name);
+                if !matches!(input.kind, LinkType::Basic(Basic::String(_))) {
+                    entry(out, &format!("{member}_count"));
+                }
+                entry(out, &member);
+            }
+        }
+        let _ = writeln!(out, "{inner}{INDENT}</EntryList>");
+        let _ = writeln!(out, "{inner}</SequenceContainer>");
+    }
     for (source, kind) in sources {
         let inner = INDENT.repeat(3);
         let _ = writeln!(

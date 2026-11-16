@@ -603,6 +603,17 @@
             "type": "string"
           }
         },
+        "defaults": {
+          "description": "For a `consolidator`: what it sends for each input until a reading has arrived at it, one entry for each input, written input=value, the value as a value of the input's type is written -- a number, 1 or 0 for a boolean, a string in quotes, bytes in square brackets: [temp=0, valve=0, name=\"none\"]. A default cannot be told from a reading of the same value.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "interval": {
           "description": "For a `consolidator` whose send names interval: how often it sends, as a length of time: `1 s`. Given with that trigger and only with it. The ground may set it.",
           "type": [
@@ -1267,6 +1278,17 @@
         },
         "send": {
           "description": "For a `consolidator`: when it sends its datum, a list of any of all_new, as soon as every input is new; interval, every interval where an input is new; and moc, when anything arrives at its moc-in from a gateway. all_new alone is refused, since one input that stops would stop it for good.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaults": {
+          "description": "For a `consolidator`: what it sends for each input until a reading has arrived at it, one entry for each input, written input=value, the value as a value of the input's type is written -- a number, 1 or 0 for a boolean, a string in quotes, bytes in square brackets: [temp=0, valve=0, name=\"none\"]. A default cannot be told from a reading of the same value.",
           "type": [
             "array",
             "string",
@@ -1964,6 +1986,17 @@
         },
         "send": {
           "description": "For a `consolidator`: when it sends its datum, a list of any of all_new, as soon as every input is new; interval, every interval where an input is new; and moc, when anything arrives at its moc-in from a gateway. all_new alone is refused, since one input that stops would stop it for good.",
+          "type": [
+            "array",
+            "string",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaults": {
+          "description": "For a `consolidator`: what it sends for each input until a reading has arrived at it, one entry for each input, written input=value, the value as a value of the input's type is written -- a number, 1 or 0 for a boolean, a string in quotes, bytes in square brackets: [temp=0, valve=0, name=\"none\"]. A default cannot be told from a reading of the same value.",
           "type": [
             "array",
             "string",

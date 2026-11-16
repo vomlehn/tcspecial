@@ -107,7 +107,7 @@ module Tcs {
     async command QUERY_THREADS opcode 7
 
     @ Ask what a consolidator has sent, by trigger, and how often each of
-    @ its inputs went into a datum held or none: the counts go to a
+    @ its inputs went into a datum held or as its default: the counts go to a
     @ ConsolidatorQueried event, and the input held most often -- the
     @ payload likeliest to have gone quiet -- to a QuietestInput event. One
     @ event each, not one for each input, as QUERY_THREADS's are
@@ -305,7 +305,7 @@ module Tcs {
       node: string size NODE_NAME_BYTES @< The consolidator
       position: U32 @< The input's position in its world-in, from nought
       timesHeld: U64 @< The datums it went into held
-      timesNone: U64 @< Those it went into none
+      timesNone: U64 @< Those it went into as its default
     ) severity activity high id 24 \
       format "{}'s input {} went into {} datums held and {} none"
 

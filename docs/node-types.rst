@@ -169,16 +169,19 @@ own bytes are not a type's encoding; ``format`` says how to read them, and
 the node at the edge turns them into the type it sends.
 
 The one node whose datum is not one type's encoding is a ``consolidator``: it
-sends several readings as one datum, a *consolidation*, each input's state and
-then their bit strings packed end to end, laid out by
-``tcsprotocol/src/consolidation.rs`` from the configuration alone. Nothing
-aboard takes one apart, so a consolidator may send only to a gateway, a log
-or a tee, which take it whole; on the ground, tcsmoc's receive takes it apart
-and hands out each new input as though its source had sent it, so no ground
-station reads a consolidation either. A new node does not make another such
-datum without the same three things: its layout worked out once, in
-tcsprotocol, from nothing but the configuration; the ground's unpacking, in
-tcsmoc; and its place in the link table (see `Adding a Compute Function`_).
+sends several readings as one datum, a *consolidation*, a structure of its
+inputs in the order its ``world-in`` lists them -- each member of a fixed
+width at a fixed offset, then each string or bytes as a count and its bytes
+-- laid out by ``tcsprotocol/src/consolidation.rs`` from the configuration
+alone. Each input's value is its latest reading, or its default until one
+has arrived. Nothing aboard takes one apart, so a consolidator may send only
+to a gateway, a log or a tee, which take it whole; on the ground, the
+configuration's own XTCE describes it member by member, and
+``Layout::unpack`` takes it apart for a station that does not read XTCE. A
+new node does not make another such datum without the same three things:
+its layout worked out once, in tcsprotocol, from nothing but the
+configuration; its description in the own XTCE; and its place in the link
+table (see `Adding a Compute Function`_).
 
 Only towards the ground is anything added: a string or bytes, which has no width
 of its own, is sent the ground after a count of its bytes, chosen for each

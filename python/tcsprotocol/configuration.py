@@ -62,8 +62,8 @@ LINKS = ("world-out", "moc-out")
 SINKS = ("world-in", "moc-in")
 
 #: The attributes a node writes as a list: ``tcsprotocol::graph::LISTED``,
-#: a line's ``terminators`` and a consolidator's ``send``.
-LISTED = ("terminators", "send")
+#: a line's ``terminators`` and a consolidator's ``send`` and ``defaults``.
+LISTED = ("terminators", "send", "defaults")
 
 #: Where the schemas are: a link to tcs-cfge's ``share/schema``, the one copy,
 #: beside this module so that an installed package has them too, as the
@@ -263,10 +263,6 @@ class ApidUse:
     node: str = None
     #: The gateway node a downlink goes through, or ``None``.
     gateway: str = None
-    #: The consolidator whose datum carries a relayed downlink's readings
-    #: to the gateway node, or ``None``: see
-    #: :meth:`Configuration.relayed`.
-    relayed_by: str = None
 
     def may_share(self, other):
         """Whether two uses may be one APID: only a gateway node's commands
@@ -608,9 +604,8 @@ class Configuration:
 
     def downlink_apid(self, gateway, source):
         """The APID what ``source`` sends to the ``gateway_yamcs`` node
-        called ``gateway`` carries as telemetry, or is relayed under: its
-        ``apid_base`` plus the source's device id, as :meth:`links` gives
-        it.
+        called ``gateway`` carries as telemetry: its ``apid_base`` plus
+        the source's device id, as :meth:`links` gives it.
 
         Args:
             gateway: The gateway node's name.
@@ -621,8 +616,8 @@ class Configuration:
 
         Raises:
             ValueError: As :meth:`uplink_apid`, ``source`` has no
-                        ``world-out`` link to ``gateway`` and is not relayed
-                        to it, or as :meth:`links`.
+                        ``world-out`` link to ``gateway``, or as
+                        :meth:`links`.
         """
         self.uplink_apid(gateway)
         return self._link_to(gateway, source)["apid"]
@@ -689,14 +684,13 @@ class Configuration:
 
         The beacon's and the command links', each ``gateway_yamcs`` node's
         ``apid_base``, every source drawn into one at that base plus its
-        device id, every source :meth:`relayed` to one at the same, and
-        every payload nothing touches at ``payload_telemetry.apid_base``
+        device id, and every payload nothing touches at ``payload_telemetry.apid_base``
         plus its device id. Two uses may share an APID only as
         :meth:`ApidUse.may_share` allows: tcs-verify refuses any other two.
 
         Returns:
             The :class:`ApidUse` of each, in that order: the gateway nodes,
-            their sources, the sources relayed to them, and the payloads.
+            their sources, and the payloads.
 
         Raises:
             ValueError: The configuration does not answer to Yamcs, or as
@@ -704,8 +698,6 @@ class Configuration:
         """
         self._framed()
         table = self.links()
-        relayed_by = {(link["gateway"], link["source"]): link["relayed_by"]
-                      for link in table["links"]}
         used = []
         for one in table["apids"]:
             carries = one["carries"]
@@ -715,9 +707,7 @@ class Configuration:
             what = carries if node is None else f'{carries} "{node}"'
             used.append(ApidUse(
                 one["apid"], carries, what, node=node,
-                gateway=gateway if carries == "downlink" else None,
-                relayed_by=relayed_by.get((gateway, node))
-                if carries == "downlink" else None))
+                gateway=gateway if carries == "downlink" else None))
         return used
 
     def _framed(self):
@@ -902,7 +892,7 @@ class Configuration:
 
     def downlink(self, gateway, source):
         """Where the ground receives what ``source`` sends to the gateway node
-        called ``gateway``, or is relayed to it.
+        called ``gateway``.
 
         Args:
             gateway: The gateway node's name.
@@ -945,31 +935,8 @@ class Configuration:
         self.node(name)
         return name in self.links()["consolidations"]
 
-    def relayed(self, gateway):
-        """The sources whose readings reach ``gateway`` only in a
-        consolidator's datum, which the ground relays to a station that
-        reads the node's ports itself as though each were drawn in, on its
-        own port and under its own APID: ``graph::telemetry::relayed``, as
-        :meth:`links` gives it.
-
-        Args:
-            gateway: The gateway node's name.
-
-        Returns:
-            Each source and the consolidator that carries it, by
-            consolidator, then by the source's device id; a source drawn
-            into ``gateway`` itself is not among them.
-
-        Raises:
-            ValueError: As :meth:`links`.
-        """
-        return [(link["source"], link["relayed_by"])
-                for link in self.links()["links"]
-                if link["gateway"] == gateway and link["relayed_by"]]
-
     def _link_to(self, gateway, source):
-        """The link on which what ``source`` sends reaches ``gateway``,
-        drawn in or :meth:`relayed`.
+        """The link on which what ``source`` sends reaches ``gateway``.
 
         Args:
             gateway: The gateway node's name.
@@ -980,8 +947,7 @@ class Configuration:
 
         Raises:
             ValueError: ``source`` is missing, or has no ``world-out`` link
-                        to ``gateway`` and is not relayed to it, or as
-                        :meth:`links`.
+                        to ``gateway``, or as :meth:`links`.
         """
         self.node(source)
         for link in self.links()["links"]:

@@ -516,9 +516,9 @@ pub fn is_node_type(node_type: &str) -> bool {
 /// whose commas are inside quotes where there are any, so the join is exact.
 /// The one list: the reader and both of the editor's writers ask it.
 ///
-/// `terminators`, a line's alternatives, and `send`, a consolidator's
-/// triggers.
-pub const LISTED: &[&str] = &["terminators", "send"];
+/// `terminators`, a line's alternatives, and `send` and `defaults`, a
+/// consolidator's triggers and its inputs' defaults.
+pub const LISTED: &[&str] = &["terminators", "send", "defaults"];
 
 /// Splits a listed attribute, as the model holds it, into its entries: see
 /// [`LISTED`].
@@ -2389,7 +2389,7 @@ mod tests {
     path: zone
 tcspecial:
   gateway: radio
-  interface: \"5684f9b97e87a4e3294258ba473c2e79\"
+  interface: \"85b9e713bed11d3415d182a4742a26b2\"
   tcs_cmd:
     \
              recv: 0.0.0.0:4000

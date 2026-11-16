@@ -58,15 +58,6 @@
       <BooleanParameterType name="boolean">
         <IntegerDataEncoding sizeInBits="8" encoding="unsigned"/>
       </BooleanParameterType>
-      <!-- True or false as one bit, 1 or 0: a boolean as a consolidation
-           packs it, alone or as a structure's field, where it is the byte
-           above everywhere else. No link carries this type; it is stated
-           here so that each width a boolean has is stated once, and a
-           consolidator and the ground's unpacking of one both take it from
-           here (tcsprotocol::consolidation::BOOLEAN_BITS). -->
-      <BooleanParameterType name="boolean_bit">
-        <IntegerDataEncoding sizeInBits="1" encoding="unsigned"/>
-      </BooleanParameterType>
       <!-- The value types, one per unit. -->
       <FloatParameterType name="kelvin" sizeInBits="64"
           shortDescription="Temperature.">
@@ -258,7 +249,6 @@
       <Parameter name="i32_datum" parameterTypeRef="i32"/>
       <Parameter name="i64_datum" parameterTypeRef="i64"/>
       <Parameter name="boolean_datum" parameterTypeRef="boolean"/>
-      <Parameter name="boolean_bit_datum" parameterTypeRef="boolean_bit"/>
       <Parameter name="kelvin_datum" parameterTypeRef="kelvin"/>
       <Parameter name="volt_datum" parameterTypeRef="volt"/>
       <Parameter name="ampere_datum" parameterTypeRef="ampere"/>
@@ -318,11 +308,6 @@
       <SequenceContainer name="boolean_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="boolean_datum"/>
-        </EntryList>
-      </SequenceContainer>
-      <SequenceContainer name="boolean_bit_packet">
-        <EntryList>
-          <ParameterRefEntry parameterRef="boolean_bit_datum"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="kelvin_packet">

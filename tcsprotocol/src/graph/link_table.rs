@@ -8,13 +8,13 @@
 //! bit layout of a consolidation are each derived by tcsprotocol's code, and
 //! a vehicle and a ground station built from different versions of that code
 //! would read one file and disagree about all of them without a word: packets
-//! under one APID read as another's, a consolidation's inputs read at the
-//! wrong bits. So both ends work the table out, and the vehicle puts the
+//! under one APID read as another's, a consolidation's members read at the
+//! wrong offsets. So both ends work the table out, and the vehicle puts the
 //! digest of its table in every beacon for the ground to compare with its own
 //! (see `beacon`).
 //!
-//! The table is every node's device id; every link to the ground, the sent
-//! and the relayed, with where it arrives, its APID and how it is counted;
+//! The table is every node's device id; every link to the ground, with
+//! where it arrives, its APID and how it is counted;
 //! every APID and every message ID used, and what each carries; and every
 //! consolidation's layout. It is written as YAML, in one order and one
 //! spelling, by [`LinkTable::body`], and the digest is the MD5 of that text:
@@ -75,9 +75,8 @@ impl std::fmt::Display for LinkDigest {
 pub struct LinkTable {
     /// Every node's device id, by name.
     pub ids: BTreeMap<String, usize>,
-    /// Every link to the ground: those tcspecial sends on, then those the
-    /// ground relays (see [`telemetry::relayed`]), then the untouched
-    /// payloads'.
+    /// Every link to the ground: those drawn into a gateway node, then the
+    /// untouched payloads'.
     pub links: Vec<Telemetered>,
     /// Every APID used, where the configuration answers to Yamcs.
     pub apids: Vec<ApidUse>,
@@ -117,7 +116,7 @@ impl LinkTable {
         }
         Ok(LinkTable {
             ids: telemetry::ids(graph),
-            links: telemetry::every(graph)?,
+            links: telemetry::of(graph)?,
             apids: telemetry::apids(graph)?,
             msgids: telemetry::msgids(graph)?,
             consolidations,
@@ -184,13 +183,6 @@ impl LinkTable {
             };
             let _ = writeln!(out, "    count: {count}");
             let _ = writeln!(out, "    largest: {}", link.largest);
-            let _ = writeln!(
-                out,
-                "    relayed_by: {}",
-                link.relayed_by
-                    .as_deref()
-                    .map_or("null".to_string(), quoted)
-            );
         }
 
         out.push_str(heading("apids", self.apids.is_empty(), "[]").as_str());
@@ -247,7 +239,7 @@ impl LinkTable {
         );
         for (name, layout) in &self.consolidations {
             let _ = writeln!(out, "  {}:", quoted(name));
-            for input in &layout.inputs {
+            for (at, input) in layout.inputs.iter().enumerate() {
                 let _ = writeln!(out, "    - input: {}", quoted(&input.name));
                 let _ =
                     writeln!(out, "      source: {}", quoted(&input.source));
@@ -256,23 +248,31 @@ impl LinkTable {
                     "      type: {}",
                     quoted(&input.kind.to_string())
                 );
-                match &input.shape {
-                    Shape::Fixed(fields) => {
-                        let bits: Vec<String> = fields
-                            .iter()
-                            .map(|field| field.bits().to_string())
-                            .collect();
-                        let _ =
-                            writeln!(out, "      bits: [{}]", bits.join(", "));
-                    }
-                    Shape::Counted { most, length_bits } => {
+                match input.shape {
+                    Shape::Fixed { bytes } => {
                         let _ = writeln!(
                             out,
-                            "      most: {most}\n      length_bits: \
-                             {length_bits}"
+                            "      offset: {}\n      bytes: {bytes}",
+                            number(
+                                layout
+                                    .offset(at)
+                                    .and_then(|o| u32::try_from(o).ok())
+                            )
+                        );
+                    }
+                    // At the datum's end, in the order of the inputs that
+                    // vary: a count and its bytes.
+                    Shape::Varies { most, count_bytes } => {
+                        let _ = writeln!(
+                            out,
+                            "      offset: null\n      most: {most}\n      \
+                             count_bytes: {count_bytes}"
                         );
                     }
                 }
+                let hex: String =
+                    input.default.iter().map(|b| format!("{b:02x}")).collect();
+                let _ = writeln!(out, "      default: \"{hex}\"");
             }
         }
         out
@@ -301,9 +301,9 @@ impl LinkTable {
              #\n\
              #     {file}\n\
              #\n\
-             # each node's device id; every link to the ground, the sent and\n\
-             # those the ground relays from a consolidator, with where it\n\
-             # arrives, its APID and how a string or bytes on it is counted;\n\
+             # each node's device id; every link to the ground, with where\n\
+             # it arrives, its APID and how a string or bytes on it is\n\
+             # counted;\n\
              # every APID and message ID used; and each consolidation's\n\
              # layout. Written by tcs-verify --links, to be read and not\n\
              # worked out again.\n\
@@ -425,8 +425,8 @@ mod tests {
         Graph::load(root.join(path)).expect("the file reads")
     }
 
-    /// The table of a consolidator to Yamcs says the relayed links, their
-    /// APIDs and the consolidation's layout; the two spellings of one
+    /// The table of a consolidator to Yamcs says its link, its APID and the
+    /// consolidation's layout; the two spellings of one
     /// configuration have one digest; and the YAML reads back as YAML,
     /// its digest that of what follows it.
     #[test]
@@ -438,13 +438,26 @@ mod tests {
         assert_eq!(yaml.digest(), xml.digest());
 
         let body = yaml.body();
-        assert!(body.contains("relayed_by: \"pack\""), "{body}");
-        assert!(body.contains("  - apid: 515\n"), "{body}");
+        assert!(body.contains("  - apid: 514\n"), "{body}");
+        assert!(!body.contains("  - apid: 515\n"), "no input's own: {body}");
+        // The valve, a boolean, a byte at offset 2 after the u16; the name,
+        // a string of at most 8, at the end after a count of one byte; each
+        // with its default.
         assert!(
-            body.contains("      most: 8\n      length_bits: 4\n"),
+            body.contains(
+                "    - input: \"valve\"\n      source: \"valve\"\n      \
+                 type: \"boolean\"\n      offset: 2\n      bytes: 1\n      \
+                 default: \"00\"\n"
+            ),
             "{body}"
         );
-        assert!(body.contains("      bits: [1]\n"), "{body}");
+        assert!(
+            body.contains(
+                "      offset: null\n      most: 8\n      count_bytes: 1\n      \
+                 default: \"\"\n"
+            ),
+            "{body}"
+        );
 
         let printed = yaml.yaml("yamcs.ytcs");
         let read: serde_norway::Value =

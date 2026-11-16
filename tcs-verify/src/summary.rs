@@ -301,9 +301,11 @@ fn rates(out: &mut String, graph: &Graph) {
     table(out, &[false, true, true, true, false], &rows);
 }
 
-/// Writes each consolidator: the gateway nodes it is drawn into, the most a
-/// datum of it may be, and each input in the order of its `world-in`, with
-/// its source, its type and the bits it takes in the datum. An input whose
+/// Writes each consolidator: the gateway nodes it is drawn into, the least
+/// and the most a datum of it may be, and each input in the order of its
+/// `world-in`, with its source, its type, where it is in the datum -- an
+/// offset, or the end, for a string or bytes -- the bytes it takes there,
+/// and its default, in hexadecimal. An input whose
 /// source is drawn into one of those gateway nodes itself reaches the
 /// ground twice, once in the datum and once alone, which costs the link
 /// what the consolidator was there to save: it is said beside the input.
@@ -336,10 +338,17 @@ fn consolidators(out: &mut String, graph: &Graph) {
         let to = into(&node.name);
         let _ = writeln!(
             out,
-            "  \"{}\": {} inputs, at most {} bytes a datum, to {}",
+            "  \"{}\": {} inputs, {} a datum, to {}",
             node.name,
             layout.inputs.len(),
-            layout.largest_bytes(),
+            match layout.fixed_bytes() {
+                Some(bytes) => format!("{bytes} bytes"),
+                None => format!(
+                    "{} to {} bytes",
+                    layout.smallest_bytes(),
+                    layout.largest_bytes()
+                ),
+            },
             if to.is_empty() {
                 "no gateway node".to_string()
             } else {
@@ -353,17 +362,29 @@ fn consolidators(out: &mut String, graph: &Graph) {
             "input".to_string(),
             "source".to_string(),
             "type".to_string(),
-            "bits".to_string(),
+            "at".to_string(),
+            "bytes".to_string(),
+            "default".to_string(),
             "note".to_string(),
         ]];
-        for input in &layout.inputs {
-            let bits = match &input.shape {
-                Shape::Fixed(fields) => {
-                    fields.iter().map(|f| f.bits()).sum::<usize>().to_string()
+        for (n, input) in layout.inputs.iter().enumerate() {
+            let (at, bytes) = match input.shape {
+                Shape::Fixed { bytes } => (
+                    layout.offset(n).map_or(String::new(), |o| o.to_string()),
+                    bytes.to_string(),
+                ),
+                Shape::Varies { most, count_bytes } => {
+                    ("end".to_string(), format!("{count_bytes} + up to {most}"))
                 }
-                Shape::Counted { most, length_bits } => {
-                    format!("{length_bits} + 8 x up to {most}")
-                }
+            };
+            let default = if input.default.is_empty() {
+                "empty".to_string()
+            } else {
+                input
+                    .default
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>()
             };
             let twice: Vec<String> = into(&input.source)
                 .into_iter()
@@ -376,11 +397,13 @@ fn consolidators(out: &mut String, graph: &Graph) {
                 input.name.clone(),
                 input.source.clone(),
                 input.kind.to_string(),
-                bits,
+                at,
+                bytes,
+                default,
                 twice.join("; "),
             ]);
         }
-        table(out, &[false, false, false, true, false], &rows);
+        table(out, &[false, false, false, true, true, false, false], &rows);
     }
     if !any {
         out.push_str("  none\n");

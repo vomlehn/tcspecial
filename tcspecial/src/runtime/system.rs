@@ -1750,6 +1750,7 @@ vehicle:
         function: consolidator
         send: [all_new, interval]
         interval: \"100 ms\"
+        defaults: [temp=0, valve=0]
         world-in: [temp, valve]
         world-out: [ground.pack]
 ",
@@ -1794,9 +1795,9 @@ vehicle:
     }
 
     /// A consolidator sends at the end of the pass in which a trigger
-    /// fires, saying of each input whether it is new or held: when both
-    /// are new, then nothing while nothing is, then, the interval come
-    /// round, the one new beside the one held. A boolean that is neither 0
+    /// fires, each input's latest reading: when both are new, then nothing
+    /// while nothing is, then, the interval come round, the one new beside
+    /// the one held. A boolean that is neither 0
     /// nor 1 is refused, and the reading before it stands.
     #[test]
     fn a_consolidator_sends_what_it_has_at_the_end_of_a_pass() {
@@ -1810,12 +1811,11 @@ vehicle:
         };
         let sent = || std::mem::take(&mut *ground.lock().expect("the record"));
 
-        // Both new: 10 10, then 0x1234 and 1, padded.
+        // Both new: 0x1234 and 1.
         said("temp", &[0x12, 0x34]);
         said("valve", &[1]);
         system.pass(start);
-        // 1010 0001 0010 0011 0100 1 -> a1 23 48.
-        assert_eq!(sent(), vec![vec![0xa1, 0x23, 0x48]]);
+        assert_eq!(sent(), vec![vec![0x12, 0x34, 1]]);
 
         // Nothing new, and the interval not yet round: nothing.
         system.pass(start + Duration::from_millis(10));
@@ -1827,8 +1827,7 @@ vehicle:
         system.pass(start + Duration::from_millis(20));
         assert!(sent().is_empty());
         system.pass(start + Duration::from_millis(100));
-        // 10 01, 0x0005, 1 -> 1001 0000 0000 0000 0101 1 -> 90 00 58.
-        assert_eq!(sent(), vec![vec![0x90, 0x00, 0x58]]);
+        assert_eq!(sent(), vec![vec![0x00, 0x05, 1]]);
 
         // A valve reading of 2 is no boolean: refused, and the 1 stands.
         said("valve", &[2]);
@@ -1840,8 +1839,7 @@ vehicle:
         );
         said("temp", &[0x00, 0x06]);
         system.pass(start + Duration::from_millis(200));
-        // 10 01, 0x0006, 1 -> 1001 0000 0000 0000 0110 1 -> 90 00 68.
-        assert_eq!(sent(), vec![vec![0x90, 0x00, 0x68]]);
+        assert_eq!(sent(), vec![vec![0x00, 0x06, 1]]);
 
         // And its node's state has what its port counted, for
         // QUERY_CONSOLIDATOR: three datums, the first with every input

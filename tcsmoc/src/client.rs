@@ -933,7 +933,7 @@ impl TcsClient {
     }
 
     /// What a consolidator has sent, by trigger, and how often each of its
-    /// inputs, from the `first`, went into a datum held or none:
+    /// inputs, from the `first`, went into a datum held or as its default:
     /// QUERY_CONSOLIDATOR.
     ///
     /// One answer tells of up to

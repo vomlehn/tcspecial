@@ -87,7 +87,8 @@ COPIED = frozenset({
     "SizeInBits", "Fixed", "FixedValue", "Variable", "TerminationChar",
     "LeadingSize", "DynamicValue", "ParameterInstanceRef",
     "LinearAdjustment", "ValidRange", "UnitSet", "Unit", "DefaultCalibrator",
-    "PolynomialCalibrator", "Term", "AncillaryDataSet", "AncillaryData"})
+    "PolynomialCalibrator", "Term", "AncillaryDataSet", "AncillaryData",
+    "AggregateParameterType", "MemberList", "Member"})
 
 #: A name XTCE allows: its ``NameType``, no space, period, slash, colon or
 #: square bracket.
@@ -195,6 +196,10 @@ class Telemetry:
     #: Whether it is a string or bytes, which is sent after a 32-bit count
     #: of its bytes: see :data:`COUNT`.
     counted: bool = False
+    #: Whether it is a consolidator's datum, which the configuration's own
+    #: XTCE lays out as a container of its members: see
+    #: :func:`_own_entries`.
+    consolidated: bool = False
 
     @property
     def container(self):
@@ -259,9 +264,7 @@ def telemetry(config):
 
     Returns:
         A :class:`Telemetry` for each source drawn into a ``gateway_yamcs``
-        node but a consolidator, each source relayed to one (see
-        :meth:`~tcsprotocol.configuration.Configuration.relayed`) and each
-        payload nothing touches, in the order of
+        node and each payload nothing touches, in the order of
         :meth:`~tcsprotocol.configuration.Configuration.apids`.
 
     Raises:
@@ -278,11 +281,6 @@ def telemetry(config):
         framed[use.node] = framed.get(use.node, 0) + 1
     links = []
     for use in uses:
-        # A consolidator's datum is the relay's to take apart, which binds
-        # its port and hands each input on under the input's own APID, on
-        # the input's own link: Yamcs never sees the datum.
-        if use.carries == "downlink" and config.is_consolidator(use.node):
-            continue
         if use.carries == "downlink":
             ground = config.downlink(use.gateway, use.node)
             name = (use.node if framed[use.node] == 1
@@ -294,9 +292,11 @@ def telemetry(config):
         form = DATUM if document else form_of(config, use.node)
         own = None if document else own_xtce(config)
         counted = type_of(config, use.node) in COUNTED
+        consolidated = (use.carries == "downlink"
+                        and config.is_consolidator(use.node))
         links.append(Telemetry(name, use.node, use.apid, ground,
                                use.carries, use.gateway, document, form,
-                               own, counted))
+                               own, counted, consolidated))
     return links
 
 
@@ -892,6 +892,11 @@ def _own_entries(copier, link):
                 parameters.
         link:   The :class:`Telemetry`.
 
+    A consolidator's datum is its container's entries: the count it is
+    sent after, each member of a fixed width, and each string or bytes with
+    its count, every one a parameter of the document, copied as it is
+    named there, ``<consolidator>_<input>``.
+
     Returns:
         Each parameter of what follows the header, in order: a parameter
         copied from the document by its name, and the source's own, named
@@ -903,6 +908,24 @@ def _own_entries(copier, link):
         OSError: The configuration's own XTCE cannot be read.
     """
     own = Document(link.own)
+    if link.consolidated:
+        container = own.find("container", f"{link.source}_packet",
+                             own.path.name)
+        entries = []
+        for entry in container.iter():
+            if own.local(entry) != "ParameterRefEntry":
+                continue
+            name = entry.get("parameterRef")
+            kind = own.find("parameter type",
+                            own.find("parameter", name, own.path.name)
+                            .get("parameterTypeRef"), own.path.name)
+            # A structure's fields' types, which its aggregate names.
+            for member in kind.iter():
+                if own.local(member) == "Member":
+                    copier.type(own, "parameter type", member.get("typeRef"))
+            copier.parameter(own, name)
+            entries.append((name, None))
+        return entries
     name = own.find("parameter", link.source,
                     own.path.name).get("parameterTypeRef")
     if link.form.kind == "Datum" and not link.counted:

@@ -68,7 +68,6 @@ sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 
 from tcsmoc.beacon import Schedule, links_of  # noqa: E402
 from tcsmoc.processes import Child, Vehicle, built  # noqa: E402
-from tcsmoc.relay import Relays  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
     Yamcs, YamcsBeacons, command_settings, connect, print_beacon_pass,
     write_yamcs, yamcs_home)
@@ -615,7 +614,6 @@ def main(argv):
         return 2
     yamcs = Yamcs(options.yamcs, run_dir, options.http_port, INSTANCE)
     started = []
-    relays = None
     try:
         if not options.no_yamcs:
             home = yamcs_home(options.yamcs)
@@ -624,10 +622,6 @@ def main(argv):
                         world=setup.world is not None)
             status(f"starting Yamcs on {run_dir}")
             yamcs.start()
-            # Each consolidator's inputs handed on to Yamcs as their
-            # sources' own, by a thread of this process; nothing where the
-            # configuration has no consolidator.
-            relays = Relays(setup.path, setup.config)
             status(f"Yamcs is at http://localhost:{options.http_port}")
         if not options.no_simulator:
             tcs_sim = options.tcs_sim or built("tcs-sim", "say --no-simulator")
@@ -682,8 +676,6 @@ def main(argv):
     finally:
         for child in reversed(started):
             child.stop()
-        if relays is not None:
-            relays.close()
         if not options.no_yamcs:
             yamcs.stop()
 

@@ -2252,8 +2252,9 @@ vehicle:
     /// not found.
     #[test]
     fn a_consolidators_counters_are_answered_from_its_port() {
+        use crate::node::vehicle::compute::consolidator::Fresh;
         use crate::runtime::node_state::ConsolidatorCounters;
-        use tcsprotocol::consolidation::{InputCounts, State};
+        use tcsprotocol::consolidation::InputCounts;
         use tcsprotocol::node::vehicle::compute::Triggers;
         use tcsprotocol::ConsolidatorCommand;
 
@@ -2273,7 +2274,7 @@ vehicle:
                 interval: true,
                 moc: true,
             },
-            [State::New, State::Held, State::None].into_iter(),
+            [Fresh::New, Fresh::Held, Fresh::Default].into_iter(),
         );
         counters.sent(
             Triggers {
@@ -2281,7 +2282,7 @@ vehicle:
                 interval: false,
                 moc: false,
             },
-            [State::New; 3].into_iter(),
+            [Fresh::New; 3].into_iter(),
         );
         counters.refused();
         states

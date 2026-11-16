@@ -436,6 +436,35 @@ class MdbTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "both APID"):
             generated.mdb(yamcs(self.directory.name, base="0x100"))
 
+    def test_a_consolidators_datum_is_its_members(self):
+        """A consolidator's container holds its datum's members as its own
+        XTCE lays them out -- the count it is sent after, the u16 and the
+        boolean in place, then the string at the end -- each a parameter
+        of its own, ``<consolidator>_<input>``, and its inputs have no
+        containers of their own."""
+        shipped = (Path(__file__).resolve().parents[2] / "tests"
+                   / "consolidator")
+        for name in ("yamcs.ytcs", "yamcs-sim.yaml"):
+            shutil.copy(shipped / name, self.directory.name)
+        config = loaded(Path(self.directory.name) / "yamcs.ytcs")
+        root = generated.mdb(config).getroot()
+        container, = self.find(root, ".//x:SequenceContainer"
+                                     "[@name='packPacket']")
+        self.assertEqual(
+            [entry.get("parameterRef") for entry
+             in self.find(container, "./x:EntryList/x:ParameterRefEntry")],
+            ["bytes_length", "pack_temp", "pack_valve", "pack_name"])
+        kinds = {parameter.get("name"): parameter.get("parameterTypeRef")
+                 for parameter in self.find(root, ".//x:Parameter")}
+        self.assertEqual(kinds["pack_name"], "pack_name_type")
+        self.assertEqual(len(self.find(root, ".//x:StringParameterType"
+                                             "[@name='pack_name_type']")),
+                         1)
+        for sent_alone in ("tempPacket", "valvePacket"):
+            self.assertEqual(
+                self.find(root, f".//x:SequenceContainer"
+                                f"[@name='{sent_alone}']"), [])
+
     def test_the_wrapper_is_well_formed_xtce(self):
         """Well-formed, and valid against the XTCE schema: the XTCE 1.2
         schema Yamcs reads, where ``$XTCE_XSD`` names it, or else XTCE

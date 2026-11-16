@@ -23,7 +23,7 @@ fn with_errors(dir: &Path, count: usize) -> PathBuf {
 description: many
 tcspecial:
   gateway: radio
-  interface: \"5684f9b97e87a4e3294258ba473c2e79\"
+  interface: \"85b9e713bed11d3415d182a4742a26b2\"
   state_file: /tmp/tcspecial-test.state
   max_consolidator_inputs: 32
   beacon:
@@ -492,7 +492,7 @@ fn with_vehicle_node(dir: &Path, node_type: &str, node: &str) -> PathBuf {
 description: one vehicle node
 tcspecial:
   gateway: radio
-  interface: \"5684f9b97e87a4e3294258ba473c2e79\"
+  interface: \"85b9e713bed11d3415d182a4742a26b2\"
   state_file: /tmp/tcspecial-test.state
   max_consolidator_inputs: 32
   beacon:
@@ -666,10 +666,10 @@ fn the_summary_lists_the_gateway_ports_by_source() {
     assert_eq!(status, 2);
 }
 
-/// `--summary` lists each consolidator: its inputs and the bits each takes,
-/// an input whose source is drawn into the gateway node itself too being
-/// said to be sent twice; and the ports and APIDs its inputs are relayed
-/// on, naming the consolidator.
+/// `--summary` lists each consolidator: its datum's size, and its inputs
+/// with where each is in the datum, the bytes it takes and its default, an
+/// input whose source is drawn into the gateway node itself too being said
+/// to be sent twice; and its inputs have no ports or APIDs of their own.
 #[test]
 fn the_summary_lists_a_consolidators_inputs() {
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -682,21 +682,21 @@ fn the_summary_lists_a_consolidators_inputs() {
             .any(|line| want.iter().all(|part| line.contains(part)))
     };
     assert!(lines.iter().any(|l| l == "Consolidators"), "{lines:?}");
-    assert!(has(&["\"pack\": 3 inputs", "to \"gateway\""]), "{lines:?}");
-    assert!(has(&["temp", "u16", "16"]), "{lines:?}");
-    assert!(has(&["valve", "boolean", " 1"]), "{lines:?}");
-    assert!(
-        has(&["name", "label", "4 + 8 x up to 8", "sent twice"]),
-        "{lines:?}"
-    );
     assert!(
         has(&[
-            "127.0.0.1:26703",
-            "\"temp\"'s readings, relayed from \"pack\""
+            "\"pack\": 3 inputs, 4 to 12 bytes a datum",
+            "to \"gateway\""
         ]),
         "{lines:?}"
     );
-    assert!(has(&["0x204", "relayed under from \"pack\""]), "{lines:?}");
+    assert!(has(&["temp", "u16", " 0 ", " 2 ", "0000"]), "{lines:?}");
+    assert!(has(&["valve", "boolean", " 2 ", " 1 ", "00"]), "{lines:?}");
+    assert!(
+        has(&["name", "label", "end", "1 + up to 8", "empty", "sent twice"]),
+        "{lines:?}"
+    );
+    assert!(!has(&["127.0.0.1:26703"]), "{lines:?}");
+    assert!(!has(&["0x203"]), "{lines:?}");
 }
 
 /// The cfs example's summary lists its message IDs, inside its allotment:

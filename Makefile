@@ -1203,6 +1203,12 @@ install-tcspecial-doc: tcs-helpers
 	install -d -m 755 $(DESTDIR)$(DOCDIR)/tcspecial-doc/docs/shots
 	install -m 644 README.md LICENSE-APACHE LICENSE-MIT \
 		$(DESTDIR)$(DOCDIR)/tcspecial-doc
+	# Its notices say it owes none: nothing in it is compiled, and the one
+	# thing not TCS's own, the stylesheet each page embeds, is in the
+	# public domain. Every package carries the file, which a release
+	# checks for.
+	install -m 644 packaging/tcspecial-doc-notices \
+		$(DESTDIR)$(DOCDIR)/tcspecial-doc/THIRD-PARTY-NOTICES
 	install -m 644 $(DOCS_DIR)/*.html $(DOCS_DIR)/*.svg \
 		$(DESTDIR)$(DOCDIR)/tcspecial-doc/docs
 	install -m 644 $(DOCS_DIR)/shots/*.png \

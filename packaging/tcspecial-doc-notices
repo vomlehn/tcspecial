@@ -1,0 +1,8 @@
+tcspecial-doc: third-party notices
+
+This package holds TCSpecial's manuals and design documents: HTML pages,
+SVG diagrams and PNG screenshots. Nothing in it is compiled, and it holds
+no third party's code, so it owes no third party a notice.
+
+Each page embeds the stylesheet of Docutils, which formats it. Its author,
+David Goodger, has placed it in the public domain, as the stylesheet says.

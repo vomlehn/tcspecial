@@ -59,7 +59,7 @@ members = [
 doc_overindented_list_items = "allow"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["TCSpecial Team"]
 license = "MIT OR Apache-2.0"

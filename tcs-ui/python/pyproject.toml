@@ -12,7 +12,7 @@ build-backend = "setuptools.build_meta"
 name = "tcs-ui"
 # The workspace's version, [workspace.package] in ../../Cargo.toml.
 # python/tests/test_version.py fails when the two differ.
-version = "0.2.0"
+version = "0.2.1"
 description = "The beacon panel and the Tk theme of tcspecial's windows"
 license = { text = "MIT OR Apache-2.0" }
 authors = [{ name = "David VomLehn", email = "dvomlehn@gmail.com" }]

@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "TCSpecial: flight software relaying telemetry and commands between payloads and an operations center"
+abstract: >-
+  TCSpecial is flight software that relays commands and telemetry between
+  a vehicle's payloads and a remote operations center, designed for
+  spacecraft several light seconds away and the unreliable links they
+  have. What a vehicle carries and does is a configuration file, checked
+  before it runs, joining payloads, computations, logs and gateways as a
+  graph of nodes. It runs as a fault domain of its own under a supervisor
+  that restarts it and falls back to the last configuration that ran,
+  and comes with a payload simulator, a test ground station, a
+  configuration editor and checker, and ground-station libraries for C,
+  C++, Rust and Python.
+authors:
+  - name: "TCSpecial Team"
+version: 0.3.0
+date-released: 2026-11-16
+license:
+  - MIT
+  - Apache-2.0
+repository-code: "https://github.com/vomlehn/tcspecial"
+url: "https://vomlehn.github.io/tcspecial/docs/manual.html"
+keywords:
+  - flight software
+  - telemetry
+  - telecommand
+  - spacecraft
+  - ground station
+  - simulation
+  - Rust

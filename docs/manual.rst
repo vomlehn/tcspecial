@@ -15,6 +15,11 @@ TCS Design and Documentation
    https://github.com/vomlehn/tcspecial/issues.
 
 .. tip::
+   **New to TCSpecial?** `Getting started <getting-started.html>`__
+   installs the released packages and runs a vehicle, a simulator and a
+   ground station on your desk, in about fifteen minutes.
+
+.. tip::
    **A complete example, worked step by step:** `Building a vehicle
    <building-a-vehicle.html>`__ is a document of its own that builds a small
    lunar lander's science deck in ten stages, from one payload to a whole
@@ -282,6 +287,11 @@ Verification tools
 
 Other documents
 ===============
+
+`Getting started <getting-started.html>`__
+    The first page to read: the released packages installed, and a
+    vehicle, a simulator and a ground station run on a desk, in about
+    fifteen minutes.
 
 `Building a vehicle <building-a-vehicle.html>`__
     The complete example, worked step by step: from the shipped examples

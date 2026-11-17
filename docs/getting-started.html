@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.22.4: https://docutils.sourceforge.io/" />
+<title>Getting Started</title>
+<style type="text/css">
+
+/*
+:Author: David Goodger (goodger@python.org)
+:Id: $Id: html4css1.css 9511 2024-01-13 09:50:07Z milde $
+:Copyright: This stylesheet has been placed in the public domain.
+
+Default cascading style sheet for the HTML output of Docutils.
+Despite the name, some widely supported CSS2 features are used.
+
+See https://docutils.sourceforge.io/docs/howto/html-stylesheets.html for how to
+customize this style sheet.
+*/
+
+/* used to remove borders from tables and images */
+.borderless, table.borderless td, table.borderless th {
+  border: 0 }
+
+table.borderless td, table.borderless th {
+  /* Override padding for "table.docutils td" with "! important".
+     The right padding separates the table cells. */
+  padding: 0 0.5em 0 0 ! important }
+
+.first {
+  /* Override more specific margin styles with "! important". */
+  margin-top: 0 ! important }
+
+.last, .with-subtitle {
+  margin-bottom: 0 ! important }
+
+.hidden {
+  display: none }
+
+.subscript {
+  vertical-align: sub;
+  font-size: smaller }
+
+.superscript {
+  vertical-align: super;
+  font-size: smaller }
+
+a.toc-backref {
+  text-decoration: none ;
+  color: black }
+
+blockquote.epigraph {
+  margin: 2em 5em ; }
+
+dl.docutils dd {
+  margin-bottom: 0.5em }
+
+object[type="image/svg+xml"], object[type="application/x-shockwave-flash"] {
+  overflow: hidden;
+}
+
+/* Uncomment (and remove this text!) to get bold-faced definition list terms
+dl.docutils dt {
+  font-weight: bold }
+*/
+
+div.abstract {
+  margin: 2em 5em }
+
+div.abstract p.topic-title {
+  font-weight: bold ;
+  text-align: center }
+
+div.admonition, div.attention, div.caution, div.danger, div.error,
+div.hint, div.important, div.note, div.tip, div.warning {
+  margin: 2em ;
+  border: medium outset ;
+  padding: 1em }
+
+div.admonition p.admonition-title, div.hint p.admonition-title,
+div.important p.admonition-title, div.note p.admonition-title,
+div.tip p.admonition-title {
+  font-weight: bold ;
+  font-family: sans-serif }
+
+div.attention p.admonition-title, div.caution p.admonition-title,
+div.danger p.admonition-title, div.error p.admonition-title,
+div.warning p.admonition-title, .code .error {
+  color: red ;
+  font-weight: bold ;
+  font-family: sans-serif }
+
+/* Uncomment (and remove this text!) to get reduced vertical space in
+   compound paragraphs.
+div.compound .compound-first, div.compound .compound-middle {
+  margin-bottom: 0.5em }
+
+div.compound .compound-last, div.compound .compound-middle {
+  margin-top: 0.5em }
+*/
+
+div.dedication {
+  margin: 2em 5em ;
+  text-align: center ;
+  font-style: italic }
+
+div.dedication p.topic-title {
+  font-weight: bold ;
+  font-style: normal }
+
+div.figure {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+div.footer, div.header {
+  clear: both;
+  font-size: smaller }
+
+div.line-block {
+  display: block ;
+  margin-top: 1em ;
+  margin-bottom: 1em }
+
+div.line-block div.line-block {
+  margin-top: 0 ;
+  margin-bottom: 0 ;
+  margin-left: 1.5em }
+
+div.sidebar {
+  margin: 0 0 0.5em 1em ;
+  border: medium outset ;
+  padding: 1em ;
+  background-color: #ffffee ;
+  width: 40% ;
+  float: right ;
+  clear: right }
+
+div.sidebar p.rubric {
+  font-family: sans-serif ;
+  font-size: medium }
+
+div.system-messages {
+  margin: 5em }
+
+div.system-messages h1 {
+  color: red }
+
+div.system-message {
+  border: medium outset ;
+  padding: 1em }
+
+div.system-message p.system-message-title {
+  color: red ;
+  font-weight: bold }
+
+div.topic {
+  margin: 2em }
+
+h1.section-subtitle, h2.section-subtitle, h3.section-subtitle,
+h4.section-subtitle, h5.section-subtitle, h6.section-subtitle {
+  margin-top: 0.4em }
+
+h1.title {
+  text-align: center }
+
+h2.subtitle {
+  text-align: center }
+
+hr.docutils {
+  width: 75% }
+
+img.align-left, .figure.align-left, object.align-left, table.align-left {
+  clear: left ;
+  float: left ;
+  margin-right: 1em }
+
+img.align-right, .figure.align-right, object.align-right, table.align-right {
+  clear: right ;
+  float: right ;
+  margin-left: 1em }
+
+img.align-center, .figure.align-center, object.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.align-left {
+  text-align: left }
+
+.align-center {
+  clear: both ;
+  text-align: center }
+
+.align-right {
+  text-align: right }
+
+/* reset inner alignment in figures */
+div.align-right {
+  text-align: inherit }
+
+/* div.align-center * { */
+/*   text-align: left } */
+
+.align-top    {
+  vertical-align: top }
+
+.align-middle {
+  vertical-align: middle }
+
+.align-bottom {
+  vertical-align: bottom }
+
+ol.simple, ul.simple {
+  margin-bottom: 1em }
+
+ol.arabic {
+  list-style: decimal }
+
+ol.loweralpha {
+  list-style: lower-alpha }
+
+ol.upperalpha {
+  list-style: upper-alpha }
+
+ol.lowerroman {
+  list-style: lower-roman }
+
+ol.upperroman {
+  list-style: upper-roman }
+
+p.attribution {
+  text-align: right ;
+  margin-left: 50% }
+
+p.caption {
+  font-style: italic }
+
+p.credits {
+  font-style: italic ;
+  font-size: smaller }
+
+p.label {
+  white-space: nowrap }
+
+p.rubric {
+  font-weight: bold ;
+  font-size: larger ;
+  color: maroon ;
+  text-align: center }
+
+p.sidebar-title {
+  font-family: sans-serif ;
+  font-weight: bold ;
+  font-size: larger }
+
+p.sidebar-subtitle {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+p.topic-title {
+  font-weight: bold }
+
+pre.address {
+  margin-bottom: 0 ;
+  margin-top: 0 ;
+  font: inherit }
+
+pre.literal-block, pre.doctest-block, pre.math, pre.code {
+  margin-left: 2em ;
+  margin-right: 2em }
+
+pre.code .ln { color: gray; } /* line numbers */
+pre.code, code { background-color: #eeeeee }
+pre.code .comment, code .comment { color: #5C6576 }
+pre.code .keyword, code .keyword { color: #3B0D06; font-weight: bold }
+pre.code .literal.string, code .literal.string { color: #0C5404 }
+pre.code .name.builtin, code .name.builtin { color: #352B84 }
+pre.code .deleted, code .deleted { background-color: #DEB0A1}
+pre.code .inserted, code .inserted { background-color: #A3D289}
+
+span.classifier {
+  font-family: sans-serif ;
+  font-style: oblique }
+
+span.classifier-delimiter {
+  font-family: sans-serif ;
+  font-weight: bold }
+
+span.interpreted {
+  font-family: sans-serif }
+
+span.option {
+  white-space: nowrap }
+
+span.pre {
+  white-space: pre }
+
+span.problematic, pre.problematic {
+  color: red }
+
+span.section-subtitle {
+  /* font-size relative to parent (h1..h6 element) */
+  font-size: 80% }
+
+table.citation {
+  border-left: solid 1px gray;
+  margin-left: 1px }
+
+table.docinfo {
+  margin: 2em 4em }
+
+table.docutils {
+  margin-top: 0.5em ;
+  margin-bottom: 0.5em }
+
+table.footnote {
+  border-left: solid 1px black;
+  margin-left: 1px }
+
+table.docutils td, table.docutils th,
+table.docinfo td, table.docinfo th {
+  padding-left: 0.5em ;
+  padding-right: 0.5em ;
+  vertical-align: top }
+
+table.docutils th.field-name, table.docinfo th.docinfo-name {
+  font-weight: bold ;
+  text-align: left ;
+  white-space: nowrap ;
+  padding-left: 0 }
+
+/* "booktabs" style (no vertical lines) */
+table.docutils.booktabs {
+  border: 0px;
+  border-top: 2px solid;
+  border-bottom: 2px solid;
+  border-collapse: collapse;
+}
+table.docutils.booktabs * {
+  border: 0px;
+}
+table.docutils.booktabs th {
+  border-bottom: thin solid;
+  text-align: left;
+}
+
+h1 tt.docutils, h2 tt.docutils, h3 tt.docutils,
+h4 tt.docutils, h5 tt.docutils, h6 tt.docutils {
+  font-size: 100% }
+
+ul.auto-toc {
+  list-style-type: none }
+
+</style>
+</head>
+<body>
+<div class="document" id="getting-started">
+<h1 class="title">Getting Started</h1>
+
+<div class="contents local topic" id="contents">
+<p class="topic-title"><a class="reference internal" href="#top">Contents</a></p>
+<ul class="simple">
+<li><a class="reference internal" href="#what-you-need" id="toc-entry-1">What you need</a></li>
+<li><a class="reference internal" href="#install" id="toc-entry-2">Install</a></li>
+<li><a class="reference internal" href="#a-first-run" id="toc-entry-3">A first run</a></li>
+<li><a class="reference internal" href="#a-vehicle-a-simulator-and-a-ground-station" id="toc-entry-4">A vehicle, a simulator and a ground station</a></li>
+<li><a class="reference internal" href="#fly-the-lander" id="toc-entry-5">Fly the lander</a></li>
+<li><a class="reference internal" href="#on-another-system" id="toc-entry-6">On another system</a></li>
+<li><a class="reference internal" href="#where-next" id="toc-entry-7">Where next</a></li>
+</ul>
+</div>
+<p>From nothing to a vehicle flying on your desk, in about fifteen minutes:
+install the released packages, run one command, and watch a vehicle, a
+simulator of its hardware and a ground station talk to one another. No
+hardware, no build and no root, beyond installing.</p>
+<p>TCSpecial is flight software. It runs aboard a vehicle and relays data
+between the vehicle's payloads -- its sensors, switches and instruments --
+and the ground. What a vehicle carries and does is a configuration file,
+checked when it is loaded. On a desk, <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> stands in for the
+payloads and <tt class="docutils literal"><span class="pre">tcs-moc</span></tt> for the ground, so all of it runs on one machine.</p>
+<div class="section" id="what-you-need">
+<h1><a class="toc-backref" href="#toc-entry-1">What you need</a></h1>
+<ul class="simple">
+<li>An x86-64 Linux desktop with a C library, glibc, of 2.43 or later:
+Ubuntu 26.04 or later, or a current Fedora. <tt class="docutils literal">ldd <span class="pre">--version</span></tt> says
+which you have. On an older system, run it in a container instead:
+see <a class="reference internal" href="#on-another-system">On another system</a>.</li>
+<li><tt class="docutils literal">curl</tt>, and <tt class="docutils literal">sudo</tt> to install packages.</li>
+</ul>
+</div>
+<div class="section" id="install">
+<h1><a class="toc-backref" href="#toc-entry-2">Install</a></h1>
+<p>Download the 0.3.0 packages from the GitHub release, and install them
+with your package manager, which fetches what they depend on.</p>
+<p>On Ubuntu or Debian:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>tcs-0.3.0<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.0<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.0<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="keyword">for</span><span class="whitespace"> </span>p<span class="whitespace"> </span><span class="keyword">in</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>tcs-tools<span class="whitespace"> </span>tcspecial-test<span class="whitespace"> </span>tcspecial-examples<span class="whitespace">
+</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}_0.3.0-1_amd64.deb&quot;; done
+</span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>apt<span class="whitespace"> </span>update<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>sudo<span class="whitespace"> </span>apt<span class="whitespace"> </span>install<span class="whitespace"> </span>./*.deb
+</pre>
+<p>On Fedora:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>tcs-0.3.0<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.0<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.0<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="keyword">for</span><span class="whitespace"> </span>p<span class="whitespace"> </span><span class="keyword">in</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>tcs-tools<span class="whitespace"> </span>tcspecial-test<span class="whitespace"> </span>tcspecial-examples<span class="whitespace">
+</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}-0.3.0-1.x86_64.rpm&quot;; done
+</span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>dnf<span class="whitespace"> </span>install<span class="whitespace"> </span>./*.rpm
+</pre>
+<p>Everything goes under <tt class="docutils literal">/opt/tcs</tt>. The packages put <tt class="docutils literal">/opt/tcs/bin</tt> on
+the path of login shells, so log out and in again, or, in the shell you
+have:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span><span class="name builtin">export</span><span class="whitespace"> </span><span class="name variable">PATH</span><span class="operator">=</span>/opt/tcs/bin:<span class="name variable">$PATH</span>
+</pre>
+<p>Then <tt class="docutils literal">tcsx</tt>, which runs the examples, lists them:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcsx<span class="whitespace">
+</span><span class="generic output">battery
+beacon
+...
+thermostat</span>
+</pre>
+<p>The manuals and designs are a sixth package, <tt class="docutils literal"><span class="pre">tcspecial-doc</span></tt>, which you
+can install the same way; they are also on the web, beside this page.</p>
+</div>
+<div class="section" id="a-first-run">
+<h1><a class="toc-backref" href="#toc-entry-3">A first run</a></h1>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcsx<span class="whitespace"> </span>--no-memlock<span class="whitespace"> </span>simple-app<span class="whitespace">
+</span><span class="generic output">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do</span>
+</pre>
+<p>In a few seconds that is a vehicle, tcspecial, starting a payload that is
+a program, which sends a line of text a word at a time, and a ground
+station that prints the words as they reach it.</p>
+<p><tt class="docutils literal"><span class="pre">--no-memlock</span></tt> is there because of your desk, not the vehicle. Aboard,
+tcspecial locks its memory into RAM, so that it is never paged out, and
+refuses to run where it cannot: a vehicle whose memory is not held is not
+the vehicle that was tested. A desktop usually lets a program lock only
+8 MiB, a little less than tcspecial needs, so without the flag it stops
+and says so. Raising the limit, with <tt class="docutils literal">ulimit <span class="pre">-l</span> unlimited</tt> in a shell
+whose limit allows it, does as well.</p>
+</div>
+<div class="section" id="a-vehicle-a-simulator-and-a-ground-station">
+<h1><a class="toc-backref" href="#toc-entry-4">A vehicle, a simulator and a ground station</a></h1>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcsx<span class="whitespace"> </span>--no-memlock<span class="whitespace"> </span>thermostat
+</pre>
+<p>This is the worked example of computing aboard. The vehicle reads three
+temperature sensors of one place, converts each reading to kelvin, votes
+on the three so that one failing cannot mislead it, and runs a
+thermostat that switches two heaters. Three programs start:</p>
+<ul class="simple">
+<li><strong>tcs-moc</strong>, the test ground station, which starts the other two.</li>
+<li><strong>tcs-sim</strong>, which simulates the vehicle's hardware: the three sensors
+and the two heater switches, joined to a model of the place they are
+in, which warms while the heaters are on and cools while they are off.</li>
+<li><strong>tcspecial</strong>, the flight software, running the thermostat's
+configuration against the simulated hardware.</li>
+</ul>
+<p>tcs-moc's window opens reading <tt class="docutils literal">Disconnected</tt>. Press <tt class="docutils literal">Connect</tt>: a
+vehicle sends nothing down until a ground station has connected with the
+configuration it is running. Then the readings come down, panel by panel:
+each sensor in kelvin, the vote, and what each heater switch was told.
+In tcs-sim's window, each payload has a panel of its own, and the
+temperature moves as the heaters go on and off.</p>
+<p>Closing tcs-moc's window stops all three.</p>
+</div>
+<div class="section" id="fly-the-lander">
+<h1><a class="toc-backref" href="#toc-entry-5">Fly the lander</a></h1>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>tcsx<span class="whitespace"> </span>--no-memlock<span class="whitespace"> </span>lander
+</pre>
+<p>A lunar landing in two dimensions, flown by hand. Two tcspecials fly it,
+one for each axis, and the ground watches through
+<a class="reference external" href="https://yamcs.org">Yamcs</a>, a mission control system, with everything
+between them delayed 1.3 seconds each way, as light from the Moon is.
+Fly it from the joystick in tcs-sim's window: press in its square and
+drag along an arm. Land on the pad at no more than 3.05 m/s down and
+1.22 m/s across, the Apollo lunar module's limits; then lift off again if
+you like. Autoland flies it for you.</p>
+<p>It needs Yamcs, which runs on Java. Install a Java runtime --
+<tt class="docutils literal"><span class="pre">default-jre-headless</span></tt> on Ubuntu, <tt class="docutils literal"><span class="pre">java-25-openjdk-headless</span></tt> on
+Fedora -- unpack a Yamcs release, and say where:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span><span class="name variable">yamcs</span><span class="operator">=</span>https://github.com/yamcs/yamcs/releases/download/yamcs-5.14.0<span class="whitespace">
+</span><span class="generic prompt">$ </span>curl<span class="whitespace"> </span>-fLO<span class="whitespace"> </span><span class="literal string double">&quot;</span><span class="name variable">$yamcs</span><span class="literal string double">/yamcs-5.14.0-linux-x86_64.tar.gz&quot;</span><span class="whitespace">
+</span><span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>yamcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tar<span class="whitespace"> </span>xzf<span class="whitespace"> </span>yamcs-5.14.0-linux-x86_64.tar.gz<span class="whitespace"> </span>-C<span class="whitespace"> </span>yamcs<span class="whitespace"> </span><span class="literal string escape">\
+</span><span class="generic prompt">&gt; </span><span class="whitespace">    </span>--strip-components<span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name builtin">export</span><span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span><span class="name variable">$PWD</span>/yamcs<span class="whitespace">
+</span><span class="generic prompt">$ </span>tcsx<span class="whitespace"> </span>--no-memlock<span class="whitespace"> </span>lander
+</pre>
+<p><tt class="docutils literal">tcsx</tt> lists the other examples through Yamcs too: <tt class="docutils literal"><span class="pre">ping-yamcs</span></tt>,
+<tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> and <tt class="docutils literal">memusage</tt>.</p>
+</div>
+<div class="section" id="on-another-system">
+<h1><a class="toc-backref" href="#toc-entry-6">On another system</a></h1>
+<p>Where the packages will not install -- an older distribution, or one
+that is neither Debian-like nor Fedora-like -- run them in the test
+container, a Kubuntu 26.04 or Fedora system of its own, made with
+<a class="reference external" href="https://podman.io">Podman</a>, that shows its windows on your desktop.
+It needs Podman, git and a clone of tcspecial, but no build:</p>
+<pre class="code console literal-block">
+<span class="generic prompt">$ </span>git<span class="whitespace"> </span>clone<span class="whitespace"> </span>https://github.com/vomlehn/tcspecial<span class="whitespace">
+</span><span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcs-0.3.0/build/packages<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.0/build/packages<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.0<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="keyword">for</span><span class="whitespace"> </span>p<span class="whitespace"> </span><span class="keyword">in</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>tcs-tools<span class="whitespace"> </span>tcspecial-test<span class="whitespace"> </span>tcspecial-examples<span class="whitespace">
+</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}_0.3.0-1_amd64.deb&quot;; done
+</span><span class="generic prompt">$ </span><span class="name builtin">cd</span><span class="whitespace"> </span>../../..<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial/container/bin/start<span class="whitespace"> </span>tcs-0.3.0
+</pre>
+<p>The first start builds the container's image, which takes some minutes,
+installs the packages in it, and opens a terminal with a shell inside,
+where <tt class="docutils literal">tcsx <span class="pre">--no-memlock</span> thermostat</tt> and the rest run as above. Yamcs is
+already there. Closing the terminal stops the container, which keeps
+what was done in it for the next start. <tt class="docutils literal">container/README.md</tt> says
+more, including how to use the Fedora image and the RPMs instead.</p>
+</div>
+<div class="section" id="where-next">
+<h1><a class="toc-backref" href="#toc-entry-7">Where next</a></h1>
+<ul class="simple">
+<li><a class="reference external" href="building-a-vehicle.html">Building a vehicle</a> builds a small lunar
+lander's science deck in ten stages, from one payload to a whole
+vehicle, each stage a configuration that runs on your desk.</li>
+<li><a class="reference external" href="tcspecial.html">The tcspecial manual</a> is the reference: every kind
+of payload and node, the configuration's every attribute, and each
+example, the thermostat and the lander among them.</li>
+<li><a class="reference external" href="manual.html">The TCS documentation</a> lists the manuals of tcs-moc,
+tcs-sim, tcs-cfge -- the configuration editor -- and the rest, and the
+design documents.</li>
+<li>To build from source, see &quot;Installing&quot; in the README.</li>
+</ul>
+<p>TCSpecial is an alpha release: it is not fully tested and not feature
+complete. Feedback is welcome: open an issue at
+<a class="reference external" href="https://github.com/vomlehn/tcspecial/issues">https://github.com/vomlehn/tcspecial/issues</a>.</p>
+</div>
+</div>
+</body>
+</html>

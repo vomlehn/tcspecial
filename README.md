@@ -36,7 +36,24 @@ with, and docs/manual.rst links to their documents.
 > the bridge component in fprime/ (`make fprime-test` tests it); none of the
 > cFS integration is built yet.
 
-# To Run
+# Quick start
+
+[Getting started](docs/getting-started.rst) takes you from nothing to a
+vehicle, a simulator of its hardware and a ground station running on your
+desk, in about fifteen minutes, from the released packages: no build. On
+Ubuntu 26.04 or later:
+
+     release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.0
+     for p in tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-examples
+     do curl -fLO "$release/${p}_0.3.0-1_amd64.deb"; done
+     sudo apt update && sudo apt install ./*.deb
+     export PATH=/opt/tcs/bin:$PATH
+     tcsx --no-memlock thermostat
+
+Then press `Connect` in tcs-moc's window. The guide also covers Fedora,
+the lander through Yamcs, and a container for older systems.
+
+# To Run From a Checkout
 
 This is an alpha release: it is not fully tested and not feature complete.
 There is a design document for each program, listed in docs/design.rst, a

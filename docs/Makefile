@@ -20,7 +20,13 @@ DESIGNS = design.html tcs-cfge-design.html tcs-moc-design.html \
 
 .PHONY: all
 all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
-	node-types.html building-a-vehicle.html desk-to-flight.html
+	node-types.html building-a-vehicle.html desk-to-flight.html \
+	getting-started.html
+
+# The first page to read: the released packages installed, and an example
+# run, in about fifteen minutes.
+getting-started.html: getting-started.rst
+	rst2html getting-started.rst getting-started.html
 
 # The message-flow figures of "In-flight data across a restart" and "The
 # restart and the beacon, in time", drawn by

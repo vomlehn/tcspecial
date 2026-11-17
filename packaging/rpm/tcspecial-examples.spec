@@ -9,6 +9,8 @@ Requires:       tcs-tools = %{version}-%{release}
 Requires:       tcsmoc = %{version}-%{release}
 Requires:       python3
 Requires:       python3-tkinter
+# tcsx stops what an example started with pkill.
+Requires:       procps-ng
 # The examples were tcspecial-doc's before 0.2.0.
 Conflicts:      tcspecial-doc < 0.2.0
 # The windows open through libraries loaded when beacon runs, which RPM

@@ -25,7 +25,7 @@ Filters = [
 	# default, and not the old SysV one as well.
 	' missing-hash-section /opt/tcs/lib/libtcsmoc-c\.so\.',
 	# Words of the trade that rpmlint's dictionary does not have.
-	" spelling-error \\('(libtcsmoc|gui|moc|config|pc|schemas|ui)',",
+	" spelling-error \\('(libtcsmoc|gui|cfge|moc|config|pc|schemas|ui)',",
 	" spelling-error \\(\"tcspecial's\",",
 	" spelling-error \\('(tcspecial|licences)',",
 	# lorem_gateway is named for the lorem ipsum it prints.

@@ -41,11 +41,11 @@ with, and docs/manual.rst links to their documents.
 [Getting started](docs/getting-started.rst) takes you from nothing to a
 vehicle, a simulator of its hardware and a ground station running on your
 desk, in about fifteen minutes, from the released packages: no build. On
-Ubuntu 26.04 or later:
+Ubuntu 22.04 or later, or Debian 12 or later:
 
-     release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.0
+     release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.1
      for p in tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-examples
-     do curl -fLO "$release/${p}_0.3.0-1_amd64.deb"; done
+     do curl -fLO "$release/${p}_0.3.1-1_amd64.deb"; done
      sudo apt update && sudo apt install ./*.deb
      export PATH=/opt/tcs/bin:$PATH
      tcsx --no-memlock thermostat

@@ -388,31 +388,31 @@ payloads and <tt class="docutils literal"><span class="pre">tcs-moc</span></tt> 
 <div class="section" id="what-you-need">
 <h1><a class="toc-backref" href="#toc-entry-1">What you need</a></h1>
 <ul class="simple">
-<li>An x86-64 Linux desktop with a C library, glibc, of 2.43 or later:
-Ubuntu 26.04 or later, or a current Fedora. <tt class="docutils literal">ldd <span class="pre">--version</span></tt> says
-which you have. On an older system, run it in a container instead:
-see <a class="reference internal" href="#on-another-system">On another system</a>.</li>
+<li>An x86-64 Linux desktop with a C library, glibc, of 2.35 or later:
+Ubuntu 22.04 or later, Debian 12 or later, or a current Fedora.
+<tt class="docutils literal">ldd <span class="pre">--version</span></tt> says which you have. On an older system, run it in a
+container instead: see <a class="reference internal" href="#on-another-system">On another system</a>.</li>
 <li><tt class="docutils literal">curl</tt>, and <tt class="docutils literal">sudo</tt> to install packages.</li>
 </ul>
 </div>
 <div class="section" id="install">
 <h1><a class="toc-backref" href="#toc-entry-2">Install</a></h1>
-<p>Download the 0.3.0 packages from the GitHub release, and install them
+<p>Download the 0.3.1 packages from the GitHub release, and install them
 with your package manager, which fetches what they depend on.</p>
 <p>On Ubuntu or Debian:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>tcs-0.3.0<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.0<span class="whitespace">
-</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.0<span class="whitespace">
+<span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>tcs-0.3.1<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.1<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.1<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="keyword">for</span><span class="whitespace"> </span>p<span class="whitespace"> </span><span class="keyword">in</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>tcs-tools<span class="whitespace"> </span>tcspecial-test<span class="whitespace"> </span>tcspecial-examples<span class="whitespace">
-</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}_0.3.0-1_amd64.deb&quot;; done
+</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}_0.3.1-1_amd64.deb&quot;; done
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>apt<span class="whitespace"> </span>update<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>sudo<span class="whitespace"> </span>apt<span class="whitespace"> </span>install<span class="whitespace"> </span>./*.deb
 </pre>
 <p>On Fedora:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>tcs-0.3.0<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.0<span class="whitespace">
-</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.0<span class="whitespace">
+<span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>tcs-0.3.1<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.1<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.1<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="keyword">for</span><span class="whitespace"> </span>p<span class="whitespace"> </span><span class="keyword">in</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>tcs-tools<span class="whitespace"> </span>tcspecial-test<span class="whitespace"> </span>tcspecial-examples<span class="whitespace">
-</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}-0.3.0-1.x86_64.rpm&quot;; done
+</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}-0.3.1-1.x86_64.rpm&quot;; done
 </span><span class="generic prompt">$ </span>sudo<span class="whitespace"> </span>dnf<span class="whitespace"> </span>install<span class="whitespace"> </span>./*.rpm
 </pre>
 <p>Everything goes under <tt class="docutils literal">/opt/tcs</tt>. The packages put <tt class="docutils literal">/opt/tcs/bin</tt> on
@@ -510,11 +510,11 @@ container, a Kubuntu 26.04 or Fedora system of its own, made with
 It needs Podman, git and a clone of tcspecial, but no build:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>git<span class="whitespace"> </span>clone<span class="whitespace"> </span>https://github.com/vomlehn/tcspecial<span class="whitespace">
-</span><span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcs-0.3.0/build/packages<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.0/build/packages<span class="whitespace">
-</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.0<span class="whitespace">
+</span><span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>-p<span class="whitespace"> </span>tcs-0.3.1/build/packages<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span><span class="name builtin">cd</span><span class="whitespace"> </span>tcs-0.3.1/build/packages<span class="whitespace">
+</span><span class="generic prompt">$ </span><span class="name variable">release</span><span class="operator">=</span>https://github.com/vomlehn/tcspecial/releases/download/v0.3.1<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="keyword">for</span><span class="whitespace"> </span>p<span class="whitespace"> </span><span class="keyword">in</span><span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>tcsmoc<span class="whitespace"> </span>tcs-tools<span class="whitespace"> </span>tcspecial-test<span class="whitespace"> </span>tcspecial-examples<span class="whitespace">
-</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}_0.3.0-1_amd64.deb&quot;; done
-</span><span class="generic prompt">$ </span><span class="name builtin">cd</span><span class="whitespace"> </span>../../..<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial/container/bin/start<span class="whitespace"> </span>tcs-0.3.0
+</span><span class="generic output">&gt; do curl -fLO &quot;$release/${p}_0.3.1-1_amd64.deb&quot;; done
+</span><span class="generic prompt">$ </span><span class="name builtin">cd</span><span class="whitespace"> </span>../../..<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tcspecial/container/bin/start<span class="whitespace"> </span>tcs-0.3.1
 </pre>
 <p>The first start builds the container's image, which takes some minutes,
 installs the packages in it, and opens a terminal with a shell inside,

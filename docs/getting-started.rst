@@ -20,36 +20,36 @@ payloads and ``tcs-moc`` for the ground, so all of it runs on one machine.
 What you need
 =============
 
-* An x86-64 Linux desktop with a C library, glibc, of 2.43 or later:
-  Ubuntu 26.04 or later, or a current Fedora. ``ldd --version`` says
-  which you have. On an older system, run it in a container instead:
-  see `On another system`_.
+* An x86-64 Linux desktop with a C library, glibc, of 2.35 or later:
+  Ubuntu 22.04 or later, Debian 12 or later, or a current Fedora.
+  ``ldd --version`` says which you have. On an older system, run it in a
+  container instead: see `On another system`_.
 * ``curl``, and ``sudo`` to install packages.
 
 Install
 =======
 
-Download the 0.3.0 packages from the GitHub release, and install them
+Download the 0.3.1 packages from the GitHub release, and install them
 with your package manager, which fetches what they depend on.
 
 On Ubuntu or Debian:
 
 .. code-block:: console
 
-   $ mkdir tcs-0.3.0 && cd tcs-0.3.0
-   $ release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.0
+   $ mkdir tcs-0.3.1 && cd tcs-0.3.1
+   $ release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.1
    $ for p in tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-examples
-   > do curl -fLO "$release/${p}_0.3.0-1_amd64.deb"; done
+   > do curl -fLO "$release/${p}_0.3.1-1_amd64.deb"; done
    $ sudo apt update && sudo apt install ./*.deb
 
 On Fedora:
 
 .. code-block:: console
 
-   $ mkdir tcs-0.3.0 && cd tcs-0.3.0
-   $ release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.0
+   $ mkdir tcs-0.3.1 && cd tcs-0.3.1
+   $ release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.1
    $ for p in tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-examples
-   > do curl -fLO "$release/${p}-0.3.0-1.x86_64.rpm"; done
+   > do curl -fLO "$release/${p}-0.3.1-1.x86_64.rpm"; done
    $ sudo dnf install ./*.rpm
 
 Everything goes under ``/opt/tcs``. The packages put ``/opt/tcs/bin`` on
@@ -165,11 +165,11 @@ It needs Podman, git and a clone of tcspecial, but no build:
 .. code-block:: console
 
    $ git clone https://github.com/vomlehn/tcspecial
-   $ mkdir -p tcs-0.3.0/build/packages && cd tcs-0.3.0/build/packages
-   $ release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.0
+   $ mkdir -p tcs-0.3.1/build/packages && cd tcs-0.3.1/build/packages
+   $ release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.1
    $ for p in tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-examples
-   > do curl -fLO "$release/${p}_0.3.0-1_amd64.deb"; done
-   $ cd ../../.. && tcspecial/container/bin/start tcs-0.3.0
+   > do curl -fLO "$release/${p}_0.3.1-1_amd64.deb"; done
+   $ cd ../../.. && tcspecial/container/bin/start tcs-0.3.1
 
 The first start builds the container's image, which takes some minutes,
 installs the packages in it, and opens a terminal with a shell inside,

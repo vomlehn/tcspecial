@@ -15,8 +15,8 @@ abstract: >-
   C++, Rust and Python.
 authors:
   - name: "TCSpecial Team"
-version: 0.3.0
-date-released: 2026-11-16
+version: 0.3.1
+date-released: 2026-11-17
 license:
   - MIT
   - Apache-2.0

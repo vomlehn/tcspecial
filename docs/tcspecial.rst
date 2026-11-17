@@ -5,6 +5,151 @@ tcspecial Manual
    :depth: 4
    :local:
 
+TCS in Plain Words
+==================
+
+The problem
+-----------
+
+A spacecraft is a collection of instruments -- cameras, thermometers,
+radios, motors, heaters -- that somebody on Earth has to look after from a
+long way off. The instruments' readings have to reach the people
+responsible for them, and those people's orders have to reach the
+instruments. Neither trip is easy. At the distance of the Moon, a message
+takes more than a second to arrive and as long again for any answer to
+come back; the radio link drops messages and sometimes fails for hours; and
+nobody can walk over and press a reset button. The software in the middle,
+which carries readings down and orders up, has to keep working through all
+of that, and when something does go wrong it has to say so plainly.
+
+The readings coming down are called **telemetry**, the orders going up
+**commands**, and the people and computers on the ground who send one and
+receive the other the **mission operations center**. TCS is free,
+open-source software for the whole of that path: aboard the vehicle, on
+the ground, and on the engineer's desk where both are built and tested.
+Nothing in it is specific to space. A submarine, a rover, a drone or an
+instrument on a remote mountainside poses the same problem at a different
+distance.
+
+TCS is three projects, each usable on its own.
+
+tcspecial: the relay aboard
+---------------------------
+
+**tcspecial**, the project this manual belongs to, is the program that
+runs aboard. It sits between the vehicle's instruments, which it calls
+*payloads*, and the ground, passing readings down and commands up, and it
+can work on the data as it goes: convert a raw reading into degrees, take
+a vote among three thermometers so that one broken one cannot mislead
+anyone, or switch on a heater when it is cold, without waiting for a
+command that would take seconds to arrive.
+
+What a particular vehicle carries, and what tcspecial does with it, is not
+written into the program. It is written down in a **configuration**, a
+plain text file a person can read: this sensor is on that wire, read it
+once a second, send it to the ground. That file is checked thoroughly
+before anything runs, so that a mistake is caught on a desk, with the
+line it is on, rather than discovered in flight. The vehicle reports
+which configuration it is running, so the ground always knows what it is
+talking to.
+
+tcspecial is built to survive. It runs apart from the vehicle's other
+software, so a failure there cannot bring it down, and a failure in it
+cannot spread. If it stops, a supervisor starts it again; if a new
+configuration sent up from the ground will not run, the vehicle falls back
+to the last one that did. It sends a regular heartbeat, a **beacon**, so
+the ground can tell at a glance whether the vehicle is alive and whether it
+has restarted. A large vehicle can run several copies, each looking after
+its own instruments, so that one failing leaves the rest working.
+
+Around it are the tools for building and testing a vehicle on an ordinary
+computer:
+
+* **tcs-sim** imitates the vehicle's hardware, so that the flight software
+  can be run and tested with no instruments at all. It can simulate the
+  physics too -- a room warming and cooling, a lander falling under the
+  Moon's gravity -- so that what the software does has consequences.
+* **tcs-moc** is a ground station for testing: it shows what the vehicle
+  sends down and sends it commands.
+* **tcs-cfge** is a graphical editor for configurations, and **tcs-verify**
+  the checker that every program uses, so that all of them agree on what is
+  wrong with a configuration and where. **tcs-conflict** says whether two
+  configurations can run on one machine at once.
+* **tcsmoc** is the library a real ground station is built on, in C, C++,
+  Rust or Python.
+* The **examples** -- a thermostat, a lunar lander flown by hand through a
+  mission control system with the Moon's delay, and more -- each run with
+  one command, ``tcsx``, and show the pieces working together.
+
+tcs-xtce: one description of every message
+------------------------------------------
+
+Every reading and every command travels as a **packet**, a string of bytes
+whose layout both ends must agree on exactly: which bits are the
+temperature, which the time, what scale each uses. A disagreement does not
+cause an error; it causes wrong numbers, which is worse. The space
+industry has a standard way of writing those layouts down, **XTCE**, which
+mission control systems already read.
+
+**tcs-xtce** takes a mission's XTCE description and writes the program code
+that builds and reads its packets, in C, C++, Rust and Python, so that
+nobody writes that code by hand and every language agrees with every
+other, to the byte. The packets carry no padding and no labels, so they
+are small, which matters on a slow radio link. To make sure two programs
+really were built from the same description, each can compute a short
+fingerprint of it, a **digest**, which is the same whichever language
+computes it; the two ends compare digests before they trust each other's
+packets. tcs-xtce also has an editor for XTCE, **tcs-xtcee**, and its
+runtime, **tcsxtce**, is the small library the generated code runs on,
+aboard and on the ground.
+
+tcslog: a record that survives the trip home
+--------------------------------------------
+
+A vehicle sees more than its radio can send as it happens, and what it
+records has to come home over the same unreliable link. **tcslog** is the
+log aboard. It writes what it is given into a series of small files,
+*segments*, each of which can be sent down on its own, whenever there is
+time on the link. When some segments are lost or damaged on the way, what
+arrived can still be read, and the reader says exactly what is missing,
+rather than losing the whole record. It uses a fixed amount of memory and
+storage, decided in advance, which is what a vehicle with a fixed amount of
+both needs. **tcslog-tools** reads the logs on the ground. Like tcs-xtce,
+tcslog is written for C, C++, Rust and Python, and a log written from one
+language reads in the others.
+
+What holds it together
+----------------------
+
+The three projects share a few convictions:
+
+* **Reliability comes first.** Where reliability and convenience
+  conflict, reliability wins. A mistake should be refused before launch, by
+  a check, rather than found after it.
+* **A vehicle is described, not programmed.** What a vehicle does is a
+  file that can be read, checked and compared, not code that has to be
+  traced.
+* **Everything runs on a desk.** Every example and every test runs on an
+  ordinary Linux computer, with the hardware simulated, so that a student
+  or a small team can learn it and try it before buying anything.
+* **It fits what is already used.** It works with Yamcs, an open-source
+  mission control system, and work is under way to fit it to NASA's core
+  Flight System and JPL's F´, the frameworks most missions are built on.
+
+TCS is an early release: it works, but it is not yet fully tested or
+finished, and it has not yet flown. `Getting started
+<getting-started.html>`__ installs it and runs the examples in about
+fifteen minutes.
+
+From here on
+------------
+
+The rest of this manual is for the engineer who builds a vehicle with
+tcspecial: what a configuration says, every kind of payload and node it
+can name, how the vehicle and the ground find and trust each other, and
+each example in detail. It starts, in the Introduction, with the same
+ground covered again in engineering terms.
+
 Introduction
 ============
 
@@ -504,8 +649,8 @@ that was not also written in YAML.
 unaffected; a configuration names the second, as its ``interface``: see `Which
 interface it is written for`_.)
 
-Which Files There Are
-=====================
+TCS Files
+=========
 Two configuration files, and neither of them has a name of its own. Any name
 will do so long as it ends in ``.ytcs`` or ``.xtcs``, which is what says how to
 read it; the names used throughout this manual are the shipped examples' and

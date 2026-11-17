@@ -367,139 +367,281 @@ ul.auto-toc {
 <div class="contents local topic" id="table-of-contents">
 <p class="topic-title"><a class="reference internal" href="#top">Table of Contents</a></p>
 <ul class="simple">
-<li><a class="reference internal" href="#introduction" id="toc-entry-1">Introduction</a><ul>
-<li><a class="reference internal" href="#what-that-buys" id="toc-entry-2">What that buys</a></li>
-<li><a class="reference internal" href="#the-vocabulary" id="toc-entry-3">The vocabulary</a></li>
+<li><a class="reference internal" href="#tcs-in-plain-words" id="toc-entry-1">TCS in Plain Words</a><ul>
+<li><a class="reference internal" href="#the-problem" id="toc-entry-2">The problem</a></li>
+<li><a class="reference internal" href="#tcspecial-the-relay-aboard" id="toc-entry-3">tcspecial: the relay aboard</a></li>
+<li><a class="reference internal" href="#tcs-xtce-one-description-of-every-message" id="toc-entry-4">tcs-xtce: one description of every message</a></li>
+<li><a class="reference internal" href="#tcslog-a-record-that-survives-the-trip-home" id="toc-entry-5">tcslog: a record that survives the trip home</a></li>
+<li><a class="reference internal" href="#what-holds-it-together" id="toc-entry-6">What holds it together</a></li>
+<li><a class="reference internal" href="#from-here-on" id="toc-entry-7">From here on</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#assumptions" id="toc-entry-4">Assumptions</a></li>
-<li><a class="reference internal" href="#limitations" id="toc-entry-5">Limitations</a></li>
-<li><a class="reference internal" href="#configuration-file-formats" id="toc-entry-6">Configuration File Formats</a></li>
-<li><a class="reference internal" href="#which-files-there-are" id="toc-entry-7">Which Files There Are</a></li>
-<li><a class="reference internal" href="#the-payload-configuration" id="toc-entry-8">The Payload Configuration</a><ul>
-<li><a class="reference internal" href="#supported-and-experimental-interfaces" id="toc-entry-9">Supported and experimental interfaces</a></li>
-<li><a class="reference internal" href="#attributes-every-payload-has" id="toc-entry-10">Attributes Every Payload Has</a><ul>
-<li><a class="reference internal" href="#how-a-payload-is-driven" id="toc-entry-11">How a payload is driven</a></li>
+<li><a class="reference internal" href="#introduction" id="toc-entry-8">Introduction</a><ul>
+<li><a class="reference internal" href="#what-that-buys" id="toc-entry-9">What that buys</a></li>
+<li><a class="reference internal" href="#the-vocabulary" id="toc-entry-10">The vocabulary</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-two-types-of-payload" id="toc-entry-12">The two types of payload</a><ul>
-<li><a class="reference internal" href="#what-a-payload-starts-in" id="toc-entry-13">What a payload starts in</a></li>
+<li><a class="reference internal" href="#assumptions" id="toc-entry-11">Assumptions</a></li>
+<li><a class="reference internal" href="#limitations" id="toc-entry-12">Limitations</a></li>
+<li><a class="reference internal" href="#configuration-file-formats" id="toc-entry-13">Configuration File Formats</a></li>
+<li><a class="reference internal" href="#tcs-files" id="toc-entry-14">TCS Files</a></li>
+<li><a class="reference internal" href="#the-payload-configuration" id="toc-entry-15">The Payload Configuration</a><ul>
+<li><a class="reference internal" href="#supported-and-experimental-interfaces" id="toc-entry-16">Supported and experimental interfaces</a></li>
+<li><a class="reference internal" href="#attributes-every-payload-has" id="toc-entry-17">Attributes Every Payload Has</a><ul>
+<li><a class="reference internal" href="#how-a-payload-is-driven" id="toc-entry-18">How a payload is driven</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-a-payload-s-data-is-read" id="toc-entry-14">How a Payload's Data Is Read</a></li>
-<li><a class="reference internal" href="#lengths-of-time" id="toc-entry-15">Lengths of Time</a></li>
-<li><a class="reference internal" href="#a-network-payload" id="toc-entry-16">A Network Payload</a></li>
-<li><a class="reference internal" href="#a-device-file-payload" id="toc-entry-17">A Device File Payload</a></li>
-<li><a class="reference internal" href="#a-can-payload" id="toc-entry-18">A CAN Payload</a></li>
-<li><a class="reference internal" href="#a-gpio-payload" id="toc-entry-19">A GPIO Payload</a></li>
-<li><a class="reference internal" href="#an-hdlc-payload" id="toc-entry-20">An HDLC Payload</a></li>
-<li><a class="reference internal" href="#an-rpmsg-payload" id="toc-entry-21">An rpmsg Payload</a></li>
-<li><a class="reference internal" href="#an-iio-payload" id="toc-entry-22">An IIO Payload</a></li>
-<li><a class="reference internal" href="#a-serial-payload" id="toc-entry-23">A Serial Payload</a></li>
-<li><a class="reference internal" href="#an-i2c-payload" id="toc-entry-24">An I<sup>2</sup>C Payload</a></li>
-<li><a class="reference internal" href="#a-spi-payload" id="toc-entry-25">A SPI Payload</a></li>
-<li><a class="reference internal" href="#temperature-sensors-on-a-thermal-mass" id="toc-entry-26">Temperature Sensors on a Thermal Mass</a></li>
-<li><a class="reference internal" href="#making-the-kernel-s-dummy-devices" id="toc-entry-27">Making the Kernel's Dummy Devices</a></li>
-<li><a class="reference internal" href="#what-the-configuration-will-not-let-pass" id="toc-entry-28">What the Configuration Will Not Let Pass</a></li>
-<li><a class="reference internal" href="#an-example" id="toc-entry-29">An Example</a></li>
-<li><a class="reference internal" href="#not-yet-read" id="toc-entry-30">Not Yet Read</a></li>
+<li><a class="reference internal" href="#the-two-types-of-payload" id="toc-entry-19">The two types of payload</a><ul>
+<li><a class="reference internal" href="#what-a-payload-starts-in" id="toc-entry-20">What a payload starts in</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#starting-and-stopping-a-payload" id="toc-entry-31">Starting and stopping a payload</a></li>
-<li><a class="reference internal" href="#seeing-what-was-read" id="toc-entry-32">Seeing what was read</a></li>
-<li><a class="reference internal" href="#the-shipped-examples" id="toc-entry-33">The shipped examples</a></li>
-<li><a class="reference internal" href="#the-examples" id="toc-entry-34">The Examples</a><ul>
-<li><a class="reference internal" href="#the-minimal-example" id="toc-entry-35">The minimal example</a></li>
-<li><a class="reference internal" href="#the-thermostat-example" id="toc-entry-36">The thermostat example</a></li>
-<li><a class="reference internal" href="#the-battery-example" id="toc-entry-37">The battery example</a></li>
-<li><a class="reference internal" href="#the-descent-example" id="toc-entry-38">The descent example</a></li>
-<li><a class="reference internal" href="#the-lander-example" id="toc-entry-39">The lander example</a></li>
-<li><a class="reference internal" href="#the-simple-app-example" id="toc-entry-40">The simple-app example</a></li>
-<li><a class="reference internal" href="#the-beacon-example" id="toc-entry-41">The beacon example</a></li>
-<li><a class="reference internal" href="#the-ping-example" id="toc-entry-42">The ping example</a></li>
-<li><a class="reference internal" href="#the-ping-yamcs-example" id="toc-entry-43">The ping-yamcs example</a></li>
-<li><a class="reference internal" href="#the-memusage-example" id="toc-entry-44">The memusage example</a></li>
-<li><a class="reference internal" href="#the-thermostat-yamcs-example" id="toc-entry-45">The thermostat-yamcs example</a></li>
-<li><a class="reference internal" href="#the-tees-example" id="toc-entry-46">The tees example</a></li>
-<li><a class="reference internal" href="#the-consolidator-example" id="toc-entry-47">The consolidator example</a></li>
-<li><a class="reference internal" href="#the-fprime-example" id="toc-entry-48">The fprime example</a><ul>
-<li><a class="reference internal" href="#the-f-bridge" id="toc-entry-49">The F´ bridge</a></li>
+<li><a class="reference internal" href="#how-a-payload-s-data-is-read" id="toc-entry-21">How a Payload's Data Is Read</a></li>
+<li><a class="reference internal" href="#lengths-of-time" id="toc-entry-22">Lengths of Time</a></li>
+<li><a class="reference internal" href="#a-network-payload" id="toc-entry-23">A Network Payload</a></li>
+<li><a class="reference internal" href="#a-device-file-payload" id="toc-entry-24">A Device File Payload</a></li>
+<li><a class="reference internal" href="#a-can-payload" id="toc-entry-25">A CAN Payload</a></li>
+<li><a class="reference internal" href="#a-gpio-payload" id="toc-entry-26">A GPIO Payload</a></li>
+<li><a class="reference internal" href="#an-hdlc-payload" id="toc-entry-27">An HDLC Payload</a></li>
+<li><a class="reference internal" href="#an-rpmsg-payload" id="toc-entry-28">An rpmsg Payload</a></li>
+<li><a class="reference internal" href="#an-iio-payload" id="toc-entry-29">An IIO Payload</a></li>
+<li><a class="reference internal" href="#a-serial-payload" id="toc-entry-30">A Serial Payload</a></li>
+<li><a class="reference internal" href="#an-i2c-payload" id="toc-entry-31">An I<sup>2</sup>C Payload</a></li>
+<li><a class="reference internal" href="#a-spi-payload" id="toc-entry-32">A SPI Payload</a></li>
+<li><a class="reference internal" href="#temperature-sensors-on-a-thermal-mass" id="toc-entry-33">Temperature Sensors on a Thermal Mass</a></li>
+<li><a class="reference internal" href="#making-the-kernel-s-dummy-devices" id="toc-entry-34">Making the Kernel's Dummy Devices</a></li>
+<li><a class="reference internal" href="#what-the-configuration-will-not-let-pass" id="toc-entry-35">What the Configuration Will Not Let Pass</a></li>
+<li><a class="reference internal" href="#an-example" id="toc-entry-36">An Example</a></li>
+<li><a class="reference internal" href="#not-yet-read" id="toc-entry-37">Not Yet Read</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-cfs-example" id="toc-entry-50">The cfs example</a></li>
-<li><a class="reference internal" href="#the-can-example" id="toc-entry-51">The can example</a></li>
-<li><a class="reference internal" href="#the-gpio-example" id="toc-entry-52">The gpio example</a></li>
-<li><a class="reference internal" href="#the-iio-example" id="toc-entry-53">The iio example</a></li>
+<li><a class="reference internal" href="#starting-and-stopping-a-payload" id="toc-entry-38">Starting and stopping a payload</a></li>
+<li><a class="reference internal" href="#seeing-what-was-read" id="toc-entry-39">Seeing what was read</a></li>
+<li><a class="reference internal" href="#the-shipped-examples" id="toc-entry-40">The shipped examples</a></li>
+<li><a class="reference internal" href="#the-examples" id="toc-entry-41">The Examples</a><ul>
+<li><a class="reference internal" href="#the-minimal-example" id="toc-entry-42">The minimal example</a></li>
+<li><a class="reference internal" href="#the-thermostat-example" id="toc-entry-43">The thermostat example</a></li>
+<li><a class="reference internal" href="#the-battery-example" id="toc-entry-44">The battery example</a></li>
+<li><a class="reference internal" href="#the-descent-example" id="toc-entry-45">The descent example</a></li>
+<li><a class="reference internal" href="#the-lander-example" id="toc-entry-46">The lander example</a></li>
+<li><a class="reference internal" href="#the-simple-app-example" id="toc-entry-47">The simple-app example</a></li>
+<li><a class="reference internal" href="#the-beacon-example" id="toc-entry-48">The beacon example</a></li>
+<li><a class="reference internal" href="#the-ping-example" id="toc-entry-49">The ping example</a></li>
+<li><a class="reference internal" href="#the-ping-yamcs-example" id="toc-entry-50">The ping-yamcs example</a></li>
+<li><a class="reference internal" href="#the-memusage-example" id="toc-entry-51">The memusage example</a></li>
+<li><a class="reference internal" href="#the-thermostat-yamcs-example" id="toc-entry-52">The thermostat-yamcs example</a></li>
+<li><a class="reference internal" href="#the-tees-example" id="toc-entry-53">The tees example</a></li>
+<li><a class="reference internal" href="#the-consolidator-example" id="toc-entry-54">The consolidator example</a></li>
+<li><a class="reference internal" href="#the-fprime-example" id="toc-entry-55">The fprime example</a><ul>
+<li><a class="reference internal" href="#the-f-bridge" id="toc-entry-56">The F´ bridge</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#where-to-get-it" id="toc-entry-54">Where to Get It</a><ul>
-<li><a class="reference internal" href="#github" id="toc-entry-55">GitHub</a></li>
-<li><a class="reference internal" href="#crates-io" id="toc-entry-56">crates.io</a></li>
-<li><a class="reference internal" href="#pypi" id="toc-entry-57">PyPI</a></li>
+<li><a class="reference internal" href="#the-cfs-example" id="toc-entry-57">The cfs example</a></li>
+<li><a class="reference internal" href="#the-can-example" id="toc-entry-58">The can example</a></li>
+<li><a class="reference internal" href="#the-gpio-example" id="toc-entry-59">The gpio example</a></li>
+<li><a class="reference internal" href="#the-iio-example" id="toc-entry-60">The iio example</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#installing" id="toc-entry-58">Installing</a><ul>
-<li><a class="reference internal" href="#the-packages" id="toc-entry-59">The packages</a></li>
-<li><a class="reference internal" href="#trying-the-packages-in-a-container" id="toc-entry-60">Trying the packages in a container</a></li>
-<li><a class="reference internal" href="#the-tools" id="toc-entry-61">The tools</a></li>
-<li><a class="reference internal" href="#make-install" id="toc-entry-62"><tt class="docutils literal">make install</tt></a></li>
-<li><a class="reference internal" href="#programs-everywhere-not-only-in-a-login-shell" id="toc-entry-63">Programs everywhere, not only in a login shell</a></li>
-<li><a class="reference internal" href="#the-python-alone" id="toc-entry-64">The Python alone</a></li>
-<li><a class="reference internal" href="#the-rust-programs-alone" id="toc-entry-65">The Rust programs alone</a></li>
-<li><a class="reference internal" href="#a-c-or-c-ground-station" id="toc-entry-66">A C or C++ ground station</a></li>
-<li><a class="reference internal" href="#running-tcspecial-under-a-supervisor" id="toc-entry-67">Running tcspecial under a supervisor</a></li>
+<li><a class="reference internal" href="#where-to-get-it" id="toc-entry-61">Where to Get It</a><ul>
+<li><a class="reference internal" href="#github" id="toc-entry-62">GitHub</a></li>
+<li><a class="reference internal" href="#crates-io" id="toc-entry-63">crates.io</a></li>
+<li><a class="reference internal" href="#pypi" id="toc-entry-64">PyPI</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#running-the-programs" id="toc-entry-68">Running the Programs</a><ul>
-<li><a class="reference internal" href="#everything-at-once" id="toc-entry-69">Everything at once</a></li>
-<li><a class="reference internal" href="#one-program-at-a-time" id="toc-entry-70">One program at a time</a></li>
-<li><a class="reference internal" href="#what-the-programs-take-without-the-makefile" id="toc-entry-71">What the programs take without the Makefile</a></li>
-<li><a class="reference internal" href="#what-the-vehicle-answers-to" id="toc-entry-72">What the vehicle answers to</a></li>
-<li><a class="reference internal" href="#configurations-kept-on-board" id="toc-entry-73">Configurations kept on board</a></li>
-<li><a class="reference internal" href="#consolidators" id="toc-entry-74">Consolidators</a><ul>
-<li><a class="reference internal" href="#what-defaults-mean" id="toc-entry-75">What defaults mean</a></li>
+<li><a class="reference internal" href="#installing" id="toc-entry-65">Installing</a><ul>
+<li><a class="reference internal" href="#the-packages" id="toc-entry-66">The packages</a></li>
+<li><a class="reference internal" href="#trying-the-packages-in-a-container" id="toc-entry-67">Trying the packages in a container</a></li>
+<li><a class="reference internal" href="#the-tools" id="toc-entry-68">The tools</a></li>
+<li><a class="reference internal" href="#make-install" id="toc-entry-69"><tt class="docutils literal">make install</tt></a></li>
+<li><a class="reference internal" href="#programs-everywhere-not-only-in-a-login-shell" id="toc-entry-70">Programs everywhere, not only in a login shell</a></li>
+<li><a class="reference internal" href="#the-python-alone" id="toc-entry-71">The Python alone</a></li>
+<li><a class="reference internal" href="#the-rust-programs-alone" id="toc-entry-72">The Rust programs alone</a></li>
+<li><a class="reference internal" href="#a-c-or-c-ground-station" id="toc-entry-73">A C or C++ ground station</a></li>
+<li><a class="reference internal" href="#running-tcspecial-under-a-supervisor" id="toc-entry-74">Running tcspecial under a supervisor</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-many-inputs-a-consolidator-may-have" id="toc-entry-76">How many inputs a consolidator may have</a></li>
-<li><a class="reference internal" href="#thread-stacks" id="toc-entry-77">Thread stacks</a><ul>
-<li><a class="reference internal" href="#how-deep-each-thread-has-been" id="toc-entry-78">How deep each thread has been</a></li>
+<li><a class="reference internal" href="#running-the-programs" id="toc-entry-75">Running the Programs</a><ul>
+<li><a class="reference internal" href="#everything-at-once" id="toc-entry-76">Everything at once</a></li>
+<li><a class="reference internal" href="#one-program-at-a-time" id="toc-entry-77">One program at a time</a></li>
+<li><a class="reference internal" href="#what-the-programs-take-without-the-makefile" id="toc-entry-78">What the programs take without the Makefile</a></li>
+<li><a class="reference internal" href="#what-the-vehicle-answers-to" id="toc-entry-79">What the vehicle answers to</a></li>
+<li><a class="reference internal" href="#configurations-kept-on-board" id="toc-entry-80">Configurations kept on board</a></li>
+<li><a class="reference internal" href="#consolidators" id="toc-entry-81">Consolidators</a><ul>
+<li><a class="reference internal" href="#what-defaults-mean" id="toc-entry-82">What defaults mean</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#locking-memory" id="toc-entry-79">Locking memory</a><ul>
-<li><a class="reference internal" href="#the-limit" id="toc-entry-80">The limit</a></li>
-<li><a class="reference internal" href="#when-the-lock-fails" id="toc-entry-81">When the lock fails</a></li>
-<li><a class="reference internal" href="#no-memlock" id="toc-entry-82"><tt class="docutils literal"><span class="pre">--no-memlock</span></tt></a></li>
-<li><a class="reference internal" href="#visual" id="toc-entry-83"><tt class="docutils literal"><span class="pre">--visual</span></tt></a></li>
+<li><a class="reference internal" href="#how-many-inputs-a-consolidator-may-have" id="toc-entry-83">How many inputs a consolidator may have</a></li>
+<li><a class="reference internal" href="#thread-stacks" id="toc-entry-84">Thread stacks</a><ul>
+<li><a class="reference internal" href="#how-deep-each-thread-has-been" id="toc-entry-85">How deep each thread has been</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#more-than-one-tcspecial-on-a-vehicle" id="toc-entry-84">More than one tcspecial on a vehicle</a><ul>
-<li><a class="reference internal" href="#what-each-must-have-of-its-own" id="toc-entry-85">What each must have of its own</a></li>
-<li><a class="reference internal" href="#checking-a-pair-before-they-fly" id="toc-entry-86">Checking a pair before they fly</a></li>
-<li><a class="reference internal" href="#starting-each" id="toc-entry-87">Starting each</a></li>
-<li><a class="reference internal" href="#from-the-ground" id="toc-entry-88">From the ground</a></li>
+<li><a class="reference internal" href="#locking-memory" id="toc-entry-86">Locking memory</a><ul>
+<li><a class="reference internal" href="#the-limit" id="toc-entry-87">The limit</a></li>
+<li><a class="reference internal" href="#when-the-lock-fails" id="toc-entry-88">When the lock fails</a></li>
+<li><a class="reference internal" href="#no-memlock" id="toc-entry-89"><tt class="docutils literal"><span class="pre">--no-memlock</span></tt></a></li>
+<li><a class="reference internal" href="#visual" id="toc-entry-90"><tt class="docutils literal"><span class="pre">--visual</span></tt></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#which-interface-it-is-written-for" id="toc-entry-89">Which interface it is written for</a></li>
-<li><a class="reference internal" href="#what-the-ground-is-told-the-configuration-s-own-xtce" id="toc-entry-90">What the ground is told: the configuration's own XTCE</a></li>
-<li><a class="reference internal" href="#where-the-links-are" id="toc-entry-91">Where the links are</a></li>
-<li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-92">Where the logs' segments go</a></li>
-<li><a class="reference internal" href="#simulated-dummy-or-real-devices-simulate" id="toc-entry-93">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
-<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-94">Waiting for the simulator</a></li>
-<li><a class="reference internal" href="#every-simulated-device-at-once" id="toc-entry-95">Every simulated device at once</a></li>
+<li><a class="reference internal" href="#more-than-one-tcspecial-on-a-vehicle" id="toc-entry-91">More than one tcspecial on a vehicle</a><ul>
+<li><a class="reference internal" href="#what-each-must-have-of-its-own" id="toc-entry-92">What each must have of its own</a></li>
+<li><a class="reference internal" href="#checking-a-pair-before-they-fly" id="toc-entry-93">Checking a pair before they fly</a></li>
+<li><a class="reference internal" href="#starting-each" id="toc-entry-94">Starting each</a></li>
+<li><a class="reference internal" href="#from-the-ground" id="toc-entry-95">From the ground</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-96">Building tcspecial for a vehicle</a></li>
-<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-97">Watching tcspecial work</a></li>
+<li><a class="reference internal" href="#which-interface-it-is-written-for" id="toc-entry-96">Which interface it is written for</a></li>
+<li><a class="reference internal" href="#what-the-ground-is-told-the-configuration-s-own-xtce" id="toc-entry-97">What the ground is told: the configuration's own XTCE</a></li>
+<li><a class="reference internal" href="#where-the-links-are" id="toc-entry-98">Where the links are</a></li>
+<li><a class="reference internal" href="#where-the-logs-segments-go" id="toc-entry-99">Where the logs' segments go</a></li>
+<li><a class="reference internal" href="#simulated-dummy-or-real-devices-simulate" id="toc-entry-100">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a><ul>
+<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-101">Waiting for the simulator</a></li>
+<li><a class="reference internal" href="#every-simulated-device-at-once" id="toc-entry-102">Every simulated device at once</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#testing" id="toc-entry-98">Testing</a></li>
-<li><a class="reference internal" href="#crates-used" id="toc-entry-99">Crates Used</a></li>
-<li><a class="reference internal" href="#license" id="toc-entry-100">License</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-101">See Also</a></li>
+<li><a class="reference internal" href="#building-tcspecial-for-a-vehicle" id="toc-entry-103">Building tcspecial for a vehicle</a></li>
+<li><a class="reference internal" href="#watching-tcspecial-work" id="toc-entry-104">Watching tcspecial work</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#testing" id="toc-entry-105">Testing</a></li>
+<li><a class="reference internal" href="#crates-used" id="toc-entry-106">Crates Used</a></li>
+<li><a class="reference internal" href="#license" id="toc-entry-107">License</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-108">See Also</a></li>
 </ul>
 </div>
+<div class="section" id="tcs-in-plain-words">
+<h1><a class="toc-backref" href="#toc-entry-1">TCS in Plain Words</a></h1>
+<div class="section" id="the-problem">
+<h2><a class="toc-backref" href="#toc-entry-2">The problem</a></h2>
+<p>A spacecraft is a collection of instruments -- cameras, thermometers,
+radios, motors, heaters -- that somebody on Earth has to look after from a
+long way off. The instruments' readings have to reach the people
+responsible for them, and those people's orders have to reach the
+instruments. Neither trip is easy. At the distance of the Moon, a message
+takes more than a second to arrive and as long again for any answer to
+come back; the radio link drops messages and sometimes fails for hours; and
+nobody can walk over and press a reset button. The software in the middle,
+which carries readings down and orders up, has to keep working through all
+of that, and when something does go wrong it has to say so plainly.</p>
+<p>The readings coming down are called <strong>telemetry</strong>, the orders going up
+<strong>commands</strong>, and the people and computers on the ground who send one and
+receive the other the <strong>mission operations center</strong>. TCS is free,
+open-source software for the whole of that path: aboard the vehicle, on
+the ground, and on the engineer's desk where both are built and tested.
+Nothing in it is specific to space. A submarine, a rover, a drone or an
+instrument on a remote mountainside poses the same problem at a different
+distance.</p>
+<p>TCS is three projects, each usable on its own.</p>
+</div>
+<div class="section" id="tcspecial-the-relay-aboard">
+<h2><a class="toc-backref" href="#toc-entry-3">tcspecial: the relay aboard</a></h2>
+<p><strong>tcspecial</strong>, the project this manual belongs to, is the program that
+runs aboard. It sits between the vehicle's instruments, which it calls
+<em>payloads</em>, and the ground, passing readings down and commands up, and it
+can work on the data as it goes: convert a raw reading into degrees, take
+a vote among three thermometers so that one broken one cannot mislead
+anyone, or switch on a heater when it is cold, without waiting for a
+command that would take seconds to arrive.</p>
+<p>What a particular vehicle carries, and what tcspecial does with it, is not
+written into the program. It is written down in a <strong>configuration</strong>, a
+plain text file a person can read: this sensor is on that wire, read it
+once a second, send it to the ground. That file is checked thoroughly
+before anything runs, so that a mistake is caught on a desk, with the
+line it is on, rather than discovered in flight. The vehicle reports
+which configuration it is running, so the ground always knows what it is
+talking to.</p>
+<p>tcspecial is built to survive. It runs apart from the vehicle's other
+software, so a failure there cannot bring it down, and a failure in it
+cannot spread. If it stops, a supervisor starts it again; if a new
+configuration sent up from the ground will not run, the vehicle falls back
+to the last one that did. It sends a regular heartbeat, a <strong>beacon</strong>, so
+the ground can tell at a glance whether the vehicle is alive and whether it
+has restarted. A large vehicle can run several copies, each looking after
+its own instruments, so that one failing leaves the rest working.</p>
+<p>Around it are the tools for building and testing a vehicle on an ordinary
+computer:</p>
+<ul class="simple">
+<li><strong>tcs-sim</strong> imitates the vehicle's hardware, so that the flight software
+can be run and tested with no instruments at all. It can simulate the
+physics too -- a room warming and cooling, a lander falling under the
+Moon's gravity -- so that what the software does has consequences.</li>
+<li><strong>tcs-moc</strong> is a ground station for testing: it shows what the vehicle
+sends down and sends it commands.</li>
+<li><strong>tcs-cfge</strong> is a graphical editor for configurations, and <strong>tcs-verify</strong>
+the checker that every program uses, so that all of them agree on what is
+wrong with a configuration and where. <strong>tcs-conflict</strong> says whether two
+configurations can run on one machine at once.</li>
+<li><strong>tcsmoc</strong> is the library a real ground station is built on, in C, C++,
+Rust or Python.</li>
+<li>The <strong>examples</strong> -- a thermostat, a lunar lander flown by hand through a
+mission control system with the Moon's delay, and more -- each run with
+one command, <tt class="docutils literal">tcsx</tt>, and show the pieces working together.</li>
+</ul>
+</div>
+<div class="section" id="tcs-xtce-one-description-of-every-message">
+<h2><a class="toc-backref" href="#toc-entry-4">tcs-xtce: one description of every message</a></h2>
+<p>Every reading and every command travels as a <strong>packet</strong>, a string of bytes
+whose layout both ends must agree on exactly: which bits are the
+temperature, which the time, what scale each uses. A disagreement does not
+cause an error; it causes wrong numbers, which is worse. The space
+industry has a standard way of writing those layouts down, <strong>XTCE</strong>, which
+mission control systems already read.</p>
+<p><strong>tcs-xtce</strong> takes a mission's XTCE description and writes the program code
+that builds and reads its packets, in C, C++, Rust and Python, so that
+nobody writes that code by hand and every language agrees with every
+other, to the byte. The packets carry no padding and no labels, so they
+are small, which matters on a slow radio link. To make sure two programs
+really were built from the same description, each can compute a short
+fingerprint of it, a <strong>digest</strong>, which is the same whichever language
+computes it; the two ends compare digests before they trust each other's
+packets. tcs-xtce also has an editor for XTCE, <strong>tcs-xtcee</strong>, and its
+runtime, <strong>tcsxtce</strong>, is the small library the generated code runs on,
+aboard and on the ground.</p>
+</div>
+<div class="section" id="tcslog-a-record-that-survives-the-trip-home">
+<h2><a class="toc-backref" href="#toc-entry-5">tcslog: a record that survives the trip home</a></h2>
+<p>A vehicle sees more than its radio can send as it happens, and what it
+records has to come home over the same unreliable link. <strong>tcslog</strong> is the
+log aboard. It writes what it is given into a series of small files,
+<em>segments</em>, each of which can be sent down on its own, whenever there is
+time on the link. When some segments are lost or damaged on the way, what
+arrived can still be read, and the reader says exactly what is missing,
+rather than losing the whole record. It uses a fixed amount of memory and
+storage, decided in advance, which is what a vehicle with a fixed amount of
+both needs. <strong>tcslog-tools</strong> reads the logs on the ground. Like tcs-xtce,
+tcslog is written for C, C++, Rust and Python, and a log written from one
+language reads in the others.</p>
+</div>
+<div class="section" id="what-holds-it-together">
+<h2><a class="toc-backref" href="#toc-entry-6">What holds it together</a></h2>
+<p>The three projects share a few convictions:</p>
+<ul class="simple">
+<li><strong>Reliability comes first.</strong> Where reliability and convenience
+conflict, reliability wins. A mistake should be refused before launch, by
+a check, rather than found after it.</li>
+<li><strong>A vehicle is described, not programmed.</strong> What a vehicle does is a
+file that can be read, checked and compared, not code that has to be
+traced.</li>
+<li><strong>Everything runs on a desk.</strong> Every example and every test runs on an
+ordinary Linux computer, with the hardware simulated, so that a student
+or a small team can learn it and try it before buying anything.</li>
+<li><strong>It fits what is already used.</strong> It works with Yamcs, an open-source
+mission control system, and work is under way to fit it to NASA's core
+Flight System and JPL's F´, the frameworks most missions are built on.</li>
+</ul>
+<p>TCS is an early release: it works, but it is not yet fully tested or
+finished, and it has not yet flown. <a class="reference external" href="getting-started.html">Getting started</a> installs it and runs the examples in about
+fifteen minutes.</p>
+</div>
+<div class="section" id="from-here-on">
+<h2><a class="toc-backref" href="#toc-entry-7">From here on</a></h2>
+<p>The rest of this manual is for the engineer who builds a vehicle with
+tcspecial: what a configuration says, every kind of payload and node it
+can name, how the vehicle and the ground find and trust each other, and
+each example in detail. It starts, in the Introduction, with the same
+ground covered again in engineering terms.</p>
+</div>
+</div>
 <div class="section" id="introduction">
-<h1><a class="toc-backref" href="#toc-entry-1">Introduction</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-8">Introduction</a></h1>
 <div class="admonition warning">
 <p class="first admonition-title">Warning</p>
 <p class="last">TCSpecial is an alpha release. It is not fully tested, it is not feature
@@ -582,7 +724,7 @@ example</a> -- and the rest of what <tt class="docutils literal"><span class="pr
 built yet; nothing else in this manual depends on it.</p>
 </div>
 <div class="section" id="what-that-buys">
-<h2><a class="toc-backref" href="#toc-entry-2">What that buys</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-9">What that buys</a></h2>
 <p>The reasons are given in the order TCSpecial ranks them. Where two designs
 compete, the earlier item wins, and this list is what an argument about them
 should cite.</p>
@@ -615,7 +757,7 @@ same readings sent somewhere new -- is an edit to a configuration file, not a
 build.</p>
 </div>
 <div class="section" id="the-vocabulary">
-<h2><a class="toc-backref" href="#toc-entry-3">The vocabulary</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-10">The vocabulary</a></h2>
 <p>These words are used precisely throughout, and some of them replaced older ones
 that were used loosely.</p>
 <dl class="docutils">
@@ -839,7 +981,7 @@ records what is so today.</p>
 </div>
 </div>
 <div class="section" id="assumptions">
-<h1><a class="toc-backref" href="#toc-entry-4">Assumptions</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-11">Assumptions</a></h1>
 <dl class="docutils">
 <dt>Order of delivery</dt>
 <dd>A packet sent between the vehicle and the ground may be dropped, but
@@ -867,7 +1009,7 @@ in the design, says what else tcspecial and the ground rest on.</dd>
 </dl>
 </div>
 <div class="section" id="limitations">
-<h1><a class="toc-backref" href="#toc-entry-5">Limitations</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-12">Limitations</a></h1>
 <dl class="docutils">
 <dt>Platform</dt>
 <dd>TCSpecial runs only on Linux. Seven of its interface types use Linux's own
@@ -905,7 +1047,7 @@ most 4096.</dd>
 </dl>
 </div>
 <div class="section" id="configuration-file-formats">
-<h1><a class="toc-backref" href="#toc-entry-6">Configuration File Formats</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-13">Configuration File Formats</a></h1>
 <p>A configuration file may be written in YAML or XML. Both describe the same
 settings and are read into the same values, so the choice is one of local
 preference and tooling rather than of capability.</p>
@@ -949,8 +1091,8 @@ that was not also written in YAML.</p>
 unaffected; a configuration names the second, as its <tt class="docutils literal">interface</tt>: see <a class="reference internal" href="#which-interface-it-is-written-for">Which
 interface it is written for</a>.)</p>
 </div>
-<div class="section" id="which-files-there-are">
-<h1><a class="toc-backref" href="#toc-entry-7">Which Files There Are</a></h1>
+<div class="section" id="tcs-files">
+<h1><a class="toc-backref" href="#toc-entry-14">TCS Files</a></h1>
 <p>Two configuration files, and neither of them has a name of its own. Any name
 will do so long as it ends in <tt class="docutils literal">.ytcs</tt> or <tt class="docutils literal">.xtcs</tt>, which is what says how to
 read it; the names used throughout this manual are the shipped examples' and
@@ -1017,7 +1159,7 @@ there is nothing left for a second file to answer and no second file to
 disagree with the one being flown.</p>
 </div>
 <div class="section" id="the-payload-configuration">
-<h1><a class="toc-backref" href="#toc-entry-8">The Payload Configuration</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-15">The Payload Configuration</a></h1>
 <p>The payloads are a section of the tcspecial configuration file: a
 description, the <tt class="docutils literal">tcspecial</tt> section, an optional section of groups, and the
 data handlers themselves. A group is a rate and nothing else: the payloads in
@@ -1056,7 +1198,7 @@ type is the <tt class="docutils literal">type</tt> it is written under -- <tt cl
 and no others: a device file stating a <tt class="docutils literal">protocol</tt>, or a network payload
 stating a <tt class="docutils literal">path</tt>, is refused.</p>
 <div class="section" id="supported-and-experimental-interfaces">
-<h2><a class="toc-backref" href="#toc-entry-9">Supported and experimental interfaces</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-16">Supported and experimental interfaces</a></h2>
 <p>Nine types of payload are supported: <tt class="docutils literal">network</tt>, <tt class="docutils literal"><span class="pre">device-file</span></tt>,
 <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">can</tt>, and the three kinds of discrete
 lines, <tt class="docutils literal">gpio_in</tt>, <tt class="docutils literal">gpio_out</tt> and <tt class="docutils literal">gpio_inout</tt>.</p>
@@ -1092,7 +1234,7 @@ control is the driver of a real UART, which a pseudo-terminal refuses.</p>
 feature to rely on. They may change in ways the supported types will not.</p>
 </div>
 <div class="section" id="attributes-every-payload-has">
-<h2><a class="toc-backref" href="#toc-entry-10">Attributes Every Payload Has</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-17">Attributes Every Payload Has</a></h2>
 <pre class="code text literal-block">
 payload        the handler's name, which commands address it by and the
                panels show: payload: temp_1 in YAML, &lt;payload
@@ -1107,7 +1249,7 @@ type           not an attribute but the type it is written under, as
                experimental iio | rpmsg | hdlc
 </pre>
 <div class="section" id="how-a-payload-is-driven">
-<h3><a class="toc-backref" href="#toc-entry-11">How a payload is driven</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-18">How a payload is driven</a></h3>
 <p><strong>One attribute says it.</strong> A payload that states a <tt class="docutils literal">trigger</tt> is asked, and
 one that states none is read; nothing else decides it, and nothing decides it
 for a file that leaves it out.</p>
@@ -1132,7 +1274,7 @@ not at all, and a handler needs them before it can be started.</p>
 </div>
 </div>
 <div class="section" id="the-two-types-of-payload">
-<h2><a class="toc-backref" href="#toc-entry-12">The two types of payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-19">The two types of payload</a></h2>
 <p>A payload either sends of its own accord or answers a request, and which it is
 decides where its timing is written down.</p>
 <p><strong>periodic</strong> -- the payload sends and tcspecial reads. It states no
@@ -1204,7 +1346,7 @@ all is refused: a payload that answers requests has to be asked something.
 Writing the escapes yourself is also how an XML configuration states a
 trigger that a YAML one states with the format's own escapes.</p>
 <div class="section" id="what-a-payload-starts-in">
-<h3><a class="toc-backref" href="#toc-entry-13">What a payload starts in</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-20">What a payload starts in</a></h3>
 <pre class="code text literal-block">
 init           what to write to the payload as the vehicle opens it, in
                the notation a trigger is written in. Optional
@@ -1249,7 +1391,7 @@ opened.</p>
 </div>
 </div>
 <div class="section" id="how-a-payload-s-data-is-read">
-<h2><a class="toc-backref" href="#toc-entry-14">How a Payload's Data Is Read</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-21">How a Payload's Data Is Read</a></h2>
 <p>This is how a configuration -- a graph of nodes -- gets data out of its
 payloads. Three things decide it: whether the payload sends on its own or has
 to be asked, whether it is in a payload group, and, for one that is asked, how
@@ -1514,7 +1656,7 @@ it was told, every <tt class="docutils literal">state_interval</tt></td>
 </table>
 </div>
 <div class="section" id="lengths-of-time">
-<h2><a class="toc-backref" href="#toc-entry-15">Lengths of Time</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-22">Lengths of Time</a></h2>
 <p>Every length of time a configuration states is a number, whitespace, and a
 unit:</p>
 <table border="1" class="docutils">
@@ -1657,7 +1799,7 @@ from there when it simulates the payload, and a simulator file that names a
 <tt class="docutils literal">payload_address</tt> for it as well is refused.</p>
 </div>
 <div class="section" id="a-network-payload">
-<h2><a class="toc-backref" href="#toc-entry-16">A Network Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-23">A Network Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type network</tt>. A socket, which the transport decides the shape of.</p>
 <pre class="code text literal-block">
 protocol       tcp | udp | unix_stream | unix_dgram | raw
@@ -1718,7 +1860,7 @@ and refuses a simulator file that asks it to.</p>
 </pre>
 </div>
 <div class="section" id="a-device-file-payload">
-<h2><a class="toc-backref" href="#toc-entry-17">A Device File Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-24">A Device File Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type <span class="pre">device-file</span></tt>. A file in the filesystem, opened and read as
 the data comes.</p>
 <pre class="code text literal-block">
@@ -1745,7 +1887,7 @@ this sense: a serial line, a bus and a SPI peripheral each have terms of their
 own, which is why each has a type of its own below.</p>
 </div>
 <div class="section" id="a-can-payload">
-<h2><a class="toc-backref" href="#toc-entry-18">A CAN Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-25">A CAN Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type can</tt>. <strong>Supported</strong>, as flown against the kernel's virtual
 bus: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and experimental interfaces</a>. A payload on a CAN bus,
 which is not a device file at all: a CAN controller is a network interface,
@@ -1811,7 +1953,7 @@ ground sends reaches it as a frame. <tt class="docutils literal">sudo <span clas
 makes the bus; see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>.</p>
 </div>
 <div class="section" id="a-gpio-payload">
-<h2><a class="toc-backref" href="#toc-entry-19">A GPIO Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-26">A GPIO Payload</a></h2>
 <p>Keywords <tt class="docutils literal">type gpio_in</tt>, <tt class="docutils literal">type gpio_out</tt> and <tt class="docutils literal">type gpio_inout</tt>.
 <strong>Supported</strong>, as flown against the kernel's simulated chip: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported
 and experimental interfaces</a>. A set of discrete lines -- a deployment switch,
@@ -1924,7 +2066,7 @@ switch's line reaches the ground in its reports as bit 0 of a <tt class="docutil
 pulls, to the user who ran it; see <a class="reference internal" href="#making-the-kernel-s-dummy-devices">Making the Kernel's Dummy Devices</a>.</p>
 </div>
 <div class="section" id="an-hdlc-payload">
-<h2><a class="toc-backref" href="#toc-entry-20">An HDLC Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-27">An HDLC Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type hdlc</tt>. <strong>Experimental, not yet supported.</strong> A synchronous
 serial line -- bits carried on a clock, framed as HDLC -- which Linux drives as
 a network interface rather than as a device file.</p>
@@ -1978,7 +2120,7 @@ does not is hardware, and tcs-sim refuses to simulate it. See <a class="referenc
 or Real Devices: --simulate</a>.</p>
 </div>
 <div class="section" id="an-rpmsg-payload">
-<h2><a class="toc-backref" href="#toc-entry-21">An rpmsg Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-28">An rpmsg Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type rpmsg</tt>. <strong>Experimental, not yet supported.</strong> Software on
 another core of the same package -- a real-time core beside the Linux one --
 reached over an rpmsg channel, which Linux presents as a character device
@@ -2007,7 +2149,7 @@ where a pty hands over whatever bytes are there -- which shows only where a
 payload writes faster than the handler reads.</p>
 </div>
 <div class="section" id="an-iio-payload">
-<h2><a class="toc-backref" href="#toc-entry-22">An IIO Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-29">An IIO Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type iio</tt>. <strong>Experimental, not yet supported</strong>, until its test has
 run against a kernel whose dummy sensor has a buffer: see <a class="reference internal" href="#supported-and-experimental-interfaces">Supported and
 experimental interfaces</a>. A sensor's buffered samples, read from a character
@@ -2049,7 +2191,7 @@ before making anything, and the test says so where it skips. That test is
 what promotes the type, once it has passed.</p>
 </div>
 <div class="section" id="a-serial-payload">
-<h2><a class="toc-backref" href="#toc-entry-23">A Serial Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-30">A Serial Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type serial</tt>. A line, with terms that say how it is driven. A
 payload states them beside everything else it states, or takes them from its
 <tt class="docutils literal">payload_groups</tt> group the way it takes the rest.</p>
@@ -2208,7 +2350,7 @@ datagram -- <tt class="docutils literal">udp</tt>, <tt class="docutils literal">
 node on one that gives the attributes is refused.</p>
 </div>
 <div class="section" id="an-i2c-payload">
-<h2><a class="toc-backref" href="#toc-entry-24">An I<sup>2</sup>C Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-31">An I<sup>2</sup>C Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type i2c</tt>. A device on a bus, which is why it gives two things to
 be found by: the bus and the address on it. Two payloads commonly sit on the
 same bus and differ only in which device the master addresses.</p>
@@ -2252,7 +2394,7 @@ to ten of them. Given none, it makes the thermostat's two, at <tt class="docutil
 <tt class="docutils literal">0x49</tt>.</p>
 </div>
 <div class="section" id="a-spi-payload">
-<h2><a class="toc-backref" href="#toc-entry-25">A SPI Payload</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-32">A SPI Payload</a></h2>
 <p>Keyword <tt class="docutils literal">type spi</tt>. A peripheral on a clocked, full-duplex link.</p>
 <pre class="code text literal-block">
 path           the device node, which names the bus and the chip select
@@ -2272,7 +2414,7 @@ fails on a serial line.</p>
 and a transfer is delimited by the chip select rather than by framing bits.</p>
 </div>
 <div class="section" id="temperature-sensors-on-a-thermal-mass">
-<h2><a class="toc-backref" href="#toc-entry-26">Temperature Sensors on a Thermal Mass</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-33">Temperature Sensors on a Thermal Mass</a></h2>
 <p>Keywords <tt class="docutils literal">type i2c_tmass</tt> and <tt class="docutils literal">type spi_tmass</tt>. A temperature sensor
 fixed to a thermal mass: on an I2C bus, or a SPI peripheral. In flight each
 is the device on its bus, and says what an <tt class="docutils literal">i2c</tt> or a <tt class="docutils literal">spi</tt> node says,
@@ -2301,7 +2443,7 @@ thermal mass's <tt class="docutils literal">temperature</tt> by <tt class="docut
 <tt class="docutils literal"><span class="pre">--features</span> i2c_tmass</tt> builds the I2C bus with it.</p>
 </div>
 <div class="section" id="making-the-kernel-s-dummy-devices">
-<h2><a class="toc-backref" href="#toc-entry-27">Making the Kernel's Dummy Devices</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-34">Making the Kernel's Dummy Devices</a></h2>
 <p>The CAN and GPIO types are supported because each is flown against the
 kernel's dummy device for it: a virtual CAN bus, <tt class="docutils literal">vcan0</tt>, and a
 chip of <tt class="docutils literal"><span class="pre">gpio-sim</span></tt> with eight lines. The experimental IIO type has a test
@@ -2337,7 +2479,7 @@ the two are not run at once.</p>
 does survives a reboot, so the first is run again after one.</p>
 </div>
 <div class="section" id="what-the-configuration-will-not-let-pass">
-<h2><a class="toc-backref" href="#toc-entry-28">What the Configuration Will Not Let Pass</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-35">What the Configuration Will Not Let Pass</a></h2>
 <p>These mistakes are refused rather than ignored, because each of them
 otherwise produces a payload that looks configured and is not:</p>
 <ul class="simple">
@@ -2428,7 +2570,7 @@ is reached by running the program it names.</li>
 produced them, so it applies to every type of payload alike.</p>
 </div>
 <div class="section" id="an-example">
-<h2><a class="toc-backref" href="#toc-entry-29">An Example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-36">An Example</a></h2>
 <p>This is the thermostat example as it would be aboard, without its
 <tt class="docutils literal">tcspecial</tt> section: three sensors of one place, two on an I<sup>2</sup>C
 bus and one on SPI, read together as a group, and two sets of heater lines
@@ -2491,7 +2633,7 @@ thing. What the nodes above feed -- the conversions, the vote and the
 thermostat -- is in the <tt class="docutils literal">vehicle</tt> section; see <a class="reference internal" href="#the-thermostat-example">The thermostat example</a>.</p>
 </div>
 <div class="section" id="not-yet-read">
-<h2><a class="toc-backref" href="#toc-entry-30">Not Yet Read</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-37">Not Yet Read</a></h2>
 <p>These have been described for this project and are not yet accepted by any
 parser. A file giving one is refused rather than quietly running without it.</p>
 <pre class="code text literal-block">
@@ -2502,7 +2644,7 @@ bidirectional           whether a handler carries data both ways; every
 </div>
 </div>
 <div class="section" id="starting-and-stopping-a-payload">
-<h1><a class="toc-backref" href="#toc-entry-31">Starting and stopping a payload</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-38">Starting and stopping a payload</a></h1>
 <p>In tcs-moc each panel has a button per command: <tt class="docutils literal">Enable</tt> sends
 <tt class="docutils literal">START_NODE</tt> and <tt class="docutils literal">Disable</tt> sends <tt class="docutils literal">STOP_NODE</tt>. Both are pressable
 whatever the node is doing -- tcspecial takes a <tt class="docutils literal">START_NODE</tt> for one already
@@ -2541,7 +2683,7 @@ handler was in the state that offered it -- and when a panel looks wrong,
 what the spacecraft says to the command is the thing worth finding out.</p>
 </div>
 <div class="section" id="seeing-what-was-read">
-<h1><a class="toc-backref" href="#toc-entry-32">Seeing what was read</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-39">Seeing what was read</a></h1>
 <p>Each payload's panel has a <tt class="docutils literal">Configuration</tt> button for it, in both windows
 and spelled the same way in each. It shows every
 parameter read for that payload: what the tcspecial configuration said about
@@ -2560,7 +2702,7 @@ different payloads costs it that half and nothing else; the panel says so in
 place of the settings.</p>
 </div>
 <div class="section" id="the-shipped-examples">
-<h1><a class="toc-backref" href="#toc-entry-33">The shipped examples</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-40">The shipped examples</a></h1>
 <p>What is shipped is the examples, under <tt class="docutils literal">examples</tt>, and one fixture:
 <tt class="docutils literal">tests/manual/thermostat.ytcs</tt>, which the programs fall back to when nothing
 names a file. Each example is a configuration in both spellings -- <tt class="docutils literal">.ytcs</tt>
@@ -2572,7 +2714,7 @@ or <tt class="docutils literal">runmocx</tt>; every other target takes the file 
 <tt class="docutils literal">TCSPECIAL_CONFIG_FILE</tt>.</p>
 </div>
 <div class="section" id="the-examples">
-<h1><a class="toc-backref" href="#toc-entry-34">The Examples</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-41">The Examples</a></h1>
 <p>The <tt class="docutils literal">examples</tt> directory holds one directory per example, each a
 configuration in both formats -- <tt class="docutils literal"><span class="pre">&lt;name&gt;.ytcs</span></tt> and <tt class="docutils literal"><span class="pre">&lt;name&gt;.xtcs</span></tt>, which a
 test holds to describing the same configuration -- and the simulator
@@ -2657,7 +2799,7 @@ in the middle of each diagram is what runs inside tcspecial, and the one on
 the right is the ground.</p>
 <p><tt class="docutils literal">make help</tt> in the <tt class="docutils literal">examples</tt> directory lists the targets that run them.</p>
 <div class="section" id="the-minimal-example">
-<h2><a class="toc-backref" href="#toc-entry-35">The minimal example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-42">The minimal example</a></h2>
 <div class="figure">
 <object data="../examples/minimal/minimal.svg" style="width: 100%;" type="image/svg+xml">The minimal example: one UDP payload, sensor, whose readings
 tcspecial sends to the ground over the sensor's telemetry link.</object>
@@ -2678,7 +2820,7 @@ tcspecial is running.</p>
 <tt class="docutils literal">make <span class="pre">-C</span> examples <span class="pre">run-simple</span></tt> runs tcspecial on the example.</p>
 </div>
 <div class="section" id="the-thermostat-example">
-<h2><a class="toc-backref" href="#toc-entry-36">The thermostat example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-43">The thermostat example</a></h2>
 <div class="figure">
 <object data="../examples/thermostat/thermostat.svg" style="width: 100%;" type="image/svg+xml">The thermostat example: three temperature sensors of one place,
 converted to kelvin, voted on and sent to the ground, with a
@@ -2811,7 +2953,7 @@ cold as 287.1 K in the first orbit.</p>
 simulated chip.</p>
 </div>
 <div class="section" id="the-battery-example">
-<h2><a class="toc-backref" href="#toc-entry-37">The battery example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-44">The battery example</a></h2>
 <div class="figure">
 <object data="../examples/battery/battery.svg" style="width: 100%;" type="image/svg+xml">The battery example: a power monitor on a serial line and a shunt
 on a UDP socket, their readings made volts and amperes, the
@@ -2862,7 +3004,7 @@ moment: see <strong>How the world moves</strong> below.</p>
 pseudo-terminal for the power monitor at its path, and sockets for the rest.</p>
 </div>
 <div class="section" id="the-descent-example">
-<h2><a class="toc-backref" href="#toc-entry-38">The descent example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-45">The descent example</a></h2>
 <div class="figure">
 <object data="../examples/descent/descent.svg" style="width: 100%;" type="image/svg+xml">The descent example: a radar altimeter's altitude made metres and
 flown down by a guidance program, whose throttle drives the
@@ -2908,7 +3050,7 @@ asks the model anything -- so enable <tt class="docutils literal">engine</tt> an
 and the rest after.</p>
 </div>
 <div class="section" id="the-lander-example">
-<h2><a class="toc-backref" href="#toc-entry-39">The lander example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-46">The lander example</a></h2>
 <p>A lunar landing in two dimensions, flown by hand: two tcspecials, one for
 each axis, read a joystick in tcs-sim's window and drive the
 lander's thrust with it, and send its position, velocity and acceleration
@@ -2967,7 +3109,7 @@ passes what the ground sends to the restart payload.</object>
 </div>
 </div>
 <div class="section" id="the-simple-app-example">
-<h2><a class="toc-backref" href="#toc-entry-40">The simple-app example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-47">The simple-app example</a></h2>
 <div class="figure">
 <object data="../examples/simple-app/simple-app.svg" style="width: 100%;" type="image/svg+xml">The simple-app example: a payload that is a program, lorem, sending
 a line of text one word per packet through the gateway node gateway-1
@@ -3008,7 +3150,7 @@ prints the line, and stops. <tt class="docutils literal">make <span class="pre">
 on its own.</p>
 </div>
 <div class="section" id="the-beacon-example">
-<h2><a class="toc-backref" href="#toc-entry-41">The beacon example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-48">The beacon example</a></h2>
 <div class="figure">
 <object data="../examples/beacon/beacon.svg" style="width: 100%;" type="image/svg+xml">The beacon example: tcspecial sending a beacon every five seconds to
 the ground station beacon, which shows it on the beacon panel
@@ -3092,7 +3234,7 @@ button back to <strong>Start tcspecial</strong>.</p>
 watcher opens a window, so it wants a display.</p>
 </div>
 <div class="section" id="the-ping-example">
-<h2><a class="toc-backref" href="#toc-entry-42">The ping example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-49">The ping example</a></h2>
 <div class="figure">
 <object data="../examples/ping/ping.svg" style="width: 100%;" type="image/svg+xml">The ping example: the ground station ping_gateway.py sends a ping up to
 the gateway node, which hands it to the ping node by its moc-out
@@ -3189,7 +3331,7 @@ window and the <tt class="docutils literal">ping</tt> node, in <tt class="docuti
 which both configurations include, and is not an example itself.</p>
 </div>
 <div class="section" id="the-ping-yamcs-example">
-<h2><a class="toc-backref" href="#toc-entry-43">The ping-yamcs example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-50">The ping-yamcs example</a></h2>
 <div class="figure">
 <object data="../examples/ping-yamcs/ping-yamcs.svg" style="width: 100%;" type="image/svg+xml">The ping-yamcs example: ping_yamcs.py, through Yamcs, sends a ping
 as a CCSDS telecommand up to the gateway_yamcs node, which takes the
@@ -3268,7 +3410,7 @@ memusage example</a>.</p>
 shares, as it shares the Yamcs templates beside it.</p>
 </div>
 <div class="section" id="the-memusage-example">
-<h2><a class="toc-backref" href="#toc-entry-44">The memusage example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-51">The memusage example</a></h2>
 <div class="figure">
 <object data="../examples/memusage/memusage.svg" style="width: 100%;" type="image/svg+xml">The memusage example: memusage.py has Yamcs send QUERY_THREADS to
 tcspecial's node command link, which answers on the same link with
@@ -3323,7 +3465,7 @@ the lock, <tt class="docutils literal"><span class="pre">--interval</span></tt> 
 times before it stops.</p>
 </div>
 <div class="section" id="the-thermostat-yamcs-example">
-<h2><a class="toc-backref" href="#toc-entry-45">The thermostat-yamcs example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-52">The thermostat-yamcs example</a></h2>
 <div class="figure">
 <object data="../examples/thermostat-yamcs/thermostat-yamcs.svg" style="width: 100%;" type="image/svg+xml">The thermostat-yamcs example: the thermostat example's sensors,
 conversions, vote, thermostat and heaters, with a gateway_yamcs
@@ -3400,7 +3542,7 @@ line goes low and stays low, which Yamcs shows, while the zone falls behind
 in the cold part of the orbit.</p>
 </div>
 <div class="section" id="the-tees-example">
-<h2><a class="toc-backref" href="#toc-entry-46">The tees example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-53">The tees example</a></h2>
 <div class="figure">
 <object data="../examples/tees/tees.svg" style="width: 100%;" type="image/svg+xml">The tees example: a command from the ground goes up to the gateway node
 ground and on to echo, a tee-gateway, which sends it to the heater and
@@ -3432,7 +3574,7 @@ back down, and a reading reaches the ground. Every port the example uses is in
 the eight thousands, which no other example uses.</p>
 </div>
 <div class="section" id="the-consolidator-example">
-<h2><a class="toc-backref" href="#toc-entry-47">The consolidator example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-54">The consolidator example</a></h2>
 <div class="figure">
 <object data="../examples/consolidator/consolidator.svg" style="width: 100%;" type="image/svg+xml">The consolidator example: sun, a u16 every second, wheel, an i32
 four times a second, and battery, a u8 every five seconds, each send
@@ -3496,7 +3638,7 @@ the beacon, connects, and prints each datum as <tt class="docutils literal">inpu
 must carry the three readings and the age.</p>
 </div>
 <div class="section" id="the-fprime-example">
-<h2><a class="toc-backref" href="#toc-entry-48">The fprime example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-55">The fprime example</a></h2>
 <div class="figure">
 <object data="../examples/fprime/fprime.svg" style="width: 100%;" type="image/svg+xml">The fprime example: the thermometer's readings go to fsw, a
 gateway_fprime node, and to zone_temp, a to_kelvin compute node
@@ -3541,7 +3683,7 @@ ports nothing holds: a reading reaches the bridge as it is and as a
 temperature, and a command from the bridge reaches the heater. Every port the example uses is in the nine
 thousands, which no other example uses.</p>
 <div class="section" id="the-f-bridge">
-<h3><a class="toc-backref" href="#toc-entry-49">The F´ bridge</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-56">The F´ bridge</a></h3>
 <p>The bridge itself is in <tt class="docutils literal">fprime/</tt>: <tt class="docutils literal">TcsBridge</tt>, an F´ component built on
 tcsmoc-c, and <tt class="docutils literal">BridgeTest</tt>, an F´ deployment it is tested in. F´'s own
 tools build them, not cargo, from an F´ checkout (v4.4.1 or later) and a Python
@@ -3640,7 +3782,7 @@ listens on TCP port 50000.</p>
 </div>
 </div>
 <div class="section" id="the-cfs-example">
-<h2><a class="toc-backref" href="#toc-entry-50">The cfs example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-57">The cfs example</a></h2>
 <div class="figure">
 <object data="../examples/cfs/cfs.svg" style="width: 100%;" type="image/svg+xml">The cfs example: the thermometer's readings go to fsw, a gateway_cfs
 node, and are published on the cFS software bus as fsw's tlm_base
@@ -3793,7 +3935,7 @@ the version 2 mapping with cFE's own topics mapped onto it, and a highest
 message ID above the block allotted tcspecial.</p>
 </div>
 <div class="section" id="the-can-example">
-<h2><a class="toc-backref" href="#toc-entry-51">The can example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-58">The can example</a></h2>
 <div class="figure">
 <object data="../examples/can/can.svg" style="width: 100%;" type="image/svg+xml">The can example: frames carrying 0x123 on the kernel's virtual CAN
 bus vcan0 are read by motor_status and go to ground, a gateway_radio
@@ -3822,7 +3964,7 @@ thirty-two to thirty-seven hundreds, ending in 00 or 10, which no other
 example uses.</p>
 </div>
 <div class="section" id="the-gpio-example">
-<h2><a class="toc-backref" href="#toc-entry-52">The gpio example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-59">The gpio example</a></h2>
 <div class="figure">
 <object data="../examples/gpio/gpio.svg" style="width: 100%;" type="image/svg+xml">The gpio example: each edge on line 0 of a gpio-sim chip is read by
 switch as a record and goes to ground, a gateway_radio node, and down
@@ -3848,7 +3990,7 @@ reading the lines itself. Every port is in the thirty-two to thirty-seven
 hundreds, ending in 20 or 30.</p>
 </div>
 <div class="section" id="the-iio-example">
-<h2><a class="toc-backref" href="#toc-entry-53">The iio example</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-60">The iio example</a></h2>
 <div class="figure">
 <object data="../examples/iio/iio.svg" style="width: 100%;" type="image/svg+xml">The iio example: the buffer of an iio_dummy sensor, filled by a
 software trigger, is read by sensor, and its sample sets go to
@@ -3874,11 +4016,11 @@ is in the thirty-two to thirty-seven hundreds, ending in 40 or 50.</p>
 </div>
 </div>
 <div class="section" id="where-to-get-it">
-<h1><a class="toc-backref" href="#toc-entry-54">Where to Get It</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-61">Where to Get It</a></h1>
 <p>TCSpecial is published in three places, each for a different way of using
 it.</p>
 <div class="section" id="github">
-<h2><a class="toc-backref" href="#toc-entry-55">GitHub</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-62">GitHub</a></h2>
 <p>The source, its history, its issues and its releases are at
 <a class="reference external" href="https://github.com/vomlehn/tcspecial">https://github.com/vomlehn/tcspecial</a>. A release carries the packages
 <a class="reference internal" href="#installing">Installing</a> describes, as <tt class="docutils literal">.deb</tt> and RPM files, beside the source; the
@@ -3887,7 +4029,7 @@ manuals and design documents, this one among them, are read on the web at
 of its own beside it, each on GitHub too: <a class="reference external" href="https://github.com/vomlehn/tcslog">tcslog</a>, the onboard log, and <a class="reference external" href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>, the packet compiler.</p>
 </div>
 <div class="section" id="crates-io">
-<h2><a class="toc-backref" href="#toc-entry-56">crates.io</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-63">crates.io</a></h2>
 <p>The Rust crates are published on <a class="reference external" href="https://crates.io">crates.io</a>, the
 Rust package registry, under their own names, so a program built on one
 names it in its <tt class="docutils literal">Cargo.toml</tt> as it would any crate, and its documentation
@@ -3934,7 +4076,7 @@ TCS program checks through.</td>
 (see <a class="reference internal" href="#crates-used">Crates Used</a>).</p>
 </div>
 <div class="section" id="pypi">
-<h2><a class="toc-backref" href="#toc-entry-57">PyPI</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-64">PyPI</a></h2>
 <p>The Python a ground station is built on -- the <tt class="docutils literal">tcsprotocol</tt> and
 <tt class="docutils literal">tcsmoc</tt> packages, one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt> -- and <tt class="docutils literal">tcs_ui</tt>,
 the <tt class="docutils literal"><span class="pre">tcs-ui</span></tt> distribution, are to be published on <a class="reference external" href="https://pypi.org">PyPI</a>, the Python package index, under those names. They
@@ -3943,7 +4085,7 @@ are not there yet. Until they are, they are installed from the source, as
 </div>
 </div>
 <div class="section" id="installing">
-<h1><a class="toc-backref" href="#toc-entry-58">Installing</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-65">Installing</a></h1>
 <p>Everything installs under one prefix, <tt class="docutils literal">/opt/tcs</tt>, which the filesystem
 hierarchy standard gives an add-on package of its own, with its host
 configuration in <tt class="docutils literal">/etc/opt/tcs</tt> and its variable data in <tt class="docutils literal">/var/opt/tcs</tt>.
@@ -3951,7 +4093,7 @@ tcslog, tcslog-tools and tcs-xtce install under the same prefix, so a
 machine with all of them has one <tt class="docutils literal">bin</tt>, one <tt class="docutils literal">lib</tt> and one <tt class="docutils literal">include</tt> to
 be told of.</p>
 <div class="section" id="the-packages">
-<h2><a class="toc-backref" href="#toc-entry-59">The packages</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-66">The packages</a></h2>
 <p>There are five, each built as a <tt class="docutils literal">.deb</tt> and as an RPM, because a package
 with operational code holds nothing else (see <a class="reference external" href="manual.html#the-categories-of-tcs-software">The categories of TCS
 software</a>):</p>
@@ -4049,7 +4191,7 @@ carries, and for rpmlint in <tt class="docutils literal">packaging/rpm/rpmlint.t
 shipped.</p>
 </div>
 <div class="section" id="trying-the-packages-in-a-container">
-<h2><a class="toc-backref" href="#toc-entry-60">Trying the packages in a container</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-67">Trying the packages in a container</a></h2>
 <p><tt class="docutils literal">container/</tt> keeps a test system in a container, Kubuntu's for the
 <tt class="docutils literal">.deb</tt> files and Fedora's for the RPMs, in which the packages are
 installed and tried as an administrator would, without touching the
@@ -4091,7 +4233,7 @@ example made of several is opened together, as one mission.</dd>
 </pre>
 </div>
 <div class="section" id="the-tools">
-<h2><a class="toc-backref" href="#toc-entry-61">The tools</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-68">The tools</a></h2>
 <p><tt class="docutils literal">make <span class="pre">install-tools</span></tt> installs the tools that building, testing, checking,
 documenting and packaging tcspecial need, with the system's own package
 manager under sudo: apt-get on Debian and Ubuntu, dnf on Fedora and Red
@@ -4111,7 +4253,7 @@ below.</p>
 each needs, since each is used without tcspecial as well.</p>
 </div>
 <div class="section" id="make-install">
-<h2><a class="toc-backref" href="#toc-entry-62"><tt class="docutils literal">make install</tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-69"><tt class="docutils literal">make install</tt></a></h2>
 <p>Building, installing and packaging from a checkout need two more checkouts
 beside this one: <a class="reference external" href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a>,
 the packaging scripts and make rules the TCS projects share, and
@@ -4163,7 +4305,7 @@ debugged:</p>
 </pre>
 </div>
 <div class="section" id="programs-everywhere-not-only-in-a-login-shell">
-<h2><a class="toc-backref" href="#toc-entry-63">Programs everywhere, not only in a login shell</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-70">Programs everywhere, not only in a login shell</a></h2>
 <p>The packages' <tt class="docutils literal">/etc/profile.d</tt> scripts put <tt class="docutils literal">/opt/tcs/bin</tt> on <tt class="docutils literal">PATH</tt>,
 but only a login shell reads them: <tt class="docutils literal">sudo</tt>, <tt class="docutils literal">cron</tt>, a systemd unit and
 other minimal environments do not see it, and find the programs only by
@@ -4195,7 +4337,7 @@ links</tt> and <tt class="docutils literal">make unlinks</tt> run every package'
 another directory.</p>
 </div>
 <div class="section" id="the-python-alone">
-<h2><a class="toc-backref" href="#toc-entry-64">The Python alone</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-71">The Python alone</a></h2>
 <p><tt class="docutils literal">python/pyproject.toml</tt> makes <tt class="docutils literal">tcsprotocol</tt> and <tt class="docutils literal">tcsmoc</tt>, the
 operational code, one distribution, <tt class="docutils literal"><span class="pre">tcspecial-moc</span></tt>, and
 <tt class="docutils literal"><span class="pre">tcs-ui/python/pyproject.toml</span></tt> makes <tt class="docutils literal">tcs_ui</tt>, a software tool, one of
@@ -4213,7 +4355,7 @@ digest is taken over, and the part of tcs-xtce that takes it, are inside
 <tt class="docutils literal">tcsprotocol</tt>, so an installed station needs nothing from the source tree.</p>
 </div>
 <div class="section" id="the-rust-programs-alone">
-<h2><a class="toc-backref" href="#toc-entry-65">The Rust programs alone</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-72">The Rust programs alone</a></h2>
 <p>Each program's crate installs with cargo, into the prefix's <tt class="docutils literal">bin</tt>:</p>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>install<span class="whitespace"> </span>--path<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--root<span class="whitespace"> </span>/opt/tcs<span class="whitespace">
@@ -4228,7 +4370,7 @@ no descriptions or schemas until <tt class="docutils literal">make <span class="
 dependencies, and are not installed.</p>
 </div>
 <div class="section" id="a-c-or-c-ground-station">
-<h2><a class="toc-backref" href="#toc-entry-66">A C or C++ ground station</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-73">A C or C++ ground station</a></h2>
 <p>With <tt class="docutils literal">/opt/tcs/lib/pkgconfig</tt> on <tt class="docutils literal">PKG_CONFIG_PATH</tt> -- the ground
 package's profile script puts it there -- a station includes
 <tt class="docutils literal"><span class="pre">&lt;tcsmoc-c.h&gt;</span></tt> and is built with what <tt class="docutils literal"><span class="pre">tcsmoc-c.pc</span></tt> says:</p>
@@ -4251,7 +4393,7 @@ besides:</p>
 </pre>
 </div>
 <div class="section" id="running-tcspecial-under-a-supervisor">
-<h2><a class="toc-backref" href="#toc-entry-67">Running tcspecial under a supervisor</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-74">Running tcspecial under a supervisor</a></h2>
 <p>tcspecial is two processes. The one that is started is tcspecial's own
 supervisor: it starts a second, its <em>child</em>, to run the vehicle, waits for
 it, and starts a fresh one when it ends -- on the configuration a RESTART
@@ -4294,7 +4436,7 @@ that sets <tt class="docutils literal">ExecStart</tt> and <tt class="docutils li
 </div>
 </div>
 <div class="section" id="running-the-programs">
-<h1><a class="toc-backref" href="#toc-entry-68">Running the Programs</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-75">Running the Programs</a></h1>
 <p>The Makefile names a configuration once and gives it to every program that needs
 it, which is the point: tcs-moc builds its panels from the tcspecial
 configuration and hands that same file to the tcspecial and tcs-sim it starts,
@@ -4318,7 +4460,7 @@ tcs-sim at the bottom -- because they are read together and would otherwise
 land on top of each other. It is a request to the window system: X11 honours
 it, Wayland may ignore it, and a tiling window manager will do as it likes.</p>
 <div class="section" id="everything-at-once">
-<h2><a class="toc-backref" href="#toc-entry-69">Everything at once</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-76">Everything at once</a></h2>
 <p><tt class="docutils literal">make runmocy</tt> runs tcs-moc, which starts a tcspecial and a tcs-sim of its
 own:</p>
 <pre class="code console literal-block">
@@ -4358,7 +4500,7 @@ for tcs-sim. It never looks for them anywhere else, as a program found on
 <tt class="docutils literal">PATH</tt> could be another install's, at another version.</p>
 </div>
 <div class="section" id="one-program-at-a-time">
-<h2><a class="toc-backref" href="#toc-entry-70">One program at a time</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-77">One program at a time</a></h2>
 <p>Useful when a program is to be run under a debugger, or restarted without
 disturbing the others, or watched with its own logging.</p>
 <pre class="code console literal-block">
@@ -4386,7 +4528,7 @@ one of it, and <tt class="docutils literal">make runverifyy</tt> and <tt class="
 spellings the same way.</p>
 </div>
 <div class="section" id="what-the-programs-take-without-the-makefile">
-<h2><a class="toc-backref" href="#toc-entry-71">What the programs take without the Makefile</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-78">What the programs take without the Makefile</a></h2>
 <pre class="code console literal-block">
 <span class="generic prompt">$ </span>cargo<span class="whitespace"> </span>run<span class="whitespace"> </span>--bin<span class="whitespace"> </span>tcspecial<span class="whitespace"> </span>--<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>tests/manual/thermostat.ytcs<span class="whitespace">
 </span><span class="generic prompt">$ </span><span class="name variable">PAYLOAD_SIM_YAML</span><span class="operator">=</span>examples/thermostat/thermostat-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
@@ -4504,7 +4646,7 @@ file:</p>
 </pre>
 </div>
 <div class="section" id="what-the-vehicle-answers-to">
-<h2><a class="toc-backref" href="#toc-entry-72">What the vehicle answers to</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-79">What the vehicle answers to</a></h2>
 <p>The section's <tt class="docutils literal">gateway</tt> says what commands the vehicle and takes its
 telemetry, and every configuration states it:</p>
 <pre class="code yaml literal-block">
@@ -4645,7 +4787,7 @@ would be wider has one attribute on each line, each under the first.
 <a class="reference internal" href="#the-ping-yamcs-example">The ping-yamcs example</a>.</p>
 </div>
 <div class="section" id="configurations-kept-on-board">
-<h2><a class="toc-backref" href="#toc-entry-73">Configurations kept on board</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-80">Configurations kept on board</a></h2>
 <p>A vehicle may keep configurations of its own, beside the one on its
 command line, and a restart may name any of them, by its checksum:</p>
 <pre class="code yaml literal-block">
@@ -4731,7 +4873,7 @@ vehicle is to keep, which nothing removes below; nothing in flight removes
 configurations yet.</p>
 </div>
 <div class="section" id="consolidators">
-<h2><a class="toc-backref" href="#toc-entry-74">Consolidators</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-81">Consolidators</a></h2>
 <p>A consolidator sends several readings to the ground as one datum, so that
 what belongs together arrives together: one datum arrives whole or not at
 all, where several packets may half arrive. It is a compute node, <tt class="docutils literal">function:
@@ -4769,7 +4911,7 @@ in it is quoted, <tt class="docutils literal"><span class="pre">&quot;data=[de</
 A default that is not a value of its input's type, an entry for no input
 and an input with no entry are refused where the configuration is read.</p>
 <div class="section" id="what-defaults-mean">
-<h3><a class="toc-backref" href="#toc-entry-75">What defaults mean</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-82">What defaults mean</a></h3>
 <p>Defaults are what let a consolidator always send: it never waits for an
 input that has nothing, so one silent sensor cannot stop the datum. What
 goes down for each input is plain:</p>
@@ -4798,7 +4940,7 @@ with its default, without costing the link anything until asked.</p>
 </div>
 </div>
 <div class="section" id="how-many-inputs-a-consolidator-may-have">
-<h2><a class="toc-backref" href="#toc-entry-76">How many inputs a consolidator may have</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-83">How many inputs a consolidator may have</a></h2>
 <p>Every configuration states the most inputs one consolidator may have:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcspecial</span><span class="punctuation">:</span><span class="whitespace">
@@ -4828,7 +4970,7 @@ mission database's <tt class="docutils literal">QueryConsolidator</tt>. A node t
 is answered <tt class="docutils literal">InvalidParameter</tt>.</p>
 </div>
 <div class="section" id="thread-stacks">
-<h2><a class="toc-backref" href="#toc-entry-77">Thread stacks</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-84">Thread stacks</a></h2>
 <p>tcspecial runs a thread for each node, one for each payload's link to the
 ground, and one each for its commands, its beacons, its signals and, where
 it keeps a log, segsend. Each node's thread, and each link's, is given
@@ -4846,7 +4988,7 @@ configurations, which takes far more than a node does. The main thread's
 stack is set as the process starts, by <tt class="docutils literal">ulimit <span class="pre">-s</span></tt> or a systemd unit's
 <tt class="docutils literal">LimitSTACK</tt>.</p>
 <div class="section" id="how-deep-each-thread-has-been">
-<h3><a class="toc-backref" href="#toc-entry-78">How deep each thread has been</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-85">How deep each thread has been</a></h3>
 <p>What a vehicle's nodes need is best learned from the vehicle. tcspecial
 measures how deep each of its threads has been into its stack since it
 started, and <tt class="docutils literal">QUERY_THREADS</tt> asks it, on the node command link: the
@@ -4863,7 +5005,7 @@ is what the default leaves over what the tests reach.</p>
 </div>
 </div>
 <div class="section" id="locking-memory">
-<h2><a class="toc-backref" href="#toc-entry-79">Locking memory</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-86">Locking memory</a></h2>
 <p>tcspecial locks its memory into RAM: everything it has when it starts and
 everything it makes after, with <tt class="docutils literal">mlockall</tt>. A buffer is then real from
 the moment it is made, so a vehicle short of memory finds out while it
@@ -4871,7 +5013,7 @@ loads a configuration, not partway through a pass, when a buffer is first
 written and the kernel has no page to give it. Only the tcspecial that runs
 the nodes locks; its supervisor, the process that was started, does not.</p>
 <div class="section" id="the-limit">
-<h3><a class="toc-backref" href="#toc-entry-80">The limit</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-87">The limit</a></h3>
 <p>Linux refuses a lock of more than the process's limit on locked memory, and
 the lock covers everything the process has mapped -- its code, its
 libraries, its threads' stacks -- not only what it has touched. A release
@@ -4899,7 +5041,7 @@ tcspecial maps: <tt class="docutils literal">memory:</tt> in the startup summary
 to, and a refused lock says both the limit and how much was mapped.</p>
 </div>
 <div class="section" id="when-the-lock-fails">
-<h3><a class="toc-backref" href="#toc-entry-81">When the lock fails</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-88">When the lock fails</a></h3>
 <p>What happens depends on <tt class="docutils literal"><span class="pre">--simulate</span></tt>:</p>
 <ul class="simple">
 <li>In flight -- <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, or no <tt class="docutils literal"><span class="pre">--simulate</span></tt> at all -- the
@@ -4921,7 +5063,7 @@ since what the failed one locked is not reliably given back. Under
 <tt class="docutils literal"><span class="pre">--simulate</span></tt> it ends with the fatal status.</p>
 </div>
 <div class="section" id="no-memlock">
-<h3><a class="toc-backref" href="#toc-entry-82"><tt class="docutils literal"><span class="pre">--no-memlock</span></tt></a></h3>
+<h3><a class="toc-backref" href="#toc-entry-89"><tt class="docutils literal"><span class="pre">--no-memlock</span></tt></a></h3>
 <p><tt class="docutils literal"><span class="pre">--no-memlock</span></tt> runs tcspecial without the lock, under any <tt class="docutils literal"><span class="pre">--simulate</span></tt>;
 the startup summary says <tt class="docutils literal">memory: not locked, as <span class="pre">--no-memlock</span> asks</tt>.
 Without it the memory is always locked. It is for a desk that cannot be
@@ -4930,7 +5072,7 @@ out is then found when a page is first written, if at all, and is no test
 of whether a vehicle has enough.</p>
 </div>
 <div class="section" id="visual">
-<h3><a class="toc-backref" href="#toc-entry-83"><tt class="docutils literal"><span class="pre">--visual</span></tt></a></h3>
+<h3><a class="toc-backref" href="#toc-entry-90"><tt class="docutils literal"><span class="pre">--visual</span></tt></a></h3>
 <p>tcspecial keeps every thread's allocations in one malloc arena, so that the
 reservation glibc makes for each thread's own -- 64 MiB of address space
 each, untouched but counted against the limit -- is not made. Built with
@@ -4940,7 +5082,7 @@ maps, and its threads are given the arenas glibc gives them.</p>
 </div>
 </div>
 <div class="section" id="more-than-one-tcspecial-on-a-vehicle">
-<h2><a class="toc-backref" href="#toc-entry-84">More than one tcspecial on a vehicle</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-91">More than one tcspecial on a vehicle</a></h2>
 <p>A vehicle may run several tcspecials at once, each on a configuration of
 its own: one for each group of payloads, say, so that a fault that ends
 one leaves the others running, and each is restarted, rolled back and
@@ -4950,7 +5092,7 @@ configuration stack</a>
 in the design describes, with its own configuration stack, its own beacon,
 its own command links and its own memory lock.</p>
 <div class="section" id="what-each-must-have-of-its-own">
-<h3><a class="toc-backref" href="#toc-entry-85">What each must have of its own</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-92">What each must have of its own</a></h3>
 <p>Two tcspecials cannot share anything one of them binds, opens or keeps:</p>
 <ul class="simple">
 <li>every socket either binds: <tt class="docutils literal">tcs_cmd.recv</tt>, <tt class="docutils literal">payload_command.dest_base</tt>,
@@ -4971,7 +5113,7 @@ identifier or a raw IP protocol on one interface, which each tcspecial then
 sees all of.</p>
 </div>
 <div class="section" id="checking-a-pair-before-they-fly">
-<h3><a class="toc-backref" href="#toc-entry-86">Checking a pair before they fly</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-93">Checking a pair before they fly</a></h3>
 <p><tt class="docutils literal"><span class="pre">tcs-conflict</span></tt> says whether two configurations can run at once, naming
 everything both want, with its file and line: see <a class="reference external" href="tcs-conflict.html">the tcs-conflict
 manual</a>. It compares a pair, so three tcspecials are
@@ -4986,7 +5128,7 @@ file and every device it opens, and a second given either is refused,
 saying which, as is one whose socket is already bound.</p>
 </div>
 <div class="section" id="starting-each">
-<h3><a class="toc-backref" href="#toc-entry-87">Starting each</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-94">Starting each</a></h3>
 <p>Each tcspecial is started on its own configuration, by a unit or a script
 of its own. The shipped systemd unit, <tt class="docutils literal">tcspecial.service</tt>, starts one, on
 <tt class="docutils literal">tcspecial.ytcs</tt>; for each more, make a unit beside it, the same but for
@@ -5012,7 +5154,7 @@ set in each unit; the RAM they lock between them is the sum of what each
 maps, which the vehicle must have.</p>
 </div>
 <div class="section" id="from-the-ground">
-<h3><a class="toc-backref" href="#toc-entry-88">From the ground</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-95">From the ground</a></h3>
 <p>To the ground each tcspecial is a vehicle of its own: it beacons with its
 own configuration's checksum, is matched by a CONNECT carrying that
 checksum, and is commanded on its own links, by a station that reads its
@@ -5035,7 +5177,7 @@ several vehicles is not supported.</p>
 </div>
 </div>
 <div class="section" id="which-interface-it-is-written-for">
-<h2><a class="toc-backref" href="#toc-entry-89">Which interface it is written for</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-96">Which interface it is written for</a></h2>
 <p>The section's <tt class="docutils literal">interface</tt> says which commands the configuration is written
 for, and every configuration states it:</p>
 <pre class="code yaml literal-block">
@@ -5082,7 +5224,7 @@ the ping node's and not tcspecial's: a test in <tt class="docutils literal">tcsp
 the code that writes and reads a ping instead.</p>
 </div>
 <div class="section" id="what-the-ground-is-told-the-configuration-s-own-xtce">
-<h2><a class="toc-backref" href="#toc-entry-90">What the ground is told: the configuration's own XTCE</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-97">What the ground is told: the configuration's own XTCE</a></h2>
 <p>Beside each configuration is an XTCE document of its own, of its name with the
 extension <tt class="docutils literal">.xtce</tt> -- <tt class="docutils literal">examples/thermostat/thermostat.xtce</tt> -- which says
 what the vehicle flying it sends the ground. Each node whose data reaches the
@@ -5113,7 +5255,7 @@ one. In the tree, <tt class="docutils literal">make xtce</tt> writes every shipp
 <tt class="docutils literal">make check</tt> fails while one is stale.</p>
 </div>
 <div class="section" id="where-the-links-are">
-<h2><a class="toc-backref" href="#toc-entry-91">Where the links are</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-98">Where the links are</a></h2>
 <p>Five of the section's attributes are a host and a port written together, as
 <tt class="docutils literal">address:port</tt>, and most of them sit in a subsection with the rest of what
 they are about:</p>
@@ -5242,7 +5384,7 @@ address, stops it before it starts, saying which setting to change: a vehicle
 flying without beacons is one the ground cannot tell from a dead one.</p>
 </div>
 <div class="section" id="where-the-logs-segments-go">
-<h2><a class="toc-backref" href="#toc-entry-92">Where the logs' segments go</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-99">Where the logs' segments go</a></h2>
 <p>A log -- the telemetry log under <tt class="docutils literal">log.directory</tt>, or a <tt class="docutils literal">log</tt> node -- is
 written in segment files, and each one that fills is handed to a program
 called <tt class="docutils literal">segsend</tt>, beside tcspecial's own executable, with the segment's file
@@ -5269,7 +5411,7 @@ overrides the quieter default as well.</p>
 </pre>
 </div>
 <div class="section" id="simulated-dummy-or-real-devices-simulate">
-<h2><a class="toc-backref" href="#toc-entry-93">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
+<h2><a class="toc-backref" href="#toc-entry-100">Simulated, Dummy or Real Devices: <tt class="docutils literal"><span class="pre">--simulate</span></tt></a></h2>
 <p>Nothing in a configuration says whether a payload is a real device, a dummy
 device the kernel makes under a real device's name or a simulated device
 tcs-sim makes, and <tt class="docutils literal"><span class="pre">/dev/i2c-7</span></tt> can be the kernel's I2C stub on one host
@@ -5340,7 +5482,7 @@ which is <tt class="docutils literal">all</tt> unless the command line says othe
 <span class="generic prompt">$ </span>make<span class="whitespace"> </span>runmocy<span class="whitespace"> </span><span class="name variable">SIMULATE</span><span class="operator">=</span>some
 </pre>
 <div class="section" id="waiting-for-the-simulator">
-<h3><a class="toc-backref" href="#toc-entry-94">Waiting for the simulator</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-101">Waiting for the simulator</a></h3>
 <p>A simulated device has to exist before tcspecial looks for it, so in a run
 with simulated devices tcs-sim is started first, and tcspecial only once
 tcs-sim has said it has made them all. tcs-sim makes every simulated device as
@@ -5384,7 +5526,7 @@ every one sending, for a test with nobody at the window: the F´ bridge's is
 one (see <a class="reference internal" href="#the-f-bridge">The F´ bridge</a>).</p>
 </div>
 <div class="section" id="every-simulated-device-at-once">
-<h3><a class="toc-backref" href="#toc-entry-95">Every simulated device at once</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-102">Every simulated device at once</a></h3>
 <p><tt class="docutils literal">make <span class="pre">simulated-devices-test</span></tt> runs tcspecial against tcs-sim with a payload
 of each type tcs-sim simulates, and checks that each one's data reaches the
 ground:</p>
@@ -5414,7 +5556,7 @@ test that starts tcspecial and tcs-sim and holds the same lock.</p>
 </div>
 </div>
 <div class="section" id="building-tcspecial-for-a-vehicle">
-<h2><a class="toc-backref" href="#toc-entry-96">Building tcspecial for a vehicle</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-103">Building tcspecial for a vehicle</a></h2>
 <p>A tcspecial contains the payload types it was built with, and no others.
 Each type is a Cargo feature named as a configuration writes the type --
 <tt class="docutils literal"><span class="pre">device-file</span></tt>, <tt class="docutils literal">serial</tt>, <tt class="docutils literal">i2c</tt>, <tt class="docutils literal">spi</tt>, <tt class="docutils literal">i2c_tmass</tt>, <tt class="docutils literal">spi_tmass</tt>,
@@ -5452,7 +5594,7 @@ configuration</span>
 vehicle; see the <a class="reference external" href="tcs-verify.html">tcs-verify manual</a>.</p>
 </div>
 <div class="section" id="watching-tcspecial-work">
-<h2><a class="toc-backref" href="#toc-entry-97">Watching tcspecial work</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-104">Watching tcspecial work</a></h2>
 <p>A tcspecial built with the <tt class="docutils literal">visual</tt> feature can show what it is doing. Never
 build a tcspecial that flies this way: the feature is for a vehicle on a desk,
 and the window toolkit it brings in, Slint, is licensed to TCS for desktop
@@ -5487,7 +5629,7 @@ build one that has it.</p>
 </div>
 </div>
 <div class="section" id="testing">
-<h1><a class="toc-backref" href="#toc-entry-98">Testing</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-105">Testing</a></h1>
 <p>Testing is done with two programs, and a third that checks the files they
 read, each with a manual of its own:</p>
 <ul class="simple">
@@ -5500,7 +5642,7 @@ running any of it: see the <a class="reference external" href="tcs-verify.html">
 </ul>
 </div>
 <div class="section" id="crates-used">
-<h1><a class="toc-backref" href="#toc-entry-99">Crates Used</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-106">Crates Used</a></h1>
 <p>These are the crates the workspace's <tt class="docutils literal">Cargo.toml</tt> files name directly --
 every one of the nineteen manifests, the root and each crate under it. The
 crates they depend on in turn are not listed: <tt class="docutils literal">cargo tree</tt> shows the whole
@@ -5696,7 +5838,7 @@ $ cargo metadata --format-version 1
 </pre>
 </div>
 <div class="section" id="license">
-<h1><a class="toc-backref" href="#toc-entry-100">License</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-107">License</a></h1>
 <p>TCSpecial -- the flight software, the libraries, the ground programs and the
 examples -- is licensed under either of the Apache License, Version 2.0
 (<tt class="docutils literal"><span class="pre">LICENSE-APACHE</span></tt>, or <a class="reference external" href="http://www.apache.org/licenses/LICENSE-2.0">http://www.apache.org/licenses/LICENSE-2.0</a>) or the MIT
@@ -5709,7 +5851,7 @@ dual licensed as above, without any additional terms or conditions.</p>
 <a class="reference internal" href="#crates-used">Crates Used</a>.</p>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-101">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-108">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="manual.html">TCS Design and Documentation</a></dt>
 <dd>Every TCS manual and design document, divided by the category of

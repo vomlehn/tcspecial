@@ -363,7 +363,7 @@ Two vehicles may include one file, as the thermostat examples share
 ``examples/thermostat-common``: a subsystem written once and flown in
 several configurations.
 
-*See:* "Which Files There Are" in the tcspecial manual.
+*See:* "TCS Files" in the tcspecial manual.
 
 Stage 8: keeping a log aboard
 =============================

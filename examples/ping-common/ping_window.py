@@ -74,7 +74,7 @@ def run_the_window(setup, beacons, pinger, title="tcspecial ping",
 
     from tkinter import ttk
 
-    from tcs_ui import fonts, theme
+    from tcs_ui import fonts, powered, theme
     from tcs_ui.beacon_panel import BeaconPanel, Shown
 
     reports = queue.Queue()
@@ -111,6 +111,7 @@ def run_the_window(setup, beacons, pinger, title="tcspecial ping",
     # Two boxes, the beacon's and the ping's, with one size of space between
     # them and round them: see tcs_ui.theme.
     between = theme.BETWEEN
+    powered.pack_in(window, between)
     beacon = BeaconPanel(window)
     beacon.pack(fill="x", padx=between, pady=(between, between // 2))
 

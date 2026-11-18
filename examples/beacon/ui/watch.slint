@@ -12,6 +12,7 @@ import { BeaconPanel } from "../../../tcs-ui/ui/beacon.slint";
 import { PlainButton } from "../../../tcs-ui/ui/button.slint";
 import { Fonts } from "../../../tcs-ui/ui/fonts.slint";
 import { Colors } from "../../../tcs-ui/ui/colors.slint";
+import { PoweredBy } from "../../../tcs-ui/ui/powered.slint";
 
 export component WatchWindow inherits Window {
     default-font-size: Fonts.window;
@@ -20,8 +21,9 @@ export component WatchWindow inherits Window {
     title: "tcspecial beacon";
     // White, as every window is: see tcs-ui/ui/colors.slint.
     background: Colors.window;
-    // Just large enough for what it holds -- the panel and the button below
-    // it -- and the border round them, `content.padding`. The panel is as
+    // Just large enough for what it holds -- the line saying what powers it,
+    // the panel and the button below it -- and the border round them,
+    // `content.padding`. The panel is as
     // wide as its widest message, `messages`, so the window opens at the
     // width it keeps and does not grow when the first beacon comes. Measured
     // rather than stated, the text being whatever size Fonts.window makes it.
@@ -32,6 +34,10 @@ export component WatchWindow inherits Window {
     out property <length> window-width: root.width;
     out property <length> window-height: root.height;
     out property <length> border: content.padding;
+    // How far down the panel starts: the border, the line saying what
+    // powers the window, and the spacing under it.
+    out property <length> above-panel: content.padding + powered.height
+        + content.spacing;
 
     in-out property <color> indicator-color: #c0c0c0;
     in-out property <string> last-received: "--:--:--";
@@ -77,6 +83,8 @@ export component WatchWindow inherits Window {
         // The button stands a little apart from the panel, being a control of
         // the vehicle rather than a line of what the vehicle said.
         spacing: 12px;
+
+        powered := PoweredBy { }
 
         // The stage beside the indicator, which shows it in colour: the
         // indicator says how stale the beacons are at a glance, and the word

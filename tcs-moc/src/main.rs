@@ -159,7 +159,7 @@ impl Sizes {
             panel_height: 204.0,
             grid_spacing: 10.0,
             chrome_width: 36.0,
-            chrome_height: 476.0,
+            chrome_height: 502.0,
         }
     }
 

@@ -59,8 +59,8 @@ fn fits_exactly(window: &WatchWindow, what: &str) {
     );
     assert_eq!(
         panel.absolute_position().y,
-        border,
-        "{what}: the border on top"
+        window.get_above_panel(),
+        "{what}: the border and the powered-by line on top"
     );
 }
 

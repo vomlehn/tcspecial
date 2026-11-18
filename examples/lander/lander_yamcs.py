@@ -1302,7 +1302,7 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
     import tkinter as tk
     from tkinter import ttk
 
-    from tcs_ui import fonts, theme
+    from tcs_ui import fonts, powered, theme
 
     def reading_loop():
         """Reads Yamcs, for ever."""
@@ -1327,6 +1327,7 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
     # The top left: tcs-sim's window asks for the top right.
     window.geometry("+0+0")
     between = round(theme.BETWEEN * zoom)
+    powered.pack_in(window, between)
     scale = SCALE * zoom
     if room is not None:
         # The landscape no wider than the room less the window's margins,

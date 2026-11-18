@@ -6,6 +6,7 @@ import { Copyable, CopyButton } from "../../tcs-verify/ui/copy.slint";
 import { Fonts } from "../../tcs-ui/ui/fonts.slint";
 import { SimFonts } from "sim-fonts.slint";
 import { Colors } from "../../tcs-ui/ui/colors.slint";
+import { PoweredBy } from "../../tcs-ui/ui/powered.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcs-moc and tcs-sim share, beside tcs-verify, whose report it
 // shows.
@@ -428,14 +429,15 @@ export component MainWindow inherits Window {
     // The least the window is tall for the lander's pane, which the panels
     // beside it may not be.
     out property <length> least-height: root.lander-height
-        + outer.padding * 2 + quit-row.height;
+        + outer.padding * 2 + powered.height + quit-row.height;
 
     // Everything the window needs besides the panels: the padding round the
-    // whole of it, the row holding the quit button, and the grid's own
-    // padding inside the scrolling area.
+    // whole of it, the line saying what powers it, the row holding the quit
+    // button, and the grid's own padding inside the scrolling area.
     out property <length> chrome-width: outer.padding * 2 + grid.padding * 2
         + root.lander-width;
     out property <length> chrome-height: outer.padding * 2
+        + powered.height
         + quit-row.height
         + grid.padding * 2;
 
@@ -443,6 +445,8 @@ export component MainWindow inherits Window {
     outer := VerticalLayout {
         padding: 2px;
         spacing: 0px;
+
+        powered := PoweredBy { }
 
         // The lander's pane, where there is one, and the panels beside it.
         HorizontalLayout {

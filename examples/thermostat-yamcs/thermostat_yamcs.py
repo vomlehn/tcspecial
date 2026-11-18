@@ -501,7 +501,7 @@ def run_the_window(readings, beacons):
     import tkinter as tk
     from tkinter import ttk
 
-    from tcs_ui import fonts, theme
+    from tcs_ui import fonts, powered, theme
     from tcs_ui.beacon_panel import BeaconPanel, Shown
 
     reports = queue.Queue()
@@ -523,6 +523,7 @@ def run_the_window(readings, beacons):
     window.title("tcspecial thermostat through Yamcs")
     window.resizable(False, False)
     between = theme.BETWEEN
+    powered.pack_in(window, between)
     beacon = BeaconPanel(window)
     beacon.pack(fill="x", padx=between, pady=(between, between // 2))
     panel = ttk.LabelFrame(window, text="Thermostat, through Yamcs",

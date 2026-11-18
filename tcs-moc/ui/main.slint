@@ -9,6 +9,7 @@ import { BeaconPanel } from "../../tcs-ui/ui/beacon.slint";
 import { PingPanel } from "../../tcs-ui/ui/ping.slint";
 import { Fonts } from "../../tcs-ui/ui/fonts.slint";
 import { Colors } from "../../tcs-ui/ui/colors.slint";
+import { PoweredBy } from "../../tcs-ui/ui/powered.slint";
 // What was found wrong as the program started, shown before this window: the
 // one window tcs-moc and tcs-sim share, beside tcs-verify, whose report it
 // shows.
@@ -548,7 +549,7 @@ export component MainWindow inherits Window {
     // only the floors, below which the command interpreter's controls stop
     // fitting side by side and the grid stops having room for a row of
     // panels. The height is one row of panels and the chrome below:
-    // panel-height as PanelProbe measures it, 204, and chrome-height, 476.
+    // panel-height as PanelProbe measures it, 204, and chrome-height, 502.
     // A window of only this, which is what the panel tests open, that is
     // short of a row cuts a panel's last line off, and
     // every_panel_shows_what_arrived_from_its_payload is what notices.
@@ -556,7 +557,7 @@ export component MainWindow inherits Window {
     // One row of panels and the chrome, which is the least the window is ever
     // opened at -- a tcspecial configuration of one handler. How much more it
     // opens at is Rust's to say: see rows_of_room() in main.rs.
-    min-height: 680px;
+    min-height: 706px;
     background: Colors.window;
 
     // Whether this window takes no presses: true while a question is waiting
@@ -695,14 +696,15 @@ export component MainWindow inherits Window {
     // since the beacon's box took a title and its message took a second line
     // where the window is too narrow for it in one, which together are 38 more
     // than the row above the grid had been; 476 since the restart target's
-    // row, a line edit and the spacing above it. Width: the padding of the scrolling
-    // area and of the grid inside it. The width was 30 in main.rs and wanted
+    // row, a line edit and the spacing above it; 502 since the line saying
+    // what powers the window, 16, and the spacing below it. Width: the
+    // padding of the scrolling area and of the grid inside it. The width was 30 in main.rs and wanted
     // 36, and the column gaps were left out of the window's width altogether,
     // so a three-column grid stood twenty-six pixels wider than the area it
     // scrolled in and the last column was cut off.
     out property <length> grid-spacing: 10px;
     out property <length> chrome-width: 36px;
-    out property <length> chrome-height: 476px;
+    out property <length> chrome-height: 502px;
 
     // Rows follow from the panel count and the column count.
     property <int> grid-rows:
@@ -748,6 +750,8 @@ export component MainWindow inherits Window {
     VerticalLayout {
         padding: 10px;
         spacing: 10px;
+
+        PoweredBy { }
 
         // CI Control Section
         GroupBox {
@@ -1341,6 +1345,8 @@ export component PlotWindow inherits Window {
         padding: 10px;
         spacing: 6px;
 
+        PoweredBy { }
+
         HorizontalLayout {
             spacing: 6px;
             Text {
@@ -1690,6 +1696,7 @@ export component PingWindow inherits Window {
     VerticalLayout {
         padding: 10px;
         spacing: 6px;
+        PoweredBy { }
         // Titled with the node, so that the box says what it is pinging.
         panel := PingPanel {
             title: "Pinging " + root.node;

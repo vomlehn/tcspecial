@@ -1,0 +1,25 @@
+// "Powered by TCSpecial", small and centred, across the top of every window
+// an example shows: tcs-moc's, tcs-sim's and the beacon example's here, and
+// the Tk windows' in tcs-ui/python/tcs_ui/powered.py, which says it in the
+// same words, size and grey.
+//
+// Imported by path, as the panels are:
+//
+//     import { PoweredBy } from "../../tcs-ui/ui/powered.slint";
+//
+// and put first in the window's outermost vertical layout. Its height is
+// stated, so that a window that works out its own size from what is round
+// its panels -- tcs-moc's and tcs-sim's chrome-height -- can count it.
+
+export component PoweredBy inherits Text {
+    text: "Powered by TCSpecial";
+    // Smaller than Fonts.window's 12pt: it says where the window comes from,
+    // not anything about the vehicle.
+    font-size: 9pt;
+    // The grey of a note, tcs_ui.theme's Note.TLabel.
+    color: #4b5563;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    height: 16px;
+    vertical-stretch: 0;
+}

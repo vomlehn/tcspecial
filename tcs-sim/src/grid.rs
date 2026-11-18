@@ -111,7 +111,7 @@ impl Sizes {
             panel_width: 188.0,
             panel_height: 136.0,
             chrome_width: 20.0,
-            chrome_height: 54.0,
+            chrome_height: 70.0,
         }
     }
 }
@@ -282,10 +282,10 @@ mod tests {
         let shape = grid_shape(&sizes(), 4);
         assert_eq!((shape.columns, shape.rows), (3, 2));
         // Three panels across and two rows down, plus the chrome: 3 x 188 + 20
-        // and 2 x 136 + 54. Written out rather than computed from the fixture,
+        // and 2 x 136 + 70. Written out rather than computed from the fixture,
         // so that a change to a panel's size has to be looked at here rather
         // than silently agreeing with itself.
-        assert_eq!((shape.width, shape.height), (584.0, 326.0));
+        assert_eq!((shape.width, shape.height), (584.0, 342.0));
     }
 
     /// A row is filled before another is started under it, three across.

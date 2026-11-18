@@ -66,6 +66,8 @@ help:
 	@echo "  make run-lander      - Run the lander example: two" \
 		"tcspecials flying a lunar lander from tcs-sim's joystick," \
 		"watched through Yamcs 1.3 s away (YAMCS_HOME=<yamcs>)"
+	@echo "  make run-lander-station - The same, watched by" \
+		"lander-station, its ground station in Rust: no Yamcs (SEED=N)"
 	@echo "  make run-tees        - Run tcs-moc on the tees example: tees" \
 		"and null nodes"
 	@echo "  make run-consolidator - Run tcs-moc on the consolidator" \
@@ -303,6 +305,19 @@ run-thermostat-yamcs: check-tkinter
 .PHONY: run-lander
 run-lander: check-tkinter
 	$(call tcsx,lander,tcspecial tcs-sim tcs-verify segsend)
+
+# The lander example again, watched by its ground station in Rust,
+# lander-station, rather than through Yamcs: no Yamcs, no Python, and the
+# same station a web page runs (see ../tcswebasm). It makes the landscape,
+# starts tcs-sim and both tcspecials, holds everything 1.3 s each way itself,
+# and opens its window; closing that window stops them all. SEED=N has a
+# landscape again.
+.PHONY: run-lander-station
+run-lander-station:
+	cd $(ROOT) && cargo build -q --bin tcspecial --bin tcs-sim \
+		--bin lander-station
+	cd $(ROOT) && $(DEBUG_DIR)/lander-station $(MEMLOCK_FLAG) \
+		$(if $(SEED),--seed=$(SEED))
 
 # Whether there is a tkinter for the ping example's window to be drawn with.
 #

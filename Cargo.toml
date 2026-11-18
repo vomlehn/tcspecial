@@ -45,7 +45,8 @@ members = [
     "examples/ping-yamcs",
     # And for the thermostat example through Yamcs.
     "examples/thermostat-yamcs",
-    # And for the lander example, through Yamcs too.
+    # And for the lander example, through Yamcs too; and its ground station
+    # in Rust, lander-station, which needs no Yamcs and runs in a web page.
     "examples/lander",
     # And for the memusage example, through Yamcs too.
     "examples/memusage",

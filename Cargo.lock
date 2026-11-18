@@ -2649,6 +2649,16 @@ dependencies = [
 [[package]]
 name = "lander-example"
 version = "0.1.0"
+dependencies = [
+ "rand",
+ "slint",
+ "slint-build",
+ "tcs-sim",
+ "tcs-ui",
+ "tcsmoc",
+ "tcsos",
+ "tcsprotocol",
+]
 
 [[package]]
 name = "lazy_static"

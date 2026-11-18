@@ -60,7 +60,9 @@ use crate::node::vehicle::thermostat::Thermostat;
 
 mod endpoint;
 mod grid;
-mod lander_view;
+// Public for a ground station that draws the lander as tcs-sim does: see
+// examples/lander.
+pub mod lander_view;
 mod node;
 mod payload;
 // Linux alone: a page has no terminals.

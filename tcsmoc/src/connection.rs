@@ -3,6 +3,7 @@
 use std::io;
 use tcsos::net::{SocketAddr, UdpSocket};
 use tcsos::time::{Duration, Instant};
+use tcsprotocol::ccsds::{self, PacketType, Sender};
 use tcsprotocol::{
     came_from, Command, CommandPacker, HostPort, TcsError, TcsResult, Telemetry,
 };
@@ -86,6 +87,20 @@ pub struct UdpConnection {
     recv_buffer: Vec<u8>,
     /// What a command is packed into to be sent, kept from one to the next.
     packer: CommandPacker,
+    /// Where the vehicle answers to Yamcs, every packet on the link a CCSDS
+    /// Space Packet: what frames each command as a telecommand under the
+    /// link's APID, which each answer must carry as telemetry. `None` for a
+    /// link that sends its packets bare.
+    framing: Option<Framing>,
+}
+
+/// The CCSDS framing of a command link: see [`UdpConnection::framed`].
+struct Framing {
+    /// Frames each command, counting them.
+    sender: Sender,
+    /// Where a framed command is put to be sent, kept from one to the
+    /// next.
+    room: Vec<u8>,
 }
 
 impl UdpConnection {
@@ -123,7 +138,34 @@ impl UdpConnection {
             },
             recv_buffer: vec![0u8; 65535],
             packer: CommandPacker::new(),
+            framing: None,
         })
+    }
+
+    /// Frames every packet on the link as a CCSDS Space Packet from now on,
+    /// as a vehicle that answers to Yamcs has them: each command a
+    /// telecommand under the link's APID, and each answer telemetry under
+    /// it. See `tcsprotocol::gateway`.
+    ///
+    /// # Arguments
+    ///
+    /// * `apid` - The link's APID, `tcs_cmd.apid`.
+    ///
+    /// # Returns
+    ///
+    /// The connection, framed.
+    ///
+    /// # Errors
+    ///
+    /// `TcsError::Config` for an APID past eleven bits.
+    pub fn framed(mut self, apid: u16) -> TcsResult<Self> {
+        let sender = Sender::new(PacketType::Telecommand, apid)
+            .map_err(|e| TcsError::Config(format!("tcs_cmd.apid: {e}")))?;
+        self.framing = Some(Framing {
+            sender,
+            room: vec![0u8; 65535],
+        });
+        Ok(self)
     }
 
     /// Connect to the remote address
@@ -179,7 +221,23 @@ impl UdpConnection {
         loop {
             let (size, from) = self.socket.recv_from(&mut self.recv_buffer)?;
             if came_from(&self.expected, &from) {
-                return Ok(Telemetry::read(&self.recv_buffer[..size])?);
+                let packet = &self.recv_buffer[..size];
+                let Some(framing) = self.framing.as_ref() else {
+                    return Ok(Telemetry::read(packet)?);
+                };
+                let data = ccsds::read_header(
+                    packet,
+                    PacketType::Telemetry,
+                    framing.sender.apid(),
+                )
+                .map_err(|e| {
+                    TcsError::Protocol(format!(
+                        "an answer that is not CCSDS telemetry under APID \
+                         {:#x}: {e}",
+                        framing.sender.apid()
+                    ))
+                })?;
+                return Ok(Telemetry::read(data)?);
             }
 
             eprintln!(
@@ -209,7 +267,15 @@ impl UdpConnection {
 impl Connection for UdpConnection {
     fn send(&mut self, command: &Command) -> TcsResult<()> {
         let packed = self.packer.pack(command);
-        self.socket.send_to(packed, self.remote_addr)?;
+        let packet = match self.framing.as_mut() {
+            Some(framing) => {
+                framing.sender.frame(&mut framing.room, packed).map_err(
+                    |e| TcsError::Protocol(format!("framing a command: {e}")),
+                )?
+            }
+            None => packed,
+        };
+        self.socket.send_to(packet, self.remote_addr)?;
         Ok(())
     }
 
@@ -291,6 +357,53 @@ mod tests {
                 tm.header.sequence, 2,
                 "the stranger's datagram was taken for an answer"
             ),
+            other => panic!("expected PING telemetry, got {other:?}"),
+        }
+    }
+
+    /// A framed link sends each command as a CCSDS telecommand under its
+    /// APID, and takes an answer only as telemetry under it, as a vehicle
+    /// that answers to Yamcs has them.
+    #[test]
+    fn a_framed_link_frames_its_commands_and_unframes_its_answers() {
+        use tcsprotocol::ccsds::{read_header, PacketType, Sender};
+        use tcsprotocol::{
+            Command, CommandPacker, CommandStatus, PingCommand, PingTelemetry,
+        };
+
+        let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("the far end");
+        spacecraft
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("a timeout");
+        let at = spacecraft.local_addr().expect("where it is");
+        let mut link = UdpConnection::new("127.0.0.1:0", &at.to_string())
+            .and_then(|link| link.framed(0x111))
+            .expect("a framed connection");
+
+        let command = Command::Ping(PingCommand::new(7));
+        link.send(&command).expect("sent");
+        let mut packet = [0u8; 512];
+        let (size, from) = spacecraft.recv_from(&mut packet).expect("arrived");
+        let data = read_header(&packet[..size], PacketType::Telecommand, 0x111)
+            .expect("a telecommand under the link's APID");
+        assert_eq!(data, CommandPacker::new().pack(&command));
+
+        // A bare answer is not one of this link's packets; a framed one is.
+        let answer =
+            Telemetry::Ping(PingTelemetry::new(7, CommandStatus::Success))
+                .to_bytes();
+        spacecraft.send_to(&answer, from).expect("sent bare");
+        assert!(link.receive_timeout(Duration::from_secs(5)).is_err());
+        let mut sender =
+            Sender::new(PacketType::Telemetry, 0x111).expect("a sender");
+        let mut room = [0u8; 512];
+        let framed = sender.frame(&mut room, &answer).expect("framed");
+        spacecraft.send_to(framed, from).expect("sent framed");
+        match link
+            .receive_timeout(Duration::from_secs(5))
+            .expect("answered")
+        {
+            Telemetry::Ping(tm) => assert_eq!(tm.header.sequence, 7),
             other => panic!("expected PING telemetry, got {other:?}"),
         }
     }

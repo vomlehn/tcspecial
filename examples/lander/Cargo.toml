@@ -4,15 +4,41 @@ version = "0.1.0"
 edition = "2021"
 license.workspace = true
 description = """\
-The tests of the lander example, whose ground station is Python 3: they run \
-the Python's own tests where the Rust's are run"""
+The lander example's ground station in Rust, lander-station, which a web \
+page runs as well as Linux; and the tests that run the Python station's \
+own"""
+build = "build.rs"
 
-# Nothing is built for the example itself: its ground station is
-# lander_yamcs.py beside this. What is here is the test that runs the
-# Python's, so that a change to the Rust the Python has not followed -- the
-# lander's rules for a landscape, the Yamcs links, the tools it runs -- fails
-# where the Rust change is being tested.
-[dev-dependencies]
+# Two ground stations watch the lander. lander_yamcs.py beside this, through
+# Yamcs, and lander-station, built here, which needs no Yamcs and runs in a
+# web page too. The test in tests/python.rs runs the Python's own tests, so
+# that a change to the Rust the Python has not followed -- the lander's rules
+# for a landscape, the Yamcs links, the tools it runs -- fails where the Rust
+# change is being tested.
+[lib]
+name = "lander_station"
+
+[[bin]]
+name = "lander-station"
+path = "src/main.rs"
+
+[dependencies]
+# Reading the configurations and the simulator file, and the lander's rules.
+tcsprotocol = { path = "../../tcsprotocol" }
+# CONNECT, the gateways' data, and the readiness of tcs-sim.
+tcsmoc = { path = "../../tcsmoc" }
+# The lander drawn as tcs-sim draws it, and its Slint pieces.
+tcs-sim = { path = "../../tcs-sim" }
+# The "Powered by" line, and where windows are made.
+tcs-ui = { path = "../../tcs-ui" }
+tcsos = { path = "../../tcsos" }
+slint = "1.3"
+# The landscape's random numbers, from a seed: the standard generator, and
+# none of the system's randomness.
+rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
+
+[build-dependencies]
+slint-build = "1.3"
 
 [lints]
 workspace = true

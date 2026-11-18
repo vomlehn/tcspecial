@@ -101,7 +101,7 @@ impl Listening {
             return Ok(None);
         };
         let ours = digest_of_graph(graph).map_err(|e| e.to_string())?;
-        let connection =
+        let mut connection =
             crate::UdpConnection::new(&links.from, &links.interpreter)
                 .map_err(|e| {
                     format!(
@@ -111,6 +111,9 @@ impl Listening {
                         links.from
                     )
                 })?;
+        if let Some(apid) = links.framing {
+            connection = connection.framed(apid).map_err(|e| e.to_string())?;
+        }
         let client = TcsClient::spacecraft_only(
             Box::new(connection),
             Matched::for_configuration(ours),

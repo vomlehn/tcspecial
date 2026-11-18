@@ -37,17 +37,17 @@ use crate::{LanderProbe, LanderScene, MainWindow};
 /// The lander's terminals' places, in
 /// `tcsprotocol::node::physics::lander::TERMINALS`'s order: its throttles,
 /// inputs, and its outputs.
-const THROTTLE_X: usize = 0;
-const THROTTLE_Y: usize = 1;
-const X: usize = 2;
-const Y: usize = 3;
-const VELOCITY_X: usize = 4;
-const VELOCITY_Y: usize = 5;
-const FUEL: usize = 6;
-const LANDED: usize = 7;
-const CRASHED: usize = 8;
-const ACCELERATION_X: usize = 9;
-const ACCELERATION_Y: usize = 10;
+pub const THROTTLE_X: usize = 0;
+pub const THROTTLE_Y: usize = 1;
+pub const X: usize = 2;
+pub const Y: usize = 3;
+pub const VELOCITY_X: usize = 4;
+pub const VELOCITY_Y: usize = 5;
+pub const FUEL: usize = 6;
+pub const LANDED: usize = 7;
+pub const CRASHED: usize = 8;
+pub const ACCELERATION_X: usize = 9;
+pub const ACCELERATION_Y: usize = 10;
 
 /// The joystick's inputs' places, in
 /// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
@@ -582,12 +582,32 @@ const SKY_DETAIL: f64 = 2.0;
 /// first times [`SKY_DETAIL`], and as tall as the display's proportions
 /// make that.
 pub fn sky(f: &Resolved) -> slint::SharedPixelBuffer<slint::Rgba8Pixel> {
+    sky_of(f, stars(f))
+}
+
+/// The sky with some stars in it, drawn as [`sky`] draws the lander's own:
+/// for a ground station, which draws the stars the vehicle sends down.
+///
+/// # Arguments
+///
+/// * `f`     - The lander's figures.
+/// * `stars` - Each star: its place, in metres; its radius, in the scene's
+///             logical pixels; and its brightness, from nought to one.
+///
+/// # Returns
+///
+/// The picture, as wide as the scene in logical pixels times
+/// `SKY_DETAIL`.
+pub fn sky_of(
+    f: &Resolved,
+    stars: impl IntoIterator<Item = (Point, f64, f32)>,
+) -> slint::SharedPixelBuffer<slint::Rgba8Pixel> {
     let wide = (SCENE_WIDTH * SKY_DETAIL).round() as u32;
     let high = (SCENE_WIDTH * SKY_DETAIL * f.height / f.width).round() as u32;
     let mut picture =
         slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(wide, high);
     let pixels = picture.make_mut_slice();
-    for ((x, y), radius, brightness) in stars(f) {
+    for ((x, y), radius, brightness) in stars {
         let cx = x / f.width * f64::from(wide);
         let cy = (1.0 - y / f.height) * f64::from(high);
         let r = radius * SKY_DETAIL;
@@ -1363,7 +1383,7 @@ fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
     pane.set_sky(slint::Image::from_rgba8(sky(f)));
 }
 
-/// Brings the window up to the world, and the stars to how bright they are
+/// Brings the window up to the world, and the lights to whether they are lit
 /// now.
 ///
 /// # Arguments
@@ -1374,107 +1394,221 @@ fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
 fn show(pane: &LanderScene<'_>, scene: &Scene, seconds: f64) {
     let now = Instant::now();
     let out = scene.world.glance_component(scene.lander, now);
-    let f = &scene.figures;
-    paint(pane, f, &out);
-    pane.set_pad_lit(pad_lit(seconds));
-    pane.set_strobe_lit(strobe_lit(seconds));
+    let frame = scene.watch.borrow_mut().frame(
+        &scene.figures,
+        &out,
+        scene.world.seconds(now),
+        seconds,
+    );
+    set_frame(pane, &frame);
+}
 
-    // A crash explodes, from the crash until the lander starts again; the
-    // lander is gone meanwhile.
-    let mut watch = scene.watch.borrow_mut();
-    let crashed = out[CRASHED] > 0.5;
-    if !crashed {
-        watch.flying = Some(Flying {
-            place: (out[X], out[Y]),
-            velocity: (out[VELOCITY_X], out[VELOCITY_Y]),
-            fuel: out[FUEL].clamp(0.0, 1.0) * f.fuel,
-        });
-        watch.explosion = None;
-    } else if !watch.crashed {
-        let began = scene.world.seconds(now);
-        watch.explosion = watch
-            .flying
-            .and_then(|flying| Explosion::of(f, flying, began));
-    }
-    watch.crashed = crashed;
-    let shown = watch.explosion.as_mut().map(|explosion| {
-        let t = scene.world.seconds(now) - explosion.began;
-        explosion.follow(f, t);
-        explosion.pictures(f, t)
-    });
-    match shown {
-        Some(([outer, flame, core], left, debris)) => {
-            pane.set_fire_outer(outer.into());
-            pane.set_fire_flame(flame.into());
-            pane.set_fire_core(core.into());
-            pane.set_fire_left(left);
-            pane.set_debris(debris.into());
-            for empty in [
-                LanderScene::set_lander_lines,
-                LanderScene::set_lander_shapes,
-                LanderScene::set_lander_green,
-                LanderScene::set_lander_strobes,
-            ] {
-                empty(pane, "".into());
-            }
+/// What the lander's pane shows at a moment that moves: every picture and
+/// every word, worked out from the lander's outputs, for a window to be set
+/// from. tcs-sim's window sets its pane from the world's lander; a ground
+/// station sets its own from what the vehicles send down.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Frame {
+    /// The lander's single lines, as picture commands; empty while it has
+    /// crashed.
+    pub lander_lines: String,
+    /// Its shapes, filled.
+    pub lander_shapes: String,
+    /// Its green light.
+    pub lander_green: String,
+    /// Its white strobes.
+    pub lander_strobes: String,
+    /// The bottom engine's plume: its glow, its core, and how hard it
+    /// fires, from nought to one.
+    pub plume_glow: String,
+    /// The bottom engine's plume's core.
+    pub plume_core: String,
+    /// How hard the bottom engine fires.
+    pub plume_strength: f32,
+    /// The side thruster's plume's glow.
+    pub side_plume_glow: String,
+    /// The side thruster's plume's core.
+    pub side_plume_core: String,
+    /// How hard the side thruster fires.
+    pub side_plume_strength: f32,
+    /// The fireball's outer cloud, after a crash.
+    pub fire_outer: String,
+    /// The fireball's flame.
+    pub fire_flame: String,
+    /// The fireball's core.
+    pub fire_core: String,
+    /// How much of the fireball is left, from one at the crash to nought.
+    pub fire_left: f32,
+    /// The debris.
+    pub debris: String,
+    /// The smiling face, on a landing.
+    pub face: String,
+    /// What the lander is doing, in words.
+    pub state: &'static str,
+    /// The fuel left, from nought to one.
+    pub fuel: f32,
+    /// Its position, velocity and acceleration, each axis as the pane says
+    /// it.
+    pub position_x: String,
+    /// Y position.
+    pub position_y: String,
+    /// X velocity.
+    pub velocity_x: String,
+    /// Y velocity.
+    pub velocity_y: String,
+    /// X acceleration.
+    pub acceleration_x: String,
+    /// Y acceleration.
+    pub acceleration_y: String,
+    /// Whether the pad's lights are lit.
+    pub pad_lit: bool,
+    /// Whether the lander's strobes are lit.
+    pub strobe_lit: bool,
+}
+
+impl Watch {
+    /// Works out what the pane shows of the lander, from its outputs: a
+    /// crash explodes, from the crash until the lander starts again, the
+    /// lander gone meanwhile.
+    ///
+    /// # Arguments
+    ///
+    /// * `f`         - The lander's figures.
+    /// * `out`       - Its terminals' values, in its type's order:
+    ///                 [`THROTTLE_X`] to [`ACCELERATION_Y`].
+    /// * `simulated` - The lander's time now, in seconds, which an
+    ///                 explosion is followed by.
+    /// * `seconds`   - The time since the window opened, in seconds, which
+    ///                 the lights flash by.
+    ///
+    /// # Returns
+    ///
+    /// The frame.
+    pub fn frame(
+        &mut self,
+        f: &Resolved,
+        out: &[f64],
+        simulated: f64,
+        seconds: f64,
+    ) -> Frame {
+        let mut frame = painted(f, out);
+        frame.pad_lit = pad_lit(seconds);
+        frame.strobe_lit = strobe_lit(seconds);
+        let crashed = out[CRASHED] > 0.5;
+        if !crashed {
+            self.flying = Some(Flying {
+                place: (out[X], out[Y]),
+                velocity: (out[VELOCITY_X], out[VELOCITY_Y]),
+                fuel: out[FUEL].clamp(0.0, 1.0) * f.fuel,
+            });
+            self.explosion = None;
+        } else if !self.crashed {
+            self.explosion = self
+                .flying
+                .and_then(|flying| Explosion::of(f, flying, simulated));
         }
-        None => {
-            for empty in [
-                LanderScene::set_fire_outer,
-                LanderScene::set_fire_flame,
-                LanderScene::set_fire_core,
-                LanderScene::set_debris,
-            ] {
-                empty(pane, "".into());
-            }
+        self.crashed = crashed;
+        if let Some(explosion) = self.explosion.as_mut() {
+            let t = simulated - explosion.began;
+            explosion.follow(f, t);
+            let ([outer, flame, core], left, debris) = explosion.pictures(f, t);
+            frame.fire_outer = outer;
+            frame.fire_flame = flame;
+            frame.fire_core = core;
+            frame.fire_left = left;
+            frame.debris = debris;
+            frame.lander_lines.clear();
+            frame.lander_shapes.clear();
+            frame.lander_green.clear();
+            frame.lander_strobes.clear();
         }
+        frame
     }
 }
 
-/// Shows the lander as its outputs say it is.
+/// Sets tcs-sim's pane from a frame.
 ///
 /// # Arguments
 ///
-/// * `pane`   - The lander's pane, in tcs-sim's window.
-/// * `f`      - The lander's figures.
-/// * `out`    - Its terminals' values, in its type's order.
-fn paint(pane: &LanderScene<'_>, f: &Resolved, out: &[f64]) {
+/// * `pane`  - The lander's pane, in tcs-sim's window.
+/// * `frame` - What it is to show.
+fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
+    pane.set_lander_lines(frame.lander_lines.as_str().into());
+    pane.set_lander_shapes(frame.lander_shapes.as_str().into());
+    pane.set_lander_green(frame.lander_green.as_str().into());
+    pane.set_lander_strobes(frame.lander_strobes.as_str().into());
+    pane.set_plume_glow(frame.plume_glow.as_str().into());
+    pane.set_plume_core(frame.plume_core.as_str().into());
+    pane.set_plume_strength(frame.plume_strength);
+    pane.set_side_plume_glow(frame.side_plume_glow.as_str().into());
+    pane.set_side_plume_core(frame.side_plume_core.as_str().into());
+    pane.set_side_plume_strength(frame.side_plume_strength);
+    pane.set_fire_outer(frame.fire_outer.as_str().into());
+    pane.set_fire_flame(frame.fire_flame.as_str().into());
+    pane.set_fire_core(frame.fire_core.as_str().into());
+    pane.set_fire_left(frame.fire_left);
+    pane.set_debris(frame.debris.as_str().into());
+    pane.set_face(frame.face.as_str().into());
+    pane.set_state(frame.state.into());
+    pane.set_fuel(frame.fuel);
+    pane.set_position_x(frame.position_x.as_str().into());
+    pane.set_position_y(frame.position_y.as_str().into());
+    pane.set_velocity_x(frame.velocity_x.as_str().into());
+    pane.set_velocity_y(frame.velocity_y.as_str().into());
+    pane.set_acceleration_x(frame.acceleration_x.as_str().into());
+    pane.set_acceleration_y(frame.acceleration_y.as_str().into());
+    pane.set_pad_lit(frame.pad_lit);
+    pane.set_strobe_lit(frame.strobe_lit);
+}
+
+/// The lander as its outputs say it is, before any explosion and with its
+/// lights unlit.
+///
+/// # Arguments
+///
+/// * `f`   - The lander's figures.
+/// * `out` - Its terminals' values, in its type's order.
+///
+/// # Returns
+///
+/// The frame.
+fn painted(f: &Resolved, out: &[f64]) -> Frame {
     let place = (out[X], out[Y]);
-    pane.set_lander_lines(lander(f, place, false).into());
-    pane.set_lander_shapes(lander(f, place, true).into());
     let (green, white) = lander_lights(f, place);
-    pane.set_lander_green(green.into());
-    pane.set_lander_strobes(white.into());
     let ([glow, core, side_glow, side_core], main, side) = plumes(f, out);
-    pane.set_plume_glow(glow.into());
-    pane.set_plume_core(core.into());
-    pane.set_plume_strength(main);
-    pane.set_side_plume_glow(side_glow.into());
-    pane.set_side_plume_core(side_core.into());
-    pane.set_side_plume_strength(side);
     let landed = out[LANDED] > 0.5;
-    pane.set_face(if landed {
-        face(f, place).into()
-    } else {
-        "".into()
-    });
-    pane.set_state(
-        if landed {
+    Frame {
+        lander_lines: lander(f, place, false),
+        lander_shapes: lander(f, place, true),
+        lander_green: green,
+        lander_strobes: white,
+        plume_glow: glow,
+        plume_core: core,
+        plume_strength: main,
+        side_plume_glow: side_glow,
+        side_plume_core: side_core,
+        side_plume_strength: side,
+        face: if landed {
+            face(f, place)
+        } else {
+            String::new()
+        },
+        state: if landed {
             "Landed"
         } else if out[CRASHED] > 0.5 {
             CRASHED_SAID
         } else {
             "Flying"
-        }
-        .into(),
-    );
-    pane.set_fuel(out[FUEL] as f32);
-    pane.set_position_x(format!("{:.1}", out[X]).into());
-    pane.set_position_y(format!("{:.1}", out[Y]).into());
-    pane.set_velocity_x(format!("{:.2}", out[VELOCITY_X]).into());
-    pane.set_velocity_y(format!("{:.2}", out[VELOCITY_Y]).into());
-    pane.set_acceleration_x(format!("{:.3}", out[ACCELERATION_X]).into());
-    pane.set_acceleration_y(format!("{:.3}", out[ACCELERATION_Y]).into());
+        },
+        fuel: out[FUEL] as f32,
+        position_x: format!("{:.1}", out[X]),
+        position_y: format!("{:.1}", out[Y]),
+        velocity_x: format!("{:.2}", out[VELOCITY_X]),
+        velocity_y: format!("{:.2}", out[VELOCITY_Y]),
+        acceleration_x: format!("{:.3}", out[ACCELERATION_X]),
+        acceleration_y: format!("{:.3}", out[ACCELERATION_Y]),
+        ..Frame::default()
+    }
 }
 
 #[cfg(test)]
@@ -1683,22 +1817,24 @@ pub(crate) mod tests {
         window.set_lander_height(height);
         let pane = window.global::<LanderScene>();
         draw_landscape(&pane, &f);
-        paint(
+        set_frame(
             &pane,
-            &f,
-            &[
-                0.0,
-                0.0,
-                450.0 * scale,
-                80.0 * scale,
-                0.0,
-                0.0,
-                0.62,
-                if zoom { 0.0 } else { 1.0 },
-                0.0,
-                0.0,
-                0.0,
-            ],
+            &painted(
+                &f,
+                &[
+                    0.0,
+                    0.0,
+                    450.0 * scale,
+                    80.0 * scale,
+                    0.0,
+                    0.0,
+                    0.62,
+                    if zoom { 0.0 } else { 1.0 },
+                    0.0,
+                    0.0,
+                    0.0,
+                ],
+            ),
         );
         let (_, _, dot_x, dot_y) = axes(70.0, -40.0);
         pane.set_dot_x(dot_x);

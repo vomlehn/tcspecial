@@ -31,7 +31,7 @@ import { Colors } from "../../tcs-ui/ui/colors.slint";
 // far end. Where the pointer is, from the square's middle, is said to Rust, which
 // works out the axes and where the lines go. Letting go is said too, and the
 // plus comes back. A press anywhere else does nothing.
-component Joystick34 inherits Rectangle {
+export component Joystick34 inherits Rectangle {
     // The square's side, which is each rectangle's thickness, and how far
     // each rectangle reaches beyond it.
     in property <length> square: 9.45px;
@@ -199,7 +199,7 @@ component Joystick34 inherits Rectangle {
 }
 
 // One of the X and Y values: a name, a unit, and the two figures.
-component Values inherits HorizontalLayout {
+export component Values inherits HorizontalLayout {
     in property <string> name;
     in property <string> unit;
     in property <string> first;
@@ -302,6 +302,194 @@ export global LanderScene {
 
 }
 
+// The landscape and the lander over it, drawn to scale, and what it is
+// doing in words: the picture at the top of the lander's pane, and of a
+// ground station's window that shows the lander as its vehicles report it.
+export component LanderPicture inherits Rectangle {
+    background: #000000;
+    border-width: 1px;
+    border-color: #6b7280;
+    Image {
+        width: 100%;
+        height: 100%;
+        source: LanderScene.sky;
+        image-fit: fill;
+    }
+    // The debris, behind the ground, so that a fragment stopped
+    // on it shows half buried.
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.debris;
+        fill: #d1d5db;
+    }
+    Image {
+        width: 100%;
+        height: 100%;
+        source: LanderScene.ground;
+        image-fit: fill;
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.pad;
+        stroke: #000000;
+        stroke-width: 4px;
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.pad;
+        stroke: #ffffff;
+        stroke-width: 2.5px;
+    }
+    // The pad's lights, flashing: bright while lit and dim between,
+    // so that they are seen even then.
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.pad-lights;
+        fill: LanderScene.pad-lit ? #E69F00 : #5c4000;
+        stroke: #000000;
+        stroke-width: 1px;
+    }
+    // The plumes, behind the lander so that its engines cover
+    // their roots: a pale orange glow and a warm off-white core,
+    // longer and brighter the harder each engine fires.
+    for plume in [
+        {
+            glow: LanderScene.plume-glow,
+            core: LanderScene.plume-core,
+            strength: LanderScene.plume-strength,
+        },
+        {
+            glow: LanderScene.side-plume-glow,
+            core: LanderScene.side-plume-core,
+            strength: LanderScene.side-plume-strength,
+        },
+    ]: Rectangle {
+        width: 100%;
+        height: 100%;
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: LanderScene.world-width;
+            viewbox-height: LanderScene.world-height;
+            commands: plume.glow;
+            fill: #F5C99A;
+            opacity: 0.2 + 0.4 * plume.strength;
+        }
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: LanderScene.world-width;
+            viewbox-height: LanderScene.world-height;
+            commands: plume.core;
+            fill: #FFF1D6;
+            opacity: 0.3 + 0.6 * plume.strength;
+        }
+    }
+    // The lander, white so that it shows against the sky, and edged
+    // with a very thin black line so that it shows against the
+    // ground. Its single lines first, each a black line a little
+    // wider than the white one over it; then its shapes over their
+    // ends, filled white, each with its own thin black line, so that
+    // where one part meets another shows.
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.lander-lines;
+        stroke: #000000;
+        stroke-width: 2.5px;
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.lander-lines;
+        stroke: #ffffff;
+        stroke-width: 1.5px;
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.lander-shapes;
+        fill: #ffffff;
+        stroke: #000000;
+        stroke-width: 0.75px;
+    }
+    // Its lights over it: the green steady, the white flashing --
+    // bright in a flash and dim between.
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.lander-green;
+        fill: #009E73;
+    }
+    Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.lander-strobes;
+        fill: LanderScene.strobe-lit ? #ffffff : #9ca3af;
+        // A black ring, so that a white light shows on the white
+        // lander as well as against the sky.
+        stroke: #000000;
+        stroke-width: 1px;
+    }
+    // The fireball: a vermillion cloud, an orange flame and a
+    // yellow core, fading as it burns out.
+    for part in [
+        { commands: LanderScene.fire-outer, colour: #D55E00 },
+        { commands: LanderScene.fire-flame, colour: #E69F00 },
+        { commands: LanderScene.fire-core, colour: #F0E442 },
+    ]: Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: part.commands;
+        fill: part.colour;
+        opacity: 0.85 * LanderScene.fire-left;
+    }
+    if LanderScene.face != "": Path {
+        width: 100%;
+        height: 100%;
+        viewbox-width: LanderScene.world-width;
+        viewbox-height: LanderScene.world-height;
+        commands: LanderScene.face;
+        // Bright, and edged in black so that it shows against
+        // the ground as well as the sky.
+        fill: #FFF35A;
+        stroke: #000000;
+        stroke-width: 2px;
+    }
+    Text {
+        x: 8px;
+        y: 6px;
+        text: LanderScene.state;
+        font-size: SimFonts.heading;
+        font-weight: 700;
+        color: #ffffff;
+    }
+}
+
 // The lander's pane: the landscape and the lander over it, what it is
 // doing, the fuel left, its X and Y values, and the joystick it is flown
 // with. tcs-sim puts it at the left of its window when the world it
@@ -324,193 +512,11 @@ export component LanderPane inherits Rectangle {
             preferred-height: 600px * root.ratio;
             horizontal-stretch: 1;
             vertical-stretch: 1;
-            scene := Rectangle {
+            scene := LanderPicture {
                 x: 0;
                 y: 0;
                 width: Math.min(parent.width, parent.height / root.ratio);
                 height: self.width * root.ratio;
-                background: #000000;
-                border-width: 1px;
-                border-color: #6b7280;
-                Image {
-                    width: 100%;
-                    height: 100%;
-                    source: LanderScene.sky;
-                    image-fit: fill;
-                }
-                // The debris, behind the ground, so that a fragment stopped
-                // on it shows half buried.
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.debris;
-                    fill: #d1d5db;
-                }
-                Image {
-                    width: 100%;
-                    height: 100%;
-                    source: LanderScene.ground;
-                    image-fit: fill;
-                }
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.pad;
-                    stroke: #000000;
-                    stroke-width: 4px;
-                }
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.pad;
-                    stroke: #ffffff;
-                    stroke-width: 2.5px;
-                }
-                // The pad's lights, flashing: bright while lit and dim between,
-                // so that they are seen even then.
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.pad-lights;
-                    fill: LanderScene.pad-lit ? #E69F00 : #5c4000;
-                    stroke: #000000;
-                    stroke-width: 1px;
-                }
-                // The plumes, behind the lander so that its engines cover
-                // their roots: a pale orange glow and a warm off-white core,
-                // longer and brighter the harder each engine fires.
-                for plume in [
-                    {
-                        glow: LanderScene.plume-glow,
-                        core: LanderScene.plume-core,
-                        strength: LanderScene.plume-strength,
-                    },
-                    {
-                        glow: LanderScene.side-plume-glow,
-                        core: LanderScene.side-plume-core,
-                        strength: LanderScene.side-plume-strength,
-                    },
-                ]: Rectangle {
-                    width: 100%;
-                    height: 100%;
-                    Path {
-                        width: 100%;
-                        height: 100%;
-                        viewbox-width: LanderScene.world-width;
-                        viewbox-height: LanderScene.world-height;
-                        commands: plume.glow;
-                        fill: #F5C99A;
-                        opacity: 0.2 + 0.4 * plume.strength;
-                    }
-                    Path {
-                        width: 100%;
-                        height: 100%;
-                        viewbox-width: LanderScene.world-width;
-                        viewbox-height: LanderScene.world-height;
-                        commands: plume.core;
-                        fill: #FFF1D6;
-                        opacity: 0.3 + 0.6 * plume.strength;
-                    }
-                }
-                // The lander, white so that it shows against the sky, and edged
-                // with a very thin black line so that it shows against the
-                // ground. Its single lines first, each a black line a little
-                // wider than the white one over it; then its shapes over their
-                // ends, filled white, each with its own thin black line, so that
-                // where one part meets another shows.
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.lander-lines;
-                    stroke: #000000;
-                    stroke-width: 2.5px;
-                }
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.lander-lines;
-                    stroke: #ffffff;
-                    stroke-width: 1.5px;
-                }
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.lander-shapes;
-                    fill: #ffffff;
-                    stroke: #000000;
-                    stroke-width: 0.75px;
-                }
-                // Its lights over it: the green steady, the white flashing --
-                // bright in a flash and dim between.
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.lander-green;
-                    fill: #009E73;
-                }
-                Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.lander-strobes;
-                    fill: LanderScene.strobe-lit ? #ffffff : #9ca3af;
-                    // A black ring, so that a white light shows on the white
-                    // lander as well as against the sky.
-                    stroke: #000000;
-                    stroke-width: 1px;
-                }
-                // The fireball: a vermillion cloud, an orange flame and a
-                // yellow core, fading as it burns out.
-                for part in [
-                    { commands: LanderScene.fire-outer, colour: #D55E00 },
-                    { commands: LanderScene.fire-flame, colour: #E69F00 },
-                    { commands: LanderScene.fire-core, colour: #F0E442 },
-                ]: Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: part.commands;
-                    fill: part.colour;
-                    opacity: 0.85 * LanderScene.fire-left;
-                }
-                if LanderScene.face != "": Path {
-                    width: 100%;
-                    height: 100%;
-                    viewbox-width: LanderScene.world-width;
-                    viewbox-height: LanderScene.world-height;
-                    commands: LanderScene.face;
-                    // Bright, and edged in black so that it shows against
-                    // the ground as well as the sky.
-                    fill: #FFF35A;
-                    stroke: #000000;
-                    stroke-width: 2px;
-                }
-                Text {
-                    x: 8px;
-                    y: 6px;
-                    text: LanderScene.state;
-                    font-size: SimFonts.heading;
-                    font-weight: 700;
-                    color: #ffffff;
-                }
             }
         }
 

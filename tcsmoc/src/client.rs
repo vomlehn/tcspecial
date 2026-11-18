@@ -52,6 +52,10 @@ pub struct CommandLinks {
     /// And where they go: `payload_command.dest_base`, one socket for every
     /// node, a command carrying the node's id.
     pub nodes_to: tcsprotocol::HostPort,
+    /// The spacecraft link's APID, `tcs_cmd.apid`, where the vehicle answers
+    /// to Yamcs and every packet on it is a CCSDS Space Packet; `None` where
+    /// they go bare. See [`crate::UdpConnection::framed`].
+    pub framing: Option<u16>,
 }
 
 /// Reads the command links of a configuration.
@@ -101,6 +105,7 @@ pub fn command_links_of(
                 address: ground.nodes().ip().to_string(),
                 port: ground.nodes().port(),
             },
+            framing: None,
         }));
     };
     Ok(Some(CommandLinks {
@@ -108,6 +113,7 @@ pub fn command_links_of(
         interpreter: format!("{}:{}", ci.address, ci.port),
         nodes_from: ci.payload_command_source_base.clone(),
         nodes_to: ci.payload_command_dest_base.clone(),
+        framing: ci.framing.as_ref().map(|framing| framing.cmd_apid),
     }))
 }
 
@@ -213,8 +219,11 @@ impl TcsClient {
     /// `TcsError::Io` if a link's address cannot be bound, and
     /// `TcsError::Config` if where one goes is not a socket address.
     pub fn open(links: &CommandLinks, matched: Matched) -> TcsResult<Self> {
-        let connection =
+        let mut connection =
             crate::UdpConnection::new(&links.from, &links.interpreter)?;
+        if let Some(apid) = links.framing {
+            connection = connection.framed(apid)?;
+        }
         let nodes = crate::UdpConnection::new(
             &links.nodes_from.to_string(),
             &links.nodes_to.to_string(),

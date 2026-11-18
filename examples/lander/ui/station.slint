@@ -1,0 +1,162 @@
+// The lander station's window: the lander as its two vehicles report it, a
+// light time late, drawn as tcs-sim draws it -- the landscape, the lander,
+// the stars sent down -- with the values, the fuel, the joystick as it was
+// held, what the station's links are doing, and the commands it sends up.
+//
+// The pictures and the joystick are tcs-sim's own pieces, imported by path,
+// and so is the global they are drawn from, which lander_station sets as
+// tcs-sim's window sets its own. Colour says nothing alone here, as in
+// tcs-sim's pane: whether the lander has landed or crashed is said in words.
+
+import { Button } from "std-widgets.slint";
+import {
+    LanderPicture, LanderScene, Joystick34, Values,
+} from "../../../tcs-sim/ui/lander.slint";
+import { Colors } from "../../../tcs-ui/ui/colors.slint";
+import { Fonts } from "../../../tcs-ui/ui/fonts.slint";
+import { PoweredBy } from "../../../tcs-ui/ui/powered.slint";
+
+export { LanderScene }
+
+// What the station says of itself, and the commands it sends up.
+export global Said {
+    // The seed and the light time: everything here is that late.
+    in-out property <string> note;
+    // What each vehicle's link is doing.
+    in-out property <string> links;
+    // Whether anything has come down yet: until then the fuel is not said.
+    in-out property <bool> heard: false;
+    // Restart the lander, wherever it is.
+    callback restart-clicked();
+    // Have the lander start again by itself after a crash, or not.
+    callback autorestart-clicked(bool);
+}
+
+export component StationWindow inherits Window {
+    default-font-size: Fonts.window;
+    title: "TCS Lander Station";
+    background: Colors.window;
+    // The display's height over its width, which the landscape keeps.
+    property <float> ratio: LanderScene.world-height / LanderScene.world-width;
+
+    content := VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+
+        PoweredBy { }
+
+        // The landscape, as large as the window lets it be at its own
+        // proportions.
+        Rectangle {
+            min-width: 300px;
+            min-height: 300px * root.ratio;
+            preferred-width: 600px;
+            preferred-height: 600px * root.ratio;
+            vertical-stretch: 1;
+            LanderPicture {
+                x: 0;
+                y: 0;
+                width: Math.min(parent.width, parent.height / root.ratio);
+                height: self.width * root.ratio;
+            }
+        }
+
+        // The fuel left, in words and as a bar.
+        HorizontalLayout {
+            spacing: 4px;
+            Text {
+                text: Said.heard
+                    ? "Fuel " + Math.round(LanderScene.fuel * 100) + "%"
+                    : "Fuel --";
+                min-width: 80px;
+                vertical-alignment: center;
+            }
+            Rectangle {
+                height: 14px;
+                border-width: 1px;
+                border-color: #374151;
+                Rectangle {
+                    x: 0;
+                    width: parent.width
+                        * Math.max(0, Math.min(1, LanderScene.fuel));
+                    height: parent.height;
+                    background: #009E73;
+                }
+            }
+        }
+
+        // The values, and the joystick as it was held beside them. The
+        // joystick only shows: the lander is flown from tcs-sim's.
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            VerticalLayout {
+                spacing: 2px;
+                alignment: center;
+                Values {
+                    name: "";
+                    unit: "";
+                    first: "X";
+                    second: "Y";
+                }
+                Values {
+                    name: "Position";
+                    unit: "m";
+                    first: LanderScene.position-x;
+                    second: LanderScene.position-y;
+                }
+                Values {
+                    name: "Velocity";
+                    unit: "m/s";
+                    first: LanderScene.velocity-x;
+                    second: LanderScene.velocity-y;
+                }
+                Values {
+                    name: "Acceleration";
+                    unit: "m/s²";
+                    first: LanderScene.acceleration-x;
+                    second: LanderScene.acceleration-y;
+                }
+            }
+            HorizontalLayout {
+                alignment: center;
+                Joystick34 {
+                    dot-x: LanderScene.dot-x;
+                    dot-y: LanderScene.dot-y;
+                    // Its lines show where it was held, and a press takes
+                    // no hold of it.
+                    steered: LanderScene.dot-x != 0 || LanderScene.dot-y != 0;
+                    paused: true;
+                }
+            }
+        }
+
+        Text {
+            text: Said.note;
+            wrap: word-wrap;
+        }
+        Text {
+            text: Said.links;
+            wrap: word-wrap;
+        }
+
+        // Each reaches the lander a light time after it is pressed, and
+        // what it did is seen here a light time after that.
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: start;
+            Button {
+                text: "Restart";
+                clicked => { Said.restart-clicked(); }
+            }
+            Button {
+                text: "Disable Autorestart";
+                clicked => { Said.autorestart-clicked(false); }
+            }
+            Button {
+                text: "Enable Autorestart";
+                clicked => { Said.autorestart-clicked(true); }
+            }
+        }
+    }
+}

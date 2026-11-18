@@ -834,6 +834,21 @@ or the MOC's, stops everything. Yamcs's web interface is at
 make run-lander YAMCS_HOME=<yamcs>
 ```
 
+`lander/` also builds a second ground station, `lander-station`, in Rust:
+the same station without Yamcs or Python, which is what runs the example in
+a web page (see the tcswebasm repository). It makes the landscape the same
+way, from its own random numbers, so a seed gives it another landscape than
+the Python's; starts tcs-sim and both tcspecials; sends each CONNECT itself,
+CCSDS-framed as a Yamcs gateway takes it; holds what goes up and what comes
+down 1.3 s each way itself, rather than with relays; and shows the same
+window, drawn with tcs-sim's own pictures, with the same three buttons.
+Closing its window stops everything.
+
+```
+make run-lander-station
+make run-lander-station SEED=7
+```
+
 Fly it from tcs-sim's window: hold the button down in the joystick's middle
 square and drag along an arm; letting go centres it.
 

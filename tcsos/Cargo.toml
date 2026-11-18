@@ -21,6 +21,12 @@ wasm-bindgen = "0.2"
 wasm_thread = "0.3.3"
 # The page's clock, for Instant and SystemTime.
 web-time = "1.1.0"
+# The page itself, for showing and hiding the canvas a window is drawn on.
+web-sys = { version = "0.3", features = [
+    "Element",
+    "HtmlCanvasElement",
+    "Window",
+] }
 
 [lints]
 workspace = true

@@ -218,7 +218,7 @@ fn every_example() -> Vec<(PathBuf, PathBuf)> {
         };
         let xml = dir.join(format!("{name}.xtcs"));
         let yaml = dir.join(format!("{name}.ytcs"));
-        if xml.is_file() && yaml.is_file() {
+        if tcsos::fs::is_file(&xml) && tcsos::fs::is_file(&yaml) {
             found.push((xml, yaml));
         }
     }

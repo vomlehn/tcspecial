@@ -31,10 +31,10 @@ fn examples() -> PathBuf {
 /// one in thermostat-common.
 #[test]
 fn the_simulator_files_are_one_file() {
-    let shared = examples()
-        .join("thermostat-common/thermostat-sim.yaml")
-        .canonicalize()
-        .expect("the shared simulator file is there");
+    let shared = tcsos::fs::canonicalize(
+        examples().join("thermostat-common/thermostat-sim.yaml"),
+    )
+    .expect("the shared simulator file is there");
     for name in [
         "thermostat/thermostat-sim.yaml",
         "thermostat-yamcs/thermostat-yamcs-sim.yaml",
@@ -44,7 +44,7 @@ fn the_simulator_files_are_one_file() {
             .unwrap_or_else(|e| panic!("{name}: {e}"));
         assert!(link.file_type().is_symlink(), "{name} is a link");
         assert_eq!(
-            path.canonicalize().expect("it resolves"),
+            tcsos::fs::canonicalize(&path).expect("it resolves"),
             shared,
             "{name} is the shared file"
         );

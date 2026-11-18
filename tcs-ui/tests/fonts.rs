@@ -56,7 +56,7 @@ fn slint_files(dir: &Path, above: &mut Vec<PathBuf>, found: &mut Vec<PathBuf>) {
     for entry in tcsos::fs::read_dir(dir).expect("a directory") {
         let path = entry.expect("an entry").path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        if path.is_dir() {
+        if tcsos::fs::is_dir(&path) {
             if name != "target" && !name.starts_with('.') {
                 slint_files(&path, above, found);
             }
@@ -210,7 +210,9 @@ fn points(size: &str) -> Option<f32> {
 /// the canvas: its name, whose size is one of the ways node types are told
 /// apart, and its type, written between two terminals where there is less
 /// room than the window's size needs (see `tcs-diagram/src/style.rs`,
-/// `TYPE_SIZE`). And the Python windows are held to it too:
+/// `TYPE_SIZE`). And the "Powered by TCSpecial" line, `ui/powered.slint`,
+/// which was asked for small: it says where a window comes from, not
+/// anything about the vehicle. And the Python windows are held to it too:
 /// a font they name with a size names the size from `tcs_ui.fonts`.
 #[test]
 fn no_text_is_set_smaller_than_the_one_size() {
@@ -246,6 +248,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
                 || size.starts_with("Type.")
                 || size == "node.label-size"
                 || size == "node.type-size"
+                || (file.ends_with("tcs-ui/ui/powered.slint") && size == "9pt")
                 || points(size).is_some_and(|pt| pt >= 12.0);
             assert!(
                 allowed,

@@ -28,7 +28,7 @@
 //! still while it is paused, and goes on from there, the time spent paused
 //! left out of it.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use tcsos::sync::{Arc, Mutex, OnceLock};
 use tcsos::time::{Duration, Instant};
 
 /// How soon a thread waiting for a simulated moment is told to look again

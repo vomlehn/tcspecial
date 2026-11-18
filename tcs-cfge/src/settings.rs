@@ -108,16 +108,19 @@ mod tests {
         // Made on the way in, before anything is written.
         directory();
         assert!(
-            where_.path().join(".tcs-cfge").is_dir(),
+            tcsos::fs::is_dir(where_.path().join(".tcs-cfge")),
             "the directory should be made automatically"
         );
 
         // And the first read leaves a file behind, with the defaults in it:
         // an empty directory is a worse answer to "where do I set this" than
         // a file whose comments say.
-        assert!(!path.exists());
+        assert!(!tcsos::fs::path_exists(&path));
         assert_eq!(load(), Settings::default());
-        assert!(path.exists(), "the settings file should be created");
+        assert!(
+            tcsos::fs::path_exists(&path),
+            "the settings file should be created"
+        );
         assert_eq!(load(), Settings::default());
 
         // And a round trip through the file itself.
@@ -151,7 +154,7 @@ mod tests {
         .expect("a file");
         assert_eq!(load().vehicle_percent, 30 - DEFAULT_GATEWAY);
         assert!(
-            path.exists(),
+            tcsos::fs::path_exists(&path),
             "the value should be carried into the new name"
         );
         assert_eq!(
@@ -160,7 +163,7 @@ mod tests {
             "and read from it afterwards"
         );
         assert!(
-            older.exists(),
+            tcsos::fs::path_exists(&older),
             "the old file is left for its owner to delete"
         );
 

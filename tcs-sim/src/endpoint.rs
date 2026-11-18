@@ -15,8 +15,8 @@
 //! [`crate::node::payload::network::udp`],
 //! [`crate::node::payload::device_file`].
 
-use std::sync::atomic::AtomicU32;
-use std::sync::Arc;
+use tcsos::sync::atomic::AtomicU32;
+use tcsos::sync::Arc;
 
 use tcsprotocol::{DHConfig, EndpointConfig, NetworkProtocol};
 
@@ -234,7 +234,7 @@ pub fn payload_config_attached(
         Some(crate::node::physics::Attachment::Drives { power, .. }) => {
             power.enabled_flag()
         }
-        _ => Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        _ => Arc::new(tcsos::sync::atomic::AtomicBool::new(false)),
     };
 
     Ok(PayloadConfig {
@@ -344,7 +344,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::Ordering;
+    use tcsos::sync::atomic::Ordering;
     use tcsos::time::Duration;
     use tcsprotocol::ResolvedSim;
     use tcsprotocol::{

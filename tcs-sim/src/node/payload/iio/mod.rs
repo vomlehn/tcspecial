@@ -28,8 +28,8 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -52,7 +52,7 @@ use crate::pty::SimulatedNode;
 pub fn run_iio_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     // A sensor of the kernel's iio_dummy, made by bin/mkiio, is a dummy device
     // already, which the kernel fills from its own trigger: there is nothing to
@@ -139,8 +139,8 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::io::Read;
-    use std::sync::atomic::AtomicU32;
     use tcsos::fs::File;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
     use tcsprotocol::Faults;
 
@@ -174,7 +174,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
         }
@@ -216,7 +216,7 @@ mod tests {
         // with it: a sensor that is not running has no buffer to open.
         tcsos::thread::sleep(Duration::from_millis(100));
         assert!(
-            !std::path::Path::new(&path).exists(),
+            !tcsos::fs::path_exists(std::path::Path::new(&path)),
             "the simulated device outlived the payload"
         );
     }

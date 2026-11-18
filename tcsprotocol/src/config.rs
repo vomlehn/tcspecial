@@ -59,7 +59,7 @@ pub fn sim_path_beside(payload_path: &str) -> Option<String> {
         .find_map(|ext| payload_path.strip_suffix(ext))?;
     [format!("{stem}-sim.yaml"), format!("{stem}sim.yaml")]
         .into_iter()
-        .find(|candidate| Path::new(candidate).is_file())
+        .find(|candidate| tcsos::fs::is_file(Path::new(candidate)))
 }
 
 /// Finds the tcspecial configuration file a program was told to read.

@@ -48,9 +48,9 @@
 //! from the room it was started with; what allocates is a line said about
 //! the peer's coming and going or about something refused.
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use tcsos::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::{Arc, Mutex};
 use tcsos::thread::JoinHandle;
 use tcsos::time::{Duration, Instant};
 use tcsos::wait::{Ready, Waitable, Watch};

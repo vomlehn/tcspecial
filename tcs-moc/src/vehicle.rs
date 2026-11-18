@@ -38,8 +38,8 @@
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::{Arc, Mutex};
 use tcsos::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
@@ -157,7 +157,7 @@ pub(crate) fn restart_target_of(
         });
     }
     let path = std::path::Path::new(said);
-    if !path.is_file() {
+    if !tcsos::fs::is_file(path) {
         return Err(format!(
             "{said} is neither a configuration file nor a checksum of 32 \
              lower-case hex digits"
@@ -3037,7 +3037,7 @@ fn ping_node(
         let window = ping_window.as_weak();
         ui.on_ping_node_clicked(move || {
             if let Some(window) = window.upgrade() {
-                let _ = window.show();
+                let _ = tcs_ui::windows::show(&window);
             }
         });
     }
@@ -3131,44 +3131,6 @@ pub fn run(
         ));
     }
 
-    let ui = MainWindow::new().unwrap();
-    crate::remember_main_window(&ui);
-    let _ = Sizes::settle(&ui);
-
-    let rows_in_order = panels(&graph, &links, &settable_of(&graph));
-    let rows: Arc<BTreeMap<String, usize>> = Arc::new(
-        rows_in_order
-            .iter()
-            .enumerate()
-            .map(|(row, info)| (info.name.to_string(), row))
-            .collect(),
-    );
-    // Which sources send values, and in what unit, asked of the configuration
-    // once: a panel then shows a reading as the number it is, with its unit,
-    // and everything else as bytes. See
-    // `tcsprotocol::graph::units::unit_of` for why this is the
-    // configuration's answer rather than a guess from the data.
-    let units: Arc<BTreeMap<String, Unit>> = Arc::new(
-        graph
-            .nodes
-            .iter()
-            .filter_map(|node| {
-                tcsprotocol::graph::units::unit_of(&graph, &node.name)
-                    .map(|unit| (node.name.clone(), unit))
-            })
-            .collect(),
-    );
-    let consolidated = consolidated_of(&graph);
-
-    let count = rows_in_order.len();
-    let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(rows_in_order));
-    ui.set_dh_model(ModelRc::from(model.clone()));
-
-    let sizes = Sizes::of(&ui);
-    let shape = grid_shape(&sizes, count);
-    ui.window().set_size(window_size(&sizes, &shape, count));
-    eprintln!("{payload_path}: {count} source(s) sending to the ground");
-
     // Whether the vehicle is serving the configuration this MOC read. This
     // MOC digests the configuration files it read, with the function
     // tcspecial digests the files it read with; tcspecial sends its digest in
@@ -3234,19 +3196,6 @@ pub fn run(
         }
     };
 
-    ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
-    ui.set_ci_address(SharedString::from(vehicle_at));
-    ui.set_last_response(SharedString::from(
-        "Each panel is a node. Press Connect to command them",
-    ));
-
-    // Whether the vehicle has agreed which configuration it is flying, which
-    // is what licenses a node id: see `Agreed`.
-    let agreed: Agreed = Arc::new(Mutex::new(None));
-    // Which nodes the operator has stopped, which the asking done when
-    // contact is made leaves out.
-    let declined = declined_for(rows.len());
-
     // The simulator, where there is anything to simulate, ready before the
     // vehicle starts: tcspecial judges each payload by what is at its endpoint
     // before it opens anything, and a simulated device not made yet is one it
@@ -3277,6 +3226,140 @@ pub fn run(
     }
     let pm_tcspecial = Arc::new(ProcessManager::new());
     pm_tcspecial.start_child(tcspecial, payload_path, mode);
+
+    // Noticed by the panels' timer, on the event loop: see
+    // `crate::stop_if_asked`. Asked for here, on the MOC's own thread, which
+    // is what a signal -- or in a web page, a stop -- is sent to.
+    crate::listen_for_stop();
+
+    // The windows, made where windows are made -- which in a web page is not
+    // this thread -- and run until they close: by Quit, by the close box, or
+    // by a stop.
+    let window_part = Vehicle {
+        payload_path: payload_path.to_string(),
+        sim_path: sim_path.map(str::to_string),
+        mode,
+        graph,
+        links,
+        digest,
+        matched,
+        link,
+        vehicle_at,
+        startup,
+    };
+    tcs_ui::windows::on_window_thread(move |closed| {
+        show_vehicle(window_part, closed)
+    });
+
+    // Then what the MOC started is stopped, here rather than on the event
+    // loop: see `crate::close_windows`.
+    pm_tcs_sim.kill();
+    pm_tcspecial.kill();
+    tcsos::process::exit(0);
+}
+
+/// What the MOC's windows are made from: what [`run`] found and set up
+/// before any window was made.
+struct Vehicle {
+    /// The tcspecial configuration's path.
+    payload_path: String,
+    /// The simulator file's path, if the set has one.
+    sim_path: Option<String>,
+    /// The run's simulation mode.
+    mode: Mode,
+    /// The configuration.
+    graph: Graph,
+    /// Every link that sends to the ground.
+    links: Vec<Telemetered>,
+    /// The configuration's digest, where it can be worked out.
+    digest: Option<tcsprotocol::config_digest::ConfigDigest>,
+    /// Whether the window is matched with the vehicle.
+    matched: Matched,
+    /// The command link, where the configuration states one.
+    link: Option<Arc<Mutex<CiLink>>>,
+    /// Where the vehicle takes commands, or nothing.
+    vehicle_at: String,
+    /// What has been found so far, to which the windows add.
+    startup: Startup,
+}
+
+/// Makes the MOC's windows and runs them until they close.
+///
+/// # Arguments
+///
+/// * `vehicle` - What they are made from.
+/// * `closed`  - What to say they have closed with: see [`tcs_ui::windows`].
+///
+/// # Panics
+///
+/// If a window cannot be made.
+fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
+    let Vehicle {
+        payload_path,
+        sim_path,
+        mode,
+        graph,
+        links,
+        digest,
+        matched,
+        link,
+        vehicle_at,
+        mut startup,
+    } = vehicle;
+    let payload_path = payload_path.as_str();
+    let sim_path = sim_path.as_deref();
+
+    let ui = MainWindow::new().unwrap();
+    crate::remember_main_window(&ui);
+    crate::remember_to_close(&ui);
+    let _ = Sizes::settle(&ui);
+
+    let rows_in_order = panels(&graph, &links, &settable_of(&graph));
+    let rows: Arc<BTreeMap<String, usize>> = Arc::new(
+        rows_in_order
+            .iter()
+            .enumerate()
+            .map(|(row, info)| (info.name.to_string(), row))
+            .collect(),
+    );
+    // Which sources send values, and in what unit, asked of the configuration
+    // once: a panel then shows a reading as the number it is, with its unit,
+    // and everything else as bytes. See
+    // `tcsprotocol::graph::units::unit_of` for why this is the
+    // configuration's answer rather than a guess from the data.
+    let units: Arc<BTreeMap<String, Unit>> = Arc::new(
+        graph
+            .nodes
+            .iter()
+            .filter_map(|node| {
+                tcsprotocol::graph::units::unit_of(&graph, &node.name)
+                    .map(|unit| (node.name.clone(), unit))
+            })
+            .collect(),
+    );
+    let consolidated = consolidated_of(&graph);
+
+    let count = rows_in_order.len();
+    let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(rows_in_order));
+    ui.set_dh_model(ModelRc::from(model.clone()));
+
+    let sizes = Sizes::of(&ui);
+    let shape = grid_shape(&sizes, count);
+    ui.window().set_size(window_size(&sizes, &shape, count));
+    eprintln!("{payload_path}: {count} source(s) sending to the ground");
+
+    ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
+    ui.set_ci_address(SharedString::from(vehicle_at));
+    ui.set_last_response(SharedString::from(
+        "Each panel is a node. Press Connect to command them",
+    ));
+
+    // Whether the vehicle has agreed which configuration it is flying, which
+    // is what licenses a node id: see `Agreed`.
+    let agreed: Agreed = Arc::new(Mutex::new(None));
+    // Which nodes the operator has stopped, which the asking done when
+    // contact is made leaves out.
+    let declined = declined_for(rows.len());
 
     let contact = Arc::new(Mutex::new(tcsmoc::beacon::Contact::Lost));
     // The question about the nodes owed as contact is made, where there is a
@@ -3329,10 +3412,7 @@ pub fn run(
                     }),
                     matched: matched.clone(),
                 },
-                Some(crate::ask_whether_to_continue(
-                    pm_tcs_sim.clone(),
-                    Some(pm_tcspecial.clone()),
-                )),
+                Some(crate::ask_whether_to_continue()),
                 // What the nodes do as contact changes: see `contacts_for`.
                 contacts_for(&ui, asking.as_ref()),
             ))
@@ -3352,6 +3432,7 @@ pub fn run(
     // window of its own, opened by Ping node, that pings it and times the
     // answer. See `tcsmoc::ping`.
     let ping_window = PingWindow::new().unwrap();
+    crate::remember_to_close(&ping_window);
     let pings = match ping_node(&ui, &ping_window, &graph, &matched) {
         Ok(pings) => pings,
         Err(e) => {
@@ -3368,6 +3449,7 @@ pub fn run(
     // by Plot, and redrawn by a timer of its own, kept for as long as the
     // window runs. See plot.rs.
     let plot_window = PlotWindow::new().unwrap();
+    crate::remember_to_close(&plot_window);
     let plot = Plot::of(&graph, |name| links.iter().any(|l| l.source == name))
         .map(|plot| plot.with_ambient(ambient_of(sim_path, mode)))
         .map(|plot| Arc::new(Mutex::new(plot)));
@@ -3425,12 +3507,10 @@ pub fn run(
     // The panels, kept current -- and the one thing that keeps running on the
     // event loop whatever else the window is doing, which is where a signal
     // asking the MOC to stop is noticed: see `crate::stop_if_asked`.
-    crate::listen_for_stop();
     let timer = slint::Timer::default();
     {
         let model = model.clone();
         let arrivals = arrivals.clone();
-        let stopping = (pm_tcs_sim.clone(), Some(pm_tcspecial.clone()));
         let times = link.clone();
         let ui_weak = ui.as_weak();
         let counted = matched.clone();
@@ -3438,7 +3518,7 @@ pub fn run(
             slint::TimerMode::Repeated,
             PANEL_REFRESH_INTERVAL,
             move || {
-                crate::stop_if_asked(&stopping.0, stopping.1.as_ref());
+                crate::stop_if_asked();
                 show_arrivals(&model, &arrivals);
 
                 // What has come from the vehicle, and what became of it:
@@ -3478,14 +3558,22 @@ pub fn run(
     // say so, rather than buttons that do nothing when pressed.
     let Some(link) = link else {
         no_command_link(&ui);
-        handle_quit(&ui, pm_tcs_sim.clone(), Some(pm_tcspecial.clone()));
-        handle_close(&ui, pm_tcs_sim, Some(pm_tcspecial));
+        handle_quit(&ui);
+        handle_close(&ui);
         if !startup.is_empty() {
             present(&startup);
         }
         ask_for_the_edge(&ui, Edge::Top);
-        ui.run().unwrap();
-        tcsos::process::exit(0);
+        let kept = (
+            ping_window,
+            plot_window,
+            timer,
+            _answers,
+            _plotting,
+            _beacon_receive,
+        );
+        tcs_ui::windows::run(ui, kept, closed).unwrap();
+        return;
     };
     // There is a link, so there is the asking made for it.
     let Some(asking) = asking else {
@@ -3503,15 +3591,24 @@ pub fn run(
         &Arc::new(graph.clone()),
     );
 
-    handle_quit(&ui, pm_tcs_sim.clone(), Some(pm_tcspecial.clone()));
-    handle_close(&ui, pm_tcs_sim, Some(pm_tcspecial));
+    handle_quit(&ui);
+    handle_close(&ui);
 
     if !startup.is_empty() {
         present(&startup);
     }
     ask_for_the_edge(&ui, Edge::Top);
-    ui.run().unwrap();
-    tcsos::process::exit(0);
+    let kept = (
+        ping_window,
+        plot_window,
+        timer,
+        _answers,
+        _plotting,
+        _beacon_receive,
+        link,
+        asking,
+    );
+    tcs_ui::windows::run(ui, kept, closed).unwrap();
 }
 
 // The manual's screenshots, made from this window on demand: see

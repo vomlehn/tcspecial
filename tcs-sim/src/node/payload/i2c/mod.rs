@@ -24,9 +24,9 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tcsos::fs::File;
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -171,7 +171,7 @@ impl Drop for SimulatedBus {
     /// Take the link away, as the serial line does. The bus itself is the
     /// kernel's and stays.
     fn drop(&mut self) {
-        if self.linked && self.named.is_symlink() {
+        if self.linked && tcsos::fs::is_symlink(&self.named) {
             let _ = tcsos::fs::remove_file(&self.named);
         }
     }
@@ -347,7 +347,7 @@ impl Watched {
 pub fn run_i2c_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let bus = match SimulatedBus::open(
         &config.name,

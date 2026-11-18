@@ -16,7 +16,7 @@
 //! for at leisure. Which command goes on which is not this module's decision --
 //! it is [`tcsprotocol::CommandType::link`], the one table both ends read.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use tcsos::sync::atomic::{AtomicU32, Ordering};
 use tcsos::time::{Duration, Instant};
 use tcsprotocol::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
@@ -1380,7 +1380,7 @@ mod tests {
     /// asked.
     struct Canned {
         answer: Telemetry,
-        asked: std::sync::Arc<std::sync::Mutex<Vec<Command>>>,
+        asked: tcsos::sync::Arc<tcsos::sync::Mutex<Vec<Command>>>,
     }
 
     impl Canned {
@@ -1412,8 +1412,10 @@ mod tests {
         /// The link, and the record of the commands it is sent.
         fn recording(
             answer: Telemetry,
-        ) -> (Box<Canned>, std::sync::Arc<std::sync::Mutex<Vec<Command>>>)
-        {
+        ) -> (
+            Box<Canned>,
+            tcsos::sync::Arc<tcsos::sync::Mutex<Vec<Command>>>,
+        ) {
             let canned = Canned::answering(answer);
             let asked = canned.asked.clone();
             (canned, asked)

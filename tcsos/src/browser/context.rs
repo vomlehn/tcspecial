@@ -9,11 +9,11 @@
 //! answers from the system on Linux -- `env::args`, a stop signal, an
 //! interface handed over -- it answers from here.
 
+use crate::browser::sync::{Arc, Mutex, OnceLock};
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::browser::net::TcpStream;
 
@@ -112,6 +112,9 @@ pub fn current() -> Arc<Program> {
 pub fn enter(program: Arc<Program>, worker: bool) {
     CURRENT.with(|current| *current.borrow_mut() = Some(program));
     WORKER.with(|is| is.set(worker));
+    if worker {
+        crate::browser::console::capture_output();
+    }
 }
 
 /// Whether the calling thread may wait: a Web Worker may, and the page's

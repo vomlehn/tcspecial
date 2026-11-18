@@ -84,7 +84,7 @@ impl Drop for SimulatedNode {
     /// true, but in a way that reads as a missing port rather than a stopped
     /// simulator.
     fn drop(&mut self) {
-        if self.named.is_symlink() {
+        if tcsos::fs::is_symlink(&self.named) {
             let _ = tcsos::fs::remove_file(&self.named);
         }
     }

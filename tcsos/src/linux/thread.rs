@@ -29,3 +29,13 @@ pub fn stack_bounds() -> Option<(usize, usize, usize)> {
             .then(|| (addr as usize, addr as usize + size, size))
     }
 }
+
+/// Whether windows must be made on a thread other than the calling one:
+/// never, on Linux, where a program makes its windows where it runs.
+///
+/// # Returns
+///
+/// `false`.
+pub fn windows_elsewhere() -> bool {
+    false
+}

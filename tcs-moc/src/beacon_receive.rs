@@ -18,7 +18,7 @@
 //! all of that, free to drift from this one in what it said about the same
 //! spacecraft.
 
-use std::sync::{Arc, Mutex};
+use tcsos::sync::{Arc, Mutex};
 use tcsos::thread;
 
 use slint::{SharedString, Weak};

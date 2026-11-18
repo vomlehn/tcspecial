@@ -23,8 +23,8 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::io::{Read, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -49,7 +49,7 @@ use crate::pty::SimulatedNode;
 pub fn run_serial_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let mut line = match SimulatedNode::open(
         &format!("{}: a serial line", config.name),
@@ -134,10 +134,10 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::AtomicU32;
     use tcsos::fs::File;
     use tcsos::linux::fs::symlink;
     use tcsos::linux::pty::make_raw;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
 
     /// Makes a path in the temporary directory unique to this process and
@@ -190,7 +190,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(segment)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
             triggered: false,
@@ -211,11 +211,11 @@ mod tests {
 
         // Wait for the line to be there, as a handler started first would.
         let deadline = Instant::now() + Duration::from_secs(5);
-        while !path.is_symlink() && Instant::now() < deadline {
+        while !tcsos::fs::is_symlink(&path) && Instant::now() < deadline {
             tcsos::thread::sleep(Duration::from_millis(10));
         }
         assert!(
-            path.is_symlink(),
+            tcsos::fs::is_symlink(&path),
             "{} is not a link to anything",
             path.display()
         );
@@ -264,7 +264,7 @@ mod tests {
         // And the link goes when the device does, rather than pointing at a
         // pty that no longer exists.
         assert!(
-            !path.is_symlink(),
+            !tcsos::fs::is_symlink(&path),
             "{} outlived the line it led to",
             path.display()
         );
@@ -288,7 +288,7 @@ mod tests {
                 || e.contains("not a link the simulator made"),
             "the refusal does not say what is there: {e}"
         );
-        assert!(real.exists(), "/dev/null was displaced");
+        assert!(tcsos::fs::path_exists(real), "/dev/null was displaced");
     }
 
     /// A file somebody else put there is likewise left alone.
@@ -329,6 +329,6 @@ mod tests {
             Path::new(line.slave())
         );
         drop(line);
-        assert!(!path.is_symlink());
+        assert!(!tcsos::fs::is_symlink(&path));
     }
 }

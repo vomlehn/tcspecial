@@ -28,8 +28,8 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -157,7 +157,7 @@ impl BusMember {
 pub fn run_can_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let bus = match BusMember::join(&config) {
         Ok(bus) => bus,
@@ -225,7 +225,7 @@ pub fn run_can_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::sync::atomic::AtomicU32;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
     use tcsprotocol::Faults;
 
@@ -284,7 +284,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(8)),
             packet_interval_ms: Arc::new(AtomicU32::new(50)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
         }

@@ -2,7 +2,7 @@
 //! shows, made on demand and never by an ordinary `cargo test`:
 //!
 //! ```text
-//! cargo test -p tcs-sim --bin tcs-sim -- --ignored --exact shots::screenshots
+//! cargo test -p tcs-sim --lib -- --ignored --exact shots::screenshots
 //! ```
 //!
 //! which `make screenshots-tcs-sim` runs. Each picture is the program's own
@@ -25,7 +25,7 @@
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use tcsos::sync::{Arc, Mutex};
 
 use i_slint_backend_testing::ElementHandle;
 use rand::rngs::StdRng;

@@ -36,8 +36,8 @@
 //! match, which the beacon thread takes only as a match begins and a
 //! receiver only as it is opened and closed.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use tcsos::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use tcsos::sync::{Arc, Mutex};
 use tcsos::wait::Source;
 
 use tcsprotocol::ConfigDigest;

@@ -16,6 +16,7 @@ pub mod pty;
 pub mod serial;
 pub mod signals;
 pub mod spi;
+pub mod sync;
 pub mod thread;
 pub mod time;
 pub mod wait;

@@ -52,7 +52,7 @@ use crate::subdiagram::Qualified;
 /// The loader's message, as text, for a file that cannot be read, parsed or
 /// included.
 pub fn read(path: &Path) -> Result<Document, String> {
-    if !path.exists() {
+    if !tcsos::fs::path_exists(path) {
         return Ok(Document::default());
     }
 

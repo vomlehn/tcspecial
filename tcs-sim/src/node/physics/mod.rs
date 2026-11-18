@@ -30,8 +30,8 @@ pub mod sun;
 pub mod thermal_mass;
 pub mod world;
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard};
+use tcsos::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use tcsos::sync::{Arc, Mutex, MutexGuard};
 use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::node::physics::Place;
@@ -92,7 +92,7 @@ pub enum Attachment {
         place: Place,
         /// The record its next packet starts with. Shared by the copies of
         /// its payload's configuration.
-        next: Arc<std::sync::atomic::AtomicUsize>,
+        next: Arc<tcsos::sync::atomic::AtomicUsize>,
     },
     /// It pulls each of a GPIO payload's lines, in the order its node names
     /// them, to one of these decision outputs: high while the output is on.
@@ -596,7 +596,7 @@ pub fn encode(reading: &ToValueParams, value: f64) -> Vec<u8> {
 pub(crate) mod tests {
     use super::*;
     use crate::payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
-    use std::sync::atomic::AtomicU32;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
     use tcsprotocol::node::physics::terminal::At;
     use tcsprotocol::node::physics::WorldSection;
@@ -1118,7 +1118,7 @@ connections:
             segment_size: Arc::new(AtomicU32::new(bytes)),
             packet_interval_ms: Arc::new(AtomicU32::new(every)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
         }

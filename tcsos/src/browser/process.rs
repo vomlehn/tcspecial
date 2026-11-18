@@ -17,12 +17,12 @@
 
 pub use std::process::{ExitCode, Termination};
 
+use crate::browser::sync::{Arc, Mutex, OnceLock};
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
 use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, OnceLock};
 
 use crate::browser::context::{self, Program};
 use crate::browser::thread::{Builder, JoinHandle};
@@ -510,9 +510,7 @@ impl Child {
             if let Some(code) = self.program.ended() {
                 return Ok(ExitStatus(code));
             }
-            crate::browser::thread::sleep(std::time::Duration::from_millis(
-                10,
-            ));
+            crate::browser::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
 

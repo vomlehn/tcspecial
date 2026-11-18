@@ -250,7 +250,7 @@ fn copy_example(work: &Path, name: &str) -> PathBuf {
     std::fs::create_dir_all(&to).expect("the copy's directory");
     for entry in std::fs::read_dir(from).expect("the example") {
         let entry = entry.expect("an entry");
-        if entry.path().is_file() {
+        if tcsos::fs::is_file(entry.path()) {
             std::fs::copy(entry.path(), to.join(entry.file_name()))
                 .expect("the example's file is copied");
         }
@@ -889,7 +889,7 @@ fn screenshots() {
 
     // A name short and the same every run, since the windows show it.
     let work = std::env::temp_dir().join("tcs-cfge-shots");
-    if work.exists() {
+    if tcsos::fs::path_exists(&work) {
         std::fs::remove_dir_all(&work).expect("the last run's files go");
     }
     std::fs::create_dir_all(&work).expect("the scratch directory");

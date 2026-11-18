@@ -655,7 +655,7 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
     must_be_yaml(path).map_err(Trouble::Unreadable)?;
 
     let mut simulator = Simulator::new(path);
-    if !path.exists() {
+    if !tcsos::fs::path_exists(path) {
         return Ok(simulator);
     }
 

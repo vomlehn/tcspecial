@@ -12,5 +12,9 @@ visual window"""
 # The configuration's own words: node types, terminals, streams.
 tcsprotocol = { path = "../tcsprotocol" }
 
+[dev-dependencies]
+# What the tests ask of the file system: see tcsos.
+tcsos = { path = "../tcsos" }
+
 [lints]
 workspace = true

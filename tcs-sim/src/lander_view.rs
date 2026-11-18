@@ -20,7 +20,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use tcsos::sync::Arc;
 use tcsos::time::{Duration, Instant};
 
 use slint::ComponentHandle;

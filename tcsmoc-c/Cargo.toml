@@ -20,6 +20,8 @@ tcsmoc = { path = "../tcsmoc" }
 tcsprotocol = { path = "../tcsprotocol" }
 
 [dev-dependencies]
+# What the tests ask of the file system: see tcsos.
+tcsos = { path = "../tcsos" }
 tempfile = "3"
 
 [lints]

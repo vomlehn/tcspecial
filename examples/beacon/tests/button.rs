@@ -54,7 +54,7 @@ fn press(window: &WatchWindow) {
 
 /// Whether a process of this id is still there, reaped or not.
 fn alive(id: u32) -> bool {
-    Path::new(&format!("/proc/{id}")).exists()
+    tcsos::fs::path_exists(Path::new(&format!("/proc/{id}")))
 }
 
 /// Start, then stop, and back where it began: the label says what the next

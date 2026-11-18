@@ -4511,6 +4511,7 @@ dependencies = [
  "const-field-offset",
  "i-slint-backend-linuxkms",
  "i-slint-backend-selector",
+ "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
@@ -4864,6 +4865,7 @@ dependencies = [
 name = "tcs-diagram"
 version = "0.1.0"
 dependencies = [
+ "tcsos",
  "tcsprotocol",
 ]
 
@@ -4898,6 +4900,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
+ "tcs-ui",
  "tcs-verify",
  "tcsmoc",
  "tcsos",
@@ -4958,6 +4961,7 @@ name = "tcsmoc-c"
 version = "0.1.0"
 dependencies = [
  "tcsmoc",
+ "tcsos",
  "tcsprotocol",
  "tempfile",
 ]
@@ -4970,6 +4974,7 @@ dependencies = [
  "signal-hook",
  "wasm-bindgen",
  "wasm_thread",
+ "web-sys",
  "web-time",
 ]
 
@@ -5062,6 +5067,7 @@ name = "thermostat-yamcs-example"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "tcsos",
  "tcsprotocol",
  "tempfile",
  "yamcs-common",

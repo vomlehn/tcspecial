@@ -25,10 +25,10 @@
 
 #[cfg(target_os = "linux")]
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use tcsos::fs::symlink;
+use tcsos::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use tcsos::sync::Arc;
 use tcsos::thread::{self, JoinHandle};
 use tcsos::time::{Duration, Instant};
 
@@ -147,7 +147,7 @@ pub struct PayloadConfig {
 fn run_kind(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     match config.protocol {
         PayloadProtocol::Tcp => {
@@ -318,7 +318,7 @@ pub struct SimulatedPayload {
     config: PayloadConfig,
     running: Arc<AtomicBool>,
     thread_handle: Option<JoinHandle<()>>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 }
 
 impl SimulatedPayload {
@@ -336,7 +336,7 @@ impl SimulatedPayload {
             config,
             running: Arc::new(AtomicBool::new(false)),
             thread_handle: None,
-            stats: Arc::new(std::sync::Mutex::new(PayloadStats::default())),
+            stats: Arc::new(tcsos::sync::Mutex::new(PayloadStats::default())),
         }
     }
 
@@ -1007,7 +1007,7 @@ pub(crate) fn wait_out_packet(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::AtomicU32;
+    use tcsos::sync::atomic::AtomicU32;
 
     /// Makes a payload with faults, for the tests below. Everything else is
     /// what a payload that works has.
@@ -1040,7 +1040,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
             segment_interval_ms: Arc::new(AtomicU32::new(100)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
         }
@@ -1459,7 +1459,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(1000)),
             segment_interval_ms: Arc::new(AtomicU32::new(1000)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
             triggered: false,

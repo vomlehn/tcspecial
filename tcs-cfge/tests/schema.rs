@@ -87,7 +87,7 @@ fn examples(ending: &str) -> Vec<String> {
     let top = root().join("examples");
     let mut found: Vec<String> = names(&top)
         .into_iter()
-        .filter(|example| top.join(example).is_dir())
+        .filter(|example| tcsos::fs::is_dir(top.join(example)))
         .flat_map(|example| {
             names(&top.join(&example))
                 .into_iter()
@@ -742,7 +742,7 @@ fn every_shipped_xml_file_is_well_formed() {
     files.extend(examples(".xtcs"));
     for file in &files {
         let path = root().join(file);
-        assert!(path.is_file(), "{file} is not there any more");
+        assert!(tcsos::fs::is_file(&path), "{file} is not there any more");
         let output = Command::new("xmllint")
             .arg("--noout")
             .arg(&path)
@@ -821,7 +821,10 @@ fn every_shipped_configuration_says_which_schema_describes_it() {
         // And the schema it names is where it says it is, which is the half
         // of a reference that rots.
         let named = path.parent().expect("a directory").join(said);
-        assert!(named.is_file(), "{file} names {said}, which is not there");
+        assert!(
+            tcsos::fs::is_file(&named),
+            "{file} names {said}, which is not there"
+        );
     }
 }
 
@@ -1158,7 +1161,7 @@ fn described() -> Vec<PathBuf> {
             .collect();
         entries.sort();
         for path in entries {
-            if path.is_dir() {
+            if tcsos::fs::is_dir(&path) {
                 walk(root, &path, above, found);
             } else if matches!(
                 path.extension().and_then(|e| e.to_str()),

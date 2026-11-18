@@ -1559,7 +1559,7 @@ docs:
 # process; never part of make test, make check or make html-check.
 .PHONY: screenshots-tcs-sim
 screenshots-tcs-sim:
-	cd $(RUST) && cargo test -p tcs-sim --bin tcs-sim -- --ignored --exact \
+	cd $(RUST) && cargo test -p tcs-sim --lib -- --ignored --exact \
 		shots::screenshots
 
 # Make the tcs-cfge manual's screenshots, docs/shots/tcs-cfge-*.png, again: its
@@ -1585,7 +1585,7 @@ screenshots-tcs-cfge:
 # make html-check.
 .PHONY: screenshots-tcs-moc
 screenshots-tcs-moc:
-	cd $(RUST) && cargo test -p tcs-moc --bin tcs-moc -- --ignored --exact \
+	cd $(RUST) && cargo test -p tcs-moc --lib -- --ignored --exact \
 		vehicle::screenshots::screenshots
 
 # Make every manual's screenshots again, one program after another, each in

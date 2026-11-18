@@ -21,9 +21,9 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tcsos::fs::{File, OpenOptions};
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -108,7 +108,7 @@ impl Drop for TextFile {
 pub fn run_device_file_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let mut text = match TextFile::make(Path::new(&config.address)) {
         Ok(text) => text,
@@ -183,7 +183,7 @@ pub fn run_device_file_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::sync::atomic::AtomicU32;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
 
     /// Makes a simulated device file that adds a packet every 10 ms, whole.
@@ -228,10 +228,10 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("payload");
         let text = TextFile::make(&path).expect("made");
-        assert!(path.is_file());
+        assert!(tcsos::fs::is_file(&path));
         assert_eq!(tcsos::fs::read(&path).unwrap(), b"");
         drop(text);
-        assert!(!path.exists(), "removed");
+        assert!(!tcsos::fs::path_exists(&path), "removed");
     }
 
     /// A file an earlier run left, holding the start of the text, is
@@ -283,6 +283,6 @@ mod tests {
         assert_eq!(device.stats().packets_sent, packets);
 
         device.stop();
-        assert!(!path.exists(), "removed when it stops");
+        assert!(!tcsos::fs::path_exists(&path), "removed when it stops");
     }
 }

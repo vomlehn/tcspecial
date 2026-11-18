@@ -30,7 +30,7 @@
 //! The sensor's random draws come from a generator of its own, seeded from
 //! the run's seed and the sensor's name.
 
-use std::sync::Mutex;
+use tcsos::sync::Mutex;
 
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};

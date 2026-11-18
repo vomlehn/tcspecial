@@ -24,7 +24,7 @@
 //! tcspecial sends to the end this binds, from the first datagram, without
 //! being told where it is. See `tcspecial::endpoint::bind_oc_pair`.
 
-use std::sync::{Arc, Mutex};
+use tcsos::sync::{Arc, Mutex};
 
 use tcsprotocol::unit::Unit;
 use tcsprotocol::{DHSample, Timestamp};

@@ -27,9 +27,9 @@
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tcsos::linux::net::{UnixDatagram, UnixListener, UnixStream};
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -135,7 +135,7 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
 pub fn run_unix_stream_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let path = PathBuf::from(&config.address);
     if let Err(e) = clear_a_dead_socket(&path) {
@@ -259,7 +259,7 @@ pub fn run_unix_stream_node(
 pub fn run_unix_dgram_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let handler = PathBuf::from(&config.address);
 
@@ -421,7 +421,7 @@ pub fn run_unix_dgram_node(
 fn run_driven_unix_dgram_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
     at: &Path,
 ) {
     if let Err(e) = clear_a_dead_socket(at) {
@@ -497,7 +497,7 @@ fn run_driven_unix_dgram_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::sync::atomic::AtomicU32;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
 
     /// Makes a path in the temporary directory unique to this process and
@@ -548,7 +548,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(100)),
             segment_interval_ms: Arc::new(AtomicU32::new(20)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
             triggered: false,
@@ -567,10 +567,14 @@ mod tests {
 
         // Wait for the socket, as a handler started first would.
         let deadline = Instant::now() + Duration::from_secs(5);
-        while !path.exists() && Instant::now() < deadline {
+        while !tcsos::fs::path_exists(&path) && Instant::now() < deadline {
             tcsos::thread::sleep(Duration::from_millis(10));
         }
-        assert!(path.exists(), "{} was never bound", path.display());
+        assert!(
+            tcsos::fs::path_exists(&path),
+            "{} was never bound",
+            path.display()
+        );
 
         // Playing the handler.
         let mut handler =
@@ -603,7 +607,11 @@ mod tests {
 
         // The socket file goes with the device, rather than being left for
         // the next run to clear.
-        assert!(!path.exists(), "{} outlived the device", path.display());
+        assert!(
+            !tcsos::fs::path_exists(&path),
+            "{} outlived the device",
+            path.display()
+        );
     }
 
     /// A datagram device sends to where the handler waits, unprompted, from a
@@ -682,7 +690,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(12)),
             packet_interval_ms: Arc::new(AtomicU32::new(10)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
         });
@@ -766,7 +774,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(1)),
             packet_interval_ms: Arc::new(AtomicU32::new(20)),
             segment_interval_ms: Arc::new(AtomicU32::new(0)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
         });
@@ -806,11 +814,14 @@ mod tests {
         let path = a_path("stale");
         tcsos::fs::remove_file(&path).ok();
         drop(UnixListener::bind(&path).expect("a socket to abandon"));
-        assert!(path.exists(), "the file should outlive the socket");
+        assert!(
+            tcsos::fs::path_exists(&path),
+            "the file should outlive the socket"
+        );
 
         clear_a_dead_socket(&path)
             .expect("a dead socket is not a reason to refuse");
-        assert!(!path.exists(), "it was not cleared");
+        assert!(!tcsos::fs::path_exists(&path), "it was not cleared");
     }
 
     /// A socket something is listening on is not taken: two devices at one

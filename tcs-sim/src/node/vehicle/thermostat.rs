@@ -34,7 +34,7 @@
 //! when it changes.
 
 use std::collections::BTreeMap;
-use std::sync::Mutex;
+use tcsos::sync::Mutex;
 
 use tcsprotocol::node::vehicle::compute::{ThermostatParams, ToValueParams};
 
@@ -236,7 +236,7 @@ mod tests {
     use super::*;
     use crate::node::physics::tests::zone_world;
     use crate::node::physics::{encode, world::World};
-    use std::sync::Arc;
+    use tcsos::sync::Arc;
     use tcsos::time::Instant;
     use tcsprotocol::node::physics::Place;
     use tcsprotocol::node::vehicle::compute::Format;

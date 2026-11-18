@@ -821,7 +821,10 @@ mod tests {
 
         // Bound and then dropped, which leaves the file behind.
         drop(UnixDatagram::bind(&path).expect("a socket to abandon"));
-        assert!(path.exists(), "the file should outlive the socket");
+        assert!(
+            tcsos::fs::path_exists(&path),
+            "the file should outlive the socket"
+        );
 
         let endpoint = UnixDatagramEndpoint::bind(
             "beacon",

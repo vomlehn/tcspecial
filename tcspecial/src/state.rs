@@ -551,7 +551,10 @@ mod tests {
             text.lines().last().unwrap().starts_with("crc16 0x"),
             "{text}"
         );
-        assert!(!beside(&path).exists(), "nothing is left beside it");
+        assert!(
+            !tcsos::fs::path_exists(beside(&path)),
+            "nothing is left beside it"
+        );
     }
 
     /// A RESTART taken pushes its target, with no trials yet, and says it is

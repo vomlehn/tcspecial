@@ -1,0 +1,16 @@
+# What every crate asks of the operating system goes through tcsos, so that
+# the programs run wherever tcsos does -- in a web page as well as on Linux.
+# std's Path asks the file system itself, past tcsos, and in a page always
+# fails: these are its tcsos equivalents.
+disallowed-methods = [
+    { path = "std::path::Path::exists", reason = "use tcsos::fs::exists or tcsos::fs::metadata" },
+    { path = "std::path::Path::try_exists", reason = "use tcsos::fs::exists" },
+    { path = "std::path::Path::is_file", reason = "use tcsos::fs::metadata(..).is_ok_and(|m| m.is_file())" },
+    { path = "std::path::Path::is_dir", reason = "use tcsos::fs::metadata(..).is_ok_and(|m| m.is_dir())" },
+    { path = "std::path::Path::is_symlink", reason = "use tcsos::fs::symlink_metadata" },
+    { path = "std::path::Path::canonicalize", reason = "use tcsos::fs::canonicalize" },
+    { path = "std::path::Path::metadata", reason = "use tcsos::fs::metadata" },
+    { path = "std::path::Path::symlink_metadata", reason = "use tcsos::fs::symlink_metadata" },
+    { path = "std::path::Path::read_dir", reason = "use tcsos::fs::read_dir" },
+    { path = "std::path::Path::read_link", reason = "use tcsos::fs::read_link" },
+]

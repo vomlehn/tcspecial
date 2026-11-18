@@ -544,7 +544,7 @@ fn gpio_sim() -> Result<Chip, String> {
             continue;
         }
         let lines = [dir.join("sim_gpio0"), dir.join("sim_gpio1")];
-        if !lines.iter().all(|line| line.is_dir()) {
+        if !lines.iter().all(tcsos::fs::is_dir) {
             continue;
         }
         // Opened to see, and closed: whether this user may is the question,
@@ -739,21 +739,22 @@ fn iio_dummy() -> Result<Sensor, String> {
     for sys in devices {
         let node = sys.file_name().expect("a name").to_string_lossy();
         let device = format!("/dev/{node}");
-        if !Path::new(&device).exists() {
+        if !tcsos::fs::path_exists(Path::new(&device)) {
             // A dummy without a buffer has no device node at all, which is
             // what an iio_dummy built without its buffer makes.
             let name =
                 tcsos::fs::read_to_string(sys.join("name")).unwrap_or_default();
             unbuffered |= !name.trim().is_empty()
-                && Path::new("/sys/kernel/config/iio/devices/dummy")
-                    .join(name.trim())
-                    .is_dir();
+                && tcsos::fs::is_dir(
+                    Path::new("/sys/kernel/config/iio/devices/dummy")
+                        .join(name.trim()),
+                );
             continue;
         }
         if !tcsprotocol::node::payload::iio::is_dummy(&host, &device) {
             continue;
         }
-        let (scan, enable) = if sys.join("buffer0").is_dir() {
+        let (scan, enable) = if tcsos::fs::is_dir(sys.join("buffer0")) {
             (sys.join("buffer0"), sys.join("buffer0/enable"))
         } else {
             (sys.join("scan_elements"), sys.join("buffer/enable"))

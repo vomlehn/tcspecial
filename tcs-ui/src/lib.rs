@@ -29,6 +29,8 @@
 //! [`tcsmoc::ping`]: the markup shows seven rows, and [`PingShown::of`]
 //! says what each says.
 
+pub mod windows;
+
 use tcsos::time::SystemTime;
 
 use slint::Color;

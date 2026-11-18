@@ -36,7 +36,7 @@ fn entries(dir: &Path) -> impl Iterator<Item = PathBuf> {
 /// The files' paths, sorted.
 fn every_file(extension: &str) -> Vec<PathBuf> {
     let mut files: Vec<PathBuf> = entries(&examples_dir())
-        .filter(|path| path.is_dir())
+        .filter(|path| tcsos::fs::is_dir(path))
         .flat_map(|dir| entries(&dir).collect::<Vec<_>>())
         .filter(|path| path.extension().is_some_and(|ext| ext == extension))
         .collect();
@@ -60,7 +60,9 @@ fn included() -> Vec<PathBuf> {
         .chain(every_file("xtcs"))
         .filter_map(|path| Graph::load(path).ok())
         .flat_map(|graph| graph.files.into_iter().skip(1))
-        .map(|file| file.canonicalize().expect("an included file is there"))
+        .map(|file| {
+            tcsos::fs::canonicalize(&file).expect("an included file is there")
+        })
         .collect()
 }
 
@@ -79,7 +81,8 @@ fn example_files(extension: &str) -> Vec<PathBuf> {
     every_file(extension)
         .into_iter()
         .filter(|path| {
-            !included.contains(&path.canonicalize().expect("it is there"))
+            !included
+                .contains(&tcsos::fs::canonicalize(path).expect("it is there"))
         })
         .collect()
 }
@@ -220,7 +223,7 @@ fn every_example_verifies() {
     for config in configs {
         let sim = sim_for(&config);
         assert!(
-            sim.is_file(),
+            tcsos::fs::is_file(&sim),
             "{} has no {}",
             config.display(),
             sim.display()
@@ -254,7 +257,7 @@ fn every_example_reads_the_same_in_both_formats() {
     for yaml in yaml_files().into_iter() {
         let xml = yaml.with_extension("xtcs");
         assert!(
-            xml.is_file(),
+            tcsos::fs::is_file(&xml),
             "{} has no {} beside it: an example is written in both formats",
             yaml.display(),
             xml.display()
@@ -286,7 +289,7 @@ fn every_xml_example_has_its_yaml() {
     for xml in example_files("xtcs") {
         let yaml = xml.with_extension("ytcs");
         assert!(
-            yaml.is_file(),
+            tcsos::fs::is_file(&yaml),
             "{} has no {}",
             xml.display(),
             yaml.display()
@@ -308,10 +311,11 @@ fn every_simulator_file_has_its_configuration() {
             .and_then(|dir| dir.to_str())
             .is_some_and(|dir| dir.ends_with("-common"));
         if shared {
-            let real = sim.canonicalize().expect("it resolves");
+            let real = tcsos::fs::canonicalize(sim).expect("it resolves");
             assert!(
                 every.iter().any(|other| other != sim
-                    && other.canonicalize().ok().as_ref() == Some(&real)),
+                    && tcsos::fs::canonicalize(other).ok().as_ref()
+                        == Some(&real)),
                 "{} is shared, and no example links to it",
                 sim.display()
             );
@@ -323,7 +327,7 @@ fn every_simulator_file_has_its_configuration() {
             &name[..name.len() - SIM_SUFFIX.len()]
         ));
         assert!(
-            config.is_file(),
+            tcsos::fs::is_file(&config),
             "{} has no {}",
             sim.display(),
             config.display()

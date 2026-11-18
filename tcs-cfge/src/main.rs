@@ -3459,10 +3459,10 @@ fn errors_of(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
 /// and one concern per warning about a node, in the same order.
 fn verified(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
     let (config, simulator) = editor.files();
-    if !config.exists() {
+    if !tcsos::fs::path_exists(config) {
         return (Vec::new(), Vec::new());
     }
-    let simulator = simulator.filter(|path| path.exists());
+    let simulator = simulator.filter(|path| tcsos::fs::path_exists(path));
     let report =
         tcsverify::verify(config, simulator, tcsverify::Limits::EVERYTHING);
 
@@ -13123,7 +13123,10 @@ mod tests {
 
         // And written, because every edit is: the file is a configuration
         // from the moment it is opened.
-        assert!(path.exists(), "the new configuration was not written");
+        assert!(
+            tcsos::fs::path_exists(&path),
+            "the new configuration was not written"
+        );
     }
 
     /// Nothing is seeded into a configuration that is not new.

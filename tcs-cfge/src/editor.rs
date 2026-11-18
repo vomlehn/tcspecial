@@ -404,7 +404,7 @@ impl Editor {
         })?;
         // A file not there yet is begun with an entry for each payload: see
         // `crate::sim::Simulator::begun`.
-        let simulator = if path.exists() {
+        let simulator = if tcsos::fs::path_exists(path) {
             simulator
         } else {
             crate::sim::Simulator::begun(
@@ -696,7 +696,7 @@ impl Editor {
             let replacing: Vec<PathBuf> = files
                 .iter()
                 .map(|file| path_clean::clean(&file.to))
-                .filter(|at| !same_file(at, to) && at.exists())
+                .filter(|at| !same_file(at, to) && tcsos::fs::path_exists(at))
                 .filter(|at| !files.iter().any(|own| same_file(&own.from, at)))
                 .collect();
             if !replacing.is_empty() {
@@ -1029,7 +1029,10 @@ fn describe(why: &SaveError) -> String {
 /// Whether writing one would write the other.
 fn same_file(one: &Path, other: &Path) -> bool {
     let (one, other) = (path_clean::clean(one), path_clean::clean(other));
-    match (one.canonicalize(), other.canonicalize()) {
+    match (
+        tcsos::fs::canonicalize(&one),
+        tcsos::fs::canonicalize(&other),
+    ) {
         (Ok(one), Ok(other)) => one == other,
         _ => one == other,
     }
@@ -1207,7 +1210,10 @@ mod tests {
         editor.forget_history();
 
         assert_eq!(editor.document(), &read, "the document changed");
-        assert!(!copy.exists(), "a read-only session saved a copy");
+        assert!(
+            !tcsos::fs::path_exists(&copy),
+            "a read-only session saved a copy"
+        );
         assert_eq!(editor.undo_depth(), 0);
         assert!(!editor.unsaved(), "nothing is waiting to be written");
         assert_eq!(
@@ -1354,7 +1360,7 @@ tcs-cfge:
         // would be.
         std::fs::remove_file(&path).expect("the file goes");
         editor.save();
-        assert!(path.exists(), "Save did not write the file");
+        assert!(tcsos::fs::path_exists(&path), "Save did not write the file");
         assert!(editor.trouble().is_none(), "{:?}", editor.trouble());
         assert!(std::fs::read_to_string(&path).unwrap().contains("temp_1"));
     }
@@ -1913,12 +1919,12 @@ tcs-cfge:
         std::fs::write(&there, "somebody's\n").expect("written");
 
         assert_eq!(editor.save_as(&copy, false), vec![there.clone()]);
-        assert!(!copy.exists(), "written before asking");
+        assert!(!tcsos::fs::path_exists(&copy), "written before asking");
         assert_eq!(editor.files().0, path.as_path(), "the session moved");
 
         assert!(editor.save_as(&copy, true).is_empty());
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
-        assert!(copy.exists());
+        assert!(tcsos::fs::path_exists(&copy));
         assert_ne!(std::fs::read_to_string(&there).unwrap(), "somebody's\n");
         editor.forget_history();
     }
@@ -2757,7 +2763,7 @@ tcs-cfge:
             .map(|to| {
                 let stem = to.file_stem().expect("a stem").to_string_lossy();
                 let sim = to.with_file_name(format!("{stem}-sim.yaml"));
-                let sim = sim.exists().then_some(sim);
+                let sim = tcsos::fs::path_exists(&sim).then_some(sim);
                 (to, sim)
             })
             .collect();

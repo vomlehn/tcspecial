@@ -3779,7 +3779,7 @@ impl Document {
         &self,
         path: &std::path::Path,
     ) -> Option<std::path::PathBuf> {
-        swapped(path).filter(|beside| beside.is_file())
+        swapped(path).filter(|beside| tcsos::fs::is_file(beside))
     }
 
     /// What leaves a node, by the data source it leaves by.

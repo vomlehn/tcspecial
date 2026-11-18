@@ -62,7 +62,7 @@ fn every_stage_verifies() {
     for config in stages() {
         let sim = config.with_file_name("deck-sim.yaml");
         assert!(
-            sim.is_file(),
+            tcsos::fs::is_file(&sim),
             "{} has no {}",
             config.display(),
             sim.display()
@@ -93,7 +93,7 @@ fn every_stage_reads_the_same_in_both_formats() {
     for yaml in stages() {
         let xml = yaml.with_extension("xtcs");
         assert!(
-            xml.is_file(),
+            tcsos::fs::is_file(&xml),
             "{} has no {} beside it: a stage is written in both formats",
             yaml.display(),
             xml.display()

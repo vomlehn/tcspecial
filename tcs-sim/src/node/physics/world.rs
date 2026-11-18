@@ -42,7 +42,7 @@
 //! is allocated once it is made: the inputs, the driven values and the queue
 //! have their room from the start.
 
-use std::sync::{Condvar, Mutex, MutexGuard};
+use tcsos::sync::{Condvar, Mutex, MutexGuard};
 use tcsos::time::Instant;
 
 use tcsprotocol::node::physics::terminal::{Direction, Terminal};
@@ -571,7 +571,7 @@ mod tests {
     #[derive(Debug, Default)]
     struct Watched {
         /// What it was advanced across, and what happened at its events.
-        seen: std::sync::Arc<Mutex<Vec<String>>>,
+        seen: tcsos::sync::Arc<Mutex<Vec<String>>>,
         /// When its event is, until it has happened.
         due: Option<f64>,
         /// Its input, as last held.

@@ -95,7 +95,7 @@ fn fresh_library() -> PathBuf {
         String::from_utf8_lossy(&built.stderr)
     );
     assert!(
-        library.is_file(),
+        tcsos::fs::is_file(&library),
         "{} is not where cargo put it",
         library.display()
     );

@@ -39,8 +39,8 @@
 
 use std::ffi::{CStr, CString};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
+use tcsos::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 
 use log::{error, info};
 
@@ -205,7 +205,8 @@ impl SegSend {
     /// thread that runs `segsend` has stopped.
     pub fn handoff(&self, dir: &Path) -> Result<Handoff, String> {
         if let Some(queue) = &self.queue {
-            let key = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+            let key = tcsos::fs::canonicalize(dir)
+                .unwrap_or_else(|_| dir.to_path_buf());
             let mut swept =
                 self.swept.lock().expect("nothing panics holding it");
             if !swept.contains(&key) {
@@ -519,7 +520,10 @@ mod tests {
         let segment = logs.path().join("telem-1.tcslog");
         tcsos::fs::write(&segment, b"filled").expect("written");
         handoff.send(&segment).expect("handed over");
-        assert!(!segment.exists(), "the segment is still in the log's name");
+        assert!(
+            !tcsos::fs::path_exists(&segment),
+            "the segment is still in the log's name"
+        );
 
         let pending = format!("{}{PENDING_SUFFIX}", segment.display());
         assert!(
@@ -528,7 +532,7 @@ mod tests {
             handed(tools.path())
         );
         assert!(
-            until(|| !Path::new(&pending).exists()),
+            until(|| !tcsos::fs::path_exists(Path::new(&pending))),
             "{pending} was not deleted"
         );
     }

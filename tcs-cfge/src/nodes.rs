@@ -359,7 +359,7 @@ fn walk(
             }
         };
         let path = entry.path();
-        if path.is_dir() {
+        if tcsos::fs::is_dir(&path) {
             walk(root, &path, above, found, trouble)?;
             continue;
         }
@@ -674,7 +674,7 @@ pub fn data_dir() -> Option<PathBuf> {
     tried.push(PathBuf::from("tcs-cfge/share"));
     tried.push(PathBuf::from("share"));
 
-    tried.into_iter().find(|where_| where_.is_dir())
+    tried.into_iter().find(|where_| tcsos::fs::is_dir(where_))
 }
 
 /// Where an installed tcs-cfge's data is: `../share/tcs-cfge` from the
@@ -689,7 +689,8 @@ pub fn data_dir() -> Option<PathBuf> {
 /// The directory, whether or not it exists; `None` where this program's own
 /// path cannot be found or is at the root of the filesystem.
 fn beside_this_program() -> Option<PathBuf> {
-    let program = std::env::current_exe().ok()?.canonicalize().ok()?;
+    let program =
+        tcsos::fs::canonicalize(std::env::current_exe().ok()?).ok()?;
     Some(program.parent()?.parent()?.join("share/tcs-cfge"))
 }
 
@@ -717,7 +718,7 @@ fn installed_schemas() -> Option<PathBuf> {
     }
     tried.push(PathBuf::from("/usr/local/share/tcspecial/schema"));
     tried.push(PathBuf::from("/usr/share/tcspecial/schema"));
-    tried.into_iter().find(|where_| where_.is_dir())
+    tried.into_iter().find(|where_| tcsos::fs::is_dir(where_))
 }
 
 /// The XSD and the JSON Schema that describe a configuration.
@@ -771,7 +772,7 @@ pub fn schema_reference(destination: &Path, schema: &str) -> String {
     let mut back = String::new();
     for _ in 0..=6 {
         let candidate = here.join(&up).join("tcsprotocol/schema").join(schema);
-        if candidate.is_file() {
+        if tcsos::fs::is_file(&candidate) {
             return format!("{back}tcsprotocol/schema/{schema}");
         }
         up.push("..");
@@ -783,7 +784,7 @@ pub fn schema_reference(destination: &Path, schema: &str) -> String {
     // fact about the file.
     if let Some(installed) = installed_schemas() {
         let installed = installed.join(schema);
-        if installed.is_file() {
+        if tcsos::fs::is_file(&installed) {
             return installed.display().to_string();
         }
     }
@@ -810,7 +811,7 @@ pub fn nodes_in(data: &Path) -> PathBuf {
 /// A loop in the tree, as [`read_tree`] refuses it.
 pub fn described() -> Result<(Vec<Described>, Vec<String>), String> {
     match data_dir().map(|data| nodes_in(&data)) {
-        Some(tree) if tree.is_dir() => read_tree(&tree),
+        Some(tree) if tcsos::fs::is_dir(&tree) => read_tree(&tree),
         _ => Ok((Vec::new(), Vec::new())),
     }
 }
@@ -829,10 +830,10 @@ mod tests {
     /// `/opt/tcs/share/tcs-cfge` for `/opt/tcs/bin/tcs-cfge`.
     #[test]
     fn an_installed_editor_looks_beside_its_own_directory() {
-        let program = std::env::current_exe()
-            .expect("this test's path")
-            .canonicalize()
-            .expect("this test's path, resolved");
+        let program = tcsos::fs::canonicalize(
+            std::env::current_exe().expect("this test's path"),
+        )
+        .expect("this test's path, resolved");
         let prefix = program
             .parent()
             .and_then(Path::parent)
@@ -1180,7 +1181,7 @@ mod tests {
             let file = code.join(&stem).with_extension("rs");
             let directory = code.join(&stem);
             assert!(
-                file.is_file() || directory.is_dir(),
+                tcsos::fs::is_file(&file) || tcsos::fs::is_dir(&directory),
                 "{}: nothing at {} or {}",
                 one.path.display(),
                 file.display(),
@@ -1450,9 +1451,9 @@ mod tests {
         // Whatever this machine has installed is not what is being tested, so
         // the search starts where this crate is.
         let data = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("share");
-        assert!(data.is_dir(), "{}", data.display());
+        assert!(tcsos::fs::is_dir(&data), "{}", data.display());
         let tree = nodes_in(&data);
-        assert!(tree.is_dir(), "{}", tree.display());
+        assert!(tcsos::fs::is_dir(&tree), "{}", tree.display());
 
         let (described, trouble) =
             read_tree(&tree).expect("the tree has no loop");

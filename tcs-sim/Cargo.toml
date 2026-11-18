@@ -12,6 +12,9 @@ tcsprotocol = { path = "../tcsprotocol" }
 tcsverify = { path = "../tcsverify" }
 # What it found, said in the window that opens before the main one.
 tcs-verify = { path = "../tcs-verify" }
+# Where the windows are made and run, which in a web page is not where
+# the rest of tcs-sim runs: see tcs_ui::windows.
+tcs-ui = { path = "../tcs-ui" }
 # How a harness waits for a simulator to be ready, which --wait is.
 tcsmoc = { path = "../tcsmoc" }
 slint = "1.3"

@@ -281,3 +281,60 @@ pub fn device_number(meta: &std::fs::Metadata) -> Option<u64> {
 
 /// Makes a symbolic link, for a test of a tree of files with one in it.
 pub use std::os::unix::fs::symlink;
+
+/// Whether a path names a file, following links: what std's
+/// `Path::is_file` says, asked of this file system.
+///
+/// # Arguments
+///
+/// * `path` - The path.
+///
+/// # Returns
+///
+/// `true` for a file; `false` for anything else, or nothing.
+pub fn is_file(path: impl AsRef<Path>) -> bool {
+    metadata(path).is_ok_and(|found| found.is_file())
+}
+
+/// Whether a path names a directory, following links: what std's
+/// `Path::is_dir` says, asked of this file system.
+///
+/// # Arguments
+///
+/// * `path` - The path.
+///
+/// # Returns
+///
+/// `true` for a directory; `false` for anything else, or nothing.
+pub fn is_dir(path: impl AsRef<Path>) -> bool {
+    metadata(path).is_ok_and(|found| found.is_dir())
+}
+
+/// Whether a path names a symbolic link, not following it: what std's
+/// `Path::is_symlink` says, asked of this file system.
+///
+/// # Arguments
+///
+/// * `path` - The path.
+///
+/// # Returns
+///
+/// `true` for a link; `false` for anything else, or nothing.
+pub fn is_symlink(path: impl AsRef<Path>) -> bool {
+    symlink_metadata(path).is_ok_and(|found| found.file_type().is_symlink())
+}
+
+/// Whether anything is at a path, following links: what std's
+/// `Path::exists` says, asked of this file system.
+///
+/// # Arguments
+///
+/// * `path` - The path.
+///
+/// # Returns
+///
+/// `true` where something is; `false` where nothing is, or it cannot be
+/// told.
+pub fn path_exists(path: impl AsRef<Path>) -> bool {
+    metadata(path).is_ok()
+}

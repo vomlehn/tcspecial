@@ -39,9 +39,9 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -151,7 +151,7 @@ pub(crate) fn how_to_make_one(chip: &str) -> String {
 pub fn run_gpio_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let lines = match lines_of(
         Path::new(SIM_DEVICES),
@@ -239,7 +239,7 @@ pub fn run_gpio_node(
 pub fn run_gpio_udp_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let at = format!("{}:{}", config.address, config.port);
     let socket = match UdpSocket::bind(&at).and_then(|socket| {
@@ -370,7 +370,7 @@ pub fn run_gpio_udp_node(
 /// * `driven`   - What the lines were last driven to, which this updates.
 fn took_a_drive(
     config: &PayloadConfig,
-    stats: &std::sync::Mutex<PayloadStats>,
+    stats: &tcsos::sync::Mutex<PayloadStats>,
     count: usize,
     datagram: &[u8],
     driven: &mut Option<u64>,
@@ -419,7 +419,7 @@ fn pull_to_the_world(
     config: &PayloadConfig,
     world: &crate::node::physics::Attachment,
     running: &AtomicBool,
-    stats: &std::sync::Mutex<PayloadStats>,
+    stats: &tcsos::sync::Mutex<PayloadStats>,
     lines: &[SimulatedLine],
 ) {
     // Made here, before the loop, and reused: what each line is to be, and
@@ -484,7 +484,7 @@ fn pull_to_the_world(
 fn watch_driven_lines(
     config: &PayloadConfig,
     running: &AtomicBool,
-    stats: &std::sync::Mutex<PayloadStats>,
+    stats: &tcsos::sync::Mutex<PayloadStats>,
     lines: &[SimulatedLine],
 ) {
     use std::io::Read;
@@ -576,8 +576,8 @@ mod tests {
     /// datum is counted as received, and nothing is counted while they stay.
     #[test]
     fn a_driven_chip_counts_each_move_of_its_lines() {
-        use std::sync::atomic::{AtomicBool, AtomicU32};
-        use std::sync::{Arc, Mutex};
+        use tcsos::sync::atomic::{AtomicBool, AtomicU32};
+        use tcsos::sync::{Arc, Mutex};
 
         let tree = tempfile::tempdir().expect("a tree of our own");
         let lines: Vec<SimulatedLine> = [0]
@@ -635,7 +635,7 @@ mod tests {
         settle();
         assert_eq!(stats.lock().unwrap().packets_recv, 1, "and stayed");
 
-        running.store(false, std::sync::atomic::Ordering::SeqCst);
+        running.store(false, tcsos::sync::atomic::Ordering::SeqCst);
         watching.join().unwrap();
     }
 
@@ -657,7 +657,7 @@ mod tests {
         lines: Vec<u32>,
         interval: u32,
     ) -> (PayloadConfig, SocketAddr) {
-        use std::sync::atomic::AtomicU32;
+        use tcsos::sync::atomic::AtomicU32;
 
         // A port nothing has, found by asking for one and letting it go.
         let at = UdpSocket::bind("127.0.0.1:0")
@@ -702,11 +702,11 @@ mod tests {
         config: PayloadConfig,
     ) -> (
         Arc<AtomicBool>,
-        Arc<std::sync::Mutex<PayloadStats>>,
+        Arc<tcsos::sync::Mutex<PayloadStats>>,
         tcsos::thread::JoinHandle<()>,
     ) {
         let running = Arc::new(AtomicBool::new(true));
-        let stats = Arc::new(std::sync::Mutex::new(PayloadStats::default()));
+        let stats = Arc::new(tcsos::sync::Mutex::new(PayloadStats::default()));
         let thread = {
             let (running, stats) = (running.clone(), stats.clone());
             tcsos::thread::spawn(move || {

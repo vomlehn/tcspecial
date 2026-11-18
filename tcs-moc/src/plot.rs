@@ -62,7 +62,7 @@
 use std::collections::VecDeque;
 use std::fmt::Write as _;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use tcsos::sync::{Arc, Mutex};
 use tcsos::time::{Duration, Instant};
 
 use slint::{
@@ -1381,7 +1381,7 @@ pub fn show(
         let window = window.as_weak();
         ui.on_plot_clicked(move || {
             if let Some(window) = window.upgrade() {
-                let _ = window.show();
+                let _ = tcs_ui::windows::show(&window);
             }
         });
     }
@@ -1458,7 +1458,7 @@ pub fn show(
     ));
     window.set_panels(ModelRc::from(panels.clone()));
     window.set_switches(ModelRc::from(shown.clone()));
-    let _ = window.show();
+    let _ = tcs_ui::windows::show(window);
 
     let timer = Timer::default();
     let window = window.as_weak();

@@ -120,3 +120,14 @@ where
 pub fn stack_bounds() -> Option<(usize, usize, usize)> {
     None
 }
+
+/// Whether windows must be made on a thread other than the calling one:
+/// on a Web Worker, which is where every program runs, since a page draws
+/// its windows on its own thread alone.
+///
+/// # Returns
+///
+/// `true` on a worker.
+pub fn windows_elsewhere() -> bool {
+    crate::browser::context::may_wait()
+}

@@ -25,9 +25,9 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 use tcsos::net::UdpSocket;
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::{Arc, Mutex};
 use tcsos::time::{Duration, Instant};
 
 use i_slint_backend_testing::{ElementHandle, ElementQuery};
@@ -950,8 +950,7 @@ impl Station {
             (through, feed)
         });
         let plot_window = PlotWindow::new().expect("the plot window");
-        let ambient = sim
-            .is_file()
+        let ambient = tcsos::fs::is_file(&sim)
             .then(|| ambient_of(sim.to_str(), Mode::All))
             .flatten();
         let plot =

@@ -189,7 +189,9 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
     );
     let mode = tcsos::fs::mode(&kept).expect("kept");
     assert_eq!(mode & 0o777, 0o444, "read-only");
-    assert!(tree.join("thermostat-common/thermostat.ytcs").is_file());
+    assert!(tcsos::fs::is_file(
+        tree.join("thermostat-common/thermostat.ytcs")
+    ));
     let (graph, _) = tcsprotocol::store::Store::at(&store)
         .load(checksum)
         .expect("it loads by its checksum");
@@ -247,7 +249,7 @@ fn the_fprime_example_has_its_bridge_model_written() {
         "{fppi}"
     );
     assert!(fppi.contains("telemetry $thermometer: I16 id 3"), "{fppi}");
-    assert!(model.join("TcsBridgeModel.cpp").is_file());
+    assert!(tcsos::fs::is_file(model.join("TcsBridgeModel.cpp")));
 
     let (lines, status) = run(&[&flag, example]);
     assert_eq!(status, 0);

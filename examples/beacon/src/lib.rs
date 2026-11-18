@@ -169,7 +169,7 @@ impl Vehicle {
             format!("cannot tell where this program is, to find tcspecial: {e}")
         })?;
         let program = here.with_file_name("tcspecial");
-        if !program.is_file() {
+        if !tcsos::fs::is_file(&program) {
             return Err(format!(
                 "there is no tcspecial at {}: build it with \
                  `cargo build --bin tcspecial`",

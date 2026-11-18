@@ -866,7 +866,7 @@ fn names(payloads: &[(&str, &Judged)]) -> String {
 /// Whether `path` is a directory, for a judgement that asks whether the
 /// kernel lists something.
 pub(crate) fn is_dir(path: &Path) -> bool {
-    path.is_dir()
+    tcsos::fs::is_dir(path)
 }
 
 /// The first line of a file the kernel keeps, trimmed, where it can be read.

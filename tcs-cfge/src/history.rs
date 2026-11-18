@@ -236,7 +236,9 @@ fn remove_abandoned(temp: &Path, procs: &Path) {
         else {
             continue;
         };
-        if pid != std::process::id() && !procs.join(pid.to_string()).exists() {
+        if pid != std::process::id()
+            && !tcsos::fs::path_exists(procs.join(pid.to_string()))
+        {
             let _ = std::fs::remove_dir_all(entry.path());
         }
     }
@@ -589,7 +591,7 @@ pub fn prune_in(directory: &Path, now: SystemTime) -> usize {
         // decide that somebody else's file in this directory is rubbish.
         let orphaned = match std::fs::read_to_string(&path) {
             Ok(text) => match serde_norway::from_str::<Kept>(&text) {
-                Ok(kept) => !kept.configuration.exists(),
+                Ok(kept) => !tcsos::fs::path_exists(&kept.configuration),
                 Err(_) => false,
             },
             Err(_) => false,
@@ -700,7 +702,7 @@ mod tests {
         std::fs::write(&one, "").expect("a configuration");
         write_in(&state, &one, &journal, &OnDisk::default())
             .expect("the history is written");
-        assert!(named.exists(), "{named:?}");
+        assert!(tcsos::fs::path_exists(&named), "{named:?}");
         assert_eq!(read_in(&state, &one).map(|kept| kept.depth()), Some(1));
 
         // A history of another configuration is not this one's, however it
@@ -722,7 +724,7 @@ mod tests {
 
         // A clean exit throws it away.
         forget_in(&state, &one);
-        assert!(!named.exists());
+        assert!(!tcsos::fs::path_exists(&named));
 
         // Pruned when the configuration is gone, whatever its age: nothing
         // else would ever notice, a configuration being free to be deleted or
@@ -731,7 +733,7 @@ mod tests {
             .expect("written again");
         std::fs::remove_file(&one).expect("the configuration goes");
         assert_eq!(prune_in(&state, SystemTime::now()), 1);
-        assert!(!named.exists());
+        assert!(!tcsos::fs::path_exists(&named));
 
         // And pruned when it is old: a crash a fortnight ago is not an undo
         // anybody is waiting for.
@@ -741,7 +743,7 @@ mod tests {
         let fortnight =
             SystemTime::now() + Duration::from_secs(14 * 24 * 60 * 60);
         assert_eq!(prune_in(&state, fortnight), 1);
-        assert!(!named.exists());
+        assert!(!tcsos::fs::path_exists(&named));
 
         // A young one whose configuration is there is left alone. That is the
         // history of a session that ended badly, and it is the one somebody
@@ -749,7 +751,7 @@ mod tests {
         write_in(&state, &one, &journal, &OnDisk::default())
             .expect("written again");
         assert_eq!(prune_in(&state, SystemTime::now()), 0);
-        assert!(named.exists());
+        assert!(tcsos::fs::path_exists(&named));
 
         // And nothing this does not understand is touched, whatever is in it:
         // it is not the prune's place to decide that somebody else's file is
@@ -757,7 +759,7 @@ mod tests {
         let theirs = state.join("notes.yaml");
         std::fs::write(&theirs, "not a history\n").expect("somebody's file");
         prune_in(&state, SystemTime::now());
-        assert!(theirs.exists());
+        assert!(tcsos::fs::path_exists(&theirs));
     }
 
     /// Where the state directory is, which is the one thing the environment

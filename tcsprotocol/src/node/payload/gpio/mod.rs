@@ -545,7 +545,7 @@ pub fn simulated_chips(
         };
         for bank in banks.flatten() {
             let name = bank.file_name().to_string_lossy().into_owned();
-            if name.starts_with("gpiochip") && bank.path().is_dir() {
+            if name.starts_with("gpiochip") && tcsos::fs::is_dir(bank.path()) {
                 chips.push((name, bank.path()));
             }
         }

@@ -811,7 +811,10 @@ mod tests {
         let found = read();
         assert_eq!(found.settings, Settings::default());
         assert!(found.missing, "there is no file yet");
-        assert!(!where_.join(".tcs-cfge").exists(), "nothing is made");
+        assert!(
+            !tcsos::fs::path_exists(where_.join(".tcs-cfge")),
+            "nothing is made"
+        );
 
         match was {
             Some(was) => std::env::set_var("HOME", was),

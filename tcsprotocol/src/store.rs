@@ -379,7 +379,7 @@ impl Store {
             let top = EXTENSIONS
                 .iter()
                 .map(|ext| dir.join(format!("{digest}.{ext}")))
-                .find(|path| path.is_file());
+                .find(|path| tcsos::fs::is_file(path));
             if let Some(top) = top {
                 return Some((top, depth));
             }
@@ -545,7 +545,7 @@ impl Store {
             )
         };
         let tree = self.dir.join(digest.to_string());
-        if tree.exists() {
+        if tcsos::fs::path_exists(&tree) {
             return Err(format!(
                 "{} is there without its top file, {digest}.ytcs or \
                  {digest}.xtcs, in it or a {TOP_DIR} directory down in it: \
@@ -556,7 +556,7 @@ impl Store {
             ));
         }
         let beside = self.dir.join(format!(".{digest}.new"));
-        if beside.exists() {
+        if tcsos::fs::path_exists(&beside) {
             tcsos::fs::remove_dir_all(&beside)
                 .map_err(|e| cannot("cleared", e))?;
         }
@@ -659,7 +659,7 @@ impl Store {
         let cannot = |e: std::io::Error| {
             format!("{} cannot be removed: {e}", tree.display())
         };
-        if going.exists() {
+        if tcsos::fs::path_exists(&going) {
             tcsos::fs::remove_dir_all(&going).map_err(cannot)?;
         }
         tcsos::fs::rename(&tree, &going).map_err(cannot)?;
@@ -777,7 +777,7 @@ mod tests {
             digest,
             "the two spellings say the same"
         );
-        assert!(!at.with_extension("xtcs").exists());
+        assert!(!tcsos::fs::path_exists(at.with_extension("xtcs")));
         assert_eq!(store.keep(&xml).unwrap(), (digest, Kept::Already(at)));
     }
 
@@ -1028,9 +1028,12 @@ mod tests {
         let at = store_dir.path().join(digest.to_string());
         let down = at.join("top/top");
         assert_eq!(kept, Kept::Written(down.join(format!("{digest}.ytcs"))));
-        assert!(at.join("shared/zone.ytcs").is_file());
-        assert!(down.join("near.ytcs").is_file());
-        assert!(down.join("sub").is_dir(), "the directory passed through");
+        assert!(tcsos::fs::is_file(at.join("shared/zone.ytcs")));
+        assert!(tcsos::fs::is_file(down.join("near.ytcs")));
+        assert!(
+            tcsos::fs::is_dir(down.join("sub")),
+            "the directory passed through"
+        );
         assert_eq!(
             crate::config_digest::digest_of_file(kept.path()).unwrap(),
             original

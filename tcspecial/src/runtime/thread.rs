@@ -381,7 +381,7 @@ mod tests {
     /// once it has ended.
     #[test]
     fn a_thread_is_measured_while_it_runs() {
-        use std::sync::mpsc::channel;
+        use tcsos::sync::mpsc::channel;
         let node = NodeId(0x7e57);
         let (deeper, go_deeper) = channel::<()>();
         let (went, gone_deeper) = channel::<usize>();
@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn a_service_thread_has_the_service_stack() {
         let node = NodeId(0x5e4c);
-        let (end, ended) = std::sync::mpsc::channel::<()>();
+        let (end, ended) = tcsos::sync::mpsc::channel::<()>();
         // A service thread belongs to no node, but this one is given an id
         // so that the test can find it among the others.
         let thread = spawn(ThreadRole::Beacons, node, "service", move || {

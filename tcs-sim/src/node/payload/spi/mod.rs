@@ -22,8 +22,8 @@
 //! See [`crate::payload`] for the pacing, and [`crate::pty`] for the pty.
 
 use std::io::{Read, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use tcsos::sync::atomic::{AtomicBool, Ordering};
+use tcsos::sync::Arc;
 use tcsos::time::Instant;
 
 use crate::payload::{
@@ -48,7 +48,7 @@ use crate::pty::SimulatedNode;
 pub fn run_spi_node(
     config: PayloadConfig,
     running: Arc<AtomicBool>,
-    stats: Arc<std::sync::Mutex<PayloadStats>>,
+    stats: Arc<tcsos::sync::Mutex<PayloadStats>>,
 ) {
     let mut node = match SimulatedNode::open(
         &format!("{}: a SPI peripheral", config.name),
@@ -128,9 +128,9 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::path::{Path, PathBuf};
-    use std::sync::atomic::AtomicU32;
     use tcsos::fs::File;
     use tcsos::linux::pty::make_raw;
+    use tcsos::sync::atomic::AtomicU32;
     use tcsos::time::Duration;
 
     /// Makes a path in the temporary directory unique to this process and
@@ -174,7 +174,7 @@ mod tests {
             segment_size: Arc::new(AtomicU32::new(5)),
             packet_interval_ms: Arc::new(AtomicU32::new(200)),
             segment_interval_ms: Arc::new(AtomicU32::new(40)),
-            sending: Arc::new(std::sync::atomic::AtomicBool::new(true)),
+            sending: Arc::new(tcsos::sync::atomic::AtomicBool::new(true)),
             standing: Default::default(),
             driven: false,
             triggered: false,
@@ -182,11 +182,11 @@ mod tests {
         simulated.start().expect("the device starts");
 
         let deadline = Instant::now() + Duration::from_secs(5);
-        while !path.is_symlink() && Instant::now() < deadline {
+        while !tcsos::fs::is_symlink(&path) && Instant::now() < deadline {
             tcsos::thread::sleep(Duration::from_millis(10));
         }
         assert!(
-            path.is_symlink(),
+            tcsos::fs::is_symlink(&path),
             "{} is not a link to anything",
             path.display()
         );
@@ -224,7 +224,7 @@ mod tests {
             stats.bytes_sent
         );
         assert!(
-            !path.is_symlink(),
+            !tcsos::fs::is_symlink(&path),
             "{} outlived the node it led to",
             path.display()
         );
@@ -243,6 +243,6 @@ mod tests {
                 || e.contains("not a link the simulator made"),
             "{e}"
         );
-        assert!(Path::new("/dev/null").exists());
+        assert!(tcsos::fs::path_exists(Path::new("/dev/null")));
     }
 }

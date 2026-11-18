@@ -221,8 +221,8 @@ pub fn wait(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicU8, Ordering};
-    use std::sync::Arc;
+    use tcsos::sync::atomic::{AtomicU8, Ordering};
+    use tcsos::sync::Arc;
     use tcsprotocol::config_digest::ConfigDigest;
     use tcsprotocol::ready::{Reason, Request};
     use tcsprotocol::simulate::Mode;

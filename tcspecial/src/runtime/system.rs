@@ -30,8 +30,8 @@
 
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::Mutex;
+use tcsos::sync::mpsc::{Receiver, SyncSender};
 use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::graph::telemetry::{Reaches, Telemetered};
@@ -189,8 +189,9 @@ impl Workbench {
     ///
     /// Why the nudge's descriptors could not be made.
     pub fn in_two() -> std::io::Result<(Workbench, Desk)> {
-        let (jobs, taken) = std::sync::mpsc::sync_channel(JOBS_AT_ONCE);
-        let (answering, answers) = std::sync::mpsc::sync_channel(JOBS_AT_ONCE);
+        let (jobs, taken) = tcsos::sync::mpsc::sync_channel(JOBS_AT_ONCE);
+        let (answering, answers) =
+            tcsos::sync::mpsc::sync_channel(JOBS_AT_ONCE);
         Ok((
             Workbench {
                 jobs,
@@ -3213,9 +3214,16 @@ vehicle:
     fn a_vehicles_log_directory_goes_with_it() {
         let vehicle = vehicle(Instant::now(), &[]);
         let log = vehicle.log.clone();
-        assert!(log.is_dir(), "the log's directory is there to write into");
+        assert!(
+            tcsos::fs::is_dir(&log),
+            "the log's directory is there to write into"
+        );
         drop(vehicle);
-        assert!(!log.exists(), "{} was left behind", log.display());
+        assert!(
+            !tcsos::fs::path_exists(&log),
+            "{} was left behind",
+            log.display()
+        );
     }
 
     /// A payload nothing in the drawing touches is read, and what it reads

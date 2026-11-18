@@ -9,9 +9,9 @@
 //! and a harness waits through `tcsmoc::simulator`. See "Waiting for the
 //! Simulator" in `docs/tcspecial-design.rst`.
 
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::{Arc, Mutex};
 use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::sync::atomic::{AtomicU8, Ordering};
+use tcsos::sync::{Arc, Mutex};
 
 use tcsprotocol::ready::{
     Answer, Reason, Request, SetUpFor, State, ANSWER_BYTES, REQUEST_BYTES,

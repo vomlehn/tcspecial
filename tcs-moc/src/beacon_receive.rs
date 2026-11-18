@@ -19,7 +19,7 @@
 //! spacecraft.
 
 use std::sync::{Arc, Mutex};
-use std::thread;
+use tcsos::thread;
 
 use slint::{SharedString, Weak};
 

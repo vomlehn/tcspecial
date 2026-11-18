@@ -384,7 +384,7 @@ impl Store {
                 return Some((top, depth));
             }
             dir.push(TOP_DIR);
-            if !std::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir()) {
+            if !tcsos::fs::symlink_metadata(&dir).is_ok_and(|m| m.is_dir()) {
                 return None;
             }
             depth += 1;
@@ -557,18 +557,18 @@ impl Store {
         }
         let beside = self.dir.join(format!(".{digest}.new"));
         if beside.exists() {
-            std::fs::remove_dir_all(&beside)
+            tcsos::fs::remove_dir_all(&beside)
                 .map_err(|e| cannot("cleared", e))?;
         }
-        std::fs::create_dir(&beside).map_err(|e| cannot("written", e))?;
+        tcsos::fs::create_dir(&beside).map_err(|e| cannot("written", e))?;
         // Each after the directory it is in, which is the order they sort in.
         for dir in &layout.dirs {
-            std::fs::create_dir(beside.join(dir))
+            tcsos::fs::create_dir(beside.join(dir))
                 .map_err(|e| cannot("written", e))?;
         }
         let kept_as = std::iter::once(&layout.top).chain(&layout.files);
         for (file, at) in graph.files.iter().zip(kept_as) {
-            let bytes = std::fs::read(file).map_err(|e| {
+            let bytes = tcsos::fs::read(file).map_err(|e| {
                 format!("{} cannot be read: {e}", file.display())
             })?;
             write_read_only(&beside.join(at), &bytes)
@@ -578,7 +578,7 @@ impl Store {
             sync_dir(&beside.join(dir)).map_err(|e| cannot("flushed", e))?;
         }
         sync_dir(&beside).map_err(|e| cannot("flushed", e))?;
-        std::fs::rename(&beside, &tree).map_err(|e| cannot("kept", e))?;
+        tcsos::fs::rename(&beside, &tree).map_err(|e| cannot("kept", e))?;
         sync_dir(&self.dir).map_err(|e| cannot("flushed", e))?;
         Ok((digest, Kept::Written(tree.join(&layout.top))))
     }
@@ -594,7 +594,7 @@ impl Store {
     ///
     /// Why the directory cannot be read.
     pub fn held(&self) -> Result<Vec<ConfigDigest>, String> {
-        let entries = std::fs::read_dir(&self.dir).map_err(|e| {
+        let entries = tcsos::fs::read_dir(&self.dir).map_err(|e| {
             format!("{} cannot be read: {e}", self.dir.display())
         })?;
         let mut held: Vec<ConfigDigest> = entries
@@ -660,11 +660,11 @@ impl Store {
             format!("{} cannot be removed: {e}", tree.display())
         };
         if going.exists() {
-            std::fs::remove_dir_all(&going).map_err(cannot)?;
+            tcsos::fs::remove_dir_all(&going).map_err(cannot)?;
         }
-        std::fs::rename(&tree, &going).map_err(cannot)?;
+        tcsos::fs::rename(&tree, &going).map_err(cannot)?;
         sync_dir(&self.dir).map_err(cannot)?;
-        std::fs::remove_dir_all(&going).map_err(cannot)
+        tcsos::fs::remove_dir_all(&going).map_err(cannot)
     }
 }
 
@@ -681,7 +681,7 @@ impl Store {
 fn write_read_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
 
-    let mut file = std::fs::OpenOptions::new()
+    let mut file = tcsos::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(path)?;
@@ -701,7 +701,7 @@ fn write_read_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 ///
 /// What the system said, where it cannot be.
 fn sync_dir(dir: &Path) -> std::io::Result<()> {
-    std::fs::File::open(dir)?.sync_all()
+    tcsos::fs::File::open(dir)?.sync_all()
 }
 
 #[cfg(test)]
@@ -736,7 +736,7 @@ mod tests {
                  - {{ compute: p{n} }}\n"
             )
         };
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         path
     }
 
@@ -792,8 +792,8 @@ mod tests {
         let two = written(from.path(), 2, "ytcs");
         let digest = crate::config_digest::digest_of_file(&one).unwrap();
         let tree = store_dir.path().join(digest.to_string());
-        std::fs::create_dir(&tree).unwrap();
-        std::fs::copy(&two, tree.join(format!("{digest}.ytcs"))).unwrap();
+        tcsos::fs::create_dir(&tree).unwrap();
+        tcsos::fs::copy(&two, tree.join(format!("{digest}.ytcs"))).unwrap();
 
         assert!(store.holds(digest), "a file of the name is there");
         let why = store.load(digest).expect_err("but it is another");
@@ -818,13 +818,13 @@ mod tests {
     ///
     /// The top file's path.
     fn tree(dir: &Path, top: &str, name: &str) -> PathBuf {
-        std::fs::write(
+        tcsos::fs::write(
             dir.join(format!("{name}.ytcs")),
             "vehicle:\n  - type ping:\n      - { compute: p }\n",
         )
         .unwrap();
         let path = dir.join(format!("{top}.ytcs"));
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!("include:\n  - subdiagram: sub\n    path: {name}\n"),
         )
@@ -846,7 +846,7 @@ mod tests {
         let at = store_dir.path().join(digest.to_string());
         let top_name = format!("{digest}.ytcs");
         assert_eq!(kept, Kept::Written(at.join(&top_name)));
-        let mut names: Vec<String> = std::fs::read_dir(&at)
+        let mut names: Vec<String> = tcsos::fs::read_dir(&at)
             .unwrap()
             .map(|entry| entry.unwrap().file_name().into_string().unwrap())
             .collect();
@@ -898,7 +898,7 @@ mod tests {
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
-        std::fs::create_dir(from.path().join(".sub")).unwrap();
+        tcsos::fs::create_dir(from.path().join(".sub")).unwrap();
 
         for name in [".zone", ".sub/zone"] {
             let why = store
@@ -918,8 +918,8 @@ mod tests {
     /// * `path` - The file.
     /// * `text` - What it says.
     fn put(path: &Path, text: &str) {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, text).unwrap();
+        tcsos::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        tcsos::fs::write(path, text).unwrap();
     }
 
     /// Copies the files of an example into `to`, each at its path from
@@ -935,7 +935,7 @@ mod tests {
         let examples =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
         for file in files {
-            let text = std::fs::read_to_string(examples.join(file))
+            let text = tcsos::fs::read_to_string(examples.join(file))
                 .expect("the example's file");
             put(&to.join(file), &text);
         }
@@ -1018,7 +1018,7 @@ mod tests {
             &format!("{node}z }}\n"),
         );
         put(&from.path().join("a/b/near.ytcs"), &format!("{node}n }}\n"));
-        std::fs::create_dir(from.path().join("a/b/sub")).unwrap();
+        tcsos::fs::create_dir(from.path().join("a/b/sub")).unwrap();
         let top = from.path().join("a/b/top.ytcs");
         put(&top, "include:\n  - subdiagram: zone\n    path: ../../shared/zone\n  - subdiagram: near\n    path: sub/../near\n");
         let original = crate::config_digest::digest_of_file(&top).unwrap();
@@ -1072,7 +1072,7 @@ mod tests {
         put(&store_dir.path().join("common/zone.ytcs"), node);
         let why = store.load(digest).expect_err("it would read outside");
         assert!(why.contains("outside the tree"), "{why}");
-        std::fs::remove_dir_all(&tree).unwrap();
+        tcsos::fs::remove_dir_all(&tree).unwrap();
 
         put(&tree.join(format!("top/top/{digest}.ytcs")), include);
         put(&tree.join("top/common/zone.ytcs"), node);
@@ -1112,8 +1112,8 @@ mod tests {
         let top = tree(from.path(), "top", "zone");
         let digest = crate::config_digest::digest_of_file(&top).unwrap();
         let cut_short = store_dir.path().join(format!(".{digest}.new"));
-        std::fs::create_dir(&cut_short).unwrap();
-        std::fs::write(cut_short.join("zone.ytcs"), "half").unwrap();
+        tcsos::fs::create_dir(&cut_short).unwrap();
+        tcsos::fs::write(cut_short.join("zone.ytcs"), "half").unwrap();
         assert!(store.held().unwrap().is_empty(), "it is not held");
 
         store.keep(&top).expect("kept");
@@ -1122,7 +1122,7 @@ mod tests {
 
         store.remove(digest, &[], 1).expect("removed");
         let named = digest.to_string();
-        let left: Vec<String> = std::fs::read_dir(store_dir.path())
+        let left: Vec<String> = tcsos::fs::read_dir(store_dir.path())
             .unwrap()
             .map(|entry| entry.unwrap().file_name().into_string().unwrap())
             .filter(|name| name.contains(&named))

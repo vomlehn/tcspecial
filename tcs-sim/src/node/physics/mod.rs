@@ -32,7 +32,7 @@ pub mod world;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::node::physics::Place;
 use tcsprotocol::node::vehicle::compute::{from_value, Format, ToValueParams};
@@ -597,7 +597,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::payload::{PayloadConfig, PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::node::physics::terminal::At;
     use tcsprotocol::node::physics::WorldSection;
     use tcsprotocol::sim_config::SensorErrors;
@@ -1070,7 +1070,7 @@ connections:
     /// If no socket can be bound.
     fn a_free_port() -> u16 {
         let socket =
-            std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
+            tcsos::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let port = socket.local_addr().expect("its address").port();
         drop(socket);
         port
@@ -1211,9 +1211,9 @@ connections:
         // The vehicle's end of each sensor link, which is the end that
         // waits: a sensor speaks first and this is where it speaks to.
         let readings = [two_byte, two_byte, three_byte];
-        let waiting: Vec<std::net::UdpSocket> = (0..3)
+        let waiting: Vec<tcsos::net::UdpSocket> = (0..3)
             .map(|_| {
-                let socket = std::net::UdpSocket::bind("127.0.0.1:0")
+                let socket = tcsos::net::UdpSocket::bind("127.0.0.1:0")
                     .expect("a socket for the vehicle");
                 socket.set_nonblocking(true).expect("non-blocking");
                 socket
@@ -1285,10 +1285,11 @@ connections:
 
             let listening = ports.iter().all(|at| {
                 (0..100).any(|_| {
-                    if std::net::UdpSocket::bind(("127.0.0.1", *at)).is_err() {
+                    if tcsos::net::UdpSocket::bind(("127.0.0.1", *at)).is_err()
+                    {
                         return true;
                     }
-                    std::thread::sleep(Duration::from_millis(10));
+                    tcsos::thread::sleep(Duration::from_millis(10));
                     false
                 })
             });
@@ -1311,7 +1312,7 @@ connections:
         // The vehicle's end of the heater links: it sends where the file
         // says the heater is, which is what `reaching_endpoint_pair` does
         // aboard.
-        let driving = std::net::UdpSocket::bind("127.0.0.1:0")
+        let driving = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .expect("a socket for the vehicle");
         let drive = |on: bool| {
             for at in &heaters {
@@ -1352,7 +1353,7 @@ connections:
             // the vote node does -- and what decides how often the heaters
             // are told anything.
             if !arrived {
-                std::thread::sleep(Duration::from_millis(5));
+                tcsos::thread::sleep(Duration::from_millis(5));
                 continue;
             }
             if let Some(reported) =
@@ -1391,7 +1392,7 @@ connections:
                 }
             }
 
-            std::thread::sleep(Duration::from_millis(5));
+            tcsos::thread::sleep(Duration::from_millis(5));
         }
 
         for payload in &mut payloads {

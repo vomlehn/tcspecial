@@ -9,9 +9,12 @@
 //! has no call for -- Linux's autobind, a socket file's kind -- is here
 //! beside them.
 
-pub use std::os::unix::net::{
-    SocketAddr, UnixDatagram, UnixListener, UnixStream,
-};
+/// Everything the standard library's `net` has, which on Linux is the
+/// interface: what is below is what it does not have.
+pub use std::net::*;
+
+pub use std::os::unix::net::SocketAddr as UnixSocketAddr;
+pub use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
 
 /// Binds a socket to a name the kernel chooses in the abstract namespace.
 ///
@@ -61,7 +64,7 @@ pub fn autobind(socket: &UnixDatagram) -> std::io::Result<()> {
 /// # Returns
 ///
 /// The name's bytes, or `None` for a path or an unnamed socket.
-pub fn abstract_name(address: &SocketAddr) -> Option<&[u8]> {
+pub fn abstract_name(address: &UnixSocketAddr) -> Option<&[u8]> {
     use std::os::linux::net::SocketAddrExt;
 
     address.as_abstract_name()
@@ -80,10 +83,10 @@ pub fn abstract_name(address: &SocketAddr) -> Option<&[u8]> {
 /// # Errors
 ///
 /// What the standard library said of a name too long.
-pub fn abstract_address(name: &[u8]) -> std::io::Result<SocketAddr> {
+pub fn abstract_address(name: &[u8]) -> std::io::Result<UnixSocketAddr> {
     use std::os::linux::net::SocketAddrExt;
 
-    SocketAddr::from_abstract_name(name)
+    UnixSocketAddr::from_abstract_name(name)
 }
 
 /// Whether what the file system says of a file is that it is a socket.

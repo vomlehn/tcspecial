@@ -10,9 +10,9 @@
 //! supervisor hands a process, and which the process that comes back must
 //! still hold.
 
-use std::net::UdpSocket;
-use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::net::UdpSocket;
+use tcsos::process::{Child, Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::{
     ArmKey, Beacon, CommandStatus, RestartArmCommand, RestartCommand, Telemetry,
@@ -68,7 +68,7 @@ impl Drop for Running {
 ///
 /// If the process's descriptors cannot be read.
 fn descriptors(pid: u32) -> Vec<i32> {
-    let mut open: Vec<i32> = std::fs::read_dir(format!("/proc/{pid}/fd"))
+    let mut open: Vec<i32> = tcsos::fs::read_dir(format!("/proc/{pid}/fd"))
         .expect("the process's descriptors")
         .filter_map(|entry| entry.ok()?.file_name().to_str()?.parse().ok())
         .collect();
@@ -92,7 +92,7 @@ fn descriptors(pid: u32) -> Vec<i32> {
 /// If it has none, or more than one.
 fn child_of(pid: u32) -> u32 {
     let listed =
-        std::fs::read_to_string(format!("/proc/{pid}/task/{pid}/children"))
+        tcsos::fs::read_to_string(format!("/proc/{pid}/task/{pid}/children"))
             .expect("its children can be read");
     let children: Vec<u32> = listed
         .split_whitespace()
@@ -182,7 +182,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     let at = || format!("127.0.0.1:{}", free());
-    std::fs::write(
+    tcsos::fs::write(
         &configuration,
         format!(
             "tcspecial:
@@ -336,7 +336,7 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     assert_eq!(back.sequence, 1, "the first beacon of the new start");
     assert!(back.restart_flag, "every start begins with the flag set");
     // Said once, and no more: a crash of this start would not be commanded.
-    let kept = std::fs::read_to_string(&state).expect("the state file");
+    let kept = tcsos::fs::read_to_string(&state).expect("the state file");
     assert!(!kept.contains("generation"), "{kept}");
     assert!(!kept.contains("next_start"), "{kept}");
     // And settled again, as it was when it was counted the first time.
@@ -403,7 +403,7 @@ fn written(
     arm: &str,
 ) {
     let at = || format!("127.0.0.1:{}", free());
-    std::fs::write(
+    tcsos::fs::write(
         path,
         format!(
             "tcspecial:
@@ -476,7 +476,7 @@ fn a_restart_runs_the_configuration_it_names() {
     let beacons_at = beacons.local_addr().expect("where").port();
     let take_at = free();
     let kept = dir.path().join("kept");
-    std::fs::create_dir(&kept).expect("a store");
+    tcsos::fs::create_dir(&kept).expect("a store");
     let state = dir.path().join("tcspecial.state");
 
     let first = dir.path().join("first.ytcs");
@@ -562,7 +562,7 @@ fn a_restart_runs_the_configuration_it_names() {
     let back = next_start(&beacons, still.sequence);
     assert_eq!(back.digest, theirs, "the configuration the RESTART named");
     assert!(back.restart_flag);
-    let said = std::fs::read_to_string(&state).expect("the state file");
+    let said = tcsos::fs::read_to_string(&state).expect("the state file");
     // Pushed above the command line's, which is the bottom and is not
     // written, and counted once, for the child running it.
     assert!(
@@ -583,7 +583,7 @@ fn a_restart_runs_the_configuration_it_names() {
     );
     beacon(&beacons);
     assert!(!beacon(&beacons).restart_flag, "matched");
-    let said = std::fs::read_to_string(&state).expect("the state file");
+    let said = tcsos::fs::read_to_string(&state).expect("the state file");
     assert!(
         said.contains(&format!("\nstack {theirs}\ntrials 0\n")),
         "{said}"
@@ -604,7 +604,7 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
     let beacons_at = beacons.local_addr().expect("where").port();
     let take_at = free();
     let kept = dir.path().join("kept");
-    std::fs::create_dir(&kept).expect("a store");
+    tcsos::fs::create_dir(&kept).expect("a store");
     let state = dir.path().join("tcspecial.state");
     let configuration = dir.path().join("vehicle.ytcs");
     written(
@@ -664,7 +664,7 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
         if Instant::now() > by {
             break None;
         }
-        std::thread::sleep(Duration::from_millis(20));
+        tcsos::thread::sleep(Duration::from_millis(20));
     };
     let Some(status) = status else {
         let _ = vehicle.kill();
@@ -686,7 +686,7 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
             heard.sequence
         );
     }
-    let said = std::fs::read_to_string(&state).expect("the state file");
+    let said = tcsos::fs::read_to_string(&state).expect("the state file");
     assert!(!said.contains("stack "), "{said}");
     assert!(said.contains("next_start commanded"), "{said}");
 }
@@ -704,7 +704,7 @@ fn a_child_that_dies_is_given_up_for_what_is_beneath() {
     let beacons_at = beacons.local_addr().expect("where").port();
     let take_at = free();
     let kept = dir.path().join("kept");
-    std::fs::create_dir(&kept).expect("a store");
+    tcsos::fs::create_dir(&kept).expect("a store");
     let state = dir.path().join("tcspecial.state");
 
     let first = dir.path().join("first.ytcs");
@@ -750,6 +750,6 @@ fn a_child_that_dies_is_given_up_for_what_is_beneath() {
     let back = next_start(&beacons, started.sequence);
     assert_eq!(back.digest, ours, "the command line's, beneath it");
     assert_ne!(child_of(pid), child, "a fresh child");
-    let said = std::fs::read_to_string(&state).expect("the state file");
+    let said = tcsos::fs::read_to_string(&state).expect("the state file");
     assert!(!said.contains("stack "), "popped: {said}");
 }

@@ -29,7 +29,7 @@
 //! left out of it.
 
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 /// How soon a thread waiting for a simulated moment is told to look again
 /// while the clock is paused: the moment is no moment of the wall clock's

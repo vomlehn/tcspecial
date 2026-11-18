@@ -46,8 +46,8 @@
 //! arrives wherever tcspecial's own complaints do.
 
 use std::io::{Read, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsos::wait::{Ready, Waitable, Watch};
 
@@ -698,7 +698,7 @@ mod tests {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("computation");
         let mut file =
-            std::fs::File::create(&path).expect("the program is written");
+            tcsos::fs::File::create(&path).expect("the program is written");
         write!(file, "#!/bin/sh\n{script}").expect("the program is written");
         file.flush().expect("flushed");
         drop(file);
@@ -756,7 +756,7 @@ mod tests {
             match p.start() {
                 Ok(()) => return,
                 Err(why) if why.contains("Text file busy") && attempt < 50 => {
-                    std::thread::sleep(Duration::from_millis(20));
+                    tcsos::thread::sleep(Duration::from_millis(20));
                 }
                 Err(why) => panic!("the program starts: {why}"),
             }

@@ -23,9 +23,9 @@
 //! that does not publish the name; the check exists to catch a node whose
 //! number moved, which only a real rpmsg device can do.
 
-use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::Path;
+use tcsos::fs::{File, OpenOptions};
 use tcsos::wait::{Ready, Source, Waitable};
 
 use tcsprotocol::{
@@ -149,7 +149,7 @@ fn is_that_service(
     };
     let named = class.join(node).join("name");
 
-    let Ok(announced) = std::fs::read_to_string(&named) else {
+    let Ok(announced) = tcsos::fs::read_to_string(&named) else {
         return Ok(());
     };
     let announced = announced.trim();
@@ -255,8 +255,8 @@ mod tests {
     fn a_node_that_is_another_channel_is_refused() {
         let class = tempfile::tempdir().expect("a class directory");
         let node = class.path().join("rpmsg0");
-        std::fs::create_dir(&node).expect("the node's directory");
-        std::fs::write(node.join("name"), "payload-telemetry\n")
+        tcsos::fs::create_dir(&node).expect("the node's directory");
+        tcsos::fs::write(node.join("name"), "payload-telemetry\n")
             .expect("what it is");
 
         is_that_service(
@@ -336,7 +336,7 @@ mod tests {
         master.write_all(b"DATA").expect("the remote answers");
         let answered = (0..50)
             .find_map(|_| {
-                std::thread::sleep(std::time::Duration::from_millis(20));
+                tcsos::thread::sleep(tcsos::time::Duration::from_millis(20));
                 match endpoint.read(&mut got) {
                     Ok(0) => None,
                     Ok(n) => Some(n),

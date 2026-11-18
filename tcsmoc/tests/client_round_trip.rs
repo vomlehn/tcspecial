@@ -10,9 +10,9 @@
 //! starts tcspecial: a test that needed the flight software running could not
 //! be run twice at once, and would be testing that as much as this.
 
-use std::net::UdpSocket;
-use std::thread;
-use std::time::Duration;
+use tcsos::net::UdpSocket;
+use tcsos::thread;
+use tcsos::time::Duration;
 
 use tcsmoc::beacon::Stage;
 use tcsmoc::matched::Matched;

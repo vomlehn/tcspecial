@@ -23,11 +23,11 @@
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
-use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::fs::File;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, lateness, make_the_path_lead_to,
@@ -172,7 +172,7 @@ impl Drop for SimulatedBus {
     /// kernel's and stays.
     fn drop(&mut self) {
         if self.linked && self.named.is_symlink() {
-            let _ = std::fs::remove_file(&self.named);
+            let _ = tcsos::fs::remove_file(&self.named);
         }
     }
 }
@@ -198,7 +198,7 @@ impl Drop for SimulatedBus {
 /// A message if `adapters` cannot be read, or saying how to load the stub
 /// if none is there.
 fn find_stub(adapters: &Path) -> Result<String, String> {
-    let entries = std::fs::read_dir(adapters)
+    let entries = tcsos::fs::read_dir(adapters)
         .map_err(|e| format!("{} cannot be read: {e}", adapters.display()))?;
 
     let mut found = Vec::new();
@@ -211,7 +211,7 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
             Some(number) => number,
             None => continue,
         };
-        let said = match std::fs::read_to_string(entry.path().join("name")) {
+        let said = match tcsos::fs::read_to_string(entry.path().join("name")) {
             Ok(said) => said,
             Err(_) => continue,
         };
@@ -459,8 +459,8 @@ mod tests {
         let root = tempfile::tempdir().expect("a directory");
         for (adapter, name) in named {
             let dir = root.path().join(adapter);
-            std::fs::create_dir(&dir).expect("an adapter");
-            std::fs::write(dir.join("name"), name).expect("its name");
+            tcsos::fs::create_dir(&dir).expect("an adapter");
+            tcsos::fs::write(dir.join("name"), name).expect("its name");
         }
         root
     }

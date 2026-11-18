@@ -40,7 +40,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread;
+use tcsos::thread;
 
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 
@@ -904,12 +904,12 @@ fn ambient_of(sim_path: Option<&str>, mode: Mode) -> Option<f64> {
 
 /// How long a simulator already running is given to answer before one is
 /// started: a simulator that is there answers at once.
-const ASK_FIRST: std::time::Duration = std::time::Duration::from_secs(1);
+const ASK_FIRST: tcsos::time::Duration = tcsos::time::Duration::from_secs(1);
 
 /// How long a simulator this starts is given to make its simulated devices.
 /// Built by `cargo run` first, which is most of it.
-const WAIT_FOR_SIMULATOR: std::time::Duration =
-    std::time::Duration::from_secs(120);
+const WAIT_FOR_SIMULATOR: tcsos::time::Duration =
+    tcsos::time::Duration::from_secs(120);
 
 /// Has a simulator ready for this run, where it has anything to simulate.
 ///
@@ -1002,7 +1002,7 @@ fn simulator_for(
     // Waited for a little at a time, so that a tcs-sim that refused to start
     // -- and said why, in its own window -- is noticed as that, rather than
     // waited for until the time runs out.
-    let started = std::time::Instant::now();
+    let started = tcsos::time::Instant::now();
     loop {
         let waited = started.elapsed();
         match simulator::wait(at, &ours, ASK_FIRST) {
@@ -2758,10 +2758,10 @@ pub(crate) fn packets_said(counts: &tcsmoc::matched::Counts) -> String {
 ///
 /// The key.
 fn window_arm_key() -> tcsprotocol::ArmKey {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let nanos = tcsos::time::SystemTime::now()
+        .duration_since(tcsos::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_nanos() as u64);
-    tcsprotocol::ArmKey(nanos ^ (u64::from(std::process::id()) << 32))
+    tcsprotocol::ArmKey(nanos ^ (u64::from(tcsos::process::id()) << 32))
 }
 
 /// The ping node's answers, on their way to the pinger and its window.
@@ -2792,7 +2792,7 @@ struct PingFeed {
 /// * `feed` - The pinger, and the flag that says something is fresh.
 /// * `data` - What the ping node sent.
 /// * `at`   - When it arrived, by the ground's clock.
-fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) {
+fn take_answer(feed: &PingFeed, data: &[u8], at: tcsos::time::Duration) {
     // A poisoned lock is a pinger nobody can use, and this answer goes with
     // it.
     if let Ok(mut pinger) = feed.pinger.lock() {
@@ -2804,8 +2804,8 @@ fn take_answer(feed: &PingFeed, data: &[u8], at: std::time::Duration) {
 /// How often the ping window looks for an answer to show. Short, because the
 /// answer to a ping somebody has just sent is what they are watching for;
 /// cheap, because most looks find nothing and do nothing.
-const PING_REFRESH_INTERVAL: std::time::Duration =
-    std::time::Duration::from_millis(100);
+const PING_REFRESH_INTERVAL: tcsos::time::Duration =
+    tcsos::time::Duration::from_millis(100);
 
 /// Shows the ping window what the pinger keeps, whenever something new has
 /// arrived, from a timer on the window's thread.
@@ -2941,7 +2941,7 @@ fn serve(
             }
         }
         if let (Some(plotted), Some(plot)) = (source.plotted, plot.as_ref()) {
-            plot::take(plot, plotted, data, std::time::Instant::now());
+            plot::take(plot, plotted, data, tcsos::time::Instant::now());
         }
         let Some(row) = source.row else {
             continue;
@@ -3485,7 +3485,7 @@ pub fn run(
         }
         ask_for_the_edge(&ui, Edge::Top);
         ui.run().unwrap();
-        std::process::exit(0);
+        tcsos::process::exit(0);
     };
     // There is a link, so there is the asking made for it.
     let Some(asking) = asking else {
@@ -3511,7 +3511,7 @@ pub fn run(
     }
     ask_for_the_edge(&ui, Edge::Top);
     ui.run().unwrap();
-    std::process::exit(0);
+    tcsos::process::exit(0);
 }
 
 // The manual's screenshots, made from this window on demand: see
@@ -3629,7 +3629,7 @@ pub(crate) mod tests {
 
         let dir = tempfile::tempdir().expect("a directory");
         let wrong = dir.path().join("wrong.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &wrong,
             "vehicle:
   - type compute:
@@ -3656,7 +3656,7 @@ pub(crate) mod tests {
     /// [`pressing_connect_and_enable_commands_the_vehicle`] is not: called
     /// from `crate::tests::every_panels_data_is_inside_the_window`.
     pub(crate) fn the_restart_controls_go_onto_the_restart_target() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::{
             Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
             Telemetry,
@@ -3664,12 +3664,12 @@ pub(crate) mod tests {
 
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_secs(10)))
             .expect("a timeout");
         let at = vehicle.local_addr().expect("where it is").to_string();
         let ours = ConfigDigest([0x5Au8; 16]);
         let other = ConfigDigest([0x77u8; 16]);
-        let asked = std::thread::spawn(move || {
+        let asked = tcsos::thread::spawn(move || {
             let mut buffer = [0u8; 256];
             let mut seen = Vec::new();
             for _ in 0..4 {
@@ -3808,7 +3808,7 @@ pub(crate) mod tests {
     /// from `crate::tests::every_panels_data_is_inside_the_window`.
     pub(crate) fn a_command_pressed_unmatched_is_said_in_a_pop_up() {
         use i_slint_backend_testing::ElementQuery;
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::{Command, CommandType, ConfigDigest, HostPort};
 
         let ours = ConfigDigest([0x5Au8; 16]);
@@ -3821,12 +3821,12 @@ pub(crate) mod tests {
         // gone, which on a loaded machine can take longer than any wait.
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_millis(100)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_millis(100)))
             .expect("a timeout");
         let at = vehicle.local_addr().expect("where it is").to_string();
         let done = Arc::new(AtomicBool::new(false));
         let finished = done.clone();
-        let asked = std::thread::spawn(move || {
+        let asked = tcsos::thread::spawn(move || {
             let mut buffer = [0u8; 256];
             let mut seen = Vec::new();
             loop {
@@ -4069,17 +4069,17 @@ pub(crate) mod tests {
     /// If it has not happened within ten seconds.
     fn pump_until(what: &str, done: impl Fn() -> bool) {
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(10);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(10);
         while !done() {
             assert!(
-                std::time::Instant::now() < deadline,
+                tcsos::time::Instant::now() < deadline,
                 "waited too long for {what}"
             );
             let _ = slint::invoke_from_event_loop(|| {
                 let _ = slint::quit_event_loop();
             });
             slint::run_event_loop().expect("the event loop");
-            thread::sleep(std::time::Duration::from_millis(10));
+            thread::sleep(tcsos::time::Duration::from_millis(10));
         }
     }
 
@@ -4093,7 +4093,7 @@ pub(crate) mod tests {
     ///
     /// Its port.
     fn vehicle_port(at: &str) -> u16 {
-        at.parse::<std::net::SocketAddr>()
+        at.parse::<tcsos::net::SocketAddr>()
             .expect("an address")
             .port()
     }
@@ -4113,7 +4113,7 @@ pub(crate) mod tests {
     fn a_ping_answer_reaches_the_pinger_and_the_window_is_told() {
         use tcsprotocol::node::vehicle::ping;
 
-        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+        let port = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .and_then(|socket| socket.local_addr())
             .expect("a free port")
             .port();
@@ -4121,7 +4121,7 @@ pub(crate) mod tests {
         let path = dir.path().join("vehicle.ytcs");
         // The ping node's name sorts after the gateway node's, so it is
         // device id 1 and its answers arrive at ground_base plus one: `port`.
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -4145,7 +4145,7 @@ vehicle:
         };
 
         let pinger = Arc::new(Mutex::new(Pinger::new()));
-        let at = std::time::Duration::new(1_760_900_000, 0);
+        let at = tcsos::time::Duration::new(1_760_900_000, 0);
         let sent = pinger
             .lock()
             .expect("the pinger")
@@ -4174,20 +4174,20 @@ vehicle:
         });
 
         let answer = ping::reply(sent.as_bytes(), at).expect("answered");
-        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
+        let vehicle = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket");
         vehicle
             .send_to(&as_sent(answer.as_bytes()), ("127.0.0.1", port))
             .expect("sent");
 
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(5);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         while !fresh.load(Ordering::Acquire) {
             assert!(
-                std::time::Instant::now() < deadline,
+                tcsos::time::Instant::now() < deadline,
                 "the window was never told of the answer"
             );
-            thread::sleep(std::time::Duration::from_millis(10));
+            thread::sleep(tcsos::time::Duration::from_millis(10));
         }
         let pinger = pinger.lock().expect("the pinger");
         assert!(
@@ -4202,13 +4202,13 @@ vehicle:
     /// a source with no panel is passed over.
     #[test]
     fn each_datum_goes_to_its_sources_panel() {
-        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+        let port = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .and_then(|socket| socket.local_addr())
             .expect("a free port")
             .port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -4257,7 +4257,7 @@ payloads:
             });
         }
 
-        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
+        let vehicle = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket");
         vehicle
             .send_to(&as_sent(b"from a"), ("127.0.0.1", port))
@@ -4269,7 +4269,7 @@ payloads:
         }
 
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(5);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         loop {
             let slots = arrivals.lock().expect("the slots");
             if let Some(arrival) = &slots[1] {
@@ -4288,10 +4288,10 @@ payloads:
             }
             drop(slots);
             assert!(
-                std::time::Instant::now() < deadline,
+                tcsos::time::Instant::now() < deadline,
                 "b's two data did not reach its panel"
             );
-            thread::sleep(std::time::Duration::from_millis(10));
+            thread::sleep(tcsos::time::Duration::from_millis(10));
         }
     }
 
@@ -4300,13 +4300,13 @@ payloads:
     /// place; and the next datum's members replace the last's.
     #[test]
     fn a_consolidation_is_shown_by_member() {
-        let port = std::net::UdpSocket::bind("127.0.0.1:0")
+        let port = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .and_then(|socket| socket.local_addr())
             .expect("a free port")
             .port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -4372,11 +4372,11 @@ vehicle:
             });
         }
 
-        let vehicle = std::net::UdpSocket::bind("127.0.0.1:0")
+        let vehicle = tcsos::net::UdpSocket::bind("127.0.0.1:0")
             .expect("the vehicle's socket");
         let shown = |packets: u64| {
-            let deadline =
-                std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let deadline = tcsos::time::Instant::now()
+                + tcsos::time::Duration::from_secs(5);
             loop {
                 if let Some(arrival) = &arrivals.lock().expect("the slots")[0] {
                     if arrival.packets == packets {
@@ -4384,10 +4384,10 @@ vehicle:
                     }
                 }
                 assert!(
-                    std::time::Instant::now() < deadline,
+                    tcsos::time::Instant::now() < deadline,
                     "datum {packets} did not reach the panel"
                 );
-                thread::sleep(std::time::Duration::from_millis(10));
+                thread::sleep(tcsos::time::Duration::from_millis(10));
             }
         };
         let mut datum = [0u8; 32];
@@ -4763,17 +4763,17 @@ vehicle:
     /// vehicle is a socket this test holds where the gateway node binds, so
     /// what is checked is the press and the answer and not tcspecial.
     pub(crate) fn pressing_send_ping_pings_the_node_and_times_its_answer() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::node::vehicle::ping;
 
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_secs(2)))
             .expect("a timeout");
         let port = vehicle.local_addr().expect("where it is").port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("ping.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -4831,7 +4831,7 @@ vehicle:
             ping_window.get_sent()
         );
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_millis(200)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_millis(200)))
             .expect("a timeout");
         let mut nothing = [0u8; 64];
         assert!(
@@ -4839,7 +4839,7 @@ vehicle:
             "a ping went up before a match"
         );
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_secs(2)))
             .expect("a timeout");
         ui.set_notice_up(false);
 
@@ -4874,7 +4874,7 @@ vehicle:
         take_answer(
             &feed,
             answer.as_bytes(),
-            had + std::time::Duration::from_millis(1),
+            had + tcsos::time::Duration::from_millis(1),
         );
         assert!(feed.fresh.load(Ordering::Acquire), "the window is told");
         show_ping(
@@ -4925,7 +4925,7 @@ vehicle:
     /// from `crate::tests::every_panels_data_is_inside_the_window`.
     pub(crate) fn pressing_connect_and_enable_commands_the_vehicle() {
         use i_slint_backend_testing::ElementHandle;
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::{
             Command, ConfigDigest, ConfigVersion, ConnectTelemetry, HostPort,
             NodeTelemetry, Telemetry,
@@ -4948,7 +4948,7 @@ vehicle:
         type Setting = (String, Vec<u8>);
         let was_set: Arc<Mutex<Option<Setting>>> = Arc::new(Mutex::new(None));
         let setting = was_set.clone();
-        let answering = std::thread::spawn(move || {
+        let answering = tcsos::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let mut seen = Vec::new();
             for _ in 0..9 {
@@ -5049,7 +5049,7 @@ vehicle:
                     port: 0,
                 },
                 to: at
-                    .parse::<std::net::SocketAddr>()
+                    .parse::<tcsos::net::SocketAddr>()
                     .map(|a| HostPort {
                         address: a.ip().to_string(),
                         port: a.port(),
@@ -5382,7 +5382,7 @@ vehicle:
         let dir = tempfile::tempdir().expect("a directory");
         let write = |name: &str, text: &str| {
             let path = dir.path().join(name);
-            std::fs::write(&path, text).expect("written");
+            tcsos::fs::write(&path, text).expect("written");
             path.to_str().expect("a path").to_string()
         };
         let world =

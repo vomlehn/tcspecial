@@ -42,8 +42,8 @@
 //! `examples/ping-common/ping_ground.py` is this in Python, for the example's
 //! Python ground station.
 
-use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
-use std::time::Duration;
+use tcsos::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use tcsos::time::Duration;
 
 use tcsprotocol::graph::reach::reach_of;
 use tcsprotocol::graph::telemetry::{self, Via};
@@ -649,7 +649,7 @@ mod tests {
         let port = vehicle.local_addr().expect("an address").port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -685,7 +685,7 @@ mod tests {
         let port = vehicle.local_addr().expect("an address").port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:

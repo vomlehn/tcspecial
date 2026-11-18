@@ -31,7 +31,7 @@
 //! fly, with `tcs-verify --types=$(tcspecial --types) <configuration>`.
 
 use std::env;
-use std::process;
+use tcsos::process;
 
 #[cfg(feature = "visual")]
 use log::warn;

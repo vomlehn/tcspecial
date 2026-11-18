@@ -31,7 +31,7 @@
 //! answers. What it answers arrives on the groundward stream, which is the
 //! other one from what it was given.
 
-use std::process::ExitStatus;
+use tcsos::process::ExitStatus;
 
 use tcsapp::parent::{self, Arrived, ReadInto, Running, Supports};
 use tcsprotocol::node::app::{AppParams, Kind};
@@ -162,7 +162,7 @@ mod tests {
     /// If it cannot be written or made executable.
     fn simulated_app(where_: &std::path::Path) -> PathBuf {
         let path = where_.join("simulated_app");
-        let mut file = std::fs::File::create(&path).expect("a program");
+        let mut file = tcsos::fs::File::create(&path).expect("a program");
         file.write_all(b"#!/bin/sh\nexec cat <&1\n")
             .expect("a program");
         tcsos::fs::set_mode(&path, 0o755).expect("a program that can be run");

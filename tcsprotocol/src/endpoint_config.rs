@@ -20,7 +20,7 @@
 //! `docs/tcspecial-design.rst`, under "Payload Configuration Files".
 
 use std::fmt;
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::{Deserialize, Serialize};

@@ -7,7 +7,7 @@
 //! say is shared with the ground link, and is `crate::graph::reach`'s: see
 //! `crate::node`, which says why there is no `gateway` directory.
 
-use std::net::IpAddr;
+use tcsos::net::IpAddr;
 
 use crate::types::{NetworkConfig, NetworkProtocol};
 

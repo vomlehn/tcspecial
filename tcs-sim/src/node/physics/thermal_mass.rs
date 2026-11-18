@@ -203,7 +203,7 @@ impl Component for ThermalMass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::node::physics::thermal_mass::TERMINALS;
     use tcsprotocol::node::physics::Wander;
 

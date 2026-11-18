@@ -22,7 +22,7 @@
 //! `start` where that is stated. The arithmetic is tcs-sim's
 //! `physics::thermal_mass`.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Serialize};

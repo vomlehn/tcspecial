@@ -38,11 +38,11 @@
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
-use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::time::Instant;
 
 use crate::payload::{
     could_not_simulate, wait_out_packet, Pacing, PayloadConfig, PayloadStats,
@@ -86,7 +86,8 @@ impl SimulatedLine {
 
 /// How often a driven chip's lines are looked at. Far quicker than any
 /// decision a vehicle makes about a heater, and slow enough to cost nothing.
-const WATCH_EVERY: std::time::Duration = std::time::Duration::from_millis(20);
+const WATCH_EVERY: tcsos::time::Duration =
+    tcsos::time::Duration::from_millis(20);
 
 /// Finds the simulated lines of a chip, where the kernel has any.
 ///
@@ -193,7 +194,7 @@ pub fn run_gpio_node(
 
             let mut moved = 0u64;
             for line in &lines {
-                match std::fs::write(&line.pull, pull) {
+                match tcsos::fs::write(&line.pull, pull) {
                     Ok(()) => moved += 1,
                     Err(e) => {
                         eprintln!(
@@ -438,7 +439,7 @@ fn pull_to_the_world(
                     continue;
                 }
                 let pull = if level { "pull-up" } else { "pull-down" };
-                match std::fs::write(&line.pull, pull) {
+                match tcsos::fs::write(&line.pull, pull) {
                     Ok(()) => {
                         moved += 1;
                         *was = Some(level);
@@ -499,7 +500,7 @@ fn watch_driven_lines(
         for (path, value) in values.iter().zip(now.iter_mut()) {
             // Opened each time, as a sysfs attribute is read: its value is
             // what it is when it is opened.
-            let high = std::fs::File::open(path)
+            let high = tcsos::fs::File::open(path)
                 .and_then(|mut file| file.read(&mut read))
                 .is_ok_and(|n| n > 0 && read[0] == b'1');
             *value = if high { b'1' } else { b'0' };
@@ -541,15 +542,15 @@ mod tests {
         let tree = tempfile::tempdir().expect("a tree of our own");
 
         // Something that is not a simulated chip, to be passed over.
-        std::fs::create_dir(tree.path().join("serial8250"))
+        tcsos::fs::create_dir(tree.path().join("serial8250"))
             .expect("another device");
 
         // And one that is, gpiochip3, whose lines the kernel puts in a
         // directory of the chip's name under its gpio-sim device.
         let bank = tree.path().join("gpio-sim.1").join("gpiochip3");
-        std::fs::create_dir_all(&bank).expect("the chip");
+        tcsos::fs::create_dir_all(&bank).expect("the chip");
         // And another simulated chip, which is not the one wanted.
-        std::fs::create_dir_all(tree.path().join("gpio-sim.0/gpiochip1"))
+        tcsos::fs::create_dir_all(tree.path().join("gpio-sim.0/gpiochip1"))
             .expect("another chip");
 
         let found = lines_of(tree.path(), "/dev/gpiochip3", &[0, 5])
@@ -583,8 +584,8 @@ mod tests {
             .iter()
             .map(|n| {
                 let dir = tree.path().join(format!("sim_gpio{n}"));
-                std::fs::create_dir_all(&dir).unwrap();
-                std::fs::write(dir.join("value"), "0\n").unwrap();
+                tcsos::fs::create_dir_all(&dir).unwrap();
+                tcsos::fs::write(dir.join("value"), "0\n").unwrap();
                 SimulatedLine {
                     pull: dir.join("pull"),
                 }
@@ -618,16 +619,16 @@ mod tests {
         let watching = {
             let (running, stats, lines) =
                 (running.clone(), stats.clone(), lines.clone());
-            std::thread::spawn(move || {
+            tcsos::thread::spawn(move || {
                 watch_driven_lines(&config, &running, &stats, &lines)
             })
         };
-        let settle = || std::thread::sleep(WATCH_EVERY * 5);
+        let settle = || tcsos::thread::sleep(WATCH_EVERY * 5);
 
         settle();
         assert_eq!(stats.lock().unwrap().packets_recv, 0, "nothing has moved");
         for line in &lines {
-            std::fs::write(line.value(), "1\n").unwrap();
+            tcsos::fs::write(line.value(), "1\n").unwrap();
         }
         settle();
         assert_eq!(stats.lock().unwrap().packets_recv, 1, "the line moved");
@@ -702,17 +703,17 @@ mod tests {
     ) -> (
         Arc<AtomicBool>,
         Arc<std::sync::Mutex<PayloadStats>>,
-        std::thread::JoinHandle<()>,
+        tcsos::thread::JoinHandle<()>,
     ) {
         let running = Arc::new(AtomicBool::new(true));
         let stats = Arc::new(std::sync::Mutex::new(PayloadStats::default()));
         let thread = {
             let (running, stats) = (running.clone(), stats.clone());
-            std::thread::spawn(move || {
+            tcsos::thread::spawn(move || {
                 run_gpio_udp_node(config, running, stats)
             })
         };
-        std::thread::sleep(WATCH_EVERY * 5);
+        tcsos::thread::sleep(WATCH_EVERY * 5);
         (running, stats, thread)
     }
 
@@ -727,12 +728,12 @@ mod tests {
 
         for (state, count) in [(b"11", 1), (b"11", 1), (b"00", 2)] {
             vehicle.send_to(state, at).expect("sent");
-            std::thread::sleep(WATCH_EVERY * 5);
+            tcsos::thread::sleep(WATCH_EVERY * 5);
             assert_eq!(received(), count, "after {state:?}");
         }
         // Not a state of the two lines: said, and taken for nothing.
         vehicle.send_to(b"1", at).expect("sent");
-        std::thread::sleep(WATCH_EVERY * 5);
+        tcsos::thread::sleep(WATCH_EVERY * 5);
         assert_eq!(received(), 2);
 
         running.store(false, Ordering::SeqCst);
@@ -748,7 +749,7 @@ mod tests {
         let (running, _stats, thread) = started(config);
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a socket");
         vehicle
-            .set_read_timeout(Some(std::time::Duration::from_secs(1)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_secs(1)))
             .expect("a timeout");
 
         vehicle.send_to(&[], at).expect("the hello");
@@ -801,15 +802,15 @@ mod tests {
     fn moving_a_line_writes_a_pull() {
         let tree = tempfile::tempdir().expect("a tree of our own");
         let bank = tree.path().join("gpio-sim.0").join("gpiochip0");
-        std::fs::create_dir_all(bank.join("sim_gpio2")).expect("the line");
+        tcsos::fs::create_dir_all(bank.join("sim_gpio2")).expect("the line");
 
         let lines =
             lines_of(tree.path(), "/dev/gpiochip0", &[2]).expect("the line");
-        std::fs::write(&lines[0].pull, "pull-up")
+        tcsos::fs::write(&lines[0].pull, "pull-up")
             .expect("the line is pulled up");
 
         assert_eq!(
-            std::fs::read_to_string(&lines[0].pull)
+            tcsos::fs::read_to_string(&lines[0].pull)
                 .expect("what it is pulled to"),
             "pull-up"
         );

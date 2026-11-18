@@ -12,8 +12,8 @@
 //! to the slave for as long as the payload runs. Opening the pty and taking
 //! the line discipline out of the way are `tcsos::linux::pty`'s.
 
-use std::fs::File;
 use std::path::PathBuf;
+use tcsos::fs::File;
 
 use crate::payload::make_the_path_lead_to;
 
@@ -85,7 +85,7 @@ impl Drop for SimulatedNode {
     /// simulator.
     fn drop(&mut self) {
         if self.named.is_symlink() {
-            let _ = std::fs::remove_file(&self.named);
+            let _ = tcsos::fs::remove_file(&self.named);
         }
     }
 }

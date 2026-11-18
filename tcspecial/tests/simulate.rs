@@ -11,10 +11,10 @@
 //! setting, is one its supervisor starts again, after a delay, for ever:
 //! that is stopped once the supervisor says it will start it again.
 
-use std::fs::File;
 use std::io::Read;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::fs::File;
+use tcsos::process::{Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 /// Runs tcspecial as `command` says until it ends, or until its supervisor
 /// says it will start it again, when it is stopped, and collects what it
@@ -43,7 +43,7 @@ fn stderr_of(command: &mut Command) -> String {
     let mut stderr = child.stderr.take().expect("its stderr");
     let said = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
     let filling = said.clone();
-    let reader = std::thread::spawn(move || {
+    let reader = tcsos::thread::spawn(move || {
         let mut chunk = [0u8; 4096];
         while let Ok(size) = stderr.read(&mut chunk) {
             if size == 0 {
@@ -76,7 +76,7 @@ fn stderr_of(command: &mut Command) -> String {
             let _ = child.wait();
             panic!("tcspecial neither ended nor said it would start again");
         }
-        std::thread::sleep(Duration::from_millis(20));
+        tcsos::thread::sleep(Duration::from_millis(20));
     }
     reader.join().expect("its stderr is read");
     let said = said.lock().expect("what it said").clone();
@@ -103,7 +103,7 @@ fn configuration(dir: &std::path::Path, payloads: &str) -> std::path::PathBuf {
     let path = dir.join("vehicle.ytcs");
     let missing = dir.join("telemetry");
     let state = dir.join("tcspecial.state").display().to_string();
-    std::fs::write(
+    tcsos::fs::write(
         &path,
         format!(
             "tcspecial:
@@ -265,7 +265,7 @@ fn a_sim_address_is_where_a_simulated_channel_is_reached() {
     let dir = tempfile::tempdir().expect("a directory");
     let path = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
-    std::fs::write(
+    tcsos::fs::write(
         &path,
         format!(
             "tcspecial:

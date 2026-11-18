@@ -56,7 +56,7 @@ pub struct Largest {
 fn is_ipv6(host: &str) -> bool {
     host.trim_start_matches('[')
         .trim_end_matches(']')
-        .parse::<std::net::Ipv6Addr>()
+        .parse::<tcsos::net::Ipv6Addr>()
         .is_ok()
 }
 

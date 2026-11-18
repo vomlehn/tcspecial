@@ -38,17 +38,19 @@
 //! can be had.
 
 use std::io::ErrorKind;
-use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::time::{Duration, Instant};
 use tcsos::wait::{Ready, Source, Waitable};
 
+#[cfg(target_os = "linux")]
+use tcsprotocol::Bias;
 use tcsprotocol::{
     graph::terminals::Stream,
     link_type::Basic,
     node::payload::gpio::{state_read, state_said},
-    Bias, GpioConfig, TcsError, TcsResult,
+    GpioConfig, TcsError, TcsResult,
 };
 
 use crate::endpoint::{
@@ -782,7 +784,9 @@ impl EndpointReadable for GpioEndpoint {
         }
 
         // What tcs-sim has said of simulated lines, taken whether or not a
-        // report is due, so that what is reported is the latest.
+        // report is due, so that what is reported is the latest. Where a
+        // chip cannot be had, every set of lines is simulated.
+        #[cfg_attr(not(target_os = "linux"), allow(irrefutable_let_patterns))]
         if let Lines::Udp(udp) = &self.lines {
             udp.take(&self.what, count)?;
         }
@@ -915,7 +919,7 @@ mod tests {
         offsets: Vec<u32>,
         watched: u64,
         driven: u64,
-    ) -> (GpioEndpoint, std::fs::File) {
+    ) -> (GpioEndpoint, tcsos::fs::File) {
         let (lines, end) =
             tcsos::linux::gpio::Lines::on_a_pipe().expect("a pipe");
         let endpoint = GpioEndpoint {
@@ -1217,7 +1221,7 @@ mod tests {
             if n > 0 {
                 return buffer[..n].to_vec();
             }
-            std::thread::sleep(Duration::from_millis(5));
+            tcsos::thread::sleep(Duration::from_millis(5));
         }
         Vec::new()
     }
@@ -1238,7 +1242,7 @@ mod tests {
         // 3 high -- bit 0 of a u8 -- and not the one before it.
         tcs_sim.send_to(b"00", vehicle).expect("sent");
         tcs_sim.send_to(b"10", vehicle).expect("sent");
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
         assert_eq!(read_some(&mut endpoint), vec![0b01]);
         assert_eq!(endpoint.stream(), Some(Stream::Groundward));
 
@@ -1248,12 +1252,12 @@ mod tests {
 
         // Line 3 falls and line 7 rises: bit 1.
         tcs_sim.send_to(b"01", vehicle).expect("sent");
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
         endpoint.shared.asked.store(true, Ordering::Release);
         assert_eq!(read_some(&mut endpoint), vec![0b10]);
 
         tcs_sim.send_to(b"2", vehicle).expect("sent");
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
         let refused = endpoint.read(&mut buffer).expect_err("not a state");
         assert!(refused.to_string().contains("not a 1 or a 0"), "{refused}");
     }

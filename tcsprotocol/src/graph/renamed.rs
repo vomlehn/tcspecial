@@ -712,7 +712,7 @@ mod tests {
             [("ytcs", yaml_with("", "")), ("xtcs", xml_with("", ""))]
         {
             let path = dir.path().join(format!("new.{extension}"));
-            std::fs::write(&path, text).expect("written");
+            tcsos::fs::write(&path, text).expect("written");
             crate::graph::Graph::load(&path)
                 .unwrap_or_else(|e| panic!("{extension}: {e}"));
         }
@@ -862,7 +862,7 @@ mod tests {
                 [("ytcs", yaml_with_old(said)), ("xtcs", xml_with_old(said))]
             {
                 let path = dir.path().join(format!("old.{extension}"));
-                std::fs::write(&path, &text).expect("written");
+                tcsos::fs::write(&path, &text).expect("written");
                 let why = crate::graph::Graph::load(&path)
                     .expect_err("an old word is refused")
                     .to_string();

@@ -39,8 +39,8 @@
 
 use std::fmt::Write as _;
 use std::io;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
-use std::time::{Duration, SystemTime};
+use tcsos::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
+use tcsos::time::{Duration, SystemTime};
 
 use tcsprotocol::graph::link_table::LinkDigest;
 use tcsprotocol::{
@@ -2055,9 +2055,9 @@ mod tests {
         let waker = beacons.waker().expect("a waker");
 
         for _ in 0..2 {
-            let woken = std::thread::scope(|scope| {
+            let woken = tcsos::thread::scope(|scope| {
                 let pass = scope.spawn(|| beacons.pass().clone());
-                std::thread::sleep(Duration::from_millis(50));
+                tcsos::thread::sleep(Duration::from_millis(50));
                 waker.wake().expect("the wakeup is sent");
                 pass.join().expect("the pass ended")
             });

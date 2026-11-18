@@ -29,9 +29,9 @@
 //! is handed every frame, so two tcspecials on one interface each see all
 //! of it rather than part.
 
-use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use tcsos::fs::{File, OpenOptions};
 
 use log::warn;
 use tcsos::fs::Taken;
@@ -49,8 +49,8 @@ use tcsprotocol::{TcsError, TcsResult};
 fn whole(file: &File) -> Taken {
     match file.try_lock() {
         Ok(()) => Taken::Yes,
-        Err(std::fs::TryLockError::WouldBlock) => Taken::Elsewhere,
-        Err(std::fs::TryLockError::Error(e)) => Taken::Cannot(e),
+        Err(tcsos::fs::TryLockError::WouldBlock) => Taken::Elsewhere,
+        Err(tcsos::fs::TryLockError::Error(e)) => Taken::Cannot(e),
     }
 }
 
@@ -74,7 +74,7 @@ fn retried(take: impl Fn() -> Taken) -> Taken {
     let tries = HELD_FOR.as_millis() / TRY_EVERY.as_millis();
     for _ in 1..tries {
         match take() {
-            Taken::Elsewhere => std::thread::sleep(TRY_EVERY),
+            Taken::Elsewhere => tcsos::thread::sleep(TRY_EVERY),
             said => return said,
         }
     }
@@ -83,10 +83,10 @@ fn retried(take: impl Fn() -> Taken) -> Taken {
 
 /// How long a lock found held is tried again before it is taken to be
 /// another tcspecial's: see [`retried`].
-const HELD_FOR: std::time::Duration = std::time::Duration::from_millis(500);
+const HELD_FOR: tcsos::time::Duration = tcsos::time::Duration::from_millis(500);
 
 /// How often it is tried in that time.
-const TRY_EVERY: std::time::Duration = std::time::Duration::from_millis(10);
+const TRY_EVERY: tcsos::time::Duration = tcsos::time::Duration::from_millis(10);
 
 /// The refusal of a device another process holds.
 ///
@@ -301,7 +301,7 @@ mod tests {
     fn a_file(name: &str) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join(name);
-        std::fs::write(&path, b"").expect("a file");
+        tcsos::fs::write(&path, b"").expect("a file");
         (dir, path)
     }
 
@@ -333,7 +333,7 @@ mod tests {
         while held("second", &shown, &second).is_err() {
             tries += 1;
             assert!(tries < 100, "it is never let go");
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(10));
         }
     }
 
@@ -396,7 +396,7 @@ mod tests {
         while state_file(&path).is_err() {
             tries += 1;
             assert!(tries < 100, "it is never let go");
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(10));
         }
         state_file(&path).expect("and taken again is still held");
     }

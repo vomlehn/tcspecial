@@ -13,8 +13,8 @@
 //! framed too: as telemetry under `payload_telemetry.apid_base` plus its
 //! device id, at `dest_base` plus the same. The test is the ground station.
 
-use std::net::{SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::ccsds::{read_header, PacketType, Sender};
 use tcsprotocol::link_type::{uncounted, Count};
@@ -82,7 +82,7 @@ fn a_vehicle_answering_to_yamcs_frames_every_packet() {
 
     let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
-    std::fs::write(
+    tcsos::fs::write(
         &configuration,
         format!(
             "tcspecial:
@@ -255,7 +255,7 @@ fn an_untouched_payload_reports_framed_under_its_counted_apid() {
 
     let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
-    std::fs::write(
+    tcsos::fs::write(
         &configuration,
         format!(
             "tcspecial:

@@ -9,10 +9,10 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::net::{TcpListener, TcpStream};
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, hangs_up, ignore_this_request, lateness,
@@ -132,9 +132,9 @@ pub fn run_tcp_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::net::TcpStream;
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::net::TcpStream;
+    use tcsos::time::Duration;
     use tcsprotocol::Faults;
 
     /// Makes a working simulated TCP device on 127.0.0.1, sending twelve-byte
@@ -214,7 +214,7 @@ mod tests {
     /// If no port can be bound.
     fn a_free_port() -> u16 {
         let socket =
-            std::net::TcpListener::bind("127.0.0.1:0").expect("a port");
+            tcsos::net::TcpListener::bind("127.0.0.1:0").expect("a port");
         socket.local_addr().expect("its address").port()
     }
 
@@ -238,7 +238,7 @@ mod tests {
             match TcpStream::connect(("127.0.0.1", port)) {
                 Ok(stream) => break stream,
                 Err(_) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
+                    tcsos::thread::sleep(Duration::from_millis(10))
                 }
                 Err(e) => panic!("the device never listened: {e}"),
             }
@@ -308,7 +308,7 @@ mod tests {
             match TcpStream::connect(("127.0.0.1", port)) {
                 Ok(stream) => return stream,
                 Err(_) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
+                    tcsos::thread::sleep(Duration::from_millis(10))
                 }
                 Err(e) => panic!("the device never listened: {e}"),
             }
@@ -389,7 +389,7 @@ mod tests {
             match TcpStream::connect(("127.0.0.1", port)) {
                 Ok(stream) => break stream,
                 Err(_) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
+                    tcsos::thread::sleep(Duration::from_millis(10))
                 }
                 Err(e) => panic!("the device never listened: {e}"),
             }

@@ -42,7 +42,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use crate::node::physics::setting::{
     quantity, size_of, time_of, wander_of, Wander,
@@ -1021,7 +1021,7 @@ fn own_end(
     // A host alone: an address, IPv4 or IPv6 in brackets or not, or a name,
     // which has no colon.
     let bare = said.trim_start_matches('[').trim_end_matches(']');
-    if bare.parse::<std::net::IpAddr>().is_ok() || !said.contains(':') {
+    if bare.parse::<tcsos::net::IpAddr>().is_ok() || !said.contains(':') {
         return Ok((bare.to_string(), None));
     }
     let at =
@@ -1891,7 +1891,7 @@ impl SimConfigFile {
                 path.display()
             ))
         })?;
-        let text = std::fs::read_to_string(path)?;
+        let text = tcsos::fs::read_to_string(path)?;
         let file = SimConfigFile::parse(&text, format)?;
         if file.moved_thermal_mass.is_some() {
             return Err(TcsError::Config(format!(
@@ -1944,7 +1944,7 @@ impl SimConfigFile {
     ///
     /// A message if there is no `tcs-sim` section, or its `ready` is not an
     /// `address:port`.
-    pub fn ready(&self) -> Result<std::net::SocketAddr, String> {
+    pub fn ready(&self) -> Result<tcsos::net::SocketAddr, String> {
         let wanted = "the simulator file needs a tcs-sim section saying where \
                       tcs-sim answers whether it is ready, as an address:port \
                       no other run uses -- tcs-sim: \
@@ -4849,7 +4849,7 @@ physics:
     fn the_model_is_the_worlds() {
         let dir = tempfile::tempdir().expect("a directory");
         let sim = dir.path().join("set-sim.yaml");
-        std::fs::write(
+        tcsos::fs::write(
             &sim,
             "thermal_mass:\n  - name: basic\n    environment: \"1\"\n    \
              time_constant: 1 s\n",
@@ -4858,14 +4858,14 @@ physics:
         let why = SimConfigFile::load(&sim).expect_err("moved").to_string();
         assert!(why.contains("world section"), "{why}");
 
-        std::fs::write(&sim, "physics: set-physics.yaml\n").expect("written");
+        tcsos::fs::write(&sim, "physics: set-physics.yaml\n").expect("written");
         let why = SimConfigFile::load(&sim).expect_err("named").to_string();
         assert!(why.contains("set-physics.yaml"), "{why}");
         assert!(why.contains("components:"), "{why}");
 
         let inline: String =
             MODEL.lines().map(|line| format!("  {line}\n")).collect();
-        std::fs::write(&sim, format!("world:\n{inline}")).expect("written");
+        tcsos::fs::write(&sim, format!("world:\n{inline}")).expect("written");
         let file = SimConfigFile::load(&sim).expect("it reads its model");
         let world = file.world.expect("a model");
         assert_eq!(world.physics.components.len(), 3);

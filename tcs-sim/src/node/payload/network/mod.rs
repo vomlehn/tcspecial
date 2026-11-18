@@ -17,4 +17,6 @@
 // it runs over, where every other type is addressed by what it is.
 pub mod tcp;
 pub mod udp;
+// Linux alone: a page's sockets are named by address, not by a path.
+#[cfg(target_os = "linux")]
 pub mod unix;

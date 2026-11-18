@@ -38,11 +38,11 @@ use slint::{Model, ModelRc, SharedString, VecModel};
 use std::cell::Cell;
 use std::env;
 use std::path::Path;
-use std::process;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use tcsos::process;
+use tcsos::time::Duration;
 
 use tcsprotocol::config::{
     payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR,
@@ -63,6 +63,8 @@ mod grid;
 mod lander_view;
 mod node;
 mod payload;
+// Linux alone: a page has no terminals.
+#[cfg(target_os = "linux")]
 mod pty;
 mod ready;
 #[cfg(test)]
@@ -986,7 +988,7 @@ fn ready_socket(
     sim_path: &str,
     sim_file: &SimConfigFile,
     mode: Mode,
-) -> Result<(std::net::UdpSocket, SetUpFor), String> {
+) -> Result<(tcsos::net::UdpSocket, SetUpFor), String> {
     let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
     let set_up_for = set_up_for(payload_paths, sim_path, mode)?;
     let socket = ready::bind(at).map_err(|e| format!("{sim_path}: {e}"))?;
@@ -1030,7 +1032,8 @@ fn set_up_for(
 }
 
 /// How long `--wait` waits where it is not told.
-const WAIT_DEFAULT: std::time::Duration = std::time::Duration::from_secs(30);
+const WAIT_DEFAULT: tcsos::time::Duration =
+    tcsos::time::Duration::from_secs(30);
 
 /// Takes `--wait` or `--wait=<seconds>` out of the arguments.
 ///
@@ -1048,7 +1051,7 @@ const WAIT_DEFAULT: std::time::Duration = std::time::Duration::from_secs(30);
 /// given twice.
 fn take_wait(
     args: Vec<String>,
-) -> Result<(Option<std::time::Duration>, Vec<String>), String> {
+) -> Result<(Option<tcsos::time::Duration>, Vec<String>), String> {
     let mut waiting = None;
     let mut rest = Vec::with_capacity(args.len());
     for arg in args {
@@ -1057,7 +1060,7 @@ fn take_wait(
         } else if let Some(seconds) = arg.strip_prefix("--wait=") {
             match seconds.parse::<f64>() {
                 Ok(seconds) if seconds > 0.0 && seconds.is_finite() => {
-                    std::time::Duration::from_secs_f64(seconds)
+                    tcsos::time::Duration::from_secs_f64(seconds)
                 }
                 _ => {
                     return Err(format!(
@@ -1226,7 +1229,7 @@ fn wait_for_another(
     payload_paths: &[&str],
     sim_path: &str,
     mode: Mode,
-    patience: std::time::Duration,
+    patience: tcsos::time::Duration,
 ) -> i32 {
     let wanted = SimConfigFile::load(sim_path)
         .map_err(|e| format!("{sim_path}: {e}"))
@@ -1630,7 +1633,7 @@ fn main() {
         let timer = slint::Timer::default();
         timer.start(
             slint::TimerMode::Repeated,
-            std::time::Duration::from_millis(500),
+            tcsos::time::Duration::from_millis(500),
             move || show_progress(&payloads, &model),
         );
 
@@ -1732,7 +1735,7 @@ fn ask_for_the_top_right(ui: &MainWindow) {
     // as one, which would make the room left far too wide.
     timer.start(
         slint::TimerMode::SingleShot,
-        std::time::Duration::from_secs(1),
+        tcsos::time::Duration::from_secs(1),
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
@@ -1747,7 +1750,8 @@ fn ask_for_the_top_right(ui: &MainWindow) {
             ));
             if let Ok(path) = std::env::var(ROOM_FILE) {
                 let room = f64::from(left) / f64::from(window.scale_factor());
-                if let Err(e) = std::fs::write(&path, format!("{room:.0}\n")) {
+                if let Err(e) = tcsos::fs::write(&path, format!("{room:.0}\n"))
+                {
                     eprintln!("tcs-sim: {path}: {e}");
                 }
             }
@@ -1775,7 +1779,7 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
     let timer = slint::Timer::default();
     timer.start(
         slint::TimerMode::SingleShot,
-        std::time::Duration::ZERO,
+        tcsos::time::Duration::ZERO,
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
@@ -1804,7 +1808,7 @@ mod tests {
         assert!(in_order(Vec::<u8>::new(), &[]).is_empty());
     }
     use std::path::Path;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::{DHName, EndpointConfig, NetworkConfig, NetworkProtocol};
 
     /// `--sending` is taken out wherever it is, once, and nothing else is;
@@ -1852,17 +1856,18 @@ mod tests {
         second: &str,
         extra: Option<&str>,
     ) -> (String, String, String) {
-        let minimal =
-            std::fs::read_to_string(repo_file("examples/minimal/minimal.ytcs"))
-                .expect("the example reads");
+        let minimal = tcsos::fs::read_to_string(repo_file(
+            "examples/minimal/minimal.ytcs",
+        ))
+        .expect("the example reads");
         let a = dir.join("a.ytcs");
         let b = dir.join("b.ytcs");
-        std::fs::write(&a, &minimal).expect("written");
+        tcsos::fs::write(&a, &minimal).expect("written");
         let renamed = minimal
             .replace("payload: sensor", &format!("payload: {second}"))
             .replace("node: sensor", &format!("node: {second}"))
             .replace("127.0.0.1:5001", "127.0.0.1:5002");
-        std::fs::write(&b, renamed).expect("written");
+        tcsos::fs::write(&b, renamed).expect("written");
         let entry = |name: &str| {
             format!(
                 "      - payload: {name}\n        packet_interval: 1 s\n\
@@ -1881,7 +1886,7 @@ mod tests {
             sim.push_str(&entry(extra));
         }
         let sim_path = dir.join("both-sim.yaml");
-        std::fs::write(&sim_path, sim).expect("written");
+        tcsos::fs::write(&sim_path, sim).expect("written");
         let path = |p: &Path| p.to_str().expect("a path").to_string();
         (path(&a), path(&b), path(&sim_path))
     }
@@ -2027,7 +2032,7 @@ mod tests {
             } else {
                 ""
             };
-            std::fs::write(
+            tcsos::fs::write(
                 &path,
                 format!(
                     "payloads:
@@ -2139,7 +2144,7 @@ mod tests {
         let doc = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("docs/tcs-sim-design.rst");
-        let text = std::fs::read_to_string(&doc).unwrap();
+        let text = tcsos::fs::read_to_string(&doc).unwrap();
 
         // The four payloads of tcspecial1.ytcs, which is the set the document
         // describes.
@@ -2215,7 +2220,7 @@ mod tests {
         // payload.
         let window =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
-        let source = std::fs::read_to_string(&window).unwrap();
+        let source = tcsos::fs::read_to_string(&window).unwrap();
         let offered = format!(
             "payload-status == \"{}\" ? \"{}\" : \"{}\"",
             RUNNING_STATUS,
@@ -2824,7 +2829,7 @@ mod tests {
         let mut sets = Vec::new();
 
         for entry in
-            std::fs::read_dir(&root).expect("the examples are readable")
+            tcsos::fs::read_dir(&root).expect("the examples are readable")
         {
             let path = entry.expect("a readable directory entry").path();
             let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
@@ -3436,7 +3441,7 @@ mod tests {
     #[test]
     fn a_shipped_payload_file_states_only_a_triggered_payload_s_interval() {
         for (payload_path, sim_path) in shipped_sets() {
-            let text = std::fs::read_to_string(&payload_path).unwrap();
+            let text = tcsos::fs::read_to_string(&payload_path).unwrap();
             // Whether the payload whose attributes are being read is one that
             // answers requests. Each payload starts with its name.
             let mut triggered = false;

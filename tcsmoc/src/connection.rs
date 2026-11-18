@@ -1,8 +1,8 @@
 //! Connection management for ground-to-space communication
 
 use std::io;
-use std::net::{SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::time::{Duration, Instant};
 use tcsprotocol::{
     came_from, Command, CommandPacker, HostPort, TcsError, TcsResult, Telemetry,
 };

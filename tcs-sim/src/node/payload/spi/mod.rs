@@ -24,7 +24,7 @@
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, ignore_this_request, lateness,
@@ -127,11 +127,11 @@ pub fn run_spi_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::fs::File;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::fs::File;
     use tcsos::linux::pty::make_raw;
+    use tcsos::time::Duration;
 
     /// Makes a path in the temporary directory unique to this process and
     /// test thread.
@@ -142,8 +142,8 @@ mod tests {
     fn a_path() -> PathBuf {
         std::env::temp_dir().join(format!(
             "tcs-sim-spi-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
+            tcsos::process::id(),
+            tcsos::thread::current().id()
         ))
     }
 
@@ -183,7 +183,7 @@ mod tests {
 
         let deadline = Instant::now() + Duration::from_secs(5);
         while !path.is_symlink() && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(10));
+            tcsos::thread::sleep(Duration::from_millis(10));
         }
         assert!(
             path.is_symlink(),
@@ -191,7 +191,7 @@ mod tests {
             path.display()
         );
         assert!(
-            std::fs::read_link(&path)
+            tcsos::fs::read_link(&path)
                 .expect("where it leads")
                 .starts_with("/dev/pts/"),
             "it does not lead to a pty slave"
@@ -210,7 +210,7 @@ mod tests {
         while got.len() < 12 && Instant::now() < deadline {
             match (&node).read(&mut buf) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buf[..n]),
-                _ => std::thread::sleep(Duration::from_millis(10)),
+                _ => tcsos::thread::sleep(Duration::from_millis(10)),
             }
         }
 

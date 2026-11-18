@@ -8,7 +8,7 @@
 //! gateway data -- until a packet says `panic`, when it panics.
 
 use std::io::Read;
-use std::process::ExitCode;
+use tcsos::process::ExitCode;
 
 use tcsapp::app::{complain, AppPayloadVeh};
 

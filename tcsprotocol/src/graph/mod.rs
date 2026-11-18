@@ -70,7 +70,7 @@ pub mod units;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::Deserialize;
 
@@ -1511,7 +1511,7 @@ impl Graph {
 /// spelling.
 pub fn read_one(path: &Path) -> TcsResult<GraphFile> {
     let format = ConfigFormat::of_file(path)?;
-    let text = std::fs::read_to_string(path)
+    let text = tcsos::fs::read_to_string(path)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))?;
 
     if let Some(TcsError::Config(gone)) =
@@ -1694,7 +1694,7 @@ fn include_path(top: &Path, name: &str) -> TcsResult<PathBuf> {
 ///
 /// [`TcsError::Config`], naming the file, for one that cannot be found.
 fn canonical(path: &Path) -> TcsResult<PathBuf> {
-    std::fs::canonicalize(path)
+    tcsos::fs::canonicalize(path)
         .map_err(|e| TcsError::Config(format!("{}: {e}", path.display())))
 }
 
@@ -2334,7 +2334,7 @@ mod tests {
             // Ten times a second, which is what holds the band: the heaters
             // move the mass several kelvin a second, so a loop that acted
             // once a second would overshoot the band every time.
-            Some(Ok(std::time::Duration::from_millis(100)))
+            Some(Ok(tcsos::time::Duration::from_millis(100)))
         );
         let sensor = yaml.node("temp_1").expect("the first of the trio");
         assert_eq!(sensor.node_type, "i2c");
@@ -2382,7 +2382,7 @@ mod tests {
 
         // With a tcspecial section, which every configuration must have and
         // only the top file may: see Graph::tcspecial.
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:
   - subdiagram: zone
@@ -2423,7 +2423,7 @@ gateways:
         // two: a link is an attribute of the node it leaves, so a link across
         // the boundary between two files is written in the file the node is
         // in.
-        std::fs::write(
+        tcsos::fs::write(
             where_.path().join("zone.ytcs"),
             "exports:\n  world-out: [zone_sensor]\n\
              payloads:\n  \
@@ -2465,7 +2465,7 @@ gateways:
         let path = where_.path().join("old.ytcs");
 
         for version in ["1.0", "2.0"] {
-            std::fs::write(
+            tcsos::fs::write(
                 &path,
                 format!("version: \"{version}\"\npayloads: []\n"),
             )
@@ -2478,7 +2478,7 @@ gateways:
         }
 
         // And the same file without the line reads.
-        std::fs::write(&path, "payloads: []\n").unwrap();
+        tcsos::fs::write(&path, "payloads: []\n").unwrap();
         Graph::load(&path).expect("no version, nothing wrong");
     }
 
@@ -2490,20 +2490,20 @@ gateways:
     fn a_subdiagram_is_named_and_its_name_is_its_own() {
         let where_ = tempfile::tempdir().expect("a directory");
         let dir = where_.path();
-        std::fs::write(dir.join("zone.ytcs"), "payloads: []\n").unwrap();
-        std::fs::write(
+        tcsos::fs::write(dir.join("zone.ytcs"), "payloads: []\n").unwrap();
+        tcsos::fs::write(
             dir.join("zone.xtcs"),
             "<configuration><payloads/></configuration>\n",
         )
         .unwrap();
-        std::fs::write(
+        tcsos::fs::write(
             dir.join("room.ytcs"),
             "payloads:\n  - type i2c:\n      - payload: probe\n",
         )
         .unwrap();
 
         let top = dir.join("vehicle.xtcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "<configuration>\n    \
              <include name=\"inside\" path=\"zone\"/>\n\
@@ -2525,7 +2525,7 @@ gateways:
 
         let top = dir.join("vehicle.ytcs");
         let refused = |includes: &str| {
-            std::fs::write(&top, format!("include:\n{includes}")).unwrap();
+            tcsos::fs::write(&top, format!("include:\n{includes}")).unwrap();
             format!("{}", Graph::load(&top).expect_err("it is refused"))
         };
         assert!(refused("  - zone\n").contains("subdiagram: <name>"));
@@ -2546,8 +2546,8 @@ gateways:
     fn a_file_is_not_included_twice() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(&top, "include:\n  - subdiagram: zone\n    path: zone\n  - subdiagram: zone2\n    path: zone\n").unwrap();
-        std::fs::write(where_.path().join("zone.ytcs"), "payloads: []\n")
+        tcsos::fs::write(&top, "include:\n  - subdiagram: zone\n    path: zone\n  - subdiagram: zone2\n    path: zone\n").unwrap();
+        tcsos::fs::write(where_.path().join("zone.ytcs"), "payloads: []\n")
             .unwrap();
 
         let said =
@@ -2561,16 +2561,16 @@ gateways:
     fn a_file_named_two_ways_is_still_included_twice() {
         let where_ = tempfile::tempdir().expect("a directory");
         let vehicle = where_.path().join("vehicle");
-        std::fs::create_dir(&vehicle).unwrap();
+        tcsos::fs::create_dir(&vehicle).unwrap();
         let top = vehicle.join("top.ytcs");
-        std::fs::write(vehicle.join("zone.ytcs"), "payloads: []\n").unwrap();
+        tcsos::fs::write(vehicle.join("zone.ytcs"), "payloads: []\n").unwrap();
 
         for includes in [
             "  - subdiagram: one\n    path: zone\n  \
              - subdiagram: two\n    path: ../vehicle/zone\n",
             "  - subdiagram: one\n    path: ../vehicle/top\n",
         ] {
-            std::fs::write(&top, format!("include:\n{includes}")).unwrap();
+            tcsos::fs::write(&top, format!("include:\n{includes}")).unwrap();
             let said =
                 format!("{}", Graph::load(&top).expect_err("twice is refused"));
             assert!(said.contains("included twice"), "{said}");
@@ -2583,15 +2583,15 @@ gateways:
     fn an_include_may_be_in_another_directory() {
         let where_ = tempfile::tempdir().expect("a directory");
         for dir in ["vehicle", "common"] {
-            std::fs::create_dir(where_.path().join(dir)).unwrap();
+            tcsos::fs::create_dir(where_.path().join(dir)).unwrap();
         }
         let top = where_.path().join("vehicle/top.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:\n  - subdiagram: zone\n    path: ../common/zone\n",
         )
         .unwrap();
-        std::fs::write(
+        tcsos::fs::write(
             where_.path().join("common/zone.ytcs"),
             "vehicle:\n  - type ping:\n      - { compute: p }\n",
         )
@@ -2617,7 +2617,7 @@ gateways:
     fn an_include_name_of_the_wrong_shape_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(where_.path().join("zone.ytcs"), "payloads: []\n")
+        tcsos::fs::write(where_.path().join("zone.ytcs"), "payloads: []\n")
             .unwrap();
         let absolute = where_.path().join("zone");
         for (name, why) in [
@@ -2631,7 +2631,7 @@ gateways:
             ("$HOME/zone", "has a $ in it"),
             ("${COMMON}/zone", "has a $ in it"),
         ] {
-            std::fs::write(
+            tcsos::fs::write(
                 &top,
                 format!("include:\n  - subdiagram: sub\n    path: {name}\n"),
             )
@@ -2652,12 +2652,12 @@ gateways:
     fn an_include_does_not_nest() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:\n  - subdiagram: zone\n    path: zone\n",
         )
         .unwrap();
-        std::fs::write(
+        tcsos::fs::write(
             where_.path().join("zone.ytcs"),
             "include:\n  - subdiagram: deeper\n    path: deeper\n",
         )
@@ -2681,7 +2681,7 @@ gateways:
 
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:\n  - subdiagram: zone\n    path: zone\n\
              gateways:\n  - type gateway_radio:\n      \
@@ -2691,7 +2691,7 @@ gateways:
         )
         .unwrap();
         let zone = |exports: &str| {
-            std::fs::write(
+            tcsos::fs::write(
                 where_.path().join("zone.ytcs"),
                 format!(
                     "{exports}vehicle:\n  - type compute:\n      \
@@ -2765,7 +2765,7 @@ gateways:
 
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:\n  - subdiagram: zone\n    path: zone\n\
              gateways:\n  - type gateway_radio:\n      \
@@ -2775,7 +2775,7 @@ gateways:
         )
         .unwrap();
         let zone = |exports: &str| {
-            std::fs::write(
+            tcsos::fs::write(
                 where_.path().join("zone.ytcs"),
                 format!(
                     "{exports}vehicle:\n  - type compute:\n      \
@@ -2809,7 +2809,7 @@ gateways:
     fn a_top_file_may_not_export() {
         let where_ = tempfile::tempdir().expect("a directory");
         let top = where_.path().join("vehicle.ytcs");
-        std::fs::write(&top, "exports:\n  world-in: [temp]\n").unwrap();
+        tcsos::fs::write(&top, "exports:\n  world-in: [temp]\n").unwrap();
 
         let said = format!("{}", Graph::load(&top).expect_err("it is refused"));
         assert!(
@@ -2823,7 +2823,7 @@ gateways:
     fn a_file_that_says_nothing_about_its_format_is_refused() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.json");
-        std::fs::write(&path, "{}").unwrap();
+        tcsos::fs::write(&path, "{}").unwrap();
 
         let said =
             format!("{}", Graph::load(&path).expect_err("json is refused"));

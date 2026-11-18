@@ -18,7 +18,7 @@
 //! three-point-one and drift.
 
 use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::graph::Graph;
 

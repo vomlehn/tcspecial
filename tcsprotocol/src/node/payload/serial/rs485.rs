@@ -23,7 +23,7 @@
 //! HDLC and a network interface; a synchronous line stating these would be
 //! describing hardware that cannot be told about them.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::{Deserialize, Serialize};
 

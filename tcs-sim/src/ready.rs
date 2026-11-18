@@ -9,9 +9,9 @@
 //! and a harness waits through `tcsmoc::simulator`. See "Waiting for the
 //! Simulator" in `docs/tcspecial-design.rst`.
 
-use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
+use tcsos::net::{SocketAddr, UdpSocket};
 
 use tcsprotocol::ready::{
     Answer, Reason, Request, SetUpFor, State, ANSWER_BYTES, REQUEST_BYTES,
@@ -151,7 +151,7 @@ pub fn bind(at: SocketAddr) -> Result<UdpSocket, String> {
 ///
 /// If the thread cannot be started.
 pub fn serve(socket: UdpSocket, readiness: Arc<Readiness>) {
-    std::thread::Builder::new()
+    tcsos::thread::Builder::new()
         .name("readiness".to_string())
         .spawn(move || {
             let mut request = [0u8; REQUEST_BYTES + 1];

@@ -5,11 +5,11 @@
 use slint::{LogicalSize, Model, ModelRc, SharedString, VecModel};
 use std::env;
 use std::path::Path;
-use std::process::{exit, Child, Command};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+use tcsos::process::{exit, Child, Command};
+use tcsos::thread;
+use tcsos::time::Duration;
 
 use tcs_verify::startup::Startup;
 use tcsprotocol::config::payload_path_from_args;
@@ -965,7 +965,7 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
     let timer = slint::Timer::default();
     timer.start(
         slint::TimerMode::SingleShot,
-        std::time::Duration::ZERO,
+        tcsos::time::Duration::ZERO,
         move || {
             let Some(ui) = ui_weak.upgrade() else { return };
             let window = ui.window();
@@ -1187,7 +1187,7 @@ mod tests {
     /// starts a child and returns stands in for a MOC killed outright.
     #[test]
     fn a_child_is_stopped_when_what_started_it_ends() {
-        use std::time::Instant;
+        use tcsos::time::Instant;
 
         let mut child = thread::spawn(|| {
             let mut command = Command::new("sleep");
@@ -2093,7 +2093,7 @@ mod tests {
             &ui,
             &tcs_ui::Shown::at(
                 &tcsmoc::beacon::Schedule::standard().at(Duration::ZERO),
-                Some(std::time::UNIX_EPOCH + Duration::from_secs(7322)),
+                Some(tcsos::time::UNIX_EPOCH + Duration::from_secs(7322)),
                 "tcspecial v0.1.0 md5 0123456789abcdef",
             ),
         );
@@ -2157,7 +2157,7 @@ mod tests {
         let doc = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("docs/tcs-moc-design.rst");
-        let text = std::fs::read_to_string(&doc).unwrap();
+        let text = tcsos::fs::read_to_string(&doc).unwrap();
 
         // The four handlers of tcspecial1.ytcs, which is the set the document
         // describes.
@@ -2223,7 +2223,7 @@ mod tests {
             Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
         // Runs of whitespace are one space, so an expression the window
         // wraps over several lines is found as written here.
-        let source = std::fs::read_to_string(&window)
+        let source = tcsos::fs::read_to_string(&window)
             .unwrap()
             .split_whitespace()
             .collect::<Vec<_>>()
@@ -2278,7 +2278,7 @@ mod tests {
     fn a_panel_has_a_button_for_each_command() {
         let window =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("ui/main.slint");
-        let source = std::fs::read_to_string(&window).unwrap();
+        let source = tcsos::fs::read_to_string(&window).unwrap();
 
         for (label, callback) in [
             (ENABLE_LABEL, "enable-clicked()"),
@@ -2327,7 +2327,7 @@ mod tests {
         data.record(&[0xDE, 0xAD]);
         let arrival = Arrival {
             at: Timestamp::at(
-                std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661),
+                tcsos::time::SystemTime::UNIX_EPOCH + Duration::from_secs(3661),
             ),
             data,
             packets: 5,
@@ -2473,7 +2473,7 @@ mod tests {
     fn an_installed_moc_runs_the_children_beside_it() {
         let installed = tempfile::tempdir().expect("a directory");
         for name in CHILDREN {
-            std::fs::write(installed.path().join(name), "").expect("written");
+            tcsos::fs::write(installed.path().join(name), "").expect("written");
             let command = child_command(
                 name,
                 "tcspecial2.ytcs",

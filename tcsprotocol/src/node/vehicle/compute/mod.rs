@@ -21,7 +21,7 @@
 //! the log node's move set the pattern.
 
 use std::collections::BTreeMap;
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::{Deserialize, Serialize};
 

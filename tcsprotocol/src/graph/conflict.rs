@@ -96,7 +96,7 @@ pub struct Conflict {
 ///
 /// The path to compare.
 fn real(written: &str) -> PathBuf {
-    std::fs::canonicalize(written)
+    tcsos::fs::canonicalize(written)
         .unwrap_or_else(|_| Path::new(written).components().collect())
 }
 
@@ -278,7 +278,7 @@ fn simulated(graph: &Graph, sim: &SimConfigFile, held: &mut Vec<Holding>) {
 /// The severity, and what follows from sharing it.
 fn shared(claim: &Claim) -> (Severity, &'static str) {
     match claim {
-        Claim::Path(path) => match std::fs::metadata(path) {
+        Claim::Path(path) => match tcsos::fs::metadata(path) {
             Ok(meta) => {
                 if tcsos::fs::is_device(&meta) {
                     (

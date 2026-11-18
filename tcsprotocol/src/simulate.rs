@@ -400,7 +400,7 @@ impl Host {
     pub fn device_of(&self, path: &str) -> Result<PathBuf, Unseen> {
         let (major, minor) = character_device(path)?;
         let entry = self.sys.join(format!("dev/char/{major}:{minor}"));
-        std::fs::canonicalize(&entry).map_err(|_| Unseen {
+        tcsos::fs::canonicalize(&entry).map_err(|_| Unseen {
             absent: false,
             said: format!(
                 "{path} is a character device ({major}:{minor}) the kernel \
@@ -463,7 +463,7 @@ pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
         absent: false,
         said,
     };
-    let found = match std::fs::metadata(path) {
+    let found = match tcsos::fs::metadata(path) {
         Ok(found) => found,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(Unseen {
@@ -490,7 +490,7 @@ pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
 /// # Returns
 ///
 /// What it is, such as "a directory".
-fn kind_of_file(found: &std::fs::Metadata) -> &'static str {
+fn kind_of_file(found: &tcsos::fs::Metadata) -> &'static str {
     use tcsos::fs::Kind;
 
     match tcsos::fs::kind_of(found) {
@@ -540,7 +540,7 @@ pub(crate) fn pseudo_terminal(
     match character_device(path) {
         Err(found) => found.judged(attribute, to_simulate),
         Ok((major, minor)) if PTY_SLAVE_MAJORS.contains(&major) => {
-            let resolved = std::fs::canonicalize(path)
+            let resolved = tcsos::fs::canonicalize(path)
                 .map(|to| to.display().to_string())
                 .unwrap_or_else(|_| format!("{major}:{minor}"));
             Judged::simulated(
@@ -871,7 +871,7 @@ pub(crate) fn is_dir(path: &Path) -> bool {
 
 /// The first line of a file the kernel keeps, trimmed, where it can be read.
 pub(crate) fn read_line(path: &Path) -> Option<String> {
-    std::fs::read_to_string(path)
+    tcsos::fs::read_to_string(path)
         .ok()
         .map(|text| text.trim().to_string())
 }

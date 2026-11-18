@@ -61,7 +61,7 @@ pub struct Reach {
     /// can guess. With one, a pass asks, waits, and reads what came back; with
     /// none, a pass reads what the last ask produced and asks again, so the
     /// reading is one interval old and nothing waits.
-    pub read_delay: Option<std::time::Duration>,
+    pub read_delay: Option<tcsos::time::Duration>,
     /// What to write to this node when the vehicle opens it, where anything.
     ///
     /// For a payload whose state matters before the vehicle's first word to
@@ -94,7 +94,7 @@ pub struct Reach {
     /// Where the node is reached over UDP when it is simulated, for a type the
     /// operating system has no faithful dummy device for: see
     /// [`simulated_over_udp`] and [`Reach::opened`].
-    pub sim_address: Option<std::net::SocketAddr>,
+    pub sim_address: Option<tcsos::net::SocketAddr>,
 }
 
 /// The types that may be reached over UDP when simulated, with `sim_address`,
@@ -530,7 +530,7 @@ fn sends_from_of(
     };
     match net.protocol {
         NetworkProtocol::Udp => {
-            let at: std::net::SocketAddr =
+            let at: tcsos::net::SocketAddr =
                 written.trim().parse().map_err(|_| {
                     format!(
                     "\"{what}\": sends_from {written:?} is not a host and a \
@@ -545,7 +545,7 @@ fn sends_from_of(
                 ));
             }
             let own = format!("{}:{}", net.address, net.port)
-                .parse::<std::net::SocketAddr>();
+                .parse::<tcsos::net::SocketAddr>();
             if own.is_ok_and(|own| own == at) {
                 return Err(format!(
                     "\"{what}\": sends_from {written:?} is the node's own \
@@ -590,9 +590,9 @@ struct Said {
     read_size: Option<u32>,
     trigger: Option<Vec<u8>>,
     init: Option<Vec<u8>>,
-    read_delay: Option<std::time::Duration>,
+    read_delay: Option<tcsos::time::Duration>,
     sends_from: Option<Scalar>,
-    sim_address: Option<std::net::SocketAddr>,
+    sim_address: Option<tcsos::net::SocketAddr>,
 }
 
 impl Default for Said {
@@ -815,7 +815,7 @@ fn take(
         // here can tell from the hardware.
         "sim_address" if simulated_over_udp(kind) => {
             let said_at = value.as_str().trim();
-            let at: std::net::SocketAddr = said_at.parse().map_err(|_| {
+            let at: tcsos::net::SocketAddr = said_at.parse().map_err(|_| {
                 format!(
                     "\"{what}\": sim_address is \"{said_at}\", which is not \
                      an address:port: give where tcs-sim answers for it, such \
@@ -1498,7 +1498,8 @@ fn network_address_of(
         // with a colon that is not an IPv6 address names a port.
         NetworkProtocol::Raw(_) => {
             let host = stated.trim_start_matches('[').trim_end_matches(']');
-            if stated.contains(':') && host.parse::<std::net::IpAddr>().is_err()
+            if stated.contains(':')
+                && host.parse::<tcsos::net::IpAddr>().is_err()
             {
                 return Err(format!(
                     "\"{what}\" is reached on a raw socket, which has no \
@@ -1624,7 +1625,7 @@ mod tests {
     use crate::node::payload::spi::SpiMode;
     use std::collections::BTreeMap;
     use std::path::Path;
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// The shipped example, which is what this has to be able to open.
     fn thermostat() -> Graph {

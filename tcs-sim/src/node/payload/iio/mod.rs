@@ -30,7 +30,7 @@
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, lateness, send_in_segments, wait_out_packet,
@@ -71,7 +71,7 @@ pub fn run_iio_node(
         config.standing.made();
         while running.load(Ordering::SeqCst) {
             crate::payload::wait_while_running(
-                std::time::Duration::from_millis(100),
+                tcsos::time::Duration::from_millis(100),
                 &running,
             );
         }
@@ -138,10 +138,10 @@ pub fn run_iio_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::fs::File;
     use std::io::Read;
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::fs::File;
+    use tcsos::time::Duration;
     use tcsprotocol::Faults;
 
     /// Configures a sensor whose buffer the handler would open at a path,
@@ -199,7 +199,7 @@ mod tests {
         // gives what the device produced.
         let samples = (0..100)
             .find_map(|_| {
-                std::thread::sleep(Duration::from_millis(20));
+                tcsos::thread::sleep(Duration::from_millis(20));
                 let mut file = File::open(&path).ok()?;
                 let mut buffer = [0u8; 64];
                 match file.read(&mut buffer) {
@@ -214,7 +214,7 @@ mod tests {
 
         // And the path is the device's for as long as it runs, so it is gone
         // with it: a sensor that is not running has no buffer to open.
-        std::thread::sleep(Duration::from_millis(100));
+        tcsos::thread::sleep(Duration::from_millis(100));
         assert!(
             !std::path::Path::new(&path).exists(),
             "the simulated device outlived the payload"

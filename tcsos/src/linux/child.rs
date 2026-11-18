@@ -221,7 +221,7 @@ impl Spawner {
 /// # Returns
 ///
 /// How it ended.
-pub fn wait_for(child: Child, look: Duration, stopping: &mut bool) -> Ended {
+pub fn wait_for(child: &Child, look: Duration, stopping: &mut bool) -> Ended {
     let set = signals(true);
     let look = libc::timespec {
         tv_sec: look.as_secs() as libc::time_t,

@@ -15,7 +15,7 @@
 //! than a vehicle that will not start.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use log::{debug, error, info, warn};
 use tcsprotocol::config_digest::{ConfigDigest, ConfigVersion};
@@ -921,7 +921,7 @@ mod tests {
     fn a_configuration_with_problems_is_refused_before_it_opens() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("wrong.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type i2c:

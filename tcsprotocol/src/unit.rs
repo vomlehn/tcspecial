@@ -151,7 +151,7 @@ mod tests {
         let here = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let dir = tempfile::tempdir().expect("a directory");
         let written = dir.path().join("unit_table.rs");
-        let ran = std::process::Command::new("python3")
+        let ran = tcsos::process::Command::new("python3")
             .arg(here.join("unit-table.py"))
             .arg(here.join("xtce/types.xtce"))
             .arg(&written)
@@ -159,7 +159,7 @@ mod tests {
             .expect("python3 runs unit-table.py");
         assert!(ran.success());
         assert_eq!(
-            std::fs::read_to_string(&written).expect("it wrote"),
+            tcsos::fs::read_to_string(&written).expect("it wrote"),
             include_str!("unit_table.rs"),
             "tcsprotocol/xtce/types.xtce has changed: run `make \
              unit-table` in \

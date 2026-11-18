@@ -7,9 +7,9 @@
 //! directory should hold no more than the segment being written and the
 //! one, perhaps, that `segsend` is dealing with.
 
-use std::net::UdpSocket;
-use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::net::UdpSocket;
+use tcsos::process::{Child, Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 /// Finds a loopback port nothing holds: the configuration check refuses
 /// port 0, a link nobody can predict the port of.
@@ -44,11 +44,11 @@ impl Drop for Running {
 fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
     let dir = tempfile::tempdir().expect("a directory");
     let logs = dir.path().join("telemetry");
-    std::fs::create_dir(&logs).expect("the log directory");
+    tcsos::fs::create_dir(&logs).expect("the log directory");
     let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
     let at = || format!("127.0.0.1:{}", free());
-    std::fs::write(
+    tcsos::fs::write(
         &configuration,
         format!(
             "tcspecial:
@@ -93,12 +93,14 @@ fn filled_segments_are_handed_to_segsend_and_leave_the_directory() {
     let by = Instant::now() + Duration::from_secs(2);
     let mut most = 0;
     while Instant::now() < by {
-        let here = std::fs::read_dir(&logs).expect("the log directory").count();
+        let here = tcsos::fs::read_dir(&logs)
+            .expect("the log directory")
+            .count();
         most = most.max(here);
-        std::thread::sleep(Duration::from_millis(20));
+        tcsos::thread::sleep(Duration::from_millis(20));
     }
     assert!(most > 0, "nothing was ever written to {}", logs.display());
-    let here: Vec<String> = std::fs::read_dir(&logs)
+    let here: Vec<String> = tcsos::fs::read_dir(&logs)
         .expect("the log directory")
         .map(|entry| {
             entry

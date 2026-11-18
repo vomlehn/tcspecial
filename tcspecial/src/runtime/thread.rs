@@ -32,7 +32,7 @@
 
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::thread::{Builder, JoinHandle};
+use tcsos::thread::{Builder, JoinHandle};
 use tcsprotocol::{NodeId, ThreadRole, ThreadStack, NO_NODE};
 
 /// The stack each of tcspecial's own threads is given, in bytes: two and a
@@ -407,7 +407,7 @@ mod tests {
             if !before.is_empty() {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(1));
         }
         assert_eq!(before.len(), 1, "{before:?}");
         assert_eq!(before[0].role, ThreadRole::Node);
@@ -442,7 +442,7 @@ mod tests {
             if !told.is_empty() {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(1));
         }
         assert_eq!(told[0].stack as usize, SERVICE_STACK, "{told:?}");
         end.send(()).expect("sent");

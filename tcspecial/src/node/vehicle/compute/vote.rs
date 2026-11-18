@@ -51,7 +51,7 @@
 //! is no longer being measured without anyone hearing of it. Without `age`,
 //! readings never expire, as before it existed.
 
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::node::vehicle::compute::{Algorithm, VoteParams};
 use tcsprotocol::unit::Unit;

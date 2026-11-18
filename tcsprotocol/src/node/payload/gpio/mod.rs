@@ -39,7 +39,7 @@
 //! goes through them is moc data both ways. A file still saying `gpio` is
 //! told the new words: see `crate::graph::renamed`.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
@@ -529,7 +529,7 @@ pub fn simulated_chips(
     devices: &std::path::Path,
 ) -> Vec<(String, std::path::PathBuf)> {
     let mut chips = Vec::new();
-    let Ok(entries) = std::fs::read_dir(devices) else {
+    let Ok(entries) = tcsos::fs::read_dir(devices) else {
         return chips;
     };
     for device in entries.flatten() {
@@ -540,7 +540,7 @@ pub fn simulated_chips(
         {
             continue;
         }
-        let Ok(banks) = std::fs::read_dir(device.path()) else {
+        let Ok(banks) = tcsos::fs::read_dir(device.path()) else {
             continue;
         };
         for bank in banks.flatten() {
@@ -648,10 +648,10 @@ mod judged_tests {
     fn a_simulated_chips_lines_are_under_the_chips_own_name() {
         let tree = tempfile::tempdir().unwrap();
         let chip = tree.path().join("gpio-sim.0").join("gpiochip1");
-        std::fs::create_dir_all(chip.join("sim_gpio0")).unwrap();
+        tcsos::fs::create_dir_all(chip.join("sim_gpio0")).unwrap();
         // Another platform device, and a file beside the chip, passed over.
-        std::fs::create_dir_all(tree.path().join("serial8250")).unwrap();
-        std::fs::write(tree.path().join("gpio-sim.0").join("uevent"), "")
+        tcsos::fs::create_dir_all(tree.path().join("serial8250")).unwrap();
+        tcsos::fs::write(tree.path().join("gpio-sim.0").join("uevent"), "")
             .unwrap();
 
         assert_eq!(

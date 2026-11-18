@@ -25,8 +25,8 @@
 //! (Nothing here is about the command link, whose packets are stated in
 //! XTCE and are no part of configuration: see [`crate::link`].)
 
-use std::fs;
 use std::path::Path;
+use tcsos::fs;
 
 use serde::de::DeserializeOwned;
 

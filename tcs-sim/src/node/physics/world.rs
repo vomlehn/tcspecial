@@ -43,7 +43,7 @@
 //! have their room from the start.
 
 use std::sync::{Condvar, Mutex, MutexGuard};
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use tcsprotocol::node::physics::terminal::{Direction, Terminal};
 use tcsprotocol::node::physics::{Joined, Model, Place, Resolution};

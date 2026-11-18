@@ -17,7 +17,7 @@
 //! and one carrying the checksum of the configuration the vehicle runs is
 //! as good from this station as from any other.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use tcsprotocol::config_digest::{
     digest_of_graph, ConfigDigest, ConfigVersion,
@@ -179,7 +179,7 @@ impl Listening {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::UdpSocket;
+    use tcsos::net::UdpSocket;
     use tcsprotocol::{Command, ConnectTelemetry, Telemetry};
 
     /// A configuration whose spacecraft command link is on loopback ports
@@ -202,7 +202,7 @@ mod tests {
         };
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("listening.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "tcspecial:
@@ -246,7 +246,7 @@ mod tests {
             .expect("it has a section");
         assert_eq!(listening.ours(), ours);
 
-        let answering = std::thread::spawn(move || {
+        let answering = tcsos::thread::spawn(move || {
             let mut buffer = [0u8; 256];
             let mut asked = 0;
             for answer in [None, Some(ConfigDigest([1; 16])), Some(ours)] {
@@ -290,7 +290,7 @@ mod tests {
     fn a_configuration_with_no_section_has_nothing_to_connect_to() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("none.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "vehicle:
   - type ping:

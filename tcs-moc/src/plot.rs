@@ -63,7 +63,7 @@ use std::collections::VecDeque;
 use std::fmt::Write as _;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use slint::{
     Color, ComponentHandle, Model, ModelRc, SharedString, Timer, TimerMode,
@@ -2120,7 +2120,7 @@ pub(crate) mod tests {
             }
             plot.decision(0, t0, true);
         }
-        std::thread::sleep(REDRAW + Duration::from_millis(50));
+        tcsos::thread::sleep(REDRAW + Duration::from_millis(50));
         slint::platform::update_timers_and_animations();
 
         let said = |text: &str| -> Vec<f32> {
@@ -2170,7 +2170,7 @@ pub(crate) mod tests {
             window
                 .window()
                 .set_size(slint::LogicalSize::new(wide, 620.0));
-            std::thread::sleep(REDRAW + Duration::from_millis(50));
+            tcsos::thread::sleep(REDRAW + Duration::from_millis(50));
             slint::platform::update_timers_and_animations();
             let _ = widths(&window);
         }

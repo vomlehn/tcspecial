@@ -34,7 +34,7 @@
 //! buffer, so a line that sends faster than it is read is held back by its
 //! driver rather than by a queue here that grows.
 
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::endpoint_config::{LengthPrefix, StreamParams};
 

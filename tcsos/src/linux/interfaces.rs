@@ -17,6 +17,10 @@ use std::process::{Command, Stdio};
 /// What an interface is carried on: one end of a pair, read and written.
 pub type Stream = std::os::unix::net::UnixStream;
 
+/// What the error interface is carried on once taken: a file, as it is only
+/// written.
+pub type Written = File;
+
 /// Makes the two ends of an interface.
 ///
 /// # Returns
@@ -247,7 +251,7 @@ pub fn take_stream(slot: i32) -> io::Result<Stream> {
 /// # Errors
 ///
 /// What the system said.
-pub fn take_file(slot: i32) -> io::Result<File> {
+pub fn take_file(slot: i32) -> io::Result<Written> {
     Ok(File::from(moved(slot)?))
 }
 
@@ -259,13 +263,13 @@ pub fn take_file(slot: i32) -> io::Result<File> {
 ///
 /// * `slot`  - 2.
 /// * `write` - What to do with it.
-pub fn with_slot(slot: i32, write: impl FnOnce(&mut File)) {
+pub fn with_slot(slot: i32, write: impl FnOnce(&mut dyn io::Write)) {
     // SAFETY: from_raw_fd needs an open descriptor, which the caller has
     // found the slot to be, and the ManuallyDrop means this File never
     // closes it.
     let mut file =
         std::mem::ManuallyDrop::new(unsafe { File::from_raw_fd(slot) });
-    write(&mut file);
+    write(&mut *file);
 }
 
 /// Covers the three standard slots with `/dev/null`, once the interfaces

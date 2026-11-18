@@ -18,7 +18,7 @@
 //! datum asked for at `moc-in` is always sent.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::consolidation::Layout;
 use tcsprotocol::node::vehicle::compute::{ConsolidatorParams, Triggers};

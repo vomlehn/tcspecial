@@ -175,16 +175,16 @@ mod judged_tests {
         let host = Host {
             sys: sys.path().to_path_buf(),
         };
-        std::fs::create_dir_all(
+        tcsos::fs::create_dir_all(
             sys.path().join("kernel/config/iio/devices/dummy/tcs-sim"),
         )
         .unwrap();
         let dummy = sys.path().join("devices/iio:device0");
-        std::fs::create_dir_all(&dummy).unwrap();
-        std::fs::write(dummy.join("name"), "tcs-sim\n").unwrap();
+        tcsos::fs::create_dir_all(&dummy).unwrap();
+        tcsos::fs::write(dummy.join("name"), "tcs-sim\n").unwrap();
         let real = sys.path().join("devices/iio:device1");
-        std::fs::create_dir_all(&real).unwrap();
-        std::fs::write(real.join("name"), "bmp280\n").unwrap();
+        tcsos::fs::create_dir_all(&real).unwrap();
+        tcsos::fs::write(real.join("name"), "bmp280\n").unwrap();
 
         assert_eq!(
             sensor_judged(&host, "/dev/iio:device0", &dummy).verdict,

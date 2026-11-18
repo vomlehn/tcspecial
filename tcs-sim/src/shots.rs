@@ -420,7 +420,7 @@ impl Scene {
         }
 
         let path = shots_dir().join(file);
-        let out = std::fs::File::create(&path)
+        let out = tcsos::fs::File::create(&path)
             .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
         let mut encoder = png::Encoder::new(
             std::io::BufWriter::new(out),
@@ -442,7 +442,7 @@ impl Scene {
 /// Its path.
 fn shots_dir() -> PathBuf {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(SHOTS);
-    std::fs::create_dir_all(&dir).unwrap();
+    tcsos::fs::create_dir_all(&dir).unwrap();
     dir
 }
 
@@ -459,7 +459,7 @@ fn screenshots() {
 
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let payload_path = root.join("examples/thermostat/thermostat.ytcs");
-    let shipped = std::fs::read_to_string(
+    let shipped = tcsos::fs::read_to_string(
         root.join("examples/thermostat/thermostat-sim.yaml"),
     )
     .unwrap();
@@ -470,7 +470,7 @@ fn screenshots() {
     assert!(shipped.contains(section), "no tcs-sim section in {shipped}");
     let seeded = shipped.replace(section, &format!("{section}  seed: 1\n"));
     let sim_path = dir.path().join("thermostat-sim.yaml");
-    std::fs::write(&sim_path, &seeded).unwrap();
+    tcsos::fs::write(&sim_path, &seeded).unwrap();
 
     // Starting: the window as it opens, a sensor enabled and sending, and a
     // heater that the vehicle switches on while it is disabled.
@@ -500,7 +500,7 @@ fn screenshots() {
     let faulty = dir.path().join("faulty-sim.yaml");
     let entry = "      - payload: temp_3\n";
     assert!(seeded.contains(entry), "temp_3 has moved in {seeded}");
-    std::fs::write(
+    tcsos::fs::write(
         &faulty,
         seeded.replace(entry, &format!("{entry}        silent_after: 3\n")),
     )

@@ -13,7 +13,7 @@
 //! whatever it is told: a moment foreseen from the flow, and an event of the
 //! world's. The arithmetic is tcs-sim's `physics::engine`.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::{Deserialize, Serialize};
 

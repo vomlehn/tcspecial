@@ -896,23 +896,24 @@ mod tests {
     #[test]
     fn a_consolidator_is_one_channel() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let text =
-            std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
-                .expect("it reads")
-                .replace("gateway: \"yamcs\"", "gateway: \"fprime\"")
-                .replace("type gateway_yamcs", "type gateway_fprime")
-                .replace(
-                    "ground_base: \"127.0.0.1:26700\"",
-                    "bridge_base: \"127.0.0.1:26700\"\n        \
+        let text = tcsos::fs::read_to_string(
+            root.join("tests/consolidator/yamcs.ytcs"),
+        )
+        .expect("it reads")
+        .replace("gateway: \"yamcs\"", "gateway: \"fprime\"")
+        .replace("type gateway_yamcs", "type gateway_fprime")
+        .replace(
+            "ground_base: \"127.0.0.1:26700\"",
+            "bridge_base: \"127.0.0.1:26700\"\n        \
                      fprime_id_base: \"0x3000\"",
-                )
-                .lines()
-                .filter(|line| !line.contains("apid"))
-                .map(|line| format!("{line}\n"))
-                .collect::<String>();
+        )
+        .lines()
+        .filter(|line| !line.contains("apid"))
+        .map(|line| format!("{line}\n"))
+        .collect::<String>();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("fprime.ytcs");
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         let graph = Graph::load(&path).expect("it reads");
         let model = of(&graph, "gateway").expect("a model");
         assert_eq!(
@@ -936,30 +937,31 @@ mod tests {
     #[test]
     fn a_consolidation_too_long_for_the_bridge_is_refused() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let text =
-            std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
-                .expect("it reads")
-                .replace("gateway: \"yamcs\"", "gateway: \"fprime\"")
-                .replace("type gateway_yamcs", "type gateway_fprime")
-                .replace(
-                    "ground_base: \"127.0.0.1:26700\"",
-                    "bridge_base: \"127.0.0.1:26700\"\n        \
+        let text = tcsos::fs::read_to_string(
+            root.join("tests/consolidator/yamcs.ytcs"),
+        )
+        .expect("it reads")
+        .replace("gateway: \"yamcs\"", "gateway: \"fprime\"")
+        .replace("type gateway_yamcs", "type gateway_fprime")
+        .replace(
+            "ground_base: \"127.0.0.1:26700\"",
+            "bridge_base: \"127.0.0.1:26700\"\n        \
                      fprime_id_base: \"0x3000\"",
-                )
-                .replace("string(8)", "string(61)")
-                .lines()
-                .filter(|line| !line.contains("apid"))
-                .map(|line| format!("{line}\n"))
-                .collect::<String>();
+        )
+        .replace("string(8)", "string(61)")
+        .lines()
+        .filter(|line| !line.contains("apid"))
+        .map(|line| format!("{line}\n"))
+        .collect::<String>();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("fprime.ytcs");
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         let graph = Graph::load(&path).expect("it reads");
         let refused = of(&graph, "gateway").expect_err("too long");
         assert_eq!(refused.node, "pack");
         assert!(refused.why.contains("64"), "{}", refused.why);
 
-        let fpp = std::fs::read_to_string(
+        let fpp = tcsos::fs::read_to_string(
             root.join("fprime/Tcs/TcsBridge/TcsBridge.fpp"),
         )
         .expect("the bridge's FPP reads");

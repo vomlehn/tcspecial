@@ -57,11 +57,11 @@
 //! pass belongs to the pass, and the answer goes out when the work is done.
 
 use std::fmt::Write as _;
-use std::net::{SocketAddr, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::thread::JoinHandle;
+use tcsos::time::{Duration, Instant};
 
 use log::{error, trace, warn};
 use tcsos::wait::{Ready, Waitable, Wakeup, Watch};
@@ -1632,13 +1632,13 @@ mod tests {
     ///
     /// The count: `want` once reached, or whatever it is when the wait ends.
     fn asked_by(counter: &std::sync::atomic::AtomicU32, want: u32) -> u32 {
-        let until = std::time::Instant::now() + Duration::from_secs(2);
+        let until = tcsos::time::Instant::now() + Duration::from_secs(2);
         loop {
             let now = counter.load(Ordering::SeqCst);
-            if now >= want || std::time::Instant::now() >= until {
+            if now >= want || tcsos::time::Instant::now() >= until {
                 return now;
             }
-            std::thread::sleep(Duration::from_millis(5));
+            tcsos::thread::sleep(Duration::from_millis(5));
         }
     }
 
@@ -1657,7 +1657,7 @@ mod tests {
     fn two_nodes() -> Graph {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("two.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type i2c:
@@ -1759,7 +1759,7 @@ vehicle:
         let (bench, desk) = Workbench::in_two().expect("a workbench");
         let done = Arc::new(std::sync::Mutex::new(Vec::new()));
         let kept = done.clone();
-        std::thread::spawn(move || {
+        tcsos::thread::spawn(move || {
             while let Some(job) = desk.wait() {
                 kept.lock().expect("the record").push(job.work.clone());
                 desk.answer(&job, how(&job.work));
@@ -2332,7 +2332,7 @@ vehicle:
     fn a_ping_node_is_neither_stopped_nor_started() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("ping.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "gateways:
   - type gateway_radio:
@@ -2974,7 +2974,8 @@ vehicle:
             restart(&mut said, Duration::from_secs(2)),
             CommandStatus::Success
         );
-        let kept = std::fs::read_to_string(&said.state_file).expect("written");
+        let kept =
+            tcsos::fs::read_to_string(&said.state_file).expect("written");
         assert!(kept.contains("\nnext_start commanded\n"), "{kept}");
 
         let mut unsaid = serving(Duration::from_secs(60));

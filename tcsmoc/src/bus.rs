@@ -48,11 +48,11 @@
 //! from the room it was started with; what allocates is a line said about
 //! the peer's coming and going or about something refused.
 
-use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use tcsos::thread::JoinHandle;
+use tcsos::time::{Duration, Instant};
 use tcsos::wait::{Ready, Waitable, Watch};
 
 use tcsprotocol::graph::parameters::{ci_config_of, flatten};
@@ -337,7 +337,7 @@ impl Ground {
             out: vec![0u8; ROOM],
             sequence: 0,
         };
-        std::thread::Builder::new()
+        tcsos::thread::Builder::new()
             .name("sbn-ground".to_string())
             .spawn(move || keeper.run())
             .map_err(|e| format!("the bus's peer cannot be started: {e}"))?;
@@ -835,7 +835,7 @@ impl SimulatedCfs {
         };
         let stop = Arc::new(AtomicBool::new(false));
         let stopping = stop.clone();
-        let thread = std::thread::Builder::new()
+        let thread = tcsos::thread::Builder::new()
             .name("sbn-simulated".to_string())
             .spawn(move || hub.run(&stopping))
             .map_err(|e| {
@@ -1177,13 +1177,14 @@ mod tests {
     /// The directory it is in, and its graph.
     fn example() -> (tempfile::TempDir, Graph) {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let text = std::fs::read_to_string(root.join("examples/cfs/cfs.ytcs"))
-            .expect("the example reads");
+        let text =
+            tcsos::fs::read_to_string(root.join("examples/cfs/cfs.ytcs"))
+                .expect("the example reads");
         let port = loopback("test").unwrap().local_addr().unwrap().port();
         let text = text.replace("127.0.0.1:2234", &format!("127.0.0.1:{port}"));
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("cfs.ytcs");
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         let graph = Graph::load(&path).expect("it reads");
         (dir, graph)
     }

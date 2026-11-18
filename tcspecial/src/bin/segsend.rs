@@ -10,7 +10,7 @@
 //! that every filled segment reaches it, and a log directory that empties as
 //! the vehicle runs is the evidence.
 
-use std::process::ExitCode;
+use tcsos::process::ExitCode;
 
 /// Deletes the one file named on the command line, the filled segment.
 ///
@@ -25,7 +25,7 @@ fn main() -> ExitCode {
         eprintln!("segsend: give it one file, the filled segment to send");
         return ExitCode::from(2);
     };
-    match std::fs::remove_file(&file) {
+    match tcsos::fs::remove_file(&file) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!(

@@ -146,7 +146,7 @@ mod tests {
             voltage: 28.0,
             supply: Wander {
                 size: 0.05,
-                time: std::time::Duration::from_secs(30),
+                time: tcsos::time::Duration::from_secs(30),
             },
         };
         let mut heater = Heater::new("h", figures, 3);

@@ -46,7 +46,7 @@ fn unusable(dir: &str) -> Option<String> {
     let fix =
         "create it, or change log.directory in the configuration's tcspecial \
                section to a directory that is there";
-    match std::fs::metadata(dir) {
+    match tcsos::fs::metadata(dir) {
         Ok(found) if found.is_dir() => None,
         Ok(_) => Some(format!(
             "the telemetry log directory, {dir}, is not a directory: {fix}"
@@ -197,7 +197,7 @@ mod tests {
         assert!(said.contains("log.directory"), "{said}");
 
         let file = dir.path().join("a file");
-        std::fs::write(&file, b"").expect("written");
+        tcsos::fs::write(&file, b"").expect("written");
         let file = file.to_str().expect("a path");
         let said = unusable(file).expect("a file is not a directory");
         assert!(said.contains("is not a directory"), "{said}");

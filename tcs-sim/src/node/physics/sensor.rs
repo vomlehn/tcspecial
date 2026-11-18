@@ -150,7 +150,7 @@ impl Sensor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::node::physics::Wander;
 
     /// A sensor with no errors reports the body exactly.

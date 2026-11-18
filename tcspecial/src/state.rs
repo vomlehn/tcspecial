@@ -47,9 +47,9 @@
 //! pushes or pops the stack all change it, and two changes made at once
 //! would lose one. See "The state file" in `docs/tcspecial-design.rst`.
 
-use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use tcsos::fs::{File, OpenOptions};
 
 use tcsprotocol::crc::crc16;
 use tcsprotocol::ConfigDigest;
@@ -142,7 +142,7 @@ pub struct Found {
 /// What it holds, what was wrong with it, and the generation an older
 /// build's file held.
 pub fn read(path: &Path) -> Found {
-    let (state, damaged) = match std::fs::read(path) {
+    let (state, damaged) = match tcsos::fs::read(path) {
         Ok(text) => match state_in(&text) {
             Ok(said) => (said, None),
             Err(why) => {
@@ -489,7 +489,7 @@ pub fn write(path: &Path, state: &State) -> Result<(), String> {
         .and_then(|()| file.sync_all())
         .map_err(|e| cannot("written", e))?;
     drop(file);
-    std::fs::rename(&beside, path).map_err(|e| cannot("replaced", e))?;
+    tcsos::fs::rename(&beside, path).map_err(|e| cannot("replaced", e))?;
     // The rename is in the directory, so the directory is what has to reach
     // storage for it to be the file that is there after a power failure.
     let directory = match path.parent() {
@@ -541,7 +541,7 @@ mod tests {
         write(&path, &state).expect("written");
         assert_eq!(read(&path).state, state);
         assert_eq!(read(&path).state.top(), Some(TWO));
-        let text = std::fs::read_to_string(&path).expect("it is text");
+        let text = tcsos::fs::read_to_string(&path).expect("it is text");
         assert!(
             text.contains(&format!("\nstack {ONE}\nstack {TWO}\ntrials 2\n")),
             "{text}"
@@ -620,7 +620,7 @@ mod tests {
             text.extend_from_slice(format!("crc16 {crc:#06x}\n").as_bytes());
             text
         };
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             old(format!("next {TWO}\ntrials 2\nconfirmed {ONE}\n")),
         )
@@ -633,7 +633,7 @@ mod tests {
                 commanded: false,
             }
         );
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             old(format!("next {ONE}\ntrials 1\nconfirmed {ONE}\n")),
         )
@@ -651,7 +651,7 @@ mod tests {
         let threads: Vec<_> = (0..8u8)
             .map(|at| {
                 let path = path.clone();
-                std::thread::spawn(move || {
+                tcsos::thread::spawn(move || {
                     update(&path, |state| {
                         state.stack.push(ConfigDigest([at; 16]))
                     })
@@ -676,7 +676,7 @@ do not edit.\ngeneration 7\nnext_start commanded\n"
             .to_vec();
         let crc = crc16(&old);
         old.extend_from_slice(format!("crc16 {crc:#06x}\n").as_bytes());
-        std::fs::write(&path, &old).expect("written");
+        tcsos::fs::write(&path, &old).expect("written");
 
         let found = read(&path);
         assert_eq!(found.dropped_generation, Some(7));
@@ -692,7 +692,7 @@ do not edit.\ngeneration 7\nnext_start commanded\n"
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tcspecial.state");
         commanded_restart(&path, ONE).expect("written");
-        let good = std::fs::read(&path).expect("it reads");
+        let good = tcsos::fs::read(&path).expect("it reads");
         let edited = String::from_utf8(good.clone())
             .unwrap()
             .replace(&ONE.to_string(), &TWO.to_string());
@@ -702,7 +702,7 @@ do not edit.\ngeneration 7\nnext_start commanded\n"
             (cut, "crc16"),
             (b"nothing like it".to_vec(), "crc16"),
         ] {
-            std::fs::write(&path, &damage).expect("it is damaged");
+            tcsos::fs::write(&path, &damage).expect("it is damaged");
             let found = read(&path);
             assert_eq!(found.state, State::default(), "it names nothing");
             let why = found.damaged.expect("and says why");

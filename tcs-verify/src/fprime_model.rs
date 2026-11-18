@@ -71,7 +71,7 @@ pub fn write(
             ))
         }
     };
-    std::fs::create_dir_all(dir)
+    tcsos::fs::create_dir_all(dir)
         .map_err(|e| format!("{}: cannot be made: {e}", dir.display()))?;
     let mut written = Vec::new();
     for (name, text) in [
@@ -79,10 +79,10 @@ pub fn write(
         (CPP, model.cpp(&shown, &digest)),
     ] {
         let path = dir.join(name);
-        if std::fs::read_to_string(&path).is_ok_and(|was| was == text) {
+        if tcsos::fs::read_to_string(&path).is_ok_and(|was| was == text) {
             continue;
         }
-        std::fs::write(&path, text).map_err(|e| {
+        tcsos::fs::write(&path, text).map_err(|e| {
             format!("{}: cannot be written: {e}", path.display())
         })?;
         written.push(path);

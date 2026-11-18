@@ -79,7 +79,7 @@ gateways:
     }
     let dir = tempfile::tempdir().expect("a directory");
     let path = dir.path().join("pack.ytcs");
-    std::fs::write(&path, text).expect("written");
+    tcsos::fs::write(&path, text).expect("written");
     let graph = Graph::load(&path).expect("it reads");
     let said = graph.check().iter().map(|p| p.describe()).collect();
     (graph, said)

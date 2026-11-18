@@ -12,10 +12,10 @@
 //! test that the vehicle keeps to it.
 
 use std::collections::BTreeSet;
-use std::net::{SocketAddr, UdpSocket};
 use std::path::Path;
-use std::process::{Child, Command as Process, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::process::{Child, Command as Process, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::sbn::{self, kind, Header};
 use tcsprotocol::{
@@ -260,9 +260,9 @@ impl Peer {
 fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/cfs/cfs.ytcs");
-    let text = std::fs::read_to_string(&path).expect("the example reads");
+    let text = tcsos::fs::read_to_string(&path).expect("the example reads");
     let dir = tempfile::tempdir().expect("a directory");
-    std::fs::create_dir(dir.path().join("telemetry"))
+    tcsos::fs::create_dir(dir.path().join("telemetry"))
         .expect("the log's directory");
     let socket = bound();
     let heater = bound();
@@ -285,7 +285,7 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
         text = moved(&text, was, &now);
     }
     let configuration = dir.path().join("cfs.ytcs");
-    std::fs::write(&configuration, &text).expect("written");
+    tcsos::fs::write(&configuration, &text).expect("written");
     let ident = sbn::ident_of("3b339a5e0f686cef822a5d6ea95004222ab7af33")
         .expect("the example's ident");
     let peer = Peer {

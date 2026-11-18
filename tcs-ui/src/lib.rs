@@ -29,7 +29,7 @@
 //! [`tcsmoc::ping`]: the markup shows seven rows, and [`PingShown::of`]
 //! says what each says.
 
-use std::time::SystemTime;
+use tcsos::time::SystemTime;
 
 use slint::Color;
 use tcsmoc::beacon::{received_at, Pass, Showing, Stage};
@@ -281,8 +281,8 @@ impl PingShown {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use tcsmoc::beacon::Schedule;
+    use tcsos::time::Duration;
 
     /// The contrast between two colours, by WCAG's relative luminance:
     /// one for the same light, twenty-one for black against white.

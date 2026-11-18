@@ -6,12 +6,12 @@
 //! beacon watch, command client and gateway receiver, none of which is told
 //! that the vehicle is on a bus rather than a radio.
 
-use std::net::{SocketAddr, UdpSocket};
 use std::path::Path;
-use std::process::{Child, Command as Process, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::process::{Child, Command as Process, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsmoc::beacon::{self, Arrived, Schedule};
 use tcsmoc::bus::SimulatedCfs;
@@ -57,8 +57,8 @@ impl Drop for Flying {
 fn example(dir: &Path) -> (std::path::PathBuf, u16) {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/cfs/cfs.ytcs");
-    let mut text = std::fs::read_to_string(&path).expect("the example reads");
-    std::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
+    let mut text = tcsos::fs::read_to_string(&path).expect("the example reads");
+    tcsos::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
     let thermometer = free();
     for (was, now) in [
         ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
@@ -78,7 +78,7 @@ fn example(dir: &Path) -> (std::path::PathBuf, u16) {
         text = text.replace(was, &now);
     }
     let configuration = dir.join("cfs.ytcs");
-    std::fs::write(&configuration, &text).expect("written");
+    tcsos::fs::write(&configuration, &text).expect("written");
     (configuration, thermometer)
 }
 
@@ -117,7 +117,7 @@ fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
     {
         let matched = matched.clone();
         let heard = heard.clone();
-        std::thread::spawn(move || loop {
+        tcsos::thread::spawn(move || loop {
             let pass = beacons.pass();
             matched.heard(pass);
             if pass.arrived == Arrived::Beacon {
@@ -127,7 +127,7 @@ fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
     }
     let deadline = Instant::now() + Duration::from_secs(20);
     while !heard.load(Ordering::SeqCst) && Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
     }
     assert!(
         heard.load(Ordering::SeqCst),
@@ -152,7 +152,7 @@ fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
     assert_eq!(theirs, digest, "the vehicle flies this configuration");
     let deadline = Instant::now() + Duration::from_secs(20);
     while !matched.for_commanding() && Instant::now() < deadline {
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
     }
     let (status, _, _) =
         client.query_node(NodeId(1)).expect("the node is asked");

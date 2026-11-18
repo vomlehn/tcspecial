@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::node::payload::hdlc::{ClockType, Encoding, FrameCheck};
 use crate::node::payload::serial::{Parity, StopBits};
 use crate::node::payload::spi::{BitOrder, CsActive, SpiMode};
-use std::net::SocketAddr;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tcsos::net::SocketAddr;
+use tcsos::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A time, in microseconds since the UNIX epoch.
 ///
@@ -1069,7 +1069,7 @@ pub struct NetworkConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SendsFrom {
     /// A UDP payload's host and port.
-    Socket(std::net::SocketAddr),
+    Socket(tcsos::net::SocketAddr),
     /// A Unix datagram payload's path.
     Path(String),
 }
@@ -1175,7 +1175,7 @@ pub struct GpioConfig {
     /// flight setting. Set by [`crate::graph::reach::Reach::opened`] and never
     /// read from a file, so a node's lines are the same whichever it is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sim_address: Option<std::net::SocketAddr>,
+    pub sim_address: Option<tcsos::net::SocketAddr>,
 }
 
 impl GpioConfig {
@@ -1493,7 +1493,7 @@ pub struct DHConfig {
     /// rather than anything at [`DHConfig::endpoint`], which is still what the
     /// payload is and what its simulator entry is held to.
     #[serde(default)]
-    pub sim_address: Option<std::net::SocketAddr>,
+    pub sim_address: Option<tcsos::net::SocketAddr>,
     /// Whether the payload is only driven: written to by the vehicle and
     /// never read, as a heater or a valve is.
     ///
@@ -3035,7 +3035,7 @@ impl std::fmt::Display for CommandStatus {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// A datagram is taken only from the socket the configuration names.
     ///
@@ -3048,7 +3048,7 @@ mod tests {
     #[test]
     fn a_datagram_is_taken_only_from_where_the_configuration_says() {
         use super::*;
-        use std::net::SocketAddr;
+        use tcsos::net::SocketAddr;
 
         let at = |text: &str| text.parse::<SocketAddr>().expect(text);
         let stated = |address: &str, port: u16| HostPort {
@@ -3218,7 +3218,7 @@ mod tests {
     /// A clock that cannot be read says so, however it failed.
     #[test]
     fn a_clock_that_cannot_be_read_says_so() {
-        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+        use tcsos::time::{Duration, SystemTime, UNIX_EPOCH};
 
         // Set to before the epoch.
         assert_eq!(

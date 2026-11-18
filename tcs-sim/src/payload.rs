@@ -23,12 +23,14 @@
 //! * [`crate::node::payload::network::unix`] -- a Unix-domain socket of either
 //!   flavour, which the simulator simply is
 
+#[cfg(target_os = "linux")]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
-use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
-use tcsos::linux::fs::symlink;
+#[cfg(target_os = "linux")]
+use tcsos::fs::symlink;
+use tcsos::thread::{self, JoinHandle};
+use tcsos::time::{Duration, Instant};
 
 use rand::Rng;
 use tcsprotocol::DHSample;
@@ -54,6 +56,7 @@ pub struct PayloadConfig {
     /// The address of the device on its bus, for an I2C payload; zero for the
     /// kinds that are not on one. Not the `port`, which a bus has not, and
     /// not the `address`, which for a bus is the bus itself.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub bus_address: u16,
     /// What a CAN payload is on and what identifies it: the interface is the
     /// `address` above, and this is the identifier its frames carry. Zero for
@@ -62,9 +65,11 @@ pub struct PayloadConfig {
     /// Apart from `bus_address` because a CAN identifier is twenty-nine bits
     /// where an I2C address is ten, and because the two are compared against
     /// different things. See [`crate::node::payload::can`].
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub can_id: u32,
     /// Whether a CAN payload's frames are CAN FD, which decides how much one
     /// carries.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub can_fd: bool,
     /// Which lines a GPIO payload moves, and empty for every other kind.
     ///
@@ -155,28 +160,35 @@ fn run_kind(
                 config, running, stats,
             )
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::Device => {
             crate::node::payload::device_file::run_device_file_node(
                 config, running, stats,
             )
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::Serial => {
             crate::node::payload::serial::run_serial_node(
                 config, running, stats,
             )
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::I2c => {
             crate::node::payload::i2c::run_i2c_node(config, running, stats)
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::Spi => {
             crate::node::payload::spi::run_spi_node(config, running, stats)
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::Can => {
             crate::node::payload::can::run_can_node(config, running, stats)
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::Iio => {
             crate::node::payload::iio::run_iio_node(config, running, stats)
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::Rpmsg => {
             crate::node::payload::rpmsg::run_rpmsg_node(config, running, stats)
         }
@@ -188,14 +200,28 @@ fn run_kind(
                 config, running, stats,
             )
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::UnixStream => {
             crate::node::payload::network::unix::run_unix_stream_node(
                 config, running, stats,
             )
         }
+        #[cfg(target_os = "linux")]
         PayloadProtocol::UnixDgram => {
             crate::node::payload::network::unix::run_unix_dgram_node(
                 config, running, stats,
+            )
+        }
+        // Where Linux's devices are not, a payload is simulated over UDP or
+        // TCP, or as GPIO lines over UDP, and nothing else.
+        #[cfg(not(target_os = "linux"))]
+        _ => {
+            let _ = (running, stats);
+            could_not_simulate(
+                &config,
+                "this kind of payload is simulated with one of Linux's \
+                 devices, which a web page does not have"
+                    .to_string(),
             )
         }
     }
@@ -507,13 +533,14 @@ impl Drop for SimulatedPayload {
 ///
 /// A message if a character device or anything but a link is at `path`,
 /// if an old link cannot be removed, or if the link cannot be made.
+#[cfg(target_os = "linux")]
 pub(crate) fn make_the_path_lead_to(
     path: &Path,
     leads_to: &str,
 ) -> Result<(), String> {
-    match std::fs::symlink_metadata(path) {
+    match tcsos::fs::symlink_metadata(path) {
         Ok(found) if found.file_type().is_symlink() => {
-            std::fs::remove_file(path).map_err(|e| {
+            tcsos::fs::remove_file(path).map_err(|e| {
                 format!(
                     "{} is a link left by an earlier run and cannot be \
                      replaced: {e}",

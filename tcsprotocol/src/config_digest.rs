@@ -800,7 +800,7 @@ mod tests {
     /// If it cannot be written.
     fn written(dir: &Path, name: &str, text: &str) -> std::path::PathBuf {
         let path = dir.join(name);
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         path
     }
 
@@ -992,15 +992,15 @@ mod tests {
         assert_eq!(digest_of_simulator_file(&two).expect("digests"), first);
 
         // A setting changed is another file.
-        std::fs::write(&two, text.replace("2 s", "3 s")).expect("written");
+        tcsos::fs::write(&two, text.replace("2 s", "3 s")).expect("written");
         assert_ne!(digest_of_simulator_file(&two).expect("digests"), first);
 
         // And so is the world's ambient temperature, and a figure of its
         // model.
-        std::fs::write(&two, text.replace("\"1 K\"", "\"2 K\""))
+        tcsos::fs::write(&two, text.replace("\"1 K\"", "\"2 K\""))
             .expect("written");
         assert_ne!(digest_of_simulator_file(&two).expect("digests"), first);
-        std::fs::write(&two, text.replace("\"1 J/K\"", "\"2 J/K\""))
+        tcsos::fs::write(&two, text.replace("\"1 J/K\"", "\"2 J/K\""))
             .expect("written");
         assert_ne!(digest_of_simulator_file(&two).expect("digests"), first);
     }

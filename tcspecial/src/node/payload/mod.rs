@@ -31,6 +31,7 @@ pub mod gpio;
 #[cfg(feature = "hdlc")]
 pub mod hdlc;
 #[cfg(feature = "i2c")]
+#[cfg_attr(not(target_os = "linux"), path = "i2c/elsewhere.rs")]
 pub mod i2c;
 #[cfg(feature = "i2c_tmass")]
 pub mod i2c_tmass;
@@ -42,6 +43,7 @@ pub mod rpmsg;
 #[cfg(feature = "serial")]
 pub mod serial;
 #[cfg(feature = "spi")]
+#[cfg_attr(not(target_os = "linux"), path = "spi/elsewhere.rs")]
 pub mod spi;
 #[cfg(feature = "spi_tmass")]
 pub mod spi_tmass;
@@ -91,17 +93,10 @@ pub const BUILT: &[&str] = &[
 // A type the platform cannot have stops the build, rather than building a
 // tcspecial that fails only when a node of the type is opened. Each of these
 // is a Linux interface: a feature says what was chosen, and this says what is
-// possible.
-#[cfg(all(feature = "i2c", not(target_os = "linux")))]
-compile_error!(
-    "the i2c payload type needs Linux's i2c-dev, which this platform does not \
-     have: build without the i2c feature"
-);
-#[cfg(all(feature = "spi", not(target_os = "linux")))]
-compile_error!(
-    "the spi payload type needs Linux's spidev, which this platform does not \
-     have: build without the spi feature"
-);
+// possible. GPIO lines, I2C devices and SPI peripherals are left out of
+// this: where Linux's interfaces are not, they are built simulated only --
+// reached at their sim_address, as the browser's examples reach them -- and
+// a node that would open the real thing says so as it is opened.
 #[cfg(all(feature = "can", not(target_os = "linux")))]
 compile_error!(
     "the can payload type needs Linux's SocketCAN, which this platform does \
@@ -116,15 +111,6 @@ compile_error!(
 compile_error!(
     "the rpmsg payload type needs Linux's rpmsg character devices, which this \
      platform does not have: build without the rpmsg feature"
-);
-#[cfg(all(
-    any(feature = "gpio_in", feature = "gpio_out", feature = "gpio_inout"),
-    not(target_os = "linux")
-))]
-compile_error!(
-    "the gpio_in, gpio_out and gpio_inout payload types need Linux's GPIO \
-     character devices, which this platform does not have: build without \
-     those features"
 );
 #[cfg(all(feature = "hdlc", not(target_os = "linux")))]
 compile_error!(

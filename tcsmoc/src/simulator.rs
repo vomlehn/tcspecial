@@ -6,8 +6,8 @@
 //! answer means. The messages are `tcsprotocol::ready`; the Python ground
 //! station's library has the same function as `tcsmoc.simulator.wait`.
 
-use std::net::{SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::ready::{Answer, Request, SetUpFor, State, ANSWER_BYTES};
 
@@ -149,7 +149,7 @@ pub fn ask(
                 // told at once: waited out as silence is, so that asking
                 // nobody does not spin.
                 Err(_) => {
-                    std::thread::sleep(
+                    tcsos::thread::sleep(
                         until.saturating_duration_since(Instant::now()),
                     );
                     break;
@@ -213,7 +213,7 @@ pub fn wait(
                     reason: answer.reason.as_str().to_string(),
                 })
             }
-            State::Starting => std::thread::sleep(RESEND_EVERY.min(left)),
+            State::Starting => tcsos::thread::sleep(RESEND_EVERY.min(left)),
         }
     }
 }
@@ -259,7 +259,7 @@ mod tests {
     fn simulator(mode: Mode, state: Arc<AtomicU8>) -> SocketAddr {
         let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
         let at = socket.local_addr().unwrap();
-        std::thread::spawn(move || {
+        tcsos::thread::spawn(move || {
             let mut buffer = [0u8; 64];
             let mut out = [0u8; ANSWER_BYTES];
             while let Ok((n, from)) = socket.recv_from(&mut buffer) {
@@ -289,8 +289,8 @@ mod tests {
         let state = Arc::new(AtomicU8::new(0));
         let at = simulator(Mode::All, state.clone());
         let later = state.clone();
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(300));
+        tcsos::thread::spawn(move || {
+            tcsos::thread::sleep(Duration::from_millis(300));
             later.store(1, Ordering::SeqCst);
         });
         wait(at, &set_up(Mode::All), Duration::from_secs(5)).expect("ready");

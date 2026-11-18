@@ -41,7 +41,7 @@
 //! reported those would bury the real faults in them.
 
 use std::collections::VecDeque;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 use tcsos::wait::{Ready, Source, Watch};
 
 use tcsapp::parent::ReadInto;
@@ -1796,7 +1796,7 @@ mod tests {
     /// before reading: the endpoint answers from its script rather than from
     /// the descriptor, and what the poll has to say is only "there is
     /// something", which a read of /dev/null always does.
-    struct Half(Arc<Mutex<Script>>, std::fs::File);
+    struct Half(Arc<Mutex<Script>>, tcsos::fs::File);
 
     impl Half {
         /// Makes one half over a script.
@@ -1815,7 +1815,7 @@ mod tests {
         fn of(script: &Arc<Mutex<Script>>) -> Half {
             Half(
                 Arc::clone(script),
-                std::fs::File::open("/dev/null")
+                tcsos::fs::File::open("/dev/null")
                     .expect("every machine has one"),
             )
         }
@@ -2063,7 +2063,7 @@ mod tests {
                 if n > 0 {
                     return buffer[..n].to_vec();
                 }
-                std::thread::sleep(Duration::from_millis(2));
+                tcsos::thread::sleep(Duration::from_millis(2));
             }
             Vec::new()
         };
@@ -2407,14 +2407,14 @@ mod tests {
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("heater");
-        std::fs::write(&path, b"").expect("the device");
+        tcsos::fs::write(&path, b"").expect("the device");
         let node = heater(path.to_str().expect("a path"));
         let port =
             EndpointPort::open(&node, &routes(&node), &Abandon::nothing())
                 .expect("the heater opens");
         drop(port);
         assert_eq!(
-            std::fs::read(&path).expect("what was written"),
+            tcsos::fs::read(&path).expect("what was written"),
             b"0",
             "the heater should have been set to what init says as it opened"
         );
@@ -2442,7 +2442,7 @@ mod tests {
     /// taken for the payload.
     #[test]
     fn a_payload_that_says_where_it_sends_from_is_read_only_from_there() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::graph::{Destinations, Link};
 
         let payload =
@@ -2510,7 +2510,7 @@ mod tests {
             if taken.bytes > 0 || Instant::now() >= deadline {
                 break taken;
             }
-            std::thread::yield_now();
+            tcsos::thread::yield_now();
         };
         assert_eq!(
             &buffer[..taken.bytes],
@@ -2530,7 +2530,7 @@ mod tests {
     /// be told where to send a trigger by a sensor waiting for one.
     #[test]
     fn an_asked_datagram_payload_is_reached_where_it_waits() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::graph::{Destinations, Link};
 
         let sensor = UdpSocket::bind("127.0.0.1:0").expect("the sensor waits");
@@ -3162,7 +3162,7 @@ mod tests {
         // flag goes down and the node's wakeup is poked.
         state.disable();
 
-        let began = std::time::Instant::now();
+        let began = tcsos::time::Instant::now();
         let taken = port.take(&mut [0u8; 64]).expect("no failure to report");
         assert_eq!(taken.bytes, 0, "nothing is produced");
         assert!(
@@ -3237,7 +3237,7 @@ mod tests {
         /// If the program cannot be written or made executable.
         fn simulated_app(where_: &Path, redirect: &str) -> std::path::PathBuf {
             let path = where_.join("simulated_app");
-            let mut file = std::fs::File::create(&path).expect("a program");
+            let mut file = tcsos::fs::File::create(&path).expect("a program");
             write!(file, "#!/bin/sh\nexec cat {redirect}\n")
                 .expect("a program");
             tcsos::fs::set_mode(&path, 0o755)
@@ -3317,18 +3317,18 @@ mod tests {
         ///
         /// If a take fails or nothing comes within five seconds.
         fn taken_soon(port: &mut AppPort, buffer: &mut [u8]) -> Taken {
-            let until =
-                std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let until = tcsos::time::Instant::now()
+                + tcsos::time::Duration::from_secs(5);
             loop {
                 let taken = port.take(buffer).expect("a datum");
                 if taken.bytes > 0 {
                     return taken;
                 }
                 assert!(
-                    std::time::Instant::now() < until,
+                    tcsos::time::Instant::now() < until,
                     "the program answered nothing"
                 );
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                tcsos::thread::sleep(tcsos::time::Duration::from_millis(1));
             }
         }
 
@@ -3438,7 +3438,7 @@ mod tests {
             let where_ = tempfile::tempdir().expect("a directory");
             // Two packets of payload data: two bytes, then one.
             let path = where_.path().join("reports");
-            let mut file = std::fs::File::create(&path).expect("a program");
+            let mut file = tcsos::fs::File::create(&path).expect("a program");
             write!(
                 file,
                 "#!/bin/sh\nprintf '\\002\\000\\000\\000\\001\\002' >&1\n\
@@ -3458,15 +3458,15 @@ mod tests {
                 .expect("it starts");
 
             let mut buffer = [0u8; 64];
-            let until =
-                std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let until = tcsos::time::Instant::now()
+                + tcsos::time::Duration::from_secs(5);
             let refused = loop {
                 match port.take(&mut buffer) {
                     Err(why) => break why,
                     Ok(taken) => assert_eq!(taken.bytes, 0, "not a u8"),
                 }
-                assert!(std::time::Instant::now() < until, "nothing came");
-                std::thread::sleep(std::time::Duration::from_millis(1));
+                assert!(tcsos::time::Instant::now() < until, "nothing came");
+                tcsos::thread::sleep(tcsos::time::Duration::from_millis(1));
             };
             assert!(
                 refused.contains("bay") && refused.contains("u8"),
@@ -3488,7 +3488,7 @@ mod tests {
             // One packet of payload data, written to descriptor 1 and read by
             // nobody: six bytes after a length of six.
             let path = where_.path().join("reports");
-            let mut file = std::fs::File::create(&path).expect("a program");
+            let mut file = tcsos::fs::File::create(&path).expect("a program");
             write!(
                 file,
                 "#!/bin/sh\nprintf '\\006\\000\\000\\000293.15' >&1\n"

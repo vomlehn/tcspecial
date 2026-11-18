@@ -529,7 +529,7 @@ pub fn compare(first: &Path, second: &Path, report: &mut Report) {
     let files: Vec<(PathBuf, String)> = files
         .into_iter()
         .map(|file| {
-            let text = std::fs::read_to_string(&file).unwrap_or_default();
+            let text = tcsos::fs::read_to_string(&file).unwrap_or_default();
             (file, text)
         })
         .collect();
@@ -963,7 +963,7 @@ fn check_graph(
         let Ok(format) = ConfigFormat::of_file(file) else {
             continue;
         };
-        let Ok(text) = std::fs::read_to_string(file) else {
+        let Ok(text) = tcsos::fs::read_to_string(file) else {
             continue;
         };
         located.push((file.clone(), crate::locate::Where::of(&text, format)));
@@ -1222,7 +1222,7 @@ fn read(path: &Path, report: &mut Report) -> Option<(String, ConfigFormat)> {
         return None;
     };
 
-    match std::fs::read_to_string(path) {
+    match tcsos::fs::read_to_string(path) {
         Ok(text) => Some((text, format)),
         Err(e) => {
             report.add(path, THE_FILE_ITSELF, e.to_string());
@@ -1313,18 +1313,18 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         let at = |name: &str| dir.path().join(name);
         for sub in ["thermostat", "thermostat-common"] {
-            std::fs::create_dir(at(sub)).expect("a directory");
+            tcsos::fs::create_dir(at(sub)).expect("a directory");
             let from = examples.join(sub).join("thermostat.ytcs");
-            std::fs::copy(from, at(sub).join("thermostat.ytcs"))
+            tcsos::fs::copy(from, at(sub).join("thermostat.ytcs"))
                 .expect("copied");
             let xml = examples.join(sub).join("thermostat.xtcs");
-            let text = std::fs::read_to_string(xml).expect("the XML");
-            std::fs::write(at(sub).join("thermostat.xtcs"), change(text))
+            let text = tcsos::fs::read_to_string(xml).expect("the XML");
+            tcsos::fs::write(at(sub).join("thermostat.xtcs"), change(text))
                 .expect("written");
         }
         // The example's simulator file is a link; the copy is of the file
         // it names, which is what a link to it reads.
-        std::fs::copy(
+        tcsos::fs::copy(
             examples.join("thermostat/thermostat-sim.yaml"),
             at("thermostat/thermostat-sim.yaml"),
         )
@@ -1353,7 +1353,7 @@ mod tests {
             .iter()
             .map(|finding| (finding.line, finding.message.as_str()))
             .collect();
-        let text = std::fs::read_to_string(&yaml).expect("the example");
+        let text = tcsos::fs::read_to_string(&yaml).expect("the example");
         let line_of = |name: &str| {
             1 + text
                 .lines()
@@ -1395,12 +1395,12 @@ mod tests {
         let (_dir, _, yaml, sim) = thermostat_pair(|xml| xml);
         let model = sim.clone();
         let edit = |path: &Path, from: &str, to: &str| {
-            let text = std::fs::read_to_string(path).expect("read");
+            let text = tcsos::fs::read_to_string(path).expect("read");
             assert!(text.contains(from), "{from}");
-            std::fs::write(path, text.replace(from, to)).expect("written");
+            tcsos::fs::write(path, text.replace(from, to)).expect("written");
         };
         let line_in = |path: &Path, said: &str| {
-            1 + std::fs::read_to_string(path)
+            1 + tcsos::fs::read_to_string(path)
                 .expect("read")
                 .lines()
                 .position(|line| line.trim() == said)
@@ -1452,7 +1452,7 @@ mod tests {
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/descent");
         let dir = tempfile::tempdir().expect("a directory");
         for name in ["descent.ytcs", "descent-sim.yaml"] {
-            std::fs::copy(root.join(name), dir.path().join(name))
+            tcsos::fs::copy(root.join(name), dir.path().join(name))
                 .expect("copied");
         }
         let (yaml, sim) = (
@@ -1463,8 +1463,8 @@ mod tests {
             .findings
             .is_empty());
 
-        let text = std::fs::read_to_string(&yaml).expect("read");
-        std::fs::write(
+        let text = tcsos::fs::read_to_string(&yaml).expect("read");
+        tcsos::fs::write(
             &yaml,
             text.replace("type-out: \"ratio\"", "type-out: \"newton\""),
         )
@@ -1535,7 +1535,7 @@ mod tests {
                 && finding.message.contains("says \"290\""),
             "{said:?}"
         );
-        let text = std::fs::read_to_string(&finding.file).expect("the XML");
+        let text = tcsos::fs::read_to_string(&finding.file).expect("the XML");
         let line = text.lines().nth(finding.line - 1).expect("a line");
         assert!(
             line.contains("<setpoint>290"),
@@ -1699,11 +1699,11 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         let payload_path = dir.path().join(format!("set{payload_ext}"));
         let sim_path = dir.path().join("setsim.yaml");
-        std::fs::File::create(&payload_path)
+        tcsos::fs::File::create(&payload_path)
             .expect("the tcspecial configuration")
             .write_all(payload.as_bytes())
             .expect("written");
-        std::fs::File::create(&sim_path)
+        tcsos::fs::File::create(&sim_path)
             .expect("the simulator file")
             .write_all(sim.as_bytes())
             .expect("written");
@@ -1731,7 +1731,7 @@ mod tests {
     ) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join(format!("vehicle{extension}"));
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         (dir, path)
     }
 
@@ -1917,7 +1917,7 @@ vehicle:
     fn an_old_word_is_reported_at_its_line_with_the_new_one() {
         let dir = tempfile::tempdir().expect("a directory");
         let top = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "description: an old file\n\
              moc:\n  \
@@ -1944,7 +1944,7 @@ vehicle:
     fn a_problem_is_reported_in_the_file_it_is_in() {
         let dir = tempfile::tempdir().expect("a directory");
         let top = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:
   - subdiagram: zone
@@ -1956,7 +1956,7 @@ gateways:
         )
         .unwrap();
         // The included file holds a node nothing links to.
-        std::fs::write(
+        tcsos::fs::write(
             dir.path().join("zone.ytcs"),
             "payloads:
   - type i2c:
@@ -1989,7 +1989,7 @@ gateways:
         let (dir, path) = graph_written(".ytcs", SOUND_GRAPH);
         let sim = dir.path().join("vehiclesim.yaml");
 
-        std::fs::write(
+        tcsos::fs::write(
             &sim,
             "simulated_payloads:\n  \
              - type i2c:\n      \
@@ -2002,7 +2002,7 @@ gateways:
         assert!(!report.found_anything(), "{:?}", report.findings);
         assert!(report.joined);
 
-        std::fs::write(
+        tcsos::fs::write(
             &sim,
             "simulated_payloads:\n  - type i2c:\n      \
              - payload: sensor\n        simulate: true\n      \
@@ -2283,7 +2283,7 @@ payloads:
     fn an_xml_file_that_does_not_parse_says_where_it_stopped() {
         let root =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/minimal");
-        let good = std::fs::read_to_string(root.join("minimal.xtcs"))
+        let good = tcsos::fs::read_to_string(root.join("minimal.xtcs"))
             .expect("the example");
         let line_holding = |text: &str, what: &str| {
             text.lines()
@@ -2340,8 +2340,8 @@ payloads:
             ("minimal.ytcs", "version: \"2.0\"\n", 3),
             ("minimal.xtcs", "    <version>2.0</version>\n", 5),
         ] {
-            let good =
-                std::fs::read_to_string(root.join(file)).expect("the example");
+            let good = tcsos::fs::read_to_string(root.join(file))
+                .expect("the example");
             let extension = if file.ends_with(".xtcs") {
                 ".xtcs"
             } else {
@@ -2583,8 +2583,8 @@ payloads:
     #[test]
     fn findings_are_printed_in_the_order_found() {
         let (_dir, path) = with_warnings(3);
-        let text = std::fs::read_to_string(&path).expect("written");
-        std::fs::write(&path, text.replace("    recv: 0.0.0.0:4000\n", ""))
+        let text = tcsos::fs::read_to_string(&path).expect("written");
+        tcsos::fs::write(&path, text.replace("    recv: 0.0.0.0:4000\n", ""))
             .expect("written");
 
         let every = printed(&verify(&path, None, Limits::EVERYTHING));
@@ -2762,10 +2762,11 @@ payloads:
         // The shipped example with one more payload on it, placed and not yet
         // told which device it is on or linked to anything -- which is what
         // the editor writes the moment somebody drops a node on the canvas.
-        let said =
-            std::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
-                .expect("the worked example");
-        std::fs::write(
+        let said = tcsos::fs::read_to_string(
+            root.join("tests/manual/thermostat.ytcs"),
+        )
+        .expect("the worked example");
+        tcsos::fs::write(
             &path,
             said.replace(
                 "  - type i2c:\n",

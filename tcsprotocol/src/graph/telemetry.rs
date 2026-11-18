@@ -1004,7 +1004,7 @@ mod tests {
     fn ids_tell_case_apart_and_sort_by_code_point() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/ids");
         let graph = Graph::load(dir.join("case.ytcs")).expect("the file reads");
-        let table = std::fs::read_to_string(dir.join("case.ids"))
+        let table = tcsos::fs::read_to_string(dir.join("case.ids"))
             .expect("the table reads");
         let expected: BTreeMap<String, usize> = table
             .lines()

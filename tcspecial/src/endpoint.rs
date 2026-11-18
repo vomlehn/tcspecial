@@ -44,6 +44,7 @@ use crate::node::payload::iio::IioEndpoint;
 use crate::node::payload::network::raw::RawEndpoint;
 use crate::node::payload::network::tcp::TcpEndpoint;
 use crate::node::payload::network::udp::UdpEndpoint;
+#[cfg(target_os = "linux")]
 use crate::node::payload::network::unix::{
     UnixDatagramEndpoint, UnixStreamEndpoint,
 };
@@ -524,6 +525,7 @@ pub fn reaching_endpoint_pair(
             let writer = reader.try_clone()?;
             Ok((Box::new(reader), Box::new(writer)))
         }
+        #[cfg(target_os = "linux")]
         EndpointConfig::Network(net_config)
             if net_config.protocol == NetworkProtocol::UnixDgram =>
         {
@@ -632,13 +634,24 @@ pub fn hearing_endpoint_pair(
             }
             // A Unix socket divides as TCP and UDP divide, for the same
             // reason: a stream is accepted and a datagram is not. The
-            // difference is only that both are named by a path.
+            // difference is only that both are named by a path. Linux
+            // alone: a page's sockets are named by address.
+            #[cfg(target_os = "linux")]
             NetworkProtocol::UnixStream => {
                 let reader =
                     UnixStreamEndpoint::connect_retrying(what, net_config)?;
                 let writer = reader.try_clone()?;
                 Ok((Box::new(reader), Box::new(writer)))
             }
+            #[cfg(not(target_os = "linux"))]
+            NetworkProtocol::UnixStream | NetworkProtocol::UnixDgram => {
+                Err(TcsError::Config(format!(
+                    "{what}: a Unix-domain socket is named by a path, which a \
+                     web page's sockets are not: reach the payload over udp \
+                     or tcp"
+                )))
+            }
+            #[cfg(target_os = "linux")]
             NetworkProtocol::UnixDgram => {
                 let mut reader = UnixDatagramEndpoint::bind(what, net_config)?;
                 if let Some(from) = sends_from {
@@ -941,7 +954,7 @@ mod tests {
     /// each passed over and counted.
     #[test]
     fn framed_datagrams_round_trip_and_the_rest_are_counted() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         let at = NetworkConfig {
             protocol: NetworkProtocol::Udp,
             address: "127.0.0.1".to_string(),
@@ -983,7 +996,7 @@ mod tests {
             if got > 0 {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(5));
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(5));
         }
         assert_eq!(&buffer[..got], b"set 21");
         assert_eq!(reader.strangers(), 3, "three passed over");
@@ -1003,7 +1016,7 @@ mod tests {
         assert_eq!(writer.write(&[4]).expect("written"), 1);
         assert!(writer.write(&[]).is_err(), "an empty packet is refused");
         ground
-            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_secs(5)))
             .expect("a timeout");
         let mut arrived = [0u8; 64];
         let (size, _) = ground.recv_from(&mut arrived).expect("a packet");

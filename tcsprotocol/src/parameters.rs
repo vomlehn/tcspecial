@@ -505,7 +505,7 @@ mod tests {
     use crate::{
         ConfigFormat, DHName, DeviceConfig, I2cConfig, NetworkConfig, SpiConfig,
     };
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// Makes a periodic UDP payload of 12-byte packets.
     ///

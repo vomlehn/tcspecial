@@ -23,9 +23,9 @@
 //! layout the configuration gives, the one the vehicle packed by, and
 //! refuses one that layout cannot have made.
 
-use std::net::UdpSocket;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use tcsos::net::UdpSocket;
+use tcsos::time::{Duration, Instant};
 use tcsos::wait::{Ready, Waitable, Watch};
 
 use tcsprotocol::ccsds::{self, PacketType};
@@ -692,7 +692,7 @@ mod tests {
     fn graph(port: u16) -> Graph {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -764,7 +764,7 @@ payloads:
         let port = a_free_port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -859,7 +859,7 @@ vehicle:
         let port = a_free_port();
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("vehicle.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:

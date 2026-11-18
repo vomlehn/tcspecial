@@ -25,7 +25,7 @@
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, ignore_this_request, lateness,
@@ -133,12 +133,12 @@ pub fn run_serial_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::fs::File;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::fs::File;
     use tcsos::linux::fs::symlink;
     use tcsos::linux::pty::make_raw;
+    use tcsos::time::Duration;
 
     /// Makes a path in the temporary directory unique to this process and
     /// test thread.
@@ -153,8 +153,8 @@ mod tests {
     fn a_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "tcs-sim-{name}-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
+            tcsos::process::id(),
+            tcsos::thread::current().id()
         ))
     }
 
@@ -212,14 +212,14 @@ mod tests {
         // Wait for the line to be there, as a handler started first would.
         let deadline = Instant::now() + Duration::from_secs(5);
         while !path.is_symlink() && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(10));
+            tcsos::thread::sleep(Duration::from_millis(10));
         }
         assert!(
             path.is_symlink(),
             "{} is not a link to anything",
             path.display()
         );
-        let slave = std::fs::read_link(&path).expect("where it leads");
+        let slave = tcsos::fs::read_link(&path).expect("where it leads");
         assert!(
             slave.starts_with("/dev/pts/"),
             "it leads to {}, which is not a pty slave",
@@ -243,7 +243,7 @@ mod tests {
         while got.len() < 12 && Instant::now() < deadline {
             match (&port).read(&mut buf) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buf[..n]),
-                _ => std::thread::sleep(Duration::from_millis(10)),
+                _ => tcsos::thread::sleep(Duration::from_millis(10)),
             }
         }
 
@@ -295,7 +295,7 @@ mod tests {
     #[test]
     fn a_file_at_the_path_is_left_alone() {
         let path = a_path("occupied");
-        std::fs::write(&path, b"not a line").expect("a file in the way");
+        tcsos::fs::write(&path, b"not a line").expect("a file in the way");
 
         let e = match SimulatedNode::open(
             "a serial line",
@@ -306,11 +306,11 @@ mod tests {
         };
         assert!(e.contains("already exists"), "{e}");
         assert_eq!(
-            std::fs::read(&path).expect("it is still there"),
+            tcsos::fs::read(&path).expect("it is still there"),
             b"not a line"
         );
 
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     /// A link left by a run that was killed rather than stopped is replaced:
@@ -318,14 +318,14 @@ mod tests {
     #[test]
     fn a_link_from_an_earlier_run_is_replaced() {
         let path = a_path("stale");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
         symlink("/dev/pts/999", &path).expect("a stale link");
 
         let line =
             SimulatedNode::open("a serial line", &path.display().to_string())
                 .expect("a link of our own making is ours to replace");
         assert_eq!(
-            std::fs::read_link(&path).expect("where it leads now"),
+            tcsos::fs::read_link(&path).expect("where it leads now"),
             Path::new(line.slave())
         );
         drop(line);

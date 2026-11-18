@@ -147,8 +147,9 @@ pub struct UnixDatagramEndpoint {
     ///
     /// Shared between the two endpoints of a conduit pair, so that the one
     /// writing sends where the one reading learnt.
-    peer:
-        std::sync::Arc<std::sync::Mutex<Option<tcsos::linux::net::SocketAddr>>>,
+    peer: std::sync::Arc<
+        std::sync::Mutex<Option<tcsos::linux::net::UnixSocketAddr>>,
+    >,
     /// Where the configuration says the device is, for a node that is
     /// spoken to first.
     ///
@@ -433,7 +434,7 @@ impl EndpointWritable for UnixDatagramEndpoint {
 /// `TcsError::Endpoint` if a live socket is at the path; `TcsError::Io`
 /// if no probe socket can be made or a dead one cannot be removed.
 fn clear_a_dead_socket(what: &str, path: &Path) -> TcsResult<()> {
-    let found = match std::fs::symlink_metadata(path) {
+    let found = match tcsos::fs::symlink_metadata(path) {
         Ok(found) => found,
         // Nothing there, which is the ordinary case.
         Err(_) => return Ok(()),
@@ -459,13 +460,13 @@ fn clear_a_dead_socket(what: &str, path: &Path) -> TcsResult<()> {
                  that was killed rather than stopped; replacing it",
                 path.display()
             );
-            std::fs::remove_file(path).map_err(TcsError::Io)
+            tcsos::fs::remove_file(path).map_err(TcsError::Io)
         }
     }
 }
 
 /// Whether what is at a path is a socket.
-fn is_a_socket(found: &std::fs::Metadata) -> bool {
+fn is_a_socket(found: &tcsos::fs::Metadata) -> bool {
     tcsos::linux::net::is_a_socket(found)
 }
 
@@ -487,8 +488,8 @@ mod tests {
     fn a_path(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
             "tcs-unix-{name}-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
+            tcsos::process::id(),
+            tcsos::thread::current().id()
         ))
     }
 
@@ -515,7 +516,7 @@ mod tests {
     #[test]
     fn a_stream_endpoint_reaches_a_listening_device() {
         let path = a_path("stream");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
 
         // Playing tcs-sim: the device listens at its path.
         let device = UnixListener::bind(&path).expect("the device listens");
@@ -532,13 +533,15 @@ mod tests {
         let mut buffer = [0u8; 64];
         let mut got = Vec::new();
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(5);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         while got.len() < b"from the device".len()
-            && std::time::Instant::now() < deadline
+            && tcsos::time::Instant::now() < deadline
         {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
-                _ => std::thread::sleep(std::time::Duration::from_millis(10)),
+                _ => {
+                    tcsos::thread::sleep(tcsos::time::Duration::from_millis(10))
+                }
             }
         }
         assert_eq!(got, b"from the device");
@@ -548,7 +551,7 @@ mod tests {
         let n = accepted.read(&mut back).expect("the device reads");
         assert_eq!(&back[..n], b"to the device");
 
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     /// A datagram endpoint binds its path, learns where the device is from
@@ -557,8 +560,8 @@ mod tests {
     fn a_datagram_endpoint_learns_where_its_device_is() {
         let handler_path = a_path("dgram");
         let device_path = a_path("dgram-device");
-        std::fs::remove_file(&handler_path).ok();
-        std::fs::remove_file(&device_path).ok();
+        tcsos::fs::remove_file(&handler_path).ok();
+        tcsos::fs::remove_file(&device_path).ok();
 
         let mut endpoint = UnixDatagramEndpoint::bind(
             "beacon",
@@ -582,12 +585,12 @@ mod tests {
 
         let mut buffer = [0u8; 64];
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(5);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         let mut got = 0;
-        while got == 0 && std::time::Instant::now() < deadline {
+        while got == 0 && tcsos::time::Instant::now() < deadline {
             got = endpoint.read(&mut buffer).expect("a read");
             if got == 0 {
-                std::thread::sleep(std::time::Duration::from_millis(10));
+                tcsos::thread::sleep(tcsos::time::Duration::from_millis(10));
             }
         }
         assert_eq!(&buffer[..got], b"from the device");
@@ -598,8 +601,8 @@ mod tests {
         let (n, _) = device.recv_from(&mut back).expect("the device reads");
         assert_eq!(&back[..n], b"to the device");
 
-        std::fs::remove_file(&handler_path).ok();
-        std::fs::remove_file(&device_path).ok();
+        tcsos::fs::remove_file(&handler_path).ok();
+        tcsos::fs::remove_file(&device_path).ok();
     }
 
     /// A node that is only driven is sent to where the file says it is.
@@ -612,7 +615,7 @@ mod tests {
     #[test]
     fn a_driven_datagram_device_is_sent_to_where_it_is() {
         let device_path = a_path("driven-device");
-        std::fs::remove_file(&device_path).ok();
+        tcsos::fs::remove_file(&device_path).ok();
 
         // The device, playing tcs-sim: it binds the path the configuration
         // names and waits to be driven, saying nothing.
@@ -647,7 +650,7 @@ mod tests {
 
         // And nothing of this end is in the filesystem to clear up.
         drop(endpoint);
-        std::fs::remove_file(&device_path).ok();
+        tcsos::fs::remove_file(&device_path).ok();
     }
 
     /// A device that is asked is sent its trigger where the file says it is,
@@ -656,7 +659,7 @@ mod tests {
     #[test]
     fn an_asked_datagram_device_is_answered_back() {
         let device_path = a_path("asked-device");
-        std::fs::remove_file(&device_path).ok();
+        tcsos::fs::remove_file(&device_path).ok();
         let device =
             UnixDatagram::bind(&device_path).expect("the device binds");
 
@@ -680,18 +683,18 @@ mod tests {
             .expect("the answer goes");
         let mut into = [0u8; 64];
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(2);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(2);
         let n = loop {
             match endpoint.read(&mut into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => {
-                    std::thread::yield_now()
+                0 if tcsos::time::Instant::now() < deadline => {
+                    tcsos::thread::yield_now()
                 }
                 n => break n,
             }
         };
         assert_eq!(&into[..n], b"21.5");
 
-        std::fs::remove_file(&device_path).ok();
+        tcsos::fs::remove_file(&device_path).ok();
     }
 
     /// A device reached at its path reads only what comes from there: a
@@ -702,7 +705,7 @@ mod tests {
         let device_path = a_path("strangers-device");
         let stranger_path = a_path("strangers-stranger");
         for path in [&device_path, &stranger_path] {
-            std::fs::remove_file(path).ok();
+            tcsos::fs::remove_file(path).ok();
         }
         let device =
             UnixDatagram::bind(&device_path).expect("the device binds");
@@ -730,11 +733,11 @@ mod tests {
 
         let mut into = [0u8; 64];
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(2);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(2);
         let n = loop {
             match endpoint.read(&mut into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => {
-                    std::thread::yield_now()
+                0 if tcsos::time::Instant::now() < deadline => {
+                    tcsos::thread::yield_now()
                 }
                 n => break n,
             }
@@ -747,7 +750,7 @@ mod tests {
         assert_eq!(endpoint.strangers(), 1);
 
         for path in [&device_path, &stranger_path] {
-            std::fs::remove_file(path).ok();
+            tcsos::fs::remove_file(path).ok();
         }
     }
 
@@ -760,7 +763,7 @@ mod tests {
         let device_path = a_path("hearing-device");
         let stranger_path = a_path("hearing-stranger");
         for path in [&vehicle_path, &device_path, &stranger_path] {
-            std::fs::remove_file(path).ok();
+            tcsos::fs::remove_file(path).ok();
         }
         let mut endpoint = UnixDatagramEndpoint::bind(
             "temp",
@@ -787,11 +790,11 @@ mod tests {
 
         let mut into = [0u8; 64];
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(2);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(2);
         let n = loop {
             match endpoint.read(&mut into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => {
-                    std::thread::yield_now()
+                0 if tcsos::time::Instant::now() < deadline => {
+                    tcsos::thread::yield_now()
                 }
                 n => break n,
             }
@@ -804,7 +807,7 @@ mod tests {
         assert_eq!(endpoint.strangers(), 1);
 
         for path in [&vehicle_path, &device_path, &stranger_path] {
-            std::fs::remove_file(path).ok();
+            tcsos::fs::remove_file(path).ok();
         }
     }
 
@@ -814,7 +817,7 @@ mod tests {
     #[test]
     fn a_dead_socket_file_is_replaced() {
         let path = a_path("stale");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
 
         // Bound and then dropped, which leaves the file behind.
         drop(UnixDatagram::bind(&path).expect("a socket to abandon"));
@@ -827,7 +830,7 @@ mod tests {
         .expect("a dead socket is not a reason to refuse");
         drop(endpoint);
 
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     /// A socket something is listening on is not displaced: two handlers at
@@ -835,7 +838,7 @@ mod tests {
     #[test]
     fn a_live_socket_is_not_displaced() {
         let path = a_path("live");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
 
         let live =
             UnixDatagram::bind(&path).expect("a socket that is listening");
@@ -853,6 +856,6 @@ mod tests {
         );
 
         drop(live);
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 }

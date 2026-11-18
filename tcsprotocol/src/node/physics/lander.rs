@@ -74,7 +74,7 @@
 //! `sky_quench` to that generation, and the lander stops sending until its
 //! sky is made again, with a new generation.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::{Deserialize, Serialize};
 

@@ -62,7 +62,7 @@ pub fn of(configuration: &Path, write: bool) -> Result<Found, String> {
     let text = own_xtce::written(&graph, &name)
         .map_err(|why| format!("{shown}: {why}"))?;
     let path = path_of(configuration);
-    match std::fs::read_to_string(&path) {
+    match tcsos::fs::read_to_string(&path) {
         Ok(there) if there == text => return Ok(Found::Current),
         Ok(_) => {}
         Err(why) if why.kind() == std::io::ErrorKind::NotFound => {}
@@ -71,7 +71,7 @@ pub fn of(configuration: &Path, write: bool) -> Result<Found, String> {
     if !write {
         return Ok(Found::Stale);
     }
-    std::fs::write(&path, text)
+    tcsos::fs::write(&path, text)
         .map_err(|why| format!("{}: {why}", path.display()))?;
     Ok(Found::Written)
 }

@@ -7,10 +7,10 @@
 //! Everything else is the example's, so a change to it that stops a tee
 //! sending both ways fails here.
 
-use std::net::{SocketAddr, UdpSocket};
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::process::{Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::graph::telemetry;
 use tcsprotocol::graph::Graph;
@@ -77,7 +77,7 @@ fn heard(at: &UdpSocket) -> Option<Vec<u8>> {
 fn a_tee_sends_each_datum_both_ways() {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/tees/tees.ytcs");
-    let text = std::fs::read_to_string(&example).expect("the example reads");
+    let text = tcsos::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own ground hears each tee, which its diagram and
     // the manual say: ground_base, 8700, plus each tee's device id.
@@ -95,7 +95,7 @@ fn a_tee_sends_each_datum_both_ways() {
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
-    std::fs::create_dir(dir.path().join("telemetry"))
+    tcsos::fs::create_dir(dir.path().join("telemetry"))
         .expect("the log's directory");
 
     // The heater is driven and never heard from, so tcspecial sends to it:
@@ -128,7 +128,7 @@ fn a_tee_sends_each_datum_both_ways() {
         text = moved(&text, was, &now);
     }
     let configuration = dir.path().join("tees.ytcs");
-    std::fs::write(&configuration, &text).expect("written");
+    tcsos::fs::write(&configuration, &text).expect("written");
 
     // Where the ground hears each tee, as the vehicle works it out: the gateway
     // node's ground_base plus the tee's device id.

@@ -21,7 +21,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use slint::ComponentHandle;
 use tcsprotocol::node::physics::lander::{Point, Resolved};
@@ -1499,7 +1499,7 @@ pub(crate) mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("lander-sim.yaml");
         let ground = "0,200 200,300 470,90 530,90 800,250 1000,150 m";
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "simulated_payloads: []\nworld:\n  physics:\n    \
@@ -1549,7 +1549,7 @@ pub(crate) mod tests {
         );
         // The joystick's x, its third terminal, gives out what it was set to.
         assert_eq!(world.glance_component(stick, now)[2], 0.5);
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
         let later = Instant::now();
         assert_eq!(
             world.glance_component(lander, later)[Y],
@@ -1565,7 +1565,7 @@ pub(crate) mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("lander-sim.yaml");
         let ground = "0,200 200,300 470,90 530,90 800,250 1000,150 m";
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "simulated_payloads: []\nworld:\n  physics:\n    \
@@ -1711,7 +1711,7 @@ pub(crate) mod tests {
         let size = window.window().size();
         let picture = window.window().take_snapshot().expect("drawn");
         let path = std::env::var("LANDER_SHOT").expect("LANDER_SHOT");
-        let file = std::fs::File::create(&path).expect("the file");
+        let file = tcsos::fs::File::create(&path).expect("the file");
         let mut png = png::Encoder::new(file, size.width, size.height);
         png.set_color(png::ColorType::Rgba);
         png.set_depth(png::BitDepth::Eight);

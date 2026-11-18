@@ -4,8 +4,8 @@
 //! What it said was tcslog's "invalid path name", which named neither the
 //! directory nor the setting.
 
-use std::net::UdpSocket;
-use std::process::Command;
+use tcsos::net::UdpSocket;
+use tcsos::process::Command;
 
 /// Finds a loopback port nothing holds: the configuration check refuses
 /// port 0, a link nobody can predict the port of.
@@ -32,7 +32,7 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
     let state = dir.path().join("tcspecial.state").display().to_string();
     // Nothing to open but the log, which is opened before anything else.
     let at = || format!("127.0.0.1:{}", free());
-    std::fs::write(
+    tcsos::fs::write(
         &configuration,
         format!(
             "tcspecial:

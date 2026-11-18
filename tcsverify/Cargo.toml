@@ -8,6 +8,8 @@ Checks a tcspecial configuration and its simulator file, giving every \
 problem with its file and line"""
 
 [dependencies]
+# What the system is asked: see tcsos.
+tcsos = { path = "../tcsos" }
 tcsprotocol = { path = "../tcsprotocol" }
 serde_json = "1.0"
 

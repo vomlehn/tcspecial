@@ -32,7 +32,7 @@
 //! It is a value asked with the time, so that what it decides can be tested
 //! without waiting five or ten seconds for it.
 
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 /// An SBN release this build speaks, and what its peers say about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -20,7 +20,7 @@ fn examples_dir() -> PathBuf {
 }
 
 fn entries(dir: &Path) -> impl Iterator<Item = PathBuf> {
-    std::fs::read_dir(dir)
+    tcsos::fs::read_dir(dir)
         .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
         .map(|entry| entry.expect("a readable directory entry").path())
 }
@@ -154,7 +154,7 @@ fn every_shipped_configuration_names_this_builds_interface() {
     let ours = tcsprotocol::InterfaceDigest::of_this_build().to_string();
     let mut stale = Vec::new();
     for path in &files {
-        let text = std::fs::read_to_string(path).expect("it reads");
+        let text = tcsos::fs::read_to_string(path).expect("it reads");
         let xml = path.extension().is_some_and(|e| e == "xtcs");
         let (_, set) =
             tcs_verify::set_interface::set_in_text(&text, xml, &ours)
@@ -340,7 +340,7 @@ fn every_simulator_file_has_its_configuration() {
 fn every_example_has_a_diagram_of_its_nodes() {
     for config in yaml_files().into_iter() {
         let svg = config.with_extension("svg");
-        let drawn = std::fs::read_to_string(&svg).unwrap_or_else(|e| {
+        let drawn = tcsos::fs::read_to_string(&svg).unwrap_or_else(|e| {
             panic!(
                 "{} has no diagram, {}: {e}",
                 config.display(),
@@ -367,7 +367,7 @@ fn every_example_has_a_diagram_of_its_nodes() {
 fn every_example_is_in_the_manual() {
     let manual =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs/tcspecial.rst");
-    let text = std::fs::read_to_string(&manual)
+    let text = tcsos::fs::read_to_string(&manual)
         .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
     for config in yaml_files().into_iter() {
         let name = config.file_stem().and_then(|s| s.to_str()).expect("a name");
@@ -399,7 +399,7 @@ fn every_example_is_in_the_manual() {
 fn every_node_in_the_manual_verifies() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let worked =
-        std::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
+        tcsos::fs::read_to_string(root.join("tests/manual/thermostat.ytcs"))
             .expect("the worked example");
     let section = top_level_section(&worked, "tcspecial");
     let dir = tempfile::tempdir().expect("a directory");
@@ -407,7 +407,7 @@ fn every_node_in_the_manual_verifies() {
     let mut checked = 0;
     for name in tcsprotocol::MANUALS {
         let manual = root.join("docs").join(name);
-        let text = std::fs::read_to_string(&manual)
+        let text = tcsos::fs::read_to_string(&manual)
             .unwrap_or_else(|e| panic!("{}: {e}", manual.display()));
         for (line, block) in yaml_blocks(&text) {
             let first = block.lines().next().unwrap_or_default();
@@ -449,7 +449,7 @@ fn every_node_in_the_manual_verifies() {
             }
 
             let path = dir.path().join(format!("{name}-{line}.ytcs"));
-            std::fs::write(&path, &file).unwrap();
+            tcsos::fs::write(&path, &file).unwrap();
             let report = verify(&path, None, tcsverify::Limits::EVERYTHING);
             assert!(
                 !report.found_anything(),

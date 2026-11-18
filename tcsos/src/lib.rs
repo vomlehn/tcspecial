@@ -30,10 +30,11 @@ pub mod linux;
 use linux as system;
 
 #[cfg(target_arch = "wasm32")]
-mod browser;
+pub mod browser;
 #[cfg(target_arch = "wasm32")]
 use browser as system;
 
 pub use system::{
-    child, fs, interfaces, memory, net, process, signals, thread, wait,
+    child, env, fs, interfaces, memory, net, process, signals, thread, time,
+    wait,
 };

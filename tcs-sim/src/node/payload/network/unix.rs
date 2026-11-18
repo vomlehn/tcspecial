@@ -29,8 +29,8 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 use tcsos::linux::net::{UnixDatagram, UnixListener, UnixStream};
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, hangs_up, ignore_this_request, lateness,
@@ -59,7 +59,7 @@ impl Drop for BoundPath {
     /// run has to clear before it can bind, and a path that still looks
     /// bound is a path nothing answers.
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        let _ = tcsos::fs::remove_file(&self.path);
     }
 }
 
@@ -83,7 +83,7 @@ impl Drop for BoundPath {
 /// A message if something other than a socket is there, a live socket is,
 /// or a dead one cannot be removed.
 fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
-    let found = match std::fs::symlink_metadata(path) {
+    let found = match tcsos::fs::symlink_metadata(path) {
         Ok(found) => found,
         // Nothing there, which is the ordinary case.
         Err(_) => return Ok(()),
@@ -113,7 +113,7 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
                  rather than stopped; replacing it",
                 path.display()
             );
-            std::fs::remove_file(path).map_err(|e| {
+            tcsos::fs::remove_file(path).map_err(|e| {
                 format!("{} cannot be replaced: {e}", path.display())
             })
         }
@@ -498,7 +498,7 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// Makes a path in the temporary directory unique to this process and
     /// test thread.
@@ -513,8 +513,8 @@ mod tests {
     fn a_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "tcs-sim-unix-{name}-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
+            tcsos::process::id(),
+            tcsos::thread::current().id()
         ))
     }
 
@@ -560,7 +560,7 @@ mod tests {
     #[test]
     fn a_stream_device_listens_and_sends_once_connected() {
         let path = a_path("stream");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
 
         let mut device = device_at(&path, PayloadProtocol::UnixStream);
         device.start().expect("the device starts");
@@ -568,7 +568,7 @@ mod tests {
         // Wait for the socket, as a handler started first would.
         let deadline = Instant::now() + Duration::from_secs(5);
         while !path.exists() && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(10));
+            tcsos::thread::sleep(Duration::from_millis(10));
         }
         assert!(path.exists(), "{} was never bound", path.display());
 
@@ -593,7 +593,7 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(5);
         let mut stats = device.stats();
         while stats.bytes_sent < 12 && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(5));
+            tcsos::thread::sleep(Duration::from_millis(5));
             stats = device.stats();
         }
         device.stop();
@@ -611,8 +611,8 @@ mod tests {
     #[test]
     fn a_datagram_device_sends_to_where_the_handler_waits() {
         let path = a_path("dgram");
-        std::fs::remove_file(&path).ok();
-        std::fs::remove_file(a_path_of_its_own(&path.display().to_string()))
+        tcsos::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(a_path_of_its_own(&path.display().to_string()))
             .ok();
 
         // Playing the handler, which is the end that binds.
@@ -653,7 +653,7 @@ mod tests {
             "the device sent from an unnamed socket, which cannot be answered"
         );
 
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     /// A device that is asked waits at the path the configuration names, and
@@ -662,7 +662,7 @@ mod tests {
     #[test]
     fn an_asked_datagram_device_waits_at_its_path_and_answers_the_asker() {
         let path = a_path("asked");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
         let mut device = SimulatedPayload::new(PayloadConfig {
             attachment: None,
             thermostats: Vec::new(),
@@ -689,7 +689,7 @@ mod tests {
         device.start().expect("the device starts");
 
         // The vehicle's end, named outside the filesystem as it is aboard.
-        let name = format!("tcs-sim-asked-{}", std::process::id());
+        let name = format!("tcs-sim-asked-{}", tcsos::process::id());
         let vehicle = UnixDatagram::bind_addr(
             &tcsos::linux::net::abstract_address(name.as_bytes())
                 .expect("a name"),
@@ -713,7 +713,7 @@ mod tests {
         device.stop();
         assert_eq!(n, 12, "a packet of twelve bytes, in one segment");
 
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     /// A socket file left by a run that was killed is replaced: the path is
@@ -732,7 +732,7 @@ mod tests {
         use crate::node::physics::Attachment;
 
         let path = a_path("driven");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
 
         let (world, place) = zone_world();
         let temperature = place("zone.temperature");
@@ -779,7 +779,7 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(5);
         while Instant::now() < deadline && vehicle.send_to(&[1], &path).is_err()
         {
-            std::thread::sleep(Duration::from_millis(10));
+            tcsos::thread::sleep(Duration::from_millis(10));
         }
         vehicle
             .send_to(&[1], &path)
@@ -789,7 +789,7 @@ mod tests {
         // second, so a tenth of a second is plenty to tell from nothing.
         let deadline = Instant::now() + Duration::from_secs(5);
         while warmth() <= cold && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(20));
+            tcsos::thread::sleep(Duration::from_millis(20));
         }
         assert!(
             warmth() > cold,
@@ -798,13 +798,13 @@ mod tests {
         );
 
         device.stop();
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     #[test]
     fn a_dead_socket_is_replaced() {
         let path = a_path("stale");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
         drop(UnixListener::bind(&path).expect("a socket to abandon"));
         assert!(path.exists(), "the file should outlive the socket");
 
@@ -818,7 +818,7 @@ mod tests {
     #[test]
     fn a_live_socket_is_not_taken() {
         let path = a_path("live");
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
         let live =
             UnixDatagram::bind(&path).expect("a socket that is listening");
 
@@ -827,19 +827,19 @@ mod tests {
         assert!(e.contains("already listening"), "{e}");
 
         drop(live);
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 
     /// Anything that is not a socket is left alone and said to be there.
     #[test]
     fn a_file_that_is_not_a_socket_is_left_alone() {
         let path = a_path("file");
-        std::fs::write(&path, b"not a socket").expect("a file in the way");
+        tcsos::fs::write(&path, b"not a socket").expect("a file in the way");
 
         let e = clear_a_dead_socket(&path).expect_err("a file is not ours");
         assert!(e.contains("not a socket"), "{e}");
-        assert_eq!(std::fs::read(&path).unwrap(), b"not a socket");
+        assert_eq!(tcsos::fs::read(&path).unwrap(), b"not a socket");
 
-        std::fs::remove_file(&path).ok();
+        tcsos::fs::remove_file(&path).ok();
     }
 }

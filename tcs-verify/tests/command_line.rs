@@ -5,7 +5,7 @@
 //! not as a file to check, which nothing short of running the program shows.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use tcsos::process::Command;
 
 /// Writes a configuration with this many errors in it, one per payload: each
 /// sends to a node that is not there.
@@ -55,7 +55,7 @@ payloads:
         ));
     }
     let path = dir.join("set.ytcs");
-    std::fs::write(&path, text).expect("written");
+    tcsos::fs::write(&path, text).expect("written");
     path
 }
 
@@ -107,7 +107,7 @@ fn the_interface_digest_is_printed_alone() {
     // And it is what the shipped configurations name.
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/ping/ping.ytcs");
-    let text = std::fs::read_to_string(example).expect("the example");
+    let text = tcsos::fs::read_to_string(example).expect("the example");
     assert!(
         text.contains(&format!("interface: \"{}\"", lines[0])),
         "the ping example names another interface"
@@ -127,7 +127,7 @@ fn the_worlds_ambient_is_printed_in_kelvin() {
     let dir = tempfile::tempdir().expect("a directory");
     let write = |name: &str, text: &str| {
         let path = dir.path().join(name);
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         path.to_str().expect("a path").to_string()
     };
     let good = write("good-sim.yaml", "world:\n  ambient_temp: \"288.15 K\"\n");
@@ -159,7 +159,7 @@ fn the_worlds_ambient_is_printed_in_kelvin() {
 fn a_checked_configuration_is_kept_under_its_checksum() {
     let dir = tempfile::tempdir().expect("a directory");
     let store = dir.path().join("kept");
-    std::fs::create_dir(&store).expect("a store");
+    tcsos::fs::create_dir(&store).expect("a store");
     let keep = format!("--keep={}", store.display());
     let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples");
     for file in [
@@ -167,9 +167,9 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
         "thermostat-common/thermostat.ytcs",
     ] {
         let to = dir.path().join(file);
-        std::fs::create_dir_all(to.parent().expect("a directory"))
+        tcsos::fs::create_dir_all(to.parent().expect("a directory"))
             .expect("a directory");
-        std::fs::copy(examples.join(file), &to).expect("copied");
+        tcsos::fs::copy(examples.join(file), &to).expect("copied");
     }
     let example = dir.path().join("thermostat/thermostat.ytcs");
     let example = example.to_str().expect("a path");
@@ -238,7 +238,7 @@ fn the_fprime_example_has_its_bridge_model_written() {
     assert_eq!(status, 0, "{lines:?}");
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert!(lines[0].contains("the F´ model of fsw"), "{lines:?}");
-    let fppi = std::fs::read_to_string(model.join("TcsBridgeModel.fppi"))
+    let fppi = tcsos::fs::read_to_string(model.join("TcsBridgeModel.fppi"))
         .expect("the FPP is written");
     let checksum = tcsprotocol::config_digest::digest_of_file(example)
         .expect("it digests");
@@ -281,9 +281,9 @@ fn set_interface_rewrites_only_the_interface() {
         let shipped = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../examples/minimal")
             .join(name);
-        let good = std::fs::read_to_string(&shipped).expect("the example");
+        let good = tcsos::fs::read_to_string(&shipped).expect("the example");
         let path = dir.path().join(name);
-        std::fs::write(&path, good.replace(&ours, stale)).expect("written");
+        tcsos::fs::write(&path, good.replace(&ours, stale)).expect("written");
         paths.push((path, good));
     }
     let args: Vec<String> = paths
@@ -297,7 +297,7 @@ fn set_interface_rewrites_only_the_interface() {
     assert_eq!(status, 0, "{lines:?}");
     for ((path, good), line) in paths.iter().zip(&lines) {
         assert_eq!(
-            &std::fs::read_to_string(path).expect("it reads"),
+            &tcsos::fs::read_to_string(path).expect("it reads"),
             good,
             "every other byte as it was"
         );
@@ -437,7 +437,7 @@ fn a_digest_that_cannot_be_taken_is_a_failed_run() {
 
     // And one that does not parse has nothing to digest.
     let unreadable = dir.path().join("unreadable.ytcs");
-    std::fs::write(&unreadable, "description: nonsense\npayloads: oops\n")
+    tcsos::fs::write(&unreadable, "description: nonsense\npayloads: oops\n")
         .expect("written");
     let unreadable = unreadable.to_str().expect("a path");
 
@@ -526,7 +526,7 @@ vehicle:
 "
     );
     let path = dir.join("one.ytcs");
-    std::fs::write(&path, text).expect("written");
+    tcsos::fs::write(&path, text).expect("written");
     path
 }
 
@@ -571,7 +571,7 @@ fn a_type_that_does_not_exist_fails_the_run() {
 ///
 /// The file's path.
 fn with_payloads_at(dir: &Path, ports: &[(&str, u16)]) -> PathBuf {
-    let whole = std::fs::read_to_string(with_errors(dir, 0)).expect("read");
+    let whole = tcsos::fs::read_to_string(with_errors(dir, 0)).expect("read");
     let mut text = whole
         .split("payloads:")
         .next()
@@ -585,7 +585,7 @@ fn with_payloads_at(dir: &Path, ports: &[(&str, u16)]) -> PathBuf {
         ));
     }
     let path = dir.join("ports.ytcs");
-    std::fs::write(&path, text).expect("written");
+    tcsos::fs::write(&path, text).expect("written");
     path
 }
 
@@ -598,7 +598,7 @@ fn with_payloads_at(dir: &Path, ports: &[(&str, u16)]) -> PathBuf {
 fn a_gateway_port_past_the_last_fails_the_run() {
     let dir = tempfile::tempdir().expect("a directory");
     let file = with_payloads_at(dir.path(), &[("one", 7001), ("two", 7002)]);
-    let mut text = std::fs::read_to_string(&file).expect("read");
+    let mut text = tcsos::fs::read_to_string(&file).expect("read");
     for name in ["one", "two"] {
         let port = if name == "one" { 7001 } else { 7002 };
         let at = format!("        address: \"127.0.0.1:{port}\"\n");
@@ -612,7 +612,7 @@ fn a_gateway_port_past_the_last_fails_the_run() {
          ground_base: \"127.0.0.1:65535\"\n        \
          world-in: [one, two]\n",
     );
-    std::fs::write(&file, &text).expect("written");
+    tcsos::fs::write(&file, &text).expect("written");
     let (lines, status) = run(&[file.to_str().expect("path")]);
     assert!(
         lines

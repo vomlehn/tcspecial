@@ -39,7 +39,7 @@ fn guide_dir() -> PathBuf {
 /// otherwise pass every test here by checking nothing.
 fn stages() -> Vec<PathBuf> {
     let dir = guide_dir();
-    let mut found: Vec<PathBuf> = std::fs::read_dir(&dir)
+    let mut found: Vec<PathBuf> = tcsos::fs::read_dir(&dir)
         .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
         .map(|entry| entry.expect("a readable directory entry").path())
         .filter(|path| {
@@ -139,7 +139,7 @@ fn every_stage_names_this_builds_interface() {
     let mut stale = Vec::new();
     for yaml in stages() {
         for path in [yaml.clone(), yaml.with_extension("xtcs")] {
-            let text = std::fs::read_to_string(&path)
+            let text = tcsos::fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
             let xml = path.extension().is_some_and(|e| e == "xtcs");
             let (_, set) =

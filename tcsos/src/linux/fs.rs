@@ -1,6 +1,10 @@
 //! What the TCS programs ask of the file system that the standard library
 //! does not give, or gives only by allocating.
 
+/// Everything the standard library's `fs` has, which on Linux is the
+/// interface: what is below is what it does not have.
+pub use std::fs::*;
+
 use std::ffi::CStr;
 use std::path::Path;
 
@@ -22,7 +26,7 @@ pub const PATH_BYTES: usize = libc::PATH_MAX as usize;
 /// # Errors
 ///
 /// What the system said.
-pub fn rename(from: &CStr, to: &CStr) -> std::io::Result<()> {
+pub fn rename_c(from: &CStr, to: &CStr) -> std::io::Result<()> {
     // SAFETY: both are nul-terminated buffers that outlive the call.
     if unsafe { libc::rename(from.as_ptr(), to.as_ptr()) } == 0 {
         Ok(())

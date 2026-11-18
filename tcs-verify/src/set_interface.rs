@@ -275,7 +275,7 @@ pub fn set_in_file(path: &Path) -> Result<Set, String> {
             .map_err(|e| said(e.to_string()))?,
         tcsprotocol::ConfigFormat::Xml
     );
-    let text = std::fs::read_to_string(path)
+    let text = tcsos::fs::read_to_string(path)
         .map_err(|e| said(format!("cannot be read: {e}")))?;
     let (new, set) = set_in_text(&text, xml, &ours).map_err(said)?;
     if set == Set::Already {
@@ -291,7 +291,7 @@ pub fn set_in_file(path: &Path) -> Result<Set, String> {
         beside.push(path.extension().unwrap_or_default());
         beside
     });
-    std::fs::write(&beside, &new)
+    tcsos::fs::write(&beside, &new)
         .map_err(|e| said(format!("cannot be written: {e}")))?;
     let checked = tcsprotocol::graph::Graph::load(&beside)
         .map_err(|e| e.to_string())
@@ -307,16 +307,16 @@ pub fn set_in_file(path: &Path) -> Result<Set, String> {
             tcsprotocol::graph::parameters::interface_of(&named).map(|_| ())
         });
     if let Err(why) = checked {
-        let _ = std::fs::remove_file(&beside);
+        let _ = tcsos::fs::remove_file(&beside);
         return Err(said(format!(
             "rewritten, it would not read as naming this build's interface \
              ({why}), so it is left as it was"
         )));
     }
-    if let Ok(meta) = std::fs::metadata(path) {
-        let _ = std::fs::set_permissions(&beside, meta.permissions());
+    if let Ok(meta) = tcsos::fs::metadata(path) {
+        let _ = tcsos::fs::set_permissions(&beside, meta.permissions());
     }
-    std::fs::rename(&beside, path)
+    tcsos::fs::rename(&beside, path)
         .map_err(|e| said(format!("cannot be replaced: {e}")))?;
     Ok(set)
 }
@@ -399,13 +399,13 @@ mod tests {
         // A file that includes none, which reads where it is copied to.
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../examples/minimal/minimal.ytcs");
-        let good = std::fs::read_to_string(example).unwrap();
+        let good = tcsos::fs::read_to_string(example).unwrap();
         let ours = InterfaceDigest::of_this_build().to_string();
         let stale = good.replace(&ours, OURS);
-        std::fs::write(&path, &stale).unwrap();
+        tcsos::fs::write(&path, &stale).unwrap();
         assert_eq!(set_in_file(&path).unwrap(), Set::Changed(OURS.to_string()));
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), good);
+        assert_eq!(tcsos::fs::read_to_string(&path).unwrap(), good);
         assert_eq!(set_in_file(&path).unwrap(), Set::Already);
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        assert_eq!(tcsos::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
 }

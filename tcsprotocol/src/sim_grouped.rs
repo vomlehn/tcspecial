@@ -817,7 +817,7 @@ mod tests {
     fn refused() -> Vec<PathBuf> {
         let dir =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/refused-sim");
-        let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+        let mut files: Vec<PathBuf> = tcsos::fs::read_dir(&dir)
             .expect("tests/refused-sim")
             .map(|entry| entry.expect("an entry").path())
             .collect();
@@ -858,7 +858,7 @@ mod tests {
         let mut shown = 0;
         for name in crate::MANUALS.iter().chain(&crate::DESIGNS) {
             let text =
-                std::fs::read_to_string(docs.join(name)).expect("a document");
+                tcsos::fs::read_to_string(docs.join(name)).expect("a document");
             let lines: Vec<&str> = text.lines().collect();
             for (at, line) in lines.iter().enumerate() {
                 if line.trim() != ".. code-block:: yaml" {
@@ -912,15 +912,15 @@ mod tests {
             assert!(why.contains("convert-format.py"), "{name}: {why}");
 
             let copy = dir.path().join(name.as_ref());
-            std::fs::copy(&file, &copy).expect("copied");
+            tcsos::fs::copy(&file, &copy).expect("copied");
             let convert = || {
-                let ran = std::process::Command::new("python3")
+                let ran = tcsos::process::Command::new("python3")
                     .arg(&converter)
                     .arg(&copy)
                     .status()
                     .expect("python3 runs the converter");
                 assert!(ran.success(), "{name}");
-                std::fs::read_to_string(&copy).expect("read")
+                tcsos::fs::read_to_string(&copy).expect("read")
             };
             let once = convert();
             assert_eq!(read(&copy), None, "{name}: {once}");

@@ -9,9 +9,9 @@
 //! See [`crate::endpoint`] for the traits.
 
 use std::io::{self, Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::thread;
-use std::time::Instant;
+use tcsos::net::{TcpListener, TcpStream};
+use tcsos::thread;
+use tcsos::time::Instant;
 use tcsos::wait::{Ready, Source, Waitable};
 
 use log::info;
@@ -336,8 +336,8 @@ mod tests {
     /// already have failed.
     #[test]
     fn a_refused_connection_is_retried_until_it_is_accepted() {
-        use std::net::{TcpListener, TcpStream};
-        use std::time::{Duration, Instant};
+        use tcsos::net::{TcpListener, TcpStream};
+        use tcsos::time::{Duration, Instant};
         use tcsprotocol::NetworkProtocol;
 
         // A port with nothing on it yet, which is what refuses.
@@ -345,8 +345,8 @@ mod tests {
         let addr = probe.local_addr().unwrap();
         drop(probe);
 
-        let listening = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(300));
+        let listening = tcsos::thread::spawn(move || {
+            tcsos::thread::sleep(Duration::from_millis(300));
             let listener =
                 TcpListener::bind(addr).expect("the far end starts late");
             listener.accept().expect("and accepts");
@@ -383,8 +383,8 @@ mod tests {
     /// timeout would leave the ground with nothing rather than an answer.
     #[test]
     fn a_connection_nothing_ever_accepts_is_reported() {
-        use std::net::TcpListener;
-        use std::time::Instant;
+        use tcsos::net::TcpListener;
+        use tcsos::time::Instant;
         use tcsprotocol::NetworkProtocol;
 
         let probe = TcpListener::bind("127.0.0.1:0").unwrap();

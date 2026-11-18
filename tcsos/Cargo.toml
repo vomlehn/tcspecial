@@ -17,6 +17,10 @@ signal-hook = "0.4"
 # The page's own interfaces, reached from WebAssembly.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
+# Threads as Web Workers, sharing the page's memory.
+wasm_thread = "0.3.3"
+# The page's clock, for Instant and SystemTime.
+web-time = "1.1.0"
 
 [lints]
 workspace = true

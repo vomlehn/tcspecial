@@ -8,10 +8,10 @@
 //!
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
-use std::net::UdpSocket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::net::UdpSocket;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, ignore_this_request, lateness,
@@ -282,7 +282,7 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::Faults;
     use tcsprotocol::Timestamp;
 
@@ -435,7 +435,7 @@ mod tests {
     }
 
     /// A device at the handler's address, with faults.
-    fn faulty(at: std::net::SocketAddr, faults: Faults) -> SimulatedPayload {
+    fn faulty(at: tcsos::net::SocketAddr, faults: Faults) -> SimulatedPayload {
         answering_from(at, faults, None, None)
     }
 
@@ -454,7 +454,7 @@ mod tests {
     ///
     /// The device, not yet started.
     fn answering_from(
-        at: std::net::SocketAddr,
+        at: tcsos::net::SocketAddr,
         faults: Faults,
         own_address: Option<String>,
         own_port: Option<u16>,
@@ -497,7 +497,7 @@ mod tests {
     /// # Panics
     ///
     /// If it cannot be bound or given the timeout.
-    fn handler_end(wait: Duration) -> (UdpSocket, std::net::SocketAddr) {
+    fn handler_end(wait: Duration) -> (UdpSocket, tcsos::net::SocketAddr) {
         let handler =
             UdpSocket::bind("127.0.0.1:0").expect("a socket for the handler");
         let at = handler.local_addr().expect("its address");
@@ -617,7 +617,7 @@ mod tests {
             match sample.time {
                 Some(_) => break sample,
                 None if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
+                    tcsos::thread::sleep(Duration::from_millis(10))
                 }
                 None => panic!("a packet arrived and nothing recorded when"),
             }
@@ -674,7 +674,7 @@ mod tests {
             match sample.time {
                 Some(_) => break sample,
                 None if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(10))
+                    tcsos::thread::sleep(Duration::from_millis(10))
                 }
                 None => panic!("the device was spoken to and recorded no time"),
             }

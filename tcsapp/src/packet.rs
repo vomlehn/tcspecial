@@ -42,7 +42,7 @@ pub const LENGTH: usize = std::mem::size_of::<u32>();
 ///
 /// `InvalidInput` if `data` is longer than a `u32` can say, or whatever
 /// writing or flushing `to` fails with.
-pub fn write<W: Write>(to: &mut W, data: &[u8]) -> io::Result<()> {
+pub fn write<W: Write + ?Sized>(to: &mut W, data: &[u8]) -> io::Result<()> {
     let length = u32::try_from(data.len()).map_err(|_| {
         io::Error::new(
             io::ErrorKind::InvalidInput,

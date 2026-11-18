@@ -41,6 +41,8 @@
 // Several readings sent to the ground as one datum: a port of its own, not
 // a `Function`, since it sends at the end of a pass.
 pub mod consolidator;
+// Linux alone: it runs a program with pipes, which a page cannot.
+#[cfg(target_os = "linux")]
 pub mod process;
 pub mod thermostat;
 pub mod to_kelvin;
@@ -357,6 +359,7 @@ pub fn make(
         // Started here, as the configuration is loaded: a program that
         // cannot be executed is a fault found on the ground rather than three
         // days into a mission. See node::vehicle::compute::process.
+        #[cfg(target_os = "linux")]
         Computation::Process(params) => {
             // The node's own wakeup, so that disabling the node gives up the
             // wait for an answer rather than waiting out a deadline that may
@@ -367,6 +370,15 @@ pub fn make(
                 .start()
                 .map_err(|why| format!("\"{}\" (process): {why}", node.name))?;
             Ok(Box::new(program))
+        }
+        #[cfg(not(target_os = "linux"))]
+        Computation::Process(_) => {
+            let _ = abandon;
+            Err(format!(
+                "\"{}\" (process): a process computation runs a program of \
+                 its own, which a web page cannot",
+                node.name
+            ))
         }
     }
 }

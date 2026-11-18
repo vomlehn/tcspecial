@@ -1,6 +1,8 @@
 //! What a process is told by the system about the processes it starts.
 
-use std::process::ExitStatus;
+/// Everything the standard library's `process` has, which on Linux is the
+/// interface: what is below is what it does not have.
+pub use std::process::*;
 
 /// The signal a process was ended by, where a signal ended it.
 ///

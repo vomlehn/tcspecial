@@ -4,7 +4,7 @@
 //! `stray_app`, which prints, reads stdin and panics.
 
 use std::path::PathBuf;
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use tcsapp::parent::{self, Supports};
 

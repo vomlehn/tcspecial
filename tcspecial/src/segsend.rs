@@ -265,7 +265,7 @@ impl tcslog::WriteCallbacks for Handoff {
                 "a segment's name is too long to rename",
             ));
         };
-        tcsos::fs::rename(from.as_c_str(), to.as_c_str())?;
+        tcsos::fs::rename_c(from.as_c_str(), to.as_c_str())?;
 
         match queue.try_send(to) {
             Ok(()) => {
@@ -314,7 +314,7 @@ impl tcslog::WriteCallbacks for Handoff {
 ///
 /// What is wrong, naming `dir`, where it cannot be read.
 fn left_pending(dir: &Path) -> Result<Vec<PathBuf>, String> {
-    let entries = std::fs::read_dir(dir).map_err(|e| {
+    let entries = tcsos::fs::read_dir(dir).map_err(|e| {
         format!("the telemetry log directory, {}: {e}", dir.display())
     })?;
     let mut pending: Vec<PathBuf> = entries
@@ -401,7 +401,7 @@ fn usable(program: &Path) -> Result<(), String> {
          them), or take log.directory out of the configuration's tcspecial \
          section"
     );
-    match std::fs::metadata(program) {
+    match tcsos::fs::metadata(program) {
         Ok(found) if found.is_file() => {}
         Ok(_) => {
             return Err(format!(
@@ -425,8 +425,8 @@ fn usable(program: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{Duration, Instant};
     use tcslog::WriteCallbacks;
+    use tcsos::time::{Duration, Instant};
 
     /// A simulated `segsend` that records each name it is given, in a file
     /// beside it, and deletes the segment as the shipped one does.
@@ -449,7 +449,7 @@ mod tests {
     fn recording(dir: &Path) -> PathBuf {
         let program = dir.join("segsend");
         let record = dir.join("handed");
-        std::fs::write(
+        tcsos::fs::write(
             &program,
             format!(
                 "#!/bin/sh\n[ -n \"$1\" ] || exit 0\necho \"$1\" >> '{}'\nrm \
@@ -460,7 +460,7 @@ mod tests {
         .expect("written");
         tcsos::fs::set_mode(&program, 0o755).expect("made executable");
         crate::when_not_busy(|| {
-            std::process::Command::new(&program)
+            tcsos::process::Command::new(&program)
                 .status()
                 .map_err(|e| e.to_string())
         })
@@ -478,7 +478,7 @@ mod tests {
     ///
     /// The names it was given, in order; none where it has been given none.
     fn handed(dir: &Path) -> Vec<String> {
-        std::fs::read_to_string(dir.join("handed"))
+        tcsos::fs::read_to_string(dir.join("handed"))
             .unwrap_or_default()
             .lines()
             .map(str::to_string)
@@ -500,7 +500,7 @@ mod tests {
             if what() {
                 return true;
             }
-            std::thread::sleep(Duration::from_millis(10));
+            tcsos::thread::sleep(Duration::from_millis(10));
         }
         false
     }
@@ -517,7 +517,7 @@ mod tests {
             .expect("started");
 
         let segment = logs.path().join("telem-1.tcslog");
-        std::fs::write(&segment, b"filled").expect("written");
+        tcsos::fs::write(&segment, b"filled").expect("written");
         handoff.send(&segment).expect("handed over");
         assert!(!segment.exists(), "the segment is still in the log's name");
 
@@ -542,9 +542,9 @@ mod tests {
         let program = recording(tools.path());
         let older = logs.path().join(format!("telem-1.tcslog{PENDING_SUFFIX}"));
         let newer = logs.path().join(format!("telem-2.tcslog{PENDING_SUFFIX}"));
-        std::fs::write(&newer, b"").expect("written");
-        std::fs::write(&older, b"").expect("written");
-        std::fs::write(logs.path().join("telem-3.tcslog"), b"")
+        tcsos::fs::write(&newer, b"").expect("written");
+        tcsos::fs::write(&older, b"").expect("written");
+        tcsos::fs::write(logs.path().join("telem-3.tcslog"), b"")
             .expect("written");
 
         let segsend = SegSend::start(&program).expect("started");
@@ -568,7 +568,7 @@ mod tests {
     fn segsend_starts_with_no_signal_blocked() {
         let dir = tempfile::tempdir().expect("a directory");
         let script = dir.path().join("mask");
-        std::fs::write(
+        tcsos::fs::write(
             &script,
             "#!/usr/bin/env python3\n\
              import sys\n\
@@ -596,7 +596,7 @@ mod tests {
         assert!(said.contains(&missing.display().to_string()), "{said}");
         assert!(said.contains("log.directory"), "{said}");
 
-        std::fs::write(&missing, b"#!/bin/sh\n").expect("written");
+        tcsos::fs::write(&missing, b"#!/bin/sh\n").expect("written");
         tcsos::fs::set_mode(&missing, 0o644).expect("made unexecutable");
         let said = usable(&missing).expect_err("it cannot be run");
         assert!(said.contains("executable"), "{said}");

@@ -28,6 +28,7 @@ pub use node::payload::i2c::*;
 pub use node::payload::network::raw::*;
 pub use node::payload::network::tcp::*;
 pub use node::payload::network::udp::*;
+#[cfg(target_os = "linux")]
 pub use node::payload::network::unix::*;
 pub use node::payload::network::*;
 #[cfg(feature = "serial")]
@@ -72,7 +73,7 @@ pub(crate) fn when_not_busy<T>(
     for _ in 0..200 {
         match start() {
             Err(why) if why.contains("os error 26") => {
-                std::thread::sleep(std::time::Duration::from_millis(5));
+                tcsos::thread::sleep(tcsos::time::Duration::from_millis(5));
             }
             said => return said,
         }

@@ -26,8 +26,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use std::thread::JoinHandle;
-use std::time::Duration;
+use tcsos::thread::JoinHandle;
+use tcsos::time::Duration;
 
 use log::info;
 
@@ -91,7 +91,7 @@ fn take(stop: fn()) {
         };
         SIGNALLED.store(true, Ordering::SeqCst);
         if !LISTENING.load(Ordering::SeqCst) {
-            std::process::exit(128 + taken);
+            tcsos::process::exit(128 + taken);
         }
         stop();
     }
@@ -144,7 +144,7 @@ pub fn before_exec() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
+    use tcsos::process::Command;
 
     /// Set in the environment of the copy of this test that is to be
     /// stopped, as the restart's child would be.
@@ -171,7 +171,7 @@ mod tests {
             start(nothing);
             assert!(!before_exec(), "no stop has been asked for yet");
             tcsos::signals::terminate_this_thread();
-            std::process::exit(LOST);
+            tcsos::process::exit(LOST);
         }
         let name =
             concat!(module_path!(), "::a_stop_after_the_look_is_not_lost");

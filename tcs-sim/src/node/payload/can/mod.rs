@@ -30,7 +30,7 @@
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, ignore_this_request, lateness, send_in_segments, wait_out_packet,
@@ -226,7 +226,7 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::Faults;
 
     /// The first virtual CAN interface this host has up, if it has one.
@@ -339,7 +339,7 @@ mod tests {
         let mut buf = [0u8; 64];
         let got = (0..50)
             .find_map(|_| {
-                std::thread::sleep(Duration::from_millis(20));
+                tcsos::thread::sleep(Duration::from_millis(20));
                 match handler.receive(&mut buf) {
                     0 => None,
                     n => Some(n),
@@ -439,7 +439,7 @@ mod tests {
 
         // Nothing until it is asked.
         let mut buf = [0u8; 64];
-        std::thread::sleep(Duration::from_millis(200));
+        tcsos::thread::sleep(Duration::from_millis(200));
         assert_eq!(
             handler.receive(&mut buf),
             0,
@@ -450,7 +450,7 @@ mod tests {
         handler.send(b"READ").expect("the trigger goes out");
         let got = (0..50)
             .find_map(|_| {
-                std::thread::sleep(Duration::from_millis(20));
+                tcsos::thread::sleep(Duration::from_millis(20));
                 match handler.receive(&mut buf) {
                     0 => None,
                     n => Some(n),

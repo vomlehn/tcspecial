@@ -9,7 +9,7 @@
 //! There is no framing to configure: the protocol fixes it at eight data bits,
 //! most significant first, followed by an acknowledge bit.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::Serialize;
 
@@ -316,7 +316,7 @@ mod judged_tests {
     fn adapter(name: Option<&str>) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         if let Some(name) = name {
-            std::fs::write(dir.path().join("name"), format!("{name}\n"))
+            tcsos::fs::write(dir.path().join("name"), format!("{name}\n"))
                 .unwrap();
         }
         dir

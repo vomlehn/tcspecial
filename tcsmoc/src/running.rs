@@ -7,8 +7,8 @@
 //! that counts.
 
 use std::cell::Cell;
-use std::net::UdpSocket;
-use std::time::Duration;
+use tcsos::net::UdpSocket;
+use tcsos::time::Duration;
 
 use tcsprotocol::graph::Graph;
 use tcsprotocol::{
@@ -177,7 +177,7 @@ fn a_beacon_pass_allocates_nothing() {
 
     // Where to, worked out once: a name and a port is looked up each time
     // it is sent to, which allocates.
-    let to = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let to = tcsos::net::SocketAddr::from(([127, 0, 0, 1], port));
     let mut sequence = datagrams.iter();
     let mut heard = |beacons: &mut Beacons| {
         let datagram = sequence.next().expect("a beacon to send");
@@ -204,7 +204,7 @@ fn a_datum_received_into_a_buffer_allocates_nothing() {
     let port = a_free_port();
     let dir = tempfile::tempdir().expect("a directory");
     let path = dir.path().join("vehicle.ytcs");
-    std::fs::write(
+    tcsos::fs::write(
         &path,
         format!(
             "gateways:
@@ -229,7 +229,7 @@ payloads:
     };
     let vehicle = UdpSocket::bind("127.0.0.1:0").expect("the vehicle's socket");
     let mut buffer = vec![0u8; gateway.datum_bytes()];
-    let to = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let to = tcsos::net::SocketAddr::from(([127, 0, 0, 1], port));
 
     // As tcspecial sends an untyped source's bytes: after their count.
     let datagram = b"\x06293.15";
@@ -257,7 +257,7 @@ fn a_datum_longer_than_the_buffer_is_refused() {
     let port = a_free_port();
     let dir = tempfile::tempdir().expect("a directory");
     let path = dir.path().join("vehicle.ytcs");
-    std::fs::write(
+    tcsos::fs::write(
         &path,
         format!(
             "gateways:

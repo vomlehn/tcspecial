@@ -204,14 +204,14 @@ mod tests {
     /// that is down has nothing to say.
     #[test]
     fn a_link_says_when_it_last_sent_and_received() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::{Command, PingTelemetry, Telemetry};
 
         // A stub spacecraft that answers one PING on the command link. The
         // payload link is never sent anything by a ping.
         let spacecraft = UdpSocket::bind("127.0.0.1:0").expect("a stub socket");
         let at = spacecraft.local_addr().expect("where it is").to_string();
-        let answering = std::thread::spawn(move || {
+        let answering = tcsos::thread::spawn(move || {
             let mut buffer = [0u8; 65535];
             let (size, from) =
                 spacecraft.recv_from(&mut buffer).expect("a command");

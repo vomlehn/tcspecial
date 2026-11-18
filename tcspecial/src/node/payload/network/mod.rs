@@ -13,16 +13,25 @@
 pub mod raw;
 pub mod tcp;
 pub mod udp;
+// Linux alone: a page's sockets are named by address, not by a path.
+#[cfg(target_os = "linux")]
 pub mod unix;
 
 /// IP protocol numbers, as IANA assigns them: the same on every system, so
 /// stated here rather than taken from one system's headers.
+#[cfg(target_os = "linux")]
 const IPPROTO_TCP: i32 = 6;
+#[cfg(target_os = "linux")]
 const IPPROTO_UDP: i32 = 17;
+#[cfg(target_os = "linux")]
 const IPPROTO_SCTP: i32 = 132;
+#[cfg(target_os = "linux")]
 const IPPROTO_UDPLITE: i32 = 136;
+#[cfg(target_os = "linux")]
 use socket2::{Domain, Type};
+#[cfg(target_os = "linux")]
 use std::collections::BTreeMap;
+#[cfg(target_os = "linux")]
 use std::sync::LazyLock;
 
 pub enum LinkType {
@@ -30,17 +39,20 @@ pub enum LinkType {
     Stream,
 }
 
+#[cfg(target_os = "linux")]
 pub struct AddressFamily<'a> {
     pub af: Domain,
     pub sock_info: BTreeMap<&'a str, SockInfo<'a>>,
 }
 
+#[cfg(target_os = "linux")]
 pub struct SockInfo<'a> {
     pub sock_type: Type,
     pub ipproto: BTreeMap<&'a str, i32>,
     //    link_type:  LinkType,
 }
 
+#[cfg(target_os = "linux")]
 pub static PROTOCOLS: LazyLock<BTreeMap<&str, AddressFamily>> =
     LazyLock::new(|| {
         BTreeMap::from([(
@@ -166,7 +178,7 @@ AF_XDP	TBD	TBD	TBD
 // module describes are spelled in socket2, and what they correspond to in C.
 /*
  * use socket2::{Socket, Domain, Type, Protocol, SockAddr};
-use std::net::SocketAddr;
+use tcsos::net::SocketAddr;
 
 fn main() -> std::io::Result<()> {
     // Equivalent to: socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)
@@ -191,7 +203,7 @@ fn main() -> std::io::Result<()> {
 }
 
 use socket2::{Socket, Domain, Type, Protocol, SockAddr};
-use std::net::SocketAddr;
+use tcsos::net::SocketAddr;
 
 fn main() -> std::io::Result<()> {
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
@@ -227,10 +239,10 @@ setsockopt(...)                 socket.set_reuse_address(true), etc.
 bind(), listen(), accept(), connect()   Same method names on Socket
 
 Converting to std types
-You can convert a socket2::Socket into a std::net::TcpStream (or TcpListener,
+You can convert a socket2::Socket into a tcsos::net::TcpStream (or TcpListener,
 UdpSocket) when you're done with low-level setup:
 
-let std_stream: std::net::TcpStream = socket.into();
+let std_stream: tcsos::net::TcpStream = socket.into();
 
 This is a common pattern: use socket2 for fine-grained control during setup,
 then convert to std types for ergonomic I/O.

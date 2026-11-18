@@ -54,11 +54,11 @@
 //! them are what the fabric calls.
 
 use std::io::{self, Read, Write};
-use std::net::Shutdown;
 use std::path::Path;
-use std::process::{Child, Command, ExitStatus};
-use std::time::{Duration, Instant};
 use tcsos::interfaces::Stream as UnixStream;
+use tcsos::net::Shutdown;
+use tcsos::process::{Child, Command, ExitStatus};
+use tcsos::time::{Duration, Instant};
 use tcsos::wait::{Ready, Waitable, Watch};
 
 use crate::{packet, Interface};
@@ -865,7 +865,7 @@ mod tests {
         // than a shell, which clears its own mask as it starts and so
         // would say nothing blocked either way.
         let blocked = |unblocked: bool| -> String {
-            let mut command = std::process::Command::new("grep");
+            let mut command = tcsos::process::Command::new("grep");
             command.args(["SigBlk", "/proc/self/status"]);
             if unblocked {
                 super::unblocking(&mut command);

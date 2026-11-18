@@ -13,10 +13,10 @@
 //!
 //! See [`crate::endpoint`] for the traits.
 
-use std::fs::File;
 use std::io::IsTerminal;
 use std::io::{Read, Write};
 use std::path::Path;
+use tcsos::fs::File;
 use tcsos::wait::{Ready, Source, Waitable};
 
 use log::info;
@@ -296,14 +296,16 @@ mod tests {
         master.flush().ok();
         let mut buffer = [0u8; 64];
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(5);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         let mut got = Vec::new();
         while got.len() < b"from the peripheral".len()
-            && std::time::Instant::now() < deadline
+            && tcsos::time::Instant::now() < deadline
         {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
-                _ => std::thread::sleep(std::time::Duration::from_millis(10)),
+                _ => {
+                    tcsos::thread::sleep(tcsos::time::Duration::from_millis(10))
+                }
             }
         }
 

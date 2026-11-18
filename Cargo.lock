@@ -1590,8 +1590,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -4888,6 +4890,7 @@ dependencies = [
 name = "tcs-sim"
 version = "0.1.0"
 dependencies = [
+ "getrandom 0.2.17",
  "i-slint-backend-testing",
  "png",
  "rand",
@@ -4909,6 +4912,7 @@ version = "0.1.0"
 dependencies = [
  "slint",
  "tcsmoc",
+ "tcsos",
 ]
 
 [[package]]
@@ -4965,6 +4969,8 @@ dependencies = [
  "libc",
  "signal-hook",
  "wasm-bindgen",
+ "wasm_thread",
+ "web-time",
 ]
 
 [[package]]
@@ -5009,6 +5015,7 @@ name = "tcsverify"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "tcsos",
  "tcsprotocol",
  "tempfile",
 ]
@@ -5577,6 +5584,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm_thread"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7516db7f32decdadb1c3b8deb1b7d78b9df7606c5cc2f6241737c2ab3a0258e"
+dependencies = [
+ "futures",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

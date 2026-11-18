@@ -28,7 +28,7 @@
 //! Nothing here allocates: a packet is written into a buffer the caller made
 //! at startup, and read in place.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tcsos::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The primary and extended headers together.
 const BASE_BYTES: usize = 10;

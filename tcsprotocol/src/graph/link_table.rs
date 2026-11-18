@@ -482,12 +482,13 @@ mod tests {
     #[test]
     fn a_moved_port_changes_the_digest() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let text =
-            std::fs::read_to_string(root.join("tests/consolidator/yamcs.ytcs"))
-                .expect("it reads");
+        let text = tcsos::fs::read_to_string(
+            root.join("tests/consolidator/yamcs.ytcs"),
+        )
+        .expect("it reads");
         let dir = tempfile::tempdir().expect("a directory");
         let moved = dir.path().join("moved.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &moved,
             text.replace("127.0.0.1:26700", "127.0.0.1:26800"),
         )

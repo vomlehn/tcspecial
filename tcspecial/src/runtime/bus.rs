@@ -36,10 +36,10 @@
 //! refused or the peer's coming and going, where the log formats it, as the
 //! UDP command links' lines do.
 
-use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
+use tcsos::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use tcsos::time::{Duration, Instant, SystemTime};
 use tcsos::wait::{Source, Waitable};
 
 use log::{error, info, warn};
@@ -1244,13 +1244,13 @@ mod tests {
             .join("../examples/cfs/cfs.ytcs");
         let ours = free();
         let peer_port = socket.local_addr().expect("its address").port();
-        let text = std::fs::read_to_string(example)
+        let text = tcsos::fs::read_to_string(example)
             .expect("the example reads")
             .replace("0.0.0.0:8634", &format!("127.0.0.1:{ours}"))
             .replace("127.0.0.1:2234", &format!("127.0.0.1:{peer_port}"));
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("cfs.ytcs");
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         let graph = Graph::load(&path).expect("it reads");
         let ci = ci_config_of(&flatten(graph.tcspecial.as_ref().unwrap()))
             .and_then(|json| json.to_ci_config())
@@ -1283,7 +1283,7 @@ mod tests {
         loop {
             match reader.take(now) {
                 Took::Empty if Instant::now() < until => {
-                    std::thread::sleep(Duration::from_millis(5))
+                    tcsos::thread::sleep(Duration::from_millis(5))
                 }
                 took => return took,
             }

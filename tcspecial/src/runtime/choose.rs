@@ -448,10 +448,13 @@ pub(crate) mod tests {
         /// The desk.
         pub(crate) fn new(trials: u32) -> Desk {
             let dir = tempfile::tempdir().expect("a directory");
-            std::fs::create_dir(dir.path().join("kept")).expect("a store");
+            tcsos::fs::create_dir(dir.path().join("kept")).expect("a store");
             let command_line = dir.path().join("vehicle.ytcs");
-            std::fs::write(&command_line, Desk::configuration(&dir, 0, trials))
-                .expect("written");
+            tcsos::fs::write(
+                &command_line,
+                Desk::configuration(&dir, 0, trials),
+            )
+            .expect("written");
             Desk { dir, command_line }
         }
 
@@ -518,7 +521,7 @@ vehicle:
         /// Its checksum.
         pub(crate) fn keep(&self, n: u32) -> ConfigDigest {
             let path = self.dir.path().join(format!("other{n}.ytcs"));
-            std::fs::write(&path, Desk::configuration(&self.dir, n, 3))
+            tcsos::fs::write(&path, Desk::configuration(&self.dir, n, 3))
                 .expect("written");
             Store::at(self.dir.path().join("kept"))
                 .keep(&path)
@@ -609,9 +612,9 @@ vehicle:
             trials: 0,
             commanded: true,
         });
-        let mut text = std::fs::read(desk.state_file()).unwrap();
+        let mut text = tcsos::fs::read(desk.state_file()).unwrap();
         text[10] ^= 1;
-        std::fs::write(desk.state_file(), text).unwrap();
+        tcsos::fs::write(desk.state_file(), text).unwrap();
         let chosen = choose(&desk.command_line).expect("it chooses");
         assert_eq!(chosen.loaded.path, desk.command_line);
         assert!(!chosen.commanded);
@@ -638,11 +641,11 @@ vehicle:
         assert!(boot.load(missing).is_err());
 
         let kept = desk.dir.path().join(format!("kept/{other}/{other}.ytcs"));
-        let mut perms = std::fs::metadata(&kept).unwrap().permissions();
+        let mut perms = tcsos::fs::metadata(&kept).unwrap().permissions();
         #[allow(clippy::permissions_set_readonly_false)]
         perms.set_readonly(false);
-        std::fs::set_permissions(&kept, perms).unwrap();
-        std::fs::write(&kept, Desk::configuration(&desk.dir, 9, 3)).unwrap();
+        tcsos::fs::set_permissions(&kept, perms).unwrap();
+        tcsos::fs::write(&kept, Desk::configuration(&desk.dir, 9, 3)).unwrap();
         let why = boot.load(other).expect_err("damaged");
         assert!(why.contains("not the"), "{why}");
     }

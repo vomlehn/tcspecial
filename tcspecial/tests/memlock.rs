@@ -6,8 +6,8 @@
 //! running the tests has. A lock that succeeds is not tested here: it takes
 //! a limit larger than this desk's.
 
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::process::{Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 mod common;
 use common::{bound, free, port};
@@ -33,7 +33,7 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
     let at = || format!("127.0.0.1:{}", free());
     let path = dir.join("vehicle.ytcs");
     let state = dir.join("tcspecial.state").display().to_string();
-    std::fs::write(
+    tcsos::fs::write(
         &path,
         format!(
             "tcspecial:
@@ -88,7 +88,7 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
         .arg(&path)
         .env_remove("RUST_LOG")
         .stdout(Stdio::null())
-        .stderr(std::fs::File::create(&log).expect("a log"));
+        .stderr(tcsos::fs::File::create(&log).expect("a log"));
     tcsos::process::limit_locked_memory(&mut command, LIMIT);
     let mut child = command.spawn().expect("tcspecial starts");
     let deadline = Instant::now() + Duration::from_secs(seconds);
@@ -98,7 +98,7 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
             ended = Some(status);
             break;
         }
-        std::thread::sleep(Duration::from_millis(50));
+        tcsos::thread::sleep(Duration::from_millis(50));
     }
     let by_itself = ended.is_some();
     let status = match ended {
@@ -112,7 +112,7 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
     (
         by_itself,
         status,
-        std::fs::read_to_string(&log).unwrap_or_default(),
+        tcsos::fs::read_to_string(&log).unwrap_or_default(),
     )
 }
 

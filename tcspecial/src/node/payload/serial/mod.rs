@@ -19,8 +19,8 @@
 // this in node/.
 pub mod rs485;
 
-use std::fs::File;
 use std::io::{Read, Write};
+use tcsos::fs::File;
 use tcsos::linux::serial;
 use tcsos::wait::{Ready, Source, Waitable};
 
@@ -531,14 +531,16 @@ mod tests {
 
         let mut buffer = [0u8; 64];
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(5);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         let mut got = Vec::new();
         while got.len() < b"from the device".len()
-            && std::time::Instant::now() < deadline
+            && tcsos::time::Instant::now() < deadline
         {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
-                _ => std::thread::sleep(std::time::Duration::from_millis(10)),
+                _ => {
+                    tcsos::thread::sleep(tcsos::time::Duration::from_millis(10))
+                }
             }
         }
 
@@ -560,7 +562,7 @@ mod tests {
     #[test]
     fn a_pty_stands_in_for_an_rs485_line() {
         use std::io::{Read, Write};
-        use std::time::{Duration, Instant};
+        use tcsos::time::{Duration, Instant};
 
         let (mut master, slave) = a_pty();
         let config = SerialConfig {
@@ -587,7 +589,7 @@ mod tests {
         while got.len() < 2 && Instant::now() < deadline {
             match endpoint.read(&mut buffer) {
                 Ok(n) if n > 0 => got.extend_from_slice(&buffer[..n]),
-                _ => std::thread::sleep(Duration::from_millis(10)),
+                _ => tcsos::thread::sleep(Duration::from_millis(10)),
             }
         }
         assert_eq!(got, b"up", "what came up the bus");

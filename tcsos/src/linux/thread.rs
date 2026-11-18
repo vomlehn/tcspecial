@@ -1,5 +1,9 @@
 //! What the system says of a thread that the standard library does not.
 
+/// Everything the standard library's `thread` has, which on Linux is the
+/// interface: what is below is what it does not have.
+pub use std::thread::*;
+
 /// The calling thread's stack, as glibc has it.
 ///
 /// # Returns

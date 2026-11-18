@@ -897,7 +897,7 @@ pub fn beacon_of(graph: &Graph) -> Result<Option<crate::BeaconLink>, String> {
 /// refuse in the section.
 pub fn beacon_interval_of(
     graph: &Graph,
-) -> Result<Option<std::time::Duration>, String> {
+) -> Result<Option<tcsos::time::Duration>, String> {
     let Some(section) = graph.tcspecial.as_ref() else {
         return Ok(None);
     };
@@ -931,7 +931,7 @@ pub fn blank() -> BTreeMap<String, Scalar> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// Makes a flattened section as a file states it.
     ///
@@ -1553,7 +1553,7 @@ mod tests {
             settled(&[("restart_arm_valid", "90 s")])
                 .expect("stated")
                 .restart_arm_valid,
-            std::time::Duration::from_secs(90)
+            tcsos::time::Duration::from_secs(90)
         );
         for wrong in ["0 s", "20", "soon"] {
             let why =
@@ -1753,7 +1753,7 @@ mod tests {
             .expect("the example reads");
         assert_eq!(
             beacon_interval_of(&graph),
-            Ok(Some(std::time::Duration::from_secs(5)))
+            Ok(Some(tcsos::time::Duration::from_secs(5)))
         );
 
         graph.tcspecial = None;

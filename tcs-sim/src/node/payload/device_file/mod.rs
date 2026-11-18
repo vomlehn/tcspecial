@@ -19,12 +19,12 @@
 //!
 //! See [`crate::payload`] for that pacing, which is common to every kind.
 
-use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::fs::{File, OpenOptions};
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet_from, could_not_simulate, lateness, send_in_segments,
@@ -58,9 +58,9 @@ impl TextFile {
     /// Why it was not made: something that is not a file this simulator
     /// wrote is at the path, or the file cannot be made or replaced there.
     fn make(path: &Path) -> Result<TextFile, String> {
-        if let Ok(found) = std::fs::symlink_metadata(path) {
+        if let Ok(found) = tcsos::fs::symlink_metadata(path) {
             let ours = found.is_file()
-                && std::fs::read(path)
+                && tcsos::fs::read(path)
                     .is_ok_and(|held| LOREM.as_bytes().starts_with(&held));
             if !ours {
                 return Err(format!(
@@ -69,7 +69,7 @@ impl TextFile {
                     path.display()
                 ));
             }
-            std::fs::remove_file(path).map_err(|e| {
+            tcsos::fs::remove_file(path).map_err(|e| {
                 format!(
                     "{}, left by an earlier run, cannot be removed: {e}",
                     path.display()
@@ -90,7 +90,7 @@ impl TextFile {
 
 impl Drop for TextFile {
     fn drop(&mut self) {
-        if let Err(e) = std::fs::remove_file(&self.path) {
+        if let Err(e) = tcsos::fs::remove_file(&self.path) {
             eprintln!("{} cannot be removed: {e}", self.path.display());
         }
     }
@@ -184,7 +184,7 @@ mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// Makes a simulated device file that adds a packet every 10 ms, whole.
     ///
@@ -229,7 +229,7 @@ mod tests {
         let path = dir.path().join("payload");
         let text = TextFile::make(&path).expect("made");
         assert!(path.is_file());
-        assert_eq!(std::fs::read(&path).unwrap(), b"");
+        assert_eq!(tcsos::fs::read(&path).unwrap(), b"");
         drop(text);
         assert!(!path.exists(), "removed");
     }
@@ -240,15 +240,15 @@ mod tests {
     fn only_a_file_of_the_text_is_replaced() {
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("payload");
-        std::fs::write(&path, &LOREM.as_bytes()[..100]).unwrap();
+        tcsos::fs::write(&path, &LOREM.as_bytes()[..100]).unwrap();
         let text = TextFile::make(&path).expect("replaced");
-        assert_eq!(std::fs::read(&path).unwrap(), b"", "made new");
+        assert_eq!(tcsos::fs::read(&path).unwrap(), b"", "made new");
         drop(text);
 
-        std::fs::write(&path, b"somebody's notes").unwrap();
+        tcsos::fs::write(&path, b"somebody's notes").unwrap();
         let why = TextFile::make(&path).err().expect("left alone");
         assert!(why.contains("left alone"), "{why}");
-        assert_eq!(std::fs::read(&path).unwrap(), b"somebody's notes");
+        assert_eq!(tcsos::fs::read(&path).unwrap(), b"somebody's notes");
 
         let why = TextFile::make(Path::new("/dev/null"))
             .err()
@@ -269,13 +269,13 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(10);
         let mut read = Vec::new();
         while read.len() < LOREM.len() && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(20));
-            read = std::fs::read(&path).unwrap_or_default();
+            tcsos::thread::sleep(Duration::from_millis(20));
+            read = tcsos::fs::read(&path).unwrap_or_default();
         }
         assert_eq!(read, LOREM.as_bytes(), "the whole text, in order");
-        std::thread::sleep(Duration::from_millis(100));
+        tcsos::thread::sleep(Duration::from_millis(100));
         assert_eq!(
-            std::fs::read(&path).unwrap().len(),
+            tcsos::fs::read(&path).unwrap().len(),
             LOREM.len(),
             "and nothing after it"
         );

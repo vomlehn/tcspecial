@@ -309,8 +309,8 @@ impl PingCommand {
 /// doing and decide, over a link with minutes of latency; short enough that an
 /// arm left behind by a session that ended does not stand ready to restart the
 /// vehicle on the next RESTART anybody sends.
-pub const RESTART_ARM_VALID_DEFAULT: std::time::Duration =
-    std::time::Duration::from_secs(20 * 60);
+pub const RESTART_ARM_VALID_DEFAULT: tcsos::time::Duration =
+    tcsos::time::Duration::from_secs(20 * 60);
 
 /// RESTART_ARM command - enable a restart for the next `restart_arm_valid`
 ///
@@ -926,14 +926,14 @@ mod tests {
     fn an_arm_lasts_as_long_as_the_manual_says() {
         assert_eq!(
             RESTART_ARM_VALID_DEFAULT,
-            std::time::Duration::from_secs(20 * 60)
+            tcsos::time::Duration::from_secs(20 * 60)
         );
         let docs =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../docs");
         let manual: String = crate::MANUALS
             .iter()
             .map(|name| {
-                std::fs::read_to_string(docs.join(name)).expect("a manual")
+                tcsos::fs::read_to_string(docs.join(name)).expect("a manual")
             })
             .collect();
         let said = manual.split_whitespace().collect::<Vec<_>>().join(" ");

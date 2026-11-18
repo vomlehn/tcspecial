@@ -40,7 +40,7 @@
 //! does, once for each child.
 
 use std::path::Path;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use log::{error, info, warn};
 use tcsos::child::{Ended, Spawner};
@@ -100,7 +100,7 @@ pub fn child_follows_supervisor() {
         .and_then(|said| said.parse::<u32>().ok());
     if !tcsos::child::follow_parent(supervisor) {
         eprintln!("tcspecial: its supervisor has ended, so it does not start");
-        std::process::exit(BAD);
+        tcsos::process::exit(BAD);
     }
 }
 
@@ -263,7 +263,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
         };
         info!("supervisor: child {pid} started");
         let mut stopping = false;
-        let ended = tcsos::child::wait_for(pid, LOOK, &mut stopping);
+        let ended = tcsos::child::wait_for(&pid, LOOK, &mut stopping);
         if stopping {
             info!("supervisor: stopped, child {pid} {ended:?}");
             return if stopped(ended) { GOOD } else { BAD };

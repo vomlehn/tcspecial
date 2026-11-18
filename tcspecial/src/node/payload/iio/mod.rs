@@ -22,8 +22,8 @@
 //! for a permission it will never use would be refused by the strict ones for
 //! nothing.
 
-use std::fs::{File, OpenOptions};
 use std::io::Read;
+use tcsos::fs::{File, OpenOptions};
 use tcsos::wait::{Ready, Source, Waitable};
 
 use tcsprotocol::{IioConfig, TcsError, TcsResult};

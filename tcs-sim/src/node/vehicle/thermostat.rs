@@ -237,7 +237,7 @@ mod tests {
     use crate::node::physics::tests::zone_world;
     use crate::node::physics::{encode, world::World};
     use std::sync::Arc;
-    use std::time::Instant;
+    use tcsos::time::Instant;
     use tcsprotocol::node::physics::Place;
     use tcsprotocol::node::vehicle::compute::Format;
 

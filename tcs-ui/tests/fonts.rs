@@ -45,7 +45,7 @@ fn root() -> PathBuf {
 /// If a directory or one of its entries cannot be read, or `dir` leads
 /// back, through a link, to a directory it is in: a loop.
 fn slint_files(dir: &Path, above: &mut Vec<PathBuf>, found: &mut Vec<PathBuf>) {
-    let real = std::fs::canonicalize(dir).expect("a directory");
+    let real = tcsos::fs::canonicalize(dir).expect("a directory");
     assert!(
         !above.contains(&real),
         "{}: a loop, back to {}",
@@ -53,7 +53,7 @@ fn slint_files(dir: &Path, above: &mut Vec<PathBuf>, found: &mut Vec<PathBuf>) {
         real.display()
     );
     above.push(real);
-    for entry in std::fs::read_dir(dir).expect("a directory") {
+    for entry in tcsos::fs::read_dir(dir).expect("a directory") {
         let path = entry.expect("an entry").path();
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if path.is_dir() {
@@ -74,7 +74,7 @@ fn every_window_is_set_in_the_one_default_size() {
 
     let mut windows = 0;
     for file in &files {
-        let text = std::fs::read_to_string(file).expect("it reads");
+        let text = tcsos::fs::read_to_string(file).expect("it reads");
         let lines: Vec<&str> = text.lines().collect();
         for (at, line) in lines.iter().enumerate() {
             if line.contains(" inherits Window {") {
@@ -99,10 +99,10 @@ fn every_window_is_set_in_the_one_default_size() {
 
 #[test]
 fn the_python_windows_use_the_same_size() {
-    let slint = std::fs::read_to_string(root().join("tcs-ui/ui/fonts.slint"))
+    let slint = tcsos::fs::read_to_string(root().join("tcs-ui/ui/fonts.slint"))
         .expect("it reads");
     let python =
-        std::fs::read_to_string(root().join("tcs-ui/python/tcs_ui/fonts.py"))
+        tcsos::fs::read_to_string(root().join("tcs-ui/python/tcs_ui/fonts.py"))
             .expect("it reads");
 
     let points = slint
@@ -134,7 +134,7 @@ fn every_text_box_and_button_is_set_in_the_one_size() {
 
     let mut checked = 0;
     for file in &files {
-        let text = std::fs::read_to_string(file).expect("it reads");
+        let text = tcsos::fs::read_to_string(file).expect("it reads");
         let lines: Vec<&str> = text.lines().collect();
         for (at, line) in lines.iter().enumerate() {
             let code = line.split("//").next().unwrap_or("");
@@ -218,7 +218,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
     slint_files(&root(), &mut Vec::new(), &mut files);
 
     for file in &files {
-        let text = std::fs::read_to_string(file).expect("it reads");
+        let text = tcsos::fs::read_to_string(file).expect("it reads");
         for (at, line) in text.lines().enumerate() {
             let code = line.split("//").next().unwrap_or("").trim();
             // A Type definition, `small: Fonts.window;`, and every use.
@@ -261,7 +261,7 @@ fn no_text_is_set_smaller_than_the_one_size() {
         "examples/ping/ping_gateway.py",
     ] {
         let text =
-            std::fs::read_to_string(root().join(python)).expect("it reads");
+            tcsos::fs::read_to_string(root().join(python)).expect("it reads");
         for (at, line) in text.lines().enumerate() {
             if let Some(font) = line.split("font=(").nth(1) {
                 let size = font.split(',').nth(1).unwrap_or("").trim();

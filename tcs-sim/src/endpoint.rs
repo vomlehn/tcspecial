@@ -345,7 +345,7 @@ pub fn endpoint_description(endpoint: &EndpointConfig) -> String {
 mod tests {
     use super::*;
     use std::sync::atomic::Ordering;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::ResolvedSim;
     use tcsprotocol::{
         BitOrder, CsActive, DHMode, DHName, DeviceConfig, I2cConfig,
@@ -470,7 +470,7 @@ mod tests {
             outputs: vec![4],
             bias: tcsprotocol::Bias::None,
             debounce: None,
-            state_interval: Some(std::time::Duration::from_secs(1)),
+            state_interval: Some(tcsos::time::Duration::from_secs(1)),
             sim_address: None,
         }));
         let config = payload_config_from(&lines, &sim(250, 100, 2)).unwrap();

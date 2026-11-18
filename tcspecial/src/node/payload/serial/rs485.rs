@@ -26,7 +26,7 @@
 //! The kernel's structure and its two ioctls are
 //! `tcsos::linux::serial::rs485`'s.
 
-use std::fs::File;
+use tcsos::fs::File;
 
 use tcsos::linux::serial::rs485::{
     Mode as SerialRs485, ENABLED as SER_RS485_ENABLED,
@@ -159,7 +159,7 @@ pub(crate) fn apply(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     /// Which way RTS goes is one flag or the other, never both and never
     /// neither.

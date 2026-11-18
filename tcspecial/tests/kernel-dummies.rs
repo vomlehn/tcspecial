@@ -25,9 +25,9 @@
 //! cargo test -p tcspecial --test kernel-dummies -- --nocapture
 //! ```
 
-use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::graph::telemetry;
 use tcsprotocol::graph::Graph;
@@ -116,11 +116,11 @@ impl Flown {
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../examples/{name}/{name}.ytcs"));
         let text =
-            std::fs::read_to_string(&example).expect("the example reads");
+            tcsos::fs::read_to_string(&example).expect("the example reads");
         let dir = tempfile::tempdir().expect("a directory");
         // tcspecial writes its log into a directory that is there, and does
         // not make one.
-        std::fs::create_dir(dir.path().join("telemetry"))
+        tcsos::fs::create_dir(dir.path().join("telemetry"))
             .expect("the log's directory");
 
         // Every port is one found free and let go, for tcspecial to bind;
@@ -190,7 +190,7 @@ impl Flown {
             }
 
             let configuration = dir.path().join(format!("{name}.ytcs"));
-            std::fs::write(&configuration, &written).expect("written");
+            tcsos::fs::write(&configuration, &written).expect("written");
             let graph = Graph::load(&configuration).expect("it reads");
 
             let mut flying = common::Flying::logged(
@@ -280,7 +280,7 @@ impl Flown {
                 if arrived() {
                     return;
                 }
-                std::thread::sleep(Duration::from_millis(10));
+                tcsos::thread::sleep(Duration::from_millis(10));
             }
         }
         panic!(
@@ -352,7 +352,7 @@ const COMMAND_ID: u32 = 0x124;
 /// Why there is none, with what makes one.
 fn virtual_can() -> Result<String, String> {
     let host = Host::this();
-    let mut names: Vec<String> = std::fs::read_dir("/sys/class/net")
+    let mut names: Vec<String> = tcsos::fs::read_dir("/sys/class/net")
         .map(|entries| {
             entries
                 .filter_map(|entry| entry.ok())
@@ -498,7 +498,7 @@ impl Chip {
     ///
     /// * `high` - Up, where true; down, where false.
     fn pull(&self, high: bool) {
-        std::fs::write(
+        tcsos::fs::write(
             self.lines[0].join("pull"),
             if high { "pull-up" } else { "pull-down" },
         )
@@ -511,7 +511,7 @@ impl Chip {
     ///
     /// Its value as gpio-sim says it, `0` or `1`.
     fn lamp(&self) -> String {
-        std::fs::read_to_string(self.lines[1].join("value"))
+        tcsos::fs::read_to_string(self.lines[1].join("value"))
             .expect("the lamp's line reads")
             .trim()
             .to_string()
@@ -549,12 +549,12 @@ fn gpio_sim() -> Result<Chip, String> {
         }
         // Opened to see, and closed: whether this user may is the question,
         // and nothing is asked of the chip.
-        let usable = std::fs::OpenOptions::new()
+        let usable = tcsos::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .open(&device)
             .is_ok()
-            && std::fs::OpenOptions::new()
+            && tcsos::fs::OpenOptions::new()
                 .write(true)
                 .open(lines[0].join("pull"))
                 .is_ok();
@@ -669,22 +669,22 @@ struct Sensor {
 /// The bytes in one set; 0 if no channel is enabled.
 fn scan_bytes(scan: &Path) -> usize {
     let mut enabled: Vec<(usize, usize)> = Vec::new();
-    for entry in std::fs::read_dir(scan).into_iter().flatten().flatten() {
+    for entry in tcsos::fs::read_dir(scan).into_iter().flatten().flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         let Some(channel) = name.strip_suffix("_en") else {
             continue;
         };
-        let on = std::fs::read_to_string(entry.path()).unwrap_or_default();
+        let on = tcsos::fs::read_to_string(entry.path()).unwrap_or_default();
         if on.trim() != "1" {
             continue;
         }
         let index =
-            std::fs::read_to_string(scan.join(format!("{channel}_index")))
+            tcsos::fs::read_to_string(scan.join(format!("{channel}_index")))
                 .ok()
                 .and_then(|index| index.trim().parse().ok())
                 .unwrap_or(usize::MAX);
         let storage =
-            std::fs::read_to_string(scan.join(format!("{channel}_type")))
+            tcsos::fs::read_to_string(scan.join(format!("{channel}_type")))
                 .ok()
                 .and_then(|kind| {
                     let bits = kind.split('/').nth(1)?.split(">>").next()?;
@@ -721,7 +721,7 @@ fn scan_bytes(scan: &Path) -> usize {
 /// Why there is none, with what makes one.
 fn iio_dummy() -> Result<Sensor, String> {
     let host = Host::this();
-    let mut devices: Vec<PathBuf> = std::fs::read_dir("/sys/bus/iio/devices")
+    let mut devices: Vec<PathBuf> = tcsos::fs::read_dir("/sys/bus/iio/devices")
         .map(|entries| {
             entries
                 .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -743,7 +743,7 @@ fn iio_dummy() -> Result<Sensor, String> {
             // A dummy without a buffer has no device node at all, which is
             // what an iio_dummy built without its buffer makes.
             let name =
-                std::fs::read_to_string(sys.join("name")).unwrap_or_default();
+                tcsos::fs::read_to_string(sys.join("name")).unwrap_or_default();
             unbuffered |= !name.trim().is_empty()
                 && Path::new("/sys/kernel/config/iio/devices/dummy")
                     .join(name.trim())
@@ -758,14 +758,14 @@ fn iio_dummy() -> Result<Sensor, String> {
         } else {
             (sys.join("scan_elements"), sys.join("buffer/enable"))
         };
-        let enabled = std::fs::read_to_string(&enable).unwrap_or_default();
+        let enabled = tcsos::fs::read_to_string(&enable).unwrap_or_default();
         if enabled.trim() != "1" {
             return Err(format!(
                 "{device} is an iio_dummy sensor whose buffer is not enabled: \
                  remake it with `{MAKE} iio`, which enables it"
             ));
         }
-        if std::fs::File::open(&device).is_err() {
+        if tcsos::fs::File::open(&device).is_err() {
             return Err(format!(
                 "{device} is an iio_dummy sensor that is not this user's to \
                  read: remake it with `{MAKE} iio`, which gives it to the \

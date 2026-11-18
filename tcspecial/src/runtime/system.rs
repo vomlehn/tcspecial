@@ -32,7 +32,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::graph::telemetry::{Reaches, Telemetered};
 use tcsprotocol::graph::Graph;
@@ -1678,7 +1678,7 @@ payloads:
                  \"127.0.0.1:7003\", world-out: ground.always }\n",
             );
         }
-        std::fs::write(&path, text).expect("written");
+        tcsos::fs::write(&path, text).expect("written");
         let graph = Graph::load(&path).expect("it reads");
 
         let counts: Counts = graph
@@ -1725,7 +1725,7 @@ payloads:
     fn consolidating(now: Instant) -> (System, BTreeMap<String, Kept>, Kept) {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pack.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "gateways:
   - type gateway_radio:
@@ -2007,7 +2007,7 @@ vehicle:
         // the wait is until the next is due.
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("quiet.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "gateways:
   - type gateway_radio:
@@ -2081,7 +2081,7 @@ payloads:
         // trigger as well as the read, and the two are separate calls.
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("stopped.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type network:
@@ -2203,7 +2203,7 @@ vehicle:
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("counted.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type network:
@@ -2343,7 +2343,7 @@ vehicle:
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("besieged.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type network:
@@ -2404,7 +2404,7 @@ vehicle:
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("released.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type network:
@@ -2498,7 +2498,7 @@ vehicle:
         let start = Instant::now();
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("handed.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type network:
@@ -2531,7 +2531,7 @@ vehicle:
         states.named("asked").expect("the node").disable();
 
         // Asked from another thread, which blocks until a pass takes it.
-        let asking = std::thread::spawn(move || {
+        let asking = tcsos::thread::spawn(move || {
             bench.ask(Work::Disable("asked".into()))
         });
 
@@ -2918,7 +2918,7 @@ vehicle:
         let started = Arc::clone(&counting);
         let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let finished = Arc::clone(&done);
-        let asking = std::thread::spawn(move || {
+        let asking = tcsos::thread::spawn(move || {
             // What the command thread does with each: read it, and hand the
             // setting to the pass by the node's shared name.
             let round = |datagram: &[u8]| {
@@ -3056,9 +3056,9 @@ vehicle:
             address: "127.0.0.1".to_string(),
             port: 4000,
         };
-        let from: std::net::SocketAddr =
+        let from: tcsos::net::SocketAddr =
             "127.0.0.1:4000".parse().expect("an address");
-        let stranger: std::net::SocketAddr =
+        let stranger: tcsos::net::SocketAddr =
             "10.0.0.1:4000".parse().expect("an address");
         let beacon = Beacon::new(
             7,
@@ -3195,10 +3195,11 @@ vehicle:
 
         // And the log holds the pass: one segment file with something in it,
         // flushed by the pass itself rather than by anything this test did.
-        let written: Vec<std::fs::DirEntry> = std::fs::read_dir(&vehicle.log)
-            .expect("the log directory")
-            .map(|entry| entry.expect("an entry"))
-            .collect();
+        let written: Vec<tcsos::fs::DirEntry> =
+            tcsos::fs::read_dir(&vehicle.log)
+                .expect("the log directory")
+                .map(|entry| entry.expect("an entry"))
+                .collect();
         assert_eq!(written.len(), 1, "one segment file");
         assert!(
             written[0].metadata().expect("its size").len() > 0,
@@ -3268,7 +3269,7 @@ vehicle:
     fn a_ping_from_the_ground_is_answered_to_the_ground() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("ping.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "gateways:
   - type gateway_radio:
@@ -3347,21 +3348,21 @@ vehicle:
     fn under_yamcs_the_uplink_and_a_downlink_are_framed() {
         use tcsprotocol::ccsds::{read_header, PacketType, Sender};
         let free = || {
-            std::net::UdpSocket::bind("127.0.0.1:0")
+            tcsos::net::UdpSocket::bind("127.0.0.1:0")
                 .and_then(|socket| socket.local_addr())
                 .expect("a free port")
                 .port()
         };
         // The ping node is device id 1, so it sends to ground_base plus 1.
-        let ground = std::net::UdpSocket::bind("127.0.0.1:0").expect("bound");
+        let ground = tcsos::net::UdpSocket::bind("127.0.0.1:0").expect("bound");
         ground
-            .set_read_timeout(Some(std::time::Duration::from_millis(500)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_millis(500)))
             .expect("a timeout");
         let ground_port = ground.local_addr().expect("where").port();
         let gateway_port = free();
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("yamcs.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             format!(
                 "gateways:
@@ -3414,7 +3415,7 @@ vehicle:
             .send_to(b"ping #1 1760900000.000000001", &gateway)
             .expect("sent");
         ground
-            .set_read_timeout(Some(std::time::Duration::from_millis(10)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_millis(10)))
             .expect("a timeout");
         assert_eq!(answered(&mut system), None, "an unframed ping");
 
@@ -3611,7 +3612,7 @@ vehicle:
         let bench = vehicle.system.workbench();
         let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let finished = done.clone();
-        let asking = std::thread::spawn(move || {
+        let asking = tcsos::thread::spawn(move || {
             let set = bench.ask(Work::Set {
                 node: "thermostat".into(),
                 attribute: tcsprotocol::Attribute::of("setpoint")
@@ -3646,7 +3647,7 @@ vehicle:
             && waited.elapsed() < Duration::from_secs(5)
         {
             vehicle.system.pass(start);
-            std::thread::sleep(Duration::from_millis(2));
+            tcsos::thread::sleep(Duration::from_millis(2));
         }
 
         let (set, unbound) = asking.join().expect("the asking thread");

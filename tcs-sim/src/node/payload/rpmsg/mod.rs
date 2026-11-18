@@ -26,7 +26,7 @@
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use tcsos::time::Instant;
 
 use crate::payload::{
     a_packet, could_not_simulate, ignore_this_request, lateness,
@@ -118,9 +118,9 @@ pub fn run_rpmsg_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use std::fs::OpenOptions;
     use std::sync::atomic::AtomicU32;
-    use std::time::Duration;
+    use tcsos::fs::OpenOptions;
+    use tcsos::time::Duration;
     use tcsprotocol::Faults;
 
     /// Configures a channel the handler would open at a path, sending
@@ -178,7 +178,7 @@ mod tests {
 
         let got = (0..100)
             .find_map(|_| {
-                std::thread::sleep(Duration::from_millis(20));
+                tcsos::thread::sleep(Duration::from_millis(20));
                 let mut file =
                     OpenOptions::new().read(true).open(&path).ok()?;
                 let mut buffer = [0u8; 64];
@@ -220,14 +220,14 @@ mod tests {
         // The handler's end of the channel, once the simulator has made it.
         let mut handler = (0..100)
             .find_map(|_| {
-                std::thread::sleep(Duration::from_millis(20));
+                tcsos::thread::sleep(Duration::from_millis(20));
                 OpenOptions::new().read(true).write(true).open(&path).ok()
             })
             .expect("the channel appeared");
 
         // Nothing until it is asked.
         let mut buffer = [0u8; 64];
-        std::thread::sleep(Duration::from_millis(200));
+        tcsos::thread::sleep(Duration::from_millis(200));
         handler
             .set_nonblocking_for_test()
             .expect("the handler's end does not block");
@@ -240,7 +240,7 @@ mod tests {
         handler.write_all(b"READ").expect("the request goes out");
         let answered = (0..100)
             .find_map(|_| {
-                std::thread::sleep(Duration::from_millis(20));
+                tcsos::thread::sleep(Duration::from_millis(20));
                 match handler.read(&mut buffer) {
                     Ok(n) if n > 0 => Some(n),
                     _ => None,
@@ -265,7 +265,7 @@ mod tests {
         fn set_nonblocking_for_test(&self) -> std::io::Result<()>;
     }
 
-    impl NonBlockingForTest for std::fs::File {
+    impl NonBlockingForTest for tcsos::fs::File {
         fn set_nonblocking_for_test(&self) -> std::io::Result<()> {
             tcsos::linux::pty::set_nonblocking(self)
                 .map_err(std::io::Error::other)

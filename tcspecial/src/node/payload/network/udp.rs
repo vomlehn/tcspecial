@@ -11,8 +11,8 @@
 //! [`crate::endpoint::connect_endpoint_pair`] for which end binds what.
 
 use std::io;
-use std::net::{SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
+use tcsos::net::{SocketAddr, UdpSocket};
 use tcsos::wait::{Ready, Source, Waitable};
 
 use tcsprotocol::{NetworkConfig, SendsFrom, TcsError, TcsResult};
@@ -371,8 +371,8 @@ mod tests {
     /// the peer it had learnt went with it.
     #[test]
     fn an_endpoint_told_where_the_ground_is_sends_there() {
-        use std::net::UdpSocket;
-        use std::time::Duration;
+        use tcsos::net::UdpSocket;
+        use tcsos::time::Duration;
         use tcsprotocol::NetworkProtocol;
 
         // The ground's end, bound and listening, and the vehicle's, which is
@@ -440,8 +440,8 @@ mod tests {
     /// configured address, which is what that address means.
     #[test]
     fn a_driven_payload_is_sent_to_where_the_node_says_it_is() {
-        use std::net::UdpSocket;
-        use std::time::Duration;
+        use tcsos::net::UdpSocket;
+        use tcsos::time::Duration;
         use tcsprotocol::NetworkProtocol;
 
         // The heater, waiting where the configuration says it is.
@@ -505,8 +505,8 @@ mod tests {
     /// payload, waiting to be asked, had spoken -- which it never would.
     #[test]
     fn an_asked_payload_is_sent_its_trigger_where_the_node_says_it_is() {
-        use std::net::UdpSocket;
-        use std::time::{Duration, Instant};
+        use tcsos::net::UdpSocket;
+        use tcsos::time::{Duration, Instant};
         use tcsprotocol::NetworkProtocol;
 
         // The sensor, waiting to be asked where the configuration says.
@@ -536,7 +536,7 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(2);
         let size = loop {
             match reader.read(&mut into).expect("a read") {
-                0 if Instant::now() < deadline => std::thread::yield_now(),
+                0 if Instant::now() < deadline => tcsos::thread::yield_now(),
                 size => break size,
             }
         };
@@ -551,7 +551,7 @@ mod tests {
     /// counted, and the payload's own datagram behind it still read.
     #[test]
     fn a_stranger_is_turned_away_and_counted() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::NetworkProtocol;
 
         let sensor = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -598,11 +598,11 @@ mod tests {
     /// If a read fails.
     fn read_soon(reader: &mut UdpEndpoint, into: &mut [u8]) -> usize {
         let deadline =
-            std::time::Instant::now() + std::time::Duration::from_secs(2);
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(2);
         loop {
             match reader.read(into).expect("a read") {
-                0 if std::time::Instant::now() < deadline => {
-                    std::thread::yield_now()
+                0 if tcsos::time::Instant::now() < deadline => {
+                    tcsos::thread::yield_now()
                 }
                 size => return size,
             }
@@ -611,7 +611,7 @@ mod tests {
 
     /// Where an endpoint's own socket is bound, for a test that has to send
     /// to it.
-    fn mine_address(endpoint: &UdpEndpoint) -> std::net::SocketAddr {
+    fn mine_address(endpoint: &UdpEndpoint) -> tcsos::net::SocketAddr {
         endpoint.socket.local_addr().expect("where it is bound")
     }
 
@@ -623,7 +623,7 @@ mod tests {
     /// the other sends to.
     #[test]
     fn a_udp_endpoint_learns_where_to_answer() {
-        use std::net::UdpSocket;
+        use tcsos::net::UdpSocket;
         use tcsprotocol::NetworkProtocol;
 
         // Port 0, bound by the endpoint itself, so the test takes whatever is
@@ -661,7 +661,7 @@ mod tests {
             if got > 0 {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(10));
         }
         assert_eq!(&buffer[..got], b"command");
         assert_eq!(reader.peer(), Some(ground_addr));
@@ -672,7 +672,7 @@ mod tests {
         assert_eq!(sent, b"telemetry".len());
 
         ground
-            .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+            .set_read_timeout(Some(tcsos::time::Duration::from_secs(2)))
             .unwrap();
         let (n, from) = ground.recv_from(&mut buffer).unwrap();
         assert_eq!(&buffer[..n], b"telemetry");

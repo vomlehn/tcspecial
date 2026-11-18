@@ -108,7 +108,7 @@ impl Component for Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::node::physics::engine::TERMINALS;
 
     /// The places here are the type's.

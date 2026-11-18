@@ -12,7 +12,7 @@ pub mod constants {
     /// `tcsmoc::beacon::Schedule::for_interval` -- and a second station
     /// with a schedule of its own would be a second account of how late a
     /// beacon is.
-    pub fn beacon_schedule(interval: std::time::Duration) -> Schedule {
+    pub fn beacon_schedule(interval: tcsos::time::Duration) -> Schedule {
         Schedule::for_interval(interval)
     }
 }

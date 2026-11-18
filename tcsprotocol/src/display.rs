@@ -19,7 +19,7 @@
 //! tell which, and nothing depends on the answer: a window that lands
 //! somewhere else is a window in the wrong place, not a program that failed.
 
-use std::fs;
+use tcsos::fs;
 
 /// Which edge of the display a window asks for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

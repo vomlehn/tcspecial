@@ -54,7 +54,7 @@ impl Read {
         let mut located = Vec::new();
         let mut note = |file: &Path| {
             let format = ConfigFormat::of_file(file).ok()?;
-            let text = std::fs::read_to_string(file).ok()?;
+            let text = tcsos::fs::read_to_string(file).ok()?;
             located.push((file.to_path_buf(), Where::of(&text, format)));
             Some(())
         };

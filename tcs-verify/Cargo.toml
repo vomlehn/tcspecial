@@ -7,6 +7,8 @@ description = """\
 Checks a tcspecial configuration file, and the simulator file beside it"""
 
 [dependencies]
+# What the system is asked: see tcsos.
+tcsos = { path = "../tcsos" }
 tcsprotocol = { path = "../tcsprotocol" }
 # The checks this program prints, which are the library's: see lib.rs.
 tcsverify = { path = "../tcsverify" }

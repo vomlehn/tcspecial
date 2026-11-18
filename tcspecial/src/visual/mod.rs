@@ -29,7 +29,7 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use tcs_diagram::look::{self, ground_of};
@@ -247,7 +247,7 @@ pub fn run(path: &str, mode: tcsprotocol::simulate::Mode) -> i32 {
 
     let flying = {
         let path = path.to_string();
-        std::thread::Builder::new()
+        tcsos::thread::Builder::new()
             .name("vehicle".to_string())
             .spawn(move || {
                 let said = runtime::start::run_or_report(&path, mode);

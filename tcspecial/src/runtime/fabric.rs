@@ -55,7 +55,7 @@ use std::collections::BTreeMap;
 use std::sync::{
     Arc, Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
-use std::thread::JoinHandle;
+use tcsos::thread::JoinHandle;
 
 use tcsprotocol::graph::terminals::Stream;
 use tcsprotocol::link_type::LinkType;
@@ -459,7 +459,7 @@ pub trait Port: Send {
     /// Why what it would send could not be made.
     fn end_of_pass(
         &mut self,
-        now: std::time::Instant,
+        now: tcsos::time::Instant,
         out: &mut [u8],
     ) -> Result<usize, String> {
         let _ = (now, out);
@@ -469,7 +469,7 @@ pub trait Port: Send {
     /// When this node next has something to do at the end of a pass by
     /// itself, so that a pass is made then: a consolidator's interval.
     /// `None` for every other node.
-    fn due(&self) -> Option<std::time::Instant> {
+    fn due(&self) -> Option<tcsos::time::Instant> {
         None
     }
 
@@ -995,7 +995,7 @@ impl Fabric {
     pub fn end_of_pass(
         &mut self,
         name: &str,
-        now: std::time::Instant,
+        now: tcsos::time::Instant,
         out: &mut [u8],
     ) -> Option<Result<usize, String>> {
         if !read(&self.shared.watch).is_enabled(name) {
@@ -1014,7 +1014,7 @@ impl Fabric {
     /// # Returns
     ///
     /// When, or `None` for nothing, or a node not held.
-    pub fn due_of(&self, name: &str) -> Option<std::time::Instant> {
+    pub fn due_of(&self, name: &str) -> Option<tcsos::time::Instant> {
         self.with_port(name, |node| node.due()).flatten()
     }
 
@@ -2162,7 +2162,7 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("tees.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "gateways:
   - type gateway_radio:
@@ -3035,13 +3035,13 @@ vehicle:
     /// each happened.
     struct Slow {
         name: &'static str,
-        slow: std::time::Duration,
+        slow: tcsos::time::Duration,
         events: Events,
     }
 
     impl Port for Slow {
         fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
-            std::thread::sleep(self.slow);
+            tcsos::thread::sleep(self.slow);
             self.events
                 .lock()
                 .unwrap()
@@ -3059,7 +3059,7 @@ vehicle:
                 .lock()
                 .unwrap()
                 .push(format!("given {}", self.name));
-            std::thread::sleep(self.slow);
+            tcsos::thread::sleep(self.slow);
             Ok(())
         }
     }
@@ -3077,7 +3077,7 @@ vehicle:
     fn slow(name: &'static str, events: &Events) -> Box<dyn Port> {
         Box::new(Slow {
             name,
-            slow: std::time::Duration::from_millis(200),
+            slow: tcsos::time::Duration::from_millis(200),
             events: events.clone(),
         })
     }
@@ -3106,12 +3106,12 @@ vehicle:
             "sink",
             Box::new(Slow {
                 name: "sink",
-                slow: std::time::Duration::ZERO,
+                slow: tcsos::time::Duration::ZERO,
                 events: events.clone(),
             }),
         );
 
-        let started = std::time::Instant::now();
+        let started = tcsos::time::Instant::now();
         let moved = fabric.pump_group(&[
             "s1".to_string(),
             "s2".to_string(),
@@ -3122,7 +3122,7 @@ vehicle:
         assert!(moved.all_delivered(), "{:?}", moved.refused);
         assert_eq!(moved.delivered, 3, "every reading arrives");
         assert!(
-            took < std::time::Duration::from_millis(450),
+            took < tcsos::time::Duration::from_millis(450),
             "three 200 ms reads took {took:?}: they were made one after another"
         );
         let happened: Vec<String> = events.lock().unwrap().clone();
@@ -3151,13 +3151,13 @@ vehicle:
         fabric.hold("d2", slow("d2", &events));
         fabric.hold("d3", slow("d3", &events));
 
-        let started = std::time::Instant::now();
+        let started = tcsos::time::Instant::now();
         let moved = fabric.deliver("source", &[1]);
         let took = started.elapsed();
 
         assert_eq!(moved.delivered, 3, "{moved:?}");
         assert!(
-            took < std::time::Duration::from_millis(450),
+            took < tcsos::time::Duration::from_millis(450),
             "three 200 ms deliveries took {took:?}: they were made one after \
              another"
         );

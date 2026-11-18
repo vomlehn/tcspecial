@@ -311,7 +311,7 @@ mod tests {
 
         // One segment file, named for the node so that a directory holding
         // several logs can be read.
-        let written: Vec<String> = std::fs::read_dir(where_.path())
+        let written: Vec<String> = tcsos::fs::read_dir(where_.path())
             .expect("the directory")
             .map(|entry| {
                 entry
@@ -330,7 +330,7 @@ mod tests {
 
         // And the records are in it: the file is at least their bytes plus
         // the headers.
-        let bytes = std::fs::metadata(where_.path().join(&written[0]))
+        let bytes = tcsos::fs::metadata(where_.path().join(&written[0]))
             .expect("the segment file")
             .len();
         let records = 6 + 6 + 8 + 1;

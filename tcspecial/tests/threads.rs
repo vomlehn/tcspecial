@@ -6,8 +6,8 @@
 //! `runtime::thread`; this is about each thread being there, with the role
 //! and the stack its role is given.
 
-use std::net::UdpSocket;
-use std::time::{Duration, Instant};
+use tcsos::net::UdpSocket;
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::{
     Command, CommandStatus, NodeId, Telemetry, ThreadRole, ThreadStack,
@@ -39,7 +39,7 @@ const NODE_STACK: u32 = 48 * 1024;
 /// to QUERY_THREADS.
 fn threads(
     from: &UdpSocket,
-    to: std::net::SocketAddr,
+    to: tcsos::net::SocketAddr,
     first: u32,
 ) -> tcsprotocol::QueryThreadsTelemetry {
     let asked = Command::QueryThreads(ThreadsCommand::new(100 + first, first))
@@ -70,7 +70,7 @@ fn every_thread_is_told_of_with_its_role_and_stack() {
 
     let configuration = dir.path().join("vehicle.ytcs");
     let state = dir.path().join("tcspecial.state").display().to_string();
-    std::fs::write(
+    tcsos::fs::write(
         &configuration,
         format!(
             "tcspecial:

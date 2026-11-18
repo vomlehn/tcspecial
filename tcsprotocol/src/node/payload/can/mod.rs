@@ -192,7 +192,7 @@ pub fn judged(
 ) -> crate::simulate::Judged {
     use crate::simulate::{read_line, Judged};
     let listed = host.sys.join("class/net").join(interface);
-    let Ok(device) = std::fs::canonicalize(&listed) else {
+    let Ok(device) = tcsos::fs::canonicalize(&listed) else {
         return Judged::absent(
             format!("there is no network interface called {interface}"),
             "interface",
@@ -216,7 +216,7 @@ pub fn judged(
             TO_SIMULATE,
         );
     }
-    let driver = std::fs::canonicalize(device.join("device/driver"))
+    let driver = tcsos::fs::canonicalize(device.join("device/driver"))
         .ok()
         .and_then(|driver| {
             driver.file_name().map(|n| n.to_string_lossy().into_owned())
@@ -248,9 +248,9 @@ mod judged_tests {
     /// If any of it cannot be made.
     fn interface(sys: &std::path::Path, name: &str, under: &str, kind: &str) {
         let device = sys.join(under).join(name);
-        std::fs::create_dir_all(&device).unwrap();
-        std::fs::write(device.join("type"), format!("{kind}\n")).unwrap();
-        std::fs::create_dir_all(sys.join("class/net")).unwrap();
+        tcsos::fs::create_dir_all(&device).unwrap();
+        tcsos::fs::write(device.join("type"), format!("{kind}\n")).unwrap();
+        tcsos::fs::create_dir_all(sys.join("class/net")).unwrap();
         tcsos::linux::fs::symlink(&device, sys.join("class/net").join(name))
             .unwrap();
     }

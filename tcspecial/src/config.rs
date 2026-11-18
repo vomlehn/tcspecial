@@ -11,7 +11,7 @@ pub use tcsprotocol::BeaconLink as Beacon;
 
 /// Configuration constants
 pub mod constants {
-    use std::time::Duration;
+    use tcsos::time::Duration;
 
     pub const BEACON_DEFAULT_MS: Duration = Duration::new(20, 0);
 

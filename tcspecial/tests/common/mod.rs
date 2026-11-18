@@ -1,9 +1,9 @@
 //! What more than one of these tests does as the ground.
 
-use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command as Process, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::process::{Child, Command as Process, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::config_digest::{digest_of_graph, ConfigDigest};
 use tcsprotocol::graph::Graph;
@@ -171,7 +171,7 @@ impl Flying {
     /// If the log cannot be made or tcspecial cannot be started.
     #[allow(dead_code)]
     pub fn logged(configuration: &Path, log: &Path) -> Flying {
-        let out = std::fs::File::create(log).expect("tcspecial's log");
+        let out = tcsos::fs::File::create(log).expect("tcspecial's log");
         let child = Process::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(configuration)
             .arg("--simulate=all")
@@ -209,7 +209,7 @@ impl Flying {
     #[allow(dead_code)]
     pub fn lost_a_port(&mut self) -> bool {
         let said = match &self.log {
-            Some(log) => std::fs::read_to_string(log).unwrap_or_default(),
+            Some(log) => tcsos::fs::read_to_string(log).unwrap_or_default(),
             None => return false,
         };
         self.exited() && said.contains("Address already in use")
@@ -220,8 +220,8 @@ impl Drop for Flying {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
-        if let (true, Some(log)) = (std::thread::panicking(), &self.log) {
-            let said = std::fs::read_to_string(log).unwrap_or_default();
+        if let (true, Some(log)) = (tcsos::thread::panicking(), &self.log) {
+            let said = tcsos::fs::read_to_string(log).unwrap_or_default();
             eprintln!("what tcspecial said, in {}:\n{said}", log.display());
         }
     }

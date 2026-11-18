@@ -5,7 +5,7 @@
 //! a build with it must not fly; `make check` runs these with
 //! `--features visual` as well.
 
-use std::process::Command;
+use tcsos::process::Command;
 
 /// Runs tcspecial.
 ///

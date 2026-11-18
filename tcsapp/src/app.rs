@@ -59,11 +59,11 @@
 //! one packet, by a panic hook `inherited` installs. Anything else an app has
 //! to say goes on [`Errors::say`].
 
-use std::fs::File;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
 use tcsos::interfaces::Stream as UnixStream;
+use tcsos::interfaces::Written as File;
 
 use crate::{is_handed_over, is_open, packet, Interface};
 

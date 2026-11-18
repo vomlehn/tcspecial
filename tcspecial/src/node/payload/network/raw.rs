@@ -30,7 +30,7 @@
 //! permitted` names neither the capability nor the node.
 
 use std::io::{self, Read, Write};
-use std::net::{SocketAddr, ToSocketAddrs};
+use tcsos::net::{SocketAddr, ToSocketAddrs};
 use tcsos::wait::{Ready, Source, Waitable};
 
 use socket2::{Domain, Protocol, Socket, Type};
@@ -329,15 +329,16 @@ mod tests {
         let mut there = here.try_clone().expect("a second endpoint");
         there.write(b"sounding").expect("sent");
         let mut buffer = [0u8; 256];
-        let by = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let by =
+            tcsos::time::Instant::now() + tcsos::time::Duration::from_secs(5);
         loop {
             let got = here.read(&mut buffer).expect("read");
             if got > 0 {
                 assert_eq!(&buffer[..got], b"sounding");
                 return;
             }
-            assert!(std::time::Instant::now() < by, "nothing arrived");
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            assert!(tcsos::time::Instant::now() < by, "nothing arrived");
+            tcsos::thread::sleep(tcsos::time::Duration::from_millis(10));
         }
     }
 }

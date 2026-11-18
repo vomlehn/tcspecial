@@ -79,7 +79,7 @@ impl Component for Sun {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::node::physics::sun::TERMINALS;
 
     /// The place here is the type's.

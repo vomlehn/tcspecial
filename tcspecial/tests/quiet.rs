@@ -5,7 +5,7 @@
 //! summary's first line is said before the file is read, and what stops the
 //! start is said after. Quiet, only the second.
 
-use std::process::Command;
+use tcsos::process::Command;
 
 /// Runs tcspecial, which must fail, and collects what it says.
 ///

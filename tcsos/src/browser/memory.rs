@@ -68,3 +68,12 @@ pub fn say_and_end(said: &[u8], _status: i32) -> ! {
     crate::browser::console::error_bytes(said);
     core::arch::wasm32::unreachable()
 }
+
+/// Has the allocator keep one arena: there is one, in a page.
+///
+/// # Returns
+///
+/// `true`.
+pub fn one_arena() -> bool {
+    true
+}

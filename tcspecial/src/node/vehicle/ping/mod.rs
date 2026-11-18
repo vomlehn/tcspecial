@@ -16,7 +16,7 @@
 //! business and not part of the link's.
 
 use std::collections::VecDeque;
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use tcsprotocol::node::vehicle::ping::{self, Reply};
 

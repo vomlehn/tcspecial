@@ -615,7 +615,7 @@ impl Component for Lander {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
+    use tcsos::time::Duration;
     use tcsprotocol::node::physics::lander::TERMINALS;
 
     /// A lander over flat ground with a pad in the middle: a square outline

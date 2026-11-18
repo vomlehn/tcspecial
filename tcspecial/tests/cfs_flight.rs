@@ -14,9 +14,9 @@
 //! `--ignored`, saying where each is through the environment. See
 //! `cfs/cfs-test`.
 
-use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use tcsos::net::UdpSocket;
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::config_digest::digest_of_graph;
 use tcsprotocol::graph::Graph;
@@ -92,7 +92,7 @@ fn given(name: &str) -> PathBuf {
 fn logged(log: &Path, said: &str, within: Duration) -> String {
     let deadline = Instant::now() + within;
     loop {
-        let text = std::fs::read_to_string(log).unwrap_or_default();
+        let text = tcsos::fs::read_to_string(log).unwrap_or_default();
         if let Some(line) = text.lines().find(|line| line.contains(said)) {
             return line.to_string();
         }
@@ -101,7 +101,7 @@ fn logged(log: &Path, said: &str, within: Duration) -> String {
             "{} never said \"{said}\"",
             log.display()
         );
-        std::thread::sleep(Duration::from_millis(200));
+        tcsos::thread::sleep(Duration::from_millis(200));
     }
 }
 
@@ -202,7 +202,7 @@ impl Ground {
             if self.socket.recv(&mut room).is_ok() {
                 return;
             }
-            std::thread::sleep(Duration::from_millis(500));
+            tcsos::thread::sleep(Duration::from_millis(500));
         }
         panic!("TO_LAB sent nothing after being told where to");
     }
@@ -232,7 +232,7 @@ fn a_vehicle_answering_to_cfs_is_a_peer_of_cfs_itself() {
     println!("{}", logged(&cfs_log, "Peer 66:2 connected", up));
     println!("{}", logged(&tcspecial_log, "is connected", up));
     println!("{}", logged(&tcspecial_log, "protocol version 11", up));
-    let said = std::fs::read_to_string(&tcspecial_log).unwrap_or_default();
+    let said = tcsos::fs::read_to_string(&tcspecial_log).unwrap_or_default();
     assert!(
         !said.contains("refused"),
         "tcspecial refused the peer:\n{said}"

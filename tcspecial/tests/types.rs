@@ -5,7 +5,7 @@
 //! how it was built, and it is in the words `tcs-verify --types=` takes, so
 //! that one can be handed to the other.
 
-use std::process::Command;
+use tcsos::process::Command;
 
 use tcsprotocol::graph::built::{types_from, OPTIONAL_TYPES};
 

@@ -15,9 +15,9 @@
 //!
 //! See [`crate::endpoint`] for the traits.
 
-use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
+use tcsos::fs::File;
 use tcsos::wait::{Ready, Source, Waitable};
 
 use tcsprotocol::{DeviceConfig, TcsError, TcsResult};

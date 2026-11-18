@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn a_reading_is_shown_as_a_temperature() {
         let at = Timestamp::at(
-            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
+            tcsos::time::UNIX_EPOCH + tcsos::time::Duration::from_secs(3661),
         );
         let mut data = DHSample::new();
         data.record(
@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn an_arrival_says_when_it_came_and_what_it_was() {
         let at = Timestamp::at(
-            std::time::UNIX_EPOCH + std::time::Duration::from_secs(3661),
+            tcsos::time::UNIX_EPOCH + tcsos::time::Duration::from_secs(3661),
         );
         let mut data = DHSample::new();
         data.record(b"hello");

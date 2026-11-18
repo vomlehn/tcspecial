@@ -8,6 +8,8 @@ Window pieces shared by the TCSpecial ground programs: the panels, and what to \
 show on them"""
 
 [dependencies]
+# What the system is asked: see tcsos.
+tcsos = { path = "../tcsos" }
 # What a panel reports is `tcsmoc::beacon`'s: this crate is how it is shown,
 # not what it means.
 tcsmoc = { path = "../tcsmoc" }

@@ -23,12 +23,12 @@
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use tcsos::net::UdpSocket;
+use tcsos::time::{Duration, Instant};
 
 use i_slint_backend_testing::{ElementHandle, ElementQuery};
 use slint::platform::software_renderer::{
@@ -160,7 +160,7 @@ fn pause(long: Duration) {
     let until = Instant::now() + long;
     while Instant::now() < until {
         settle();
-        std::thread::sleep(Duration::from_millis(10));
+        tcsos::thread::sleep(Duration::from_millis(10));
     }
     settle();
 }
@@ -183,7 +183,7 @@ fn until(what: &str, done: impl Fn() -> bool) {
             return;
         }
         assert!(Instant::now() < deadline, "waited too long for {what}");
-        std::thread::sleep(Duration::from_millis(20));
+        tcsos::thread::sleep(Duration::from_millis(20));
     }
 }
 
@@ -278,7 +278,7 @@ fn shots() -> PathBuf {
         .join("..")
         .join("docs")
         .join("shots");
-    std::fs::create_dir_all(&dir).expect("docs/shots");
+    tcsos::fs::create_dir_all(&dir).expect("docs/shots");
     dir
 }
 
@@ -351,7 +351,7 @@ fn shoot(window: &slint::Window, region: Option<Region>, name: &str) {
     let (rgb, out_width, out_height) =
         shrink(&rgb, cut_width, cut_height, wanted / cut_width as f32);
     let path = shots().join(format!("tcs-moc-{name}.png"));
-    let file = std::fs::File::create(&path).expect("the picture's file");
+    let file = tcsos::fs::File::create(&path).expect("the picture's file");
     let mut encoder = png::Encoder::new(
         std::io::BufWriter::new(file),
         out_width as u32,
@@ -546,11 +546,11 @@ fn interpreter(
     socket: UdpSocket,
     aboard: Arc<Mutex<Aboard>>,
     done: Arc<AtomicBool>,
-) -> std::thread::JoinHandle<()> {
+) -> tcsos::thread::JoinHandle<()> {
     socket
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
-    std::thread::spawn(move || {
+    tcsos::thread::spawn(move || {
         let mut buffer = [0u8; 65535];
         while !done.load(Ordering::Relaxed) {
             let Ok((size, from)) = socket.recv_from(&mut buffer) else {
@@ -769,7 +769,7 @@ struct Station {
     /// The vehicle's beacon socket, and where it sends them.
     beacon_from: UdpSocket,
     /// Where this window hears beacons.
-    beacon_to: std::net::SocketAddr,
+    beacon_to: tcsos::net::SocketAddr,
     /// The vehicle's data socket.
     data_from: UdpSocket,
     /// The plot, where the example has one.
@@ -847,7 +847,7 @@ impl Station {
         let vehicle = UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let vehicle_at = vehicle.local_addr().expect("where").to_string();
         let here = |at: &str| {
-            let at: std::net::SocketAddr = at.parse().expect("an address");
+            let at: tcsos::net::SocketAddr = at.parse().expect("an address");
             HostPort {
                 address: at.ip().to_string(),
                 port: at.port(),
@@ -967,7 +967,7 @@ impl Station {
             let arrivals = arrivals.clone();
             let plot = plot.clone();
             let feed = pings.map(|(_, feed)| feed);
-            std::thread::spawn(move || {
+            tcsos::thread::spawn(move || {
                 serve(receiver, rows, units, consolidated, arrivals, feed, plot)
             });
         }
@@ -1141,7 +1141,7 @@ fn ping_node_answers(
     socket
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
-    std::thread::spawn(move || {
+    tcsos::thread::spawn(move || {
         let mut buffer = [0u8; 256];
         while !done.load(Ordering::Relaxed) {
             let Ok((size, _)) = socket.recv_from(&mut buffer) else {
@@ -1149,10 +1149,10 @@ fn ping_node_answers(
             };
             // A link of a few milliseconds each way, which the round trip
             // then shows.
-            std::thread::sleep(Duration::from_millis(4));
+            tcsos::thread::sleep(Duration::from_millis(4));
             let at = ping::now().expect("a clock");
             let reply = ping::reply(&buffer[..size], at).expect("answered");
-            std::thread::sleep(Duration::from_millis(3));
+            tcsos::thread::sleep(Duration::from_millis(3));
             let mut out = Vec::new();
             match count {
                 Some(count) => {

@@ -1,7 +1,7 @@
 //! `--help` says how tcspecial is run, rather than being taken for the name
 //! of a configuration.
 
-use std::process::Command;
+use tcsos::process::Command;
 
 #[test]
 fn help_says_how_it_is_run() {

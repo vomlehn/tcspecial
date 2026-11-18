@@ -1116,7 +1116,7 @@ pub fn line_of_node(
     name: &str,
     nth: usize,
 ) -> Option<usize> {
-    let text = std::fs::read_to_string(path).ok()?;
+    let text = tcsos::fs::read_to_string(path).ok()?;
     let words = [Section::Gateway, Section::Vehicle, Section::Payloads]
         .map(Section::node_word);
     let unquoted =
@@ -1476,7 +1476,7 @@ mod tests {
     fn every_file_the_two_readers_refuse_is_refused() {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../tests/refused");
-        let mut files: Vec<std::path::PathBuf> = std::fs::read_dir(&dir)
+        let mut files: Vec<std::path::PathBuf> = tcsos::fs::read_dir(&dir)
             .expect("tests/refused")
             .map(|entry| entry.expect("an entry").path())
             .collect();
@@ -1500,7 +1500,7 @@ mod tests {
     fn a_name_is_one_across_the_configuration() {
         let dir = tempfile::tempdir().expect("a directory");
         let top = dir.path().join("top.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "payloads:\n  - type i2c:\n      - payload: a\n  \
              - type spi:\n      - payload: a\n",
@@ -1509,13 +1509,13 @@ mod tests {
         let why = Graph::load(&top).expect_err("twice").to_string();
         assert!(why.contains("\"a\" twice in this file"), "{why}");
 
-        std::fs::write(
+        tcsos::fs::write(
             &top,
             "include:\n  - subdiagram: other\n    path: other\npayloads:\n  - type i2c:\n      \
              - payload: a\n",
         )
         .expect("written");
-        std::fs::write(
+        tcsos::fs::write(
             dir.path().join("other.ytcs"),
             "vehicle:\n  - type ping:\n      - compute: a\n",
         )

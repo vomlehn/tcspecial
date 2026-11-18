@@ -3,7 +3,7 @@
 //! Neither opens a window: the first is refused before anything is read, and
 //! the second waits for a simulator rather than being one.
 
-use std::process::Command;
+use tcsos::process::Command;
 
 /// Runs tcs-sim from the top of the tree, without `PAYLOAD_SIM_YAML`.
 ///

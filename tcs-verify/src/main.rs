@@ -28,7 +28,7 @@
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use tcsos::process::ExitCode;
 
 /// What is said when the command line is not one of the two shapes.
 ///

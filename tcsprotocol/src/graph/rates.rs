@@ -18,7 +18,7 @@
 //! are most of a link's load, and roughly how much that is.
 
 use std::collections::BTreeMap;
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use super::{Destination, Graph, Node};
 

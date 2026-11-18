@@ -314,7 +314,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let got = (0..50)
             .find_map(|_| {
-                std::thread::sleep(std::time::Duration::from_millis(20));
+                tcsos::thread::sleep(tcsos::time::Duration::from_millis(20));
                 match handler.read(&mut buffer) {
                     Ok(0) => None,
                     Ok(n) => Some(n),

@@ -34,7 +34,7 @@
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use tcsos::time::Duration;
 use tcsos::wait::{Ready, Source, Wakeup, Watch};
 
 use tcsprotocol::consolidation::{ConsolidatorCounts, InputCounts};
@@ -114,7 +114,7 @@ impl Abandon {
     pub fn wait(&self, how_long: Duration) -> bool {
         let Some(wakeup) = self.wakeup.as_ref() else {
             if !how_long.is_zero() {
-                std::thread::sleep(how_long);
+                tcsos::thread::sleep(how_long);
             }
             return false;
         };
@@ -168,7 +168,7 @@ impl Nudge {
             // A failed wait is waited out instead. The failure is the wait's
             // own and a loop that treated it as a nudge would spin.
             if tcsos::wait::wait(&mut set, Some(how_long)).is_err() {
-                std::thread::sleep(how_long);
+                tcsos::thread::sleep(how_long);
             }
         }
         self.0.drain();
@@ -867,7 +867,7 @@ mod tests {
     fn every_node_has_a_state_numbered_as_its_telemetry_is() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("two.ytcs");
-        std::fs::write(
+        tcsos::fs::write(
             &path,
             "payloads:
   - type i2c:

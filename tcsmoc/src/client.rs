@@ -17,7 +17,7 @@
 //! it is [`tcsprotocol::CommandType::link`], the one table both ends read.
 
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant};
 use tcsprotocol::{
     sequence_is_before, ArmKey, Command, CommandLink, CommandStatus,
     CommandType, ConfigDigest, ConfigVersion, ConnectCommand,

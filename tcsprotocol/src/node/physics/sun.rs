@@ -10,7 +10,7 @@
 //! It starts at the beginning of the sunlit part of its orbit, or `start`
 //! of the way round from it.
 
-use std::time::Duration;
+use tcsos::time::Duration;
 
 use serde::{Deserialize, Serialize};
 

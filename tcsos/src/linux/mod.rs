@@ -3,6 +3,7 @@
 
 pub mod can;
 pub mod child;
+pub mod env;
 pub mod fs;
 pub mod gpio;
 pub mod hdlc;
@@ -16,4 +17,5 @@ pub mod serial;
 pub mod signals;
 pub mod spi;
 pub mod thread;
+pub mod time;
 pub mod wait;

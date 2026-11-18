@@ -51,7 +51,7 @@
 //! allocated per ping. A message longer than the largest ping is not a ping,
 //! and it is refused as one rather than read as far as it fits.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tcsos::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// What every ping begins with.
 pub const PREFIX: &str = "ping #";

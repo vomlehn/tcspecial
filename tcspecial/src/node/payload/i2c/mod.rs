@@ -13,8 +13,8 @@
 //!
 //! See [`crate::endpoint`] for the traits.
 
-use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use tcsos::fs::{File, OpenOptions};
 use tcsos::wait::{Ready, Source, Waitable};
 
 use tcsprotocol::{I2cConfig, TcsError, TcsResult};

@@ -9,10 +9,10 @@
  * the interval to a very large interval will effectively do so.
  */
 
-use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::{Duration, SystemTime};
+use tcsos::net::{SocketAddr, ToSocketAddrs, UdpSocket};
+use tcsos::time::{Duration, SystemTime};
 
 use log::{error, info, trace};
 use tcsprotocol::{
@@ -600,8 +600,8 @@ mod tests {
     /// fail whenever something else on the machine held it.
     #[test]
     fn the_beacons_are_numbered_in_order_from_one() {
-        let ground =
-            std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        let ground = tcsos::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("a ground socket");
         ground
             .set_read_timeout(Some(Duration::from_secs(5)))
             .expect("a timeout");
@@ -726,10 +726,10 @@ mod tests {
     /// If either socket cannot be made.
     fn sending(
         timing: BeaconTiming,
-    ) -> (std::net::UdpSocket, BeaconSend, Matched) {
+    ) -> (tcsos::net::UdpSocket, BeaconSend, Matched) {
         let matched = Matched::at_a_start();
-        let ground =
-            std::net::UdpSocket::bind("127.0.0.1:0").expect("a ground socket");
+        let ground = tcsos::net::UdpSocket::bind("127.0.0.1:0")
+            .expect("a ground socket");
         let at = ground.local_addr().expect("where it is");
         let sender = BeaconSend::new(
             timing,
@@ -767,7 +767,7 @@ mod tests {
     /// # Panics
     ///
     /// If the timeout cannot be set or what arrives is not a beacon.
-    fn next(ground: &std::net::UdpSocket, wait: Duration) -> Option<Beacon> {
+    fn next(ground: &tcsos::net::UdpSocket, wait: Duration) -> Option<Beacon> {
         ground.set_read_timeout(Some(wait)).expect("a timeout");
         let mut buffer = [0u8; 512];
         loop {
@@ -852,7 +852,8 @@ mod tests {
     /// without a word.
     #[test]
     fn a_beacon_address_that_cannot_be_bound_is_refused_at_the_start() {
-        let held = std::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
+        let held =
+            tcsos::net::UdpSocket::bind("127.0.0.1:0").expect("a socket");
         let at = held.local_addr().expect("where it is");
 
         let refused = BeaconSend::new(

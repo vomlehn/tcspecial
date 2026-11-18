@@ -8,10 +8,10 @@
 //! else, the example included -- and its log moved to a directory of the
 //! test's. The test is the bridge and both payloads.
 
-use std::net::{SocketAddr, UdpSocket};
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
+use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::process::{Child, Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsprotocol::graph::telemetry;
 use tcsprotocol::graph::Graph;
@@ -120,7 +120,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
 {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/fprime/fprime.ytcs");
-    let text = std::fs::read_to_string(&example).expect("the example reads");
+    let text = tcsos::fs::read_to_string(&example).expect("the example reads");
 
     // Where the example's own bridge hears the thermometer, which its
     // comments say: bridge_base, 9700, plus the thermometer's device id, 3,
@@ -143,7 +143,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     let dir = tempfile::tempdir().expect("a directory");
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
-    std::fs::create_dir(dir.path().join("telemetry"))
+    tcsos::fs::create_dir(dir.path().join("telemetry"))
         .expect("the log's directory");
 
     // The heater is driven and never heard from, so tcspecial sends to it:
@@ -175,7 +175,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         text = moved(&text, was, &now);
     }
     let configuration = dir.path().join("fprime.ytcs");
-    std::fs::write(&configuration, &text).expect("written");
+    tcsos::fs::write(&configuration, &text).expect("written");
 
     // Where the bridge hears the thermometer, as the vehicle works it out:
     // the gateway node's bridge_base plus the thermometer's device id.

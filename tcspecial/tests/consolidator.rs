@@ -12,12 +12,12 @@
 //! C ground station `tcsmoc-c/examples/consolidator-station.c` built as C
 //! and as C++.
 
-use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use tcsos::net::SocketAddr;
+use tcsos::process::{Command, Stdio};
+use tcsos::time::{Duration, Instant};
 
 use tcsmoc::gateway::GatewayReceiver;
 use tcsprotocol::consolidation::Layout;
@@ -66,7 +66,7 @@ fn received_for(
 /// The datum.
 fn until_sent(
     ground: &mut GatewayReceiver,
-    sensors: &std::net::UdpSocket,
+    sensors: &tcsos::net::UdpSocket,
     readings: &[(SocketAddr, &[u8])],
     wanted: impl Fn(&[u8]) -> bool,
 ) -> Vec<u8> {
@@ -129,10 +129,10 @@ fn example(dir: &Path, commands: u16) -> Example {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/consolidator/consolidator.ytcs");
     let mut text =
-        std::fs::read_to_string(&example).expect("the example reads");
+        tcsos::fs::read_to_string(&example).expect("the example reads");
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
-    std::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
+    tcsos::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
 
     let (sun, wheel, battery, base) = (free(), free(), free(), free());
     // Where tcs_cmd.recv says tcspecial takes the ground's commands.
@@ -171,7 +171,7 @@ fn example(dir: &Path, commands: u16) -> Example {
         text = moved(&text, was, &now);
     }
     let configuration = dir.join("consolidator.ytcs");
-    std::fs::write(&configuration, &text).expect("written");
+    tcsos::fs::write(&configuration, &text).expect("written");
     Example {
         configuration,
         sun,
@@ -379,7 +379,7 @@ fn station(
 /// # Returns
 ///
 /// What it printed, and how it ended.
-fn ran_within(command: &mut Command, most: Duration) -> std::process::Output {
+fn ran_within(command: &mut Command, most: Duration) -> tcsos::process::Output {
     let child = command
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -389,13 +389,13 @@ fn ran_within(command: &mut Command, most: Duration) -> std::process::Output {
     let ended = Arc::new(AtomicBool::new(false));
     let watch = {
         let ended = ended.clone();
-        std::thread::spawn(move || {
+        tcsos::thread::spawn(move || {
             let deadline = Instant::now() + most;
             while Instant::now() < deadline {
                 if ended.load(Ordering::SeqCst) {
                     return;
                 }
-                std::thread::sleep(Duration::from_millis(100));
+                tcsos::thread::sleep(Duration::from_millis(100));
             }
             // The child this test started, which has not been waited for,
             // so its id is still its own.
@@ -430,7 +430,7 @@ fn a_c_ground_station_takes_the_datum_apart() {
     let done = Arc::new(AtomicBool::new(false));
     let sensors = {
         let done = done.clone();
-        std::thread::spawn(move || {
+        tcsos::thread::spawn(move || {
             let sensors = bound();
             let at = |port: u16| -> SocketAddr {
                 format!("127.0.0.1:{port}").parse().expect("an address")
@@ -444,7 +444,7 @@ fn a_c_ground_station_takes_the_datum_apart() {
                 for (at, reading) in &readings {
                     sensors.send_to(reading, at).expect("sent");
                 }
-                std::thread::sleep(Duration::from_millis(200));
+                tcsos::thread::sleep(Duration::from_millis(200));
             }
         })
     };

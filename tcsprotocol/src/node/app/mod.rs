@@ -328,7 +328,7 @@ impl AppParams {
     ///
     /// What [`expanded`] refuses, naming the node.
     pub fn executable_path(&self) -> Result<PathBuf, String> {
-        let home = std::env::var("HOME").ok();
+        let home = tcsos::env::var("HOME").ok();
         expanded(&self.executable, home.as_deref())
             .map(PathBuf::from)
             .map_err(|why| format!("\"{}\": executable: {why}", self.name))
@@ -935,7 +935,7 @@ mod tests {
 
         // And expanded against the home of this process, which aboard the
         // vehicle is the one the program will be run from.
-        match std::env::var("HOME") {
+        match tcsos::env::var("HOME") {
             Ok(home) if !home.is_empty() => assert_eq!(
                 params.executable_path().expect("a home"),
                 PathBuf::from(format!("{home}/libexec/tcs/bay-2"))

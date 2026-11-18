@@ -1647,7 +1647,7 @@ pub(crate) mod tests {
                 .expect("the outline reads");
         // LANDER_ZOOM draws a display a tenth the size, for the lander's
         // figure to be seen.
-        let zoom = std::env::var("LANDER_ZOOM").is_ok();
+        let zoom = tcsos::env::var("LANDER_ZOOM").is_ok();
         let scale = if zoom { 0.1 } else { 1.0 };
         let f = Resolved {
             width: 1000.0 * scale,
@@ -1710,7 +1710,7 @@ pub(crate) mod tests {
         ));
         let size = window.window().size();
         let picture = window.window().take_snapshot().expect("drawn");
-        let path = std::env::var("LANDER_SHOT").expect("LANDER_SHOT");
+        let path = tcsos::env::var("LANDER_SHOT").expect("LANDER_SHOT");
         let file = tcsos::fs::File::create(&path).expect("the file");
         let mut png = png::Encoder::new(file, size.width, size.height);
         png.set_color(png::ColorType::Rgba);

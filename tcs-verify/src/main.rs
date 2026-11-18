@@ -246,7 +246,7 @@ fn main() -> ExitCode {
     let mut fprime_model: Option<PathBuf> = None;
     let mut built: Vec<&str> =
         tcsprotocol::graph::built::OPTIONAL_TYPES.to_vec();
-    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let args: Vec<_> = tcsos::env::args_os().skip(1).collect();
     if args.iter().any(|arg| arg == INTERFACE_DIGEST_FLAG) {
         if args.len() != 1 {
             eprintln!(

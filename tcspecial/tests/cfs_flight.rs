@@ -73,7 +73,7 @@ const TO_LAB_ADDRESS_BYTES: usize = 16;
 /// Where the variable is not set, which is this being run by hand without
 /// the harness.
 fn given(name: &str) -> PathBuf {
-    PathBuf::from(std::env::var_os(name).unwrap_or_else(|| {
+    PathBuf::from(tcsos::env::var_os(name).unwrap_or_else(|| {
         panic!("{name} is not set: run this through make cfs-test")
     }))
 }

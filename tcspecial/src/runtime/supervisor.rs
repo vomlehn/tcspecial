@@ -86,7 +86,7 @@ const LOOK: Duration = Duration::from_millis(200);
 ///
 /// Whether [`CHILD_VAR`] is set.
 pub fn is_child() -> bool {
-    std::env::var_os(CHILD_VAR).is_some()
+    tcsos::env::var_os(CHILD_VAR).is_some()
 }
 
 /// Makes this child end when its supervisor does, so that no child runs
@@ -95,7 +95,7 @@ pub fn is_child() -> bool {
 ///
 /// The first thing a child does.
 pub fn child_follows_supervisor() {
-    let supervisor = std::env::var(CHILD_VAR)
+    let supervisor = tcsos::env::var(CHILD_VAR)
         .ok()
         .and_then(|said| said.parse::<u32>().ok());
     if !tcsos::child::follow_parent(supervisor) {

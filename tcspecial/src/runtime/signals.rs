@@ -167,7 +167,7 @@ mod tests {
     /// and exits as for a restart. It must die of the SIGTERM.
     #[test]
     fn a_stop_after_the_look_is_not_lost() {
-        if std::env::var_os(CHILD).is_some() {
+        if tcsos::env::var_os(CHILD).is_some() {
             start(nothing);
             assert!(!before_exec(), "no stop has been asked for yet");
             tcsos::signals::terminate_this_thread();
@@ -176,11 +176,12 @@ mod tests {
         let name =
             concat!(module_path!(), "::a_stop_after_the_look_is_not_lost");
         let name = name.split_once("::").map(|(_, rest)| rest).unwrap_or(name);
-        let status = Command::new(std::env::current_exe().expect("this test"))
-            .args(["--exact", name, "--test-threads=1", "--nocapture"])
-            .env(CHILD, "1")
-            .status()
-            .expect("the copy runs");
+        let status =
+            Command::new(tcsos::env::current_exe().expect("this test"))
+                .args(["--exact", name, "--test-threads=1", "--nocapture"])
+                .env(CHILD, "1")
+                .status()
+                .expect("the copy runs");
         assert_eq!(
             tcsos::process::ended_by(&status),
             Some(tcsos::signals::TERMINATE),

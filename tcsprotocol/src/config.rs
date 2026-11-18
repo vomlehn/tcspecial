@@ -111,7 +111,7 @@ pub fn payload_path_from_args<I: Iterator<Item = String>>(
     }
 
     Ok(var
-        .and_then(|var| std::env::var(var).ok())
+        .and_then(|var| tcsos::env::var(var).ok())
         .unwrap_or_else(|| DEFAULT_PAYLOAD_CONFIG_PATH.to_string()))
 }
 
@@ -240,7 +240,7 @@ mod tests {
         // The argument is the unambiguous one: a variable set for one program
         // reaches the subprocesses it starts, and an argument does not.
         let var = "TCS_TEST_PAYLOAD_PATH_PRECEDENCE";
-        std::env::set_var(var, "from_the_environment.ytcs");
+        tcsos::env::set_var(var, "from_the_environment.ytcs");
 
         assert_eq!(
             payload_path_from_args(
@@ -256,7 +256,7 @@ mod tests {
             "from_the_environment.ytcs"
         );
 
-        std::env::remove_var(var);
+        tcsos::env::remove_var(var);
     }
 
     #[test]

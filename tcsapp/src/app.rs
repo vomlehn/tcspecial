@@ -439,7 +439,7 @@ impl AppAllPl {
 /// `N` of them.
 fn told<const N: usize>(expects: [&str; N]) -> Result<[String; N], String> {
     let mut said: Vec<String> = Vec::with_capacity(N);
-    for (at, argument) in std::env::args_os().enumerate().skip(1) {
+    for (at, argument) in tcsos::env::args_os().enumerate().skip(1) {
         said.push(argument.into_string().map_err(|_| {
             format!(
                 "argument {at} is not text: every argument an app is given is \

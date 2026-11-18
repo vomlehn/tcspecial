@@ -511,7 +511,7 @@ mod tests {
     ///
     /// The path, which nothing has made yet.
     fn a_path(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!(
+        tcsos::env::temp_dir().join(format!(
             "tcs-sim-unix-{name}-{}-{:?}",
             tcsos::process::id(),
             tcsos::thread::current().id()

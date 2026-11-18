@@ -20,7 +20,7 @@ use tcsos::process::ExitCode;
 /// name exactly one file, and failure for a file that cannot be deleted,
 /// each said on stderr.
 fn main() -> ExitCode {
-    let mut args = std::env::args_os().skip(1);
+    let mut args = tcsos::env::args_os().skip(1);
     let (Some(file), None) = (args.next(), args.next()) else {
         eprintln!("segsend: give it one file, the filled segment to send");
         return ExitCode::from(2);

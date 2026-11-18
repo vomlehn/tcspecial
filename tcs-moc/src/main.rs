@@ -3,7 +3,7 @@
 //! A GUI application for testing and visualizing tcspecial operation.
 
 use slint::{LogicalSize, Model, ModelRc, SharedString, VecModel};
-use std::env;
+use tcsos::env;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};

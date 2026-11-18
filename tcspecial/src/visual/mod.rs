@@ -624,7 +624,7 @@ fn draw_physics(
     window.set_physics_width(dividers.physics as f32);
     window.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
 
-    let sim = std::env::var("PAYLOAD_SIM_YAML")
+    let sim = tcsos::env::var("PAYLOAD_SIM_YAML")
         .ok()
         .filter(|named| !named.is_empty())
         .or_else(|| tcsprotocol::config::sim_path_beside(path));

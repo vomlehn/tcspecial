@@ -5,6 +5,8 @@
 //! manages communication between ground operations and payloads.
 
 pub mod beacon_send;
+// What the binary is: see command_line::main.
+pub mod command_line;
 pub mod config;
 pub mod endpoint;
 pub mod exclusive;

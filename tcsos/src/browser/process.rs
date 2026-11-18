@@ -39,7 +39,8 @@ fn programs() -> &'static Mutex<BTreeMap<String, Entry>> {
 
 /// Registers a program the page can start, under the name its file would
 /// have: `tcspecial`, `tcs-sim`. A path whose last part is the name starts
-/// it, wherever the path says it is.
+/// it, wherever the path says it is, and an empty file is put at `/bin/`
+/// and its name, where [`crate::browser::env::current_exe`] says it is.
 ///
 /// # Arguments
 ///
@@ -49,6 +50,13 @@ pub fn register(name: &str, entry: Entry) {
     if let Ok(mut programs) = programs().lock() {
         programs.insert(name.to_string(), entry);
     }
+    // A file where the program would be, as installing it puts one: what
+    // looks for a program before running it finds it there.
+    crate::browser::fs::preload(&format!("/bin/{name}"), b"");
+    let _ = crate::browser::fs::set_mode(
+        std::path::Path::new(&format!("/bin/{name}")),
+        0o755,
+    );
 }
 
 /// The program a path names, by its last part.
@@ -403,13 +411,14 @@ impl Command {
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default();
         let handle = Builder::new().name(name).spawn(move || {
-            context::enter(started, true);
-            run(entry, args)
+            context::enter(started.clone(), true);
+            let code = entry(args);
+            started.end(code);
+            code
         })?;
         Ok(Child {
             program,
-            handle: Arc::new(Mutex::new(Some(handle))),
-            ended: Arc::new(Mutex::new(None)),
+            _handle: Arc::new(Mutex::new(Some(handle))),
         })
     }
 
@@ -445,33 +454,13 @@ impl Command {
     }
 }
 
-/// Runs a program's entry point, turning an [`exit`] from inside it into
-/// what it ends with, as a process's exit would be.
-///
-/// # Arguments
-///
-/// * `entry` - The entry point.
-/// * `args`  - Its arguments.
-///
-/// # Returns
-///
-/// What it ended with: 101 where it panicked, as a process's panic does.
-fn run(entry: Entry, args: Vec<String>) -> i32 {
-    match std::panic::catch_unwind(move || entry(args)) {
-        Ok(code) => code,
-        Err(why) => why.downcast_ref::<Exited>().map_or(101, |exited| exited.0),
-    }
-}
-
 /// A program the page started, running or ended.
 #[derive(Debug, Clone)]
 pub struct Child {
     /// The program.
     program: Arc<Program>,
-    /// Its thread, until it is joined.
-    handle: Arc<Mutex<Option<JoinHandle<i32>>>>,
-    /// How it ended, once it has.
-    ended: Arc<Mutex<Option<ExitStatus>>>,
+    /// Its thread, kept so that the worker is not forgotten.
+    _handle: Arc<Mutex<Option<JoinHandle<i32>>>>,
 }
 
 impl Child {
@@ -504,19 +493,7 @@ impl Child {
     ///
     /// None.
     pub fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
-        if let Some(ended) = *self.ended.lock().expect("a status") {
-            return Ok(Some(ended));
-        }
-        let finished = self
-            .handle
-            .lock()
-            .expect("a handle")
-            .as_ref()
-            .is_some_and(|handle| handle.is_finished());
-        if finished {
-            return self.wait().map(Some);
-        }
-        Ok(None)
+        Ok(self.program.ended().map(ExitStatus))
     }
 
     /// Waits for it to end.
@@ -529,23 +506,14 @@ impl Child {
     ///
     /// None.
     pub fn wait(&mut self) -> io::Result<ExitStatus> {
-        if let Some(ended) = *self.ended.lock().expect("a status") {
-            return Ok(ended);
+        loop {
+            if let Some(code) = self.program.ended() {
+                return Ok(ExitStatus(code));
+            }
+            crate::browser::thread::sleep(std::time::Duration::from_millis(
+                10,
+            ));
         }
-        let handle = self.handle.lock().expect("a handle").take();
-        let status = match handle {
-            Some(handle) => ExitStatus(handle.join().unwrap_or(101)),
-            None => loop {
-                if let Some(ended) = *self.ended.lock().expect("a status") {
-                    break ended;
-                }
-                crate::browser::thread::sleep(
-                    std::time::Duration::from_millis(10),
-                );
-            },
-        };
-        *self.ended.lock().expect("a status") = Some(status);
-        Ok(status)
     }
 
     /// Waits for it to end, keeping what it said: nothing, in a page.
@@ -575,19 +543,26 @@ pub fn id() -> u32 {
     context::current().id
 }
 
-/// What [`exit`] unwinds with, for [`run`] to turn into the program's
-/// status.
-#[derive(Debug, Clone, Copy)]
-pub struct Exited(pub i32);
-
-/// Ends the calling program: in a page, its thread, by unwinding to its
-/// entry point, which is the one way out of a thread from inside it.
+/// Ends the calling program, as far as anything that waits for it can
+/// tell: what it ended with is noted, and the thread that called this
+/// waits for ever. A page's WebAssembly cannot unwind -- a panic ends the
+/// page -- and nothing ends a thread but its returning, so this is the
+/// nearest there is; the program's other threads are its own to stop, as
+/// they are once a stopped program's loops see the stop.
 ///
 /// # Arguments
 ///
 /// * `code` - What it ends with.
 pub fn exit(code: i32) -> ! {
-    std::panic::resume_unwind(Box::new(Exited(code)))
+    let program = context::current();
+    program.end(code);
+    if context::may_wait() {
+        loop {
+            crate::browser::thread::park();
+        }
+    }
+    // The page's own thread cannot wait, and cannot end without the page.
+    panic!("the page's own thread exited with {code}")
 }
 
 /// Ends the page's WebAssembly where it is.

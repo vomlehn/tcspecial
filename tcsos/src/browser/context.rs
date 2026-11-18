@@ -34,6 +34,31 @@ pub struct Program {
     pub slots: Mutex<[Option<TcpStream>; 3]>,
     /// The program that started it, nought for the page.
     pub parent: u32,
+    /// What it ended with, once it has.
+    pub ended: Mutex<Option<i32>>,
+}
+
+impl Program {
+    /// Notes that the program has ended, and with what: the first ending
+    /// is the one kept.
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - What it ended with.
+    pub fn end(&self, code: i32) {
+        if let Ok(mut ended) = self.ended.lock() {
+            ended.get_or_insert(code);
+        }
+    }
+
+    /// What the program ended with, where it has.
+    ///
+    /// # Returns
+    ///
+    /// The status, or `None` while it runs.
+    pub fn ended(&self) -> Option<i32> {
+        self.ended.lock().ok().and_then(|ended| *ended)
+    }
 }
 
 /// The next program's number. The page is 1.
@@ -52,6 +77,7 @@ fn page() -> &'static Arc<Program> {
             stop: AtomicBool::new(false),
             slots: Mutex::new([None, None, None]),
             parent: 0,
+            ended: Mutex::new(None),
         })
     })
 }
@@ -123,6 +149,7 @@ pub fn new_program(
         stop: AtomicBool::new(false),
         slots: Mutex::new([None, None, None]),
         parent: current().id,
+        ended: Mutex::new(None),
     });
     note(&program);
     program

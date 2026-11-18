@@ -486,7 +486,7 @@ mod tests {
     ///
     /// A path in the temporary directory; nothing is made there.
     fn a_path(name: &str) -> std::path::PathBuf {
-        std::env::temp_dir().join(format!(
+        tcsos::env::temp_dir().join(format!(
             "tcs-unix-{name}-{}-{:?}",
             tcsos::process::id(),
             tcsos::thread::current().id()

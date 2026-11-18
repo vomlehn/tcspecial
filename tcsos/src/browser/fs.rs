@@ -785,6 +785,13 @@ impl OpenOptions {
                 }
                 bytes
             }
+            // A directory, opened only to read, as Linux allows: what a
+            // program syncs a directory through. It has no bytes.
+            Some(Entry {
+                node: Node::Dir, ..
+            }) if !(self.write || self.append) => {
+                Arc::new(Mutex::new(Vec::new()))
+            }
             Some(_) => {
                 return Err(io::Error::from(io::ErrorKind::IsADirectory));
             }

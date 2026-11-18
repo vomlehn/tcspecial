@@ -302,7 +302,7 @@ fn the_datum_carries_defaults_then_readings() {
 ///
 /// If cargo cannot be run or the library does not build.
 fn tcsmoc_c_library() -> PathBuf {
-    let test = std::env::current_exe().expect("where this test is");
+    let test = tcsos::env::current_exe().expect("where this test is");
     let target = test
         .parent()
         .and_then(Path::parent)

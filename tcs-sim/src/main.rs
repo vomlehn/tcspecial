@@ -36,7 +36,7 @@
 
 use slint::{Model, ModelRc, SharedString, VecModel};
 use std::cell::Cell;
-use std::env;
+use tcsos::env;
 use std::path::Path;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -1748,7 +1748,7 @@ fn ask_for_the_top_right(ui: &MainWindow) {
                 i32::try_from(left).unwrap_or(0),
                 0,
             ));
-            if let Ok(path) = std::env::var(ROOM_FILE) {
+            if let Ok(path) = tcsos::env::var(ROOM_FILE) {
                 let room = f64::from(left) / f64::from(window.scale_factor());
                 if let Err(e) = tcsos::fs::write(&path, format!("{room:.0}\n"))
                 {

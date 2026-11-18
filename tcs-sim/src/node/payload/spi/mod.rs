@@ -140,7 +140,7 @@ mod tests {
     ///
     /// The path, which nothing has made yet.
     fn a_path() -> PathBuf {
-        std::env::temp_dir().join(format!(
+        tcsos::env::temp_dir().join(format!(
             "tcs-sim-spi-{}-{:?}",
             tcsos::process::id(),
             tcsos::thread::current().id()

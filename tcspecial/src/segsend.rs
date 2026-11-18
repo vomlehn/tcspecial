@@ -371,7 +371,7 @@ fn send_each(program: &CStr, shown: &str, waiting: Receiver<Name>) {
 /// What is wrong, said in the user's terms, where this program's own path
 /// cannot be found or `segsend` is not a program this process may run.
 pub fn beside_this_program() -> Result<PathBuf, String> {
-    let here = std::env::current_exe().map_err(|e| {
+    let here = tcsos::env::current_exe().map_err(|e| {
         format!("where tcspecial is cannot be found, to find {SEGSEND}: {e}")
     })?;
     let program = here.with_file_name(SEGSEND);
